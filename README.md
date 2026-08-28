@@ -26,7 +26,9 @@ clone → ./tools/bootstrap.sh → ./build.sh jellyjump     # that's the whole p
 | `.ci/` | Shared plumbing (SDK/Godot installers, preset patcher, APK verifier, CI matrix) |
 | `plugins/` | Shared Godot android plugins (currently: `unity_ads`) |
 | `projects/<game>/` | One self-contained Godot project per game |
-| `docs/` | SETUP · ADDING_A_GAME · ASSETS · ADS · CI |
+| `docs/` | General guides: SETUP · ADDING_A_GAME · ASSETS · ADS · CI · AGENTS |
+| `docs/AGENTS.md` | Operating manual for AI agents / returning sessions |
+| `WORKLOG.md` | Append-only task journal — what was done and why |
 
 ## Current projects
 
@@ -47,6 +49,19 @@ Ubuntu (24.04 tested) with `curl unzip zip jq python3` — then:
 
 Details & troubleshooting: [docs/SETUP.md](docs/SETUP.md)
 
+## Returning to this repo (AI agents included)
+
+One obvious step, then real work:
+
+```bash
+git pull && ./tools/bootstrap.sh && ./tools/test.sh jellyjump
+```
+
+Then read [WORKLOG.md](WORKLOG.md) (what happened last) and
+[docs/AGENTS.md](docs/AGENTS.md) (how everything works: ads IDs, build,
+commit/push/CI conventions, sandbox recovery). Agent sessions: append your
+entry to WORKLOG.md with your change.
+
 ## CI
 
 `.github/workflows/build-android.yml`:
@@ -65,9 +80,10 @@ Unity Ads is integrated as a shared, configurable plugin: each project ships a
 
 ## Assets
 
-All art/audio is CC0 (Kenney packs + in-repo generated SFX). Provenance,
-licenses and re-download instructions per project: `projects/<game>/assets.manifest.json`
-and [docs/ASSETS.md](docs/ASSETS.md).
+All art/audio is CC0 (Kenney packs + in-repo generated SFX). General policy,
+manifest schema and source catalogs: [docs/ASSETS.md](docs/ASSETS.md).
+Per-game provenance: `projects/<game>/assets.manifest.json` and
+`projects/<game>/docs/ASSETS.md`.
 
 ## Adding a new game
 

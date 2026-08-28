@@ -1,8 +1,21 @@
-# ASSETS — sources, licenses, re-fetching
+# ASSETS — policy, manifest, source catalogs (general)
 
 Every project carries an `assets.manifest.json` that documents **where each
 file came from, its license, and how to re-download it**. Assets are vendored
 (committed) so builds never depend on the network.
+
+This guide is **general** — any project in this repo. Which concrete packs
+each game actually uses is recorded next to the game:
+`projects/<game>/docs/ASSETS.md` (plus the machine-auditable
+`projects/<game>/assets.manifest.json`).
+
+## Policy
+
+- **CC0 only.** No attribution required, safe for commercial apps.
+- **Vendor everything** (commit the files); never hot-link at runtime.
+- Record every file in the project's `assets.manifest.json` (schema 2:
+  sources have `id`; `files` maps project-relative paths → `{source, origin}`).
+- Prefer sources with stable direct URLs.
 
 ## Re-download on a fresh machine
 
@@ -16,52 +29,41 @@ python3 tools/sync-assets.py jellyjump  # one project
 - OpenGameArt sources use direct file URLs.
 - Missing files are restored; existing files are never overwritten.
 
-## Verified sources (checked Aug 2026)
+## Source catalogs (reachable, checked Aug 2026)
 
-### Kenney (kenney.nl) — all CC0 1.0
+### Kenney — kenney.nl/assets
 
-| pack | page | used for |
-|---|---|---|
-| Interface Sounds | https://kenney.nl/assets/interface-sounds | UI click / confirm / error / buy |
-| Music Jingles | https://kenney.nl/assets/music-jingles | win + daily-reward jingles (8-Bit set) |
-| Digital Audio | https://kenney.nl/assets/digital-audio | spare arcade blips (not used yet) |
+Full catalog is CC0 1.0. Zips are page-scrapable (the sync tool handles the
+rotating URLs). Note: their catalog was restructured in 2025–2026 — some
+classic 2D packs (e.g. "Platformer Pack Redux") now live on OpenGameArt
+mirrors instead; check `projects/<game>/docs/ASSETS.md` for resolved links.
 
-Kenney's classic 2D platformer pack ("Platformer Pack Redux") lives on
-OpenGameArt as **Platformer Art Deluxe** (the kenney.nl catalog restructured
-in 2025-2026; the new "Platformer Kit" is 3D):
+### OpenGameArt — opengameart.org
 
-| pack | page | used for |
-|---|---|---|
-| Platformer Art Deluxe | https://opengameart.org/content/platformer-art-deluxe | aliens (p1/p2/p3), grass/stone/dirt tiles, coin, springboard, hills bg, HUD coin |
+Huge CC0/CC-BY catalog with direct file URLs. Watch the license per asset —
+not everything there is CC0; filter before vendoring.
 
-Direct zip: https://opengameart.org/sites/default/files/platformerGraphicsDeluxe_Updated.zip
+### Godot Asset Library — godotengine.org/asset-library
 
-### Godot Asset Library — plugins & templates (reach + fetch)
+Search + direct download (each asset page has a zip). Licenses vary per
+asset — verify license **and** Godot 4.x compatibility before vendoring.
+Proven add-ons for future games (MIT/CC0 unless noted): *Phantom Camera*
+(camera rigs), *Dialogue Manager*, *SimpleGrassTextured*.
 
-- https://godotengine.org/asset-library — search + direct download
-  (each asset page has a downloadable zip; licenses vary, check per asset).
-- Useful proven add-ons for future games (MIT/CC0 unless noted):
-  *Phantom Camera* (camera rigs), *Dialogue Manager*, *SimpleGrassTextured*.
-  Verify license + Godot 4.x compatibility before vendoring.
+### Audio
 
-### Other reachable sources
-
-- https://opengameart.org — huge CC0/CC-BY catalog, direct file URLs.
-- https://kenney.nl/assets — full CC0 catalog (page-scrapable zips).
-- https://freesound.org — CC0 filter available (needs account for some downloads).
+- https://freesound.org — CC0 filter available (account needed for some downloads).
 - https://pixabay.com/sound-effects — CC0-like license, direct downloads.
 
-> Rule of thumb for this repo: **CC0 only**, record everything in the
-> manifest, prefer sources with stable direct URLs, and vendor the files —
-> never hot-link at runtime.
+## Conventions
 
-## Project conventions
-
-- `projects/<g>/assets/sprites|audio/...` — vendored files.
-- `projects/<g>/assets.manifest.json` — the audit trail (schema 2: sources
-  have `id`; `files` map project-relative paths → `{source, origin}`).
-- Generated audio lives in `assets/audio/synth/` and is produced by
-  `projects/<g>/tools/gen_sfx.py` (numpy; deterministic output).
-- Icons: `icon.svg` is the master; `tools/rasterize_icons.gd` renders the
-  launcher PNGs referenced by the export presets (needs one
+- `projects/<game>/assets/sprites|audio/...` — vendored files.
+- `projects/<game>/assets.manifest.json` — the audit trail.
+- Generated audio (synth SFX) lives in `assets/audio/synth/` and must be
+  reproducible by a committed per-project script (see the game's
+  `tools/gen_sfx.py` pattern — deterministic output only).
+- Icons: `icon.svg` is the master; a per-project `tools/rasterize_icons.gd`
+  renders the launcher PNGs referenced by the export presets (needs one
   `godot --headless --import` first).
+- When you add a game-specific source (pack tables, resolved URLs), put it
+  in `projects/<game>/docs/ASSETS.md` — not here.

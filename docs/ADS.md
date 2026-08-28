@@ -3,6 +3,11 @@
 Monetization is a **shared plugin + per-project config**. Nothing ad-related
 is hardcoded inside game scenes.
 
+> Agent-facing playbook — real IDs, backend switching, re-enabling the
+> LevelPlay mediation backend, writing new plugins, SDK upgrade protocol:
+> **[AGENTS.md §4](AGENTS.md#4-ads-integration-playbook)**. This file is the
+> architecture reference.
+
 ## Architecture
 
 ```
