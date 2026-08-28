@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. version_code: arm64 gets base+2, armeabi-v7a gets base+1 (Play Store requires distinct, higher on the modern ABI). Ads backend = the single entry in use_plugins: 'unity_ads' (direct, works today) or 'levelplay' (mediation, needs dashboard App Key + ad unit ids - see docs/ADS.md). GDA_FORCE_PLUGINS env var overrides use_plugins per build without editing this file.",
+  "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. version_code: arm64 gets base+2, armeabi-v7a gets base+1 (Play Store requires distinct, higher on the modern ABI).",
   "projects": {
     "jellyjump": {
       "display_name": "Jelly Jump",
