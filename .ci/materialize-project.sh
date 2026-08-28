@@ -101,10 +101,6 @@ done
 
 # ---------------------------------------------------------------- 4. gradle plumbing
 gda_log "materialize[$KEY]: writing local.properties"
-# .gdignore -> Godot's asset scanner never enters android/build; otherwise it
-# generates *.import sidecars inside res/ and the Android resource merger
-# fails with 'file name must end with .xml or .png' (races per gradle run).
-touch "$PROJ/android/build/.gdignore"
 cat > "$PROJ/android/build/local.properties" <<EOF
 sdk.dir=$ANDROID_HOME
 EOF
