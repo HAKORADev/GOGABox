@@ -15,7 +15,7 @@ This file is about *operating* the repo: resuming, changing, shipping.
 cd godot-android-arsenal        # fresh sandbox? see §7 first
 git pull                        # fast-forward to latest main
 ./tools/bootstrap.sh            # idempotent: ~1 min warm, ~10 min cold
-./tools/test.sh jellyjump       # must end ALL PASS before anything else
+./tools/test.sh <game>          # jellyjump | candyrush - must end ALL PASS
 ```
 
 Then, in order:
@@ -99,15 +99,15 @@ are staged in at build time from `plugins/<backend>/`, selected by
 
 **ACTIVE backend — Unity Ads direct** (`use_plugins: ["unity_ads"]`):
 
-| thing | value |
-|---|---|
-| Unity Game ID (Android) | `5770940` |
-| interstitial placement | `Interstitial_Android` |
-| rewarded placement | `Rewarded_Android` |
-| banner placement | `Banner_Android` |
-| package name | `com.zai.jellyjump` |
-| dashboard | Unity Publishing dashboard → Monetization → Placements |
-| config file | `projects/jellyjump/config/ads_config.json` |
+| thing | jellyjump | candyrush |
+|---|---|---|
+| Unity Game ID (Android) | `5770940` | **not yet created** — see its `ads_config.json` `_doc` |
+| interstitial placement | `Interstitial_Android` | `Interstitial_Android` |
+| rewarded placement | `Rewarded_Android` | `Rewarded_Android` |
+| banner placement | `Banner_Android` | `Banner_Android` |
+| package name | `com.zai.jellyjump` | `com.zai.candyrush` |
+| dashboard | Unity Publishing dashboard → Monetization → Projects (one project per game; the new game's entry must be created and its Game ID pasted into `projects/candyrush/config/ads_config.json` before release) | |
+| config file | `projects/jellyjump/config/ads_config.json` | `projects/candyrush/config/ads_config.json` |
 
 **LevelPlay mediation — built, verified, then rolled back (see §4.3):**
 

@@ -1,0 +1,14 @@
+{
+	"enabled": true,
+	"test_mode": true,
+	"game_id": "",
+	"_doc": "TODO before release: create this app in the Unity Dashboard (Monetization -> Projects) with package com.zai.candyrush, then paste its Android Game ID here. Empty id = plugin skips init gracefully (no ads on device, desktop simulation unaffected). test_mode MUST be false only after a real device test.",
+	"placements": {
+		"interstitial": "Interstitial_Android",
+		"rewarded": "Rewarded_Android",
+		"banner": "Banner_Android"
+	},
+	"interstitial_every_runs": 2,
+	"banner_height": 90,
+	"banner_enabled": true
+}

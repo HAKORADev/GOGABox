@@ -34,6 +34,7 @@ clone → ./tools/bootstrap.sh → ./build.sh jellyjump     # that's the whole p
 | project | status | ABIs | monetization |
 |---|---|---|---|
 | `jellyjump` | playable, CI-green | arm64-v8a, armeabi-v7a | Unity Ads: interstitial every 3 runs, rewarded revive + double coins, menu banner |
+| `candyrush` | playable, CI-green | arm64-v8a, armeabi-v7a | Unity Ads: interstitial every 2 levels, rewarded +5 moves / double coins, menu banner |
 
 ## Quickstart (local)
 
