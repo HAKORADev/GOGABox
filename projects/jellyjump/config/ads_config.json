@@ -1,13 +1,15 @@
 {
-	"enabled": true,
-	"test_mode": true,
-	"game_id": "5770940",
-	"placements": {
-		"interstitial": "Interstitial_Android",
-		"rewarded": "Rewarded_Android",
-		"banner": "Banner_Android"
-	},
-	"interstitial_every_runs": 3,
-	"banner_height": 90,
-	"banner_enabled": true
+        "backend": "levelplay",
+        "enabled": true,
+        "test_mode": true,
+        "app_key": "27d84b1ed",
+        "ad_units": {
+                "interstitial": "6j6die13bsc4f0n3",
+                "rewarded": "s6iuno9k7m9nx0sz",
+                "banner": "l7t8jl7rzxpuq0im",
+                "native": "jsyz6rjnru2nd61x"
+        },
+        "interstitial_every_runs": 3,
+        "banner_height": 90,
+        "banner_enabled": true
 }

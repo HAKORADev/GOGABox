@@ -16,7 +16,7 @@ config/icon="res://icon.svg"
 
 GameState="*res://game/singletons/state.gd"
 Sfx="*res://game/singletons/sfx.gd"
-Ads="*res://addons/unity_ads/ads.gd"
+Ads="*res://addons/levelplay/ads.gd"
 
 [display]
 
