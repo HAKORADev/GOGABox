@@ -39,6 +39,25 @@
         "unity_ads"
       ],
       "ads_config": "config/ads_config.json"
+    },
+    "gogabox": {
+      "display_name": "GOGABox",
+      "path": "projects/gogabox",
+      "enabled": true,
+      "ci_auto": true,
+      "apk_name": "GOGABox",
+      "package": "com.zai.gogabox",
+      "version_name": "0.0.1",
+      "version_code_base": 30010,
+      "aab": false,
+      "abi_presets": {
+        "arm64-v8a": "Android arm64",
+        "armeabi-v7a": "Android arm32"
+      },
+      "use_plugins": [
+        "unity_ads"
+      ],
+      "ads_config": "config/ads_config.json"
     }
   }
 }
