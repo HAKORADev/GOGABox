@@ -1,0 +1,42 @@
+name: env-check
+# Fast sanity check of the build environment without building anything.
+# Useful after bumping config/environment.lock or touching .ci scripts.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore toolchain cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/jdk
+            .cache/android-sdk
+            .cache/godot
+          key: toolchain-${{ runner.os }}-${{ hashFiles('config/environment.lock') }}
+
+      - name: Bootstrap toolchain
+        run: ./tools/bootstrap.sh
+
+      - name: Report tool versions
+        run: |
+          source .cache/env.sh
+          echo "### Toolchain versions" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "| component | version |"
+            echo "|---|---|"
+            echo "| Godot | $("$GODOT_BIN" --version) |"
+            echo "| Java | $("$JAVA_HOME/bin/java" -version 2>&1 | head -1) |"
+            echo "| Android platform | $(ls "$ANDROID_HOME/platforms") |"
+            echo "| Build tools | $(ls "$ANDROID_HOME/build-tools") |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"

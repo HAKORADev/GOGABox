@@ -1,0 +1,147 @@
+name: build-android
+# General "build this app" dispatcher.
+#
+# - push to main:            builds every project with ci_auto=true (all ABIs, release)
+# - manual run (Actions UI): pick project / ABI / build type, optionally publish a release
+#
+# The toolchain is pinned in config/environment.lock and shared with local
+# builds through the exact same scripts (.ci/*, tools/bootstrap.sh, build.sh).
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Project to build (key in config/projects.json)"
+        required: true
+        default: "jellyjump"
+        type: string
+      abi:
+        description: "ABI to build"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - arm64-v8a
+          - armeabi-v7a
+      build_type:
+        description: "Build type"
+        required: true
+        default: "release"
+        type: choice
+        options:
+          - release
+          - debug
+      create_release:
+        description: "Attach APKs to a GitHub release (tag v<version_name>)"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - "projects/**"
+      - "plugins/**"
+      - "config/**"
+      - ".ci/**"
+      - "tools/**"
+      - "build.sh"
+      - ".github/workflows/build-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build matrix
+        id: gen
+        run: |
+          matrix_json="$(bash .ci/ci-matrix.sh \
+            --event "${{ github.event_name }}" \
+            --project "${{ inputs.project || '' }}" \
+            --abi "${{ inputs.abi || 'all' }}" \
+            --build-type "${{ inputs.build_type || 'release' }}")"
+          echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
+          echo "Build plan: $matrix_json"
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore toolchain cache (JDK / Android SDK / Godot)
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/jdk
+            .cache/android-sdk
+            .cache/godot
+          key: toolchain-${{ runner.os }}-${{ hashFiles('config/environment.lock') }}
+
+      - name: Restore gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('projects/**/build.gradle', 'projects/**/config.gradle', 'projects/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Bootstrap toolchain (idempotent)
+        run: ./tools/bootstrap.sh
+
+      - name: Build ${{ matrix.project }} (${{ matrix.abi }}, ${{ matrix.build_type }})
+        run: ./build.sh "${{ matrix.project }}" --abi "${{ matrix.abi }}" --type "${{ matrix.build_type }}"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.project }}-${{ matrix.abi }}-${{ matrix.build_type }}
+          path: dist/${{ matrix.project }}/*.apk
+          if-no-files-found: error
+
+      - name: Append build summary
+        if: always()
+        run: |
+          if [ -f "dist/${{ matrix.project }}/BUILD_SUMMARY.md" ]; then
+            cat "dist/${{ matrix.project }}/BUILD_SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.create_release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.project }}-*
+          merge-multiple: true
+          path: dist
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(jq -r '.projects["${{ inputs.project }}"].version_name' config/projects.json)"
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --clobber
+          else
+            gh release create "$TAG" dist/*.apk --title "${{ inputs.project }} $TAG" --generate-notes
+          fi

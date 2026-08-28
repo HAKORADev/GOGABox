@@ -1,0 +1,13 @@
+{
+	"enabled": true,
+	"test_mode": true,
+	"game_id": "5770940",
+	"placements": {
+		"interstitial": "Interstitial_Android",
+		"rewarded": "Rewarded_Android",
+		"banner": "Banner_Android"
+	},
+	"interstitial_every_runs": 3,
+	"banner_height": 90,
+	"banner_enabled": true
+}

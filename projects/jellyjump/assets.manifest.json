@@ -1,0 +1,66 @@
+{
+	"schema": 2,
+	"project": "jellyjump",
+	"_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Run from repo root: python3 tools/sync-assets.py jellyjump. Assets are vendored (committed) - the manifest is the audit trail + re-download path.",
+	"sources": [
+		{
+			"id": "platformer-art-deluxe",
+			"name": "Kenney - Platformer Art Deluxe",
+			"url": "https://opengameart.org/content/platformer-art-deluxe",
+			"zip": "https://opengameart.org/sites/default/files/platformerGraphicsDeluxe_Updated.zip",
+			"license": "CC0 1.0 Universal",
+			"used_for": "player aliens, platform tiles, coin, springboard, hills background, HUD coin icon"
+		},
+		{
+			"id": "interface-sounds",
+			"name": "Kenney - Interface Sounds",
+			"url": "https://kenney.nl/assets/interface-sounds",
+			"license": "CC0 1.0 Universal",
+			"used_for": "UI clicks, confirmation, error, purchase sounds"
+		},
+		{
+			"id": "music-jingles",
+			"name": "Kenney - Music Jingles",
+			"url": "https://kenney.nl/assets/music-jingles",
+			"license": "CC0 1.0 Universal",
+			"used_for": "win jingle (NES00), daily reward jingle (NES12)"
+		}
+	],
+	"files": {
+		"assets/sprites/player_mint_stand.png": {"source": "platformer-art-deluxe", "origin": "Player/p1_stand.png"},
+		"assets/sprites/player_mint_jump.png": {"source": "platformer-art-deluxe", "origin": "Player/p1_jump.png"},
+		"assets/sprites/player_mint_hurt.png": {"source": "platformer-art-deluxe", "origin": "Player/p1_hurt.png"},
+		"assets/sprites/player_sky_stand.png": {"source": "platformer-art-deluxe", "origin": "Player/p2_stand.png"},
+		"assets/sprites/player_sky_jump.png": {"source": "platformer-art-deluxe", "origin": "Player/p2_jump.png"},
+		"assets/sprites/player_sky_hurt.png": {"source": "platformer-art-deluxe", "origin": "Player/p2_hurt.png"},
+		"assets/sprites/player_bubblegum_stand.png": {"source": "platformer-art-deluxe", "origin": "Player/p3_stand.png"},
+		"assets/sprites/player_bubblegum_jump.png": {"source": "platformer-art-deluxe", "origin": "Player/p3_jump.png"},
+		"assets/sprites/player_bubblegum_hurt.png": {"source": "platformer-art-deluxe", "origin": "Player/p3_hurt.png"},
+		"assets/sprites/plat_grass_left.png": {"source": "platformer-art-deluxe", "origin": "Tiles/grassHalfLeft.png"},
+		"assets/sprites/plat_grass_mid.png": {"source": "platformer-art-deluxe", "origin": "Tiles/grassHalfMid.png"},
+		"assets/sprites/plat_grass_right.png": {"source": "platformer-art-deluxe", "origin": "Tiles/grassHalfRight.png"},
+		"assets/sprites/plat_stone_left.png": {"source": "platformer-art-deluxe", "origin": "Tiles/stoneHalfLeft.png"},
+		"assets/sprites/plat_stone_mid.png": {"source": "platformer-art-deluxe", "origin": "Tiles/stoneHalfMid.png"},
+		"assets/sprites/plat_stone_right.png": {"source": "platformer-art-deluxe", "origin": "Tiles/stoneHalfRight.png"},
+		"assets/sprites/plat_dirt_left.png": {"source": "platformer-art-deluxe", "origin": "Tiles/dirtHalfLeft.png"},
+		"assets/sprites/plat_dirt_mid.png": {"source": "platformer-art-deluxe", "origin": "Tiles/dirtHalfMid.png"},
+		"assets/sprites/plat_dirt_right.png": {"source": "platformer-art-deluxe", "origin": "Tiles/dirtHalfRight.png"},
+		"assets/sprites/coin.png": {"source": "platformer-art-deluxe", "origin": "Items/coinGold.png"},
+		"assets/sprites/spring_up.png": {"source": "platformer-art-deluxe", "origin": "Items/springboardUp.png"},
+		"assets/sprites/spring_down.png": {"source": "platformer-art-deluxe", "origin": "Items/springboardDown.png"},
+		"assets/sprites/bg_hills.png": {"source": "platformer-art-deluxe", "origin": "bg.png"},
+		"assets/sprites/hud_coin.png": {"source": "platformer-art-deluxe", "origin": "HUD/hud_coins.png"},
+		"assets/audio/ui/click.ogg": {"source": "interface-sounds", "origin": "Audio/click_001.ogg"},
+		"assets/audio/ui/confirm.ogg": {"source": "interface-sounds", "origin": "Audio/confirmation_001.ogg"},
+		"assets/audio/ui/error.ogg": {"source": "interface-sounds", "origin": "Audio/error_004.ogg"},
+		"assets/audio/ui/buy.ogg": {"source": "interface-sounds", "origin": "Audio/maximize_001.ogg"},
+		"assets/audio/jingles/win.ogg": {"source": "music-jingles", "origin": "Audio/8-Bit jingles/jingles_NES00.ogg"},
+		"assets/audio/jingles/daily.ogg": {"source": "music-jingles", "origin": "Audio/8-Bit jingles/jingles_NES12.ogg"},
+		"assets/audio/synth/jump.wav": {"source": "generated", "tool": "tools/gen_sfx.py"},
+		"assets/audio/synth/coin.wav": {"source": "generated", "tool": "tools/gen_sfx.py"},
+		"assets/audio/synth/spring.wav": {"source": "generated", "tool": "tools/gen_sfx.py"},
+		"assets/audio/synth/crumble.wav": {"source": "generated", "tool": "tools/gen_sfx.py"},
+		"assets/audio/synth/gameover.wav": {"source": "generated", "tool": "tools/gen_sfx.py"},
+		"icon.svg": {"source": "original", "origin": "hand-drawn SVG in this repo"}
+	}
+}
