@@ -1,7 +1,15 @@
 {
-	"addon_dir": "unity_ads",
-	"android_sdk": "com.unity3d.ads:unity-ads:4.20.0",
-	"gradle_deps": ["com.unity3d.ads:unity-ads:4.20.0"],
-	"godot_plugin_version": 1,
-	"description": "Unity Ads bridge plugin (v1 GodotPlugin) - interstitial, rewarded, banner. Java source staged into <project>/android/build/src/main/java; gradle deps injected into build.gradle."
+        "addon_dir": "unity_ads",
+        "android_sdk": "com.unity3d.ads:unity-ads:4.20.0",
+        "gradle_deps": ["com.unity3d.ads:unity-ads:4.20.0"],
+        "manifest_meta": {
+                "name": "org.godotengine.plugin.v1.UnityAds",
+                "value": "org.godotengine.plugin.unityads.UnityAdsPlugin"
+        },
+        "autoload": {
+                "name": "Ads",
+                "script": "res://addons/unity_ads/ads.gd"
+        },
+        "godot_plugin_version": 1,
+        "description": "Unity Ads DIRECT bridge plugin (v1 GodotPlugin) - single network, no mediation. Interstitial, rewarded, banner. Java source staged into <project>/android/build/src/main/java; gradle deps injected into build.gradle. For multi-network mediation use the 'levelplay' plugin instead."
 }

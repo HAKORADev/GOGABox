@@ -1,0 +1,14 @@
+{
+        "backend": "levelplay",
+        "enabled": true,
+        "test_mode": true,
+        "app_key": "PASTE_LEVELPLAY_APP_KEY",
+        "ad_units": {
+                "interstitial": "PASTE_INTERSTITIAL_AD_UNIT_ID",
+                "rewarded": "PASTE_REWARDED_AD_UNIT_ID",
+                "banner": "PASTE_BANNER_AD_UNIT_ID"
+        },
+        "interstitial_every_runs": 3,
+        "banner_height": 90,
+        "banner_enabled": true
+}

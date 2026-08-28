@@ -5,7 +5,10 @@
     android:versionName="1.0"
     android:installLocation="auto" >
 
-    <!-- JellyJump overlay: portrait + network permissions + Unity Ads plugin registration -->
+    <!-- JellyJump overlay: portrait + network permissions.
+         Ad plugin registration (meta-data) is injected per backend by
+         .ci/materialize-project.sh from plugins/<backend>/plugin.meta.json,
+         so switching unity_ads <-> levelplay never touches this file. -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -33,11 +36,6 @@
             android:shell="true"
             android:enabled="true"
             tools:targetApi="29" />
-
-        <!-- Unity Ads v1 plugin registration (value = GodotPlugin subclass) -->
-        <meta-data
-            android:name="org.godotengine.plugin.v1.UnityAds"
-            android:value="org.godotengine.plugin.unityads.UnityAdsPlugin" />
 
         <activity
             android:name=".GodotApp"

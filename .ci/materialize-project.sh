@@ -47,7 +47,14 @@ cp -a "$PROJ/android-overlay/." "$PROJ/android/build/"
 
 # ---------------------------------------------------------------- 3. shared plugins
 mkdir -p "$PROJ/addons"
-for plugin in $(gda_project '.use_plugins[]' "$KEY" 2>/dev/null); do
+# GDA_FORCE_PLUGINS="a,b" overrides the registry's use_plugins (backend A/B
+# testing without editing config; CI uses it to compile-verify every backend).
+PLUGIN_LIST="$(gda_project '.use_plugins[]' "$KEY" 2>/dev/null || true)"
+if [ -n "${GDA_FORCE_PLUGINS:-}" ]; then
+  PLUGIN_LIST="${GDA_FORCE_PLUGINS//,/ }"
+  gda_log "materialize[$KEY]: GDA_FORCE_PLUGINS override -> $PLUGIN_LIST"
+fi
+for plugin in $PLUGIN_LIST; do
   PDIR="$GDA_ROOT/plugins/$plugin"
   [ -d "$PDIR" ] || gda_die "plugin '$plugin' not found in plugins/"
   ADDON_DIR="$(jq -r '.addon_dir' "$PDIR/plugin.meta.json")"
@@ -66,6 +73,25 @@ for plugin in $(gda_project '.use_plugins[]' "$KEY" 2>/dev/null); do
       gda_log "materialize[$KEY]: injected gradle dep: $dep"
     fi
   done
+  # plugin manifest meta-data (v1 plugin registration) -> AndroidManifest.xml
+  META_NAME="$(jq -r '.manifest_meta.name // empty' "$PDIR/plugin.meta.json")"
+  if [ -n "$META_NAME" ]; then
+    META_VALUE="$(jq -r '.manifest_meta.value' "$PDIR/plugin.meta.json")"
+    MANIFEST="$PROJ/android/build/src/main/AndroidManifest.xml"
+    [ -f "$MANIFEST" ] || gda_die "manifest not found: $MANIFEST"
+    python3 "$GDA_ROOT/.ci/inject-manifest-meta.py" "$MANIFEST" "$META_NAME" "$META_VALUE"
+  fi
+  # autoload re-point (e.g. 'Ads' -> the staged backend's addon script)
+  AUTOLOAD_NAME="$(jq -r '.autoload.name // empty' "$PDIR/plugin.meta.json")"
+  AUTOLOAD_SCRIPT="$(jq -r '.autoload.script // empty' "$PDIR/plugin.meta.json")"
+  if [ -n "$AUTOLOAD_NAME" ] && [ -n "$AUTOLOAD_SCRIPT" ]; then
+    if grep -qE "^${AUTOLOAD_NAME}=" "$PROJ/project.godot"; then
+      sed -i "s|^${AUTOLOAD_NAME}=\"\*.*\"|${AUTOLOAD_NAME}=\"*${AUTOLOAD_SCRIPT}\"|" "$PROJ/project.godot"
+      gda_log "materialize[$KEY]: autoload '$AUTOLOAD_NAME' -> $AUTOLOAD_SCRIPT"
+    else
+      gda_die "project.godot has no autoload '$AUTOLOAD_NAME' (required by plugin '$plugin')"
+    fi
+  fi
   # per-project ads config injected into the addon (runtime reads res://addons/<dir>/ads_config.json)
   CFG_REL="$(gda_project '.ads_config' "$KEY")"
   if [ -n "$CFG_REL" ] && [ -f "$PROJ/$CFG_REL" ]; then
