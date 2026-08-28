@@ -20,13 +20,12 @@ git pull                        # fast-forward to latest main
 
 Then, in order:
 
-1. Read **WORKLOG.md** (repo root). The last entries tell you what was done,
-   what was left pending and which decisions are already made. Do not
-   re-decide settled things.
+1. Skim `git log --oneline -15` — commit subjects (`<area>: summary`) tell
+   you what landed last. The repo has no in-repo journal by design (see §8).
 2. Check CI is green: `./tools/ci.sh` (or the Actions tab).
 3. Do the task — §4 for ads, §5 for build, §6 for shipping.
-4. **Append what you did to WORKLOG.md** (template inside) in the same
-   commit as your change. An undocumented change is half-done work.
+4. **Log your session in the sandbox-level journal** (outside the repo,
+   §8). An undocumented change is half-done work.
 
 ## 1. What this repo is (and is not)
 
@@ -242,19 +241,24 @@ Notes:
 - GitHub PAT (push + CI API): kept **outside** the repo; if missing, ask the
   user. `tools/ci.sh` accepts `GITHUB_TOKEN` or `$HOME/.arsenal-gh-token`;
   read-only public access works without one (rate limits apply).
-- Two worklogs exist: the durable one is **`WORKLOG.md` in this repo**
-  (survives wipes — always write it); the sandbox-local one is
-  `/home/z/my-project/worklog.md` (may vanish; mirror to it when present).
+- Session journal lives **outside the repo** (user preference):
+  `/home/z/my-project/worklog.md`. Write entries there, never commit a
+  journal file into the repo. Since it can be lost with a sandbox wipe,
+  the durable memory is this manual + clean commit messages.
 - Builds are validated on 4 GB RAM; keep `org.gradle.jvmargs=-Xmx2048m`
   (already set in the overlay).
 
-## 8. WORKLOG protocol (how "one obvious step" stays possible)
+## 8. Session journal (outside the repo)
 
-Append-only, newest at the bottom, template at the top of `WORKLOG.md`.
-One entry per task session: what was asked → what was done (commits, runs,
-versions) → what is pending or broken → decisions taken. A future agent
-reading only your entry must be able to continue without re-deriving
-anything. Never delete or rewrite older entries.
+The task journal is **not part of the repo** (user preference — the repo
+ships products, not diary entries). It lives in the sandbox at
+`/home/z/my-project/worklog.md`: append-only, newest at the bottom, one
+entry per session — what was asked → what was done (commits, runs,
+versions) → what is pending → decisions taken.
+
+Because that file can vanish with a sandbox wipe, keep the durable record
+in the repo itself: accurate AGENTS.md sections and descriptive commit
+subjects (`git log` is the real history).
 
 ## 9. Doc index
 
@@ -266,4 +270,4 @@ anything. Never delete or rewrite older entries.
 | assets policy, manifest, source catalogs | docs/ASSETS.md (general) |
 | which assets *this* game uses | projects/<g>/docs/ASSETS.md |
 | CI, caching, releases, signing | docs/CI.md |
-| what happened so far, decisions made | WORKLOG.md |
+| what happened so far | `git log` + the sandbox session journal (§8) |

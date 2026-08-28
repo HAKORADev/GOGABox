@@ -28,7 +28,6 @@ clone → ./tools/bootstrap.sh → ./build.sh jellyjump     # that's the whole p
 | `projects/<game>/` | One self-contained Godot project per game |
 | `docs/` | General guides: SETUP · ADDING_A_GAME · ASSETS · ADS · CI · AGENTS |
 | `docs/AGENTS.md` | Operating manual for AI agents / returning sessions |
-| `WORKLOG.md` | Append-only task journal — what was done and why |
 
 ## Current projects
 
@@ -57,10 +56,10 @@ One obvious step, then real work:
 git pull && ./tools/bootstrap.sh && ./tools/test.sh jellyjump
 ```
 
-Then read [WORKLOG.md](WORKLOG.md) (what happened last) and
-[docs/AGENTS.md](docs/AGENTS.md) (how everything works: ads IDs, build,
-commit/push/CI conventions, sandbox recovery). Agent sessions: append your
-entry to WORKLOG.md with your change.
+Then read [docs/AGENTS.md](docs/AGENTS.md) — how everything works: ads IDs,
+build, commit/push/CI conventions, sandbox recovery. Agent sessions: keep
+the sandbox session journal up to date (AGENTS.md §8) — journals stay out
+of the repo.
 
 ## CI
 

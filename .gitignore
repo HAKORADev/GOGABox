@@ -23,6 +23,9 @@ projects/*/android/build/build/
 .ci/local.env
 *.keystore
 
+# ---- Session journal (user preference: stays out of the repo) ----
+WORKLOG.md
+
 # ---- OS / editor noise ----
 .DS_Store
 Thumbs.db

@@ -139,9 +139,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(jq -r '.projects["${{ inputs.project }}"].version_name' config/projects.json)"
-          TAG="v${VERSION}"
+          TAG="${{ inputs.project }}-v${VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
           else
-            gh release create "$TAG" dist/*.apk --title "${{ inputs.project }} $TAG" --generate-notes
+            gh release create "$TAG" dist/*.apk --title "$TAG" --generate-notes
           fi

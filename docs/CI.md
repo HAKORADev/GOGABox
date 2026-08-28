@@ -38,7 +38,9 @@ First uncached run ≈ 20–25 min per ABI; cached runs ≈ 8–12 min.
 ## Releases
 
 Manual dispatch with `create_release: true` attaches both ABIs to a GitHub
-release tagged `v<version_name>` from `config/projects.json`. Re-running with
+release tagged `<project>-v<version_name>` — project-scoped, so two games
+can both be at v1.0.0 without colliding (older global `v<version>` tags like
+`v1.0.0` remain from before this scheme). Re-running with
 the same version re-uploads (clobbers).
 
 ## Production signing on CI (optional, when ready)
