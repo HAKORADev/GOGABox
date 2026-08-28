@@ -311,6 +311,13 @@ func _t_scene() -> int:
         m3b.moves_left = 0
         m3b._after_action()
         ok += _check(m3b.over, "lose path ends level")
+        # regression: decorative panels must NOT eat touches (STOP) or the
+        # board freezes on device while buttons keep working
+        ok += _check(m3b.get("_board_layer") != null, "board layer exists")
+        for child in m3b.get_children():
+                if child is Panel:
+                        ok += _check(child.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                                "board frame panel must be MOUSE_FILTER_IGNORE")
         main.queue_free()
         await get_tree().process_frame
         return ok

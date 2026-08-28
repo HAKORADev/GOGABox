@@ -206,9 +206,11 @@ public class UnityAdsPlugin extends GodotPlugin {
         bannerHolder = new LinearLayout(activity);
         bannerHolder.setOrientation(LinearLayout.VERTICAL);
         bannerHolder.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        bannerHolder.setBackgroundColor(0xFF101418);
+        // transparent + wrap-content: only the 320x50dp standard banner shows,
+        // never a big dark slab across the bottom of the game.
+        bannerHolder.setBackgroundColor(0x00000000);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(90));
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(52));
         lp.gravity = Gravity.BOTTOM;
         root.addView(bannerHolder, lp);
         bannerHolder.setVisibility(View.GONE);

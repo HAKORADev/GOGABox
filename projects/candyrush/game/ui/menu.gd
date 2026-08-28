@@ -65,6 +65,7 @@ func _ready() -> void:
                 t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
                 t.size = Vector2(56, 56)
                 t.modulate.a = 0.85
+                t.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 _hud.add_child(t)
                 var tw := create_tween().set_loops()
                 tw.tween_property(t, "position:y", t.position.y - 18, 1.2 + 0.2 * i) \
@@ -72,16 +73,16 @@ func _ready() -> void:
                 tw.tween_property(t, "position:y", t.position.y, 1.2 + 0.2 * i) \
                                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-        # bottom bar: coins + toggles
+        # bottom bar: coins + toggles (kept above banner safe zone)
         var coins := Label.new()
         coins.text = "%d coins" % GameState.coins()
         coins.label_settings = tls.duplicate()
-        coins.position = Vector2(24, 1180)
+        coins.position = Vector2(24, 1140)
         _hud.add_child(coins)
         GameState.coins_changed.connect(func(total: int): coins.text = "%d coins" % total)
         var sfx_btn := Button.new()
         sfx_btn.text = "SFX ON" if GameState.data["sound"] else "SFX OFF"
-        sfx_btn.position = Vector2(300, 1170)
+        sfx_btn.position = Vector2(300, 1132)
         sfx_btn.size = Vector2(120, 60)
         sfx_btn.pressed.connect(func():
                 GameState.toggle_sound()
@@ -92,7 +93,7 @@ func _ready() -> void:
 
         var music_btn := Button.new()
         music_btn.text = "MUSIC ON" if GameState.data["music"] else "MUSIC OFF"
-        music_btn.position = Vector2(430, 1170)
+        music_btn.position = Vector2(430, 1132)
         music_btn.size = Vector2(150, 60)
         music_btn.pressed.connect(func():
                 GameState.toggle_music()

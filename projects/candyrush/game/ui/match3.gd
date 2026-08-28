@@ -64,6 +64,9 @@ func _build_board() -> void:
         frame.add_theme_stylebox_override("panel", sb)
         frame.position = BOARD_POS - Vector2(12, 12)
         frame.size = Vector2(CELL * 8 + 24, CELL * 8 + 24)
+        # CRITICAL: STOP would eat every touch over the board before it reaches
+        # _unhandled_input -> board feels frozen while buttons still work.
+        frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
         add_child(frame)
         move_child(frame, _board_layer.get_index())
 
@@ -99,8 +102,9 @@ func _build_hud() -> void:
         _hud = CanvasLayer.new()
         add_child(_hud)
 
-        _label("LEVEL %d" % level, Vector2(0, 18), 40, skin["text"], 720).horizontal_alignment \
-                        = HORIZONTAL_ALIGNMENT_CENTER
+        var lvl := _label("LEVEL %d" % level, Vector2(0, 18), 40, skin["text"], 720)
+        lvl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        lvl.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _coins_label = _label("%d" % GameState.coins(), Vector2(560, 22), 30, skin["text"])
         _coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
         _coins_label.size.x = 130
@@ -111,11 +115,13 @@ func _build_hud() -> void:
         coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         coin_icon.size = Vector2(40, 40)
+        coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _hud.add_child(coin_icon)
 
         _bar = ScoreBar.new()
         _bar.position = Vector2(24, 74)
         _bar.size = Vector2(672, 30)
+        _bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _hud.add_child(_bar)
 
         _moves_label = _label("MOVES %d" % moves_left, Vector2(0, 118), 44, skin["text"], 720)
@@ -129,8 +135,9 @@ func _build_hud() -> void:
         _combo_label.z_index = 50
 
         _button("II", Vector2(16, 14), Vector2(56, 56), func(): _pause())
-        _button("HINT", Vector2(24, 1176), Vector2(140, 64), func(): _hint())
-        _button("SKINS", Vector2(556, 1176), Vector2(140, 64), func(): _go_shop())
+        # bottom row sits above the banner safe zone (banner + gesture bar)
+        _button("HINT", Vector2(24, 1124), Vector2(140, 64), func(): _hint())
+        _button("SKINS", Vector2(556, 1124), Vector2(140, 64), func(): _go_shop())
         GameState.coins_changed.connect(func(total: int): _coins_label.text = str(total))
 
 func _label(txt: String, pos: Vector2, size_px: int, color: Color, width := 0.0) -> Label:
