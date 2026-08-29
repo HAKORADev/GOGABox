@@ -33,6 +33,11 @@ var _tappables: Array = []         # [{ctrl: Control, cb: Callable}]
 ## suspended so the overlay's controls (sliders, buttons) work normally.
 var input_locked := false
 
+## A scroll that lives INSIDE a game's own overlay (pause / game-over sheet).
+## Those run while GameHost.active_host != null - the guard below would mute
+## them, so they opt out with this flag.
+var game_safe := false
+
 func _init() -> void:
         horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -59,8 +64,9 @@ func _hit_tappable(pos: Vector2) -> bool:
 func _input(event: InputEvent) -> void:
         # a running game owns the whole screen: never scroll/fire tappables
         # behind it (belt & suspenders on top of menu.set_active(false) -
-        # this also covers signal-driven calls that slip past process_mode)
-        if GameHost.active_host != null:
+        # this also covers signal-driven calls that slip past process_mode).
+        # game_safe scrolls (inside the game's own sheets) are exempt.
+        if GameHost.active_host != null and not game_safe:
                 return
         if input_locked:
                 return

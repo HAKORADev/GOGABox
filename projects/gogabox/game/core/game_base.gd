@@ -24,6 +24,7 @@ var _coins_label: Label
 var _overlay_root: Control
 var _toast: Dictionary
 var _ach_clock := 0.0
+var _hud_buttons := 0      # collision-free HUD stacking (see add_hud_button)
 
 func _ready() -> void:
         tk = TouchKit.new()
@@ -151,9 +152,17 @@ func set_hud_score_prefix(prefix: String) -> void:
         _score_label.text = prefix + " " + str(score)
 
 ## Games with shops call this during _goga_setup() to get a HUD button.
+## BUTTON SAFETY SYSTEM (floating flavor): buttons stack side by side after
+## the back button instead of one fixed spot (two callers = overlap), and
+## clamp to the screen edge so nothing ever runs off-screen.
 func add_hud_button(txt: String, cb: Callable) -> void:
         var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85), cb)
-        b.position = Vector2(88, 16)
+        var vw := get_viewport_rect().size.x
+        var col := _hud_buttons % 5
+        var row := int(_hud_buttons / 5.0)
+        var x := minf(88.0 + float(col) * 104.0, maxf(88.0, vw - 104.0))
+        b.position = Vector2(x, 16.0 + float(row) * 64.0)
+        _hud_buttons += 1
         _hud.add_child(b)
 
 func _score_label_ref() -> Label:
@@ -185,6 +194,7 @@ func _pause_open() -> void:
         sheet.add_child(Arc.button("QUIT TO BOX", Vector2(460, 84), 26, Arc.BAD, func():
                 get_tree().paused = false
                 quit_to_box()))
+        Arc.fit_sheet(sheet, 2)     # RESUME + QUIT pinned, content clamped
 
 func _pause_close() -> void:
         get_tree().paused = false

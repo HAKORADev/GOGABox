@@ -217,3 +217,101 @@ static func confetti(parent: Control, at: Vector2, n := 26) -> void:
                 tw.tween_property(r, "rotation", r.rotation + randf() * 6.0, 0.9)
                 tw.tween_property(r, "modulate:a", 0.0, 0.35).set_delay(0.55)
                 tw.chain().tween_callback(r.queue_free)
+
+# ------------------------------------------------------- button safety system
+## Sheets must NEVER let their buttons overlap each other or run off the
+## screen (landscape pre-play and the game-over sheet both overflowed). One
+## smart pass fixes every sheet built through Arc.sheet():
+##   1. MEASURE the real content height after layout.
+##   2. If it exceeds the screen, wrap everything except the last `keep_tail`
+##      controls (the pinned action buttons) into a BoxScroll - so buttons
+##      move apart instead of colliding, and the tail stays reachable.
+##   3. Auto-register every wrapped Button as a BoxScroll tappable (BoxScroll
+##      owns taps inside scrolls - an unregistered button is the "refill
+##      hangs pressed forever" bug class).
+##   4. CLAMP the panel inside the screen edges for any rotation / aspect.
+static func fit_sheet(vb: VBoxContainer, keep_tail := 1) -> void:
+        var pc: PanelContainer = vb.get_parent() as PanelContainer
+        var cc: Control = (pc.get_parent() as Control) if pc != null else null
+        var root: Control = (cc.get_parent() as Control) if cc != null else null
+        if pc == null or cc == null or root == null:
+                return
+        for c in vb.get_children():
+                if c is BoxScroll:
+                        return      # already fitted - idempotent
+        await vb.get_tree().process_frame
+        if not is_instance_valid(vb) or not is_instance_valid(pc):
+                return
+        var avail := root.size
+        if avail.y < 200.0:
+                return
+        var avail_h := avail.y * 0.94
+        var avail_w := minf(620.0, avail.x - 24.0)
+        pc.custom_minimum_size = Vector2(avail_w, 0)
+        var sep := float(vb.get_theme_constant("separation"))
+        var margins := 60.0                    # panel_style(CARD, 30, 30)
+        var need := vb.get_combined_minimum_size().y + margins
+        if need <= avail_h:
+                return                         # fits - nothing to do
+        # sheets holding raw sliders stay untouched: BoxScroll would swallow
+        # the slider drags (native overflow is the lesser evil there)
+        for c in vb.get_children():
+                if _has_slider(c):
+                        return
+        var kids := vb.get_children()
+        var tail: Array = kids.slice(maxi(0, kids.size() - keep_tail))
+        var tail_h := 0.0
+        for c in tail:
+                if c is Control:
+                        tail_h += (c as Control).get_combined_minimum_size().y
+        var sc := BoxScroll.new()
+        sc.game_safe = true    # game-owned sheets run while the host is active
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.custom_minimum_size = Vector2(0,
+                        maxf(140.0, avail_h - margins - tail_h - sep * float(keep_tail + 1)))
+        var inner := VBoxContainer.new()
+        inner.add_theme_constant_override("separation", int(sep))
+        inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(inner)
+        vb.add_child(sc)
+        vb.move_child(sc, maxi(0, kids.size() - keep_tail))
+        for c in kids:
+                if c == sc or c in tail:
+                        continue
+                vb.remove_child(c)
+                inner.add_child(c)
+        for b in _buttons_in(sc):
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, _tap_emitter(b))
+
+## Replays a real press on a Button living inside a BoxScroll (raw emulated
+## mouse is swallowed there). Toggle buttons replay a toggle instead.
+static func _tap_emitter(btn: BaseButton) -> Callable:
+        return func():
+                if btn.toggle_mode:
+                        var now := not btn.button_pressed
+                        btn.set_pressed_no_signal(now)
+                        btn.toggled.emit(now)
+                else:
+                        btn.pressed.emit()
+
+static func _buttons_in(n: Node) -> Array:
+        var out: Array = []
+        var stack := [n]
+        while not stack.is_empty():
+                var cur: Node = stack.pop_back()
+                if cur is BaseButton:
+                        out.append(cur)
+                for c in cur.get_children():
+                        stack.append(c)
+        return out
+
+static func _has_slider(n: Node) -> bool:
+        var stack := [n]
+        while not stack.is_empty():
+                var cur: Node = stack.pop_back()
+                if cur is Slider or cur is SpinBox or cur is LineEdit or cur is TextEdit:
+                        return true
+                for c in cur.get_children():
+                        stack.append(c)
+        return false

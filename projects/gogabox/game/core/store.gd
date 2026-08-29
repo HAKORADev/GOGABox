@@ -170,14 +170,17 @@ func consume_round_batteries(id: String) -> bool:
         _sync_battery_notifications()
         return true
 
-## Emergency refill: pour from the global box pool into a game pool.
-## Returns the number of batteries transferred.
+## Emergency refill: pour from the global box bank into a game pool - ONE
+## ROUND worth per tap (owner rule). The game pool's capacity is a hard
+## ceiling (it can never grow past cap - no extra batteries), and the tap
+## never moves more than the box bank holds. Returns the number of batteries
+## transferred (0 = nothing to move).
 func refill_game_from_box(id: String) -> int:
         var b := game_battery(id)
         if b.is_empty():
                 return 0
-        var missing := int(b["cap"]) - int(b["count"])
-        var move := mini(missing, box_batteries())
+        var want := mini(int(b["per_round"]), int(b["cap"]) - int(b["count"]))
+        var move := mini(want, box_batteries())
         if move <= 0:
                 return 0
         data["game_batteries"][id]["count"] = int(b["count"]) + move

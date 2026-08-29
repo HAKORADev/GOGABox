@@ -289,6 +289,7 @@ func _open_batteries() -> void:
 
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _pool_timer_text(count: int, cap: int, step: int) -> String:
         if count >= cap:
@@ -658,6 +659,7 @@ func _open_quit_confirm() -> void:
                 get_tree().quit()))
         vb.add_child(Arc.button("STAY", Vector2(480, 80), 26, Arc.ACCENT,
                 func(): _close_sheet()))
+        Arc.fit_sheet(vb, 2)
 
 # ------------------------------------------------------------ search
 
@@ -691,6 +693,7 @@ func _open_search() -> void:
                 _filter_sub = ""
                 _close_sheet()
                 _refresh()))
+        Arc.fit_sheet(vb, 2)
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -785,6 +788,7 @@ func _open_help() -> void:
 
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 ## Thumbnail + name header line, description under (simple list, no stats).
 func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
@@ -888,6 +892,7 @@ func _open_guide(g: Dictionary) -> void:
                         func():
                                 _close_sheet()
                                 _open_help()))
+        Arc.fit_sheet(vb)
 
 # ---------------------------------------------------------------- sheets
 
@@ -943,6 +948,7 @@ func _open_settings() -> void:
         vb.add_child(note)
         vb.add_child(Arc.button("CLOSE", Vector2(480, 72), 26, Arc.ACCENT,
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _confirm_reset_all() -> void:
         _close_sheet()
@@ -964,6 +970,7 @@ func _confirm_reset_all() -> void:
                 _refresh()))
         vb.add_child(Arc.button("KEEP IT", Vector2(480, 80), 26, Arc.ACCENT,
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb, 2)
 
 func _volume_row(name_: String, value: float, on_change: Callable) -> Control:
         var row := VBoxContainer.new()
@@ -1052,9 +1059,15 @@ func _open_game_page(g: Dictionary) -> void:
                                         Vector2(240, 56), 17, Color("3f7fb0"), func():
                                 var moved := Box.refill_game_from_box(id)
                                 Jukebox.sfx("confirm" if moved > 0 else "error", -4.0)
-                                Arc.toast(_toast, "%d batteries moved from the box" % moved if moved > 0 else "box pool is empty")
+                                Arc.toast(_toast, "%d batteries moved (one round)" % moved if moved > 0 else "box pool is empty")
                                 _close_sheet()
                                 _open_game_page(g))
+                        # inside a BoxScroll the feed scroll OWNS taps: without
+                        # this the button captured a ghost press and hung
+                        # pressed forever while nothing fired (owner L)
+                        refill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        scroll.register_tappable(refill, func():
+                                refill.pressed.emit())
                         brow.add_child(refill)
         var win := Roadmap.window_text(id)
         if win != "":
@@ -1155,6 +1168,7 @@ func _open_game_page(g: Dictionary) -> void:
                 _confirm_reset(g))
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _confirm_reset(g: Dictionary) -> void:
         _close_sheet()
@@ -1172,6 +1186,7 @@ func _confirm_reset(g: Dictionary) -> void:
                 _refresh()))
         vb.add_child(Arc.button("KEEP IT", Vector2(480, 80), 26, Arc.ACCENT,
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb, 2)
 
 # ------------------------------------------------------------ unlock / gated / soon / mystery
 
@@ -1201,6 +1216,7 @@ func _open_unlock_page(g: Dictionary) -> void:
         vb.add_child(btn)
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _open_gated_page(g: Dictionary) -> void:
         if _sheet_open:
@@ -1218,6 +1234,7 @@ func _open_gated_page(g: Dictionary) -> void:
         vb.add_child(msg)
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _open_soon_page(g: Dictionary) -> void:
         if _sheet_open:
@@ -1231,6 +1248,7 @@ func _open_soon_page(g: Dictionary) -> void:
         vb.add_child(msg)
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 func _open_mystery_page(g: Dictionary) -> void:
         if _sheet_open:
@@ -1280,6 +1298,7 @@ func _open_mystery_page(g: Dictionary) -> void:
                                 vb.add_child(Arc.label("revealing...", 22, Arc.INK, false))
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
+        Arc.fit_sheet(vb)
 
 # ------------------------------------------------------------ trophies & stats
 

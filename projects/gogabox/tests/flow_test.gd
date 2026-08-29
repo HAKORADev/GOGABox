@@ -20,6 +20,7 @@ func _ready() -> void:
         fails += _test("games: all playable boot", await _t_all_games())
         fails += _test("menu: boots and lays out", await _t_menu())
         fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
+        fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)
 
@@ -116,9 +117,21 @@ func _t_batteries() -> int:
         Box.data["box_batteries"] = 30
         Box.data["game_batteries"]["rally"]["count"] = 1
         var moved := Box.refill_game_from_box("rally")
-        ok += _check(moved == 9 and int(Box.game_battery("rally")["count"]) == 10,
-                "refill moves 9 from box")
-        ok += _check(Box.box_batteries() == 21, "box pool drained to 21")
+        # OWNER RULE (v0.0.6): a tap refills ONE ROUND worth (per_round), never
+        # a full battery - the game pool's cap is a hard ceiling
+        ok += _check(moved == 2 and int(Box.game_battery("rally")["count"]) == 3,
+                "refill moves one round (2), pool 1->3")
+        ok += _check(Box.box_batteries() == 28, "box bank drained to 28")
+        moved = Box.refill_game_from_box("rally")
+        ok += _check(moved == 2 and int(Box.game_battery("rally")["count"]) == 5,
+                "second tap: another round, pool 3->5")
+        Box.data["game_batteries"]["rally"]["count"] = 9
+        moved = Box.refill_game_from_box("rally")
+        ok += _check(moved == 1 and int(Box.game_battery("rally")["count"]) == 10,
+                "cap-limited: only the missing 1 moves")
+        Box.data["game_batteries"]["rally"]["count"] = 5
+        Box.data["box_batteries"] = 0
+        ok += _check(Box.refill_game_from_box("rally") == 0, "dry bank: nothing moves")
         # closed-time regen for the global pool
         Box.data["box_batteries"] = 0
         Box.meta()["closed_ts"] = int(Time.get_unix_time_from_system()) - 620
@@ -250,6 +263,73 @@ func _t_scroll() -> int:
         sc.queue_free()
         return ok
 
+## v0.0.6: the BUTTON SAFETY SYSTEM. A sheet taller than the screen must wrap
+## its middle into a scroll (buttons move apart instead of colliding), the
+## pinned tail stays outside it, wrapped buttons become tappables, and the
+## panel is clamped inside the screen edges.
+func _t_fitsheet() -> int:
+        Box.reset_all()
+        var ok := 0
+        var root := Control.new()
+        root.set_anchors_preset(Control.PRESET_FULL_RECT)
+        add_child(root)
+        var vb := Arc.sheet(root, 0.0)
+        # deliberately oversized content: 20 big buttons + a CLOSE tail
+        for i in 20:
+                vb.add_child(Arc.button("B %d" % i, Vector2(480, 84), 24, Arc.ACCENT))
+        vb.add_child(Arc.button("TAIL", Vector2(480, 64), 22, Color(0.42, 0.30, 0.16),
+                func(): pass))
+        Arc.fit_sheet(vb, 1)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var pc := vb.get_parent() as PanelContainer
+        var sc: BoxScroll = null
+        var tail_found := false
+        for c in vb.get_children():
+                if c is BoxScroll:
+                        sc = c
+                elif c is Button and (c as Button).text == "TAIL":
+                        tail_found = true
+        ok += _check(sc != null, "overflow wrapped into a scroll")
+        ok += _check(tail_found, "tail button pinned outside the scroll")
+        if sc != null:
+                ok += _check(sc.game_safe, "sheet scroll works inside game sessions")
+                ok += _check(sc._tappables.size() >= 20,
+                                "wrapped buttons auto-registered (%d)" % sc._tappables.size())
+                # a registered tap REPLAYS the real press on the wrapped button
+                var inner: VBoxContainer = sc.get_child(0)
+                var b3: Button = null
+                for c in inner.get_children():
+                        if c is Button and (c as Button).text == "B 3":
+                                b3 = c
+                ok += _check(b3 != null, "B 3 lives inside the scroll")
+                if b3 != null:
+                        var hit := [false]
+                        b3.pressed.connect(func(): hit[0] = true)
+                        sc._hit_tappable(b3.get_global_rect().get_center())
+                        ok += _check(hit[0], "tap on wrapped button fires its press")
+        if pc != null:
+                ok += _check(pc.size.y <= 1280.0 and pc.size.x <= 640.0,
+                                "panel clamped inside the screen (%dx%d)" % [int(pc.size.x), int(pc.size.y)])
+                ok += _check(pc.size.y < 20.0 * 84.0,
+                                "panel no longer stacks all 20 buttons raw (%d)" % int(pc.size.y))
+        root.queue_free()
+        await get_tree().process_frame
+        Box.reset_all()
+        return ok
+
+## First Button in the subtree whose text starts with `starts`.
+func _find_button(root: Node, starts: String) -> Button:
+        var stack := [root]
+        while not stack.is_empty():
+                var n: Node = stack.pop_back()
+                if n is Button and String((n as Button).text).begins_with(starts):
+                        return n
+                for c in n.get_children():
+                        stack.append(c)
+        return null
+
 func _touch(idx: int, pos: Vector2, pressed: bool) -> void:
         var ev := InputEventScreenTouch.new()
         ev.index = idx
@@ -297,6 +377,16 @@ func _t_host_flow() -> int:
         # MODULAR coin_div: snake 37 / 10 = 3 bonus, + 5 pickups = 8 total
         ok += _check(Box.coins() == 150 - 10 + 8, "net wallet 148 -> %d" % Box.coins())
         ok += _check(Box.stat("snake", "plays") == 1, "plays 1")
+        # ---- rewarded DOUBLE: sim pays instantly -> wallet + button state ----
+        var dbl := _find_button(host, "DOUBLE")
+        ok += _check(dbl != null, "double button on the game-over sheet")
+        if dbl != null:
+                dbl.pressed.emit()
+                await get_tree().create_timer(0.6).timeout
+                ok += _check(Box.coins() == 148 + 8,
+                                "double pays the REAL amount (156) -> %d" % Box.coins())
+                ok += _check(dbl.disabled and String(dbl.text).begins_with("REWARDED"),
+                                "button enters rewarded state (%s)" % dbl.text)
         # quit path
         host._quit_to_menu()
         await get_tree().process_frame

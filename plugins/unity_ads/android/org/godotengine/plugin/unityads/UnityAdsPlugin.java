@@ -65,10 +65,11 @@ public class UnityAdsPlugin extends GodotPlugin {
     private long bannerShownAtMs = 0L;
     private int bannerRetries = 0;
     private boolean refreshScheduled = false;
-    private static final int BANNER_MAX_RETRIES = 6;      // ~1 min of tries
-    private static final long BANNER_RETRY_MS = 10000L;   // spacing between tries
+    private static final int BANNER_MAX_RETRIES = 6;      // fast burst ~1 min
+    private static final long BANNER_RETRY_MS = 10000L;   // spacing between burst tries
+    private static final long BANNER_SLOW_RETRY_MS = 60000L; // then a 60s pulse - FOREVER
     private static final long BANNER_STALE_MS = 90000L;   // reload after 90s up
-    private static final long BANNER_REFRESH_MS = 75000L; // keep fill fresh
+    private static final long BANNER_REFRESH_MS = 30000L; // owner rule: rotate to a NEW ad ~every 30s
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     public UnityAdsPlugin(Godot godot) {
@@ -324,11 +325,14 @@ public class UnityAdsPlugin extends GodotPlugin {
         }
     }
 
-    /** Retry ladder: up to 6 tries, 10s apart, only while the banner is wanted. */
+    /** Retry ladder: a fast burst (6 tries, 10s apart), then a slow 60s pulse
+     *  that NEVER gives up while the banner is wanted. The v0.0.5 hard stop
+     *  after 6 tries is why banners "appeared rarely": if fill was dry for
+     *  that first minute, nothing re-armed until another banner_show call. */
     private void retryBannerLater(final String placement) {
         if (!bannerWanted) return;
-        if (bannerRetries >= BANNER_MAX_RETRIES) return;
         bannerRetries++;
+        final long delay = bannerRetries <= BANNER_MAX_RETRIES ? BANNER_RETRY_MS : BANNER_SLOW_RETRY_MS;
         mainHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -336,11 +340,12 @@ public class UnityAdsPlugin extends GodotPlugin {
                     loadBanner(placement);
                 }
             }
-        }, BANNER_RETRY_MS);
+        }, delay);
     }
 
-    /** Banners expire silently while showing - reload periodically so the
-     *  bottom strip never turns into an empty slab during a long session. */
+    /** Rotation (owner rule): a banner lives ~30s, then we load a FRESH one
+     *  (new creative) and swap the view on arrival - the strip never sits on
+     *  the same ad forever. Armed on every impression + fresh load. */
     private void scheduleBannerRefresh() {
         if (refreshScheduled || !bannerWanted) return;
         refreshScheduled = true;

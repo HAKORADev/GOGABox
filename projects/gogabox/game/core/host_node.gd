@@ -152,6 +152,11 @@ func _on_finish(final_score: int, earned: int) -> void:
         cc.alignment = BoxContainer.ALIGNMENT_CENTER
         cc.add_child(earn_row)
         sheet.add_child(cc)
+        # live payout line: the rewarded DOUBLE updates BOTH the wallet AND this
+        # chip + its own button state, so the bonus is VISIBLE where it happened
+        # (v0.0.5 credited silently - the sheet looked unchanged, owner L)
+        var earn_lbl: Label = earn_row.get_child(0).get_child(earn_row.get_child(0).get_child_count() - 1)
+        var paid := [total]
 
         if not res["new_best"]:
                 var hype := Arc.label("best %d" % int(res["best"]), 24, Color("8a6a40"))
@@ -164,22 +169,34 @@ func _on_finish(final_score: int, earned: int) -> void:
                 var hint := Arc.label(Ads.reward_hint(), 16, Color("8a6a40"), false)
                 hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 sheet.add_child(hint)
-                sheet.add_child(Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
+                var dbl := [null]   # holder: the lambda cannot capture dbl_btn
+                var dbl_btn := Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
                                 Ads.show_rewarded(func(watched: bool, mult: float, _secs: float):
+                                                var btn: Button = dbl[0]
                                                 if not watched:
+                                                        Arc.toast(game._toast_ref(), "ad closed early - no bonus")
                                                         return
                                                 if mult <= 0.0:
                                                         Arc.toast(game._toast_ref(), "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half"))
+                                                        btn.text = "TRY AGAIN  (%ds+)" % Ads.tier_secs("half")
                                                         return
                                                 var extra := int(round(float(total) * mult))
                                                 Box.earn(extra)
                                                 Box.add_earned(id, extra)
+                                                paid[0] += extra
+                                                earn_lbl.text = "+%d GOGACoins" % int(paid[0])
+                                                # the button TELLS the story: rewarded state,
+                                                # grayed out, with the real amount on it
+                                                btn.text = "REWARDED!  +%d" % extra
+                                                btn.disabled = true
                                                 var msg := "FULL reward! +%d more GOGACoins!" % extra
                                                 if mult < 1.0:
                                                         msg = "%d%% reward: +%d more GOGACoins" % [int(round(mult * 100.0)), extra]
                                                 Arc.toast(game._toast_ref(), msg)
-                                                Jukebox.sfx("coin")))
-                                )
+                                                Jukebox.sfx("coin"))
+                                                )
+                dbl[0] = dbl_btn
+                sheet.add_child(dbl_btn)
 
         # coin breakdown so earnings never feel random (pickups vs score bonus)
         var breakdown := Arc.label("pickups +%d   ·   score bonus +%d" % [earned, bonus],
@@ -189,6 +206,11 @@ func _on_finish(final_score: int, earned: int) -> void:
 
         var again_free := fee <= 0 or free_play
         var again_txt := "PLAY AGAIN FREE" if again_free else "PLAY AGAIN  -%d" % fee
+        if not again_free and Box.coins() < fee:
+                var need := Arc.label("need %d more GOGACoins to replay" % (fee - Box.coins()),
+                                18, Arc.BAD, false)
+                need.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                sheet.add_child(need)
         var again_btn := Arc.coin_button(again_txt, Vector2(520, 84), 28, Arc.ACCENT) \
                         if not again_free else Arc.button(again_txt, Vector2(520, 84), 28, Arc.ACCENT)
         again_btn.pressed.connect(func():
@@ -212,11 +234,6 @@ func _on_finish(final_score: int, earned: int) -> void:
                         else:
                                 Arc.toast(game._toast_ref(), "Not enough GOGACoins"))
         sheet.add_child(again_btn)
-        if not again_free and Box.coins() < fee:
-                var need := Arc.label("need %d more GOGACoins to replay" % (fee - Box.coins()),
-                                18, Arc.BAD, false)
-                need.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                sheet.add_child(need)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():
                         # pacing owned by the Box: every 3rd run-back shows one.
@@ -226,6 +243,11 @@ func _on_finish(final_score: int, earned: int) -> void:
                                         Ads.show_interstitial(func(_shown: bool): _quit_to_menu())
                         else:
                                         _quit_to_menu()))
+
+        # BUTTON SAFETY SYSTEM: measure, wrap overflow into a scroll, clamp to
+        # the screen edges (this sheet ran off the bottom in landscape).
+        # PLAY AGAIN + BACK TO BOX stay pinned at the bottom, always reachable.
+        Arc.fit_sheet(sheet, 2)
 
         if res["new_best"]:
                 Arc.confetti(sheet.get_parent().get_parent().get_parent(), Vector2(W / 2.0, H / 3.0))

@@ -39,9 +39,17 @@ func permission_granted() -> bool:
         return native.permission_granted()
 
 ## Ask Android 13+ for POST_NOTIFICATIONS (no-op below 33 / on desktop).
+## If the system hit its silent dead end (denied twice), the native side
+## opens the app's notification settings instead - the tap always reacts.
 func request_permission() -> void:
         if native != null:
                 native.request_permission()
+
+## Jump straight to this app's system notification settings (user flips the
+## toggle by hand). Desktop: no-op.
+func open_notification_settings() -> void:
+        if native != null:
+                native.open_notification_settings()
 
 func channel_for(kind: String) -> String:
         return String(KINDS.get(kind, KINDS["general"])["channel"])

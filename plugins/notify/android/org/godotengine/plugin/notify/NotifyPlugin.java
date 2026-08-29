@@ -39,6 +39,7 @@ public class NotifyPlugin extends GodotPlugin {
 
     private static final String PREFS = "goga_notify";
     private static final String KEY_PENDING = "pending";
+    private static final String KEY_ASKED_ONCE = "asked_once";
 
     // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
     // new sounds need new ids on already-installed devices). Each channel has
@@ -73,12 +74,60 @@ public class NotifyPlugin extends GodotPlugin {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
+    /**
+     * Ask Android 13+ for POST_NOTIFICATIONS. MUST run on the UI thread
+     * (GodotPlugin methods arrive on the GL thread - off-thread requests
+     * silently do nothing, the "allow reminders" button did nothing bug).
+     * When the system reached its silent dead end (denied twice / don't-ask-
+     * again), requestPermissions no-ops - fall back to the app's notification
+     * settings so the tap ALWAYS produces a visible reaction.
+     */
     @UsedByGodot
     public void requestPermission() {
         if (activity == null || Build.VERSION.SDK_INT < 33 || permissionGranted()) {
             return;
         }
-        activity.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4711);
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                boolean canAskDialog = activity.shouldShowRequestPermissionRationale(
+                        Manifest.permission.POST_NOTIFICATIONS);
+                SharedPreferences sp = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                boolean askedOnce = sp.getBoolean(KEY_ASKED_ONCE, false);
+                if (!canAskDialog && askedOnce) {
+                    // system will never show the dialog again -> settings page
+                    openNotificationSettings();
+                    return;
+                }
+                sp.edit().putBoolean(KEY_ASKED_ONCE, true).apply();
+                activity.requestPermissions(
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4711);
+            }
+        });
+    }
+
+    /** Opens this app's system notification settings page (user flips the
+     *  toggle by hand when the runtime dialog is gone for good). */
+    @UsedByGodot
+    public void openNotificationSettings() {
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    android.content.Intent i =
+                            new android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
+                            activity.getPackageName());
+                    i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(i);
+                } catch (Exception ignored) {
+                    // ancient OEM without the settings screen - nothing else we can do
+                }
+            }
+        });
     }
 
     @UsedByGodot
