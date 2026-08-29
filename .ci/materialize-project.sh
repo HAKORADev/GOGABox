@@ -41,6 +41,36 @@ fi
 [ -f "$PROJ/android/build/build.gradle" ] || gda_die "template extraction failed (no build.gradle)"
 echo -n "$TEMPLATES_DIR_NAME" > "$PROJ/android/.build_version"
 
+# ---------------------------------------------------------------- 1.5 apk slimming
+# Best compression, still installable: pack the native libraries DEFLATEd
+# instead of page-aligned raw. libgodot.so dominates the APK, so this cuts
+# the download a lot; the tradeoff (libs extracted at install) is the right
+# one for sideloaded APKs. Idempotent: skips when the marker is present.
+if ! grep -q "GDA_SLIM_PACKAGING" "$PROJ/android/build/build.gradle"; then
+  python3 - "$PROJ/android/build/build.gradle" <<'PYEOF'
+import re, sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+block = """    // GDA_SLIM_PACKAGING: compress native libs inside the APK (smaller
+    // download, still installable; libs are extracted at install time).
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+"""
+# insert right after the FIRST "android {" line (top-level), whatever the
+# template already contains inside it
+s2, n = re.subn(r"(?m)^android \{\n", "android {\n" + block, s, count=1)
+if n == 0:  # fallback: odd formatting (e.g. "android{" without space)
+    s2, n = re.subn(r"(?m)^android\{\n", "android{\n" + block, s, count=1)
+if n == 0:
+    sys.exit("could not find android block in " + p)
+open(p, "w", encoding="utf-8").write(s2)
+PYEOF
+  gda_log "materialize[$KEY]: slim packaging enabled (legacy jniLibs compression)"
+fi
+
 # ---------------------------------------------------------------- 2. project overlay
 gda_log "materialize[$KEY]: applying android-overlay"
 cp -a "$PROJ/android-overlay/." "$PROJ/android/build/"

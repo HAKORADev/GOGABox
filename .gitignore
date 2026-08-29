@@ -22,6 +22,10 @@ projects/*/android/build/build/
 # ---- Local secrets / overrides (never commit) ----
 .ci/local.env
 *.keystore
+# Owner-approved exception (v0.0.7): the arsenal RELEASE keystore IS committed
+# on purpose - an ephemeral CI keystore made every update "conflict with the
+# installed package". Sideload hobby project; rotate before any store upload.
+!config/keystore/*.jks
 
 # ---- Session journal (user preference: stays out of the repo) ----
 WORKLOG.md

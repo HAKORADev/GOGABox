@@ -132,13 +132,18 @@ static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCEN
         return b
 
 ## Dynamic GOGABattery meter: body + level fill + color by charge.
+## LIVE-UPDATABLE (v0.0.7 battery sheet ticks every second): the returned
+## control carries a "set_level" meta - call
+##   ctrl.get_meta("set_level").call(count, cap); ctrl.queue_redraw()
+## to move the fill without rebuilding the whole sheet.
 static func battery_control(count: int, cap: int, w := 56.0, h := 26.0) -> Control:
         var c := Control.new()
         c.custom_minimum_size = Vector2(w + 6, h)
         c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var lvl := 0.0 if cap <= 0 else clampf(float(count) / float(cap), 0.0, 1.0)
-        var col := Arc.GOOD if lvl > 0.5 else (Arc.ACCENT if lvl > 0.25 else Arc.BAD)
+        var state := {"lvl": _battery_level(count, cap)}
         c.draw.connect(func():
+                var lvl: float = state["lvl"]
+                var col := Arc.GOOD if lvl > 0.5 else (Arc.ACCENT if lvl > 0.25 else Arc.BAD)
                 # tip nub
                 c.draw_rect(Rect2(w, h * 0.3, 5, h * 0.4), Color(1, 1, 1, 0.75))
                 # body
@@ -147,7 +152,13 @@ static func battery_control(count: int, cap: int, w := 56.0, h := 26.0) -> Contr
                 # fill
                 if lvl > 0.01:
                         c.draw_rect(Rect2(3, 3, (w - 6) * lvl, h - 6), col))
+        c.set_meta("set_level", func(n: int, cap_: int): state["lvl"] = _battery_level(n, cap_))
         return c
+
+static func _battery_level(count: int, cap: int) -> float:
+        if cap <= 0:
+                return 0.0
+        return clampf(float(count) / float(cap), 0.0, 1.0)
 
 static func coin_chip() -> PanelContainer:
         return chip(str(Box.coins()), "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 28, COIN)

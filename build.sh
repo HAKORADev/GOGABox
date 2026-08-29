@@ -60,18 +60,53 @@ abi_code() {
     *) gda_die "unknown abi $1" ;;
   esac
 }
-# keystore: debug by default; set GDA_RELEASE_KEYSTORE/USER/PASS for prod signing
-KS="${GDA_RELEASE_KEYSTORE:-$GDA_DEBUG_KEYSTORE}"
-KU="${GDA_RELEASE_KEYSTORE_USER:-androiddebugkey}"
-KP="${GDA_RELEASE_KEYSTORE_PASS:-android}"
+# ---------------------------------------------------------------------------
+# keystore resolution (v0.0.7) - the "every update conflicts with the installed
+# package" root cause was an EPHEMERAL debug keystore: a new one is generated
+# per machine/CI run, so each build carried a different signature and Android
+# refused the in-place update. Priority (most specific wins):
+#   1. env override            GDA_RELEASE_KEYSTORE / _USER / _PASS
+#   2. per-project config      "keystore": {path, user, pass} in projects.json
+#                              (path relative to repo root; committed ON PURPOSE
+#                              for stable sideload updates - see AGENTS.md 2.5)
+#   3. fallback                ephemeral debug keystore (fresh installs only)
+# ---------------------------------------------------------------------------
+KS="$(gda_project '.keystore.path' "$KEY" 2>/dev/null || true)"
+KU="$(gda_project '.keystore.user' "$KEY" 2>/dev/null || true)"
+KP="$(gda_project '.keystore.pass' "$KEY" 2>/dev/null || true)"
+if [ -n "${GDA_RELEASE_KEYSTORE:-}" ]; then
+  KS="$GDA_RELEASE_KEYSTORE"
+  [ -n "${GDA_RELEASE_KEYSTORE_USER:-}" ] && KU="$GDA_RELEASE_KEYSTORE_USER"
+  [ -n "${GDA_RELEASE_KEYSTORE_PASS:-}" ] && KP="$GDA_RELEASE_KEYSTORE_PASS"
+fi
+if [ -n "$KS" ]; then
+  case "$KS" in
+    /*) ;;                                  # already absolute
+    *) [ -f "$GDA_ROOT/$KS" ] && KS="$GDA_ROOT/$KS" ;;
+  esac
+  if [ ! -f "$KS" ]; then
+    gda_die "keystore not found: $KS (fix projects.json keystore.path)"
+  fi
+  [ -n "$KU" ] || gda_die "keystore user missing for $KEY"
+  [ -n "$KP" ] || gda_die "keystore pass missing for $KEY"
+  gda_log "build[$KEY]: signing with project keystore ($KU)"
+else
+  KS="${GDA_RELEASE_KEYSTORE:-$GDA_DEBUG_KEYSTORE}"
+  KU="${GDA_RELEASE_KEYSTORE_USER:-androiddebugkey}"
+  KP="${GDA_RELEASE_KEYSTORE_PASS:-android}"
+  gda_log "build[$KEY]: no project keystore - EPHEMERAL debug signature (updates will conflict!)"
+fi
 FMT=0
 if [ "$AAB" = "1" ] || [ "$AAB" = "true" ]; then FMT=1; fi
 
+PKG="$(gda_project '.package' "$KEY")"
 patch_preset() { # abi preset-name
   python3 "$GDA_ROOT/.ci/patch-preset.py" "$PROJ/export_presets.cfg" "$2" \
     "version/code=$(abi_code "$1")" \
     "version/name=\"$VNAME\"" \
     "application/export_format=$FMT" \
+    "package/unique_name=\"$PKG\"" \
+    "gradle_build/compress_native_libraries=true" \
     "keystore/debug=\"$KS\"" "keystore/debug_user=\"$KU\"" "keystore/debug_password=\"$KP\"" \
     "keystore/release=\"$KS\"" "keystore/release_user=\"$KU\"" "keystore/release_password=\"$KP\""
 }

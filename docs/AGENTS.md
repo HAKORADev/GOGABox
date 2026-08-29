@@ -58,6 +58,12 @@ placements, its quirks). Rule of thumb: if a doc answer starts with
    Ad IDs / App Keys are *not* secrets — they ship inside every APK and
    mediation platforms gate misuse by package name — so they live in
    `ads_config.json` and in §4 below.
+   **Exception (owner-approved, v0.0.7):** `config/keystore/arsenal-release.jks`
+   IS committed. An ephemeral per-run debug keystore made every update
+   "conflict with the installed package" — a stable signature is what makes
+   sideloaded updates installable. This is a hobby sideload project: rotate
+   the keystore (and bump `keystore.pass` in `config/projects.json`) BEFORE
+   any store publishing, and treat the current signature as public.
 6. **Tests are the contract**: `tools/test.sh <game>` passes before and
    after every change. CI green = shippable; red = stop and fix first.
 7. **Talk to the user in English**, short messages, conclusions first.

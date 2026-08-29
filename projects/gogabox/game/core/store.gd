@@ -27,7 +27,7 @@ func _defaults() -> Dictionary:
                 "runs_since_interstitial": 0,
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
-                "box_batteries": BOX_BATTERY_CAP,   # global pool; refills ONLY while app closed
+                "box_batteries": {"count": BOX_BATTERY_CAP, "ts": 0},   # ts-based pool (charges ALWAYS)
                 "game_batteries": {},         # id -> {"count": n, "ts": unix} (refills always)
         }
 
@@ -45,6 +45,23 @@ func _load() -> void:
                 data["owned"] = ["snake"]
         if not (data["owned"] as Array).has("snake"):
                 (data["owned"] as Array).append("snake")
+        _migrate_box_pool()
+
+## v0.0.7: the box bank used to be a plain int that only recharged while the
+## app was CLOSED (closed_ts math). It now charges ALWAYS (+1 / 5 min, same
+## as every game pool) via a {count, ts} pair. Old saves migrate here and
+## still get the credit for the time the app was off.
+func _migrate_box_pool() -> void:
+        var v: Variant = data.get("box_batteries", BOX_BATTERY_CAP)
+        if v is Dictionary:
+                return
+        var now := int(Time.get_unix_time_from_system())
+        var count := clampi(int(v), 0, BOX_BATTERY_CAP)
+        var elapsed := now - int(data["meta"].get("closed_ts", now))
+        if elapsed > 0 and count < BOX_BATTERY_CAP:
+                count = mini(BOX_BATTERY_CAP, count + elapsed / BATTERY_STEP)
+        data["box_batteries"] = {"count": count, "ts": now}
+        save()
 
 func _merge(base: Dictionary, over: Dictionary) -> void:
         for k in over:
@@ -109,17 +126,64 @@ func is_seen(id: String) -> bool:
 
 func mark_seen(id: String) -> void:
         _slot(id)["seen"] = true
+        _slot(id)["badge"] = ""      # any badge dies with the first tap
+        save()
+
+# --------------------------------------------------- feed badges (v0.0.7)
+## Two-level badge per game tile (owner rule):
+##   "new"      - the teaser just APPEARED (orange NEW!)
+##   "unlocked" - it resolved into a real buyable tile (green UNLOCKED!)
+##   ""         - tapped / seen: no badge
+## Roadmap.tick() sets + upgrades levels; mark_seen() clears.
+func badge(id: String) -> String:
+        return String(_slot(id).get("badge", ""))
+
+func set_badge(id: String, level: String) -> void:
+        if badge(id) == level:
+                return
+        _slot(id)["badge"] = level
         save()
 
 # ------------------------------------------------------------- GOGABatteries
 
-## Global pool. Refills 1 / 5 min ONLY while the app is closed (see
-## NOTIFICATION_APPLICATION_PAUSED/RESUMED below).
+## Global pool. v0.0.7: charges ALWAYS - +1 / 5 min while the app is open
+## AND while it is closed (timestamp math covers both; no more "only while
+## closed" fine print). Lazy-regenerated on every read, like game pools.
 func box_batteries() -> int:
-        return clampi(int(data.get("box_batteries", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
+        var p: Dictionary = data["box_batteries"]
+        var count := clampi(int(p.get("count", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
+        if count >= BOX_BATTERY_CAP:
+                p["count"] = BOX_BATTERY_CAP
+                p["ts"] = int(Time.get_unix_time_from_system())
+                return BOX_BATTERY_CAP
+        var now := int(Time.get_unix_time_from_system())
+        var elapsed := now - int(p.get("ts", now))
+        var regen := elapsed / BATTERY_STEP
+        if regen > 0:
+                count = mini(BOX_BATTERY_CAP, count + regen)
+                p["ts"] = now - (elapsed % BATTERY_STEP)
+                p["count"] = count
+                save()
+                if count >= BOX_BATTERY_CAP:
+                        _battery_full_sfx()   # this pool just filled up
+        return count
 
 func box_battery_cap() -> int:
         return BOX_BATTERY_CAP
+
+## Write access used by spends/refills/tests (keeps the regen clock intact).
+func set_box_batteries(n: int) -> void:
+        data["box_batteries"]["count"] = clampi(n, 0, BOX_BATTERY_CAP)
+        save()
+        batteries_changed.emit()
+
+## Seconds until the next +1 (0 when full) - feeds the live battery sheet.
+func box_regen_in() -> int:
+        if box_batteries() >= BOX_BATTERY_CAP:
+                return 0
+        var p: Dictionary = data["box_batteries"]
+        var now := int(Time.get_unix_time_from_system())
+        return BATTERY_STEP - ((now - int(p.get("ts", now))) % BATTERY_STEP)
 
 ## Per-game pool: fully modular per game (registry `charges`):
 ##   per_round      batteries one play costs
@@ -164,9 +228,7 @@ func consume_round_batteries(id: String) -> bool:
         if int(b["count"]) < need or box_batteries() < need:
                 return false
         data["game_batteries"][id]["count"] = int(b["count"]) - need
-        data["box_batteries"] = box_batteries() - need
-        save()
-        batteries_changed.emit()
+        set_box_batteries(box_batteries() - need)
         _sync_battery_notifications()
         return true
 
@@ -184,42 +246,21 @@ func refill_game_from_box(id: String) -> int:
         if move <= 0:
                 return 0
         data["game_batteries"][id]["count"] = int(b["count"]) + move
-        data["box_batteries"] = box_batteries() - move
-        save()
-        batteries_changed.emit()
+        set_box_batteries(box_batteries() - move)
         _sync_battery_notifications()
         return move
 
-## Called on pause (app "closed") and resume; keeps global regen honest.
+## v0.0.7: the box bank regenerates itself on every READ (ts math), so the
+## pause/resume pair only has to manage the away-notifications. closed_ts is
+## still stamped on pause - it feeds the "while you were away" schedule math.
 func _notification(what: int) -> void:
         if what == NOTIFICATION_APPLICATION_PAUSED:
                 meta()["closed_ts"] = int(Time.get_unix_time_from_system())
                 save()
                 _schedule_battery_notifications()
         elif what == NOTIFICATION_APPLICATION_RESUMED:
-                _apply_closed_regen()
+                box_batteries()      # credit the closed time right away
                 _cancel_battery_notifications()
-
-## Add global batteries earned while the app was closed.
-func _apply_closed_regen() -> void:
-        var closed := int(meta().get("closed_ts", 0))
-        if closed <= 0:
-                return
-        var now := int(Time.get_unix_time_from_system())
-        var elapsed := now - closed
-        if elapsed <= 0:
-                return
-        var count := box_batteries()
-        if count >= BOX_BATTERY_CAP:
-                return
-        var regen := mini(BOX_BATTERY_CAP - count, elapsed / BATTERY_STEP)
-        if regen > 0:
-                data["box_batteries"] = count + regen
-                save()
-                batteries_changed.emit()
-                if count + regen >= BOX_BATTERY_CAP:
-                        _battery_full_sfx()
-        meta()["closed_ts"] = now
 
 ## In-app "pool just hit full" ping (the device channel handles the away-case).
 ## Cooldown keeps lazy regen reads from spamming the sound.
@@ -241,13 +282,12 @@ func _battery_notify_id(key: String) -> int:
 ## game that is not full (fired by the native alarm while the app is closed).
 ## Both use the "battery_full" kind -> its own Android channel + custom SFX.
 func _schedule_battery_notifications() -> void:
-        var now := int(Time.get_unix_time_from_system())
         var gb := box_batteries()
         if gb < BOX_BATTERY_CAP:
                 var secs := (BOX_BATTERY_CAP - gb) * BATTERY_STEP
                 Notify.schedule(_battery_notify_id("box"), "GOGABatteries",
                         "Your GOGABatteries are fully charged - %d/%d!" % [BOX_BATTERY_CAP, BOX_BATTERY_CAP],
-                        maxi(60, secs - (now - int(meta().get("closed_ts", now)))), "battery_full")
+                        maxi(60, secs), "battery_full")
         for g in GameReg.playable():
                 var id := String(g["id"])
                 if not owns_game(id):
@@ -326,7 +366,7 @@ func _slot(id: String) -> Dictionary:
                         "best": 0, "last": 0, "plays": 0,
                         "time": 0.0, "spent": 0, "earned": 0,
                         "counters": {}, "ach": {}, "progress": {}, "skins": {"owned": [], "on": ""},
-                        "seen": false,
+                        "seen": false, "badge": "", "last_ts": 0,
                 }
         return data["games"][id]
 
@@ -337,11 +377,16 @@ func record_run(id: String, score: int) -> Dictionary:
         var s := _slot(id)
         s["last"] = score
         s["plays"] = int(s["plays"]) + 1
+        s["last_ts"] = int(Time.get_unix_time_from_system())   # last-played lists
         var new_best := score > int(s["best"])
         if new_best:
                 s["best"] = score
         save()
         return {"new_best": new_best, "best": int(s["best"])}
+
+## Unix time of the most recent run (0 = never played).
+func last_played_at(id: String) -> int:
+        return int(_slot(id).get("last_ts", 0))
 
 ## Games report named counters (apples eaten, fruits slashed...).
 func bump_counter(id: String, key: String, amount: int) -> void:
@@ -371,7 +416,8 @@ func reset_game(id: String) -> void:
                 "time": 0.0, "spent": 0, "earned": 0,
                 "counters": {}, "ach": {}, "progress": {},
                 "skins": {"owned": [], "on": ""},
-                "seen": true,    # keep the New! badge cleared across a wipe
+                "seen": true, "badge": "",    # badges stay cleared across a wipe
+                "last_ts": 0,
         }
         save()
 
@@ -388,6 +434,10 @@ func grant_achievement(id: String, ach_id: String) -> bool:
 
 func has_achievement(id: String, ach_id: String) -> bool:
         return _slot(id)["ach"].has(ach_id)
+
+## How many trophies this game has granted (achievement mystery orders).
+func ach_count(id: String) -> int:
+        return (_slot(id)["ach"] as Dictionary).size()
 
 # ------------------------------------------------------------- skins (per game)
 

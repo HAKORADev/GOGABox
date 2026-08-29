@@ -22,10 +22,10 @@ const GAMES := [
                 "script": "res://game/games/snake/snake.gd",
                 "thumb": "res://assets/thumbs/snake.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 10, "price": 0, "fee": 10, "shop": true,
-                "hot": true, "banner": true,
+                "coin_div": 2, "price": 0, "fee": 10, "shop": true,
+                "banner": true,
                 "desc": "Steer the snake, eat apples, grab GOGACoins. Every apple makes you longer and faster - walls and your own tail end the run.",
-                "controls": ["swipe anywhere to steer", "grab the spinning coin for +5 GOGACoins", "the run ends when you bite yourself or a wall"],
+                "controls": ["swipe anywhere to steer", "each apple = 1 score point", "grab the spinning coin for +1 GOGACoin", "the run ends when you bite yourself or a wall"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [
@@ -41,7 +41,6 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 4, "price": 150, "fee": 8, "shop": false,
-                "hot": false,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "desc": "Endless pong rally against a machine that never gets tired. Every return speeds it up - how long can you keep the ball alive?",
@@ -60,7 +59,6 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 100, "price": 200, "fee": 10, "shop": false,
-                "hot": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "blocked_hours": {"from": 1, "to": 8},
@@ -80,7 +78,6 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 20, "price": 250, "fee": 15, "shop": false,
-                "hot": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "desc": "Fruits fly, your finger is the blade. Slash combos for juice, avoid the bombs - one wrong swipe slices the run short.",
@@ -99,7 +96,6 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/hopper.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 60, "price": 300, "fee": 12, "shop": false,
-                "hot": false,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "hours": {"from": 16, "to": 22},
@@ -119,7 +115,7 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/merge.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 150, "price": 400, "fee": 15, "shop": false,
-                "hot": false, "banner": true,   # turn-based: banner is safe here
+                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "desc": "Swipe to slide the tiles. Equal numbers merge and double. Reach 2048 before the board fills up - the classic brain cooker.",
@@ -151,6 +147,7 @@ const GAMES := [
                         "orders": [
                                 {"type": "spend_in", "game": "snake", "amount": 120},
                                 {"type": "plays", "game": "snake", "count": 3},
+                                {"type": "ach_in", "game": "snake", "count": 2},
                         ]}},
         {"id": "hen", "title": "Hen Invaders", "tag": "1P shooter port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/hen.png",
@@ -191,6 +188,7 @@ const GAMES := [
                         "orders": [
                                 {"type": "plays", "game": "hopper", "count": 5},
                                 {"type": "beat_best", "game": "slasher"},
+                                {"type": "ach_exact", "game": "rally", "ach": "rally_30"},
                         ]}},
         {"id": "keys", "title": "Key Singer", "tag": "rhythm rework", "coming_soon": true,
                 "thumb": "res://assets/thumbs/keys.png",
@@ -237,10 +235,3 @@ static func playable_index(id: String) -> int:
                         return i
                 i += 1
         return -1
-
-static func hot() -> Array:
-        var out := []
-        for g in playable():
-                if g.get("hot", false):
-                        out.append(g)
-        return out

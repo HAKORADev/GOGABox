@@ -1,14 +1,18 @@
 {
-	"enabled": true,
-	"test_mode": false,
-	"game_id": "5770940",
-	"placements": {
-		"interstitial": "Interstitial_Android",
-		"rewarded": "Rewarded_Android",
-		"banner": "Banner_Android"
-	},
-	"interstitial_every_runs": 3,
-	"banner_height": 52,
-	"banner_enabled": true,
-	"reward_tiers": { "half": 15, "p75": 20, "full": 30 }
+        "enabled": true,
+        "test_mode": false,
+        "game_id": "5770940",
+        "placements": {
+                "interstitial": "Interstitial_Android",
+                "rewarded": "Rewarded_Android",
+                "banner": "Banner_Android"
+        },
+        "interstitial_every_runs": 3,
+        "banner_height": 52,
+        "banner_enabled": true,
+        "reward_tiers": { "half": 15, "p75": 20, "full": 30 },
+        "test_device": {
+                "name": "XRN124G",
+                "gaid": "08dabd21-c11a-4893-9207-f22f6403e46f"
+        }
 }

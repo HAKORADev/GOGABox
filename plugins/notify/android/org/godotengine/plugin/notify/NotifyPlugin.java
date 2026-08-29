@@ -39,7 +39,7 @@ public class NotifyPlugin extends GodotPlugin {
 
     private static final String PREFS = "goga_notify";
     private static final String KEY_PENDING = "pending";
-    private static final String KEY_ASKED_ONCE = "asked_once";
+    private static final String KEY_ASKED_DIALOG = "asked_dialog_v3";
 
     // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
     // new sounds need new ids on already-installed devices). Each channel has
@@ -77,10 +77,15 @@ public class NotifyPlugin extends GodotPlugin {
     /**
      * Ask Android 13+ for POST_NOTIFICATIONS. MUST run on the UI thread
      * (GodotPlugin methods arrive on the GL thread - off-thread requests
-     * silently do nothing, the "allow reminders" button did nothing bug).
-     * When the system reached its silent dead end (denied twice / don't-ask-
-     * again), requestPermissions no-ops - fall back to the app's notification
-     * settings so the tap ALWAYS produces a visible reaction.
+     * silently do nothing).
+     *
+     * v0.0.7 DETERMINISTIC LADDER (the "allow reminders did nothing" bug):
+     * many OEMs (Transsion/XOS among them) silently no-op repeat permission
+     * requests and some report misleading rationale flags, so heuristics can
+     * dead-end with NO visible reaction. Now:
+     *   tap 1  -> the real system permission dialog (exactly once ever)
+     *   tap 2+ -> this app's notification settings page (ALWAYS reacts, and
+     *             the toggle there is the one that actually counts)
      */
     @UsedByGodot
     public void requestPermission() {
@@ -90,16 +95,14 @@ public class NotifyPlugin extends GodotPlugin {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                boolean canAskDialog = activity.shouldShowRequestPermissionRationale(
-                        Manifest.permission.POST_NOTIFICATIONS);
                 SharedPreferences sp = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                boolean askedOnce = sp.getBoolean(KEY_ASKED_ONCE, false);
-                if (!canAskDialog && askedOnce) {
-                    // system will never show the dialog again -> settings page
+                if (sp.getBoolean(KEY_ASKED_DIALOG, false)) {
+                    // the one system dialog was spent (denied, or the OEM never
+                    // showed it) -> the settings page ALWAYS opens
                     openNotificationSettings();
                     return;
                 }
-                sp.edit().putBoolean(KEY_ASKED_ONCE, true).apply();
+                sp.edit().putBoolean(KEY_ASKED_DIALOG, true).apply();
                 activity.requestPermissions(
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4711);
             }

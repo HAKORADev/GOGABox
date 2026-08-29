@@ -30,6 +30,9 @@ Ads.maybe_interstitial(cb)             # cb(shown: bool) - fires when pacing thr
 Ads.show_rewarded(cb)                  # cb(watched_to_end: bool)
 Ads.banner_show() / Ads.banner_hide()  # anchored bottom banner (menu only)
 Ads.cfg["test_mode"]                   # true while testing - flip to false for release
+Ads.cfg["test_device"]                 # {name, gaid}: test ads serve ONLY on this
+                                       # advertising id (matched natively at startup,
+                                       # v0.0.7). Empty gaid -> everyone gets real ads.
 ```
 
 Signals: `init_complete`, `banner_shown_changed(visible)`.

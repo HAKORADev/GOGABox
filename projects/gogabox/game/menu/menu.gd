@@ -11,12 +11,20 @@ var _layer: CanvasLayer
 var _root: Control
 var _margin: MarginContainer
 var _vb: VBoxContainer
-var _hot_row: HBoxContainer
-var _hot_scroll: BoxScroll
+# today's-picks carousel (owner rule: no real "hot" exists locally - the feed
+# picks up to 5 random games per day, paged with arrows + dot indicators)
+var _picks: Array = []
+var _pick_idx := 0
+var _pick_holder: Control
+var _dots_row: HBoxContainer
+var _pick_prev: Button
+var _pick_next: Button
+var _list_scrolls: Array = []      # every horizontal BoxScroll on the feed
 var _grid: GridContainer
 var _grid_scroll: BoxScroll
 var _wallet_label: Label
 var _battery_box: HBoxContainer
+var _battery_last := -1            # chip rebuilds only when the count changes
 var _toast: Dictionary
 var _sheet_open := false
 var _trophies_open := false
@@ -63,7 +71,8 @@ func _ready() -> void:
         _margin.add_child(_vb)
 
         _build_top_bar()
-        _build_hot_row()
+        _build_picks()
+        _build_list_sections()
         _build_grid()
 
         _toast = Arc.toast_overlay(_root)
@@ -73,19 +82,21 @@ func _ready() -> void:
         Box.batteries_changed.connect(_update_battery_chip)
 
         Jukebox.play_music_menu()
-        if not Box.meta().get("asked_notif", false):
-                Box.meta()["asked_notif"] = true
-                Box.save()
-                Notify.request_permission()
+        # v0.0.7: NO auto permission ask at boot. The single system dialog is
+        # far better spent the moment the player taps ALLOW REMINDERS (the
+        # mystery page) - a boot-time popup gets reflex-denied and burns the
+        # one ask the OS gives us.
         Roadmap.tick()
         _refresh()
         # NOTE: the banner joins only after the splash (main.gd -> on_splash_done)
 
-        # slow tick so timed mysteries resolve live
+        # slow tick so timed mysteries resolve live + battery chip stays honest
         var t := Timer.new()
         t.wait_time = 2.0
         t.autostart = true
-        t.timeout.connect(func(): Roadmap.tick())
+        t.timeout.connect(func():
+                Roadmap.tick()
+                _update_battery_chip())
         add_child(t)
 
         _build_particles()
@@ -116,8 +127,7 @@ func set_active(on: bool) -> void:
         if _layer != null and is_instance_valid(_layer):
                 _layer.visible = on
         process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
-        if _hot_scroll != null and is_instance_valid(_hot_scroll):
-                _set_feed_lock(not on)
+        _set_feed_lock(not on)
 
 # ---------------------------------------------------------------- layout
 
@@ -202,10 +212,13 @@ func _build_top_bar() -> void:
 func _update_battery_chip() -> void:
         if _battery_box == null:
                 return
+        var n := Box.box_batteries()
+        if n == _battery_last and _battery_box.get_child_count() > 0:
+                return                     # chip only rebuilds when the pool moves
+        _battery_last = n
         for c in _battery_box.get_children():
                 _battery_box.remove_child(c)
                 c.queue_free()
-        var n := Box.box_batteries()
         var cap := Box.box_battery_cap()
         # tappable: opens the full battery status (pools + both timers)
         var b := Button.new()
@@ -225,8 +238,10 @@ func _update_battery_chip() -> void:
                 _open_batteries())
         _battery_box.add_child(b)
 
-## Full battery status: box pool + every owned charged game, with BOTH timers
-## (next +1 in..., full in...).
+## Full battery status: box pool + every owned charged game, with BOTH timers.
+## v0.0.7: everything here is LIVE - a 1s ticker re-reads the pools and moves
+## the meters/counts/countdowns while you watch (the ticker is a child of the
+## sheet, so it dies with it - no cleanup needed).
 func _open_batteries() -> void:
         if _sheet_open or _trophies_open:
                 return
@@ -245,6 +260,8 @@ func _open_batteries() -> void:
         v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(v)
 
+        var live: Array = []   # [{meter, count, timer, id, title}] (id="" = box)
+
         # --- the box bank ---
         var n := Box.box_batteries()
         var cap := Box.box_battery_cap()
@@ -256,13 +273,17 @@ func _open_batteries() -> void:
         var bh := HBoxContainer.new()
         bh.add_theme_constant_override("separation", 12)
         bv.add_child(bh)
-        bh.add_child(Arc.battery_control(n, cap, 72.0, 30.0))
-        bh.add_child(Arc.label("BOX BANK   %d/%d" % [n, cap], 24, Arc.INK))
+        var bank_meter := Arc.battery_control(n, cap, 72.0, 30.0)
+        bh.add_child(bank_meter)
+        var bank_lbl := Arc.label("BOX BANK   %d/%d" % [n, cap], 24, Arc.INK)
+        bh.add_child(bank_lbl)
         var bt := Arc.label(_pool_timer_text(n, cap, Box.BATTERY_STEP), 18, Color("6a4a28"), false)
         bv.add_child(bt)
-        var bn := Arc.label("charges only while the app is closed", 16, Color("8a6a40"), false)
+        var bn := Arc.label("+1 every 5 min  ·  charges while the app is open AND closed",
+                        16, Color("8a6a40"), false)
         bv.add_child(bn)
         v.add_child(bank)
+        live.append({"meter": bank_meter, "count": bank_lbl, "timer": bt, "id": "", "title": ""})
 
         # --- per-game pools ---
         for g in GameReg.playable():
@@ -280,16 +301,55 @@ func _open_batteries() -> void:
                 var rh := HBoxContainer.new()
                 rh.add_theme_constant_override("separation", 12)
                 rv.add_child(rh)
-                rh.add_child(Arc.battery_control(int(b["count"]), int(b["cap"]), 72.0, 30.0))
-                rh.add_child(Arc.label("%s   %d/%d" % [String(g["title"]).to_upper(), int(b["count"]), int(b["cap"])], 22, Arc.INK))
-                rv.add_child(Arc.label("%d per round  ·  +1 every %d min  ·  %s" 
-                                % [int(b["per_round"]), int(b["step"]) / 60, _pool_timer_text(int(b["count"]), int(b["cap"]), int(b["step"]))],
-                                18, Color("6a4a28"), false))
+                var gm := Arc.battery_control(int(b["count"]), int(b["cap"]), 72.0, 30.0)
+                rh.add_child(gm)
+                var gl := Arc.label("%s   %d/%d" % [String(g["title"]).to_upper(), int(b["count"]), int(b["cap"])], 22, Arc.INK)
+                rh.add_child(gl)
+                var gt := Arc.label("%d per round  ·  +1 every %d min  ·  %s"
+                                                % [int(b["per_round"]), int(b["step"]) / 60, _pool_timer_text(int(b["count"]), int(b["cap"]), int(b["step"]))],
+                                                18, Color("6a4a28"), false)
+                rv.add_child(gt)
                 v.add_child(row)
+                live.append({"meter": gm, "count": gl, "timer": gt, "id": id,
+                                "title": String(g["title"]).to_upper(), "b": b})
 
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
+
+        # --- the live ticker ---
+        var panel := vb.get_parent()
+        var tick := Timer.new()
+        tick.wait_time = 1.0
+        tick.autostart = true
+        panel.add_child(tick)
+        tick.timeout.connect(func():
+                if not is_instance_valid(vb):
+                        return
+                for e in live:
+                        if not is_instance_valid(e["meter"]) or not is_instance_valid(e["count"]):
+                                continue
+                        var count: int
+                        var ccap: int
+                        var step: int
+                        var extra := ""
+                        if String(e["id"]) == "":
+                                count = Box.box_batteries()
+                                ccap = Box.box_battery_cap()
+                                step = Box.BATTERY_STEP
+                                (e["count"] as Label).text = "BOX BANK   %d/%d" % [count, ccap]
+                        else:
+                                var bb := Box.game_battery(String(e["id"]))
+                                if bb.is_empty():
+                                        continue
+                                count = int(bb["count"])
+                                ccap = int(bb["cap"])
+                                step = int(bb["step"])
+                                (e["count"] as Label).text = "%s   %d/%d" % [String(e["title"]), count, ccap]
+                                extra = "%d per round  ·  +1 every %d min  ·  " % [int(bb["per_round"]), step / 60]
+                        (e["meter"] as Control).get_meta("set_level").call(count, ccap)
+                        (e["meter"] as Control).queue_redraw()
+                        (e["timer"] as Label).text = extra + _pool_timer_text(count, ccap, step))
 
 func _pool_timer_text(count: int, cap: int, step: int) -> String:
         if count >= cap:
@@ -323,16 +383,176 @@ func _icon_button(icon_path: String, cb: Callable) -> Button:
                 cb.call())
         return b
 
-func _build_hot_row() -> void:
-        var hot_head := Arc.label("HOT", 32, Arc.ACCENT)
-        _vb.add_child(hot_head)
-        _hot_scroll = BoxScroll.new()
-        _hot_scroll.custom_minimum_size = Vector2(0, 208)
-        _hot_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        _vb.add_child(_hot_scroll)
-        _hot_row = HBoxContainer.new()
-        _hot_row.add_theme_constant_override("separation", 16)
-        _hot_scroll.add_child(_hot_row)
+func _build_picks() -> void:
+        _picks_head = Arc.label("TODAY'S PICKS", 32, Arc.ACCENT)
+        _vb.add_child(_picks_head)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 10)
+        _vb.add_child(row)
+        _pick_prev = _arrow_btn("<", func(): _pick_move(-1))
+        row.add_child(_pick_prev)
+        _pick_holder = Control.new()
+        _pick_holder.custom_minimum_size = Vector2(0, 208)
+        _pick_holder.clip_contents = true
+        _pick_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _pick_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_child(_pick_holder)
+        _pick_next = _arrow_btn(">", func(): _pick_move(1))
+        row.add_child(_pick_next)
+        _dots_row = HBoxContainer.new()
+        _dots_row.alignment = BoxContainer.ALIGNMENT_CENTER
+        _dots_row.add_theme_constant_override("separation", 10)
+        _vb.add_child(_dots_row)
+
+func _arrow_btn(txt: String, cb: Callable) -> Button:
+        return Arc.button(txt, Vector2(72, 208), 44, Color(0.16, 0.10, 0.05, 0.85), cb)
+
+## One carousel page: a big OWNED-game card, directly tappable (it does NOT
+## live in a BoxScroll - plain Button input works here).
+func _pick_card(g: Dictionary) -> Control:
+        var b := _card_base(Vector2(300, 208), false)
+        _add_thumb(b, g, 48)
+        var name_l := Arc.label(String(g["title"]), 25, Arc.INK)
+        name_l.position = Vector2(14, 160)
+        name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(name_l)
+        b.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                _tap_tile(g, "OWNED", b))
+        return b
+
+func _pick_move(dir: int) -> void:
+        if _picks.is_empty():
+                return
+        _pick_idx = wrapi(_pick_idx + dir, 0, _picks.size())
+        Jukebox.sfx("click", -4.0)
+        _pick_show(_pick_idx)
+
+func _pick_show(i: int) -> void:
+        if _picks.is_empty():
+                _picks_head.visible = false
+                _pick_prev.visible = false
+                _pick_next.visible = false
+                _pick_holder.visible = false
+                _dots_row.visible = false
+                return
+        _picks_head.visible = true
+        _pick_prev.visible = true
+        _pick_next.visible = true
+        _pick_holder.visible = true
+        _dots_row.visible = _picks.size() > 1
+        _pick_idx = clampi(i, 0, _picks.size() - 1)
+        for c in _pick_holder.get_children():
+                _pick_holder.remove_child(c)
+                c.queue_free()
+        var card := _pick_card(_picks[_pick_idx])
+        # center the 300px card in the flexible holder
+        card.set_anchors_preset(Control.PRESET_CENTER)
+        card.position = Vector2(maxf(0.0, (_pick_holder.size.x - 300.0) / 2.0), 0)
+        _pick_holder.add_child(card)
+        for c in _dots_row.get_children():
+                _dots_row.remove_child(c)
+                c.queue_free()
+        for k in _picks.size():
+                var dot := Panel.new()
+                dot.custom_minimum_size = Vector2(18, 18)
+                var on := k == _pick_idx
+                dot.add_theme_stylebox_override("panel",
+                                Arc.panel_style(Arc.ACCENT if on else Color(0, 0, 0, 0.22), 9))
+                dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                _dots_row.add_child(dot)
+
+# ------------------------------------------------------- feed mini-lists
+
+var _picks_head: Label
+var _sec_last := {}
+var _sec_least := {}
+var _sec_not := {}
+
+func _build_list_sections() -> void:
+        _sec_last = _build_list_section("LAST PLAYED")
+        _sec_least = _build_list_section("LEAST PLAYED")
+        _sec_not = _build_list_section("NOT PLAYED YET")
+
+func _build_list_section(title_: String) -> Dictionary:
+        var head := Arc.label(title_, 26, Arc.HOT)
+        _vb.add_child(head)
+        var sc := BoxScroll.new()
+        sc.custom_minimum_size = Vector2(0, 124)
+        sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        _vb.add_child(sc)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 12)
+        sc.add_child(row)
+        _list_scrolls.append(sc)
+        return {"head": head, "scroll": sc, "row": row}
+
+## Compact owned-game card for the stat lists (thumb + name + one stat line).
+func _mini_card(g: Dictionary, stat_txt: String) -> Control:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(296, 116)
+        b.mouse_filter = Control.MOUSE_FILTER_IGNORE   # its BoxScroll owns taps
+        var sb := Arc.panel_style(Arc.CARD, 20)
+        sb.shadow_color = Color(0, 0, 0, 0.35)
+        sb.shadow_size = 6
+        sb.shadow_offset = Vector2(0, 4)
+        for st in ["normal", "hover", "pressed", "disabled"]:
+                b.add_theme_stylebox_override(st, sb)
+        var ic := TextureRect.new()
+        var tp := String(g.get("thumb", ""))
+        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        ic.position = Vector2(10, 10)
+        ic.size = Vector2(96, 96)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        ic.clip_contents = true
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(ic)
+        var name_l := Arc.label(String(g["title"]), 22, Arc.INK)
+        name_l.position = Vector2(116, 20)
+        name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(name_l)
+        var stat_l := Arc.label(stat_txt, 18, Color("6a4a28"), false)
+        stat_l.position = Vector2(116, 62)
+        stat_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(stat_l)
+        return b
+
+func _fill_list(sec: Dictionary, items: Array, stat_fn: Callable) -> void:
+        var head: Label = sec["head"]
+        var sc: BoxScroll = sec["scroll"]
+        var row: HBoxContainer = sec["row"]
+        for c in row.get_children():
+                row.remove_child(c)
+                c.queue_free()
+        sc.stop_motion()
+        sc._tappables.clear()
+        if items.is_empty():
+                head.visible = false
+                sc.visible = false
+                return
+        head.visible = true
+        sc.visible = true
+        for it in items:
+                var g: Dictionary = it["g"]
+                var card := _mini_card(g, String(stat_fn.call(it)))
+                sc.register_tappable(card, func():
+                        Jukebox.sfx("click", -4.0)
+                        _open_game_page(g))
+                row.add_child(card)
+
+## "3m ago / 5h ago / 2d ago" for the LAST PLAYED strip.
+func _ago(ts: int) -> String:
+        if ts <= 0:
+                return "never"
+        var s := maxi(0, int(Time.get_unix_time_from_system()) - ts)
+        if s < 90:
+                return "just now"
+        if s < 3600:
+                return "%dm ago" % (s / 60)
+        if s < 86400:
+                return "%dh ago" % (s / 3600)
+        return "%dd ago" % (s / 86400)
 
 func _build_grid() -> void:
         var all_head := Arc.label("ALL GAMES", 32, Arc.ACCENT)
@@ -352,20 +572,42 @@ func _build_grid() -> void:
 
 func _refresh() -> void:
         _layout()
-        for c in _hot_row.get_children():
-                _hot_row.remove_child(c)
-                c.queue_free()
         for c in _grid.get_children():
                 _grid.remove_child(c)
                 c.queue_free()
-        _hot_scroll.stop_motion()
         _grid_scroll.stop_motion()
-        _hot_scroll._tappables.clear()
         _grid_scroll._tappables.clear()
 
-        for g in GameReg.hot():
-                if Roadmap.state(String(g["id"])) == "OWNED":
-                        _hot_row.add_child(_hot_card(g))
+        # ---- today's picks (daily random, arrows + dots) ----
+        _picks = Roadmap.daily_picks()
+        _pick_idx = clampi(_pick_idx, 0, maxi(0, _picks.size() - 1))
+        _pick_show(_pick_idx)
+
+        # ---- personal stat strips (owned games only) ----
+        var played: Array = []
+        var never: Array = []
+        for g in GameReg.playable():
+                var gid := String(g["id"])
+                if not Box.owns_game(gid):
+                        continue
+                var plays := Box.stat(gid, "plays")
+                var ts := Box.last_played_at(gid)
+                if plays > 0:
+                        played.append({"g": g, "plays": plays, "ts": ts})
+                else:
+                        never.append({"g": g})
+        var by_recents := played.duplicate()
+        by_recents.sort_custom(func(a, b): return int(a["ts"]) > int(b["ts"]))
+        var by_least := played.duplicate()
+        by_least.sort_custom(func(a, b):
+                var pa := int(a["plays"])
+                var pb := int(b["plays"])
+                if pa != pb:
+                        return pa < pb
+                return int(a["ts"]) < int(b["ts"]))
+        _fill_list(_sec_last, by_recents.slice(0, 10), func(it): return _ago(int(it["ts"])))
+        _fill_list(_sec_least, by_least.slice(0, 10), func(it): return "plays %d" % int(it["plays"]))
+        _fill_list(_sec_not, never.slice(0, 10), func(_it): return "new game")
 
         var tiles := 0
         for g in GameReg.GAMES:
@@ -426,12 +668,12 @@ func _tap_tile(g: Dictionary, st: String, panel: Control) -> void:
         elif st == "MYSTERY":
                 _open_mystery_page(g)
 
-func _card_base(size: Vector2) -> Button:
+func _card_base(size: Vector2, ignore_mouse := true) -> Button:
         var b := Button.new()
         b.custom_minimum_size = size
         b.size = size
         b.clip_contents = true
-        b.mouse_filter = Control.MOUSE_FILTER_IGNORE   # BoxScroll owns gestures
+        b.mouse_filter = Control.MOUSE_FILTER_IGNORE if ignore_mouse else Control.MOUSE_FILTER_STOP
         for st in ["normal", "hover", "pressed", "disabled"]:
                 var sb := Arc.panel_style(Arc.CARD, 24)
                 sb.shadow_color = Color(0, 0, 0, 0.4)
@@ -479,19 +721,20 @@ func _ribbon(b: Control, txt: String, bg: Color, top_right := true) -> void:
         l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         rib.add_child(l)
 
-func _hot_card(g: Dictionary) -> Control:
-        var b := _card_base(Vector2(300, 208))
-        _add_thumb(b, g, 48)
-        var name_l := Arc.label(String(g["title"]), 25, Arc.INK)
-        name_l.position = Vector2(14, 160)
-        name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        b.add_child(name_l)
-        _hot_scroll.register_tappable(b, func(): _tap_tile(g, "OWNED", b))
-        return b
+## Two-level feed badge (owner rule v0.0.7):
+##   NEW!      orange - the teaser just appeared
+##   UNLOCKED! green  - it resolved into a real buyable tile
+## Any tap on the tile clears the level (Box.mark_seen).
+func _feed_ribbon(b: Control, level: String, top_right := true) -> void:
+        if level == "new":
+                _ribbon(b, "NEW!", Arc.HOT, top_right)
+        elif level == "unlocked":
+                _ribbon(b, "UNLOCKED!", Arc.GOOD, top_right)
 
 func _tile(g: Dictionary, st: String) -> Control:
         var b := _card_base(Vector2(334, 312))
         var id := String(g["id"])
+        var bd := Box.badge(id)
         match st:
                 "OWNED":
                         _add_thumb(b, g, 70)
@@ -524,8 +767,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         lock_ic.position = Vector2(262, 16)
                         lock_ic.modulate = Color(1, 1, 1, 0.9)
                         b.add_child(lock_ic)
-                        if not Box.is_seen(id):
-                                _ribbon(b, "NEW!", Arc.HOT, false)
+                        _feed_ribbon(b, bd)
                 "GATED":
                         var th := _add_thumb(b, g, 70, true)
                         th.modulate = Color(1, 1, 1, 0.22)
@@ -546,8 +788,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         lock_ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         lock_ic.position = Vector2(131, 96)
                         b.add_child(lock_ic)
-                        if not Box.is_seen(id):
-                                _ribbon(b, "NEW!", Arc.HOT, false)
+                        _feed_ribbon(b, bd)
                 "SOON":
                         _add_thumb(b, g, 70)
                         var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
@@ -559,8 +800,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         tag.position = Vector2(14, 274)
                         tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(tag)
-                        if not Box.is_seen(id):
-                                _ribbon(b, "NEW!", Arc.HOT, false)
+                        _feed_ribbon(b, bd, false)
                 "MYSTERY":
                         var dark := ColorRect.new()
                         dark.color = Color(0.07, 0.05, 0.04, 1.0)
@@ -899,8 +1139,11 @@ func _open_guide(g: Dictionary) -> void:
 func _set_feed_lock(locked: bool) -> void:
         # sheets sit ON TOP of the feed scrolls; without this lock BoxScroll would
         # swallow the emulated mouse and sliders/buttons in sheets would "hang"
-        _hot_scroll.input_locked = locked
-        _grid_scroll.input_locked = locked
+        if _grid_scroll != null and is_instance_valid(_grid_scroll):
+                _grid_scroll.input_locked = locked
+        for sc in _list_scrolls:
+                if sc != null and is_instance_valid(sc):
+                        (sc as BoxScroll).input_locked = locked
 
 func _sheet_base(h := 0.0) -> VBoxContainer:
         _sheet_open = true
@@ -1257,10 +1500,29 @@ func _open_mystery_page(g: Dictionary) -> void:
         var id := String(g["id"])
         var rv: Dictionary = g.get("reveal", {})
         var vb := _sheet_base()
-        var q := Arc.label("?", 90, Arc.ACCENT)
-        q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(q)
+        # v0.0.7: the real mystery art (the old text "?" was the stale design;
+        # the tile already used this artwork - now the pre-play page matches)
+        var qc := HBoxContainer.new()
+        qc.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_child(qc)
+        var q := TextureRect.new()
+        q.texture = load("res://assets/ui/mystery.png")
+        q.custom_minimum_size = Vector2(300, 206)
+        q.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        q.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        q.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        qc.add_child(q)
         vb.add_child(Arc.label("MYSTERY GAME", 32, Arc.INK))
+
+        # live poll: the countdown ticks every second, and the moment the
+        # notification permission flips (dialog granted / settings toggle) the
+        # ALLOW REMINDERS button disappears without reopening the page
+        var countdown: Label = null
+        var panel := vb.get_parent()
+        var tick := Timer.new()
+        tick.wait_time = 1.0
+        tick.autostart = true
+        panel.add_child(tick)
 
         match String(rv.get("kind", "")):
                 "orders":
@@ -1275,19 +1537,21 @@ func _open_mystery_page(g: Dictionary) -> void:
                 "inbox":
                         var left := Roadmap.inbox_left(id)
                         if left > 0.0:
-                                var l1 := Arc.label("play %s more (total box time)\nto reveal this one" %
-                                                Roadmap.fmt_clock(left), 22, Arc.INK, false)
-                                l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                                vb.add_child(l1)
+                                countdown = Arc.label("", 22, Arc.INK, false)
+                                countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                                vb.add_child(countdown)
+                                var hint := Arc.label("of total box play time to reveal this one",
+                                                19, Color("8a6a40"), false)
+                                hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                                vb.add_child(hint)
                         else:
                                 vb.add_child(Arc.label("revealing...", 22, Arc.INK, false))
                 "real":
                         var left := Roadmap.time_left(id)
                         if left > 0.0:
-                                var l2 := Arc.label("reveals in %s" % Roadmap.fmt_clock(left),
-                                                24, Arc.INK)
-                                l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                                vb.add_child(l2)
+                                countdown = Arc.label("", 24, Arc.INK)
+                                countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                                vb.add_child(countdown)
                                 var sub := Arc.label("we'll ping you when it's ready", 19, Color("8a6a40"), false)
                                 sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                                 vb.add_child(sub)
@@ -1296,6 +1560,34 @@ func _open_mystery_page(g: Dictionary) -> void:
                                                         Color("58a8d8"), func(): Notify.request_permission()))
                         else:
                                 vb.add_child(Arc.label("revealing...", 22, Arc.INK, false))
+        tick.timeout.connect(func():
+                if not is_instance_valid(vb):
+                        return
+                if countdown != null and is_instance_valid(countdown):
+                        if String(rv.get("kind", "")) == "inbox":
+                                var lft := Roadmap.inbox_left(id)
+                                if lft <= 0.0:
+                                        _close_sheet()
+                                        _after_roadmap_change()
+                                        return
+                                countdown.text = "%s left\nplay any game" % Roadmap.fmt_clock(lft)
+                        else:
+                                var lft := Roadmap.time_left(id)
+                                if lft <= 0.0:
+                                        _close_sheet()
+                                        _after_roadmap_change()
+                                        return
+                                countdown.text = "reveals in %s" % Roadmap.fmt_clock(lft)
+                # permission flipped while the page is open -> refresh the button
+                if String(rv.get("kind", "")) == "real" and Notify.permission_granted() \
+                                and Roadmap.time_left(id) > 0.0:
+                        var has_btn := false
+                        for c in vb.get_children():
+                                if c is Button and String((c as Button).text).begins_with("ALLOW"):
+                                        has_btn = true
+                        if has_btn:
+                                _close_sheet()
+                                _open_mystery_page(g))
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)

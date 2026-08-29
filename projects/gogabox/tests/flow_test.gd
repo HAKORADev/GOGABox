@@ -72,6 +72,7 @@ func _t_slots() -> int:
         ok += _check(not Box.has_achievement("snake", "a1"), "ach unset")
         ok += _check(Box.grant_achievement("snake", "a1"), "first grant true")
         ok += _check(not Box.grant_achievement("snake", "a1"), "second grant false")
+        ok += _check(Box.ach_count("snake") == 1, "ach_count tracks trophies")
         ok += _check(Box.buy_skin("snake", "gold", 300) == false, "skin refused (broke)")
         Box.earn(400)
         ok += _check(Box.buy_skin("snake", "gold", 300), "skin bought")
@@ -111,10 +112,10 @@ func _t_batteries() -> int:
         Box.data["game_batteries"]["rally"]["count"] = 1
         ok += _check(not Box.consume_round_batteries("rally"), "no play at 1 battery")
         Box.data["game_batteries"]["rally"]["count"] = 10
-        Box.data["box_batteries"] = 1
+        Box.set_box_batteries(1)
         ok += _check(not Box.consume_round_batteries("rally"), "no play when bank < cost")
         ok += _check(int(Box.game_battery("rally")["count"]) == 10, "pool untouched on fail")
-        Box.data["box_batteries"] = 30
+        Box.set_box_batteries(30)
         Box.data["game_batteries"]["rally"]["count"] = 1
         var moved := Box.refill_game_from_box("rally")
         # OWNER RULE (v0.0.6): a tap refills ONE ROUND worth (per_round), never
@@ -130,13 +131,13 @@ func _t_batteries() -> int:
         ok += _check(moved == 1 and int(Box.game_battery("rally")["count"]) == 10,
                 "cap-limited: only the missing 1 moves")
         Box.data["game_batteries"]["rally"]["count"] = 5
-        Box.data["box_batteries"] = 0
+        Box.set_box_batteries(0)
         ok += _check(Box.refill_game_from_box("rally") == 0, "dry bank: nothing moves")
-        # closed-time regen for the global pool
-        Box.data["box_batteries"] = 0
-        Box.meta()["closed_ts"] = int(Time.get_unix_time_from_system()) - 620
-        Box._apply_closed_regen()
-        ok += _check(Box.box_batteries() == 2, "closed 620s -> +2 box batteries")
+        # v0.0.7: the bank charges ALWAYS via timestamps (open or closed)
+        Box.data["box_batteries"] = {"count": 0, "ts": int(Time.get_unix_time_from_system()) - 620}
+        ok += _check(Box.box_batteries() == 2, "620s elapsed -> +2 box batteries")
+        ok += _check(Box.box_regen_in() > 0 and Box.box_regen_in() <= Box.BATTERY_STEP,
+                "regen countdown sane")
         Box.reset_all()
         return ok
 
@@ -174,7 +175,6 @@ func _t_meta() -> int:
 
 func _t_registry() -> int:
         var ok := _check(GameReg.playable().size() == 6, "6 playable games")
-        ok += _check(GameReg.hot().size() == 3, "3 hot games")
         ok += _check(GameReg.workshop().size() == 8, "8 workshop teasers")
         var ok2 := true
         for g in GameReg.GAMES:
@@ -196,20 +196,47 @@ func _t_roadmap() -> int:
         ok += _check(Roadmap.state("rally") == "HIDDEN", "rally hidden before first play")
         ok += _check(Roadmap.state("dario") == "MYSTERY", "dario mystery teaser from start")
         ok += _check(Roadmap.state("maze") == "HIDDEN", "maze hidden (appear_after 2)")
+        # daily picks: deterministic per day, owned games only, <= 5
+        var picks := Roadmap.daily_picks()
+        var picks2 := Roadmap.daily_picks()
+        ok += _check(picks.size() >= 1 and picks.size() <= 5, "daily picks 1..5 (%d)" % picks.size())
+        ok += _check(picks.size() == picks2.size(), "daily picks stable in a day")
+        var same := true
+        for i in picks.size():
+                same = same and String(picks[i]["id"]) == String(picks2[i]["id"])
+        ok += _check(same, "daily picks same order within a day")
+        # v0.0.7 two-level badges: mystery teaser wears NEW!
+        Roadmap.tick()
+        ok += _check(Box.badge("dario") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("dario"))
         # playing snake reveals rally (chain) but it stays hidden until Roadmap.tick stamps it
         Box.record_run("snake", 10)
         ok += _check(Roadmap.state("rally") == "LOCKED", "rally revealed after snake played")
-        # mystery orders progress
+        Roadmap.tick()
+        ok += _check(Box.badge("rally") == "unlocked", "resolved tile badge UNLOCKED! (%s)" % Box.badge("rally"))
+        Box.mark_seen("rally")
+        ok += _check(Box.badge("rally") == "", "tap clears the badge")
+        # mystery orders progress (spend + plays + 2 snake achievements)
         var lines := Roadmap.order_lines("dario")
-        ok += _check(lines.size() == 2, "dario has 2 orders")
+        ok += _check(lines.size() == 3, "dario has 3 orders (incl. achievement order)")
         ok += _check(not Roadmap._condition_done("dario", GameReg.get_game("dario")["reveal"]),
                 "dario orders incomplete")
         Box.add_spent("snake", 120)
         Box.record_run("snake", 5)
         Box.record_run("snake", 5)
+        Box.grant_achievement("snake", "score_30")
+        ok += _check(not Roadmap._condition_done("dario", GameReg.get_game("dario")["reveal"]),
+                "dario still locked at 1/2 achievements")
+        Box.grant_achievement("snake", "score_60")
         ok += _check(Roadmap._condition_done("dario", GameReg.get_game("dario")["reveal"]),
-                "dario orders complete after spend+plays")
+                "dario orders complete after spend+plays+2 achievements")
         ok += _check(Roadmap.state("dario") == "SOON", "dario SOON (workshop game)")
+        # ach_exact order: a SPECIFIC trophy line resolves with its title
+        var xo_lines := Roadmap.order_lines("xo")
+        var found_exact := false
+        for l in xo_lines:
+                if "Wall of Paddle" in String(l["text"]):
+                        found_exact = true
+        ok += _check(found_exact and xo_lines.size() == 3, "xo carries the exact-trophy order")
         # gated: maze needs 2 owned games (snake + rally = 2 -> teaser appears)
         Box.unlock_game("rally", 0)
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze mystery at 2 owned")
@@ -372,19 +399,21 @@ func _t_host_flow() -> int:
         game.set_score(37)
         game.add_run_coins(5)
         game.finish_run(37)
-        await get_tree().create_timer(1.2).timeout
+        await get_tree().create_timer(2.2).timeout   # payout theatre animates first
         ok += _check(Box.stat("snake", "best") == 37, "run recorded (best 37)")
-        # MODULAR coin_div: snake 37 / 10 = 3 bonus, + 5 pickups = 8 total
-        ok += _check(Box.coins() == 150 - 10 + 8, "net wallet 148 -> %d" % Box.coins())
+        # MODULAR coin_div (v0.0.7: snake /2): 37 / 2 = 18 bonus, + 5 pickups = 23 total
+        ok += _check(Box.coins() == 150 - 10 + 23, "net wallet 163 -> %d" % Box.coins())
         ok += _check(Box.stat("snake", "plays") == 1, "plays 1")
+        # breakdown theatre collapsed into the sum line + chip shows the total
+        ok += _check(host.has_method("_score_to_coins"), "host keeps the coin math")
         # ---- rewarded DOUBLE: sim pays instantly -> wallet + button state ----
         var dbl := _find_button(host, "DOUBLE")
         ok += _check(dbl != null, "double button on the game-over sheet")
         if dbl != null:
                 dbl.pressed.emit()
-                await get_tree().create_timer(0.6).timeout
-                ok += _check(Box.coins() == 148 + 8,
-                                "double pays the REAL amount (156) -> %d" % Box.coins())
+                await get_tree().create_timer(1.0).timeout
+                ok += _check(Box.coins() == 163 + 23,
+                                "double pays the REAL amount (186) -> %d" % Box.coins())
                 ok += _check(dbl.disabled and String(dbl.text).begins_with("REWARDED"),
                                 "button enters rewarded state (%s)" % dbl.text)
         # quit path
@@ -401,7 +430,7 @@ func _t_all_games() -> int:
         Box.reset_all()
         Box.earn(100000)
         # charged games need BOTH pools: keep the box bank topped up
-        Box.data["box_batteries"] = Box.box_battery_cap()
+        Box.set_box_batteries(Box.box_battery_cap())
         for g in GameReg.playable():
                 if not Box.owns_game(String(g["id"])):
                         Box.unlock_game(String(g["id"]), 0)
@@ -410,6 +439,14 @@ func _t_all_games() -> int:
         add_child(router)
         for g in GameReg.playable():
                 var id := String(g["id"])
+                # real-hours gates (hopper 16-22 local) refuse the launch when
+                # the wall clock is outside - that is the GAME WORKING AS
+                # DESIGNED, so assert the gate exists and skip the boot
+                # instead of flaking on the time of day
+                if not Roadmap.window_ok(id):
+                        ok += _check(Roadmap.window_text(id) != "",
+                                        id + " window-gated right now (boot skipped by design)")
+                        continue
                 var fee := int(g["fee"])
                 var before := Box.coins()
                 var launched: bool = host_script.launch(router, id)
@@ -450,6 +487,21 @@ func _t_menu() -> int:
         ok += _check(grid != null and grid.get_child_count() >= 2,
                 "menu grid has tiles (%s)" % (grid.get_child_count() if grid else -1))
         ok += _check(menu._root.size.x > 0 and menu._root.size.y > 0, "menu root sized")
+        # v0.0.7 feed: picks carousel (arrows + dots) + the three stat strips
+        ok += _check(menu._picks.size() >= 1 and menu._picks.size() <= 5,
+                "picks carousel filled (%d)" % menu._picks.size())
+        ok += _check(menu._pick_holder.get_child_count() == 1, "one pick card shown")
+        ok += _check(menu._dots_row.get_child_count() == menu._picks.size(),
+                "dots == picks (%d dots)" % menu._dots_row.get_child_count())
+        var before_idx: int = menu._pick_idx
+        if menu._picks.size() > 1:
+                menu._pick_move(1)
+                ok += _check(menu._pick_idx != before_idx, "arrow advances the carousel")
+        else:
+                menu._pick_move(1)   # single pick: wraps onto itself, must not crash
+                ok += _check(menu._pick_idx == before_idx, "single pick stays put")
+        ok += _check(menu._dots_row.get_child_count() == menu._picks.size(),
+                "dots rebuilt after paging")
         # every sheet opens without script errors
         menu._open_settings()
         await get_tree().process_frame
@@ -518,8 +570,12 @@ func _t_isolation() -> int:
         ok += _check(not menu.visible, "menu node hidden")
         ok += _check(not menu._layer.visible, "menu CanvasLayer hidden (the v0.0.4 leak)")
         ok += _check(menu.process_mode == Node.PROCESS_MODE_DISABLED, "menu processing stopped")
-        ok += _check(menu._hot_scroll.input_locked and menu._grid_scroll.input_locked,
-                "feed scrolls locked")
+        ok += _check(menu._grid_scroll.input_locked, "feed scrolls locked")
+        var list_locked := true
+        for sc in menu._list_scrolls:
+                list_locked = list_locked and (sc as BoxScroll).input_locked
+        ok += _check(list_locked and menu._list_scrolls.size() == 3,
+                "stat strips locked (%d)" % menu._list_scrolls.size())
 
         # ---- close restores everything (main.on_game_closed -> set_active) ----
         host._quit_to_menu()

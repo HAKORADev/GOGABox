@@ -13,8 +13,9 @@ extends RefCounted
 ##   kind: chain | orders | inbox (minutes) | real (hours)
 ##   appear_after: owned games needed before the teaser shows at all
 ##   needs_games:  owned games required to BUY once revealed
-## Order progress (spend_in / earn_in / plays / beat_best) is computed live
-## from Box stats, so nothing extra to persist except baselines + timestamps.
+##   Order progress (spend_in / earn_in / plays / beat_best / ach_in /
+##   ach_exact) is computed live from Box stats, so nothing extra to persist
+##   except baselines + timestamps.
 
 # ---------------------------------------------------------------- states
 
@@ -78,6 +79,8 @@ static func _order_value(o: Dictionary) -> int:
                         var base := int(Box.get_progress("__roadmap__", "base_" + gid, 0))
                         var best := Box.stat(gid, "best")
                         return best if best > base else 0
+                "ach_in": return Box.ach_count(String(o["game"]))
+                "ach_exact": return 1 if Box.has_achievement(String(o["game"]), String(o["ach"])) else 0
         return 0
 
 static func _order_goal(o: Dictionary) -> int:
@@ -85,6 +88,8 @@ static func _order_goal(o: Dictionary) -> int:
                 "spend_in", "earn_in": return int(o["amount"])
                 "plays": return int(o["count"])
                 "beat_best": return 1
+                "ach_in": return int(o["count"])
+                "ach_exact": return 1
         return 1
 
 static func order_lines(id: String) -> Array:
@@ -106,6 +111,13 @@ static func _order_text(o: Dictionary) -> String:
                 "earn_in": return "earn %d coins in %s" % [int(o["amount"]), gt]
                 "plays": return "play %d rounds of %s" % [int(o["count"]), gt]
                 "beat_best": return "beat your high score in %s" % gt
+                "ach_in": return "earn %d achievements in %s" % [int(o["count"]), gt]
+                "ach_exact":
+                        var title := String(o["ach"])
+                        for a in GameReg.get_game(String(o["game"])).get("ach", []):
+                                if String(a["id"]) == String(o["ach"]):
+                                        title = String(a["title"])
+                        return "unlock the '%s' trophy in %s" % [title, gt]
         return "??"
 
 ## Seconds left on a timed mystery (0 when not timed / already done).
@@ -170,6 +182,7 @@ static func tick() -> void:
                 var key := "state_" + id
                 var prev := String(Box.meta().get(key, ""))
                 if st == prev:
+                        _heal_badge(id, st)     # v0.0.7: self-heal old saves
                         continue
                 Box.meta()[key] = st
                 if prev == "" or (prev == "HIDDEN" and st != "HIDDEN"):
@@ -178,14 +191,35 @@ static func tick() -> void:
                                 Box.meta()["seen_at_" + id] = now
                                 _stamp_order_baselines(id)
                                 _schedule_reveal_notification(id, g)
-                if (prev == "HIDDEN" or prev == "MYSTERY") \
+                        # v0.0.7 two-level badge: first appearance = NEW!
+                        # (OWNED games never badge - the starter must not wear
+                        # a permanent ribbon)
+                        if st != "OWNED" and not Box.is_seen(id) and Box.badge(id) == "":
+                                Box.set_badge(id, "new")
+                if (prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED") \
                                 and (st == "GATED" or st == "SOON" or st == "LOCKED"):
                         # a teaser just resolved into something tangible -> celebrate
                         Notify.cancel(_notify_id(id))
                         Notify.play_kind_sfx("game_ready")   # in-app ping
                         Box.reveal_changed.emit(id)
+                        # ...and its badge upgrades to UNLOCKED! (green)
+                        if not Box.is_seen(id):
+                                Box.set_badge(id, "unlocked")
+                _heal_badge(id, st)
         Box.save()
 
+## v0.0.7 migration: saves from before the badge system have seen=false games
+## sitting in visible states with no badge. Derive the level from the state
+## once; tap-to-clear then works exactly like fresh badges.
+static func _heal_badge(id: String, st: String) -> void:
+        if Box.is_seen(id) or Box.badge(id) != "":
+                return
+        match st:
+                "MYSTERY": Box.set_badge(id, "new")
+                "LOCKED", "GATED", "SOON": Box.set_badge(id, "unlocked")
+
+## Baselines are already stamped when a teaser first appears; nothing to do
+## for ach_in / ach_exact (they read live trophy counts).
 static func _stamp_order_baselines(id: String) -> void:
         var rv: Dictionary = GameReg.get_game(id).get("reveal", {})
         for o in rv.get("orders", []):
@@ -211,6 +245,29 @@ static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
         Notify.schedule(_notify_id(id), "GOGABox",
                         "%s finished baking in the workshop - come see!" % String(g["title"]),
                         int(delay), "game_ready")
+
+# ------------------------------------------------------------ daily picks
+
+## The feed has no real "hot" metric (everything is local), so the owner
+## redefined it: up to 5 games picked by a daily seed - the same handful all
+## day for everyone, reshuffled at midnight. OWNED games only (pickable).
+static func daily_picks() -> Array:
+        var d := Time.get_date_dict_from_system()
+        var seed_text := "%s-%s-%s-gogabox" % [d["year"], d["month"], d["day"]]
+        var rng := RandomNumberGenerator.new()
+        rng.seed = hash(seed_text)
+        var pool := []
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if Box.owns_game(id):
+                        pool.append(g)
+        # Fisher-Yates with the day's rng
+        for i in range(pool.size() - 1, 0, -1):
+                var j := rng.randi_range(0, i)
+                var tmp = pool[i]
+                pool[i] = pool[j]
+                pool[j] = tmp
+        return pool.slice(0, mini(5, pool.size()))
 
 # ------------------------------------------------------------------ format
 

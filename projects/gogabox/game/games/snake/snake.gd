@@ -145,18 +145,18 @@ func _step() -> void:
         if head == food:
                 ate = true
                 _eaten += 1
-                set_score(score + 10)
+                set_score(score + 1)   # owner rule: each apple = 1 score point
                 grow += 1
                 Jukebox.sfx("pop", -4.0, 1.0 + 0.02 * mini(20, _eaten))
                 _spawn_food()
                 _maybe_spawn_coin()
-                # speed ramp
-                step_time = maxf(0.075, 0.16 - 0.004 * float(score / 10))
+                # speed ramp (rescaled for 1-point apples: same curve shape)
+                step_time = maxf(0.075, 0.16 - 0.002 * float(score))
         elif head == coin_pos:
                 ate = true
-                add_run_coins(5)
-                achievement_count("coins_taken", 5)
-                achievement_max("coins_got", 5)
+                add_run_coins(1)   # owner rule: one pickup = ONE GOGACoin
+                achievement_count("coins_taken", 1)
+                achievement_max("coins_got", run_coins)
                 Jukebox.sfx("coin", -4.0)
                 coin_pos = Vector2i(-1, -1)
                 _coin_node.position = Vector2(-100, -100)
