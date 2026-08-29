@@ -5,11 +5,17 @@
     android:versionName="1.0"
     android:installLocation="auto" >
 
-    <!-- GOGABox overlay: portrait default (games may switch at runtime via
-         GameHost) + network permissions + Unity Ads plugin registration -->
+    <!-- GOGABox overlay: the box rotates freely (fullSensor; games force their
+         own orientation at runtime via GameHost) + network + Unity Ads plugin
+         registration + local notification system (Notify plugin). -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- local notifications (timed game reveals + return reminders) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <supports-screens
         android:smallScreens="true"
@@ -40,6 +46,11 @@
             android:name="org.godotengine.plugin.v1.UnityAds"
             android:value="org.godotengine.plugin.unityads.UnityAdsPlugin" />
 
+        <!-- Local notification plugin registration -->
+        <meta-data
+            android:name="org.godotengine.plugin.v1.Notify"
+            android:value="org.godotengine.plugin.notify.NotifyPlugin" />
+
         <activity
             android:name=".GodotApp"
             android:theme="@style/GodotAppSplashTheme"
@@ -47,7 +58,7 @@
             android:excludeFromRecents="false"
             android:exported="false"
             android:supportsPictureInPicture="true"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullSensor"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="layoutDirection|locale|orientation|keyboardHidden|screenSize|smallestScreenSize|density|keyboard|navigation|screenLayout|uiMode"
             android:resizeableActivity="false"
@@ -62,6 +73,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+
+        <!-- Notify plugin: fires scheduled alarms + re-arms them after reboot -->
+        <receiver
+            android:name="org.godotengine.plugin.notify.NotifyPlugin$AlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="org.godotengine.plugin.notify.NotifyPlugin$BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

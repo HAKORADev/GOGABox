@@ -1,0 +1,6 @@
+{
+	"addon_dir": "notify",
+	"gradle_deps": [],
+	"godot_plugin_version": 1,
+	"description": "Local notification plugin (v1 GodotPlugin) - AlarmManager scheduling persisted across reboot, POST_NOTIFICATIONS aware. Java source staged into <project>/android/build/src/main/java; no external deps."
+}

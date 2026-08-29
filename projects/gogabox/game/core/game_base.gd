@@ -23,6 +23,7 @@ var _score_label: Label
 var _coins_label: Label
 var _overlay_root: Control
 var _toast: Dictionary
+var _ach_clock := 0.0
 
 func _ready() -> void:
         tk = TouchKit.new()
@@ -75,7 +76,8 @@ func achievement_count(key: String, amount: int) -> void:
 func achievement_max(key: String, value: int) -> void:
         Box.max_counter(game_id, key, value)
 
-## Check this game's achievements; toasts + returns count of new ones.
+## Check this game's achievements; awards the SHARED popup (Achiever) with
+## sound + confetti and returns count of new ones. Safe to call often.
 func check_achievements() -> int:
         var g := GameReg.get_game(game_id)
         var new_count := 0
@@ -103,8 +105,7 @@ func check_achievements() -> int:
                         "tile_2048": ok = Box.counter(game_id, "max_tile") >= 2048
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
-                        _toast_show("ACHIEVEMENT: " + String(a["title"]))
-                        Jukebox.sfx("win", -6.0)
+                        Achiever.award(game_id, a)
         return new_count
 
 # --------------------------------------------------- toasts
@@ -205,3 +206,8 @@ func _process(delta: float) -> void:
         if over or paused:
                 return
         _goga_tick(delta)
+        # live achievement sweep every ~3s so the shared popup fires mid-run
+        _ach_clock += delta
+        if _ach_clock >= 3.0:
+                _ach_clock = 0.0
+                check_achievements()

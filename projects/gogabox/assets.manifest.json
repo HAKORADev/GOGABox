@@ -1,47 +1,47 @@
 {
-	"schema": 2,
-	"project": "gogabox",
-	"_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Re-derive everything: python3 projects/gogabox/tools/derive_assets.py (idempotent: re-downloads the Kenney fonts zip, re-copies CC0 audio vendored in candyrush, re-draws all PIL art, re-synthesizes sfx, regenerates thumbnails). All sources CC0; derivations inherit CC0.",
-	"sources": [
-		{
-			"id": "kenney-fonts",
-			"name": "Kenney - Kenney Fonts pack",
-			"url": "https://kenney.nl/assets/kenney-fonts",
-			"zip": "https://kenney.nl/media/pages/assets/kenney-fonts/8d5435c213-1677661710/kenney_kenney-fonts.zip",
-			"license": "CC0 1.0 Universal",
-			"used_for": "assets/fonts/Kenney_Rocket.ttf (display font, menu/titles), assets/fonts/Kenney_Mini.ttf (UI font, chips/labels); also used inside PIL thumbnails"
-		},
-		{
-			"id": "vendored-candyrush-cc0-audio",
-			"name": "CC0 audio already vendored in projects/candyrush (originally Kenney Interface Sounds / Music Jingles, OpenGameArt pops + Happy Adventure loop, synth gaps)",
-			"url": "https://kenney.nl/assets/interface-sounds ; https://kenney.nl/assets/music-jingles ; https://opengameart.org (see projects/candyrush/assets.manifest.json for exact URLs)",
-			"license": "CC0 1.0 Universal",
-			"used_for": "assets/audio/ui/{click,confirm,buy,error}.ogg, assets/audio/jingles/{win,lose}.*, assets/audio/sfx/{boom,coin,sparkle,star,swap,pop*}.*, assets/audio/music/box_theme.mp3"
-		},
-		{
-			"id": "oga-pixel-fruit-pack",
-			"name": "OpenGameArt - Pixel Fruit Pack (via candyrush vendored copies)",
-			"url": "https://opengameart.org/content/pixel-fruit-pack",
-			"license": "CC0 1.0 Universal",
-			"used_for": "Fruit Slasher fruit_0..4 (upscaled 160px); fruit_gold is a deterministic gold recolor of fruit_0"
-		},
-		{
-			"id": "pil-drawn",
-			"name": "Deterministic PIL drawings (this repo, tools/derive_assets.py)",
-			"license": "CC0 (project-authored)",
-			"used_for": "box chrome (bg_main, logo, coin, lock/gear/trophy icons), snake apple/body/head x4 skins, lanes ship+block, rally ball+paddle, hopper platform+player, slasher bomb, all 14 menu thumbnails (6 games + 8 SOON tiles), icon.svg"
-		},
-		{
-			"id": "synth-sfx",
-			"name": "numpy-synthesized sfx (this repo, tools/derive_assets.py)",
-			"license": "CC0 (project-authored)",
-			"used_for": "assets/audio/sfx/hop.wav (up-chirp), assets/audio/sfx/land.wav (soft thud)"
-		}
-	],
-	"audit": {
-		"policy": "CC0-only, vendored, no network fetch at runtime",
-		"fonts": "Kenney Fonts (CC0) vendored as TTF",
-		"music": "1 box theme loop (CC0, via candyrush vendored copy); games share jingles+sfx pool",
-		"note": "Audio kept deliberately small for v0.0.1; per-game music is a roadmap item (Docs/ideas)"
-	}
+        "schema": 2,
+        "project": "gogabox",
+        "_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Re-derive everything: python3 projects/gogabox/tools/derive_assets.py (idempotent: re-downloads the Kenney fonts zip, re-copies CC0 audio vendored in candyrush, re-draws all PIL art, re-synthesizes sfx, regenerates thumbnails). All sources CC0; derivations inherit CC0.",
+        "sources": [
+                {
+                        "id": "kenney-fonts",
+                        "name": "Kenney - Kenney Fonts pack",
+                        "url": "https://kenney.nl/assets/kenney-fonts",
+                        "zip": "https://kenney.nl/media/pages/assets/kenney-fonts/8d5435c213-1677661710/kenney_kenney-fonts.zip",
+                        "license": "CC0 1.0 Universal",
+                        "used_for": "assets/fonts/Kenney_Rocket.ttf (display font, menu/titles), assets/fonts/Kenney_Mini.ttf (UI font, chips/labels); also used inside PIL thumbnails"
+                },
+                {
+                        "id": "vendored-candyrush-cc0-audio",
+                        "name": "CC0 audio already vendored in projects/candyrush (originally Kenney Interface Sounds / Music Jingles, OpenGameArt pops + Happy Adventure loop, synth gaps)",
+                        "url": "https://kenney.nl/assets/interface-sounds ; https://kenney.nl/assets/music-jingles ; https://opengameart.org (see projects/candyrush/assets.manifest.json for exact URLs)",
+                        "license": "CC0 1.0 Universal",
+                        "used_for": "assets/audio/ui/{click,confirm,buy,error}.ogg, assets/audio/jingles/{win,lose}.*, assets/audio/sfx/{boom,coin,sparkle,star,swap,pop*}.*, assets/audio/music/box_theme.mp3"
+                },
+                {
+                        "id": "oga-pixel-fruit-pack",
+                        "name": "OpenGameArt - Pixel Fruit Pack (via candyrush vendored copies)",
+                        "url": "https://opengameart.org/content/pixel-fruit-pack",
+                        "license": "CC0 1.0 Universal",
+                        "used_for": "Fruit Slasher fruit_0..4 (upscaled 160px); fruit_gold is a deterministic gold recolor of fruit_0"
+                },
+                {
+                        "id": "pil-drawn",
+                        "name": "Deterministic PIL drawings (this repo, tools/derive_assets.py + tools/make_brand.py)",
+                        "license": "CC0 (project-authored)",
+                        "used_for": "box chrome (bg_main, logo, coin, lock/gear/trophy icons, splash), snake apple/body/head x4 skins, lanes ship+block, rally ball+paddle, hopper platform+player, slasher bomb, all 14 menu thumbnails (6 games + 8 workshop teasers), icon.svg, app icon set (icons/main_192x192.png + icons/adaptive_foreground_432x432.png + icons/adaptive_background_432x432.png, letter-G emblem via tools/make_brand.py), android notification glyph (android-overlay/.../drawable-nodpi/ic_notify.png)"
+                },
+                {
+                        "id": "synth-sfx",
+                        "name": "numpy-synthesized sfx (this repo, tools/derive_assets.py)",
+                        "license": "CC0 (project-authored)",
+                        "used_for": "assets/audio/sfx/hop.wav (up-chirp), assets/audio/sfx/land.wav (soft thud)"
+                }
+        ],
+        "audit": {
+                "policy": "CC0-only, vendored, no network fetch at runtime",
+                "fonts": "Kenney Fonts (CC0) vendored as TTF",
+                "music": "1 box theme loop (CC0, via candyrush vendored copy); games share jingles+sfx pool",
+                "note": "Audio kept deliberately small for v0.0.1; per-game music is a roadmap item (Docs/ideas)"
+        }
 }

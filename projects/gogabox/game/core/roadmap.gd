@@ -1,0 +1,193 @@
+class_name Roadmap
+extends RefCounted
+## The feed-reveal brain. The box does NOT show every game at once - it grows:
+##
+##   HIDDEN  -> not rendered at all
+##   MYSTERY -> black tile "?????" (orders to complete, or a countdown)
+##   GATED   -> visible + faded + lock: revealed, but you must own more games
+##   SOON    -> visible workshop game: conditions met, script still baking
+##   LOCKED  -> visible + purchasable with GOGACoins (+ New! badge until tapped)
+##   OWNED   -> in the library
+##
+## Conditions are declarative in registry.gd ("reveal" dict):
+##   kind: chain | orders | inbox (minutes) | real (hours)
+##   appear_after: owned games needed before the teaser shows at all
+##   needs_games:  owned games required to BUY once revealed
+## Order progress (spend_in / earn_in / plays / beat_best) is computed live
+## from Box stats, so nothing extra to persist except baselines + timestamps.
+
+# ---------------------------------------------------------------- states
+
+static func state(id: String) -> String:
+        var g := GameReg.get_game(id)
+        if g.is_empty():
+                return "HIDDEN"
+        if Box.owns_game(id):
+                return "OWNED"
+        var rv: Dictionary = g.get("reveal", {})
+        if rv.is_empty():
+                return "LOCKED"
+        # appear_after gate: teaser not even shown yet
+        var after := int(rv.get("appear_after", 0))
+        if after > 0 and Box.owned_count() < after:
+                return "HIDDEN"
+        # condition gate (orders / timers); chain games stay fully hidden
+        if not _condition_done(id, rv):
+                return "HIDDEN" if String(rv.get("kind", "chain")) == "chain" else "MYSTERY"
+        # revealed: workshop games stay SOON, real games check extra gate
+        if int(rv.get("needs_games", 0)) > Box.owned_count():
+                return "GATED"
+        if g.get("coming_soon", false):
+                return "SOON"
+        return "LOCKED"
+
+## True once the reveal condition (not the games-owned gate) is satisfied.
+static func _condition_done(id: String, rv: Dictionary) -> bool:
+        match String(rv.get("kind", "chain")):
+                "chain":
+                        var idx := GameReg.playable_index(id)
+                        if idx <= 0:
+                                return true
+                        var prev: Dictionary = GameReg.playable()[idx - 1]
+                        var pid := String(prev["id"])
+                        return Box.owns_game(pid) and Box.stat(pid, "plays") > 0
+                "inbox":
+                        return Box.total_time() >= float(rv.get("minutes", 30)) * 60.0
+                "real":
+                        var seen := _seen_at(id)
+                        return seen > 0 and Time.get_unix_time_from_system() >= seen + float(rv.get("hours", 24)) * 3600.0
+                "orders":
+                        for o in rv.get("orders", []):
+                                if int(_order_value(o)) < _order_goal(o):
+                                        return false
+                        return true
+        return true
+
+# ---------------------------------------------------------------- orders
+
+## Progress toward one order line.
+static func _order_value(o: Dictionary) -> int:
+        match String(o["type"]):
+                "spend_in": return Box.spent_in(String(o["game"]))
+                "earn_in": return Box.earned_in(String(o["game"]))
+                "plays": return Box.stat(String(o["game"]), "plays")
+                "beat_best":
+                        var gid := String(o["game"])
+                        var base := int(Box.get_progress("__roadmap__", "base_" + gid, 0))
+                        var best := Box.stat(gid, "best")
+                        return best if best > base else 0
+        return 0
+
+static func _order_goal(o: Dictionary) -> int:
+        match String(o["type"]):
+                "spend_in", "earn_in": return int(o["amount"])
+                "plays": return int(o["count"])
+                "beat_best": return 1
+        return 1
+
+static func order_lines(id: String) -> Array:
+        ## [{text, done, value, goal}]
+        var rv: Dictionary = GameReg.get_game(id).get("reveal", {})
+        var out := []
+        for o in rv.get("orders", []):
+                var v := mini(int(_order_value(o)), _order_goal(o))
+                out.append({
+                        "text": _order_text(o), "done": v >= _order_goal(o),
+                        "value": v, "goal": _order_goal(o),
+                })
+        return out
+
+static func _order_text(o: Dictionary) -> String:
+        var gt := String(GameReg.get_game(String(o["game"])).get("title", o["game"]))
+        match String(o["type"]):
+                "spend_in": return "spend %d coins in %s" % [int(o["amount"]), gt]
+                "earn_in": return "earn %d coins in %s" % [int(o["amount"]), gt]
+                "plays": return "play %d rounds of %s" % [int(o["count"]), gt]
+                "beat_best": return "beat your high score in %s" % gt
+        return "??"
+
+## Seconds left on a timed mystery (0 when not timed / already done).
+static func time_left(id: String) -> float:
+        var rv: Dictionary = GameReg.get_game(id).get("reveal", {})
+        if String(rv.get("kind", "")) != "real":
+                return 0.0
+        var seen := _seen_at(id)
+        if seen <= 0:
+                return float(rv.get("hours", 24)) * 3600.0
+        return maxf(0.0, seen + float(rv.get("hours", 24)) * 3600.0 - Time.get_unix_time_from_system())
+
+static func inbox_left(id: String) -> float:
+        var rv: Dictionary = GameReg.get_game(id).get("reveal", {})
+        if String(rv.get("kind", "")) != "inbox":
+                return 0.0
+        return maxf(0.0, float(rv.get("minutes", 30)) * 60.0 - Box.total_time())
+
+# ------------------------------------------------------------ bookkeeping
+
+static func _seen_at(id: String) -> int:
+        return int(Box.meta().get("seen_at_" + id, 0))
+
+## Evaluate every game, persist transitions, fire notifications.
+## Call on menu refresh + a slow timer + after runs/unlocks.
+static func tick() -> void:
+        var now := int(Time.get_unix_time_from_system())
+        for g in GameReg.GAMES:
+                var id := String(g["id"])
+                var st := state(id)
+                var key := "state_" + id
+                var prev := String(Box.meta().get(key, ""))
+                if st == prev:
+                        continue
+                Box.meta()[key] = st
+                if prev == "" or (prev == "HIDDEN" and st != "HIDDEN"):
+                        # first time this teaser is visible: stamp time, baseline orders
+                        if st == "MYSTERY":
+                                Box.meta()["seen_at_" + id] = now
+                                _stamp_order_baselines(id)
+                                _schedule_reveal_notification(id, g)
+                if (prev == "HIDDEN" or prev == "MYSTERY") \
+                                and (st == "GATED" or st == "SOON" or st == "LOCKED"):
+                        # a teaser just resolved into something tangible -> celebrate
+                        Notify.cancel(_notify_id(id))
+                        Box.reveal_changed.emit(id)
+        Box.save()
+
+static func _stamp_order_baselines(id: String) -> void:
+        var rv: Dictionary = GameReg.get_game(id).get("reveal", {})
+        for o in rv.get("orders", []):
+                if String(o["type"]) != "beat_best":
+                        continue
+                var gid := String(o["game"])
+                var key := "base_" + gid
+                if int(Box.get_progress("__roadmap__", key, -1)) < 0:
+                        Box.set_progress("__roadmap__", key, Box.stat(gid, "best"))
+
+static func _notify_id(id: String) -> int:
+        # stable small ints for the native alarm manager
+        var h := 0
+        for c in id:
+                h = (h * 31 + c.unicode_at(0)) % 100000
+        return 1000 + h
+
+static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
+        var rv: Dictionary = g.get("reveal", {})
+        if String(rv.get("kind", "")) != "real":
+                return
+        var delay := float(rv.get("hours", 24)) * 3600.0
+        Notify.schedule(_notify_id(id), "GOGABox",
+                        "%s finished baking in the workshop - come see!" % String(g["title"]),
+                        int(delay))
+
+# ------------------------------------------------------------------ format
+
+static func fmt_clock(seconds: float) -> String:
+        var s := int(maxf(0.0, seconds))
+        if s >= 86400:
+                return "%dd %dh" % [s / 86400, (s % 86400) / 3600]
+        if s >= 3600:
+                return "%dh %dm" % [s / 3600, (s % 3600) / 60]
+        return "%dm %02ds" % [s / 60, s % 60]
+
+static func fmt_time(seconds: float) -> String:
+        var s := int(seconds)
+        return "%d:%02d" % [s / 60, s % 60]
