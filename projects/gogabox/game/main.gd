@@ -14,6 +14,10 @@ func _ready() -> void:
         _menu.name = "Menu"
         _menu.set_script(load("res://game/menu/menu.gd"))
         add_child(_menu)
+        # games launch THROUGH main: the menu hands GameHost this router so
+        # on_game_entered/on_game_closed actually fire (v0.0.4 passed the menu
+        # itself, so the hide never happened -> the big L survived on device).
+        _menu.set("router", self)
 
         var achiever: Node = load("res://game/core/achiever.gd").new()
         add_child(achiever)
@@ -22,16 +26,18 @@ func _ready() -> void:
 
 ## A game is its OWN WORLD: while it runs the menu is fully hidden AND stops
 ## processing - no layering weirdness, no taps leaking into the feed, no
-## "double taps". (v0.0.3 kept the menu alive under the game: big L, fixed.)
+## "double taps". v0.0.4 tried this but two engine facts defeated it:
+##   1) Node2D.visible=false does NOT hide a child CanvasLayer (menu UI lives
+##      on one) - so the menu kept rendering behind the game, and
+##   2) launch() was handed the MENU as router, so this method never ran.
+## menu.set_active() now handles BOTH the Node2D and the CanvasLayer.
 func on_game_entered() -> void:
-        if _menu != null and is_instance_valid(_menu):
-                _menu.visible = false
-                _menu.process_mode = Node.PROCESS_MODE_DISABLED
+        if _menu != null and is_instance_valid(_menu) and _menu.has_method("set_active"):
+                _menu.call("set_active", false)
 
 func on_game_closed() -> void:
-        if _menu != null and is_instance_valid(_menu):
-                _menu.visible = true
-                _menu.process_mode = Node.PROCESS_MODE_INHERIT
+        if _menu != null and is_instance_valid(_menu) and _menu.has_method("set_active"):
+                _menu.call("set_active", true)
                 if _menu.has_method("on_game_closed"):
                         _menu.call("on_game_closed")
 

@@ -26,14 +26,35 @@ static func launch(router: Node, id: String) -> bool:
         # GOGABatteries: charged games consume their pool + the box bank
         if not Box.consume_round_batteries(id):
                 return false
+        # The STAGE owns the session (hide the box, restore it after): the node
+        # that answers on_game_entered/on_game_closed. v0.0.4 handed it the
+        # menu, which has neither - the box stayed alive under the game (the
+        # big L on device: menu visible around the board + every tap leaked).
+        var stage := find_stage(router)
+        if stage == null:
+                stage = router          # tests / headless: plain node, no chrome
         var host: Node = load("res://game/core/host_node.gd").new()
-        host.configure(g, router, fee, free_play)
-        router.add_child(host)
+        # host keeps the STAGE as its router: close must reach
+        # stage.on_game_closed (restore the box), not an inner node that
+        # happens to carry the same method name (the menu does - that
+        # shadowing would leave the box hidden forever after a run).
+        host.configure(g, stage, fee, free_play)
+        stage.add_child(host)
         active_host = host
-        # the game is its OWN WORLD: hide + freeze the menu while it runs
-        if router.has_method("on_game_entered"):
-                router.call("on_game_entered")
+        if stage.has_method("on_game_entered"):
+                stage.call("on_game_entered")
         return true
+
+## Walk up to the session stage (main.gd). Capped + null-safe.
+static func find_stage(node: Node) -> Node:
+        var n := node
+        var hops := 0
+        while n != null and hops < 8:
+                if n.has_method("on_game_entered"):
+                        return n
+                n = n.get_parent()
+                hops += 1
+        return null
 
 static func end_session() -> void:
         if active_host != null and is_instance_valid(active_host):

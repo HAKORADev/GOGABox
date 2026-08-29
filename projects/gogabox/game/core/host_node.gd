@@ -38,13 +38,19 @@ func _ready() -> void:
         W = get_viewport_rect().size.x
         H = get_viewport_rect().size.y
 
-        # full-rect bg: covers the REAL viewport (expand aspect grows it on tall
-        # phones - a fixed (720,1280) rect left the bottom dead / "out of screen")
+        # full-screen OWN-WORLD background - MUST live on a CanvasLayer. A
+        # Control under a Node2D anchors to a ZERO rect in Godot 4.7 (verified
+        # headless): the v0.0.3/0.0.4 bg collapsed to 0x0, so the live box menu
+        # stayed visible around the board ("game in a small window"). This
+        # layer is opaque, covers the REAL viewport, and dies with the host.
+        var bg_layer := CanvasLayer.new()
+        bg_layer.layer = -1     # below the game world (0), above the hidden box
+        add_child(bg_layer)
         var bg := ColorRect.new()
         bg.color = Color("241407")
         bg.set_anchors_preset(Control.PRESET_FULL_RECT)
         bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        add_child(bg)
+        bg_layer.add_child(bg)
 
         # ---- universal GOGABox loading screen (loads the script + assets) ----
         var id := String(game_def["id"])
@@ -153,13 +159,26 @@ func _on_finish(final_score: int, earned: int) -> void:
                 sheet.add_child(hype)
 
         if total > 0:
+                # TIERED rewarded: watch-time decides the payout (15s+ = half,
+                # 20s+ = 75%, full ad = full reward; config in ads_config.json)
+                var hint := Arc.label(Ads.reward_hint(), 16, Color("8a6a40"), false)
+                hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                sheet.add_child(hint)
                 sheet.add_child(Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
-                                Ads.show_rewarded(func(watched: bool):
-                                                if watched:
-                                                                Box.earn(total)
-                                                                Box.add_earned(id, total)
-                                                                Arc.toast(game._toast_ref(), "+%d more GOGACoins!" % total)
-                                                                Jukebox.sfx("coin")))
+                                Ads.show_rewarded(func(watched: bool, mult: float, _secs: float):
+                                                if not watched:
+                                                        return
+                                                if mult <= 0.0:
+                                                        Arc.toast(game._toast_ref(), "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half"))
+                                                        return
+                                                var extra := int(round(float(total) * mult))
+                                                Box.earn(extra)
+                                                Box.add_earned(id, extra)
+                                                var msg := "FULL reward! +%d more GOGACoins!" % extra
+                                                if mult < 1.0:
+                                                        msg = "%d%% reward: +%d more GOGACoins" % [int(round(mult * 100.0)), extra]
+                                                Arc.toast(game._toast_ref(), msg)
+                                                Jukebox.sfx("coin")))
                                 )
 
         # coin breakdown so earnings never feel random (pickups vs score bonus)
@@ -200,8 +219,11 @@ func _on_finish(final_score: int, earned: int) -> void:
                 sheet.add_child(need)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():
+                        # pacing owned by the Box: every 3rd run-back shows one.
+                        # (v0.0.4 double-gated this through Ads' own counter too,
+                        # which is why per-turn ads almost never fired.)
                         if Box.should_show_interstitial(3):
-                                        Ads.maybe_interstitial(func(_shown: bool): _quit_to_menu())
+                                        Ads.show_interstitial(func(_shown: bool): _quit_to_menu())
                         else:
                                         _quit_to_menu()))
 

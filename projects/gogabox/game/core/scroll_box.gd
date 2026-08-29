@@ -57,6 +57,11 @@ func _hit_tappable(pos: Vector2) -> bool:
 # ---------------------------------------------------------------- input
 
 func _input(event: InputEvent) -> void:
+        # a running game owns the whole screen: never scroll/fire tappables
+        # behind it (belt & suspenders on top of menu.set_active(false) -
+        # this also covers signal-driven calls that slip past process_mode)
+        if GameHost.active_host != null:
+                return
         if input_locked:
                 return
         if event is InputEventScreenTouch:

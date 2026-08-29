@@ -21,6 +21,9 @@ var _toast: Dictionary
 var _sheet_open := false
 var _trophies_open := false
 var _last_wide := false
+## The launch router (main.gd). GameHost.launch MUST get this, not `self` -
+## passing the menu was v0.0.4's big-L bug: on_game_entered lives on main.
+var router: Node = null
 
 # search filters (id arrays; empty = no filter)
 var _filter_age := ""
@@ -105,9 +108,25 @@ func handle_back() -> void:
 func has_open_overlay() -> bool:
         return _sheet_open or _trophies_open
 
+## The own-world switch. Hides BOTH the Node2D and the inner CanvasLayer
+## (Node2D.visible does NOT propagate to CanvasLayers - verified in 4.7) and
+## hard-stops all processing so BoxScroll can never swallow taps during play.
+func set_active(on: bool) -> void:
+        visible = on
+        if _layer != null and is_instance_valid(_layer):
+                _layer.visible = on
+        process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+        if _hot_scroll != null and is_instance_valid(_hot_scroll):
+                _set_feed_lock(not on)
+
 # ---------------------------------------------------------------- layout
 
 func _on_resized() -> void:
+        # a running game owns content_scale_size (its orientation swap) - the
+        # menu must not fight it from behind (signal handlers fire even while
+        # process_mode is DISABLED)
+        if GameHost.active_host != null:
+                return
         _apply_base()
         _layout()
 
@@ -1064,9 +1083,10 @@ func _open_game_page(g: Dictionary) -> void:
                 if play_btn.disabled:
                         return
                 _close_sheet()
-                GameHost.launch(self, id))
+                GameHost.launch(router if router != null else self, id))
 
-        # achievements (scrollable - some games will have tons)
+        # achievements: OWN up/down scroll area so a long trophy list never
+        # spams the page (owner rule) - the rest of the page stays compact
         var ach: Array = g.get("ach", [])
         var got := 0
         for a in ach:
@@ -1074,14 +1094,26 @@ func _open_game_page(g: Dictionary) -> void:
                         got += 1
         var a_head := Arc.label("ACHIEVEMENTS   %d / %d" % [got, ach.size()], 24, Arc.HOT)
         content.add_child(a_head)
-        for a in ach:
-                var done: bool = Box.has_achievement(id, String(a["id"]))
-                var row := Arc.label(("+ %s  -  %s" % [String(a["title"]), String(a["desc"])])
-                                if done else ("- %s  -  %s" % [String(a["title"]), String(a["desc"])]),
-                                18, Arc.GOOD if done else Color("9a7a50"), false)
-                row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                row.custom_minimum_size = Vector2(540, 0)
-                content.add_child(row)
+        if ach.is_empty():
+                var none := Arc.label("no trophies in this one yet", 18, Color("9a7a50"), false)
+                content.add_child(none)
+        else:
+                var t_scroll := BoxScroll.new()
+                t_scroll.custom_minimum_size = Vector2(0, clampf(ach.size() * 44.0 + 16.0, 96.0, 260.0))
+                t_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                content.add_child(t_scroll)
+                var t_list := VBoxContainer.new()
+                t_list.add_theme_constant_override("separation", 10)
+                t_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                t_scroll.add_child(t_list)
+                for a in ach:
+                        var done: bool = Box.has_achievement(id, String(a["id"]))
+                        var row := Arc.label(("+ %s  -  %s" % [String(a["title"]), String(a["desc"])])
+                                        if done else ("- %s  -  %s" % [String(a["title"]), String(a["desc"])]),
+                                        18, Arc.GOOD if done else Color("9a7a50"), false)
+                        row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        row.custom_minimum_size = Vector2(540, 0)
+                        t_list.add_child(row)
 
         var info := Arc.label("time %s   spent %d   earned %d" % [
                         Roadmap.fmt_time(_play_seconds(id)), Box.spent_in(id), Box.earned_in(id)],
@@ -1377,6 +1409,7 @@ func _play_seconds(id: String) -> float:
 
 ## Called by GameHost when a game session ends.
 func on_game_closed() -> void:
-        Ads.banner_show()
+        Ads.banner_show()   # back on the box: banner returns (fresh fill)
+        Ads.refresh()       # re-preload interstitial + rewarded for next runs
         Roadmap.tick()
         _refresh()

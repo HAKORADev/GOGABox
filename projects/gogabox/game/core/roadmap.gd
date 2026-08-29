@@ -182,6 +182,7 @@ static func tick() -> void:
                                 and (st == "GATED" or st == "SOON" or st == "LOCKED"):
                         # a teaser just resolved into something tangible -> celebrate
                         Notify.cancel(_notify_id(id))
+                        Notify.play_kind_sfx("game_ready")   # in-app ping
                         Box.reveal_changed.emit(id)
         Box.save()
 
@@ -209,7 +210,7 @@ static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
         var delay := float(rv.get("hours", 24)) * 3600.0
         Notify.schedule(_notify_id(id), "GOGABox",
                         "%s finished baking in the workshop - come see!" % String(g["title"]),
-                        int(delay))
+                        int(delay), "game_ready")
 
 # ------------------------------------------------------------------ format
 

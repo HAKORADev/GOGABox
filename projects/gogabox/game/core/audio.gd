@@ -80,7 +80,8 @@ func sfx(name_: String, volume_db := 0.0, pitch := 1.0) -> void:
 
 const DIRS := [
         "res://assets/audio/ui/", "res://assets/audio/jingles/",
-        "res://assets/audio/sfx/", "res://assets/audio/music/",
+        "res://assets/audio/sfx/", "res://assets/audio/notify/",
+        "res://assets/audio/music/",
 ]
 
 func _resolve(name_: String) -> String:

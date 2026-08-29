@@ -61,6 +61,14 @@ public class UnityAdsPlugin extends GodotPlugin {
     private LinearLayout bannerHolder = null;
     private boolean bannerVisible = false;
     private boolean bannerWanted = false;
+    private String bannerPlacement = "";
+    private long bannerShownAtMs = 0L;
+    private int bannerRetries = 0;
+    private boolean refreshScheduled = false;
+    private static final int BANNER_MAX_RETRIES = 6;      // ~1 min of tries
+    private static final long BANNER_RETRY_MS = 10000L;   // spacing between tries
+    private static final long BANNER_STALE_MS = 90000L;   // reload after 90s up
+    private static final long BANNER_REFRESH_MS = 75000L; // keep fill fresh
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     public UnityAdsPlugin(Godot godot) {
@@ -174,19 +182,28 @@ public class UnityAdsPlugin extends GodotPlugin {
     public void banner_show(final String placement) {
         if (!bannerEnabled || !initialized) return;
         bannerWanted = true;
+        bannerPlacement = placement;
+        bannerRetries = 0;
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 ensureBannerHolder();
-                if (bannerAd != null && bannerAd.getView() != null) {
+                boolean stale = bannerAd != null
+                        && bannerShownAtMs > 0
+                        && System.currentTimeMillis() - bannerShownAtMs > BANNER_STALE_MS;
+                if (bannerAd != null && !stale) {
                     // fresh banner already loaded -> just reveal it
                     bannerHolder.setVisibility(View.VISIBLE);
                     bannerVisible = true;
+                    bannerShownAtMs = System.currentTimeMillis();
+                    scheduleBannerRefresh();
                 } else {
-                    // no banner yet (first show, or stale one destroyed on
-                    // hide): load a FRESH one. Banners expire - reusing an old
-                    // view is why the banner "worked once and never again".
+                    // no banner yet, or the current one is stale (banners
+                    // expire -> blank view). Load a FRESH one and retry with
+                    // backoff until fill arrives - "showed once, never again"
+                    // happened because a single 8s retry was all we had.
                     bannerVisible = false;
+                    bannerAd = null;
                     loadBanner(placement);
                 }
             }
@@ -207,6 +224,7 @@ public class UnityAdsPlugin extends GodotPlugin {
                 // drop the banner view entirely so the next show loads fresh
                 // fill (banners expire - a stale view shows nothing)
                 bannerAd = null;
+                bannerShownAtMs = 0L;
             }
         });
     }
@@ -233,7 +251,12 @@ public class UnityAdsPlugin extends GodotPlugin {
         try {
             BannerShowListener showListener = new BannerShowListener() {
                 @Override
-                public void onImpression(BannerAd ad) { emitSignal("banner_loaded"); }
+                public void onImpression(BannerAd ad) {
+                    emitSignal("banner_loaded");
+                    bannerRetries = 0;
+                    bannerShownAtMs = System.currentTimeMillis();
+                    scheduleBannerRefresh();
+                }
 
                 @Override
                 public void onClicked(BannerAd ad) { }
@@ -241,6 +264,19 @@ public class UnityAdsPlugin extends GodotPlugin {
                 @Override
                 public void onFailedToShow(BannerAd ad, UnityAdsError error) {
                     emitSignal("banner_failed", String.valueOf(error));
+                    // the view is dead from here on - drop it and go again
+                    activity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (bannerHolder != null) {
+                                bannerHolder.removeAllViews();
+                                bannerHolder.setVisibility(View.GONE);
+                            }
+                            bannerAd = null;
+                            bannerVisible = false;
+                        }
+                    });
+                    retryBannerLater(placement);
                 }
             };
             BannerConfiguration config = new BannerConfiguration.Builder(
@@ -267,8 +303,14 @@ public class UnityAdsPlugin extends GodotPlugin {
                                         Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
                                 bannerHolder.setVisibility(bannerWanted ? View.VISIBLE : View.GONE);
                                 bannerVisible = bannerWanted;
+                                if (bannerWanted) {
+                                    bannerShownAtMs = System.currentTimeMillis();
+                                    scheduleBannerRefresh();
+                                }
                             } catch (Exception e) {
                                 emitSignal("banner_failed", String.valueOf(e));
+                                bannerAd = null;
+                                retryBannerLater(placement);
                             }
                         }
                     });
@@ -282,9 +324,11 @@ public class UnityAdsPlugin extends GodotPlugin {
         }
     }
 
-    /** One quiet retry after 8s - no fill is common right after init. */
+    /** Retry ladder: up to 6 tries, 10s apart, only while the banner is wanted. */
     private void retryBannerLater(final String placement) {
         if (!bannerWanted) return;
+        if (bannerRetries >= BANNER_MAX_RETRIES) return;
+        bannerRetries++;
         mainHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -292,7 +336,31 @@ public class UnityAdsPlugin extends GodotPlugin {
                     loadBanner(placement);
                 }
             }
-        }, 8000);
+        }, BANNER_RETRY_MS);
+    }
+
+    /** Banners expire silently while showing - reload periodically so the
+     *  bottom strip never turns into an empty slab during a long session. */
+    private void scheduleBannerRefresh() {
+        if (refreshScheduled || !bannerWanted) return;
+        refreshScheduled = true;
+        mainHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                refreshScheduled = false;
+                if (!bannerWanted) return;
+                if (bannerAd == null) {
+                    retryBannerLater(bannerPlacement);
+                } else if (bannerVisible
+                        && System.currentTimeMillis() - bannerShownAtMs >= BANNER_REFRESH_MS) {
+                    bannerAd = null;
+                    bannerVisible = false;
+                    loadBanner(bannerPlacement);   // fresh creative; holder flips visible on impression
+                } else {
+                    scheduleBannerRefresh();
+                }
+            }
+        }, BANNER_REFRESH_MS);
     }
 
     private int dpToPx(int dp) {

@@ -9,5 +9,6 @@
 	},
 	"interstitial_every_runs": 3,
 	"banner_height": 52,
-	"banner_enabled": true
+	"banner_enabled": true,
+	"reward_tiers": { "half": 15, "p75": 20, "full": 30 }
 }

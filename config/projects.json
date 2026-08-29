@@ -47,8 +47,8 @@
       "ci_auto": true,
       "apk_name": "GOGABox",
       "package": "com.zai.gogabox",
-      "version_name": "0.0.4",
-      "version_code_base": 30040,
+      "version_name": "0.0.5",
+      "version_code_base": 30050,
       "aab": false,
       "abi_presets": {
         "arm64-v8a": "Android arm64",

@@ -37,9 +37,15 @@ import java.util.Iterator;
  */
 public class NotifyPlugin extends GodotPlugin {
 
-    private static final String CHANNEL_ID = "gogabox_general";
     private static final String PREFS = "goga_notify";
     private static final String KEY_PENDING = "pending";
+
+    // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
+    // new sounds need new ids on already-installed devices). Each channel has
+    // its own raw-resource sound: batteries-full / game-ready / general.
+    private static final String CHANNEL_GENERAL = "gogabox_general_v2";
+    private static final String CHANNEL_BATTERY = "gogabox_battery_v2";
+    private static final String CHANNEL_READY = "gogabox_ready_v2";
 
     private final android.app.Activity activity;
 
@@ -77,9 +83,14 @@ public class NotifyPlugin extends GodotPlugin {
 
     @UsedByGodot
     public void schedule(int id, String title, String body, int delaySec) {
+        scheduleKind(id, title, body, delaySec, CHANNEL_GENERAL);
+    }
+
+    @UsedByGodot
+    public void scheduleKind(int id, String title, String body, int delaySec, String channelId) {
         Context ctx = context();
         long fireAt = System.currentTimeMillis() + Math.max(1, delaySec) * 1000L;
-        persist(ctx, id, title, body, fireAt);
+        persist(ctx, id, title, body, fireAt, channelId);
         arm(ctx, id, title, body, fireAt);
     }
 
@@ -148,18 +159,23 @@ public class NotifyPlugin extends GodotPlugin {
         return PendingIntent.getActivity(ctx, 9001, i, flags);
     }
 
-    static void persist(Context ctx, int id, String title, String body, long fireAt) {
+    static void persist(Context ctx, int id, String title, String body, long fireAt, String channel) {
         JSONObject all = readPending(ctx);
         try {
             JSONObject e = new JSONObject();
             e.put("title", title);
             e.put("body", body);
             e.put("fireAt", fireAt);
+            e.put("channel", channel == null ? CHANNEL_GENERAL : channel);
             all.put(String.valueOf(id), e);
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit().putString(KEY_PENDING, all.toString()).apply();
         } catch (Exception ignored) {
         }
+    }
+
+    static void persist(Context ctx, int id, String title, String body, long fireAt) {
+        persist(ctx, id, title, body, fireAt, CHANNEL_GENERAL);
     }
 
     static void unpersist(Context ctx, int id) {
@@ -179,7 +195,7 @@ public class NotifyPlugin extends GodotPlugin {
         }
     }
 
-    static void post(Context ctx, int id, String title, String body) {
+    static void post(Context ctx, int id, String title, String body, String channelId) {
         NotificationManager nm =
                 (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) {
@@ -187,11 +203,8 @@ public class NotifyPlugin extends GodotPlugin {
         }
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL_ID,
-                    "GOGABox", NotificationManager.IMPORTANCE_DEFAULT);
-            ch.setDescription("Game reveals and return reminders");
-            nm.createNotificationChannel(ch);
-            b = new Notification.Builder(ctx, CHANNEL_ID);
+            createChannels(nm, ctx);
+            b = new Notification.Builder(ctx, channelId);
         } else {
             b = new Notification.Builder(ctx);
         }
@@ -208,6 +221,43 @@ public class NotifyPlugin extends GodotPlugin {
         nm.notify(id, b.build());
     }
 
+    static void post(Context ctx, int id, String title, String body) {
+        post(ctx, id, title, body, CHANNEL_GENERAL);
+    }
+
+    /** Creates the three sound-equipped channels (idempotent). */
+    private static void createChannels(NotificationManager nm, Context ctx) {
+        makeChannel(nm, ctx, CHANNEL_GENERAL, "GOGABox",
+                "General GOGABox news", "notify_general");
+        makeChannel(nm, ctx, CHANNEL_BATTERY, "GOGABatteries",
+                "Batteries fully charged reminders", "notify_battery");
+        makeChannel(nm, ctx, CHANNEL_READY, "Games ready",
+                "Revealed and ready-to-play announcements", "notify_ready");
+    }
+
+    private static void makeChannel(NotificationManager nm, Context ctx,
+            String channelId, String name, String desc, String rawSound) {
+        NotificationChannel ch = nm.getNotificationChannel(channelId);
+        if (ch == null) {
+            ch = new NotificationChannel(channelId, name,
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            ch.setDescription(desc);
+            int resId = ctx.getResources().getIdentifier(rawSound, "raw",
+                    ctx.getPackageName());
+            if (resId != 0) {
+                android.net.Uri soundUri =
+                        android.net.Uri.parse("android.resource://" + ctx.getPackageName() + "/" + resId);
+                android.media.AudioAttributes attrs =
+                        new android.media.AudioAttributes.Builder()
+                                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build();
+                ch.setSound(soundUri, attrs);
+            }
+            nm.createNotificationChannel(ch);
+        }
+    }
+
     /** Fires a due notification (called by AlarmReceiver / BootReceiver). */
     public static void fire(Context ctx, int id) {
         JSONObject all = readPending(ctx);
@@ -215,7 +265,8 @@ public class NotifyPlugin extends GodotPlugin {
         if (e == null) {
             return;
         }
-        post(ctx, id, e.optString("title", "GOGABox"), e.optString("body", ""));
+        String channel = e.optString("channel", CHANNEL_GENERAL);
+        post(ctx, id, e.optString("title", "GOGABox"), e.optString("body", ""), channel);
         unpersist(ctx, id);
     }
 

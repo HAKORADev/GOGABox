@@ -20,7 +20,10 @@ const DEFAULTS := {
         },
         "interstitial_every_runs": 3,
         "banner_height": 90,
-        "banner_enabled": true
+        "banner_enabled": true,
+        # TIERED rewarded payouts (owner rule: 5s ads pay nothing):
+        #   watch >= half -> 50%, >= p75 -> 75%, >= full -> 100%
+        "reward_tiers": {"half": 15, "p75": 20, "full": 30}
 }
 
 var cfg: Dictionary = {}
@@ -35,6 +38,8 @@ var _pending_since_ms := 0
 var _banner_wanted := false        # banner requested before init finished
 var _showing := false              # an ad is on screen (watchdog paused)
 var _load_retries := {}            # placement -> retries while a cb waits
+var _ad_start_ms := 0              # when the current ad started SHOWING
+var _banner_retrying := false      # gdscript-side banner retry in flight
 
 func _ready() -> void:
         _load_config()
@@ -45,6 +50,9 @@ func _ready() -> void:
                 native.connect("ad_loaded", _on_native_loaded)
                 native.connect("ad_failed", _on_native_failed)
                 native.connect("ad_closed", _on_native_closed)
+                native.connect("ad_shown", _on_native_shown)
+                native.connect("banner_loaded", func(): _banner_retrying = false)
+                native.connect("banner_failed", func(_m): _schedule_banner_retry())
                 native.configure(String(cfg.game_id), bool(cfg.test_mode), bool(cfg.banner_enabled))
                 _preload_all()
         elif OS.has_feature("android"):
@@ -86,6 +94,39 @@ func refresh() -> void:
         if desktop_sim or not enabled_ok():
                 return
         _preload_all()
+
+# ----------------------------------------------------------- rewarded tiers
+
+func tier_secs(kind: String) -> int:
+        var t: Dictionary = cfg.get("reward_tiers", DEFAULTS["reward_tiers"])
+        return int(t.get(kind, 15))
+
+## Payout multiplier for a fully-watched ad of `watched_secs` length.
+## Skipped/too-short -> 0 (no reward; the caller keeps the base payout).
+func reward_mult(watched_secs: float) -> float:
+        if watched_secs >= float(tier_secs("full")):
+                return 1.0
+        if watched_secs >= float(tier_secs("p75")):
+                return 0.75
+        if watched_secs >= float(tier_secs("half")):
+                return 0.5
+        return 0.0
+
+func reward_hint() -> String:
+        return "watch %ds+ = half  ·  %ds+ = 75%%  ·  %ds = full reward" % [
+                        tier_secs("half"), tier_secs("p75"), tier_secs("full")]
+
+## Call the owner callback with as many args as it declared (legacy 1-arg
+## lambdas keep working; new callers get [watched, mult, watch_seconds]).
+func _resolve_cb(watched: bool, mult: float, secs: float) -> void:
+        if not _pending_cb.is_valid():
+                return
+        var cb := _pending_cb
+        _pending_cb = Callable()
+        if cb.get_argument_count() >= 3:
+                cb.call(watched, mult, secs)
+        else:
+                cb.call(watched)
 
 # ---------------------------------------------------------------- pacing API
 
@@ -196,9 +237,7 @@ func _on_native_failed(placement_id: String, _message: String) -> void:
                 native.load(placement_id)   # loaded -> _on_native_loaded shows it
                 return
         _load_retries[placement_id] = 0
-        var cb := _pending_cb
-        _pending_cb = Callable()
-        cb.call(false)
+        _resolve_cb(false, 0.0, 0.0)
 
 func _kind_of(placement_id: String) -> String:
         if placement_id == placement("rewarded"):
@@ -220,17 +259,42 @@ func _process(_delta: float) -> void:
                 var cb := _pending_cb
                 _pending_cb = Callable()
                 _pending_since_ms = 0
-                cb.call(false)
+                if cb.get_argument_count() >= 3:
+                        cb.call(false, 0.0, 0.0)
+                else:
+                        cb.call(false)
+
+## Fired when an ad actually starts playing - the watch-time clock starts here
+## (tiers need REAL seconds watched, not time since request).
+func _on_native_shown(_placement_id: String) -> void:
+        _ad_start_ms = Time.get_ticks_msec()
+
+## GDScript-side banner safety net: if the native loader gives up (no fill
+## twice), we keep trying every 12s while the banner is still wanted. Together
+## with the Java-side retry loop this makes "banner never came back" impossible.
+func _schedule_banner_retry() -> void:
+        if not _banner_wanted or _banner_retrying or not ready_ok or native == null:
+                return
+        _banner_retrying = true
+        var t := get_tree().create_timer(12.0)
+        t.timeout.connect(func():
+                _banner_retrying = false
+                if _banner_wanted and ready_ok and native != null:
+                        native.banner_show(placement("banner")))
 
 func _on_native_closed(placement_id: String, completion_state: int) -> void:
         # UnityAdsShowCompletionState ordinals: SKIPPED=0, COMPLETED=1
         var watched := completion_state >= 1  # SKIPPED=0, COMPLETED=1 (ordinal)
         _showing = false
         _pending_since_ms = 0
-        if _pending_cb.is_valid():
-                var cb := _pending_cb
-                _pending_cb = Callable()
-                cb.call(watched)
+        # watch-time = show-start -> close. This drives the tiered payout:
+        # 15s+ = half, 20s+ = 75%, 30s+ = full (reward_tiers in config).
+        var secs := 0.0
+        if _ad_start_ms > 0:
+                secs = float(Time.get_ticks_msec() - _ad_start_ms) / 1000.0
+        _ad_start_ms = 0
+        var mult := reward_mult(secs) if watched else 0.0
+        _resolve_cb(watched, mult, secs)
 
 # ------------------------------------------------------------------ desktop sim
 
@@ -238,7 +302,15 @@ func _simulate(rewarded: bool, cb: Callable) -> void:
         var t := get_tree().create_timer(0.15)
         t.timeout.connect(func():
                 if rewarded:
-                        cb.call(true)   # simulated user always watches to the end
+                        # simulated user always watches a full-length ad
+                        var full := float(tier_secs("full"))
+                        if cb.get_argument_count() >= 3:
+                                cb.call(true, 1.0, full)
+                        else:
+                                cb.call(true)
                 else:
-                        cb.call(true)
+                        if cb.get_argument_count() >= 3:
+                                cb.call(true, 1.0, 0.0)
+                        else:
+                                cb.call(true)
         )

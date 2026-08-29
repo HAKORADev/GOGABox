@@ -146,6 +146,8 @@ func game_battery(id: String) -> Dictionary:
                         p["ts"] = now - (elapsed % step)
                         p["count"] = count
                         save()
+                        if count >= cap:
+                                _battery_full_sfx()   # this pool just filled up
         var regen_in := 0
         if count < cap:
                 regen_in = step - ((now - int(p.get("ts", now))) % step)
@@ -212,7 +214,19 @@ func _apply_closed_regen() -> void:
                 data["box_batteries"] = count + regen
                 save()
                 batteries_changed.emit()
+                if count + regen >= BOX_BATTERY_CAP:
+                        _battery_full_sfx()
         meta()["closed_ts"] = now
+
+## In-app "pool just hit full" ping (the device channel handles the away-case).
+## Cooldown keeps lazy regen reads from spamming the sound.
+func _battery_full_sfx() -> void:
+        var now := int(Time.get_unix_time_from_system())
+        if now - int(meta().get("batt_full_sfx_at", 0)) < 90:
+                return
+        meta()["batt_full_sfx_at"] = now
+        save()
+        Notify.play_kind_sfx("battery_full")
 
 func _battery_notify_id(key: String) -> int:
         var h := 0
@@ -222,14 +236,15 @@ func _battery_notify_id(key: String) -> int:
 
 ## Schedule "batteries full" pings for the box pool and every owned charged
 ## game that is not full (fired by the native alarm while the app is closed).
+## Both use the "battery_full" kind -> its own Android channel + custom SFX.
 func _schedule_battery_notifications() -> void:
         var now := int(Time.get_unix_time_from_system())
         var gb := box_batteries()
         if gb < BOX_BATTERY_CAP:
                 var secs := (BOX_BATTERY_CAP - gb) * BATTERY_STEP
-                Notify.schedule(_battery_notify_id("box"), "GOGABox",
+                Notify.schedule(_battery_notify_id("box"), "GOGABatteries",
                         "Your GOGABatteries are fully charged - %d/%d!" % [BOX_BATTERY_CAP, BOX_BATTERY_CAP],
-                        maxi(60, secs - (now - int(meta().get("closed_ts", now)))))
+                        maxi(60, secs - (now - int(meta().get("closed_ts", now)))), "battery_full")
         for g in GameReg.playable():
                 var id := String(g["id"])
                 if not owns_game(id):
@@ -238,9 +253,9 @@ func _schedule_battery_notifications() -> void:
                 if b.is_empty() or int(b["count"]) >= int(b["cap"]):
                         continue
                 var secs2 := (int(b["cap"]) - int(b["count"])) * int(b["step"])
-                Notify.schedule(_battery_notify_id("g_" + id), "GOGABox",
+                Notify.schedule(_battery_notify_id("g_" + id), "GOGABatteries",
                         "%s batteries are full - back to it!" % String(g["title"]),
-                        maxi(60, secs2))
+                        maxi(60, secs2), "battery_full")
 
 func _cancel_battery_notifications() -> void:
         Notify.cancel(_battery_notify_id("box"))

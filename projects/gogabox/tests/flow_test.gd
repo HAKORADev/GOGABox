@@ -19,6 +19,7 @@ func _ready() -> void:
         fails += _test("host: launch + finish + economy", await _t_host_flow())
         fails += _test("games: all playable boot", await _t_all_games())
         fails += _test("menu: boots and lays out", await _t_menu())
+        fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)
 
@@ -374,6 +375,70 @@ func _t_menu() -> int:
         menu._close_sheet()
         ok += _check(true, "sheets open/close cleanly")
         menu.queue_free()
+        await get_tree().process_frame
+        Box.reset_all()
+        return ok
+
+## v0.0.5 core regression: a game is its OWN WORLD - the box hides (BOTH the
+## Node2D and its CanvasLayer) and stops processing, the host carries a real
+## full-screen background, and rewarded payouts follow the watch-time tiers.
+func _t_isolation() -> int:
+        Box.reset_all()
+        var ok := 0
+
+        # ---- tier math (half/p75/full from ads_config) ----
+        ok += _check(Ads.reward_mult(5.0) == 0.0, "5s watch pays nothing")
+        ok += _check(Ads.reward_mult(14.9) == 0.0, "14.9s pays nothing")
+        ok += _check(Ads.reward_mult(15.0) == 0.5, "15s = half")
+        ok += _check(Ads.reward_mult(19.9) == 0.5, "19.9s = half")
+        ok += _check(Ads.reward_mult(20.0) == 0.75, "20s = 75%")
+        ok += _check(Ads.reward_mult(29.9) == 0.75, "29.9s = 75%")
+        ok += _check(Ads.reward_mult(30.0) == 1.0, "30s = full")
+
+        # ---- REAL main.gd as the stage: launch through its menu (the exact
+        # v0.0.4 bug shape) and prove the box fully vanishes ----
+        var stage := Node2D.new()
+        stage.set_script(load("res://game/main.gd"))
+        add_child(stage)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var menu: Node2D = stage._menu
+        ok += _check(menu != null, "main built the menu")
+
+        var launched: bool = load("res://game/core/game_host.gd").launch(menu, "snake")
+        ok += _check(launched, "launch through menu router succeeds")
+        await get_tree().create_timer(3.0).timeout   # loading screen
+        var host: Node = load("res://game/core/game_host.gd").active_host
+        ok += _check(host != null, "host alive")
+        if host != null:
+                # the own-world background: a CanvasLayer (layer -1) whose
+                # full-rect ColorRect ACTUALLY has size (a Control under the
+                # host Node2D collapsed to 0x0 - the original big L)
+                var bg_layer: CanvasLayer = null
+                for c in host.get_children():
+                        if c is CanvasLayer and (c as CanvasLayer).layer == -1:
+                                bg_layer = c
+                ok += _check(bg_layer != null, "host bg lives on a CanvasLayer")
+                if bg_layer != null and bg_layer.get_child_count() > 0:
+                        var bgc := bg_layer.get_child(0) as ColorRect
+                        ok += _check(bgc != null and bgc.size.x > 100.0 and bgc.size.y > 100.0,
+                                "bg covers the real viewport (%s)" % (bgc.size if bgc else Vector2()))
+
+        # ---- menu really hides: Node2D AND CanvasLayer AND processing ----
+        ok += _check(not menu.visible, "menu node hidden")
+        ok += _check(not menu._layer.visible, "menu CanvasLayer hidden (the v0.0.4 leak)")
+        ok += _check(menu.process_mode == Node.PROCESS_MODE_DISABLED, "menu processing stopped")
+        ok += _check(menu._hot_scroll.input_locked and menu._grid_scroll.input_locked,
+                "feed scrolls locked")
+
+        # ---- close restores everything (main.on_game_closed -> set_active) ----
+        host._quit_to_menu()
+        await get_tree().process_frame
+        ok += _check(menu.visible and menu._layer.visible, "menu fully visible again")
+        ok += _check(menu.process_mode == Node.PROCESS_MODE_INHERIT, "menu processing restored")
+        ok += _check(load("res://game/core/game_host.gd").active_host == null, "session ended")
+
+        stage.queue_free()
         await get_tree().process_frame
         Box.reset_all()
         return ok
