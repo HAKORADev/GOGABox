@@ -1,7 +1,8 @@
 class_name GameReg
 extends RefCounted
 ## The game list. Adding a game = add one entry here + a <id>.gd in
-## game/games/ + a thumbnail assets/thumbs/<id>.png. Nothing else.
+## game/games/<id>/<id>.gd (each game = its own folder = its own room)
+## + a thumbnail assets/thumbs/<id>.png. Nothing else.
 ##
 ## Metadata carried per game (consumed by the help screen + search filters):
 ##   desc     one-liner shown in the ?-guide list
@@ -16,10 +17,10 @@ extends RefCounted
 const GAMES := [
 	{
 		"id": "snake", "title": "Snake", "tag": "the classic, hungry",
-		"script": "res://game/games/snake.gd",
+		"script": "res://game/games/snake/snake.gd",
 		"thumb": "res://assets/thumbs/snake.png",
 		"orientation": "portrait", "dim": "2d",
-		"price": 0, "fee": 10, "shop": true,
+		"coin_div": 10, "price": 0, "fee": 10, "shop": true,
 		"hot": true,
 		"desc": "Steer the snake, eat apples, grab GOGACoins. Every apple makes you longer and faster - walls and your own tail end the run.",
 		"controls": ["swipe anywhere to steer", "grab the spinning coin for +5 GOGACoins", "the run ends when you bite yourself or a wall"],
@@ -34,13 +35,13 @@ const GAMES := [
 	},
 	{
 		"id": "rally", "title": "Pong Rally", "tag": "don't blink",
-		"script": "res://game/games/rally.gd",
+		"script": "res://game/games/rally/rally.gd",
 		"thumb": "res://assets/thumbs/rally.png",
 		"orientation": "portrait", "dim": "2d",
-		"price": 150, "fee": 8, "shop": false,
+		"coin_div": 4, "price": 150, "fee": 8, "shop": false,
 		"hot": false,
 		"reveal": {"kind": "chain"},
-		"charges": {"per_round": 2, "capacity": 10},
+		"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
 		"desc": "Endless pong rally against a machine that never gets tired. Every return speeds it up - how long can you keep the ball alive?",
 		"controls": ["drag your finger to move the paddle", "every return adds speed", "missing the ball ends the rally"],
 		"genres": {"main": ["arcade", "sports"], "sub": ["retro", "competitive", "singleplayer"]},
@@ -53,13 +54,13 @@ const GAMES := [
 	},
 	{
 		"id": "lanes", "title": "Geometry Flash", "tag": "dodge the grid",
-		"script": "res://game/games/lanes.gd",
+		"script": "res://game/games/lanes/lanes.gd",
 		"thumb": "res://assets/thumbs/lanes.png",
 		"orientation": "portrait", "dim": "2d",
-		"price": 200, "fee": 10, "shop": false,
+		"coin_div": 100, "price": 200, "fee": 10, "shop": false,
 		"hot": true,
 		"reveal": {"kind": "chain"},
-		"charges": {"per_round": 2, "capacity": 10},
+		"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
 		"blocked_hours": {"from": 1, "to": 8},
 		"desc": "Three lanes, one ship, a wall of falling blocks. Swap lanes at the last moment - the grid only gets faster.",
 		"controls": ["tap left / right side to swap lanes", "survive as long as possible", "the grid speeds up over time"],
@@ -73,13 +74,13 @@ const GAMES := [
 	},
 	{
 		"id": "slasher", "title": "Fruit Slasher", "tag": "swipe everything",
-		"script": "res://game/games/slasher.gd",
+		"script": "res://game/games/slasher/slasher.gd",
 		"thumb": "res://assets/thumbs/slasher.png",
 		"orientation": "landscape", "dim": "2d",
-		"price": 250, "fee": 15, "shop": false,
+		"coin_div": 20, "price": 250, "fee": 15, "shop": false,
 		"hot": true,
 		"reveal": {"kind": "chain"},
-		"charges": {"per_round": 2, "capacity": 10},
+		"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
 		"desc": "Fruits fly, your finger is the blade. Slash combos for juice, avoid the bombs - one wrong swipe slices the run short.",
 		"controls": ["swipe across fruits to slice them", "multi-slices in one swipe = combo", "never touch the bombs"],
 		"genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
@@ -92,13 +93,13 @@ const GAMES := [
 	},
 	{
 		"id": "hopper", "title": "Snowy Tower", "tag": "climb till you slip",
-		"script": "res://game/games/hopper.gd",
+		"script": "res://game/games/hopper/hopper.gd",
 		"thumb": "res://assets/thumbs/hopper.png",
 		"orientation": "portrait", "dim": "2d",
-		"price": 300, "fee": 12, "shop": false,
+		"coin_div": 60, "price": 300, "fee": 12, "shop": false,
 		"hot": false,
 		"reveal": {"kind": "chain"},
-		"charges": {"per_round": 2, "capacity": 10},
+		"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
 		"hours": {"from": 16, "to": 22},
 		"desc": "Hop up an endless snowy tower of icy platforms. The camera never waits - climb fast or freeze at the bottom.",
 		"controls": ["tap / hold sides to hop between platforms", "height is score", "fall below the screen and the run ends"],
@@ -112,13 +113,13 @@ const GAMES := [
 	},
 	{
 		"id": "merge", "title": "2048", "tag": "swipe and double",
-		"script": "res://game/games/merge2048.gd",
+		"script": "res://game/games/merge/merge2048.gd",
 		"thumb": "res://assets/thumbs/merge.png",
 		"orientation": "portrait", "dim": "2d",
-		"price": 400, "fee": 15, "shop": false,
+		"coin_div": 150, "price": 400, "fee": 15, "shop": false,
 		"hot": false,
 		"reveal": {"kind": "chain"},
-		"charges": {"per_round": 2, "capacity": 10},
+		"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
 		"desc": "Swipe to slide the tiles. Equal numbers merge and double. Reach 2048 before the board fills up - the classic brain cooker.",
 		"controls": ["swipe to slide all tiles", "equal tiles merge and double", "the run ends when no move is left"],
 		"genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "turnbased", "singleplayer"]},

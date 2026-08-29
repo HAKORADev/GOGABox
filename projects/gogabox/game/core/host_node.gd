@@ -48,7 +48,12 @@ func _ready() -> void:
 
         # ---- universal GOGABox loading screen (loads the script + assets) ----
         var id := String(game_def["id"])
-        Ads.banner_hide()
+        # games may opt INTO a banner in their own view (registry "banner": true);
+        # default is banner-free play
+        if bool(game_def.get("banner", false)):
+                Ads.banner_show()
+        else:
+                Ads.banner_hide()
         await Loader.load_game(self, game_def)
 
         if not _session_open:
@@ -212,12 +217,11 @@ func _clear_game() -> void:
         game = null
 
 func _score_to_coins(s: int) -> int:
-        # per-game tuned generosity; always >= 1 coin for a real run
-        match String(game_def["id"]):
-                "snake": return 2 + s / 3
-                "rally": return 1 + s / 4
-                "lanes": return 2 + s / 100
-                "slasher": return 2 + s / 20
-                "hopper": return 2 + s / 60
-                "merge": return 2 + s / 150
-        return 1 + s / 100
+        # MODULAR per game (registry "coin_div"): score / divider, and BELOW the
+        # divider a run earns nothing ("easy 500-score game -> /100" style).
+        # Games with in-run collectables can still rely on pickups; the divider
+        # is just the predictable fallback. No key -> default /100.
+        var div := int(game_def.get("coin_div", 100))
+        if div <= 0 or s < div:
+                return 0
+        return s / div

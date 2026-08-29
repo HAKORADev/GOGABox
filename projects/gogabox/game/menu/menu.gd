@@ -108,15 +108,23 @@ func has_open_overlay() -> bool:
 # ---------------------------------------------------------------- layout
 
 func _on_resized() -> void:
-        var s := _root.size
-        var wide := s.x > s.y
-        if wide != _last_wide:
-                _last_wide = wide
-                # swap the stretch base so UI keeps its physical size in landscape
-                if GameHost.active_host == null:
-                        get_window().content_scale_size = Vector2i(1280, 720) if wide \
-                                        else Vector2i(720, 1280)
+        _apply_base()
         _layout()
+
+## THE SCALING FIX: with stretch aspect "expand" the base viewport grows in
+## whichever direction the device is, so the UI keeps its physical size ONLY
+## if content_scale_size matches the orientation. Re-apply on EVERY resize
+## (launch state, rotation, game return) - comparing only transitions left
+## half-swapped states: landscape-from-launch got a different scale than
+## portrait-then-rotate, and the top bar went off-screen.
+func _apply_base() -> void:
+        var s := _root.size
+        if s.x <= 0.0 or s.y <= 0.0:
+                return
+        var want := Vector2i(1280, 720) if s.x > s.y else Vector2i(720, 1280)
+        var win := get_window()
+        if win.content_scale_size != want:
+                win.content_scale_size = want
 
 func _layout() -> void:
         var w := maxf(360.0, _root.size.x)
@@ -165,9 +173,8 @@ func _build_top_bar() -> void:
 
         bar.add_child(_icon_button("res://assets/meta/icon_search.png",
                         func(): _open_search()))
-        var help := Arc.button("?", Vector2(64, 64), 30, Color(0.16, 0.10, 0.05, 0.85),
-                        func(): _open_help())
-        bar.add_child(help)
+        bar.add_child(_icon_button("res://assets/ui/icon_help.png",
+                        func(): _open_help()))
         bar.add_child(_icon_button("res://assets/ui/icon_trophy.png",
                         func(): _open_trophies()))
         bar.add_child(_icon_button("res://assets/ui/icon_gear.png",
@@ -181,14 +188,96 @@ func _update_battery_chip() -> void:
                 c.queue_free()
         var n := Box.box_batteries()
         var cap := Box.box_battery_cap()
+        # tappable: opens the full battery status (pools + both timers)
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(0, 56)
+        b.flat = true
         var wchip := PanelContainer.new()
         wchip.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.42), 26, 10))
+        wchip.mouse_filter = Control.MOUSE_FILTER_IGNORE
         var wh := HBoxContainer.new()
         wh.add_theme_constant_override("separation", 8)
         wchip.add_child(wh)
         wh.add_child(Arc.battery_control(n, cap, 46.0, 24.0))
         wh.add_child(Arc.label("%d/%d" % [n, cap], 24, Color(1, 1, 1, 0.9), false))
-        _battery_box.add_child(wchip)
+        b.add_child(wchip)
+        b.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                _open_batteries())
+        _battery_box.add_child(b)
+
+## Full battery status: box pool + every owned charged game, with BOTH timers
+## (next +1 in..., full in...).
+func _open_batteries() -> void:
+        if _sheet_open or _trophies_open:
+                return
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
+        var title := Arc.label("GOGABATTERIES", 38, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 210)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 12)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
+
+        # --- the box bank ---
+        var n := Box.box_batteries()
+        var cap := Box.box_battery_cap()
+        var bank := PanelContainer.new()
+        bank.add_theme_stylebox_override("panel", Arc.panel_style(Color(1, 1, 1, 0.55), 18, 12))
+        var bv := VBoxContainer.new()
+        bv.add_theme_constant_override("separation", 6)
+        bank.add_child(bv)
+        var bh := HBoxContainer.new()
+        bh.add_theme_constant_override("separation", 12)
+        bv.add_child(bh)
+        bh.add_child(Arc.battery_control(n, cap, 72.0, 30.0))
+        bh.add_child(Arc.label("BOX BANK   %d/%d" % [n, cap], 24, Arc.INK))
+        var bt := Arc.label(_pool_timer_text(n, cap, Box.BATTERY_STEP), 18, Color("6a4a28"), false)
+        bv.add_child(bt)
+        var bn := Arc.label("charges only while the app is closed", 16, Color("8a6a40"), false)
+        bv.add_child(bn)
+        v.add_child(bank)
+
+        # --- per-game pools ---
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if not Box.owns_game(id):
+                        continue
+                var b := Box.game_battery(id)
+                if b.is_empty():
+                        continue
+                var row := PanelContainer.new()
+                row.add_theme_stylebox_override("panel", Arc.panel_style(Color(1, 1, 1, 0.4), 18, 12))
+                var rv := VBoxContainer.new()
+                rv.add_theme_constant_override("separation", 6)
+                row.add_child(rv)
+                var rh := HBoxContainer.new()
+                rh.add_theme_constant_override("separation", 12)
+                rv.add_child(rh)
+                rh.add_child(Arc.battery_control(int(b["count"]), int(b["cap"]), 72.0, 30.0))
+                rh.add_child(Arc.label("%s   %d/%d" % [String(g["title"]).to_upper(), int(b["count"]), int(b["cap"])], 22, Arc.INK))
+                rv.add_child(Arc.label("%d per round  ·  +1 every %d min  ·  %s" 
+                                % [int(b["per_round"]), int(b["step"]) / 60, _pool_timer_text(int(b["count"]), int(b["cap"]), int(b["step"]))],
+                                18, Color("6a4a28"), false))
+                v.add_child(row)
+
+        vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+
+func _pool_timer_text(count: int, cap: int, step: int) -> String:
+        if count >= cap:
+                return "FULL"
+        var now := int(Time.get_unix_time_from_system())
+        var next_in := step - (now % step)
+        var full_in := (cap - count - 1) * step + next_in
+        return "+1 in %s  ·  full in %s" % [Roadmap.fmt_clock(float(next_in)), Roadmap.fmt_clock(float(full_in))]
 
 func _icon_button(icon_path: String, cb: Callable) -> Button:
         var b := Button.new()
@@ -584,7 +673,8 @@ func _open_search() -> void:
                 _close_sheet()
                 _refresh()))
 
-## A wrapped row of selectable chips (search filters).
+## A wrapped row of proper toggle buttons (icon + label in ONE control -
+## no nested Panel-in-Button hacks, that's what overlapped weirdly).
 func _chip_row(title_: String, ids: Array, on_toggle: Callable, kind: String) -> Control:
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 8)
@@ -600,17 +690,41 @@ func _chip_row(title_: String, ids: Array, on_toggle: Callable, kind: String) ->
                         "age": active = _filter_age == sid
                         "genre": active = _filter_genre == sid
                         "sub": active = _filter_sub == sid
-                var c := Arc.meta_chip(kind, sid,
-                                Color(0.98, 0.62, 0.1, 0.85) if active else Color(0, 0, 0, 0.12),
-                                18, Arc.CARD if active else Color("8a6a40"))
-                # chips are Panels - wrap in a Button for taps
+                var lbl := ""
+                match kind:
+                        "genre": lbl = Meta.genre_label(sid)
+                        "sub": lbl = Meta.sub_label(sid)
+                        "age": lbl = Meta.age_label(sid)
                 var b := Button.new()
-                b.flat = true
-                b.mouse_filter = Control.MOUSE_FILTER_STOP
-                b.pressed.connect(func():
+                b.text = " " + lbl
+                b.toggle_mode = true
+                b.button_pressed = active
+                var icon_path := Meta.icon_for(kind, sid)
+                if icon_path != "" and ResourceLoader.exists(icon_path):
+                        b.icon = load(icon_path)
+                        b.add_theme_constant_override("icon_max_width", 26)
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 19)
+                b.add_theme_color_override("font_color", Arc.CARD if active else Color("7a5a34"))
+                b.add_theme_color_override("font_pressed_color", Arc.CARD)
+                var sb := Arc.panel_style(Color(0.98, 0.62, 0.1) if active else Color(0, 0, 0, 0.14), 20)
+                sb.content_margin_left = 16
+                sb.content_margin_right = 16
+                sb.content_margin_top = 8
+                sb.content_margin_bottom = 8
+                b.add_theme_stylebox_override("normal", sb)
+                var sbh := sb.duplicate() as StyleBoxFlat
+                sbh.bg_color = sbh.bg_color.lightened(0.08)
+                b.add_theme_stylebox_override("hover", sbh)
+                var sbp := sb.duplicate() as StyleBoxFlat
+                sbp.bg_color = Color(0.85, 0.5, 0.06)
+                b.add_theme_stylebox_override("pressed", sbp)
+                b.toggled.connect(func(_on: bool):
                         Jukebox.sfx("click", -4.0)
-                        on_toggle.call(sid))
-                b.add_child(c)
+                        on_toggle.call(sid)
+                        # rebuild the sheet so every chip shows its true state
+                        _close_sheet()
+                        _open_search())
                 wrap.add_child(b)
         return box
 
@@ -712,11 +826,10 @@ func _open_guide(g: Dictionary) -> void:
                 v.add_child(l)
 
         v.add_child(Arc.label("GOOD TO KNOW", 24, Arc.HOT))
-        var geo: Dictionary = g.get("genres", {})
         var facts := ""
         if g.has("charges"):
-                facts += "uses GOGABatteries: %d per round, pool %d (+1 every 5 min)\n" \
-                                % [int(g["charges"].get("per_round", 2)), int(g["charges"].get("capacity", 10))]
+                facts += "uses GOGABatteries: %d per round, pool %d (+1 every %d min)\n" \
+                                % [int(g["charges"].get("per_round", 2)), int(g["charges"].get("capacity", 10)), int(g["charges"].get("regen_minutes", 5))]
         var win := Roadmap.window_text(String(g["id"]))
         if win != "":
                 facts += win + "\n"
@@ -726,16 +839,31 @@ func _open_guide(g: Dictionary) -> void:
         fk.custom_minimum_size = Vector2(540, 0)
         v.add_child(fk)
 
-        var chips := HFlowContainer.new()
-        chips.add_theme_constant_override("h_separation", 8)
-        chips.add_theme_constant_override("v_separation", 8)
-        chips.alignment = FlowContainer.ALIGNMENT_CENTER
-        for gid in (geo.get("main", []) as Array):
-                chips.add_child(Arc.meta_chip("genre", String(gid)))
-        for sid in (geo.get("sub", []) as Array):
-                chips.add_child(Arc.meta_chip("sub", String(sid)))
-        chips.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
-        v.add_child(chips)
+        # GENRES / MORE TAGS / AGE each in their OWN labeled section (owner rule:
+        # never mixed together in one pile)
+        var geo: Dictionary = g.get("genres", {})
+        if not (geo.get("main", []) as Array).is_empty():
+                v.add_child(Arc.label("GENRES", 24, Arc.HOT))
+                var grow := HFlowContainer.new()
+                grow.add_theme_constant_override("h_separation", 8)
+                grow.add_theme_constant_override("v_separation", 8)
+                for gid in (geo.get("main", []) as Array):
+                        grow.add_child(Arc.meta_chip("genre", String(gid)))
+                v.add_child(grow)
+        if not (geo.get("sub", []) as Array).is_empty():
+                v.add_child(Arc.label("MORE TAGS", 24, Arc.HOT))
+                var srow := HFlowContainer.new()
+                srow.add_theme_constant_override("h_separation", 8)
+                srow.add_theme_constant_override("v_separation", 8)
+                for sid in (geo.get("sub", []) as Array):
+                        srow.add_child(Arc.meta_chip("sub", String(sid)))
+                v.add_child(srow)
+        v.add_child(Arc.label("AGE", 24, Arc.HOT))
+        var arow := HFlowContainer.new()
+        arow.add_theme_constant_override("h_separation", 8)
+        arow.add_theme_constant_override("v_separation", 8)
+        arow.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
+        v.add_child(arow)
 
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func():
@@ -895,7 +1023,8 @@ func _open_game_page(g: Dictionary) -> void:
                 brow.add_child(Arc.battery_control(int(batt["count"]), int(batt["cap"]), 64.0, 28.0))
                 var btxt := "%d/%d GOGABatteries  ·  %d per round" % [int(batt["count"]), int(batt["cap"]), int(batt["per_round"])]
                 if int(batt["count"]) < int(batt["cap"]):
-                        btxt += "\n+1 in %s" % Roadmap.fmt_clock(float(batt["regen_in"]))
+                        btxt += "\n+1 in %s  ·  full in %s" % [Roadmap.fmt_clock(float(batt["regen_in"])),
+                                Roadmap.fmt_clock(float((int(batt["cap"]) - int(batt["count"]) - 1) * int(batt["step"]) + int(batt["regen_in"])))]
                 var bl := Arc.label(btxt, 18, Color("6a4a28"), false)
                 bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 brow.add_child(bl)
@@ -959,6 +1088,32 @@ func _open_game_page(g: Dictionary) -> void:
                         18, Color("6a4a28"), false)
         info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         content.add_child(info)
+
+        # GENRES / MORE TAGS / AGE live in the (previously empty) space between
+        # RESET and CLOSE - each group in its own labeled spot.
+        var geo: Dictionary = g.get("genres", {})
+        if not (geo.get("main", []) as Array).is_empty():
+                content.add_child(Arc.label("GENRES", 20, Arc.HOT))
+                var grow := HFlowContainer.new()
+                grow.add_theme_constant_override("h_separation", 8)
+                grow.add_theme_constant_override("v_separation", 8)
+                for gid in (geo.get("main", []) as Array):
+                        grow.add_child(Arc.meta_chip("genre", String(gid)))
+                content.add_child(grow)
+        if not (geo.get("sub", []) as Array).is_empty():
+                content.add_child(Arc.label("MORE TAGS", 20, Arc.HOT))
+                var srow := HFlowContainer.new()
+                srow.add_theme_constant_override("h_separation", 8)
+                srow.add_theme_constant_override("v_separation", 8)
+                for sid in (geo.get("sub", []) as Array):
+                        srow.add_child(Arc.meta_chip("sub", String(sid)))
+                content.add_child(srow)
+        content.add_child(Arc.label("AGE", 20, Arc.HOT))
+        var arow := HFlowContainer.new()
+        arow.add_theme_constant_override("h_separation", 8)
+        arow.add_theme_constant_override("v_separation", 8)
+        arow.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
+        content.add_child(arow)
 
         var reset_btn := Arc.button("RESET GAME PROGRESS", Vector2(540, 60), 20,
                         Color(0.6, 0.32, 0.24))

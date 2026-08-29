@@ -2,7 +2,6 @@
 	"enabled": true,
 	"test_mode": false,
 	"game_id": "5770940",
-	"_doc": "Same Unity Ads Game ID as the arsenal's first app (docs/ADS.md 5770940), per owner decision. test_mode=false = REAL ads from day one (owner instruction). If Unity dashboard later requires a per-package entry for com.zai.gogabox, paste that new Game ID here; placements stay the same.",
 	"placements": {
 		"interstitial": "Interstitial_Android",
 		"rewarded": "Rewarded_Android",

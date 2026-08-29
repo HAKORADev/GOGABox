@@ -10,8 +10,16 @@ Two pools, one currency:
 
 | pool | cap | refill | where |
 |---|---|---|---|
-| game pool | per game (`charges.capacity`, default 10) | +1 / 5 min, **always** (in and out of the box) | `Box.game_battery(id)` |
+| game pool | per game (`charges.capacity`) | +1 / `charges.regen_minutes`, **always** (in and out of the box) | `Box.game_battery(id)` |
 | box pool | 50 (`Box.BOX_BATTERY_CAP`) | +1 / 5 min, **only while the app is closed** | `Box.box_batteries()` |
+
+Fully MODULAR per game - registry `charges`:
+```gdscript
+"charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5}
+```
+Every game may use different numbers (capacity 6 with 3 per round and 8-minute
+regen is just as valid). Playing takes from BOTH pools (game pool AND the box
+bank) - owner rule, so the bank stays meaningful and sessions stay finite.
 
 - A charged game declares `charges: {"per_round": n, "capacity": n}` in the
   registry. Games WITHOUT the key (snake) never touch batteries.

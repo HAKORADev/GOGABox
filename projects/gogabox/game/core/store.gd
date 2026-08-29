@@ -121,13 +121,17 @@ func box_batteries() -> int:
 func box_battery_cap() -> int:
         return BOX_BATTERY_CAP
 
-## Per-game pool: refills 1 / 5 min in AND out of the box. Returns {} when
-## the game does not use charges.
+## Per-game pool: fully modular per game (registry `charges`):
+##   per_round      batteries one play costs
+##   capacity       pool size
+##   regen_minutes  minutes for +1 (this game's own rhythm)
+## Refills in AND out of the box. Returns {} when the game has no charges.
 func game_battery(id: String) -> Dictionary:
         var g := GameReg.get_game(id)
         if g.is_empty() or not g.has("charges"):
                 return {}
         var cap := int(g["charges"].get("capacity", 10))
+        var step := maxi(60, int(g["charges"].get("regen_minutes", 5)) * 60)
         var pools: Dictionary = data["game_batteries"]
         var now := int(Time.get_unix_time_from_system())
         if not pools.has(id):
@@ -136,26 +140,29 @@ func game_battery(id: String) -> Dictionary:
         var count := int(p["count"])
         if count < cap:
                 var elapsed := now - int(p.get("ts", now))
-                var regen := elapsed / BATTERY_STEP
+                var regen := elapsed / step
                 if regen > 0:
                         count = mini(cap, count + regen)
-                        p["ts"] = now - (elapsed % BATTERY_STEP)
+                        p["ts"] = now - (elapsed % step)
                         p["count"] = count
                         save()
         var regen_in := 0
         if count < cap:
-                regen_in = BATTERY_STEP - ((now - int(p.get("ts", now))) % BATTERY_STEP)
-        return {"count": count, "cap": cap,
+                regen_in = step - ((now - int(p.get("ts", now))) % step)
+        return {"count": count, "cap": cap, "step": step,
                 "per_round": int(g["charges"].get("per_round", 2)), "regen_in": regen_in}
 
-## Spend one round's worth of a game's batteries. False if not enough.
+## Spend one round: takes from BOTH the game pool AND the box bank (owner
+## rule). False (and nothing spent) unless both can afford it.
 func consume_round_batteries(id: String) -> bool:
         var b := game_battery(id)
         if b.is_empty():
                 return true   # game plays without charges
-        if int(b["count"]) < int(b["per_round"]):
+        var need := int(b["per_round"])
+        if int(b["count"]) < need or box_batteries() < need:
                 return false
-        data["game_batteries"][id]["count"] = int(b["count"]) - int(b["per_round"])
+        data["game_batteries"][id]["count"] = int(b["count"]) - need
+        data["box_batteries"] = box_batteries() - need
         save()
         batteries_changed.emit()
         _sync_battery_notifications()
@@ -230,7 +237,7 @@ func _schedule_battery_notifications() -> void:
                 var b := game_battery(id)
                 if b.is_empty() or int(b["count"]) >= int(b["cap"]):
                         continue
-                var secs2 := (int(b["cap"]) - int(b["count"])) * BATTERY_STEP
+                var secs2 := (int(b["cap"]) - int(b["count"])) * int(b["step"])
                 Notify.schedule(_battery_notify_id("g_" + id), "GOGABox",
                         "%s batteries are full - back to it!" % String(g["title"]),
                         maxi(60, secs2))

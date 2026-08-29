@@ -23,13 +23,16 @@ static func launch(router: Node, id: String) -> bool:
                 if not Box.spend(fee):
                         return false
                 Box.add_spent(id, fee)
-        # GOGABatteries: charged games consume their pool per round
+        # GOGABatteries: charged games consume their pool + the box bank
         if not Box.consume_round_batteries(id):
                 return false
         var host: Node = load("res://game/core/host_node.gd").new()
         host.configure(g, router, fee, free_play)
         router.add_child(host)
         active_host = host
+        # the game is its OWN WORLD: hide + freeze the menu while it runs
+        if router.has_method("on_game_entered"):
+                router.call("on_game_entered")
         return true
 
 static func end_session() -> void:

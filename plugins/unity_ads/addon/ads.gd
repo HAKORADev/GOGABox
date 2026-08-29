@@ -34,6 +34,7 @@ var _last_result_ok := false
 var _pending_since_ms := 0
 var _banner_wanted := false        # banner requested before init finished
 var _showing := false              # an ad is on screen (watchdog paused)
+var _load_retries := {}            # placement -> retries while a cb waits
 
 func _ready() -> void:
         _load_config()
@@ -77,6 +78,14 @@ func placement(kind: String) -> String:
 
 func banner_height() -> float:
         return float(cfg.banner_height)
+
+## Pre-load everything again. Call when the menu opens / after a session -
+## interstitials and banners expire, so a fresh load right before the moment
+## we might show one massively raises fill ("per-turn ads never show" fix).
+func refresh() -> void:
+        if desktop_sim or not enabled_ok():
+                return
+        _preload_all()
 
 # ---------------------------------------------------------------- pacing API
 
@@ -166,6 +175,7 @@ func _on_native_init_failed() -> void:
 
 func _on_native_loaded(placement_id: String) -> void:
         # if something was waiting for a load, show it now
+        _load_retries[placement_id] = 0
         if _pending_cb.is_valid() and (placement_id == placement("rewarded") \
                         or placement_id == placement("interstitial")):
                 _showing = true
@@ -173,13 +183,29 @@ func _on_native_loaded(placement_id: String) -> void:
 
 func _on_native_failed(placement_id: String, _message: String) -> void:
         # load/show failed: NEVER leave the caller's callback dangling (this was
-        # the "back to box hangs" bug). Skip the ad and let the flow continue.
+        # the "back to box hangs" bug). Retry ONCE quietly, then skip the ad.
         _showing = false
-        if _pending_cb.is_valid() and (placement_id == placement("rewarded") \
-                        or placement_id == placement("interstitial")):
-                var cb := _pending_cb
-                _pending_cb = Callable()
-                cb.call(false)
+        if not _pending_cb.is_valid():
+                return
+        var kind := _kind_of(placement_id)
+        if kind == "":
+                return
+        var tries := int(_load_retries.get(placement_id, 0))
+        if tries < 1 and native != null:
+                _load_retries[placement_id] = tries + 1
+                native.load(placement_id)   # loaded -> _on_native_loaded shows it
+                return
+        _load_retries[placement_id] = 0
+        var cb := _pending_cb
+        _pending_cb = Callable()
+        cb.call(false)
+
+func _kind_of(placement_id: String) -> String:
+        if placement_id == placement("rewarded"):
+                return "rewarded"
+        if placement_id == placement("interstitial"):
+                return "interstitial"
+        return ""
 
 func _process(_delta: float) -> void:
         # watchdog: if a pending ad never resolves (no fill + no failed event),

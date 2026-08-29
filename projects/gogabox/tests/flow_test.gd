@@ -105,9 +105,15 @@ func _t_batteries() -> int:
                 "rally pool 10, 2 per round")
         ok += _check(Box.consume_round_batteries("rally"), "round consumes 2")
         ok += _check(int(Box.game_battery("rally")["count"]) == 8, "pool 8 after round")
+        ok += _check(Box.box_batteries() == 48, "box bank drained too (48)")
         Box.data["game_batteries"]["rally"]["count"] = 1
         ok += _check(not Box.consume_round_batteries("rally"), "no play at 1 battery")
+        Box.data["game_batteries"]["rally"]["count"] = 10
+        Box.data["box_batteries"] = 1
+        ok += _check(not Box.consume_round_batteries("rally"), "no play when bank < cost")
+        ok += _check(int(Box.game_battery("rally")["count"]) == 10, "pool untouched on fail")
         Box.data["box_batteries"] = 30
+        Box.data["game_batteries"]["rally"]["count"] = 1
         var moved := Box.refill_game_from_box("rally")
         ok += _check(moved == 9 and int(Box.game_battery("rally")["count"]) == 10,
                 "refill moves 9 from box")
@@ -287,8 +293,8 @@ func _t_host_flow() -> int:
         game.finish_run(37)
         await get_tree().create_timer(1.2).timeout
         ok += _check(Box.stat("snake", "best") == 37, "run recorded (best 37)")
-        # conversion: 2 + 37/3 = 14, + run_coins 5 = 19 total earned
-        ok += _check(Box.coins() == 150 - 10 + 19, "net wallet 159 -> %d" % Box.coins())
+        # MODULAR coin_div: snake 37 / 10 = 3 bonus, + 5 pickups = 8 total
+        ok += _check(Box.coins() == 150 - 10 + 8, "net wallet 148 -> %d" % Box.coins())
         ok += _check(Box.stat("snake", "plays") == 1, "plays 1")
         # quit path
         host._quit_to_menu()
@@ -303,6 +309,8 @@ func _t_all_games() -> int:
         # own everything so launch() passes
         Box.reset_all()
         Box.earn(100000)
+        # charged games need BOTH pools: keep the box bank topped up
+        Box.data["box_batteries"] = Box.box_battery_cap()
         for g in GameReg.playable():
                 if not Box.owns_game(String(g["id"])):
                         Box.unlock_game(String(g["id"]), 0)

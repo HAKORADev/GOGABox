@@ -157,24 +157,23 @@ def splash():
 
 
 def mystery_tile():
-    """Black mystery tile art: blocky ? + accent blocks on the edges."""
+    """Black mystery tile art: clean blocky ? on dark checker. No colored
+    accents (owner asked to remove them)."""
     W, H = 320, 220
     img = Image.new("RGBA", (W, H), (18, 14, 12, 255))
     d = ImageDraw.Draw(img)
-    # subtle checker
     for cy in range(0, H, 20):
         for cx in range(0, W, 20):
             if (cx // 20 + cy // 20) % 2 == 0:
                 d.rectangle([cx, cy, cx + 19, cy + 19], fill=(24, 19, 16, 255))
-    B = 18  # block size
-    bx = W // 2 - B * 2  # ? starts
-    by = 34
+    B = 18
+    bx = W // 2 - B * 2
+    by = 30
 
-    def blk(cx, cy, fill, outline=(240, 235, 225, 255)):
+    def blk(cx, cy, fill):
         d.rectangle([bx + cx * B, by + cy * B, bx + cx * B + B - 2, by + cy * B + B - 2],
-                    fill=fill, outline=outline, width=3)
+                    fill=fill, outline=(240, 235, 225, 255), width=3)
 
-    # blocky question mark (grid 4 wide x 6 tall)
     Y = (243, 238, 228, 255)
     for cx in (0, 1, 2):
         blk(cx, 0, Y)
@@ -182,18 +181,35 @@ def mystery_tile():
     blk(2, 2, Y)
     for cx in (1, 2):
         blk(cx, 3, Y)
-    blk(1, 5, Y)
-    # edge accent blocks (arcade confetti corners)
-    A = ACCENT + (255,)
-    H2 = HOT + (255,)
-    C = COIN + (255,)
-    for (ex, ey, col) in [(0, 0, A), (1, 0, C), (0, 1, H2),
-                          (9, 9, A), (8, 9, C), (9, 8, H2),
-                          (9, 0, C), (0, 9, A)]:
-        d.rectangle([ex * B + 2, ey * B + 2, ex * B + B - 2, ey * B + B - 2],
-                    fill=col)
+    blk(1, 4, Y)
+    blk(1, 6, Y)   # the longer tail
     img.save(os.path.join(ASSETS, "ui", "mystery.png"))
     print("assets/ui/mystery.png")
+
+
+def help_icon():
+    """Top-bar ? glyph - same blocky family as the mystery art (long tail)."""
+    S = 96
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    B = 12
+    bx = S // 2 - B * 2
+    by = 8
+
+    def blk(cx, cy):
+        d.rectangle([bx + cx * B, by + cy * B, bx + cx * B + B - 2, by + cy * B + B - 2],
+                    fill=(255, 244, 224, 255))
+
+    for cx in (0, 1, 2):
+        blk(cx, 0)
+    blk(3, 1)
+    blk(2, 2)
+    for cx in (1, 2):
+        blk(cx, 3)
+    blk(1, 4)
+    blk(1, 6)   # longer tail
+    img.save(os.path.join(ASSETS, "ui", "icon_help.png"))
+    print("assets/ui/icon_help.png")
 
 
 # ------------------------------------------------------------------ meta icons
@@ -411,6 +427,7 @@ if __name__ == "__main__":
     adaptive()
     splash()
     mystery_tile()
+    help_icon()
     meta_icons()
     notif_icon()
     icon_svg()

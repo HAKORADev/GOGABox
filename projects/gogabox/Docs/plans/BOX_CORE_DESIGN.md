@@ -1,4 +1,4 @@
-# GOGABox — Core Design (v0.0.2)
+# GOGABox — Core Design (v0.0.4)
 
 > GOGABox = **GO**dot **GA**me **Box**. One Android app that hosts many mini-games,
 > Cartoon-Network-GameBox style but our own: arcade-warm, for everyone (not
@@ -14,9 +14,13 @@
    touch helpers, UI kit) is written ONCE in `game/core/`. Each game is a folder
    in `game/games/` with its own art, physics and feel. Games do NOT have to
    match each other visually — the Box chrome (menu, buttons, currency) does.
-3. **Adding a game = blinking**: create `game/games/<id>.gd` extending
-   `GogaGame`, add ONE entry to `game/core/registry.gd`, drop a thumbnail in
+3. **Adding a game = blinking**: create the game's OWN ROOM -
+   `game/games/<id>/<id>.gd` (one folder per game, extending `GogaGame`),
+   add ONE entry to `game/core/registry.gd`, drop a thumbnail in
    `assets/thumbs/<id>.png`, add a test case. No core edits.
+4. **Games are their own world**: launching a game HIDES + freezes the menu
+   (main.gd on_game_entered) - no windows-on-top, no taps leaking into the
+   feed. Returning restores it (on_game_closed).
 4. **Fair economy**: playing always *nets positive* for a decent run. The box
    can never soft-lock (FREE PLAY kicks in below the cheapest fee).
 
@@ -150,13 +154,22 @@ B lives in config/projects.json and moves with every released build.
 - Rewarded: run-end "DOUBLE GOGACoins"; later per-game extras opt-in via the
   same plugin API. Per-game ads may also register extra runs.
 
-## 7. 2D & 3D
+## 7. Economy modularity (v0.0.4)
+
+- **coin_div**: score -> coins is per game (`"coin_div": N` in the registry):
+  bonus = score / N, and below N a run earns 0. snake /10, lanes /100 ...
+  In-run collectables (pickups) stack on top. No key -> default /100.
+- **Per-game banner**: registry `"banner": true` opts a game into showing the
+  ad banner inside its own view. Default: banner-free play.
+- **coin icon rule**: every coin-priced control uses `Arc.coin_button`.
+
+## 8. 2D & 3D
 
 Godot runs 2D and 3D **in the same project** (separate scenes, and 3D can be
 embedded inside 2D via SubViewport). The registry carries a `dim` field so a
 future 3D game (Pop TD 3D?) plugs in without core changes. v0.0.1 ships 2D.
 
-## 8. Ported at v0.0.1 (from PGB v1.3.8) + roadmap
+## 9. Ported at v0.0.1 (from PGB v1.3.8) + roadmap
 
 | game (PGB name) | id | price | fee | status |
 |---|---|---|---|---|
