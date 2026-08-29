@@ -9,6 +9,6 @@
 		"banner": "Banner_Android"
 	},
 	"interstitial_every_runs": 2,
-	"banner_height": 90,
+	"banner_height": 52,
 	"banner_enabled": true
 }

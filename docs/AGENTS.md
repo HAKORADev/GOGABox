@@ -15,7 +15,7 @@ This file is about *operating* the repo: resuming, changing, shipping.
 cd godot-android-arsenal        # fresh sandbox? see §7 first
 git pull                        # fast-forward to latest main
 ./tools/bootstrap.sh            # idempotent: ~1 min warm, ~10 min cold
-./tools/test.sh <game>          # jellyjump | candyrush - must end ALL PASS
+./tools/test.sh <game>          # jellyjump | candyrush | gogabox - must end ALL PASS
 ```
 
 Then, in order:
@@ -99,15 +99,16 @@ are staged in at build time from `plugins/<backend>/`, selected by
 
 **ACTIVE backend — Unity Ads direct** (`use_plugins: ["unity_ads"]`):
 
-| thing | jellyjump | candyrush |
-|---|---|---|
-| Unity Game ID (Android) | `5770940` | **not yet created** — see its `ads_config.json` `_doc` |
-| interstitial placement | `Interstitial_Android` | `Interstitial_Android` |
-| rewarded placement | `Rewarded_Android` | `Rewarded_Android` |
-| banner placement | `Banner_Android` | `Banner_Android` |
-| package name | `com.zai.jellyjump` | `com.zai.candyrush` |
-| dashboard | Unity Publishing dashboard → Monetization → Projects (one project per game; the new game's entry must be created and its Game ID pasted into `projects/candyrush/config/ads_config.json` before release) | |
-| config file | `projects/jellyjump/config/ads_config.json` | `projects/candyrush/config/ads_config.json` |
+| thing | jellyjump | candyrush | gogabox |
+|---|---|---|---|
+| Unity Game ID (Android) | `5770940` | `5770940` (owner decision: reuse the arsenal's first ID) | `5770940` (owner decision: reuse the arsenal's first ID) |
+| test_mode | `true` | `false` (real ads) | `false` (real ads) |
+| interstitial placement | `Interstitial_Android` | `Interstitial_Android` | `Interstitial_Android` |
+| rewarded placement | `Rewarded_Android` | `Rewarded_Android` | `Rewarded_Android` |
+| banner placement | `Banner_Android` | `Banner_Android` | `Banner_Android` |
+| package name | `com.zai.jellyjump` | `com.zai.candyrush` | `com.zai.gogabox` |
+| dashboard | Unity Publishing dashboard → Monetization → Projects. NOTE: per-package dashboard entries may be needed later if Unity restricts serving for unregistered packages — create them, then paste each new Game ID into that project's `config/ads_config.json`. Placements and the plugin contract stay identical. |||
+| config file | `projects/jellyjump/config/ads_config.json` | `projects/candyrush/config/ads_config.json` | `projects/gogabox/config/ads_config.json` |
 
 **LevelPlay mediation — built, verified, then rolled back (see §4.3):**
 
@@ -265,7 +266,7 @@ subjects (`git log` is the real history).
 | need | read |
 |---|---|
 | env setup, toolchain freeze, pitfalls | docs/SETUP.md |
-| add a new game | docs/ADDING_A_GAME.md |
+| add a new game | docs/ADDING_A_GAME.md (single-game repo) — for the gogabox multi-game app read `projects/gogabox/Docs/plans/BOX_CORE_DESIGN.md` instead: adding a game = one registry entry + one GogaGame script + one thumbnail |
 | ads architecture and config | docs/ADS.md + plugins/unity_ads/README.md |
 | assets policy, manifest, source catalogs | docs/ASSETS.md (general) |
 | which assets *this* game uses | projects/<g>/docs/ASSETS.md |

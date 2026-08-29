@@ -36,7 +36,7 @@ single-source.
         "banner": "Banner_Android"
     },
     "interstitial_every_runs": 3,          // pacing: one interstitial per N finished runs
-    "banner_height": 90,                   // px reserved at the bottom of the menu
+    "banner_height": 52,                   // px reserved at the bottom (plugin holder = 52dp, transparent, standard 320x50 banner)
     "banner_enabled": true
 }
 ```
