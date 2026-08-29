@@ -61,6 +61,8 @@ static func _condition_done(id: String, rv: Dictionary) -> bool:
                                 if int(_order_value(o)) < _order_goal(o):
                                         return false
                         return true
+                "direct":
+                        return true   # no conditions: appears as a locked/gated tile right away
         return true
 
 # ---------------------------------------------------------------- orders
@@ -121,6 +123,37 @@ static func inbox_left(id: String) -> float:
         if String(rv.get("kind", "")) != "inbox":
                 return 0.0
         return maxf(0.0, float(rv.get("minutes", 30)) * 60.0 - Box.total_time())
+
+# ------------------------------------------------------- play-time windows
+
+## Inside a "from".."to" local-hour window (wrap-safe).
+static func _hour_in(h: int, from_h: int, to_h: int) -> bool:
+        if from_h == to_h:
+                return true
+        if from_h < to_h:
+                return h >= from_h and h < to_h
+        return h >= from_h or h < to_h   # overnight window
+
+## Can this game be played RIGHT NOW (time-of-day rules)?
+static func window_ok(id: String) -> bool:
+        var g := GameReg.get_game(id)
+        var h := int(Time.get_time_dict_from_system()["hour"])
+        if g.has("hours"):
+                if not _hour_in(h, int(g["hours"]["from"]), int(g["hours"]["to"])):
+                        return false
+        if g.has("blocked_hours"):
+                if _hour_in(h, int(g["blocked_hours"]["from"]), int(g["blocked_hours"]["to"])):
+                        return false
+        return true
+
+## Human hint for the restriction ("" when the game has none).
+static func window_text(id: String) -> String:
+        var g := GameReg.get_game(id)
+        if g.has("hours"):
+                return "playable %02d:00-%02d:00" % [int(g["hours"]["from"]), int(g["hours"]["to"])]
+        if g.has("blocked_hours"):
+                return "rests %02d:00-%02d:00" % [int(g["blocked_hours"]["from"]), int(g["blocked_hours"]["to"])]
+        return ""
 
 # ------------------------------------------------------------ bookkeeping
 

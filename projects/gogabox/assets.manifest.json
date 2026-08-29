@@ -29,7 +29,7 @@
                         "id": "pil-drawn",
                         "name": "Deterministic PIL drawings (this repo, tools/derive_assets.py + tools/make_brand.py)",
                         "license": "CC0 (project-authored)",
-                        "used_for": "box chrome (bg_main, logo, coin, lock/gear/trophy icons, splash), snake apple/body/head x4 skins, lanes ship+block, rally ball+paddle, hopper platform+player, slasher bomb, all 14 menu thumbnails (6 games + 8 workshop teasers), icon.svg, app icon set (icons/main_192x192.png + icons/adaptive_foreground_432x432.png + icons/adaptive_background_432x432.png, letter-G emblem via tools/make_brand.py), android notification glyph (android-overlay/.../drawable-nodpi/ic_notify.png)"
+                        "used_for": "box chrome (bg_main, logo, coin, lock/gear/trophy icons, splash, mystery tile art), snake apple/body/head x4 skins, lanes ship+block, rally ball+paddle, hopper platform+player, slasher bomb, all 14 menu thumbnails (6 games + 8 workshop teasers), icon.svg, app icon set (icons/ - chunky letter-G from the Kenney Mini font via tools/make_brand.py), android notification glyph, meta vocabulary icons (assets/meta/: genres arcade/action/puzzle/adventure/shooter/racing/kids/music/story, subs retro/singleplayer/survival/competitive/hacknslash/platformer/minimal/turnbased, age ratings everyone/kids/teens, search glyph)"
                 },
                 {
                         "id": "synth-sfx",

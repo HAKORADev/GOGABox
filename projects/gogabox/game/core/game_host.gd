@@ -13,12 +13,19 @@ static func launch(router: Node, id: String) -> bool:
                 return false
         if not Box.owns_game(id):
                 return false
+        if not Roadmap.window_ok(id):
+                return false
         var fee := int(g["fee"])
-        var free_play := fee > 0 and Box.coins() < Box.cheapest_owned_fee()
+        # anti-softlock, snake only: the starter game is ALWAYS playable.
+        # Every other game requires real coins (adds value to the wallet).
+        var free_play := id == "snake" and fee > 0 and Box.coins() < fee
         if fee > 0 and not free_play:
                 if not Box.spend(fee):
                         return false
                 Box.add_spent(id, fee)
+        # GOGABatteries: charged games consume their pool per round
+        if not Box.consume_round_batteries(id):
+                return false
         var host: Node = load("res://game/core/host_node.gd").new()
         host.configure(g, router, fee, free_play)
         router.add_child(host)

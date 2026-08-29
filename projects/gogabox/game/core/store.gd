@@ -5,9 +5,12 @@ extends Node
 signal coins_changed(total: int)
 signal game_unlocked(id: String)
 signal reveal_changed(id: String)   # a game's feed state changed (mystery->locked...)
+signal batteries_changed
 
 const SAVE_PATH := "user://gogabox.json"
 const START_COINS := 150
+const BATTERY_STEP := 300          # one GOGABattery per 5 minutes
+const BOX_BATTERY_CAP := 50        # global box pool (recharges only while CLOSED)
 
 var data := {}
 
@@ -24,6 +27,8 @@ func _defaults() -> Dictionary:
                 "runs_since_interstitial": 0,
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
+                "box_batteries": BOX_BATTERY_CAP,   # global pool; refills ONLY while app closed
+                "game_batteries": {},         # id -> {"count": n, "ts": unix} (refills always)
         }
 
 func _load() -> void:
@@ -105,6 +110,142 @@ func is_seen(id: String) -> bool:
 func mark_seen(id: String) -> void:
         _slot(id)["seen"] = true
         save()
+
+# ------------------------------------------------------------- GOGABatteries
+
+## Global pool. Refills 1 / 5 min ONLY while the app is closed (see
+## NOTIFICATION_APPLICATION_PAUSED/RESUMED below).
+func box_batteries() -> int:
+        return clampi(int(data.get("box_batteries", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
+
+func box_battery_cap() -> int:
+        return BOX_BATTERY_CAP
+
+## Per-game pool: refills 1 / 5 min in AND out of the box. Returns {} when
+## the game does not use charges.
+func game_battery(id: String) -> Dictionary:
+        var g := GameReg.get_game(id)
+        if g.is_empty() or not g.has("charges"):
+                return {}
+        var cap := int(g["charges"].get("capacity", 10))
+        var pools: Dictionary = data["game_batteries"]
+        var now := int(Time.get_unix_time_from_system())
+        if not pools.has(id):
+                pools[id] = {"count": cap, "ts": now}
+        var p: Dictionary = pools[id]
+        var count := int(p["count"])
+        if count < cap:
+                var elapsed := now - int(p.get("ts", now))
+                var regen := elapsed / BATTERY_STEP
+                if regen > 0:
+                        count = mini(cap, count + regen)
+                        p["ts"] = now - (elapsed % BATTERY_STEP)
+                        p["count"] = count
+                        save()
+        var regen_in := 0
+        if count < cap:
+                regen_in = BATTERY_STEP - ((now - int(p.get("ts", now))) % BATTERY_STEP)
+        return {"count": count, "cap": cap,
+                "per_round": int(g["charges"].get("per_round", 2)), "regen_in": regen_in}
+
+## Spend one round's worth of a game's batteries. False if not enough.
+func consume_round_batteries(id: String) -> bool:
+        var b := game_battery(id)
+        if b.is_empty():
+                return true   # game plays without charges
+        if int(b["count"]) < int(b["per_round"]):
+                return false
+        data["game_batteries"][id]["count"] = int(b["count"]) - int(b["per_round"])
+        save()
+        batteries_changed.emit()
+        _sync_battery_notifications()
+        return true
+
+## Emergency refill: pour from the global box pool into a game pool.
+## Returns the number of batteries transferred.
+func refill_game_from_box(id: String) -> int:
+        var b := game_battery(id)
+        if b.is_empty():
+                return 0
+        var missing := int(b["cap"]) - int(b["count"])
+        var move := mini(missing, box_batteries())
+        if move <= 0:
+                return 0
+        data["game_batteries"][id]["count"] = int(b["count"]) + move
+        data["box_batteries"] = box_batteries() - move
+        save()
+        batteries_changed.emit()
+        _sync_battery_notifications()
+        return move
+
+## Called on pause (app "closed") and resume; keeps global regen honest.
+func _notification(what: int) -> void:
+        if what == NOTIFICATION_APPLICATION_PAUSED:
+                meta()["closed_ts"] = int(Time.get_unix_time_from_system())
+                save()
+                _schedule_battery_notifications()
+        elif what == NOTIFICATION_APPLICATION_RESUMED:
+                _apply_closed_regen()
+                _cancel_battery_notifications()
+
+## Add global batteries earned while the app was closed.
+func _apply_closed_regen() -> void:
+        var closed := int(meta().get("closed_ts", 0))
+        if closed <= 0:
+                return
+        var now := int(Time.get_unix_time_from_system())
+        var elapsed := now - closed
+        if elapsed <= 0:
+                return
+        var count := box_batteries()
+        if count >= BOX_BATTERY_CAP:
+                return
+        var regen := mini(BOX_BATTERY_CAP - count, elapsed / BATTERY_STEP)
+        if regen > 0:
+                data["box_batteries"] = count + regen
+                save()
+                batteries_changed.emit()
+        meta()["closed_ts"] = now
+
+func _battery_notify_id(key: String) -> int:
+        var h := 0
+        for c in key:
+                h = (h * 31 + c.unicode_at(0)) % 100000
+        return 200000 + h
+
+## Schedule "batteries full" pings for the box pool and every owned charged
+## game that is not full (fired by the native alarm while the app is closed).
+func _schedule_battery_notifications() -> void:
+        var now := int(Time.get_unix_time_from_system())
+        var gb := box_batteries()
+        if gb < BOX_BATTERY_CAP:
+                var secs := (BOX_BATTERY_CAP - gb) * BATTERY_STEP
+                Notify.schedule(_battery_notify_id("box"), "GOGABox",
+                        "Your GOGABatteries are fully charged - %d/%d!" % [BOX_BATTERY_CAP, BOX_BATTERY_CAP],
+                        maxi(60, secs - (now - int(meta().get("closed_ts", now)))))
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if not owns_game(id):
+                        continue
+                var b := game_battery(id)
+                if b.is_empty() or int(b["count"]) >= int(b["cap"]):
+                        continue
+                var secs2 := (int(b["cap"]) - int(b["count"])) * BATTERY_STEP
+                Notify.schedule(_battery_notify_id("g_" + id), "GOGABox",
+                        "%s batteries are full - back to it!" % String(g["title"]),
+                        maxi(60, secs2))
+
+func _cancel_battery_notifications() -> void:
+        Notify.cancel(_battery_notify_id("box"))
+        for g in GameReg.playable():
+                Notify.cancel(_battery_notify_id("g_" + String(g["id"])))
+
+## Keep scheduled pings in sync after pools change while the app is open.
+func _sync_battery_notifications() -> void:
+        # cheap approach: cancel + reschedule only if we are not the foreground
+        # payer - while open the alarms would fire inside the session, which is
+        # pointless, so just cancel them; they get re-armed on the next pause.
+        _cancel_battery_notifications()
 
 # ------------------------------------------------------------------ wallet
 

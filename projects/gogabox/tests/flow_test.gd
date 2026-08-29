@@ -10,6 +10,9 @@ func _ready() -> void:
         fails += _test("store: unlocks + anti-softlock", _t_unlocks())
         fails += _test("store: stats/achievements/skins", _t_slots())
         fails += _test("store: time/spent/earned tracking", _t_accounting())
+        fails += _test("batteries: pools, consumption, refill", _t_batteries())
+        fails += _test("windows: hour math", _t_windows())
+        fails += _test("meta: registry metadata sane", _t_meta())
         fails += _test("registry: entries sane", _t_registry())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("scroll: BoxScroll drag/tap", await _t_scroll())
@@ -91,6 +94,62 @@ func _t_accounting() -> int:
         Box.mark_seen("snake")
         ok += _check(Box.is_seen("snake") and not Box.is_seen("rally"), "New! seen flags")
         ok += _check(Box.meta().has("last_play"), "last_play stamped")
+        return ok
+
+func _t_batteries() -> int:
+        Box.reset_all()
+        var ok := _check(Box.box_batteries() == 50, "box pool starts full (50)")
+        ok += _check(Box.game_battery("snake").is_empty(), "snake plays without charges")
+        var b := Box.game_battery("rally")
+        ok += _check(not b.is_empty() and int(b["count"]) == 10 and int(b["per_round"]) == 2,
+                "rally pool 10, 2 per round")
+        ok += _check(Box.consume_round_batteries("rally"), "round consumes 2")
+        ok += _check(int(Box.game_battery("rally")["count"]) == 8, "pool 8 after round")
+        Box.data["game_batteries"]["rally"]["count"] = 1
+        ok += _check(not Box.consume_round_batteries("rally"), "no play at 1 battery")
+        Box.data["box_batteries"] = 30
+        var moved := Box.refill_game_from_box("rally")
+        ok += _check(moved == 9 and int(Box.game_battery("rally")["count"]) == 10,
+                "refill moves 9 from box")
+        ok += _check(Box.box_batteries() == 21, "box pool drained to 21")
+        # closed-time regen for the global pool
+        Box.data["box_batteries"] = 0
+        Box.meta()["closed_ts"] = int(Time.get_unix_time_from_system()) - 620
+        Box._apply_closed_regen()
+        ok += _check(Box.box_batteries() == 2, "closed 620s -> +2 box batteries")
+        Box.reset_all()
+        return ok
+
+func _t_windows() -> int:
+        var ok := 0
+        ok += _check(Roadmap._hour_in(3, 1, 8), "3h inside 1-8")
+        ok += _check(not Roadmap._hour_in(12, 1, 8), "12h outside 1-8")
+        ok += _check(Roadmap._hour_in(23, 22, 6), "23h inside overnight 22-6")
+        ok += _check(Roadmap._hour_in(2, 22, 6), "2h inside overnight 22-6")
+        ok += _check(not Roadmap._hour_in(9, 22, 6), "9h outside overnight 22-6")
+        ok += _check(Roadmap._hour_in(16, 16, 22) and Roadmap._hour_in(21, 16, 22)
+                and not Roadmap._hour_in(22, 16, 22), "16-22 window edges")
+        ok += _check(Roadmap.window_text("hopper") != "", "hopper has a window text")
+        ok += _check(Roadmap.window_text("snake") == "", "snake has no window")
+        return ok
+
+func _t_meta() -> int:
+        var ok := 0
+        for g in GameReg.GAMES:
+                var geo: Dictionary = g.get("genres", {})
+                ok += _check((geo.get("main", []) as Array).size() <= Meta.MAIN_LIMIT,
+                        String(g["id"]) + " main genres <= 3")
+                ok += _check((geo.get("sub", []) as Array).size() <= Meta.SUB_LIMIT,
+                        String(g["id"]) + " sub genres <= 3")
+                var age := String(g.get("age", "everyone"))
+                ok += _check(Meta.AGES.has(age), String(g["id"]) + " age rating valid")
+                if g.has("charges"):
+                        ok += _check(int(g["charges"].get("per_round", 0)) > 0
+                                and int(g["charges"].get("capacity", 0)) > 0,
+                                String(g["id"]) + " charges sane")
+        ok += _check(not Meta.used_genres().is_empty(), "genres used by feed games")
+        ok += _check(Meta.genre_label("arcade") == "Arcade", "genre labels resolve")
+        ok += _check(Meta.icon_for("genre", "arcade") != "", "genre icons resolve")
         return ok
 
 func _t_registry() -> int:

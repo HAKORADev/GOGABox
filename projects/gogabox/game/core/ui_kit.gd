@@ -98,6 +98,57 @@ static func chip(txt: String, icon_path := "", bg := Color(0, 0, 0, 0.35),
         pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return pc
 
+## Chip fed from the Meta tables (genres / subs / ages). Unknown ids degrade
+## to a text-only chip - modular by design.
+static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
+                font_size := 18, color := INK) -> PanelContainer:
+        var txt := id
+        match kind:
+                "genre": txt = Meta.genre_label(id)
+                "sub": txt = Meta.sub_label(id)
+                "age": txt = Meta.age_label(id)
+        return chip(txt, Meta.icon_for(kind, id), bg, font_size, color)
+
+## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so
+## players never confuse GOGACoins with per-game currencies.
+static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
+                on_press := Callable()) -> Button:
+        var b := button("", size, font_size, bg, on_press)
+        var h := HBoxContainer.new()
+        h.set_anchors_preset(Control.PRESET_FULL_RECT)
+        h.alignment = BoxContainer.ALIGNMENT_CENTER
+        h.add_theme_constant_override("separation", 10)
+        h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var l := label(txt, font_size, Color.WHITE)
+        h.add_child(l)
+        var c := TextureRect.new()
+        c.texture = load("res://assets/ui/coin.png")
+        c.custom_minimum_size = Vector2(font_size + 10, font_size + 10)
+        c.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        c.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        h.add_child(c)
+        b.add_child(h)
+        return b
+
+## Dynamic GOGABattery meter: body + level fill + color by charge.
+static func battery_control(count: int, cap: int, w := 56.0, h := 26.0) -> Control:
+        var c := Control.new()
+        c.custom_minimum_size = Vector2(w + 6, h)
+        c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var lvl := 0.0 if cap <= 0 else clampf(float(count) / float(cap), 0.0, 1.0)
+        var col := Arc.GOOD if lvl > 0.5 else (Arc.ACCENT if lvl > 0.25 else Arc.BAD)
+        c.draw.connect(func():
+                # tip nub
+                c.draw_rect(Rect2(w, h * 0.3, 5, h * 0.4), Color(1, 1, 1, 0.75))
+                # body
+                c.draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.45))
+                c.draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, 0.85), false, 2.0)
+                # fill
+                if lvl > 0.01:
+                        c.draw_rect(Rect2(3, 3, (w - 6) * lvl, h - 6), col))
+        return c
+
 static func coin_chip() -> PanelContainer:
         return chip(str(Box.coins()), "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 28, COIN)
 

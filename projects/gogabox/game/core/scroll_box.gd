@@ -29,6 +29,10 @@ var _vel := Vector2.ZERO
 var _dragging := false
 var _tappables: Array = []         # [{ctrl: Control, cb: Callable}]
 
+## While a sheet/overlay covers this scroll, ALL input processing here is
+## suspended so the overlay's controls (sliders, buttons) work normally.
+var input_locked := false
+
 func _init() -> void:
         horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -53,6 +57,8 @@ func _hit_tappable(pos: Vector2) -> bool:
 # ---------------------------------------------------------------- input
 
 func _input(event: InputEvent) -> void:
+        if input_locked:
+                return
         if event is InputEventScreenTouch:
                 _touch(event as InputEventScreenTouch)
         elif event is InputEventScreenDrag:

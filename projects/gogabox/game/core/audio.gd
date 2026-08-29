@@ -40,8 +40,19 @@ func music(track: String, restart := false) -> void:
         var stream: AudioStream = load(track)
         if stream == null:
                 return
+        # box theme loops forever, with a soft fade-in so it never slams in
+        if stream is AudioStreamMP3:
+                (stream as AudioStreamMP3).loop = true
+        elif stream is AudioStreamOggVorbis:
+                (stream as AudioStreamOggVorbis).loop = true
+        elif stream is AudioStreamWAV:
+                (stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
         _music.stream = stream
+        _music.volume_db = -38.0
         _music.play()
+        var tw := _music.create_tween()
+        tw.tween_property(_music, "volume_db", -6.0, 1.2) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 func stop_music() -> void:
         _current_music = ""

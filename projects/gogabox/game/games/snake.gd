@@ -5,7 +5,7 @@ extends GogaGame
 const CELL := 44
 const COLS := 16
 const ROWS := 24
-const ORIGIN := Vector2(8, 96)
+var ORIGIN := Vector2(8, 96)   # re-centered per device in _build_board()
 
 var world: Node2D
 var snake: Array[Vector2i] = []
@@ -51,6 +51,10 @@ func _load_skin_textures() -> void:
 
 func _build_board() -> void:
         var vp := get_viewport_rect().size
+        # center the board in the REAL viewport (tall phones expand it - never
+        # assume 1280 height; see docs/RESOLUTION_RULE.md)
+        var board_h := ROWS * CELL + 12
+        ORIGIN = Vector2(8, maxf(96.0, (vp.y - board_h) / 2.0))
         _board_panel = Panel.new()
         _board_panel.add_theme_stylebox_override("panel",
                 Arc.panel_style(Color("1e3320"), 18))

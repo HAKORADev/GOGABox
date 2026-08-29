@@ -9,11 +9,7 @@
 <line x1="-20" y1="140" x2="140" y2="-20"/><line x1="30" y1="160" x2="180" y2="10"/>
 <line x1="90" y1="170" x2="220" y2="40"/></g>
 <circle cx="64" cy="46" r="52" fill="#5a3719" opacity="0.45"/>
-<g transform="translate(64,64)">
-<path d="M 21.5 -40.5 A 42 42 0 1 0 42 0 L 21.5 0 Z"
- fill="none" stroke="#ffb020" stroke-width="20" stroke-linejoin="round"/>
-<path d="M 21.5 -40.5 A 42 42 0 0 0 -8 -34" fill="none" stroke="#ffe196"
- stroke-width="5" stroke-linecap="round" opacity="0.8"/>
-</g>
-<circle cx="90" cy="96" r="9" fill="#a06e14"/><circle cx="90" cy="96" r="6.6" fill="#ffc93c"/>
+<text x="64" y="100" font-family="monospace" font-size="104" font-weight="bold"
+ text-anchor="middle" fill="#ffb020" stroke="#7a4a14" stroke-width="4">G</text>
+<circle cx="100" cy="98" r="9" fill="#a06e14"/><circle cx="100" cy="98" r="6.6" fill="#ffc93c"/>
 </svg>

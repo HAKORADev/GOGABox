@@ -16,9 +16,16 @@ var _hot_scroll: BoxScroll
 var _grid: GridContainer
 var _grid_scroll: BoxScroll
 var _wallet_label: Label
+var _battery_box: HBoxContainer
 var _toast: Dictionary
 var _sheet_open := false
+var _trophies_open := false
 var _last_wide := false
+
+# search filters (id arrays; empty = no filter)
+var _filter_age := ""
+var _filter_genre := ""
+var _filter_sub := ""
 
 func _ready() -> void:
         _layer = CanvasLayer.new()
@@ -60,6 +67,7 @@ func _ready() -> void:
         Box.coins_changed.connect(func(_t: int): _wallet_label.text = str(Box.coins()))
         Box.game_unlocked.connect(func(_id: String): _after_roadmap_change())
         Box.reveal_changed.connect(func(_id: String): _after_roadmap_change())
+        Box.batteries_changed.connect(_update_battery_chip)
 
         Jukebox.play_music_menu()
         if not Box.meta().get("asked_notif", false):
@@ -68,7 +76,7 @@ func _ready() -> void:
                 Notify.request_permission()
         Roadmap.tick()
         _refresh()
-        Ads.banner_show()
+        # NOTE: the banner joins only after the splash (main.gd -> on_splash_done)
 
         # slow tick so timed mysteries resolve live
         var t := Timer.new()
@@ -76,6 +84,26 @@ func _ready() -> void:
         t.autostart = true
         t.timeout.connect(func(): Roadmap.tick())
         add_child(t)
+
+        _build_particles()
+
+## Called by main.gd when the splash fully faded out.
+func on_splash_done() -> void:
+        Ads.banner_show()
+
+## Android BACK (routed from main.gd): close the top-most layer, or ask to
+## leave the box. Never kills the app without a confirm.
+func handle_back() -> void:
+        if _sheet_open:
+                _close_sheet()
+                return
+        if _trophies_open:
+                _close_sheet()
+                return
+        _open_quit_confirm()
+
+func has_open_overlay() -> bool:
+        return _sheet_open or _trophies_open
 
 # ---------------------------------------------------------------- layout
 
@@ -103,7 +131,7 @@ func _build_top_bar() -> void:
 
         var logo := TextureRect.new()
         logo.texture = load("res://assets/ui/logo.png")
-        logo.custom_minimum_size = Vector2(240, 74)
+        logo.custom_minimum_size = Vector2(214, 74)
         logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -114,9 +142,13 @@ func _build_top_bar() -> void:
         spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
         bar.add_child(spacer)
 
-        var wallet := Arc.panel_style(Color(0, 0, 0, 0.42), 26, 10)
+        # GOGABatteries chip (dynamic meter + count)
+        _battery_box = HBoxContainer.new()
+        _battery_box.add_theme_constant_override("separation", 8)
+        bar.add_child(_battery_box)
+
         var wchip := PanelContainer.new()
-        wchip.add_theme_stylebox_override("panel", wallet)
+        wchip.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.42), 26, 10))
         var wh := HBoxContainer.new()
         wh.add_theme_constant_override("separation", 10)
         wchip.add_child(wh)
@@ -131,13 +163,32 @@ func _build_top_bar() -> void:
         wh.add_child(_wallet_label)
         bar.add_child(wchip)
 
-        var trophy := _icon_button("res://assets/ui/icon_trophy.png",
-                        func(): _open_trophies())
-        bar.add_child(trophy)
+        bar.add_child(_icon_button("res://assets/meta/icon_search.png",
+                        func(): _open_search()))
+        var help := Arc.button("?", Vector2(64, 64), 30, Color(0.16, 0.10, 0.05, 0.85),
+                        func(): _open_help())
+        bar.add_child(help)
+        bar.add_child(_icon_button("res://assets/ui/icon_trophy.png",
+                        func(): _open_trophies()))
+        bar.add_child(_icon_button("res://assets/ui/icon_gear.png",
+                        func(): _open_settings()))
 
-        var gear := _icon_button("res://assets/ui/icon_gear.png",
-                        func(): _open_settings())
-        bar.add_child(gear)
+func _update_battery_chip() -> void:
+        if _battery_box == null:
+                return
+        for c in _battery_box.get_children():
+                _battery_box.remove_child(c)
+                c.queue_free()
+        var n := Box.box_batteries()
+        var cap := Box.box_battery_cap()
+        var wchip := PanelContainer.new()
+        wchip.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.42), 26, 10))
+        var wh := HBoxContainer.new()
+        wh.add_theme_constant_override("separation", 8)
+        wchip.add_child(wh)
+        wh.add_child(Arc.battery_control(n, cap, 46.0, 24.0))
+        wh.add_child(Arc.label("%d/%d" % [n, cap], 24, Color(1, 1, 1, 0.9), false))
+        _battery_box.add_child(wchip)
 
 func _icon_button(icon_path: String, cb: Callable) -> Button:
         var b := Button.new()
@@ -213,15 +264,31 @@ func _refresh() -> void:
                 var st := Roadmap.state(id)
                 if st == "HIDDEN":
                         continue
+                if not _passes_filters(g):
+                        continue
                 _grid.add_child(_tile(g, st))
                 tiles += 1
         if tiles == 0:
-                var empty := Arc.label("play to grow your box...", 24, Color(0.55, 0.42, 0.25), false)
+                var empty_txt := "play to grow your box..." \
+                                if (_filter_age == "" and _filter_genre == "" and _filter_sub == "") \
+                                else "nothing matches these filters"
+                var empty := Arc.label(empty_txt, 24, Color(0.55, 0.42, 0.25), false)
                 empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 empty.custom_minimum_size = Vector2(0, 120)
                 _grid.add_child(empty)
 
         _wallet_label.text = str(Box.coins())
+        _update_battery_chip()
+
+func _passes_filters(g: Dictionary) -> bool:
+        if _filter_age != "" and String(g.get("age", "everyone")) != _filter_age:
+                return false
+        var geo: Dictionary = g.get("genres", {})
+        if _filter_genre != "" and not (_filter_genre in (geo.get("main", []) as Array)):
+                return false
+        if _filter_sub != "" and not (_filter_sub in (geo.get("sub", []) as Array)):
+                return false
+        return true
 
 func _after_roadmap_change() -> void:
         Roadmap.tick()
@@ -392,15 +459,17 @@ func _tile(g: Dictionary, st: String) -> Control:
                         dark.offset_bottom = -70
                         dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(dark)
-                        var q := Arc.label("?", 110, Color(0.12, 0.1, 0.09))
-                        q.add_theme_color_override("font_outline_color", Color.WHITE)
-                        q.add_theme_constant_override("outline_size", 6)
-                        q.set_anchors_preset(Control.PRESET_FULL_RECT)
-                        q.offset_bottom = -70
-                        q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                        q.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-                        q.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                        b.add_child(q)
+                        var art := TextureRect.new()
+                        art.texture = load("res://assets/ui/mystery.png")
+                        art.set_anchors_preset(Control.PRESET_FULL_RECT)
+                        art.offset_left = 10
+                        art.offset_top = 10
+                        art.offset_right = -10
+                        art.offset_bottom = -80
+                        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                        art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        b.add_child(art)
                         var name_l := Arc.label("?????", 24, Color(0.85, 0.8, 0.7))
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -411,15 +480,286 @@ func _tile(g: Dictionary, st: String) -> Control:
         _grid_scroll.register_tappable(b, func(): _tap_tile(g, st, b))
         return b
 
+# ------------------------------------------------------------ living bg
+
+var _fx: Control
+var _fx_dots: Array = []   # {pos, spd, size, phase}
+var _fx_night := false
+
+func _build_particles() -> void:
+        _fx = Control.new()
+        _fx.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _fx.draw.connect(_draw_fx)
+        _root.add_child(_fx)
+        _root.move_child(_fx, 1)   # above bg, below everything interactive
+        var hour := int(Time.get_time_dict_from_system()["hour"])
+        _fx_night = hour >= 19 or hour < 6
+        for i in 26:
+                _fx_dots.append({
+                        "pos": Vector2(randf() * 720.0, randf() * 1280.0),
+                        "spd": 8.0 + randf() * 16.0,
+                        "size": 2.0 + randf() * 3.5,
+                        "phase": randf() * TAU,
+                })
+
+func _process(delta: float) -> void:
+        if _fx == null or not is_instance_valid(_fx):
+                return
+        var vp := _root.size
+        for d in _fx_dots:
+                d["pos"] = d["pos"] + Vector2(sin(d["phase"] + Time.get_ticks_msec() / 1900.0) * 6.0, -d["spd"]) * delta
+                if d["pos"].y < -12.0:
+                        d["pos"] = Vector2(randf() * vp.x, vp.y + 12.0)
+                if d["pos"].x < -12.0:
+                        d["pos"].x = vp.x + 12.0
+                elif d["pos"].x > vp.x + 12.0:
+                        d["pos"].x = -12.0
+        _fx.queue_redraw()
+
+func _draw_fx() -> void:
+        var vp := _root.size
+        var drift := fmod(Time.get_ticks_msec() / 1000.0 * 7.0, vp.y + 400.0) - 200.0
+        # slow diagonal neon stripes
+        var line_col := Color(1.0, 0.78, 0.3, 0.05) if not _fx_night \
+                        else Color(0.62, 0.78, 1.0, 0.05)
+        for i in 3:
+                var off := drift + i * (vp.y / 3.0)
+                _fx.draw_line(Vector2(-100, vp.y - off), Vector2(vp.x + 100, -off), line_col, 26.0)
+        # floating dust
+        var dot_col := Color(1.0, 0.85, 0.45, 0.5) if not _fx_night \
+                        else Color(0.75, 0.85, 1.0, 0.5)
+        for d in _fx_dots:
+                _fx.draw_circle(d["pos"], d["size"], dot_col)
+
+# ---------------------------------------------------------------- quit
+
+func _open_quit_confirm() -> void:
+        if _sheet_open or _trophies_open:
+                return
+        _sheet_open = true
+        _set_feed_lock(true)
+        var vb := Arc.sheet(_root)
+        var t := Arc.label("LEAVE GOGABOX?", 40, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var sub := Arc.label("your coins, batteries and progress\nare safe - everything saves instantly.", 21, Color("8a6a40"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+        vb.add_child(Arc.button("YES, BYE", Vector2(480, 80), 26, Arc.BAD, func():
+                get_tree().quit()))
+        vb.add_child(Arc.button("STAY", Vector2(480, 80), 26, Arc.ACCENT,
+                func(): _close_sheet()))
+
+# ------------------------------------------------------------ search
+
+func _open_search() -> void:
+        if _sheet_open or _trophies_open:
+                return
+        Jukebox.sfx("click", -4.0)
+        var vb := _sheet_base()
+        var title := Arc.label("FIND GAMES", 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+
+        vb.add_child(_chip_row("AGE", Meta.used_ages(),
+                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
+        vb.add_child(_chip_row("GENRE", Meta.used_genres(),
+                        func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
+        vb.add_child(_chip_row("MORE", Meta.used_subs(),
+                        func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
+
+        var hint := Arc.label("filters only touch games you can already see", 18,
+                        Color("8a6a40"), false)
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint)
+        vb.add_child(Arc.button("APPLY FILTERS", Vector2(480, 78), 26, Arc.ACCENT, func():
+                _close_sheet()
+                _refresh()
+                Arc.toast(_toast, "filters applied")))
+        vb.add_child(Arc.button("CLEAR", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16), func():
+                _filter_age = ""
+                _filter_genre = ""
+                _filter_sub = ""
+                _close_sheet()
+                _refresh()))
+
+## A wrapped row of selectable chips (search filters).
+func _chip_row(title_: String, ids: Array, on_toggle: Callable, kind: String) -> Control:
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.add_child(Arc.label(title_, 22, Arc.HOT))
+        var wrap := HFlowContainer.new()
+        wrap.add_theme_constant_override("h_separation", 8)
+        wrap.add_theme_constant_override("v_separation", 8)
+        box.add_child(wrap)
+        for id in ids:
+                var sid := String(id)
+                var active := false
+                match kind:
+                        "age": active = _filter_age == sid
+                        "genre": active = _filter_genre == sid
+                        "sub": active = _filter_sub == sid
+                var c := Arc.meta_chip(kind, sid,
+                                Color(0.98, 0.62, 0.1, 0.85) if active else Color(0, 0, 0, 0.12),
+                                18, Arc.CARD if active else Color("8a6a40"))
+                # chips are Panels - wrap in a Button for taps
+                var b := Button.new()
+                b.flat = true
+                b.mouse_filter = Control.MOUSE_FILTER_STOP
+                b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        on_toggle.call(sid))
+                b.add_child(c)
+                wrap.add_child(b)
+        return box
+
+# ------------------------------------------------------------ help (? button)
+
+func _open_help() -> void:
+        if _sheet_open or _trophies_open:
+                return
+        Jukebox.sfx("click", -4.0)
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
+        var title := Arc.label("YOUR GAMES", 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var sub := Arc.label("tap a game for the guide", 19, Color("8a6a40"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 250)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var list := VBoxContainer.new()
+        list.add_theme_constant_override("separation", 10)
+        list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(list)
+
+        var shown := 0
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if not Box.owns_game(id):
+                        continue
+                shown += 1
+                list.add_child(_help_row(g, scroll))
+        if shown == 0:
+                var e := Arc.label("own a game and it shows up here", 20, Color("8a6a40"), false)
+                e.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                list.add_child(e)
+
+        vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+
+## Thumbnail + name header line, description under (simple list, no stats).
+func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
+        var row := PanelContainer.new()
+        row.add_theme_stylebox_override("panel", Arc.panel_style(Color(1, 1, 1, 0.5), 18, 10))
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 4)
+        row.add_child(v)
+        var head := HBoxContainer.new()
+        head.add_theme_constant_override("separation", 12)
+        v.add_child(head)
+        var ic := TextureRect.new()
+        var tp := String(g.get("thumb", ""))
+        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        ic.custom_minimum_size = Vector2(96, 64)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        ic.clip_contents = true
+        head.add_child(ic)
+        head.add_child(Arc.label(String(g["title"]), 26, Arc.INK))
+        var d := Arc.label(String(g.get("desc", "")), 17, Color("6a4a28"), false)
+        d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        v.add_child(d)
+        scroll.register_tappable(row, func():
+                Jukebox.sfx("click", -4.0)
+                _open_guide(g))
+        return row
+
+## General guide: about, how to play, controls, then genres + age rating.
+func _open_guide(g: Dictionary) -> void:
+        _close_sheet()
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
+        var title := Arc.label(String(g["title"]).to_upper(), 38, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 220)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 12)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
+
+        v.add_child(Arc.label("THE GAME", 24, Arc.HOT))
+        var about := Arc.label(String(g.get("desc", "")), 20, Color("6a4a28"), false)
+        about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        about.custom_minimum_size = Vector2(540, 0)
+        v.add_child(about)
+
+        v.add_child(Arc.label("HOW TO PLAY", 24, Arc.HOT))
+        for line in g.get("controls", []):
+                var l := Arc.label("- " + String(line), 19, Arc.INK, false)
+                l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                l.custom_minimum_size = Vector2(540, 0)
+                v.add_child(l)
+
+        v.add_child(Arc.label("GOOD TO KNOW", 24, Arc.HOT))
+        var geo: Dictionary = g.get("genres", {})
+        var facts := ""
+        if g.has("charges"):
+                facts += "uses GOGABatteries: %d per round, pool %d (+1 every 5 min)\n" \
+                                % [int(g["charges"].get("per_round", 2)), int(g["charges"].get("capacity", 10))]
+        var win := Roadmap.window_text(String(g["id"]))
+        if win != "":
+                facts += win + "\n"
+        facts += "entry fee %d GOGACoins" % int(g.get("fee", 0))
+        var fk := Arc.label(facts, 18, Color("6a4a28"), false)
+        fk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        fk.custom_minimum_size = Vector2(540, 0)
+        v.add_child(fk)
+
+        var chips := HFlowContainer.new()
+        chips.add_theme_constant_override("h_separation", 8)
+        chips.add_theme_constant_override("v_separation", 8)
+        chips.alignment = FlowContainer.ALIGNMENT_CENTER
+        for gid in (geo.get("main", []) as Array):
+                chips.add_child(Arc.meta_chip("genre", String(gid)))
+        for sid in (geo.get("sub", []) as Array):
+                chips.add_child(Arc.meta_chip("sub", String(sid)))
+        chips.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
+        v.add_child(chips)
+
+        vb.add_child(Arc.button("BACK", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
+                        func():
+                                _close_sheet()
+                                _open_help()))
+
 # ---------------------------------------------------------------- sheets
+
+func _set_feed_lock(locked: bool) -> void:
+        # sheets sit ON TOP of the feed scrolls; without this lock BoxScroll would
+        # swallow the emulated mouse and sliders/buttons in sheets would "hang"
+        _hot_scroll.input_locked = locked
+        _grid_scroll.input_locked = locked
 
 func _sheet_base(h := 0.0) -> VBoxContainer:
         _sheet_open = true
+        _set_feed_lock(true)
         var vb := Arc.sheet(_root, h)
         return vb
 
 func _close_sheet() -> void:
         _sheet_open = false
+        _trophies_open = false
+        _set_feed_lock(false)
         # Arc.sheet() appended exactly 2 controls (dim + center) at the end
         var kids := _root.get_children()
         for i in range(maxi(0, kids.size() - 2), kids.size()):
@@ -534,15 +874,66 @@ func _open_game_page(g: Dictionary) -> void:
         content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(content)
 
+        var fee := int(g["fee"])
+        # anti-softlock: ONLY the starter game (snake) is ever free to play
+        var free_play: bool = id == "snake" and fee > 0 and Box.coins() < fee
+        var can_pay: bool = fee <= 0 or free_play or Box.coins() >= fee
+        var can_batt: bool = true
+        var batt := Box.game_battery(id)
+        if not batt.is_empty():
+                can_batt = int(batt["count"]) >= int(batt["per_round"])
+        var can_time := Roadmap.window_ok(id)
+        var can_play := can_pay and can_batt and can_time
+
         _header_block(content, g)
 
-        var fee := int(g["fee"])
-        var free_play: bool = fee > 0 and Box.coins() < Box.cheapest_owned_fee()
+        # batteries + time-window info, right under the header
+        if not batt.is_empty():
+                var brow := HBoxContainer.new()
+                brow.add_theme_constant_override("separation", 10)
+                content.add_child(brow)
+                brow.add_child(Arc.battery_control(int(batt["count"]), int(batt["cap"]), 64.0, 28.0))
+                var btxt := "%d/%d GOGABatteries  ·  %d per round" % [int(batt["count"]), int(batt["cap"]), int(batt["per_round"])]
+                if int(batt["count"]) < int(batt["cap"]):
+                        btxt += "\n+1 in %s" % Roadmap.fmt_clock(float(batt["regen_in"]))
+                var bl := Arc.label(btxt, 18, Color("6a4a28"), false)
+                bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                brow.add_child(bl)
+                if Box.box_batteries() > 0 and int(batt["count"]) < int(batt["cap"]):
+                        var refill := Arc.button("REFILL FROM BOX",
+                                        Vector2(240, 56), 17, Color("3f7fb0"), func():
+                                var moved := Box.refill_game_from_box(id)
+                                Jukebox.sfx("confirm" if moved > 0 else "error", -4.0)
+                                Arc.toast(_toast, "%d batteries moved from the box" % moved if moved > 0 else "box pool is empty")
+                                _close_sheet()
+                                _open_game_page(g))
+                        brow.add_child(refill)
+        var win := Roadmap.window_text(id)
+        if win != "":
+                var wl := Arc.label(win, 18, Arc.HOT if can_time else Arc.BAD, false)
+                wl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                content.add_child(wl)
+
         var play_txt := "PLAY  -%d" % fee if (fee > 0 and not free_play) else "PLAY  FREE"
-        var play_btn := Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
+        var play_btn := Arc.coin_button(play_txt, Vector2(540, 92), 34, Arc.ACCENT) \
+                        if (fee > 0 and not free_play) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
         content.add_child(play_btn)
+        if not can_play:
+                play_btn.disabled = true
+                var why := ""
+                if not can_time:
+                        why = "this one %s - come back in the window" % win
+                elif not can_pay:
+                        why = "need %d more GOGACoins (snake is always free)" % (fee - Box.coins())
+                elif not can_batt:
+                        why = "batteries empty - +1 every 5 min, or refill from the box"
+                var whyl := Arc.label(why, 18, Arc.BAD, false)
+                whyl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                content.add_child(whyl)
         scroll.register_tappable(play_btn, func():
                 Jukebox.sfx("click", -4.0)
+                if play_btn.disabled:
+                        return
                 _close_sheet()
                 GameHost.launch(self, id))
 
@@ -607,7 +998,7 @@ func _open_unlock_page(g: Dictionary) -> void:
         var price := int(g["price"])
         vb.add_child(Arc.label("unlock with GOGACoins", 22, Color("8a6a40"), false))
         var afford := Box.coins() >= price
-        var btn := Arc.button("UNLOCK  %d" % price, Vector2(540, 92), 30, Arc.GOOD, func():
+        var btn := Arc.coin_button("UNLOCK  %d" % price, Vector2(540, 92), 30, Arc.GOOD, func():
                 if Box.unlock_game(id, price):
                         Jukebox.jingle_win()
                         _close_sheet()
@@ -706,10 +1097,12 @@ func _open_mystery_page(g: Dictionary) -> void:
 # ------------------------------------------------------------ trophies & stats
 
 func _open_trophies() -> void:
-        if _sheet_open:
+        if _sheet_open or _trophies_open:
                 return
         Jukebox.sfx("click", -4.0)
-        _sheet_open = true
+        _sheet_open = false
+        _trophies_open = true
+        _set_feed_lock(true)
 
         var dim := ColorRect.new()
         dim.color = Arc.DIM_BG
@@ -759,14 +1152,23 @@ func _open_trophies() -> void:
         list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(list)
 
+        # PRIVACY OF THE ROADMAP: only OWNED games appear here. Showing hidden or
+        # locked games (even as rows) would leak how many games the box will grow.
         var rows := []
         for g in GameReg.playable():
-                rows.append(g)
-        for g in GameReg.workshop():
-                rows.append(g)
+                if Box.owns_game(String(g["id"])):
+                        rows.append(g)
 
+        if rows.is_empty():
+                var e := Arc.label("own a game to start this wall", 20, Color("8a6a40"), false)
+                e.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                list.add_child(e)
         for g in rows:
                 list.add_child(_stat_row(g))
+        if rows.size() < GameReg.playable().size():
+                var more := Arc.label("more games = more rows here...", 16, Color("8a6a40"), false)
+                more.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                list.add_child(more)
 
 func _stat_row(g: Dictionary) -> Control:
         var id := String(g["id"])
