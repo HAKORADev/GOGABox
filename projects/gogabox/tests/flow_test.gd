@@ -23,6 +23,7 @@ func _ready() -> void:
         fails += _test("menu: boots and lays out", await _t_menu())
         fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
+        fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)
 
@@ -643,4 +644,54 @@ func _t_isolation() -> int:
         stage.queue_free()
         await get_tree().process_frame
         Box.reset_all()
+        return ok
+
+# ------------------------------------------------------------------ plugins
+
+## THE v0.1.0 REGRESSION GUARD: Godot android plugins do NO snake_case ->
+## camelCase conversion of method names ("There is no coercing snake_case to
+## camelCase" - docs). A GDScript native.permission_granted() call against a
+## Java permissionGranted() method silently errors out on device - that was
+## the whole "allow reminders does nothing" bug (v0.0.6..v0.0.9). This test
+## parses every native.NAME( call in the addon GDScript and asserts a Java
+## method with that exact name exists.
+func _t_plugin_names() -> int:
+        var ok := 0
+        # res:// = projects/gogabox -> repo root is two levels up
+        var root := (ProjectSettings.globalize_path("res://") + "/../../plugins/").simplify_path() + "/"
+        var plugins := [
+                {"gd": root + "notify/addon/notify.gd",
+                 "java": root + "notify/android/org/godotengine/plugin/notify/NotifyPlugin.java"},
+                {"gd": root + "unity_ads/addon/ads.gd",
+                 "java": root + "unity_ads/android/org/godotengine/plugin/unityads/UnityAdsPlugin.java"},
+        ]
+        # built-in Object methods that are legal on the singleton but not Java
+        var builtin := {"connect": true}
+        var call_re := RegEx.new()
+        call_re.compile("native\\.([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(")
+        var meth_re := RegEx.new()
+        meth_re.compile("\\b(?:public|static)\\s+[\\w<>\\[\\], ]+?\\s([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(")
+        for p in plugins:
+                var gd := FileAccess.open(p["gd"], FileAccess.READ)
+                ok += _check(gd != null, "addon readable: " + p["gd"])
+                if gd == null:
+                        continue
+                var java := FileAccess.open(p["java"], FileAccess.READ)
+                ok += _check(java != null, "java readable: " + p["java"])
+                if java == null:
+                        continue
+                var java_names := {}
+                for m in meth_re.search_all(java.get_as_text()):
+                        java_names[m.get_string(1)] = true
+                var missing := {}
+                for m in call_re.search_all(gd.get_as_text()):
+                        var name_ := m.get_string(1)
+                        if builtin.has(name_):
+                                continue
+                        if not java_names.has(name_):
+                                missing[name_] = true
+                var list := missing.keys()
+                list.sort()
+                ok += _check(missing.is_empty(),
+                        "%s -> GDScript calls without exact Java match: %s" % [p["gd"].get_file(), ", ".join(list)])
         return ok

@@ -1737,11 +1737,12 @@ func _open_mystery_page(g: Dictionary) -> void:
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
 
-## v0.0.9 ALLOW REMINDERS - the owner tapped this three builds in a row and
-## got nothing. Native audit says the plugin, manifest and permission are all
-## present in the APK, so what is left is OEM-suppressed dialogs AND a
-## silently-failing settings intent. Every tap now answers VISIBLY, and a
-## GDScript-side watchdog is the last-resort ladder under the native one.
+## ALLOW REMINDERS (v0.1.0, simple per owner). Root cause of the dead tap in
+## v0.0.6..v0.0.9 was NEVER the OEM: GDScript called native.request_permission()
+## while the Java method was requestPermission() - Godot does no case
+## conversion, so every call silently failed (docs: "There is no coercing
+## snake_case to camelCase"). Names now match exactly and the flow is the
+## plain official one: tap -> the real system dialog. No watchdogs, no ladders.
 func _ask_reminders() -> void:
         if not Notify.available():
                 Arc.toast(_toast, "notification service missing on this device")
@@ -1751,19 +1752,6 @@ func _ask_reminders() -> void:
                 return
         Arc.toast(_toast, "asking the system...")
         Notify.request_permission()
-        # belt & braces: the native side has its own result-callback + 3.5s
-        # watchdog; this 5s timer only fires if BOTH went silent, and then
-        # opens the notification settings from here. If the settings page is
-        # already open, re-firing the same intent is invisible.
-        var sw := Timer.new()
-        sw.wait_time = 5.0
-        sw.one_shot = true
-        sw.autostart = true
-        add_child(sw)
-        sw.timeout.connect(func():
-                sw.queue_free()
-                if not Notify.permission_granted():
-                        Notify.open_notification_settings())
 
 # ------------------------------------------------------------ trophies & stats
 

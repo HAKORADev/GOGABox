@@ -16,8 +16,6 @@ import android.content.SharedPreferences;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -27,12 +25,17 @@ import java.util.Iterator;
 /**
  * Local notifications plugin for GOGABox (v1 GodotPlugin).
  *
- * GDScript:
+ * GDScript (names MUST match the @UsedByGodot Java methods EXACTLY - Godot
+ * does no snake_case/camelCase conversion, docs: "There is no coercing
+ * snake_case to camelCase". That mismatch is exactly what silently killed
+ * the permission ask in v0.0.6..v0.0.9 - every call errored out unseen):
  *   var n = Engine.get_singleton("Notify")
- *   n.requestPermission()
- *   n.permissionGranted()
+ *   n.permission_granted()
+ *   n.request_permission()                       // the real system dialog
+ *   n.open_notification_settings()               // manual helper
  *   n.schedule(id, title, body, delay_seconds)   // survives reboot
- *   n.cancel(id) / n.cancelAll()
+ *   n.schedule_kind(id, title, body, delay_seconds, channel)
+ *   n.cancel(id) / n.cancel_all()
  *
  * Schedules are persisted to SharedPreferences and re-armed by BootReceiver,
  * so "come back in 3 days" style reveals work across process death.
@@ -41,7 +44,6 @@ public class NotifyPlugin extends GodotPlugin {
 
     private static final String PREFS = "goga_notify";
     private static final String KEY_PENDING = "pending";
-    private static final String KEY_ASKED_DIALOG = "asked_dialog_v3";
     private static final int REQ_POST_NOTIFICATIONS = 4711;
 
     // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
@@ -52,13 +54,6 @@ public class NotifyPlugin extends GodotPlugin {
     private static final String CHANNEL_READY = "gogabox_ready_v2";
 
     private final android.app.Activity activity;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    /** Set once the request RESOLVES (result callback). A silent OEM that
-     *  never shows the dialog and never resolves never sets this - the
-     *  watchdog below is what rescues that case. */
-    private boolean requestResolved = false;
-    /** Guards against double-opening settings (result path + watchdog). */
-    private boolean fallbackOpened = false;
 
     public NotifyPlugin(Godot godot) {
         super(godot);
@@ -73,7 +68,7 @@ public class NotifyPlugin extends GodotPlugin {
     // ------------------------------------------------------------ GDScript API
 
     @UsedByGodot
-    public boolean permissionGranted() {
+    public boolean permission_granted() {
         if (activity == null) {
             return false;
         }
@@ -85,131 +80,56 @@ public class NotifyPlugin extends GodotPlugin {
     }
 
     /**
-     * Ask Android 13+ for POST_NOTIFICATIONS. MUST run on the UI thread
-     * (GodotPlugin methods arrive on the GL thread - off-thread requests
-     * silently do nothing).
-     *
-     * v0.0.8 NO-DEAD-TAP LADDER ("still pressing allow reminders does
-     * nothing"): some OEMs silently suppress the runtime dialog - they fire
-     * NO dialog and NO result, so tap 1 looked completely dead. Now every
-     * path ends in something VISIBLE:
-     *   tap 1  -> the real system permission dialog (exactly once ever);
-     *             if it RESOLVES as denied (instant or by the user) we open
-     *             this app's notification settings right away;
-     *             watchdog: if NOTHING resolved within 3.5s (suppressed),
-     *             the settings page opens anyway - no dead tap, ever;
-     *   tap 2+ -> this app's notification settings page directly (ALWAYS
-     *             reacts, and the toggle there is the one that counts).
+     * Ask Android 13+ for POST_NOTIFICATIONS - the plain, official flow.
+     * Shows the system dialog when the OS allows it; the OS alone decides.
+     * MUST run on the UI thread (GodotPlugin methods arrive on the GL
+     * thread - off-thread requests silently do nothing).
+     * No ladders, no watchdogs, no auto-settings: one honest request.
      */
     @UsedByGodot
-    public void requestPermission() {
-        if (activity == null || Build.VERSION.SDK_INT < 33 || permissionGranted()) {
+    public void request_permission() {
+        if (activity == null || Build.VERSION.SDK_INT < 33 || permission_granted()) {
             return;
         }
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                SharedPreferences sp = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                if (sp.getBoolean(KEY_ASKED_DIALOG, false)) {
-                    // the one system dialog was spent (denied, or the OEM never
-                    // showed it) -> the settings page ALWAYS opens
-                    openNotificationSettings();
-                    return;
-                }
-                sp.edit().putBoolean(KEY_ASKED_DIALOG, true).apply();
-                requestResolved = false;
-                fallbackOpened = false;
                 activity.requestPermissions(
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIFICATIONS);
-                // THE WATCHDOG: a healthy system resolves the request (dialog
-                // answered, or instant-deny) well inside 3.5s. An OEM that
-                // silently drops it resolves nothing - so we open the settings
-                // page ourselves. The only false positive (user stares at the
-                // real dialog for 3.5s+) lands on the page we wanted anyway.
-                mainHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (!requestResolved && !fallbackOpened && !permissionGranted()) {
-                            fallbackOpened = true;
-                            openNotificationSettings();
-                        }
-                    }
-                }, 3500L);
             }
         });
     }
 
-    /** Godot routes the platform result to every plugin via this hook
-     *  (GodotPlugin#onMainRequestPermissionsResult). Denied (instant
-     *  silent-deny included) -> open the settings page IMMEDIATELY so the
-     *  tap always produces a visible reaction. */
-    @Override
-    public void onMainRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode != REQ_POST_NOTIFICATIONS) {
-            return;
-        }
-        requestResolved = true;
-        boolean granted = false;
-        for (int r : grantResults) {
-            if (r == PackageManager.PERMISSION_GRANTED) {
-                granted = true;
-            }
-        }
-        if (!granted && !fallbackOpened && activity != null) {
-            fallbackOpened = true;
-            openNotificationSettings();
-        }
-    }
-
-    /** Opens this app's system notification settings page (user flips the
-     *  toggle by hand when the runtime dialog is gone for good).
-     *  v0.0.9: some OEMs silently FAIL the notification-settings intent -
-     *  that was the last "dead tap" path. If it does not start, fall back to
-     *  the app DETAILS page (every Android has it, and it carries the
-     *  notification toggle too). Never a silent no-op again. */
+    /** Opens this app's system notification settings page (manual helper -
+     *  the user lands on the toggle that always counts). */
     @UsedByGodot
-    public void openNotificationSettings() {
+    public void open_notification_settings() {
         if (activity == null) {
             return;
         }
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                android.content.Intent i =
-                        new android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
-                        activity.getPackageName());
-                if (tryStartActivity(i)) {
-                    return;
+                try {
+                    android.content.Intent i = new android.content.Intent(
+                            android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
+                            activity.getPackageName());
+                    i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(i);
+                } catch (Exception ignored) {
                 }
-                // OEM-proof fallback: the app details screen
-                android.content.Intent d = new android.content.Intent(
-                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                d.setData(android.net.Uri.parse("package:" + activity.getPackageName()));
-                d.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                tryStartActivity(d);
             }
         });
     }
 
-    /** startActivity with no throws - returns whether it started. */
-    private boolean tryStartActivity(android.content.Intent i) {
-        try {
-            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity.startActivity(i);
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
     @UsedByGodot
     public void schedule(int id, String title, String body, int delaySec) {
-        scheduleKind(id, title, body, delaySec, CHANNEL_GENERAL);
+        schedule_kind(id, title, body, delaySec, CHANNEL_GENERAL);
     }
 
     @UsedByGodot
-    public void scheduleKind(int id, String title, String body, int delaySec, String channelId) {
+    public void schedule_kind(int id, String title, String body, int delaySec, String channelId) {
         Context ctx = context();
         long fireAt = System.currentTimeMillis() + Math.max(1, delaySec) * 1000L;
         persist(ctx, id, title, body, fireAt, channelId);
@@ -232,7 +152,7 @@ public class NotifyPlugin extends GodotPlugin {
     }
 
     @UsedByGodot
-    public void cancelAll() {
+    public void cancel_all() {
         Context ctx = context();
         SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         JSONObject all = readPending(ctx);

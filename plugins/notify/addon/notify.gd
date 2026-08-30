@@ -39,10 +39,13 @@ func permission_granted() -> bool:
         return native.permission_granted()
 
 ## Ask Android 13+ for POST_NOTIFICATIONS (no-op below 33 / on desktop).
-## If the system hit its silent dead end (denied twice), the native side
-## opens the app's notification settings instead - the tap always reacts.
+## v0.1.0: names now match the Java methods EXACTLY (Godot does no
+## snake_case/camelCase conversion - that mismatch silently killed every
+## permission call in v0.0.6..v0.0.9). This is the plain official ask:
+## the real system dialog, nothing else.
 func request_permission() -> void:
         if native != null:
+                print("[Notify] request_permission -> native")
                 native.request_permission()
 
 ## Jump straight to this app's system notification settings (user flips the
