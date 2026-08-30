@@ -1,8 +1,8 @@
 name: build-android
-# General "build this app" dispatcher.
+# GOGABox (Godot all-in-one Game box) build pipeline.
 #
-# - push to main:            builds every project with ci_auto=true (all ABIs, release)
-# - manual run (Actions UI): pick project / ABI / build type, optionally publish a release
+# - push to main:            builds GOGABox (ci_auto=true, all ABIs, release)
+# - manual run (Actions UI): pick ABI / build type, optionally publish a release
 #
 # The toolchain is pinned in config/environment.lock and shared with local
 # builds through the exact same scripts (.ci/*, tools/bootstrap.sh, build.sh).
@@ -13,7 +13,7 @@ on:
       project:
         description: "Project to build (key in config/projects.json)"
         required: true
-        default: "jellyjump"
+        default: "gogabox"
         type: string
       abi:
         description: "ABI to build"

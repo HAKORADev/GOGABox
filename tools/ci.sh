@@ -12,7 +12,7 @@
 # ============================================================================
 set -euo pipefail
 
-REPO="${GDA_REPO:-HAKORADev/godot-android-arsenal}"
+REPO="${GDA_REPO:-HAKORADev/GOGABox}"
 API="https://api.github.com"
 
 TOKEN="${GITHUB_TOKEN:-}"

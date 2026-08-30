@@ -20,8 +20,8 @@ RAM: 4 GB works (gradle is tuned to 2 GB heap in the project overlay);
 ## 1. Bootstrap the toolchain
 
 ```bash
-git clone https://github.com/HAKORADev/godot-android-arsenal.git
-cd godot-android-arsenal
+git clone https://github.com/HAKORADev/GOGABox.git
+cd GOGABox
 ./tools/bootstrap.sh
 ```
 

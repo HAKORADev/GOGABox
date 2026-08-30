@@ -6,16 +6,17 @@
 > commit / push / build discipline — so the path from "hello" to "working"
 > is one obvious step.
 
-Human guides live next door: SETUP · ADDING_A_GAME · ASSETS · ADS · CI.
-This file is about *operating* the repo: resuming, changing, shipping.
+Human guides live next door: SETUP · ASSETS · ADS · CI · RESOLUTION_RULE.
+Planning lives in `docs/goga_docs/`. This file is about *operating* the
+repo: resuming, changing, shipping.
 
 ## 0. The one obvious step (resume checklist)
 
 ```bash
-cd godot-android-arsenal        # fresh sandbox? see §7 first
+cd GOGABox                      # fresh sandbox? see §7 first
 git pull                        # fast-forward to latest main
 ./tools/bootstrap.sh            # idempotent: ~1 min warm, ~10 min cold
-./tools/test.sh <game>          # gogabox (the projects/ registry decides) - must end ALL PASS
+./tools/test.sh gogabox         # must end ALL PASS
 ```
 
 Then, in order:
@@ -29,17 +30,22 @@ Then, in order:
 
 ## 1. What this repo is (and is not)
 
-Two products share this repo. Keep them separated:
+**This repo is GOGABox** — the Godot all-in-one Game box. One product: the
+`projects/gogabox/` Godot project (menu + games + economy + plugins). The
+machinery around it (`build.sh`, `.ci/`, `tools/`, `config/`, `plugins/`,
+CI) exists to build and ship that one product — it stays generic in
+mechanics (registry-driven, no hardcoded IDs) but serves nothing else.
 
-| layer | status | rule |
-|---|---|---|
-| **The machinery** — `build.sh`, `.ci/`, `tools/`, `config/`, `plugins/`, CI | fully general, project-agnostic | never hardcode a game's name or IDs here; a new game must work with **zero** machinery edits |
-| **The games** — `projects/<name>/` | specific by design | game-specific docs belong in `projects/<name>/docs/`, not in `docs/` |
+| layer | rule |
+|---|---|
+| **The machinery** — `build.sh`, `.ci/`, `tools/`, `config/`, `plugins/`, CI | stays project-agnostic in mechanics; no game name or ad IDs hardcoded |
+| **The product** — `projects/gogabox/` | the whole point of the repo |
 
-`docs/` = **general guides** (any project, any machine).
-`projects/<g>/docs/` = **this-game notes** (its asset packs, its ad
-placements, its quirks). Rule of thumb: if a doc answer starts with
-"for gogabox …", that content belongs in the project folder.
+`docs/` = **guides** (SETUP · CI · ADS · ASSETS · RESOLUTION_RULE · AGENTS)
+plus `docs/goga_docs/` — the GOGABox planning home (GDDs in `gogames_ideas/`,
+product thoughts in `ideas/`, release lists in `plans/`, raw dumps in
+`brainstorms/`). If a doc answer starts with "for gogabox …", that content
+belongs in `docs/goga_docs/`.
 
 ## 2. Ground rules (non-negotiable)
 
@@ -80,8 +86,8 @@ placements, its quirks). Rule of thumb: if a doc answer starts with
 | `tools/bootstrap.sh` | installs exactly the locked toolchain into `.cache/` (same on CI and local) |
 | `tools/ci.sh [watch]` | list / watch GitHub Actions runs from the terminal |
 | `tools/sync-assets.py` | re-vendor assets from `assets.manifest.json` |
-| `plugins/<name>/` | shared Android plugins (currently `unity_ads`; canonical contract in its README) |
-| `docs/` | general guides · `projects/<g>/docs/` | per-game notes |
+| `plugins/<name>/` | GOGABox android plugins (`unity_ads`, `notify`) |
+| `docs/` | guides + `docs/goga_docs/` planning home (GDDs · ideas · plans · brainstorms) |
 
 ## 4. Ads integration playbook
 
@@ -106,14 +112,14 @@ are staged in at build time from `plugins/<backend>/`, selected by
 **ACTIVE backend — Unity Ads direct** (`use_plugins: ["unity_ads"]`):
 
 | thing | gogabox |
-|---|---|---|---|
-| Unity Game ID (Android) | `5770940` | `5770940` (owner decision: reuse the arsenal's first ID) | `5770940` (owner decision: reuse the arsenal's first ID) |
-| test_mode | `true` | `false` (real ads) | `false` (real ads) |
-| interstitial placement | `Interstitial_Android` | `Interstitial_Android` | `Interstitial_Android` |
-| rewarded placement | `Rewarded_Android` | `Rewarded_Android` | `Rewarded_Android` |
-| banner placement | `Banner_Android` | `Banner_Android` | `Banner_Android` |
+|---|---|
+| Unity Game ID (Android) | `5770940` (owner decision: GOGABox reuses the first ID created for the repo) |
+| test_mode | `false` (real ads; flip `projects/gogabox/config/ads_config.json` for local testing) |
+| interstitial placement | `Interstitial_Android` |
+| rewarded placement | `Rewarded_Android` |
+| banner placement | `Banner_Android` |
 | package name | `hakora.dev.gogabox` |
-| dashboard | Unity Publishing dashboard → Monetization → Projects. NOTE: per-package dashboard entries may be needed later if Unity restricts serving for unregistered packages — create them, then paste each new Game ID into that project's `config/ads_config.json`. Placements and the plugin contract stay identical. |||
+| dashboard | Unity Publishing dashboard → Monetization → Projects. NOTE: per-package dashboard entries may be needed later if Unity restricts serving for unregistered packages — create them, then paste the new Game ID into `projects/gogabox/config/ads_config.json`. Placements and the plugin contract stay identical. |
 | config file | `projects/gogabox/config/ads_config.json` |
 
 **LevelPlay mediation — built, verified, then rolled back (see §4.3):**
@@ -238,7 +244,7 @@ docs updated.
 The workspace has been wiped **twice**; both times full recovery took
 ~10 minutes because everything lives in git:
 
-1. `git clone https://github.com/HAKORADev/godot-android-arsenal.git`
+1. `git clone https://github.com/HAKORADev/GOGABox.git`
    (public — no auth needed).
 2. `./tools/bootstrap.sh`.
 3. `./tools/test.sh gogabox` — if this passes, you are fully back.
@@ -272,9 +278,8 @@ subjects (`git log` is the real history).
 | need | read |
 |---|---|
 | env setup, toolchain freeze, pitfalls | docs/SETUP.md |
-| add a new game | docs/ADDING_A_GAME.md (single-game repo) — for the gogabox multi-game app read `projects/gogabox/Docs/plans/BOX_CORE_DESIGN.md` instead: adding a game = one registry entry + one GogaGame script + one thumbnail |
+| add a new game | inside the box: one registry entry + one GogaGame script + one thumbnail — read `docs/goga_docs/plans/BOX_CORE_DESIGN.md` and docs/ADDING_A_GAME.md |
 | ads architecture and config | docs/ADS.md + plugins/unity_ads/README.md |
-| assets policy, manifest, source catalogs | docs/ASSETS.md (general) |
-| which assets *this* game uses | projects/<g>/docs/ASSETS.md |
+| assets policy, manifest, source catalogs, store trials | docs/ASSETS.md |
 | CI, caching, releases, signing | docs/CI.md |
 | what happened so far | `git log` + the sandbox session journal (§8) |

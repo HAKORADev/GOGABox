@@ -1,92 +1,28 @@
-# ADDING A GAME — the 6-step checklist
+# ADDING A GAME — to the GOGABox shelf
 
-The environment is project-agnostic: `build.sh`, CI, plugins and the toolchain
-are shared. A new game = a folder + one registry entry.
+> The repo ships ONE product: GOGABox. You do not add new project folders —
+> you add games **inside** `projects/gogabox`. (The old multi-project
+> workflow was retired when the repo became GOGABox-only.)
 
-## 1. Create the project folder
+## The 6-step checklist (inside the box)
 
-Easiest: copy the reference game and rename.
+1. **Register the game** — `projects/gogabox/game/core/registry.gd`:
+   id, display name, price (GOGACoins), meta tags (age/genre/subs), state
+   (PLAYABLE / SOON / GATED), description ("tag" used by the pre-play ? menu).
+2. **Write the game script** — one file under
+   `projects/gogabox/game/games/<id>/<id>.gd` extending `GogaGame`
+   (see `docs/goga_docs/plans/BOX_CORE_DESIGN.md` for the contract:
+   `_build_hud`, `set_score`, payouts, death-menu hooks).
+3. **Thumbnail** — `projects/gogabox/assets/thumbs/<id>.png`, 480x320,
+   drawn from the real game sprites (see `projects/gogabox/tools/`).
+4. **Wire it into the box** — the box feed/carousel, store page and search
+   read the registry; a PLAYABLE game appears automatically.
+5. **Tests** — extend `projects/gogabox/tests/flow_test.gd` (unlock, play,
+   score paths for the new game); `./tools/test.sh gogabox` must end ALL PASS.
+6. **Ship** — bump `version_name`/`version_code_base` in
+   `config/projects.json`, build both ABIs, push, CI green.
 
-```bash
-cp -r projects/jellyjump projects/mygame
-rm -rf projects/mygame/.godot projects/mygame/icons
-```
+## Design docs
 
-Then adjust `projects/mygame`:
-- `project.godot` — `config/name`, `run/main_scene`, autoloads (keep
-  `GameState`/`Sfx`; keep the `Ads` autoload path exactly as-is — it is staged).
-- `icon.svg` + rerun `tools/rasterize_icons.gd` after the first import.
-- `game/…` — your code. You may delete everything jelly-specific.
-- `tests/flow_test.tscn` — keep the convention (exits 0 = pass).
-- `assets.manifest.json` — record every asset's source + license.
-
-## 2. Android overlay
-
-`android-overlay/` layers your customizations over the pinned Godot android
-template (re-applied on every build — never edit `android/build/` directly):
-
-| file | purpose |
-|---|---|
-| `src/main/AndroidManifest.xml` | permissions, orientation, plugin meta-data |
-| `gradle.properties` | memory tuning, gradle flags |
-| `src/main/java/…` | (optional) project-specific java |
-
-Start by copying jellyjump's two files and editing package-specific bits.
-
-## 3. Export presets
-
-`export_presets.cfg` with **one preset per ABI**, named whatever you like.
-Register the mapping in the registry (step 4): preset names are referenced
-per-ABI. Keep `version/code` values — they are overwritten at build time from
-`version_code_base` (+1 arm32, +2 arm64).
-
-## 4. Register the project
-
-`config/projects.json`:
-
-```json
-"mygame": {
-    "display_name": "My Game",
-    "path": "projects/mygame",
-    "enabled": true,
-    "ci_auto": true,
-    "apk_name": "MyGame",
-    "package": "com.zai.mygame",
-    "version_name": "0.1.0",
-    "version_code_base": 20000,
-    "aab": false,
-    "abi_presets": {
-        "arm64-v8a": "Android arm64",
-        "armeabi-v7a": "Android arm32"
-    },
-    "use_plugins": ["unity_ads"],
-    "ads_config": "config/ads_config.json"
-}
-```
-
-- `ci_auto: true` → built on every push to main (both ABIs).
-- `use_plugins` → which shared plugins get staged (and their gradle deps
-  injected). Drop the key or empty it to skip ads.
-
-## 5. Ads (optional)
-
-Copy `config/ads_config.json`, set your Unity Game ID + placements, keep
-`test_mode: true` until shipping (see docs/ADS.md).
-
-## 6. Validate + push
-
-```bash
-python3 tools/sync-assets.py mygame   # re-fetch any missing assets
-./tools/test.sh mygame                # headless tests
-./build.sh mygame                     # both ABIs locally
-git add -A && git commit -m "add mygame" && git push
-```
-
-CI builds it automatically; APKs appear under the run's artifacts. Done.
-
-## Notes & guardrails
-
-- `projects/<g>/android/build/`, `projects/<g>/addons/`, `.godot/`, `dist/`
-  are generated — never commit them (gitignore already handles it).
-- The monorepo is the storage of record: push before the session ends.
-- Keep per-game tools under `projects/<g>/tools/` (e.g. `gen_sfx.py`).
+Every game idea gets a GDD in `docs/goga_docs/gogames_ideas/<id>.md` before
+it gets a script. Raw ideas go to `docs/goga_docs/brainstorms/`.
