@@ -84,27 +84,25 @@ func _flush_time() -> void:
                 _accum = 0.0
 
 func _apply_orientation(landscape: bool) -> void:
-        # v0.1.2 UNIVERSAL FHD RESOLUTION: the two pre-set designs are now
-        # 1080x1920 portrait / 1920x1080 landscape (9:16 / 16:9 - the owner's
-        # FHD+ panel renders them at exactly 1:1 native px, and every other
-        # aspect letterboxes under aspect KEEP). The design swaps with the
-        # orientation and the engine scales it to whatever the window is -
-        # same look on every device.
+        # v0.1.3: the SAME two designs as the box menu (ScaleRule is the one
+        # source of truth) + stretch aspect EXPAND - the engine fills the
+        # window edge-to-edge at ANY aspect, so a game just gets a little
+        # more canvas in design px on taller/wider phones (games read the
+        # real viewport W/H, they absorb it naturally).
         var root := get_window()
-        if landscape:
-                root.content_scale_size = Vector2i(1920, 1080)
-                DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
-        else:
-                root.content_scale_size = Vector2i(1080, 1920)
-                DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_PORTRAIT)
+        root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE if landscape \
+                        else ScaleRule.DESIGN_PORTRAIT
+        DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE
+                        if landscape else DisplayServer.SCREEN_SENSOR_PORTRAIT)
 
 func _restore() -> void:
-        # box level: free rotation again. The portrait pin is just the safe
-        # default - menu.set_active(true) re-decides the design from the REAL
-        # window pixels the moment the session ends (v0.1.2).
+        # v0.1.3: NO blind portrait pin. Decide from the REAL window px at
+        # this exact moment (a landscape-held phone keeps the landscape
+        # design - no flash), release the rotation lock, and let the menu
+        # governor keep watching from here: whenever the system actually
+        # rotates the window, the design follows within one frame.
         _flush_time()
-        var root := get_window()
-        root.content_scale_size = Vector2i(1080, 1920)
+        ScaleRule.apply(get_window())
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:

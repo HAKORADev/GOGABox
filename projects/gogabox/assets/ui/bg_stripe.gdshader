@@ -13,12 +13,16 @@ shader_type canvas_item;
 // A soft sheen band sweeps down every 26s and the dots parallax at half
 // speed: the box background breathes instead of ghosting.
 //
-// Pattern space = the universal design px (1080x1920 / 1920x1080), so both
-// orientations show the SAME stripe width and speed, on every phone.
+// Pattern space = the LIVE CANVAS SIZE in design px (the "canvas" uniform,
+// kept equal to the background rect by the menu on every design swap - see
+// menu._bg_canvas_update). aspect EXPAND gives taller/wider phones extra
+// canvas, and the pattern stays pixel-exact at ANY size: stripes always 45
+// degrees at the measured period, identical look on every phone.
 
 uniform vec4 base_col : source_color = vec4(0.1490196, 0.0823529, 0.0313726, 1.0);
 uniform vec4 stripe_col : source_color = vec4(0.2078431, 0.1254902, 0.0509804, 1.0);
 uniform vec4 dot_col : source_color = vec4(0.2588235, 0.1647059, 0.0862745, 1.0);
+uniform vec2 canvas = vec2(1080.0, 1920.0); // live rect in design px (menu)
 uniform float speed = 14.0;    // design px per second along the diagonal normal
 uniform float period = 95.5;   // stripe period along the normal (design px;
                                // the png measured 90 px at 720-wide = 135 at
@@ -26,7 +30,7 @@ uniform float period = 95.5;   // stripe period along the normal (design px;
 uniform float duty = 0.42;     // bright-band duty cycle (measured from the png)
 
 void fragment() {
-        vec2 p = UV * vec2(1080.0, 1920.0);
+        vec2 p = UV * canvas;
         float t = TIME * speed;
 
         // --- stripes: 45 degrees, running bottom-left -> top-right, drifting
@@ -50,7 +54,7 @@ void fragment() {
 
         // --- the sheen: one soft 450px-wide light band sweeping down, one
         // lap every 26s - subtle life, never a second ghost image
-        float sy = fract(TIME / 26.0) * (1920.0 + 900.0) - 450.0;
+        float sy = fract(TIME / 26.0) * (canvas.y + 900.0) - 450.0;
         float sheen = 1.0 - smoothstep(0.0, 450.0, abs(p.y - sy));
         col += stripe_col.rgb * sheen * 0.10;
 

@@ -194,39 +194,38 @@ func _t_batteries() -> int:
         # the game pools still refill ALWAYS (only the bank is offline-only)
         Box.data["game_batteries"]["rally"] = {"count": 0, "ts": int(Time.get_unix_time_from_system()) - 620}
         ok += _check(int(Box.game_battery("rally")["count"]) == 2, "game pool still refills live (+2)")
-        # v0.1.2 OWNER RULE: the in-app ping is "an extra ROUND became ready",
-        # not "the pool is full" ("batteries-for-a-round recharged instead").
-        # battery_round_ready mirrors the audible ping for tests.
+        # v0.1.3 OWNER RULE (final call): the in-app ping fires when a pool
+        # charges back to COMPLETELY FULL - the v0.1.2 per-round ping was
+        # tried on device and reverted ("the old design when it's complete
+        # full is much better"). battery_full_reached mirrors the ping.
         var pings := [0]
         var ping_cb := func(): pings[0] += 1
-        Box.battery_round_ready.connect(ping_cb)
+        Box.battery_full_reached.connect(ping_cb)
+        Box.data["game_batteries"]["rally"] = {"count": 8,
+                "ts": int(Time.get_unix_time_from_system()) - 620}
+        Box.meta().erase("batt_ping_at")
+        Box.game_battery("rally")            # 8 -> 10 FULL -> PING
+        ok += _check(pings[0] == 1, "pool reaching FULL pings once")
+        Box.game_battery("rally")            # steady full - no new ping
+        ok += _check(pings[0] == 1, "no repeat ping while the pool sits full")
         Box.data["game_batteries"]["rally"] = {"count": 0,
                 "ts": int(Time.get_unix_time_from_system()) - 620}
         Box.meta().erase("batt_ping_at")
-        Box.game_battery("rally")            # 0 -> +2 crosses per_round 2 -> PING
-        ok += _check(pings[0] == 1, "pool crossing per_round pings once")
-        Box.game_battery("rally")            # steady state - no new ping
-        ok += _check(pings[0] == 1, "no ping while a round is already affordable")
-        Box.data["game_batteries"]["rally"] = {"count": 6,
-                "ts": int(Time.get_unix_time_from_system()) - 620}
+        Box.game_battery("rally")            # 0 -> +2: a round is ready, NOT full
+        ok += _check(pings[0] == 1, "no ping when the pool is not full yet")
+        # the BANK pings the same way on resume credit when the closed time
+        # FILLS it to the cap
+        Box.data["box_batteries"] = {"count": 45,
+                "ts": int(Time.get_unix_time_from_system()) - 1250, "rem": 0}
         Box.meta().erase("batt_ping_at")
-        Box.game_battery("rally")            # 6 -> 8: the round was already ready
-        ok += _check(pings[0] == 1, "no ping when regen does not cross per_round")
-        Box.data["game_batteries"]["rally"] = {"count": 8,
-                "ts": int(Time.get_unix_time_from_system()) - 620}
-        Box.game_battery("rally")            # 8 -> 10 FULL: still no ping
-        ok += _check(pings[0] == 1, "the old full-cap ping is gone")
-        # the BANK pings the same way on resume credit (crossing _round_need)
-        Box.data["box_batteries"] = {"count": 0,
-                "ts": int(Time.get_unix_time_from_system()) - 310, "rem": 0}
-        Box.meta().erase("batt_ping_at")
-        Box._credit_offline()                # bank 0 -> +1: below a round, silent
-        ok += _check(pings[0] == 1, "bank below a round's worth stays silent")
-        Box.data["box_batteries"] = {"count": 0,
+        Box._credit_offline()                # 45 -> 47: charged but NOT full
+        ok += _check(pings[0] == 1, "bank below full stays silent")
+        Box.data["box_batteries"] = {"count": 48,
                 "ts": int(Time.get_unix_time_from_system()) - 620, "rem": 0}
-        Box._credit_offline()                # bank 0 -> +2: crosses need 2 -> PING
-        ok += _check(pings[0] == 2, "bank crossing a round's worth pings")
-        Box.battery_round_ready.disconnect(ping_cb)
+        Box.meta().erase("batt_ping_at")
+        Box._credit_offline()                # 48 -> 50 FULL -> PING
+        ok += _check(pings[0] == 2, "bank charging to full pings")
+        Box.battery_full_reached.disconnect(ping_cb)
         # v0.1.1: the ONE playability oracle (feed chip + pre-play button)
         Box.reset_all()
         ok += _check(Roadmap.can_play_now("snake"), "snake is always ready (starter)")
@@ -622,8 +621,18 @@ func _t_all_games() -> int:
                 ok += _check(Box.stat(id, "plays") == 1, id + " play recorded")
                 host._quit_to_menu()
                 await get_tree().process_frame
-                ok += _check(get_window().content_scale_size == Vector2i(1080, 1920),
-                        id + " orientation restored to portrait design (1080x1920)")
+                # v0.1.3: _restore decides from the REAL window px (no blind
+                # pin). Headless reports a (0,0) window - the guarded no-op
+                # then keeps the game's own design; a real window always
+                # re-decides from true pixels.
+                var ws := DisplayServer.window_get_size()
+                var want_restore: Vector2i = ScaleRule.DESIGN_LANDSCAPE \
+                                if String(g.get("orientation", "portrait")) == "landscape" \
+                                else ScaleRule.DESIGN_PORTRAIT
+                if ws.x > 0 and ws.y > 0:
+                        want_restore = ScaleRule.want_for(ws)
+                ok += _check(get_window().content_scale_size == want_restore,
+                        id + " restore design honest (real px, else keeps game design)")
         Box.reset_all()
         return ok
 

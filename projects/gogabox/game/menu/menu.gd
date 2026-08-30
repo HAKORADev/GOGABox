@@ -109,6 +109,7 @@ func _ready() -> void:
         # one ask the OS gives us.
         Roadmap.tick()
         _refresh()
+        _apply_base()   # v0.1.3: design + safe margins decided at build too
         # NOTE: the banner joins only after the splash (main.gd -> on_splash_done)
 
         # slow tick so timed mysteries resolve live + battery chip stays honest
@@ -117,7 +118,7 @@ func _ready() -> void:
         t.autostart = true
         t.timeout.connect(func():
                 Roadmap.tick()
-                Box.poll_game_batteries()   # v0.1.2: round-ready pings tick live
+                Box.poll_game_batteries()   # v0.1.3: full-pool pings tick live
                 _update_battery_chip())
         add_child(t)
 
@@ -155,10 +156,11 @@ func set_active(on: bool) -> void:
         process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
         _set_feed_lock(not on)
         if on:
-                # v0.1.2: the host's _restore pins the portrait design blindly -
-                # re-decide from the REAL window on the way out (a landscape-held
-                # phone must get the landscape design NOW, not after the next
-                # rotation). GameHost.end_session already ran -> no guard fight.
+                # v0.1.3: the host's _restore already decided from the REAL
+                # window px; re-decide here anyway (a rotation that happened
+                # between end_session and this call self-corrects NOW, and
+                # the safe margins re-pad). GameHost.end_session already ran
+                # -> no guard fight.
                 _apply_base()
 
 # ---------------------------------------------------------------- layout
@@ -171,35 +173,78 @@ func _on_resized() -> void:
                 return
         _apply_base()
         _layout()
+        _bg_canvas_update()
 
 ## v0.1.2 test hook: the geometry probe drives orientation headless (the
 ## fake window never rotates there). "" = decide from the real window, the
 ## device behavior.
 var orientation_override := ""
+# v0.1.3: the background shader's material - its pattern space ("canvas")
+# uniform is kept equal to the REAL canvas size in design px, so the code-
+# drawn background is pixel-exact at any aspect (see _bg_canvas_update).
+var _bg_mat: ShaderMaterial
 
-## THE SCALING RULE (v0.1.2 universal FHD): the design is a FIXED 1080x1920
-## portrait / 1920x1080 landscape (9:16 / 16:9 - the owner's FHD+ phone
-## renders it at exactly 1:1 native pixels, and every other aspect just
-## letterboxes with box-brown bars under aspect KEEP).
-## v0.1.2 THE LANDSCAPE FIX: the decision reads the REAL WINDOW PIXELS
-## (DisplayServer), never _root.size. _root lives in DESIGN space, so once
-## the portrait design is applied its rect is 1080x1920-shaped forever - the
-## old "s.x > s.y" check could never flip, and landscape rendered the
-## portrait design letterboxed dead-center (the owner's black-sides bug).
+## THE SCALING RULE (v0.1.3 - owner contract): the INTERNAL resolution is
+## FIXED (1080x1920 portrait / 1920x1080 landscape, ScaleRule) and the
+## window is always FILLED - stretch aspect EXPAND grows the canvas to
+## cover any phone aspect edge-to-edge. No letterbox bars on any device,
+## nothing distorted; taller/wider screens just get extra canvas in design
+## px and the anchored/container layout absorbs it.
+## The decision reads the REAL WINDOW PIXELS (DisplayServer), never
+## _root.size - _root lives in DESIGN space and would stick (the v0.1.1
+## black-sides bug). The size_changed hook gives same-frame swaps on a
+## plain rotation, and main.gd's per-frame governor calls apply_resolution()
+## - even a missed signal self-corrects within one frame (the v0.1.2
+## opened-as-landscape race).
 func _apply_base() -> void:
-        var want := Vector2i(1080, 1920)
+        var want := ScaleRule.DESIGN_PORTRAIT
         if orientation_override == "landscape":
-                want = Vector2i(1920, 1080)
+                want = ScaleRule.DESIGN_LANDSCAPE
         elif orientation_override == "portrait":
                 pass
         else:
                 var ws := DisplayServer.window_get_size()
                 if ws.x <= 0 or ws.y <= 0:
                         return
-                want = Vector2i(1920, 1080) if ws.x > ws.y else Vector2i(1080, 1920)
+                want = ScaleRule.want_for(ws)
         var win := get_window()
         if win.content_scale_size != want:
                 win.content_scale_size = want
+        # v0.1.3: the banner margin follows the REAL stretch scale of THIS
+        # orientation + device, and the OS safe insets (notch / status /
+        # gesture bar) pad the page - the canvas now reaches every edge, so
+        # nothing may sit under a cutout on any phone.
+        banner_safe = _banner_safe_px()
+        _apply_safe_margins()
+
+## v0.1.3 GOVERNOR ENTRY - main._process calls this every frame (menu side:
+## one compare at steady state).
+func apply_resolution() -> void:
+        var before := get_window().content_scale_size
+        _apply_base()
+        if get_window().content_scale_size != before:
+                _layout()
+                _bg_canvas_update()
+
+## v0.1.3: OS safe insets (notch / status bar / gesture bar) as design px,
+## padded into the page margins per side (landscape phones put the notch
+## on a SIDE - side insets matter as much as the top).
+func _apply_safe_margins() -> void:
+        if _margin == null:
+                return
+        var ins := ScaleRule.safe_insets_design(get_window())
+        _margin.add_theme_constant_override("margin_left", 16 + int(ins.x))
+        _margin.add_theme_constant_override("margin_top", maxi(22, int(ins.y)))
+        _margin.add_theme_constant_override("margin_right", 16 + int(ins.z))
+        _margin.add_theme_constant_override("margin_bottom",
+                        int(banner_safe) + int(ins.w))
+
+## v0.1.3: the background shader draws in REAL design px (its "canvas"
+## uniform = the live canvas size) - stripes stay 45 degrees at the exact
+## measured period on every phone, whichever way the canvas expanded.
+func _bg_canvas_update() -> void:
+        if _bg_mat != null and is_instance_valid(_bg_mat) and _root != null:
+                _bg_mat.set_shader_parameter("canvas", _root.size)
 
 func _layout() -> void:
         var w := maxf(360.0, _root.size.x)
@@ -976,6 +1021,7 @@ func _build_background() -> void:
         mat.set_shader_parameter("base_col", BG_BASE)
         mat.set_shader_parameter("stripe_col", BG_STRIPE)
         mat.set_shader_parameter("dot_col", BG_DOT)
+        _bg_mat = mat
         bg.material = mat
         _root.add_child(bg)
 

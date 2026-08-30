@@ -173,3 +173,57 @@ Owner feedback after testing v0.1.1 on the FHD+ phone:
   `menu.orientation_override` and lets the REAL `_apply_base` code apply
   the design, then fails if the visible rect is not exactly the design or
   any control pokes out. This is the exact regression that was broken.
+
+## 8. THE RESOLUTION & SCALE RULE (v0.1.3 — EXPAND fills the window, ScaleRule is law)
+
+The owner tested v0.1.2 on the FHD+ phone and shipped back three screenshots:
+portrait opened LETTERBOXED (black bars top/bottom), landscape opened showing
+the PORTRAIT design dead-center with black sides, and a vertical -> horizontal
+-> vertical switch left a squashed hybrid floating in black. Verdict: "work
+hard on the resolution handler and scaling system to manage the aspect ratios
+and resolutions for the phone window while keeping internal resolution the
+same for the app" — and NO letterbox bars ("you said letterboxed and i have
+never said that").
+
+The v0.1.3 system (game/core/scale_rule.gd is the single source of truth):
+
+1. INTERNAL RESOLUTION IS FIXED: 1080x1920 portrait / 1920x1080 landscape
+   (9:16 / 16:9). Two constants, used by menu, host_node, tests - nothing
+   else in the codebase may hardcode a design size.
+2. THE WINDOW IS ALWAYS FILLED: project.godot stretch = canvas_items +
+   aspect EXPAND. The engine scales by min(win/design) and GROWS the canvas
+   in the spare direction - extra phone aspect becomes extra canvas in
+   design px. No bars on ANY device, nothing distorted, ever. (KEEP and its
+   letterbox bars are RETIRED - the owner explicitly rejected them.)
+3. THE DESIGN FOLLOWS THE REAL WINDOW PIXELS: ScaleRule.want_for() decides
+   portrait vs landscape from DisplayServer.window_get_size() - never from
+   design-space state (that was the v0.1.1 stuck-portrait root cause).
+4. THE GOVERNOR: main._process calls menu.apply_resolution() EVERY FRAME
+   while no game is running. Steady state = one Vector2i compare; a missed
+   signal (boot-in-landscape races, system rotations, resume-after-kill)
+   self-corrects within one frame. get_window().size_changed stays hooked
+   for same-frame swaps. "Stuck in the wrong design" is structurally
+   impossible.
+5. SAFE AREA: with the canvas reaching every edge, OS insets (notch, status
+   bar, gesture bar) are converted to design px (ScaleRule.safe_insets_design,
+   via the real stretch scale) and padded into the menu page margins per
+   SIDE - landscape phones wear the notch on a side.
+6. GAMES: host_node._apply_orientation pins the game's design from the same
+   two constants; _restore() decides from the REAL window px (no blind
+   portrait pin). Games read the real viewport W/H, so the extra canvas on
+   tall phones is just more playing field.
+7. THE CODE-DRAWN BACKGROUND: bg_stripe.gdshader's pattern space is the
+   LIVE canvas (its `canvas` uniform = the background rect in design px,
+   menu._bg_canvas_update) - stripes stay 45 degrees at the measured period
+   on every phone, whichever way the canvas expanded.
+8. BANNER MARGIN: _banner_safe_px() recomputes on every design swap (the
+   real stretch scale of THIS orientation + device).
+
+Verification (tests/geometry_probe.gd, rewritten v0.1.3):
+- LAYER 1 - the aspect matrix: 15 realistic window sizes (16:9, 19.5:9,
+  20:9, 4:3 tablets, iPhones, degenerate/garbage) -> correct design decision.
+- LAYER 2 - end-to-end: the REAL scene, the REAL _apply_base; asserts the
+  design applied, the visible rect equals the EXPAND math (catches any
+  regression back to KEEP), and no visible Control pokes outside.
+- LAYER 3 - rotation ping-pong: landscape -> portrait -> landscape ->
+  portrait on one live scene (the owner's third screenshot regression).

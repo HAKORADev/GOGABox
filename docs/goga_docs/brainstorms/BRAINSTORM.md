@@ -60,3 +60,52 @@
 - "i tested the notifications system for the GOGABatteries full, it showed
   the notification but i heard no audio for it" -> v3 channels + migration
   + logcat diagnostics; phone-side checklist in PLAN_v0.1.2 section 5.
+
+## v0.1.3 owner directives (verbatim, 2026-08-31)
+
+RESOLUTION (the three screenshots: opened_as_vertical / opened_as_horizontal /
+opened_as_vertical_then_switched_in_app_to_horizontal_then_returned_to_vertical):
+- "the opened as vertical has an issue which is the letterbox system you did,
+  and the opened as horizontal has the issue i described earlier ... the
+  third file is a brutal bug and weird code at this point. fix it, do the work"
+- "i said work hard on the resolution handler and scaling system to manage
+  the aspect ratios and resolutions for the phone window while keeping
+  internal resolution the same for the app" -> ScaleRule + aspect EXPAND +
+  the per-frame governor (RESOLUTION_RULE section 8). Letterboxing retired.
+
+BATTERY SFX (final call, reverts the v0.1.2 round-ping):
+- "i guess the old design when it's complete full is much better, my idea
+  was making it like that so the player get notified that there is a
+  recharges enough for a round, but i felt it will feel spammy when there
+  is many games so your design was better" -> ping when a pool is
+  COMPLETELY FULL again (battery_full_reached).
+
+ECONOMY / CONTENT BRAINSTORMS (owner ideas for AFTER v0.1.3 - recorded, not
+built yet):
+- "Make all available mysteries only up to 4 and others stay inexistent
+  completely and untracked but inside the code there will be a list so when
+  a mystery revealed, the code knows what next game to show as mystery"
+- "some games be locked without being a mystery and requires owning games
+  to be bought"
+- "update the design to make mysteries have orders about spending
+  GOGACharges and some games to be unlocked to be bought may require
+  charging like 100 charges or 200, there will be a button in the pre-play
+  to give it charges and track the capacity meter, this adds more variety
+  for us later to make each game have different ways from mystery to locked
+  to bought"
+- "in the pre-play we will ensure that the game times window is visible,
+  like the time it's available to play or time it is unavailable to play
+  for the games that uses time-specific, also fade-out the thumbnail of it
+  and shows unlocks at nn AM/PM which will feels more responsive while the
+  nn is updates in real-time"
+- "will update snake play entry logic instead of if coins less than 10 then
+  it's free to play, will make it if money is +0 and -10, use all money so
+  the player plays and have 0 coins, because an exploit could be the player
+  have 9 coins and plays for free and earns money easily, also same for
+  retry logic too"
+- "will add extra designs for owned games where some will have limited
+  rounds per day and get reset at 12AM 00:00 and some have limited playtime
+  per day too, the limit will be visible in the pre-play menu in a proper
+  place and when reaches the limit, it will fade-out the thumbnail and
+  shows get back tomorrow to play, some games may have limited rounds and
+  limited time btw and like that"

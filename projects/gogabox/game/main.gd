@@ -9,16 +9,13 @@ var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
-        # v0.1.2 THE UNIVERSAL FHD RESOLUTION (owner rule): ONE pre-set design
-        # size per orientation - 1080x1920 portrait / 1920x1080 landscape
-        # (9:16 / 16:9). The engine scales that design to ANY window (stretch
-        # canvas_items + aspect KEEP), so games and menu are designed ONCE and
-        # every other device just gets the scale-up/down (odd aspects get
-        # box-brown letterbox bars). v0.1.2 THE LANDSCAPE FIX: the menu now
-        # decides the design from the REAL window pixels (menu._apply_base) +
-        # the window size_changed signal - rotation can never stick it in the
-        # wrong design again. menu is built immediately, the splash covers it
-        # while the engine warms up
+        # v0.1.3 THE RESOLUTION & SCALE RULE (ScaleRule.gd = source of truth):
+        # internal resolution FIXED at 1080x1920 portrait / 1920x1080
+        # landscape; stretch canvas_items + aspect EXPAND fills ANY window
+        # edge-to-edge (no letterbox bars on any phone, nothing distorted -
+        # extra aspect just becomes extra canvas in design px). The design
+        # follows the REAL window px. menu is built immediately, the splash
+        # covers it while the engine warms up
         _menu = Node2D.new()
         _menu.name = "Menu"
         _menu.set_script(load("res://game/menu/menu.gd"))
@@ -33,10 +30,25 @@ func _ready() -> void:
 
         _show_splash()
 
-## v0.1.2: the design resolution lives in project.godot (1080x1920, aspect
-## KEEP) and the only runtime knobs left are the two pre-set designs swapped
-## on rotation (host_node._apply_orientation / menu._apply_base - the menu
-## re-decides from the real window pixels on set_active(true) too).
+## v0.1.3 THE GOVERNOR - the resolution system's safety net. Every frame
+## (menu in the box, splash included) re-decide the design from the REAL
+## window pixels. At steady state this is one Vector2i compare; when the
+## window changed (boot-in-landscape races, system-driven rotations the
+## size_changed hook missed, resume after a background kill) the design and
+## the whole layout self-correct within one frame. "Stuck in the wrong
+## design" - the v0.1.2 opened-as-landscape screenshot - is structurally
+## impossible now. During a GAME the host owns content_scale_size (its
+## orientation lock + design swap); the governor must not fight it.
+func _process(_delta: float) -> void:
+        if GameHost.active_host != null:
+                return
+        if _menu != null and is_instance_valid(_menu) \
+                        and _menu.has_method("apply_resolution"):
+                _menu.call("apply_resolution")
+
+## v0.1.3: the design resolution lives in ScaleRule (1080x1920 portrait /
+## 1920x1080 landscape, aspect EXPAND); the governor above + the menu's
+## _apply_base keep it glued to the real window px.
 
 ## A game is its OWN WORLD: while it runs the menu is fully hidden AND stops
 ## processing - no layering weirdness, no taps leaking into the feed, no
