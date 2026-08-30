@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cthumbcapture1"]
+
+[ext_resource type="Script" path="res://dev/thumb_capture/capture.gd" id="1_cap"]
+
+[node name="ThumbCapture" type="Node"]
+script = ExtResource("1_cap")

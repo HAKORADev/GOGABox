@@ -45,3 +45,22 @@ into path 2 (longer runs + video encode) without throwing anything away.
 Decision pending with owner: harness details (native 3:2 render vs
 full-frame + action-band crop for portrait games), SOON/mystery text policy
 confirmation, and which release carries the first batch.
+
+---
+
+## 3. RESOLVED (v0.1.6) — the owner picked the production path
+
+Owner decisions from the v0.1.6 chat, now locked:
+- Production = **real-gameplay capture pipeline** (the engine runs the real
+  game at native resolution, a per-game drive plays it, frames get picked
+  by vision review). NOT hand-designed posters, NOT AI-played video.
+- Native resolution then downscale to 960x640 (never render scaled).
+- SOON + mystery keep their design (SOON regenerated at 960x640).
+- **No video previews at all** — "let the player just play the game" (the
+  dynamic tap-to-preview dream is explicitly shelved, do not re-raise).
+- Tooling lives outside the shipped build (dev/ export-excluded).
+- The full playbook: **docs/THUMBNAILS.md** (drive API, capture flags,
+  post-stage, vision review criteria, survived traps, status table).
+- v0.1.6 shipped snake + rally through the pipeline with before/after proof
+  (download/thumbs_before_after.png); the other four games keep legacy
+  thumbs until their capture passes.

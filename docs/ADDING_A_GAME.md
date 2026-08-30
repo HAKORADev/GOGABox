@@ -13,8 +13,12 @@
    `projects/gogabox/game/games/<id>/<id>.gd` extending `GogaGame`
    (see `docs/goga_docs/plans/BOX_CORE_DESIGN.md` for the contract:
    `_build_hud`, `set_score`, payouts, death-menu hooks).
-3. **Thumbnail** — `projects/gogabox/assets/thumbs/<id>.png`, 480x320,
-   drawn from the real game sprites (see `projects/gogabox/tools/`).
+3. **Thumbnail** — `projects/gogabox/assets/thumbs/<id>.png`, **960x640**
+   (universal canvas). Real games get CAPTURED GAMEPLAY through the
+   pipeline: write a drive in `projects/gogabox/dev/thumb_capture/drives/`
+   and follow **`docs/THUMBNAILS.md`** (no baked text; the vision pass
+   picks the frame). Until the game is playable, ship a SOON-style
+   placeholder (`derive_assets.py _thumbs_soon()`).
 4. **Wire it into the box** — the box feed/carousel, store page and search
    read the registry; a PLAYABLE game appears automatically.
 5. **Tests** — extend `projects/gogabox/tests/flow_test.gd` (unlock, play,

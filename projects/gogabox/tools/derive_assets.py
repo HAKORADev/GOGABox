@@ -349,36 +349,41 @@ def thumbs():
     t = os.path.join(ASSETS, "thumbs")
     os.makedirs(t, exist_ok=True)
 
-    # SNAKE
-    img, d = _thumb_base()
-    for i in range(480):
-        d.line([(i, 0), (i, 320)], fill=(30 + i // 20, 60, 32))
-    for gy in range(6):
-        for gx in range(9):
-            if (gx + gy) % 2 == 0:
-                d.rectangle([gx * 56, gy * 56, gx * 56 + 56, gy * 56 + 56],
-                            fill=(34, 72, 36))
-    img = img.convert("RGBA")
-    body = Image.open(os.path.join(ASSETS, "games/snake/body_classic.png"))
-    head = Image.open(os.path.join(ASSETS, "games/snake/head_classic.png"))
-    apple = Image.open(os.path.join(ASSETS, "games/snake/apple.png"))
-    for i, c in enumerate([(120, 180), (176, 180), (232, 180), (232, 124), (232, 68)]):
-        img.alpha_composite(body.resize((56, 56)), c)
-    img.alpha_composite(head.resize((56, 56)), (288, 180))
-    img.alpha_composite(apple.resize((56, 56)), (392, 124))
-    _thumb_title(img, "SNAKE", "eat, grow, grab coins")
-    img.convert("RGB").save(os.path.join(t, "snake.png"))
-
-    # PONG RALLY
-    img, d = _thumb_base()
-    d.rectangle([0, 0, 480, 320], fill=(26, 16, 48))
-    for i in range(8):
-        d.rectangle([236, i * 42, 244, i * 42 + 22], fill=(255, 255, 255, 24))
-    d.rounded_rectangle([40, 60, 90, 130], radius=16, fill=HOT)
-    d.rounded_rectangle([390, 190, 440, 260], radius=16, fill=ACCENT)
-    d.ellipse([210, 130, 270, 190], fill=(255, 255, 255))
-    _thumb_title(img, "PONG RALLY", "how long can you return?")
-    img.convert("RGB").save(os.path.join(t, "rally.png"))
+    # v0.1.6: SNAKE and PONG RALLY thumbs are CAPTURED REAL GAMEPLAY now
+    # (dev/thumb_capture + post.py -> 960x640, no text). The hand-drawn
+    # scenes below are RETIRED for those two - do NOT re-run them, they
+    # would clobber the captured assets. See docs/THUMBNAILS.md.
+    #
+    # SNAKE (retired v0.1.6 - superseded by the capture pipeline)
+    # img, d = _thumb_base()
+    # for i in range(480):
+    #     d.line([(i, 0), (i, 320)], fill=(30 + i // 20, 60, 32))
+    # for gy in range(6):
+    #     for gx in range(9):
+    #         if (gx + gy) % 2 == 0:
+    #             d.rectangle([gx * 56, gy * 56, gx * 56 + 56, gy * 56 + 56],
+    #                         fill=(34, 72, 36))
+    # img = img.convert("RGBA")
+    # body = Image.open(os.path.join(ASSETS, "games/snake/body_classic.png"))
+    # head = Image.open(os.path.join(ASSETS, "games/snake/head_classic.png"))
+    # apple = Image.open(os.path.join(ASSETS, "games/snake/apple.png"))
+    # for i, c in enumerate([(120, 180), (176, 180), (232, 180), (232, 124), (232, 68)]):
+    #     img.alpha_composite(body.resize((56, 56)), c)
+    # img.alpha_composite(head.resize((56, 56)), (288, 180))
+    # img.alpha_composite(apple.resize((56, 56)), (392, 124))
+    # _thumb_title(img, "SNAKE", "eat, grow, grab coins")
+    # img.convert("RGB").save(os.path.join(t, "snake.png"))
+    #
+    # PONG RALLY (retired v0.1.6 - superseded by the capture pipeline)
+    # img, d = _thumb_base()
+    # d.rectangle([0, 0, 480, 320], fill=(26, 16, 48))
+    # for i in range(8):
+    #     d.rectangle([236, i * 42, 244, i * 42 + 22], fill=(255, 255, 255, 24))
+    # d.rounded_rectangle([40, 60, 90, 130], radius=16, fill=HOT)
+    # d.rounded_rectangle([390, 190, 440, 260], radius=16, fill=ACCENT)
+    # d.ellipse([210, 130, 270, 190], fill=(255, 255, 255))
+    # _thumb_title(img, "PONG RALLY", "how long can you return?")
+    # img.convert("RGB").save(os.path.join(t, "rally.png"))
 
     # GEOMETRY FLASH
     img, d = _thumb_base()
@@ -444,26 +449,32 @@ def thumbs():
     _thumb_title(img, "2048", "swipe and double")
     img.convert("RGB").save(os.path.join(t, "merge.png"))
 
-    # coming soon tiles
+    # coming soon tiles - v0.1.6: universal 960x640 canvas (rule R1), same
+    # design, everything scaled 2x from the old 480x320
+    _thumbs_soon(t)
+    print("thumbs/*")
+
+
+def _thumbs_soon(t):
     names = {"dario": "DARIO", "hen": "HEN INVADERS", "spud": "COSMIC SPUD",
              "maze": "ESCAPE THE MAZE", "matcher": "MATCHER", "xo": "XO LADDER",
              "keys": "KEY SINGER", "poptd": "POP TD"}
     for key, title in names.items():
-        img, d = _thumb_base()
-        d.rectangle([0, 0, 480, 320], fill=(52, 42, 66))
-        for i in range(-320, 480, 90):
-            d.polygon([(i, 320), (i + 30, 320), (i + 350, 0), (i + 320, 0)],
+        img = Image.new("RGB", (960, 640))
+        d = ImageDraw.Draw(img)
+        d.rectangle([0, 0, 960, 640], fill=(52, 42, 66))
+        for i in range(-640, 960, 180):
+            d.polygon([(i, 640), (i + 60, 640), (i + 700, 0), (i + 640, 0)],
                       fill=(64, 52, 84))
-        f = font(120)
+        f = font(240)
         bb = d.textbbox((0, 0), "?", font=f)
-        d.text(((480 - bb[2] + bb[0]) / 2, 40), "?", font=f, fill=(122, 108, 180))
-        f2 = font(30)
+        d.text(((960 - bb[2] + bb[0]) / 2, 80), "?", font=f, fill=(122, 108, 180))
+        f2 = font(60)
         bb2 = d.textbbox((0, 0), title, font=f2)
-        d.text(((480 - bb2[2] + bb2[0]) / 2, 210), title, font=f2, fill=(210, 200, 240))
-        f3 = font(20, False)
-        d.text(((480 - 64) / 2, 262), "SOON", font=f3, fill=(150, 130, 210))
-        img.convert("RGB").save(os.path.join(t, "%s.png" % key))
-    print("thumbs/*")
+        d.text(((960 - bb2[2] + bb2[0]) / 2, 420), title, font=f2, fill=(210, 200, 240))
+        f3 = font(40, False)
+        d.text(((960 - 128) / 2, 524), "SOON", font=f3, fill=(150, 130, 210))
+        img.save(os.path.join(t, "%s.png" % key))
 
 
 # ============================================================ audio
