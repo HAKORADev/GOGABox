@@ -109,3 +109,13 @@ built yet):
   place and when reaches the limit, it will fade-out the thumbnail and
   shows get back tomorrow to play, some games may have limited rounds and
   limited time btw and like that"
+  -> ALL SIX SHIPPED in v0.1.4 (PLAN_v0.1.4.md): the mystery queue caps at
+  4 with the catalog-order list (xo/poptd stay inexistent until a slot
+  frees); matcher + keys are locked non-mystery tiles; GOGACharges meters
+  (matcher 100, keys 200) with the pre-play GIVE 10 CHARGES button +
+  capacity meter + the spend-50 order on maze; daily limits (rally 6
+  rounds, lanes 6+15min, slasher 20min, merge 8) with lazy 12AM 00:00
+  rollover, the pre-play DAILY LIMIT panel and the faded "get back tomorrow
+  to play" tiles; pre-play time windows now live ("unlocks at 4 PM · in
+  2h 13m", self-rebuilding page); and snake entry/retry charges
+  min(fee, wallet) - the 9-coin free-farm exploit is dead.

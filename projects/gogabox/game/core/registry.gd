@@ -43,6 +43,7 @@ const GAMES := [
                 "coin_div": 4, "price": 150, "fee": 8, "shop": false,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "daily_rounds": 6,   # v0.1.4: 6 rounds a day, resets 12AM 00:00
                 "desc": "Endless pong rally against a machine that never gets tired. Every return speeds it up - how long can you keep the ball alive?",
                 "controls": ["drag your finger to move the paddle", "every return adds speed", "missing the ball ends the rally"],
                 "genres": {"main": ["arcade", "sports"], "sub": ["retro", "competitive", "singleplayer"]},
@@ -62,6 +63,9 @@ const GAMES := [
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "blocked_hours": {"from": 1, "to": 8},
+                # v0.1.4: BOTH daily caps on one game (owner: "some games may
+                # have limited rounds and limited time btw")
+                "daily_rounds": 6, "daily_minutes": 15,
                 "desc": "Three lanes, one ship, a wall of falling blocks. Swap lanes at the last moment - the grid only gets faster.",
                 "controls": ["tap left / right side to swap lanes", "survive as long as possible", "the grid speeds up over time"],
                 "genres": {"main": ["action", "arcade"], "sub": ["retro", "singleplayer"]},
@@ -80,6 +84,7 @@ const GAMES := [
                 "coin_div": 20, "price": 250, "fee": 15, "shop": false,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
                 "desc": "Fruits fly, your finger is the blade. Slash combos for juice, avoid the bombs - one wrong swipe slices the run short.",
                 "controls": ["swipe across fruits to slice them", "multi-slices in one swipe = combo", "never touch the bombs"],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
@@ -118,6 +123,7 @@ const GAMES := [
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "daily_rounds": 8,   # v0.1.4: 8 rounds a day
                 "desc": "Swipe to slide the tiles. Equal numbers merge and double. Reach 2048 before the board fills up - the classic brain cooker.",
                 "controls": ["swipe to slide all tiles", "equal tiles merge and double", "the run ends when no move is left"],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "turnbased", "singleplayer"]},
@@ -138,6 +144,13 @@ const GAMES := [
         #            tile right away (name + thumb visible, never a mystery)
         # appear_after = owned games needed before the teaser even shows.
         # needs_games = owned games required to BUY once revealed.
+        # charge_unlock = GOGACharges to pour in via the pre-play button before
+        #                 the game resolves further (v0.1.4: 100 or 200).
+        # daily_rounds / daily_minutes = per-day play caps on real games,
+        #                 reset at 12AM 00:00 (v0.1.4).
+        # v0.1.4 THE MYSTERY QUEUE: only the first 4 mystery-able teasers
+        # (catalog order) exist at once - the rest stay inexistent until a
+        # queue slot frees (Roadmap.MYSTERY_CAP).
         {"id": "dario", "title": "Dario", "tag": "platformer port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/dario.png",
                 "desc": "A proper little platformer - run, jump, stomp.",
@@ -172,13 +185,19 @@ const GAMES := [
                         "orders": [
                                 {"type": "beat_best", "game": "rally"},
                                 {"type": "earn_in", "game": "lanes", "amount": 150},
+                                {"type": "spend_charges", "amount": 50},   # v0.1.4 GOGACharges order
                         ]}},
+        # v0.1.4 LOCKED WITHOUT BEING A MYSTERY (owner brainstorm): matcher
+        # shows up right away as a visible tile, never a black box - pour 100
+        # GOGACharges into it (pre-play button + capacity meter) and own 3
+        # games, and its spot is fully unlocked.
         {"id": "matcher", "title": "Matcher", "tag": "match-3 port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/matcher.png",
                 "desc": "Swap, match, cascade. The calm one you play for hours.",
                 "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "singleplayer"]},
                 "age": "everyone",
-                "reveal": {"kind": "direct", "appear_after": 2, "price": 400, "needs_games": 3}},
+                "charge_unlock": 100,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3}},
         {"id": "xo", "title": "XO Ladder", "tag": "AI streaks port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/xo.png",
                 "desc": "Tic-tac-toe against a climbing AI ladder. It learns. It wins.",
@@ -190,12 +209,14 @@ const GAMES := [
                                 {"type": "beat_best", "game": "slasher"},
                                 {"type": "ach_exact", "game": "rally", "ach": "rally_30"},
                         ]}},
+        # keys = the 200-charge meter (the bigger, later game)
         {"id": "keys", "title": "Key Singer", "tag": "rhythm rework", "coming_soon": true,
                 "thumb": "res://assets/thumbs/keys.png",
                 "desc": "Hit the keys on the beat. The better your timing, the louder the song.",
                 "genres": {"main": ["music", "arcade"], "sub": ["rhythm", "singleplayer"]},
                 "age": "everyone",
-                "reveal": {"kind": "direct", "appear_after": 3, "price": 450, "needs_games": 4}},
+                "charge_unlock": 200,
+                "reveal": {"kind": "direct", "appear_after": 2, "price": 450, "needs_games": 4}},
         {"id": "poptd", "title": "Pop TD", "tag": "tower defense port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/poptd.png",
                 "desc": "Place towers, pop the waves, defend the base. Classic TD energy.",

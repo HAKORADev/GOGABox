@@ -2,20 +2,31 @@ class_name Roadmap
 extends RefCounted
 ## The feed-reveal brain. The box does NOT show every game at once - it grows:
 ##
-##   HIDDEN  -> not rendered at all
-##   MYSTERY -> black tile "?????" (orders to complete, or a countdown)
-##   GATED   -> visible + faded + lock: revealed, but you must own more games
-##   SOON    -> visible workshop game: conditions met, script still baking
-##   LOCKED  -> visible + purchasable with GOGACoins (+ New! badge until tapped)
-##   OWNED   -> in the library
+##   HIDDEN   -> not rendered at all
+##   MYSTERY  -> black tile "?????" (orders to complete, or a countdown)
+##   CHARGING -> visible + faded + capacity meter: pour GOGACharges to unlock
+##               the BUY (v0.1.4)
+##   GATED    -> visible + faded + lock: revealed, but you must own more games
+##   SOON     -> visible workshop game: conditions met, script still baking
+##   LOCKED   -> visible + purchasable with GOGACoins (+ New! badge until tapped)
+##   OWNED    -> in the library
 ##
 ## Conditions are declarative in registry.gd ("reveal" dict):
-##   kind: chain | orders | inbox (minutes) | real (hours)
+##   kind: chain | orders | inbox (minutes) | real (hours) | direct
 ##   appear_after: owned games needed before the teaser shows at all
 ##   needs_games:  owned games required to BUY once revealed
+##   charge_unlock: GOGACharges to pour in (pre-play button) before the buy
 ##   Order progress (spend_in / earn_in / plays / beat_best / ach_in /
-##   ach_exact) is computed live from Box stats, so nothing extra to persist
-##   except baselines + timestamps.
+##   ach_exact / spend_charges) is computed live from Box stats.
+##
+## v0.1.4 THE MYSTERY QUEUE (owner brainstorm): at most MYSTERY_CAP mysteries
+## exist AT ONCE. The queue is the catalog order of mystery-able teasers
+## (orders / inbox / real) that are eligible (appear_after met) and not yet
+## resolved - literally "a list inside the code". Everyone past the cap stays
+## HIDDEN: inexistent, untracked, unrendered - until an earlier mystery
+## resolves and the queue slides up one slot.
+
+const MYSTERY_CAP := 4
 
 # ---------------------------------------------------------------- states
 
@@ -34,13 +45,43 @@ static func state(id: String) -> String:
                 return "HIDDEN"
         # condition gate (orders / timers); chain games stay fully hidden
         if not _condition_done(id, rv):
-                return "HIDDEN" if String(rv.get("kind", "chain")) == "chain" else "MYSTERY"
-        # revealed: workshop games stay SOON, real games check extra gate
+                var kind := String(rv.get("kind", "chain"))
+                if kind == "chain":
+                        return "HIDDEN"
+                # v0.1.4: past the mystery queue cap = inexistent completely
+                if _mystery_rank(id) >= MYSTERY_CAP:
+                        return "HIDDEN"
+                return "MYSTERY"
+        # revealed: the GOGACharges meter first (v0.1.4), then the games gate
+        var cu := int(g.get("charge_unlock", 0))
+        if cu > 0 and Box.charges_in(id) < cu:
+                return "CHARGING"
         if int(rv.get("needs_games", 0)) > Box.owned_count():
                 return "GATED"
         if g.get("coming_soon", false):
                 return "SOON"
         return "LOCKED"
+
+## Position of `id` in the mystery queue: the catalog order of mystery-able
+## teasers (orders / inbox / real) that are eligible and still unresolved.
+## The caller guarantees `id` itself is unresolved; it never counts itself.
+static func _mystery_rank(id: String) -> int:
+        var rank := 0
+        for g in GameReg.GAMES:
+                var gid := String(g["id"])
+                if gid == id:
+                        return rank
+                var rv: Dictionary = g.get("reveal", {})
+                var kind := String(rv.get("kind", ""))
+                if not (kind == "orders" or kind == "inbox" or kind == "real"):
+                        continue
+                if Box.owns_game(gid) or _condition_done(gid, rv):
+                        continue   # resolved - its queue slot is free
+                var after := int(rv.get("appear_after", 0))
+                if after > 0 and Box.owned_count() < after:
+                        continue   # not eligible yet - takes no slot
+                rank += 1
+        return -1
 
 ## True once the reveal condition (not the games-owned gate) is satisfied.
 static func _condition_done(id: String, rv: Dictionary) -> bool:
@@ -81,6 +122,7 @@ static func _order_value(o: Dictionary) -> int:
                         return best if best > base else 0
                 "ach_in": return Box.ach_count(String(o["game"]))
                 "ach_exact": return 1 if Box.has_achievement(String(o["game"]), String(o["ach"])) else 0
+                "spend_charges": return Box.charges_spent()   # v0.1.4
         return 0
 
 static func _order_goal(o: Dictionary) -> int:
@@ -90,6 +132,7 @@ static func _order_goal(o: Dictionary) -> int:
                 "beat_best": return 1
                 "ach_in": return int(o["count"])
                 "ach_exact": return 1
+                "spend_charges": return int(o["amount"])
         return 1
 
 static func order_lines(id: String) -> Array:
@@ -105,13 +148,17 @@ static func order_lines(id: String) -> Array:
         return out
 
 static func _order_text(o: Dictionary) -> String:
-        var gt := String(GameReg.get_game(String(o["game"])).get("title", o["game"]))
+        match String(o["type"]):
+                "spend_charges":
+                        return "spend %d GOGACharges" % int(o["amount"])
+        var gt := String(GameReg.get_game(String(o.get("game", ""))).get("title", o.get("game", "")))
         match String(o["type"]):
                 "spend_in": return "spend %d coins in %s" % [int(o["amount"]), gt]
                 "earn_in": return "earn %d coins in %s" % [int(o["amount"]), gt]
                 "plays": return "play %d rounds of %s" % [int(o["count"]), gt]
                 "beat_best": return "beat your high score in %s" % gt
                 "ach_in": return "earn %d achievements in %s" % [int(o["count"]), gt]
+                "spend_charges": return "spend %d GOGACharges" % int(o["amount"])
                 "ach_exact":
                         var title := String(o["ach"])
                         for a in GameReg.get_game(String(o["game"])).get("ach", []):
@@ -137,21 +184,25 @@ static func inbox_left(id: String) -> float:
         return maxf(0.0, float(rv.get("minutes", 30)) * 60.0 - Box.total_time())
 
 ## THE one playability answer (v0.1.1): entry fee vs wallet, BOTH battery
-## pools (a charged round drinks from the game pool AND the box bank), and
-## the time-of-day window. The pre-play page's PLAY button and the feed's
-## "ready to play" chip both read THIS, so the chip can never promise a
-## button that won't open (and the button can never ignore a dry box bank -
-## that mismatch shipped in v0.0.9..v0.1.0).
+## pools (a charged round drinks from the game pool AND the box bank), the
+## time-of-day window, and the DAILY limits (v0.1.4). The pre-play page's
+## PLAY button and the feed's "ready to play" chip both read THIS, so the
+## chip can never promise a button that won't open (and the button can never
+## ignore a dry box bank - that mismatch shipped in v0.0.9..v0.1.0).
 static func can_play_now(id: String) -> bool:
         var g := GameReg.get_game(id)
         if g.is_empty() or g.get("coming_soon", false) or not Box.owns_game(id):
                 return false
         if not window_ok(id):
                 return false
+        # v0.1.4: a reached daily cap (rounds or playtime) blocks play
+        if not Box.daily_ok(id):
+                return false
         var fee := int(g.get("fee", 0))
-        # anti-softlock, snake only: the starter game is ALWAYS playable
-        var free_play := id == "snake" and fee > 0 and Box.coins() < fee
-        if fee > 0 and not free_play and Box.coins() < fee:
+        # v0.1.4 snake partial-pay: the starter is playable at ANY wallet -
+        # a thin wallet just pays every coin it has (see Box.snake_entry_cost)
+        var can_pay := fee <= 0 or id == "snake" or Box.coins() >= fee
+        if not can_pay:
                 return false
         var b := Box.game_battery(id)
         if not b.is_empty():
@@ -183,13 +234,56 @@ static func window_ok(id: String) -> bool:
         return true
 
 ## Human hint for the restriction ("" when the game has none).
+## v0.1.4: AM/PM wording (owner: "shows unlocks at nn AM/PM").
 static func window_text(id: String) -> String:
         var g := GameReg.get_game(id)
         if g.has("hours"):
-                return "playable %02d:00-%02d:00" % [int(g["hours"]["from"]), int(g["hours"]["to"])]
+                return "playable %s - %s" % [fmt_hour(int(g["hours"]["from"])),
+                                fmt_hour(int(g["hours"]["to"]))]
         if g.has("blocked_hours"):
-                return "rests %02d:00-%02d:00" % [int(g["blocked_hours"]["from"]), int(g["blocked_hours"]["to"])]
+                return "rests %s - %s" % [fmt_hour(int(g["blocked_hours"]["from"])),
+                                fmt_hour(int(g["blocked_hours"]["to"]))]
         return ""
+
+## v0.1.4 LIVE WINDOW STATE: unix time of the moment this game's time window
+## next opens (0 = playable right now / no window rules). The pre-play page
+## prints "unlocks at %s" from it and re-checks it every second.
+static func next_unlock_at(id: String) -> int:
+        if window_ok(id):
+                return 0
+        var g := GameReg.get_game(id)
+        var target := -1
+        if g.has("hours"):
+                target = int(g["hours"]["from"])
+        elif g.has("blocked_hours"):
+                target = int(g["blocked_hours"]["to"])
+        if target < 0:
+                return 0
+        var t := Time.get_time_dict_from_system()
+        var now_secs := int(t["hour"]) * 3600 + int(t["minute"]) * 60 + int(t["second"])
+        var wait := target * 3600 - now_secs
+        if wait <= 0:
+                wait += 86400   # that hour already passed today -> tomorrow
+        return int(Time.get_unix_time_from_system()) + wait
+
+## 24h -> "12 AM" / "1 PM" / "4 PM" (owner wording: "nn AM/PM").
+static func fmt_hour(h: int) -> String:
+        var hh := ((h % 24) + 24) % 24
+        var disp := hh % 12
+        if disp == 0:
+                disp = 12
+        return "%d %s" % [disp, "AM" if hh < 12 else "PM"]
+
+## v0.1.4 THE DAILY LIMIT LINE for the pre-play page ("" = no caps):
+## "today 2/6 rounds - 9/15 min". Live: the playtime half ticks with play.
+static func daily_text(id: String) -> String:
+        var u := Box.daily_usage(id)
+        var parts := []
+        if int(u["rounds_cap"]) > 0:
+                parts.append("%d/%d rounds" % [int(u["rounds"]), int(u["rounds_cap"])])
+        if int(u["mins_cap"]) > 0:
+                parts.append("%d/%d min" % [int(float(u["secs"]) / 60.0), int(u["mins_cap"])])
+        return " - ".join(parts)
 
 # ------------------------------------------------------------ bookkeeping
 
@@ -222,7 +316,10 @@ static func tick() -> void:
                                 Box.set_badge(id, "new")
                 # "" counts as a fresh save seeing the teaser resolve directly
                 # (e.g. save-meta wipe): the upgrade must still land.
-                if (prev == "" or prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED") \
+                # v0.1.4: CHARGING -> GATED/SOON/LOCKED also celebrates (the
+                # capacity meter just filled).
+                if (prev == "" or prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED" \
+                                or prev == "CHARGING") \
                                 and (st == "GATED" or st == "SOON" or st == "LOCKED"):
                         # a teaser just resolved into something tangible -> celebrate
                         Notify.cancel(_notify_id(id))
@@ -245,7 +342,7 @@ static func _heal_badge(id: String, st: String) -> void:
         if Box.is_seen(id) or Box.badge(id) != "":
                 return
         match st:
-                "MYSTERY", "GATED", "SOON": Box.set_badge(id, "new")
+                "MYSTERY", "GATED", "SOON", "CHARGING": Box.set_badge(id, "new")
                 "LOCKED": Box.set_badge(id, "unlocked")
 
 ## Baselines are already stamped when a teaser first appears; nothing to do
@@ -306,9 +403,9 @@ static func daily_picks() -> Array:
 ## v0.1.1 THE OWNER FEED ORDER (replaces raw registry order, which interleaved
 ## states "uncannily" - an owned game buried between black boxes): OWNED
 ## games first (oldest unlock first - the save's owned[] append order), then
-## the revealed locked/gated/soon tiles (catalog order = the box's growth
-## order), then the mysteries (catalog order). HIDDEN games never appear.
-## [ {g, st, bucket, ord} ]
+## the revealed charging/locked/gated/soon tiles (catalog order = the box's
+## growth order), then the mysteries (catalog order). HIDDEN games never
+## appear. [ {g, st, bucket, ord} ]
 static func feed_rows() -> Array:
         var owned_idx := {}
         var i := 0

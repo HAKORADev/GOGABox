@@ -8,7 +8,7 @@ extends Node2D
 var game_def := {}
 var router: Node
 var fee := 0
-var free_play := false
+var partial := false   # v0.1.4: snake partial-pay - retry charges min(fee, wallet)
 var game: GogaGame
 
 var W := 720.0
@@ -24,11 +24,11 @@ func _close_over_sheet() -> void:
                         n.queue_free()
         _over_sheet_pair.clear()
 
-func configure(g: Dictionary, router_: Node, fee_: int, free_play_: bool) -> void:
+func configure(g: Dictionary, router_: Node, fee_: int, partial_: bool) -> void:
         game_def = g
         router = router_
         fee = fee_
-        free_play = free_play_
+        partial = partial_
 
 func _ready() -> void:
         var landscape := String(game_def.get("orientation", "portrait")) == "landscape"
@@ -283,9 +283,17 @@ func _on_finish(final_score: int, earned: int) -> void:
                 sheet.add_child(reward_line)
                 sheet.add_child(dbl_btn)
 
-        var again_free := fee <= 0 or free_play
-        var again_txt := "PLAY AGAIN FREE" if again_free else "PLAY AGAIN  -%d" % fee
-        if not again_free and Box.coins() < fee:
+        # ---- v0.1.4 RETRY ECONOMY (owner rule: "same for retry logic too"):
+        # the charge is what the wallet can ACTUALLY pay - snake pours every
+        # coin it has (min(fee, wallet)), an empty wallet replays free, other
+        # games still pay the full fee. Daily caps + batteries gate the tap
+        # BEFORE any coin moves, so a refused retry never eats the wallet.
+        var pay_now := fee
+        if partial:
+                pay_now = Box.snake_entry_cost(fee)
+        var again_free := pay_now <= 0
+        var again_txt := "PLAY AGAIN FREE" if again_free else "PLAY AGAIN  -%d" % pay_now
+        if not again_free and not partial and Box.coins() < fee:
                 var need := Arc.label("need %d more GOGACoins to replay" % (fee - Box.coins()),
                                 18, Arc.BAD, false)
                 need.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -294,24 +302,34 @@ func _on_finish(final_score: int, earned: int) -> void:
                         if not again_free else Arc.button(again_txt, Vector2(520, 84), 28, Arc.ACCENT)
         again_btn.pressed.connect(func():
                         Jukebox.sfx("click", -4.0)
-                        var can := free_play or fee == 0 or Box.coins() >= fee
-                        if can:
-                                if not free_play and fee > 0:
-                                        Box.spend(fee)
-                                        Box.add_spent(id, fee)
-                                if not Box.consume_round_batteries(id):
-                                        Arc.toast(game._toast_ref(), "Batteries empty - they refill over time")
-                                        return
-                                Ads.register_run()
-                                _close_over_sheet()
-                                _clear_game()
-                                game = (load(String(game_def["script"])) as GDScript).new()
-                                game.game_id = id
-                                game.request_finish.connect(_on_finish)
-                                game.request_quit.connect(_quit_to_menu)
-                                add_child(game)
-                        else:
-                                Arc.toast(game._toast_ref(), "Not enough GOGACoins"))
+                        # re-derive the truth at tap time - the wallet moved while
+                        # the sheet was open (rewarded DOUBLE may have paid out)
+                        var pay := Box.snake_entry_cost(fee) if partial else fee
+                        if not Box.daily_ok(id):
+                                Arc.toast(game._toast_ref(), "daily limit reached - get back tomorrow to play")
+                                return
+                        if pay > 0 and Box.coins() < pay:
+                                Arc.toast(game._toast_ref(), "Not enough GOGACoins")
+                                return
+                        var batt := Box.game_battery(id)
+                        if not batt.is_empty() and (int(batt["count"]) < int(batt["per_round"]) \
+                                        or Box.box_batteries() < int(batt["per_round"])):
+                                Arc.toast(game._toast_ref(), "Batteries empty - they refill over time")
+                                return
+                        if pay > 0:
+                                Box.spend(pay)
+                                Box.add_spent(id, pay)
+                        if not Box.consume_round_batteries(id):
+                                Arc.toast(game._toast_ref(), "Batteries empty - they refill over time")
+                                return
+                        Ads.register_run()
+                        _close_over_sheet()
+                        _clear_game()
+                        game = (load(String(game_def["script"])) as GDScript).new()
+                        game.game_id = id
+                        game.request_finish.connect(_on_finish)
+                        game.request_quit.connect(_quit_to_menu)
+                        add_child(game))
         sheet.add_child(again_btn)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():

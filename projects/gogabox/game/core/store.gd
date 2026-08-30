@@ -7,6 +7,7 @@ signal game_unlocked(id: String)
 signal reveal_changed(id: String)   # a game's feed state changed (mystery->locked...)
 signal batteries_changed
 signal battery_full_reached        # v0.1.3: a pool just charged back to FULL
+signal charges_changed(id: String) # v0.1.4: a game's GOGACharges meter moved
 
 const SAVE_PATH := "user://gogabox.json"
 const START_COINS := 150
@@ -118,6 +119,7 @@ func add_time(id: String, seconds: float) -> void:
         if seconds <= 0.0:
                 return
         _slot(id)["time"] = float(_slot(id).get("time", 0.0)) + seconds
+        _daily(id)["secs"] = float(_daily(id).get("secs", 0.0)) + seconds   # v0.1.4 daily playtime
         meta()["last_play"] = int(Time.get_unix_time_from_system())
         save()
 
@@ -302,6 +304,7 @@ func refill_game_from_box(id: String) -> int:
         if move <= 0:
                 return 0
         data["game_batteries"][id]["count"] = int(b["count"]) + move
+        meta()["charges_spent"] = charges_spent() + move   # v0.1.4: a pour is a spend
         set_box_batteries(box_batteries() - move)
         _sync_battery_notifications()
         return move
@@ -414,6 +417,49 @@ func unlock_game(id: String, price: int) -> bool:
         game_unlocked.emit(id)
         return true
 
+# ------------------------------------------------------------ GOGACharges (v0.1.4)
+## The owner's economy brainstorm: GOGACharges ARE the box-bank batteries,
+## but SPENT on purpose - poured into a game's unlock meter (give_charges)
+## or into a round pool (refill). Every pour counts toward charges_spent,
+## which the mystery orders read ("spend N GOGACharges").
+
+## Total GOGACharges ever spent (any box-bank drain that isn't a round fee).
+func charges_spent() -> int:
+        return int(meta().get("charges_spent", 0))
+
+## Charges poured into ONE game's unlock meter so far.
+func charges_in(id: String) -> int:
+        return int(_slot(id).get("charges_in", 0))
+
+## Pour up to `n` charges from the box bank into game `id`'s unlock meter.
+## The registry `charge_unlock` is the meter's ceiling. Returns the amount
+## actually moved (0 = dry bank / nothing missing / game has no meter).
+func give_charges(id: String, n: int) -> int:
+        var g := GameReg.get_game(id)
+        if g.is_empty() or n <= 0:
+                return 0
+        var goal := int(g.get("charge_unlock", 0))
+        if goal <= 0:
+                return 0
+        var room := goal - charges_in(id)
+        var move := mini(mini(n, room), box_batteries())
+        if move <= 0:
+                return 0
+        _slot(id)["charges_in"] = charges_in(id) + move
+        meta()["charges_spent"] = charges_spent() + move
+        set_box_batteries(box_batteries() - move)
+        charges_changed.emit(id)
+        return move
+
+## v0.1.4 OWNER RULE (snake entry): the old "coins < 10 -> free play" was an
+## exploit - a 9-coin player farmed forever without paying. Now the starter
+## charges min(fee, wallet): a fat wallet pays the fee, a thin wallet pays
+## EVERY coin it has, an empty wallet plays free (anti-softlock stays).
+func snake_entry_cost(fee: int) -> int:
+        if fee <= 0:
+                return 0
+        return mini(fee, maxi(0, coins()))
+
 ## Anti-softlock: the cheapest fee across owned, playable games.
 func cheapest_owned_fee() -> int:
         var best := -1
@@ -446,6 +492,7 @@ func record_run(id: String, score: int) -> Dictionary:
         var s := _slot(id)
         s["last"] = score
         s["plays"] = int(s["plays"]) + 1
+        _daily(id)["rounds"] = int(_daily(id).get("rounds", 0)) + 1   # v0.1.4 daily rounds
         s["last_ts"] = int(Time.get_unix_time_from_system())   # last-played lists
         var new_best := score > int(s["best"])
         if new_best:
@@ -481,7 +528,10 @@ func get_progress(id: String, key: String, def: Variant = null) -> Variant:
 
 func reset_game(id: String) -> void:
         # a game progress wipe does NOT touch the favorite mark (that is a
-        # library opinion, not a run stat)
+        # library opinion, not a run stat) and does NOT touch the GOGACharges
+        # unlock meter (v0.1.4: poured charges are SPENT economy - wiping
+        # progress must never un-charge a game back behind its meter)
+        var keep_charges := charges_in(id)
         data["games"][id] = {
                 "best": 0, "last": 0, "plays": 0,
                 "time": 0.0, "spent": 0, "earned": 0,
@@ -490,7 +540,52 @@ func reset_game(id: String) -> void:
                 "seen": true, "badge": "",    # badges stay cleared across a wipe
                 "last_ts": 0,
         }
+        if keep_charges > 0:
+                data["games"][id]["charges_in"] = keep_charges
         save()
+
+# ------------------------------------------------- daily limits (v0.1.4)
+## Owner brainstorm: some OWNED games carry a daily round cap and/or a daily
+## playtime cap. Both reset at 12AM 00:00 LOCAL - implemented as a lazy day
+## rollover: the first read after midnight wipes the counters (no timers,
+## no clocks to drift, survives kills and timezone rides).
+
+## The local day key. 12AM 00:00 = the instant this string changes.
+func _today_key() -> String:
+        var d := Time.get_date_dict_from_system()
+        return "%04d-%02d-%02d" % [int(d["year"]), int(d["month"]), int(d["day"])]
+
+## The live daily counter for one game, rolled over to today when stale.
+func _daily(id: String) -> Dictionary:
+        var s := _slot(id)
+        var d: Dictionary = s.get("daily", {})
+        if String(d.get("day", "")) != _today_key():
+                d = {"day": _today_key(), "rounds": 0, "secs": 0.0}
+                s["daily"] = d
+                save()
+        return d
+
+## Read-only view + the registry caps (0 = unlimited):
+##   {rounds, secs, rounds_cap, mins_cap}
+func daily_usage(id: String) -> Dictionary:
+        var g := GameReg.get_game(id)
+        var d := _daily(id)
+        return {
+                "rounds": int(d.get("rounds", 0)),
+                "secs": float(d.get("secs", 0.0)),
+                "rounds_cap": int(g.get("daily_rounds", 0)),
+                "mins_cap": int(g.get("daily_minutes", 0)),
+        }
+
+## Can this game still be played TODAY (both caps respected)? Games without
+## caps always answer true.
+func daily_ok(id: String) -> bool:
+        var u := daily_usage(id)
+        if int(u["rounds_cap"]) > 0 and int(u["rounds"]) >= int(u["rounds_cap"]):
+                return false
+        if int(u["mins_cap"]) > 0 and float(u["secs"]) >= float(int(u["mins_cap"]) * 60):
+                return false
+        return true
 
 # ------------------------------------------------------------- achievements
 

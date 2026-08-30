@@ -17,6 +17,11 @@ func _ready() -> void:
         fails += _test("meta: registry metadata sane", _t_meta())
         fails += _test("registry: entries sane", _t_registry())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
+        fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
+        fails += _test("roadmap: GOGACharges meters", _t_charging())
+        fails += _test("wallet: snake partial pay", await _t_snake_pay())
+        fails += _test("wallet: daily limits 12AM reset", _t_daily())
+        fails += _test("time: AM/PM + live unlock", _t_time_fmt())
         fails += _test("roadmap: owner feed order + playability oracle", _t_feed_order())
         fails += _test("scroll: BoxScroll drag/tap", await _t_scroll())
         fails += _test("host: launch + finish + economy", await _t_host_flow())
@@ -346,11 +351,13 @@ func _t_roadmap() -> int:
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze mystery at 2 owned")
         # v0.0.9 badge rules: GATED/SOON never wear UNLOCKED! - that badge is
         # for BUYABLE (LOCKED) tiles only; fresh appearances wear NEW!
-        # (matcher: appear_after 2 -> visible, needs_games 3 -> GATED at 2 owned)
+        # v0.1.4: matcher carries a charge_unlock meter -> CHARGING, not GATED
+        # (appear_after 0 -> the tile is visible from the start, never a mystery)
         Roadmap.tick()
-        ok += _check(Roadmap.state("matcher") == "GATED", "matcher gated at 2 owned")
+        ok += _check(Roadmap.state("matcher") == "CHARGING",
+                "matcher CHARGING (direct + 100-charge meter)")
         ok += _check(Box.badge("matcher") == "new",
-                "GATED wears NEW! (%s)" % Box.badge("matcher"))
+                "CHARGING wears NEW! (%s)" % Box.badge("matcher"))
         Box.unlock_game("lanes", 0)
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze still mystery (orders pending)")
         ok += _check(Box.badge("dario") == "new" or Box.is_seen("dario"),
@@ -358,7 +365,203 @@ func _t_roadmap() -> int:
         # timed mystery
         ok += _check(Roadmap.time_left("spud") > 23.0 * 3600.0, "spud ~24h left")
         ok += _check(Roadmap.inbox_left("hen") > 19.0 * 60.0, "hen ~20min box time left")
+        # v0.1.4: the spend_charges order line exists on maze (4 orders now)
+        var maze_lines := Roadmap.order_lines("maze")
+        var found_charges := false
+        for l in maze_lines:
+                if "GOGACharges" in String(l["text"]):
+                        found_charges = true
+        ok += _check(found_charges and maze_lines.size() == 3,
+                "maze carries the spend-50-GOGACharges order")
         Box.reset_all()
+        return ok
+
+# ------------------------------------------------- v0.1.4 economy suites
+
+## THE MYSTERY QUEUE (owner brainstorm): at most 4 mysteries exist at once;
+## the rest are INEXISTENT (HIDDEN, untracked) until a queue slot frees.
+func _t_mystery_queue() -> int:
+        Box.reset_all()
+        var ok := _check(Roadmap.state("dario") == "MYSTERY", "queue: dario slot 1")
+        ok += _check(Roadmap.state("hen") == "MYSTERY", "queue: hen slot 2")
+        ok += _check(Roadmap.state("spud") == "MYSTERY", "queue: spud slot 3")
+        ok += _check(Roadmap.state("maze") == "HIDDEN", "maze waits (appear_after 2 at 1 owned)")
+        ok += _check(Roadmap.state("xo") == "HIDDEN", "xo waits (appear_after 3)")
+        ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd waits (appear_after 4)")
+        ok += _check(Roadmap.state("matcher") == "CHARGING",
+                "matcher is NO mystery (direct): visible CHARGING tile")
+        # own 2 -> maze joins: 4 mysteries (the FULL queue)
+        Box.unlock_game("rally", 0)
+        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 4 at 2 owned")
+        # own 3 -> xo becomes eligible but RANK 5 -> stays inexistent (THE CAP)
+        Box.unlock_game("lanes", 0)
+        ok += _check(Roadmap.state("xo") == "HIDDEN", "xo past the cap: inexistent completely")
+        ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd still inexistent")
+        var feed_ids := []
+        for r in Roadmap.feed_rows():
+                feed_ids.append(String(r["g"]["id"]))
+        ok += _check(not feed_ids.has("xo") and not feed_ids.has("poptd"),
+                "capped teasers never render in the feed")
+        # resolve dario -> its slot frees -> xo SLIDES UP as the next mystery
+        Box.add_spent("snake", 120)
+        Box.record_run("snake", 5)
+        Box.record_run("snake", 5)
+        Box.record_run("snake", 5)
+        Box.grant_achievement("snake", "score_30")
+        Box.grant_achievement("snake", "score_60")
+        Roadmap.tick()
+        ok += _check(Roadmap.state("dario") == "SOON", "dario resolved (orders done)")
+        ok += _check(Roadmap.state("xo") == "MYSTERY",
+                "the queue knows what to show next: xo is the new mystery")
+        ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd still queued behind")
+        Box.reset_all()
+        return ok
+
+## GOGACharges: pour from the box bank into a game's unlock meter; when the
+## meter reaches charge_unlock the tile resolves (CHARGING -> next state).
+func _t_charging() -> int:
+        Box.reset_all()
+        var ok := _check(Box.charges_in("matcher") == 0, "meter starts at 0")
+        Box.set_box_batteries(50)
+        var moved := Box.give_charges("matcher", 60)   # bank caps the pour at 50
+        ok += _check(moved == 50, "pour capped by the bank (50 of 60 asked)")
+        ok += _check(Box.charges_in("matcher") == 50 and Box.charges_spent() == 50,
+                "meter 50/100, charges_spent tracked")
+        ok += _check(Box.box_batteries() == 0, "the bank really drained")
+        ok += _check(Roadmap.state("matcher") == "CHARGING", "meter half: still CHARGING")
+        Box.set_box_batteries(50)
+        moved = Box.give_charges("matcher", 60)   # meter room caps the pour at 50
+        ok += _check(moved == 50, "pour capped by the meter room")
+        ok += _check(Box.charges_in("matcher") == 100, "matcher meter FULL (100)")
+        ok += _check(Roadmap.state("matcher") == "GATED",
+                "meter full -> GATED (needs 3 games, owns 1)")
+        ok += _check(Box.give_charges("matcher", 10) == 0, "full meter takes no more")
+        Box.unlock_game("rally", 0)
+        Box.unlock_game("lanes", 0)
+        ok += _check(Roadmap.state("matcher") == "SOON", "3 owned: matcher SOON")
+        # keys = the 200-charge meter, deeper in the box
+        Box.unlock_game("slasher", 0)   # owned 4 > appear_after 2
+        ok += _check(Roadmap.state("keys") == "CHARGING", "keys CHARGING (200 meter)")
+        for i in 4:
+                Box.set_box_batteries(50)
+                Box.give_charges("keys", 60)
+        ok += _check(Box.charges_in("keys") == 200, "keys meter 200/200")
+        ok += _check(Roadmap.state("keys") == "SOON",
+                "keys meter full + 4 owned (needs_games 4 met) -> SOON")
+        ok += _check(Box.charges_spent() == 300, "charges_spent total 300 (%d)" % Box.charges_spent())
+        # refills also count as spending charges (any box-bank pour does)
+        Box.set_box_batteries(10)
+        Box.game_battery("rally")   # materialize the pool first
+        Box.data["game_batteries"]["rally"]["count"] = 5   # room for 2 in the pool
+        var rmove := Box.refill_game_from_box("rally")
+        ok += _check(rmove == 2 and Box.charges_spent() == 302, "refill pours count too (+2)")
+        # a progress wipe keeps the meter (spent economy is not progress)
+        Box.reset_game("matcher")
+        ok += _check(Box.charges_in("matcher") == 100, "reset_game keeps the charges meter")
+        Box.reset_all()
+        return ok
+
+## THE SNAKE ENTRY FIX (owner brainstorm): 0 < coins < fee used to play FREE
+## - a 9-coin player farmed forever. Now the starter pays ALL its coins.
+func _t_snake_pay() -> int:
+        Box.reset_all()
+        var ok := _check(Box.snake_entry_cost(10) == 10, "fat wallet pays the full fee")
+        Box.spend(141)   # 150 -> 9 coins
+        ok += _check(Box.snake_entry_cost(10) == 9, "9 coins: the fee is ALL 9")
+        var router := Node2D.new()
+        add_child(router)
+        var launched: bool = load("res://game/core/game_host.gd").launch(router, "snake")
+        ok += _check(launched and Box.coins() == 0,
+                "launch with 9 coins: plays and lands at 0 (no free farm)")
+        var host: Node = load("res://game/core/game_host.gd").active_host
+        if host != null:
+                host._quit_to_menu()
+                await get_tree().process_frame
+        ok += _check(Box.snake_entry_cost(10) == 0, "0 coins: still free (anti-softlock)")
+        launched = load("res://game/core/game_host.gd").launch(router, "snake")
+        ok += _check(launched and Box.coins() == 0, "empty wallet still launches (starter)")
+        host = load("res://game/core/game_host.gd").active_host
+        if host != null:
+                host._quit_to_menu()
+                await get_tree().process_frame
+        # NO partial pay for non-snake games: rally owns the full-fee rule
+        Box.earn(5)
+        Box.unlock_game("rally", 0)   # free unlock (price 0) - only the FEE matters here
+        ok += _check(not load("res://game/core/game_host.gd").launch(router, "rally"),
+                "rally refuses at 5 < 8 coins (the exploit dies with snake-only partial pay)")
+        router.queue_free()
+        Box.reset_all()
+        return ok
+
+## DAILY LIMITS (owner brainstorm): rounds and/or playtime per day, reset at
+## 12AM 00:00 - lazy day rollover, no timers.
+func _t_daily() -> int:
+        Box.reset_all()
+        var ok := _check(Box.daily_ok("snake"), "snake has no daily cap")
+        ok += _check(Roadmap.daily_text("snake") == "", "no caps -> no daily line")
+        var u := Box.daily_usage("rally")
+        ok += _check(int(u["rounds_cap"]) == 6 and int(u["mins_cap"]) == 0,
+                "rally: 6 rounds/day")
+        for i in 6:
+                Box.record_run("rally", 1)
+        ok += _check(not Box.daily_ok("rally"), "6 rounds: rally is done for today")
+        ok += _check(Roadmap.daily_text("rally") == "6/6 rounds",
+                "daily text live (%s)" % Roadmap.daily_text("rally"))
+        # 12AM 00:00: the day key flips -> counters wipe on first read
+        Box.data["games"]["rally"]["daily"]["day"] = "2000-01-01"
+        ok += _check(Box.daily_ok("rally") and Box.daily_usage("rally")["rounds"] == 0,
+                "past midnight: the cap resets")
+        # lanes: BOTH caps on one game
+        u = Box.daily_usage("lanes")
+        ok += _check(int(u["rounds_cap"]) == 6 and int(u["mins_cap"]) == 15,
+                "lanes: 6 rounds AND 15 min")
+        for i in 6:
+                Box.record_run("lanes", 1)
+        ok += _check(not Box.daily_ok("lanes"), "lanes dead via rounds")
+        Box.data["games"]["lanes"]["daily"]["day"] = "2000-01-01"
+        Box.add_time("lanes", 15.0 * 60.0)
+        ok += _check(not Box.daily_ok("lanes"), "lanes dead via playtime too")
+        ok += _check(Roadmap.daily_text("lanes") == "0/6 rounds - 15/15 min",
+                "both halves print (%s)" % Roadmap.daily_text("lanes"))
+        # slasher: playtime-only
+        Box.add_time("slasher", 19.0 * 60.0)
+        ok += _check(Box.daily_ok("slasher"), "19 of 20 min: still playable")
+        Box.add_time("slasher", 61.0)
+        ok += _check(not Box.daily_ok("slasher"), "20 min reached: locked")
+        # the oracle + the launcher respect the cap
+        Box.unlock_game("rally", 0)
+        Box.earn(100)
+        Box.data["games"]["rally"]["daily"]["rounds"] = 6
+        ok += _check(not Roadmap.can_play_now("rally"), "can_play_now false while capped")
+        var router := Node2D.new()
+        add_child(router)
+        ok += _check(not load("res://game/core/game_host.gd").launch(router, "rally"),
+                "launch REFUSES a daily-capped game")
+        router.queue_free()
+        Box.reset_all()
+        return ok
+
+## AM/PM wording + the live window math (owner: "unlocks at nn AM/PM").
+func _t_time_fmt() -> int:
+        var ok := _check(Roadmap.fmt_hour(0) == "12 AM", "00h is 12 AM")
+        ok += _check(Roadmap.fmt_hour(9) == "9 AM", "09h is 9 AM")
+        ok += _check(Roadmap.fmt_hour(12) == "12 PM", "12h is 12 PM")
+        ok += _check(Roadmap.fmt_hour(13) == "1 PM", "13h is 1 PM")
+        ok += _check(Roadmap.fmt_hour(16) == "4 PM", "16h is 4 PM")
+        ok += _check(Roadmap.fmt_hour(23) == "11 PM", "23h is 11 PM")
+        ok += _check(Roadmap.window_text("hopper") == "playable 4 PM - 10 PM",
+                "hopper window in AM/PM (%s)" % Roadmap.window_text("hopper"))
+        ok += _check(Roadmap.window_text("lanes") == "rests 1 AM - 8 AM",
+                "lanes rest window in AM/PM (%s)" % Roadmap.window_text("lanes"))
+        # next_unlock_at is 0 exactly when the window is open right now
+        var na := Roadmap.next_unlock_at("hopper")
+        var open_now := Roadmap.window_ok("hopper")
+        ok += _check((na == 0) == open_now, "unlock ts <-> window-open agree")
+        if na > 0:
+                var td := Time.get_time_dict_from_unix_time(na)
+                ok += _check(int(td["hour"]) == 16, "hopper unlocks AT 4 PM (hour %d)" % int(td["hour"]))
+                ok += _check(na > int(Time.get_unix_time_from_system()), "unlock is in the future")
+        ok += _check(Roadmap.next_unlock_at("snake") == 0, "no window -> no unlock ts")
         return ok
 
 # ------------------------------------------------------------------ scroll
@@ -679,6 +882,17 @@ func _t_menu() -> int:
         await get_tree().process_frame
         menu._close_sheet()
         menu._open_game_page(GameReg.get_game("snake"))
+        await get_tree().process_frame
+        menu._close_sheet()
+        # v0.1.4 pages: the daily-limit row (rally), the live window line
+        # (hopper), and the charging meter page (matcher) all build cleanly
+        menu._open_game_page(GameReg.get_game("rally"))
+        await get_tree().process_frame
+        menu._close_sheet()
+        menu._open_game_page(GameReg.get_game("hopper"))
+        await get_tree().process_frame
+        menu._close_sheet()
+        menu._open_charging_page(GameReg.get_game("matcher"))
         await get_tree().process_frame
         menu._close_sheet()
         menu._open_search()

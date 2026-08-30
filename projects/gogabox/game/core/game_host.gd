@@ -15,14 +15,20 @@ static func launch(router: Node, id: String) -> bool:
                 return false
         if not Roadmap.window_ok(id):
                 return false
+        # v0.1.4: a reached daily cap (rounds / playtime) refuses the launch
+        if not Box.daily_ok(id):
+                return false
         var fee := int(g["fee"])
-        # anti-softlock, snake only: the starter game is ALWAYS playable.
-        # Every other game requires real coins (adds value to the wallet).
-        var free_play := id == "snake" and fee > 0 and Box.coins() < fee
-        if fee > 0 and not free_play:
-                if not Box.spend(fee):
+        # v0.1.4 OWNER RULE (snake entry): "if money is +0 and -10, use all
+        # money so the player plays and have 0 coins". The old "coins < fee ->
+        # free" let a 9-coin player farm forever. Now the starter charges
+        # min(fee, wallet); every other game still demands the full fee.
+        var partial := id == "snake" and fee > 0
+        var pay := Box.snake_entry_cost(fee) if partial else fee
+        if pay > 0:
+                if not Box.spend(pay):
                         return false
-                Box.add_spent(id, fee)
+                Box.add_spent(id, pay)
         # GOGABatteries: charged games consume their pool + the box bank
         if not Box.consume_round_batteries(id):
                 return false
@@ -38,7 +44,8 @@ static func launch(router: Node, id: String) -> bool:
         # stage.on_game_closed (restore the box), not an inner node that
         # happens to carry the same method name (the menu does - that
         # shadowing would leave the box hidden forever after a run).
-        host.configure(g, stage, fee, free_play)
+        # v0.1.4: `partial` tells the retry button to charge min(fee, wallet).
+        host.configure(g, stage, fee, partial)
         stage.add_child(host)
         active_host = host
         if stage.has_method("on_game_entered"):

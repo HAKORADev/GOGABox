@@ -113,16 +113,31 @@ func _ready() -> void:
         # NOTE: the banner joins only after the splash (main.gd -> on_splash_done)
 
         # slow tick so timed mysteries resolve live + battery chip stays honest
+        _day_key = _local_day()
         var t := Timer.new()
         t.wait_time = 2.0
         t.autostart = true
         t.timeout.connect(func():
                 Roadmap.tick()
                 Box.poll_game_batteries()   # v0.1.3: full-pool pings tick live
-                _update_battery_chip())
+                _update_battery_chip()
+                # v0.1.4: 12AM 00:00 = the daily limits reset. The moment the
+                # local day string changes, the feed rebuilds - faded
+                # "get back tomorrow" tiles come back to life live.
+                var dk := _local_day()
+                if dk != _day_key:
+                        _day_key = dk
+                        _refresh())
         add_child(t)
 
         _build_particles()
+
+## The local day key (menu-side mirror of Box._today_key) - drives the
+## midnight refresh so the 12AM daily reset is VISIBLE in the box.
+var _day_key := ""
+func _local_day() -> String:
+        var d := Time.get_date_dict_from_system()
+        return "%04d-%02d-%02d" % [int(d["year"]), int(d["month"]), int(d["day"])]
 
 ## Called by main.gd when the splash fully faded out.
 func on_splash_done() -> void:
@@ -784,7 +799,7 @@ func _flash(c: Control) -> void:
 func _tap_tile(g: Dictionary, st: String, panel: Control) -> void:
         _flash(panel)
         var id := String(g["id"])
-        if st == "LOCKED" or st == "GATED" or st == "SOON":
+        if st == "LOCKED" or st == "GATED" or st == "SOON" or st == "CHARGING":
                 if not Box.is_seen(id):
                         Box.mark_seen(id)          # "New!" disappears after first tap
                         _refresh()
@@ -796,6 +811,8 @@ func _tap_tile(g: Dictionary, st: String, panel: Control) -> void:
                 _open_gated_page(g)
         elif st == "SOON":
                 _open_soon_page(g)
+        elif st == "CHARGING":
+                _open_charging_page(g)
         elif st == "MYSTERY":
                 _open_mystery_page(g)
 
@@ -894,12 +911,24 @@ func _tile(g: Dictionary, st: String) -> Control:
         var bd := Box.badge(id)
         match st:
                 "OWNED":
-                        _add_thumb(b, g, 70)
+                        # v0.1.4 OWNER RULE: a reached daily limit fades the
+                        # thumbnail and wears "get back tomorrow to play" - the
+                        # tile must never look alive while the PLAY button would
+                        # refuse (the v0.1.1 mismatch disease, daily edition)
+                        var daily_dead := not Box.daily_ok(id)
+                        var th := _add_thumb(b, g, 70, daily_dead)
+                        if daily_dead:
+                                th.modulate = Color(1, 1, 1, 0.32)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
-                        if id != "snake" and Roadmap.can_play_now(id):
+                        if daily_dead:
+                                var dchip := Arc.chip("get back tomorrow to play", "",
+                                                Color(0, 0, 0, 0.4), 16, Color(1, 1, 1, 0.85))
+                                dchip.position = Vector2(14, 272)
+                                b.add_child(dchip)
+                        elif id != "snake" and Roadmap.can_play_now(id):
                                 var chip := Arc.chip("ready to play", "", Color(0, 0, 0, 0.12), 18, Color("8a6a40"))
                                 chip.position = Vector2(14, 272)
                                 b.add_child(chip)
@@ -961,6 +990,30 @@ func _tile(g: Dictionary, st: String) -> Control:
                         tag.position = Vector2(14, 274)
                         tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(tag)
+                        _feed_ribbon(b, bd)
+                "CHARGING":
+                        # v0.1.4 THE CAPACITY TILE: visible (never a mystery),
+                        # faded, with the live GOGACharges meter on it
+                        var th := _add_thumb(b, g, 70, true)
+                        th.modulate = Color(1, 1, 1, 0.38)
+                        var name_l := Arc.fit_label(String(g["title"]), 24, Color(0.45, 0.38, 0.3), 306)
+                        name_l.position = Vector2(14, 242)
+                        name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        b.add_child(name_l)
+                        var cu := int(g.get("charge_unlock", 0))
+                        var chip := Arc.chip("charges %d/%d" % [Box.charges_in(id), cu], "",
+                                        Color(0, 0, 0, 0.4), 16, Color(1, 1, 1, 0.9))
+                        chip.position = Vector2(14, 272)
+                        b.add_child(chip)
+                        var lock_ic := TextureRect.new()
+                        lock_ic.texture = load("res://assets/ui/icon_lock.png")
+                        lock_ic.custom_minimum_size = Vector2(56, 56)
+                        lock_ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                        lock_ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                        lock_ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        lock_ic.position = Vector2(16, 16)
+                        lock_ic.modulate = Color(1, 1, 1, 0.9)
+                        b.add_child(lock_ic)
                         _feed_ribbon(b, bd)
                 "MYSTERY":
                         var dark := ColorRect.new()
@@ -1357,7 +1410,13 @@ func _open_guide(g: Dictionary) -> void:
         var win := Roadmap.window_text(String(g["id"]))
         if win != "":
                 facts += win + "\n"
+        var gid2 := String(g["id"])
         facts += "entry fee %d GOGACoins" % int(g.get("fee", 0))
+        # v0.1.4 owner rule, stated in plain words where players read
+        if gid2 == "snake" and int(g.get("fee", 0)) > 0:
+                facts += " (less coins in the box? you play for ALL of them)"
+        if g.has("daily_rounds") or g.has("daily_minutes"):
+                facts += "\ndaily limit: %s - resets at 12 AM" % Roadmap.daily_text(gid2)
         var fk := Arc.label(facts, 18, Color("6a4a28"), false)
         fk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         fk.custom_minimum_size = Vector2(540, 0)
@@ -1572,9 +1631,14 @@ func _open_game_page(g: Dictionary) -> void:
         scroll.add_child(content)
 
         var fee := int(g["fee"])
-        # anti-softlock: ONLY the starter game (snake) is ever free to play
-        var free_play: bool = id == "snake" and fee > 0 and Box.coins() < fee
-        var can_pay: bool = fee <= 0 or free_play or Box.coins() >= fee
+        # v0.1.4 OWNER RULE (snake entry): the starter charges min(fee, wallet)
+        # - a thin wallet pays EVERY coin ("use all money so the player plays
+        # and have 0 coins"), an empty wallet plays free. Other games demand
+        # the full fee (nothing changed for them).
+        var partial := id == "snake" and fee > 0
+        var pay := Box.snake_entry_cost(fee) if partial else fee
+        var free_play: bool = partial and pay <= 0
+        var can_pay: bool = pay <= 0 or Box.coins() >= pay
         var can_batt: bool = true
         var batt := Box.game_battery(id)
         if not batt.is_empty():
@@ -1584,11 +1648,17 @@ func _open_game_page(g: Dictionary) -> void:
                 can_batt = int(batt["count"]) >= int(batt["per_round"]) \
                                 and Box.box_batteries() >= int(batt["per_round"])
         var can_time := Roadmap.window_ok(id)
-        var can_play := can_pay and can_batt and can_time
+        # v0.1.4: the daily caps (rounds / playtime) gate the button too
+        var can_daily := Box.daily_ok(id)
+        var can_play := can_pay and can_batt and can_time and can_daily
         # NOTE: the feed tile's "ready to play" chip calls Roadmap.can_play_now,
-        # the same fee + pools + window oracle this page mirrors line by line.
+        # the same fee + pools + window + daily oracle this page mirrors.
 
-        _header_block(content, g, false, true, scroll)
+        # OWNER RULE (v0.1.4): a game you cannot play RIGHT NOW wears its
+        # blocker in the UI - the thumbnail fades for a closed time window
+        # or a reached daily limit ("fade-out the thumbnail of it")
+        var blocked_visually := not can_time or not can_daily
+        _header_block(content, g, blocked_visually, true, scroll)
 
         # batteries + time-window info, right under the header
         if not batt.is_empty():
@@ -1623,18 +1693,67 @@ func _open_game_page(g: Dictionary) -> void:
                 var wl := Arc.label(win, 18, Arc.HOT if can_time else Arc.BAD, false)
                 wl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 content.add_child(wl)
+                # v0.1.4 OWNER SPEC: "shows unlocks at nn AM/PM which will feels
+                # more responsive while the nn is updates in real-time" - a
+                # LIVE line while the window is closed: the target hour + a
+                # 1s countdown, and the page rebuilds itself the moment the
+                # window opens (the PLAY button comes alive without a reopen).
+                if not can_time:
+                        var unlock_lbl := Arc.label("", 20, Arc.BAD, false)
+                        unlock_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        content.add_child(unlock_lbl)
+                        var paint_unlock := func() -> bool:
+                                var na := Roadmap.next_unlock_at(id)
+                                if na <= 0:
+                                        return false   # window is OPEN now
+                                var td := Time.get_time_dict_from_unix_time(na)
+                                unlock_lbl.text = "unlocks at %s  ·  in %s" % [
+                                        Roadmap.fmt_hour(int(td["hour"])),
+                                        Roadmap.fmt_clock(float(na - int(Time.get_unix_time_from_system())))]
+                                return true
+                        paint_unlock.call()
+                        _page_tick(vb, func():
+                                if not paint_unlock.call():
+                                        _close_sheet()
+                                        _open_game_page(g))   # window opened live
 
-        var play_txt := "PLAY  -%d" % fee if (fee > 0 and not free_play) else "PLAY  FREE"
+        # v0.1.4 THE DAILY LIMIT ROW (owner: "the limit will be visible in the
+        # pre-play menu in a proper place"): progress + the 12AM reset hint,
+        # between the window line and the PLAY button.
+        var dtxt := Roadmap.daily_text(id)
+        if dtxt != "":
+                var dpanel := PanelContainer.new()
+                dpanel.add_theme_stylebox_override("panel",
+                                Arc.panel_style(Color(1, 1, 1, 0.5) if can_daily else Color(1, 0.85, 0.8, 0.7), 18, 10))
+                var dv := VBoxContainer.new()
+                dv.add_theme_constant_override("separation", 2)
+                dpanel.add_child(dv)
+                var dhead := Arc.label("DAILY LIMIT" + ("" if can_daily else "  -  REACHED"),
+                                17, Arc.HOT if can_daily else Arc.BAD, false)
+                dhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                dv.add_child(dhead)
+                var dval := Arc.label("today %s" % dtxt, 19,
+                                Arc.INK if can_daily else Arc.BAD, false)
+                dval.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                dv.add_child(dval)
+                var dsub := Arc.label("resets at 12 AM", 15, Color("8a6a40"), false)
+                dsub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                dv.add_child(dsub)
+                content.add_child(dpanel)
+
+        var play_txt := "PLAY  -%d" % pay if (pay > 0) else "PLAY  FREE"
         var play_btn := Arc.coin_button(play_txt, Vector2(540, 92), 34, Arc.ACCENT) \
-                        if (fee > 0 and not free_play) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
+                        if (pay > 0) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
         content.add_child(play_btn)
         if not can_play:
                 play_btn.disabled = true
                 var why := ""
                 if not can_time:
                         why = "this one %s - come back in the window" % win
+                elif not can_daily:
+                        why = "daily limit reached - get back tomorrow to play"
                 elif not can_pay:
-                        why = "need %d more GOGACoins (snake is always free)" % (fee - Box.coins())
+                        why = "need %d more GOGACoins" % (pay - Box.coins())
                 elif not can_batt:
                         why = "batteries empty - +1 every 5 min, or refill from the box"
                 var whyl := Arc.label(why, 18, Arc.BAD, false)
@@ -1897,6 +2016,83 @@ func _open_mystery_page(g: Dictionary) -> void:
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
+
+## v0.1.4 THE CHARGING PRE-PLAY PAGE: the capacity meter + the GIVE CHARGES
+## button (owner brainstorm: "there will be a button in the pre-play to give
+## it charges and track the capacity meter"). Pours GOGACharges from the box
+## bank into this game's unlock meter; the page updates live and celebrates
+## the moment the meter fills.
+func _open_charging_page(g: Dictionary) -> void:
+        if _sheet_open:
+                return
+        Jukebox.sfx("click", -4.0)
+        var id := String(g["id"])
+        var cu := int(g.get("charge_unlock", 0))
+        var vb := _sheet_base()
+        _header_block(vb, g, true)
+        vb.add_child(Arc.label("CHARGE TO UNLOCK", 30, Arc.HOT))
+        var msg := Arc.label("pour GOGACharges into the capacity meter.\nwhen it reaches %d, this game's spot is unlocked." % cu,
+                        22, Arc.INK, false)
+        msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        msg.custom_minimum_size = Vector2(540, 0)
+        msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(msg)
+
+        # the capacity meter (live-updatable, battery-sheet pattern)
+        var meter_row := HBoxContainer.new()
+        meter_row.alignment = BoxContainer.ALIGNMENT_CENTER
+        meter_row.add_theme_constant_override("separation", 14)
+        vb.add_child(meter_row)
+        var meter := Arc.battery_control(Box.charges_in(id), cu, 240.0, 42.0)
+        meter_row.add_child(meter)
+        var m_lbl := Arc.label("%d/%d" % [Box.charges_in(id), cu], 28, Arc.INK)
+        meter_row.add_child(m_lbl)
+        var paint_meter := func():
+                meter.get_meta("set_level").call(Box.charges_in(id), cu)
+                meter.queue_redraw()
+                m_lbl.text = "%d/%d" % [Box.charges_in(id), cu]
+
+        var hint := Arc.label("the box bank holds %d/%d GOGACharges\nit charges while GOGABox is closed" %
+                        [Box.box_batteries(), Box.box_battery_cap()], 18, Color("6a4a28"), false)
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint)
+
+        var give := Arc.button("GIVE 10 CHARGES", Vector2(540, 84), 26, Color("3f7fb0"), func():
+                var moved := Box.give_charges(id, 10)
+                if moved <= 0:
+                        Jukebox.sfx("error", -4.0)
+                        Arc.toast(_toast, "the box bank is dry - it charges while GOGABox is closed")
+                        return
+                paint_meter.call()
+                hint.text = ("the box bank holds %d/%d GOGACharges\nit charges while GOGABox is closed"
+                                % [Box.box_batteries(), Box.box_battery_cap()])
+                if Box.charges_in(id) >= cu:
+                        # METER FULL: the tile resolves right now (CHARGING -> next state)
+                        Jukebox.sfx("unlock", -2.0)
+                        Arc.toast(_toast, "%s is fully charged - capacity %d/%d!" %
+                                        [String(g["title"]), cu, cu])
+                        _close_sheet()
+                        _after_roadmap_change()
+                else:
+                        Jukebox.sfx("coin", -4.0)
+                        Arc.toast(_toast, "+%d charges poured (%d/%d)" %
+                                        [moved, Box.charges_in(id), cu]))
+        vb.add_child(give)
+        vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb)
+
+## One 1s ticker bound to a sheet's lifetime (the mystery-page pattern,
+## generalized for the live unlock countdown). Dies with the sheet.
+func _page_tick(vb: VBoxContainer, cb: Callable) -> void:
+        var panel := vb.get_parent()
+        var tick := Timer.new()
+        tick.wait_time = 1.0
+        tick.autostart = true
+        panel.add_child(tick)
+        tick.timeout.connect(func():
+                if is_instance_valid(vb):
+                        cb.call())
 
 ## ALLOW REMINDERS (v0.1.0, simple per owner). Root cause of the dead tap in
 ## v0.0.6..v0.0.9 was NEVER the OEM: GDScript called native.request_permission()
