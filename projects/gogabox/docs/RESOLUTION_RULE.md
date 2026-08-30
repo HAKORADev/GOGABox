@@ -47,3 +47,26 @@
   in v0.0.2 with anchor layout).
 - GOGABox v0.0.2 games — snake board top-glued on 20:9 (fixed in v0.0.3 by
   rule 4); loading screen off-center (fixed by rule 3).
+
+## 4. "The app uses its own resolution" (owner question, answered v0.0.9)
+
+The box renders **720x1280 LOGICAL units**; `canvas_items` + `expand`
+stretches them to whatever room the device has (16:9 -> exactly 720x1280,
+20:9 -> 720x1600 portrait). Text and vector drawing are rasterized at the
+device's REAL resolution by the engine - they are always sharp.
+
+What read as "small internal resolution" on a 1080x2400 phone was:
+1. **1x raster art** (icons/thumbs drawn for a 720-wide canvas, then
+   upscaled ~1.5x by the stretch -> soft). Fix: re-rendered the small UI
+   icons at 2x and the thumbs at 1.5x source density (same on-screen
+   logical size, sharper sampling).
+2. **The battery chip bug** - a 0-min-width Button wrapping an overflowing
+   panel painted OVER the GOGACoin chip and the search icon in the box
+   menu top bar. That was a LAYOUT bug, not a resolution one. Fixed by
+   measuring the chip and giving the button its real width (v0.0.9).
+
+DECISION (do not relitigate without the owner): the logical layout stays
+720-based. Rewriting every coordinate/font/asset to a 1080 base would buy
+nothing the engine does not already do (text renders at native res) and
+would risk regression across ~4000 lines of UI code. Sharpness comes from
+hi-res art; placement comes from anchors; the ROOM comes from `expand`.

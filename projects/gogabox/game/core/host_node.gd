@@ -217,23 +217,35 @@ func _on_finish(final_score: int, earned: int) -> void:
                 var hint := Arc.label(Ads.reward_hint(), 16, Color("8a6a40"), false)
                 hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 sheet.add_child(hint)
+                # v0.0.9 owner rule ("i told you more than two times"): the
+                # honest math line above the ad button - pickups and the score
+                # bonus ratio, in ONE modular format (Arc.bonus_ratio_text).
+                var ratio := Arc.label("pickups = %d   -   score bonus = %s" %
+                                [earned, Arc.bonus_ratio_text(final_score, div)],
+                                18, Color("8a6a40"), false)
+                ratio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                sheet.add_child(ratio)
                 var dbl := [null]   # holder: the lambda cannot capture dbl_btn
                 var reward_line := Arc.label("", 20, Arc.GOOD, false)
                 reward_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 reward_line.visible = false
-                # v0.0.8: closed-early no longer dead-ends on a green "TRY
-                # AGAIN (15s+)" that had to burn another ad first. The button
-                # goes GRAY with "AD CLOSED EARLY - NO REWARDS" and stays
-                # clickable: one tap = straight back into a fresh ad.
+                # v0.0.9 REWORK (owner spec): a closed-early ad does NOT gray+
+                # clickable (that read as broken) - the button counts down
+                # "RETRY IN 10s" grayed AND dead, then comes back green as
+                # "RETRY NOW". One tap = one clean new ad attempt. The second-
+                # watch no-reward bug is fixed in Ads itself (show-start
+                # fallback stamp + load-aware watchdog there).
                 var dbl_btn := Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
                                 var btn: Button = dbl[0]
-                                btn.text = "DOUBLE  (watch ad)"
-                                Arc.repaint_button(btn, Arc.GOOD)
+                                if btn.disabled:
+                                        return
+                                btn.text = "LOADING AD..."
+                                btn.disabled = true
                                 Ads.show_rewarded(func(watched: bool, mult: float, _secs: float):
                                                 var b2: Button = dbl[0]
+                                                print("[rewarded] watched=%s mult=%.2f" % [watched, mult])
                                                 if not watched or mult <= 0.0:
-                                                        b2.text = "AD CLOSED EARLY  -  NO REWARDS"
-                                                        Arc.gray_out_button(b2)
+                                                        _reward_retry_countdown(b2)
                                                         var why := "ad closed early - no bonus"
                                                         if mult <= 0.0 and watched:
                                                                 why = "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half")
@@ -320,6 +332,34 @@ func _clear_game() -> void:
         if game != null and is_instance_valid(game):
                 game.queue_free()
         game = null
+
+## v0.0.9 owner spec: closed-early rewarded -> the button turns gray AND dead
+## while it counts "RETRY IN 10s" -> 9 -> ... -> "RETRY NOW" (green, live).
+## The countdown also pre-loads a fresh rewarded ad so the retry rarely
+## starts from an empty slot. The timer dies with the sheet (child of it).
+func _reward_retry_countdown(b: Button) -> void:
+        if b == null or not is_instance_valid(b):
+                return
+        b.text = "RETRY IN 10s"
+        b.disabled = true
+        var left := [10]
+        var t := Timer.new()
+        t.wait_time = 1.0
+        t.autostart = true
+        b.add_child(t)
+        t.timeout.connect(func():
+                if not is_instance_valid(b):
+                        t.queue_free()
+                        return
+                left[0] -= 1
+                if left[0] <= 0:
+                        t.queue_free()
+                        b.text = "RETRY NOW"
+                        b.disabled = false
+                        Arc.repaint_button(b, Arc.GOOD)
+                        Ads.refresh()   # fresh rewarded ready for the retry
+                else:
+                        b.text = "RETRY IN %ds" % left[0])
 
 func _score_to_coins(s: int) -> int:
         # MODULAR per game (registry "coin_div"): score / divider, and BELOW the

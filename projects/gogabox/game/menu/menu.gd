@@ -18,20 +18,28 @@ var _vb: VBoxContainer
 # not proper scale"). Now any leftover space just scrolls.
 var _feed_scroll: BoxScroll
 var _feed_vb: VBoxContainer
-# today's-picks carousel (owner rule: no real "hot" exists locally - the feed
-# picks up to 5 random games per day from EVERYTHING visible in the box,
-# paged with arrows + dot indicators under the title)
-var _picks: Array = []
-var _pick_idx := 0
-var _pick_holder: Control
+# v0.0.9 CAROUSEL: one horizontal strip, swipeable left/right by TOUCH; the
+# arrows switch WHICH LIST the strip shows (owner: "scrollable left-right by
+# touching and left-right arrows to change list from top picks to like last
+# played and not played"). The three v0.0.8 stat strips below are gone - they
+# duplicated these lists ("last played twice" bug family).
+const LIST_TITLES := ["TODAY'S PICKS", "LAST PLAYED", "LEAST PLAYED", "NOT PLAYED YET"]
+const LIST_HINTS := ["", "play something and it lands here",
+                        "every game you played lines up here",
+                        "you played everything you own!"]
+var _lists_data: Array = []      # [{items: [{g, stat}], ...}] rebuilt by _refresh
+var _list_idx := 0
+var _strip_scroll: BoxScroll
+var _strip_row: HBoxContainer
+var _strip_title: Label
 var _dots_row: HBoxContainer
 var _pick_prev: Button
 var _pick_next: Button
-var _list_scrolls: Array = []      # every horizontal BoxScroll on the feed
 var _grid: GridContainer
+var _all_head: Label             # "ALL GAMES" -> FAVORITES / MYSTERY with the state filter
 var _wallet_label: Label
 var _battery_box: HBoxContainer
-var _battery_last := -1            # chip rebuilds only when the count changes
+var _battery_last := -1          # chip rebuilds only when the count changes
 var _toast: Dictionary
 var _sheet_open := false
 var _trophies_open := false
@@ -44,6 +52,7 @@ var router: Node = null
 var _filter_age := ""
 var _filter_genre := ""
 var _filter_sub := ""
+var _filter_state := ""          # "" = all | "favorites" | "mystery" (single-select)
 
 func _ready() -> void:
         _layer = CanvasLayer.new()
@@ -79,8 +88,7 @@ func _ready() -> void:
 
         _build_top_bar()
         _build_feed()
-        _build_picks()
-        _build_list_sections()
+        _build_carousel()
         _build_grid()
 
         _toast = Arc.toast_overlay(_root)
@@ -134,6 +142,10 @@ func set_active(on: bool) -> void:
         visible = on
         if _layer != null and is_instance_valid(_layer):
                 _layer.visible = on
+        # the toast lives on its OWN layer-100 CanvasLayer (above sheets) -
+        # Node2D.visible does not reach it, hide it by hand with the box
+        if _toast.has("layer") and is_instance_valid(_toast["layer"]):
+                (_toast["layer"] as CanvasLayer).visible = on
         process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
         _set_feed_lock(not on)
 
@@ -241,6 +253,14 @@ func _update_battery_chip() -> void:
         wh.add_child(Arc.battery_control(n, cap, 46.0, 24.0))
         wh.add_child(Arc.label("%d/%d" % [n, cap], 24, Color(1, 1, 1, 0.9), false))
         b.add_child(wchip)
+        # v0.0.9 THE OVERLAP FIX (battery sat on top of the coin chip and the
+        # search icon since v0.0.6): the button had ZERO min width, so the
+        # HBox reserved no room for it and its inner panel PAINTED OVER the
+        # neighbours. Measure the panel and give the button its real width -
+        # then the top bar lays out chip -> coin -> icons side by side.
+        wchip.set_anchors_preset(Control.PRESET_FULL_RECT)
+        b.custom_minimum_size = Vector2(
+                        ceilf(wchip.get_combined_minimum_size().x) + 4.0, 56.0)
         b.pressed.connect(func():
                 Jukebox.sfx("click", -4.0)
                 _open_batteries())
@@ -407,11 +427,14 @@ func _build_feed() -> void:
         _feed_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         _feed_scroll.add_child(_feed_vb)
 
-func _build_picks() -> void:
-        _picks_head = Arc.label("TODAY'S PICKS", 32, Arc.ACCENT)
-        _feed_vb.add_child(_picks_head)
-        # owner rule: the dots sit UNDER THE WORD - they show how many options
-        # exist and which one is on screen right now
+## v0.0.9 CAROUSEL (owner redesign): title + dots = WHICH list is shown;
+## arrows switch the list; the cards themselves swipe left/right by touch.
+## Lists: TODAY'S PICKS (daily random, OWNED only) / LAST PLAYED / LEAST
+## PLAYED / NOT PLAYED YET (owned-never-played). One strip, zero duplication.
+func _build_carousel() -> void:
+        _strip_title = Arc.label(LIST_TITLES[0], 32, Arc.ACCENT)
+        _feed_vb.add_child(_strip_title)
+        # dots under the word: one per LIST, showing which list is on screen
         _dots_row = HBoxContainer.new()
         _dots_row.alignment = BoxContainer.ALIGNMENT_CENTER
         _dots_row.add_theme_constant_override("separation", 10)
@@ -419,17 +442,19 @@ func _build_picks() -> void:
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 10)
         _feed_vb.add_child(row)
-        _pick_prev = _arrow_btn("<", func(): _pick_move(-1))
+        _pick_prev = _arrow_btn("<", func(): _list_move(-1))
         row.add_child(_pick_prev)
-        # CenterContainer keeps the 300px card truly centered at any width
-        # (v0.0.7 did manual position math against a not-yet-laid-out holder,
-        # so the first build landed off-center and clip_contents cut it)
-        _pick_holder = CenterContainer.new()
-        _pick_holder.custom_minimum_size = Vector2(0, 208)
-        _pick_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        _pick_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        row.add_child(_pick_holder)
-        _pick_next = _arrow_btn(">", func(): _pick_move(1))
+        # horizontal touch-scroll strip: finger drags the cards, BoxScroll adds
+        # inertia and owns taps (cards are registered tappables)
+        _strip_scroll = BoxScroll.new()
+        _strip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        _strip_scroll.custom_minimum_size = Vector2(0, 208)
+        _strip_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        row.add_child(_strip_scroll)
+        _strip_row = HBoxContainer.new()
+        _strip_row.add_theme_constant_override("separation", 12)
+        _strip_scroll.add_child(_strip_row)
+        _pick_next = _arrow_btn(">", func(): _list_move(1))
         row.add_child(_pick_next)
 
 func _arrow_btn(txt: String, cb: Callable) -> Button:
@@ -437,159 +462,74 @@ func _arrow_btn(txt: String, cb: Callable) -> Button:
         b.mouse_filter = Control.MOUSE_FILTER_IGNORE   # feed scroll owns taps
         return b
 
-## One carousel page: a big card for ANY visible game (owned -> the game
-## page; locked/gated/soon/mystery teasers -> their own pages. The whole
-## point of picks is "don't know what to pick? pick from here").
-func _pick_card(g: Dictionary) -> Control:
-        var st := Roadmap.state(String(g["id"]))
-        var b := _card_base(Vector2(300, 208), true)
-        if st == "MYSTERY":
-                var dark := ColorRect.new()
-                dark.color = Color(0.07, 0.05, 0.04, 1.0)
-                dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-                dark.offset_bottom = -48
-                dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                b.add_child(dark)
-                var art := TextureRect.new()
-                art.texture = load("res://assets/ui/mystery.png")
-                art.set_anchors_preset(Control.PRESET_FULL_RECT)
-                art.offset_bottom = -48
-                art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                b.add_child(art)
-                var qn := Arc.label("?????", 25, Color(0.85, 0.8, 0.7))
-                qn.position = Vector2(14, 160)
-                qn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                b.add_child(qn)
-        else:
-                _add_thumb(b, g, 48, st != "OWNED")
-                var name_l := Arc.label(String(g["title"]), 25, Arc.INK)
-                name_l.position = Vector2(14, 160)
-                name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                b.add_child(name_l)
-        _feed_scroll.register_tappable(b, func():
-                Jukebox.sfx("click", -4.0)
-                _tap_tile(g, st, b))
-        return b
-
-func _pick_move(dir: int) -> void:
-        if _picks.is_empty():
-                return
-        _pick_idx = wrapi(_pick_idx + dir, 0, _picks.size())
+func _list_move(dir: int) -> void:
+        _list_idx = wrapi(_list_idx + dir, 0, LIST_TITLES.size())
         Jukebox.sfx("click", -4.0)
-        _pick_show(_pick_idx)
+        _apply_list()
 
-func _pick_show(i: int) -> void:
-        if _picks.is_empty():
-                _picks_head.visible = false
-                _pick_prev.visible = false
-                _pick_next.visible = false
-                _pick_holder.visible = false
-                _dots_row.visible = false
+## Fill the strip with the CURRENT list (called on build + every refresh +
+## every arrow press). Empty lists get a soft hint card instead of nothing.
+func _apply_list() -> void:
+        if _lists_data.is_empty():
                 return
-        _picks_head.visible = true
-        _pick_holder.visible = true
-        _dots_row.visible = _picks.size() > 1
-        # owner rule: with one option the arrows have nothing to page -> gone
-        _pick_prev.visible = _picks.size() > 1
-        _pick_next.visible = _picks.size() > 1
-        _pick_idx = clampi(i, 0, _picks.size() - 1)
-        for c in _pick_holder.get_children():
-                _pick_holder.remove_child(c)
-                c.queue_free()
-        var card := _pick_card(_picks[_pick_idx])
-        _pick_holder.add_child(card)
+        _list_idx = clampi(_list_idx, 0, _lists_data.size() - 1)
+        _strip_title.text = LIST_TITLES[_list_idx]
+        _strip_title.visible = true
+        _strip_scroll.visible = true
+        # dots: one per list
         for c in _dots_row.get_children():
                 _dots_row.remove_child(c)
                 c.queue_free()
-        for k in _picks.size():
+        for k in _lists_data.size():
                 var dot := Panel.new()
                 dot.custom_minimum_size = Vector2(18, 18)
-                var on := k == _pick_idx
+                var on := k == _list_idx
                 dot.add_theme_stylebox_override("panel",
                                 Arc.panel_style(Arc.ACCENT if on else Color(0, 0, 0, 0.22), 9))
                 dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 _dots_row.add_child(dot)
+        # cards
+        for c in _strip_row.get_children():
+                _strip_row.remove_child(c)
+                c.queue_free()
+        _strip_scroll.stop_motion()
+        _strip_scroll._tappables.clear()
+        _strip_scroll.scroll_horizontal = 0
+        var items: Array = _lists_data[_list_idx]["items"]
+        if items.is_empty():
+                var hint := _card_base(Vector2(300, 208), true)
+                var hl := Arc.label(LIST_HINTS[_list_idx], 22, Color(0.55, 0.42, 0.25), false)
+                hl.set_anchors_preset(Control.PRESET_FULL_RECT)
+                hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                hl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+                hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                hl.custom_minimum_size = Vector2(260, 0)
+                hint.add_child(hl)
+                _strip_row.add_child(hint)
+                return
+        for it in items:
+                _strip_row.add_child(_strip_card(it["g"], String(it["stat"])))
 
-# ------------------------------------------------------- feed mini-lists
-
-var _picks_head: Label
-var _sec_last := {}
-var _sec_least := {}
-var _sec_not := {}
-
-func _build_list_sections() -> void:
-        _sec_last = _build_list_section("LAST PLAYED")
-        _sec_least = _build_list_section("LEAST PLAYED")
-        _sec_not = _build_list_section("NOT PLAYED YET")
-
-func _build_list_section(title_: String) -> Dictionary:
-        var head := Arc.label(title_, 26, Arc.HOT)
-        _feed_vb.add_child(head)
-        var sc := BoxScroll.new()
-        sc.custom_minimum_size = Vector2(0, 124)
-        sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        _feed_vb.add_child(sc)
-        var row := HBoxContainer.new()
-        row.add_theme_constant_override("separation", 12)
-        sc.add_child(row)
-        _list_scrolls.append(sc)
-        return {"head": head, "scroll": sc, "row": row}
-
-## Compact owned-game card for the stat lists (thumb + name + one stat line).
-func _mini_card(g: Dictionary, stat_txt: String) -> Control:
-        var b := Button.new()
-        b.custom_minimum_size = Vector2(296, 116)
-        b.mouse_filter = Control.MOUSE_FILTER_IGNORE   # its BoxScroll owns taps
-        var sb := Arc.panel_style(Arc.CARD, 20)
-        sb.shadow_color = Color(0, 0, 0, 0.35)
-        sb.shadow_size = 6
-        sb.shadow_offset = Vector2(0, 4)
-        for st in ["normal", "hover", "pressed", "disabled"]:
-                b.add_theme_stylebox_override(st, sb)
-        var ic := TextureRect.new()
-        var tp := String(g.get("thumb", ""))
-        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
-        ic.position = Vector2(10, 10)
-        ic.size = Vector2(96, 96)
-        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-        ic.clip_contents = true
-        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        b.add_child(ic)
-        var name_l := Arc.label(String(g["title"]), 22, Arc.INK)
-        name_l.position = Vector2(116, 20)
+## Big owned-game card for the strip: thumb + name + one stat line. ALL
+## carousel lists are owned-only, so a tap opens the pre-play page.
+func _strip_card(g: Dictionary, stat_txt: String) -> Control:
+        var b := _card_base(Vector2(300, 208), true)
+        _add_thumb(b, g, 58)
+        var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
+        name_l.position = Vector2(14, 150)
         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(name_l)
-        var stat_l := Arc.label(stat_txt, 18, Color("6a4a28"), false)
-        stat_l.position = Vector2(116, 62)
+        var stat_l := Arc.label(stat_txt, 17, Color("6a4a28"), false)
+        stat_l.position = Vector2(14, 180)
         stat_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(stat_l)
+        _feed_scroll.register_tappable(b, func():
+                Jukebox.sfx("click", -4.0)
+                if Roadmap.state(String(g["id"])) == "OWNED":
+                        _open_game_page(g)
+                else:
+                        _tap_tile(g, Roadmap.state(String(g["id"])), b))
         return b
-
-func _fill_list(sec: Dictionary, items: Array, stat_fn: Callable) -> void:
-        var head: Label = sec["head"]
-        var sc: BoxScroll = sec["scroll"]
-        var row: HBoxContainer = sec["row"]
-        for c in row.get_children():
-                row.remove_child(c)
-                c.queue_free()
-        sc.stop_motion()
-        sc._tappables.clear()
-        if items.is_empty():
-                head.visible = false
-                sc.visible = false
-                return
-        head.visible = true
-        sc.visible = true
-        for it in items:
-                var g: Dictionary = it["g"]
-                var card := _mini_card(g, String(stat_fn.call(it)))
-                sc.register_tappable(card, func():
-                        Jukebox.sfx("click", -4.0)
-                        _open_game_page(g))
-                row.add_child(card)
 
 ## "3m ago / 5h ago / 2d ago" for the LAST PLAYED strip.
 func _ago(ts: int) -> String:
@@ -605,8 +545,8 @@ func _ago(ts: int) -> String:
         return "%dd ago" % (s / 86400)
 
 func _build_grid() -> void:
-        var all_head := Arc.label("ALL GAMES", 32, Arc.ACCENT)
-        _feed_vb.add_child(all_head)
+        _all_head = Arc.label("ALL GAMES", 32, Arc.ACCENT)
+        _feed_vb.add_child(_all_head)
         _grid = GridContainer.new()
         _grid.columns = 2
         _grid.add_theme_constant_override("h_separation", 14)
@@ -624,22 +564,15 @@ func _refresh() -> void:
         _feed_scroll.stop_motion()
         _feed_scroll._tappables.clear()
 
-        # ---- today's picks (daily random, arrows + dots under the title) ----
-        _picks = Roadmap.daily_picks()
-        _pick_idx = clampi(_pick_idx, 0, maxi(0, _picks.size() - 1))
-        _pick_show(_pick_idx)
-        # arrows are static controls but the tappable registry was cleared:
-        # re-register them (BoxScroll owns every tap inside the feed scroll)
-        _feed_scroll.register_tappable(_pick_prev, Arc._tap_emitter(_pick_prev))
-        _feed_scroll.register_tappable(_pick_next, Arc._tap_emitter(_pick_next))
-
-        # ---- personal stat strips ----
-        # LAST PLAYED: owned + played, newest first (max 10).
-        # LEAST PLAYED: owned + played, fewest plays first (max 10) MINUS what
-        #   LAST PLAYED already shows - with a small library the two strips
-        #   would show the same game twice ("last played shows two times").
-        # NOT PLAYED YET: owned-never-played first, then every visible teaser
-        #   (locked / gated / soon / mystery) - the discovery strip.
+        # ---- carousel lists (v0.0.9: ONE strip, arrows switch the list) ----
+        # TODAY'S PICKS: daily random over OWNED games only (owner rule).
+        # LAST PLAYED:   owned + played, newest first (max 10).
+        # LEAST PLAYED:  owned + played, fewest plays first (max 10).
+        # NOT PLAYED YET: owned-never-played ONLY (owner rule: "soon" teasers
+        #   never belonged here).
+        var picks: Array = []
+        for g in Roadmap.daily_picks():
+                picks.append({"g": g, "stat": String(g["tag"])})
         var played: Array = []
         var never: Array = []
         for g in GameReg.playable():
@@ -651,16 +584,19 @@ func _refresh() -> void:
                 if plays > 0:
                         played.append({"g": g, "plays": plays, "ts": ts})
                 else:
-                        never.append({"g": g})
+                        never.append({"g": g, "stat": "new game"})
         var by_recents := played.duplicate()
         by_recents.sort_custom(func(a, b): return int(a["ts"]) > int(b["ts"]))
         by_recents = by_recents.slice(0, 10)
         var last_ids := []
         for it in by_recents:
                 last_ids.append(String(it["g"]["id"]))
+        for it in by_recents:
+                it["stat"] = _ago(int(it["ts"]))
         var by_least := []
         for it in played:
                 if not last_ids.has(String(it["g"]["id"])):
+                        it["stat"] = "plays %d" % int(it["plays"])
                         by_least.append(it)
         by_least.sort_custom(func(a, b):
                 var pa := int(a["plays"])
@@ -668,35 +604,44 @@ func _refresh() -> void:
                 if pa != pb:
                         return pa < pb
                 return int(a["ts"]) < int(b["ts"]))
-        var not_played: Array = never.duplicate()
-        for g in GameReg.GAMES:
-                var gid2 := String(g["id"])
-                var st := Roadmap.state(gid2)
-                if st == "OWNED" or st == "HIDDEN":
-                        continue
-                not_played.append({"g": g, "st": st})
-        _fill_list(_sec_last, by_recents, func(it): return _ago(int(it["ts"])))
-        _fill_list(_sec_least, by_least.slice(0, 10),
-                        func(it): return "plays %d" % int(it["plays"]))
-        _fill_list(_sec_not, not_played.slice(0, 10), func(it):
-                if it.has("st"):
-                        return String(it["st"]).to_lower()
-                return "new game")
+        by_least = by_least.slice(0, 10)
+        _lists_data = [
+                {"items": picks},
+                {"items": by_recents},
+                {"items": by_least},
+                {"items": never},
+        ]
+        _apply_list()
+        # arrows are static controls but the tappable registry was cleared:
+        # re-register them (BoxScroll owns every tap inside the feed scroll)
+        _feed_scroll.register_tappable(_pick_prev, Arc._tap_emitter(_pick_prev))
+        _feed_scroll.register_tappable(_pick_next, Arc._tap_emitter(_pick_next))
 
+        # ---- the grid (ALL GAMES / FAVORITES / MYSTERY via the state filter)
+        _all_head.text = "FAVORITES" if _filter_state == "favorites" \
+                        else "MYSTERY" if _filter_state == "mystery" else "ALL GAMES"
         var tiles := 0
         for g in GameReg.GAMES:
                 var id := String(g["id"])
                 var st := Roadmap.state(id)
                 if st == "HIDDEN":
                         continue
+                match _filter_state:
+                        "favorites":
+                                if st != "OWNED" or not Box.is_favorite(id):
+                                        continue
+                        "mystery":
+                                if st != "MYSTERY":
+                                        continue
                 if not _passes_filters(g):
                         continue
                 _grid.add_child(_tile(g, st))
                 tiles += 1
         if tiles == 0:
+                var filtered := _filter_age != "" or _filter_genre != "" \
+                                or _filter_sub != "" or _filter_state != ""
                 var empty_txt := "play to grow your box..." \
-                                if (_filter_age == "" and _filter_genre == "" and _filter_sub == "") \
-                                else "nothing matches these filters"
+                                if not filtered else "nothing matches these filters"
                 var empty := Arc.label(empty_txt, 24, Color(0.55, 0.42, 0.25), false)
                 empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 empty.custom_minimum_size = Vector2(0, 120)
@@ -705,6 +650,10 @@ func _refresh() -> void:
         _update_battery_chip()
 
 func _passes_filters(g: Dictionary) -> bool:
+        # MYSTERY tiles bypass metadata filters: a black box carries no public
+        # info, and filtering by genre would LEAK what the hidden game is.
+        if Roadmap.state(String(g["id"])) == "MYSTERY":
+                return true
         if _filter_age != "" and String(g.get("age", "everyone")) != _filter_age:
                 return false
         var geo: Dictionary = g.get("genres", {})
@@ -794,15 +743,16 @@ func _ribbon(b: Control, txt: String, bg: Color, top_right := true) -> void:
         l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         rib.add_child(l)
 
-## Two-level feed badge (owner rule v0.0.7):
-##   NEW!      orange - the teaser just appeared
-##   UNLOCKED! green  - it resolved into a real buyable tile
+## Two-level feed badge (owner rule v0.0.9):
+##   NEW!      orange    - the tile just APPEARED (any teaser state)
+##   UNLOCKED! green - it resolved into a BUYABLE tile (LOCKED only)
+## Badges ALWAYS own the top-right corner; static ribbons (SOON) sit top-left.
 ## Any tap on the tile clears the level (Box.mark_seen).
-func _feed_ribbon(b: Control, level: String, top_right := true) -> void:
+func _feed_ribbon(b: Control, level: String) -> void:
         if level == "new":
-                _ribbon(b, "NEW!", Arc.HOT, top_right)
+                _ribbon(b, "NEW!", Arc.HOT, true)
         elif level == "unlocked":
-                _ribbon(b, "UNLOCKED!", Arc.GOOD, top_right)
+                _ribbon(b, "UNLOCKED!", Arc.GOOD, true)
 
 func _tile(g: Dictionary, st: String) -> Control:
         var b := _card_base(Vector2(334, 312))
@@ -831,13 +781,14 @@ func _tile(g: Dictionary, st: String) -> Control:
                                         Color(0, 0, 0, 0.5), 20, Arc.COIN)
                         price.position = Vector2(226, 268)
                         b.add_child(price)
+                        # lock moved TOP-LEFT: the badge owns the top-right corner
                         var lock_ic := TextureRect.new()
                         lock_ic.texture = load("res://assets/ui/icon_lock.png")
                         lock_ic.custom_minimum_size = Vector2(56, 56)
                         lock_ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
                         lock_ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
                         lock_ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                        lock_ic.position = Vector2(262, 16)
+                        lock_ic.position = Vector2(16, 16)
                         lock_ic.modulate = Color(1, 1, 1, 0.9)
                         b.add_child(lock_ic)
                         _feed_ribbon(b, bd)
@@ -868,12 +819,13 @@ func _tile(g: Dictionary, st: String) -> Control:
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
-                        _ribbon(b, "SOON", Color("6a5ab8"))
+                        # static ribbon TOP-LEFT - NEW!/UNLOCKED! own the right
+                        _ribbon(b, "SOON", Color("6a5ab8"), false)
                         var tag := Arc.label(String(g["tag"]), 16, Color("8a6a40"), false)
                         tag.position = Vector2(14, 274)
                         tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(tag)
-                        _feed_ribbon(b, bd, false)
+                        _feed_ribbon(b, bd)
                 "MYSTERY":
                         var dark := ColorRect.new()
                         dark.color = Color(0.07, 0.05, 0.04, 1.0)
@@ -899,6 +851,10 @@ func _tile(g: Dictionary, st: String) -> Control:
                         var chip := Arc.chip("mystery", "", Color(0.25, 0.16, 0.3, 1), 18, Color(1, 1, 1, 0.9))
                         chip.position = Vector2(14, 272)
                         b.add_child(chip)
+                        # v0.0.9: fresh mysteries show NEW! too (it was computed
+                        # but never rendered on the black tile - "where is the
+                        # New! badge gone?")
+                        _feed_ribbon(b, bd)
         _feed_scroll.register_tappable(b, func(): _tap_tile(g, st, b))
         return b
 
@@ -980,37 +936,64 @@ func _open_search() -> void:
         if _sheet_open or _trophies_open:
                 return
         Jukebox.sfx("click", -4.0)
-        var vb := _sheet_base()
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
         var title := Arc.label("FIND GAMES", 40, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
 
-        vb.add_child(_chip_row("AGE", Meta.used_ages(),
-                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
-        vb.add_child(_chip_row("GENRE", Meta.used_genres(),
-                        func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
-        vb.add_child(_chip_row("MORE", Meta.used_subs(),
-                        func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
+        # v0.0.9 owner rule: the sheet itself scrolls up-down; every filter
+        # group is a titled section inside that one scroll, so adding more
+        # filter kinds later just lengthens the scroll (and a group that outgrows
+        # ~3 chip rows gets its own inner vertical scroll).
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 330)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 14)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
 
-        var hint := Arc.label("filters only touch games you can already see", 18,
+        v.add_child(_chip_row(scroll, "AGE", Meta.used_ages(),
+                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
+        v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
+                        func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
+        v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
+                        func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
+        # STATES (single-select): none -> all games; favorites -> owned hearts;
+        # mystery -> the unlisted black boxes. The grid headline follows.
+        v.add_child(_state_row(scroll))
+
+        var hint := Arc.label("filters work on owned + revealed games", 18,
                         Color("8a6a40"), false)
         hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(hint)
-        vb.add_child(Arc.button("APPLY FILTERS", Vector2(480, 78), 26, Arc.ACCENT, func():
+        # v0.0.9 owner rule: with NOTHING set the apply button is gray + dead;
+        # it lights up the moment any filter/state is chosen.
+        var apply_btn := Arc.button("APPLY FILTERS", Vector2(480, 78), 26, Arc.ACCENT, func():
                 _close_sheet()
                 _refresh()
-                Arc.toast(_toast, "filters applied")))
+                Arc.toast(_toast, "filters applied"))
+        apply_btn.disabled = not _filters_dirty()
+        vb.add_child(apply_btn)
         vb.add_child(Arc.button("CLEAR", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16), func():
                 _filter_age = ""
                 _filter_genre = ""
                 _filter_sub = ""
+                _filter_state = ""
                 _close_sheet()
                 _refresh()))
-        Arc.fit_sheet(vb, 2)
+
+func _filters_dirty() -> bool:
+        return _filter_age != "" or _filter_genre != "" or _filter_sub != "" \
+                        or _filter_state != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
-func _chip_row(title_: String, ids: Array, on_toggle: Callable, kind: String) -> Control:
+## `scroll` is the sheet's BoxScroll: chips inside it are registered
+## tappables (BoxScroll owns taps - an unregistered button is a dead button).
+func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callable, kind: String) -> Control:
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 8)
         box.add_child(Arc.label(title_, 22, Arc.HOT))
@@ -1054,12 +1037,59 @@ func _chip_row(title_: String, ids: Array, on_toggle: Callable, kind: String) ->
                 var sbp := sb.duplicate() as StyleBoxFlat
                 sbp.bg_color = Color(0.85, 0.5, 0.06)
                 b.add_theme_stylebox_override("pressed", sbp)
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 b.toggled.connect(func(_on: bool):
                         Jukebox.sfx("click", -4.0)
                         on_toggle.call(sid)
                         # rebuild the sheet so every chip shows its true state
                         _close_sheet()
                         _open_search())
+                scroll.register_tappable(b, Arc._tap_emitter(b))
+                wrap.add_child(b)
+        return box
+
+## Single-select STATES chips: ALL / FAVORITES / MYSTERY. Tapping the active
+## chip again falls back to ALL. Only one can be on at any time.
+func _state_row(scroll: BoxScroll) -> Control:
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.add_child(Arc.label("STATES", 22, Arc.HOT))
+        var wrap := HFlowContainer.new()
+        wrap.add_theme_constant_override("h_separation", 8)
+        wrap.add_theme_constant_override("v_separation", 8)
+        box.add_child(wrap)
+        for st in [["", "All"], ["favorites", "Favorites"], ["mystery", "Mystery"]]:
+                var sid := String(st[0])
+                var lbl := String(st[1])
+                var active := _filter_state == sid
+                var b := Button.new()
+                b.text = " " + lbl
+                b.toggle_mode = true
+                b.button_pressed = active
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 19)
+                b.add_theme_color_override("font_color", Arc.CARD if active else Color("7a5a34"))
+                b.add_theme_color_override("font_pressed_color", Arc.CARD)
+                var sb := Arc.panel_style(Color(0.98, 0.62, 0.1) if active else Color(0, 0, 0, 0.14), 20)
+                sb.content_margin_left = 16
+                sb.content_margin_right = 16
+                sb.content_margin_top = 8
+                sb.content_margin_bottom = 8
+                b.add_theme_stylebox_override("normal", sb)
+                var sbh := sb.duplicate() as StyleBoxFlat
+                sbh.bg_color = sbh.bg_color.lightened(0.08)
+                b.add_theme_stylebox_override("hover", sbh)
+                var sbp := sb.duplicate() as StyleBoxFlat
+                sbp.bg_color = Color(0.85, 0.5, 0.06)
+                b.add_theme_stylebox_override("pressed", sbp)
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.toggled.connect(func(_on: bool):
+                        Jukebox.sfx("click", -4.0)
+                        # single-select: re-tap falls back to ALL
+                        _filter_state = "" if _filter_state == sid else sid
+                        _close_sheet()
+                        _open_search())
+                scroll.register_tappable(b, Arc._tap_emitter(b))
                 wrap.add_child(b)
         return box
 
@@ -1104,6 +1134,9 @@ func _open_help() -> void:
         Arc.fit_sheet(vb)
 
 ## Thumbnail + name header line, description under (simple list, no stats).
+## v0.0.9 owner rule: this line shows the PRE-PLAY description (the tag line
+## visible on the game page), not the long guide text - the guide's "THE
+## GAME" section keeps the full desc.
 func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
         var row := PanelContainer.new()
         row.add_theme_stylebox_override("panel", Arc.panel_style(Color(1, 1, 1, 0.5), 18, 10))
@@ -1122,7 +1155,7 @@ func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
         ic.clip_contents = true
         head.add_child(ic)
         head.add_child(Arc.label(String(g["title"]), 26, Arc.INK))
-        var d := Arc.label(String(g.get("desc", "")), 17, Color("6a4a28"), false)
+        var d := Arc.label(String(g.get("tag", "")), 17, Color("6a4a28"), false)
         d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         v.add_child(d)
         scroll.register_tappable(row, func():
@@ -1214,9 +1247,8 @@ func _set_feed_lock(locked: bool) -> void:
         # swallow the emulated mouse and sliders/buttons in sheets would "hang"
         if _feed_scroll != null and is_instance_valid(_feed_scroll):
                 _feed_scroll.input_locked = locked
-        for sc in _list_scrolls:
-                if sc != null and is_instance_valid(sc):
-                        (sc as BoxScroll).input_locked = locked
+        if _strip_scroll != null and is_instance_valid(_strip_scroll):
+                _strip_scroll.input_locked = locked
 
 func _sheet_base(h := 0.0) -> VBoxContainer:
         _sheet_open = true
@@ -1305,7 +1337,8 @@ func _volume_row(name_: String, value: float, on_change: Callable) -> Control:
 
 # ------------------------------------------------------------ game page
 
-func _header_block(vb: VBoxContainer, g: Dictionary, faded := false) -> void:
+func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav := false,
+                reg_scroll: BoxScroll = null) -> void:
         var id := String(g["id"])
         var head := HBoxContainer.new()
         head.add_theme_constant_override("separation", 18)
@@ -1321,11 +1354,50 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false) -> void:
         head.add_child(thumb)
         var hv := VBoxContainer.new()
         hv.add_theme_constant_override("separation", 4)
+        hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         head.add_child(hv)
         hv.add_child(Arc.label(String(g["title"]), 34, Arc.INK))
         hv.add_child(Arc.label(String(g["tag"]), 20, Color("8a6a40"), false))
         hv.add_child(Arc.label("best %d   last %d   plays %d" % [Box.stat(id, "best"),
                         Box.stat(id, "last"), Box.stat(id, "plays")], 20, Color("6a4a28"), false))
+        if allow_fav:
+                var hb := _heart_button(id)
+                head.add_child(hb)
+                # the header lives INSIDE the page's BoxScroll - raw button input
+                # is swallowed there, so the heart must be a registered tappable
+                if reg_scroll != null:
+                        hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        reg_scroll.register_tappable(hb, Arc._tap_emitter(hb))
+
+## v0.0.9 FAVORITES: the heart lives on the pre-play (owned game) page.
+## Cream/white heart by default; RED when the game is in the FAVORITES feed
+## (search -> STATES -> Favorites). One texture, modulate does the color.
+func _heart_button(id: String) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(64, 64)
+        b.flat = true
+        var ic := TextureRect.new()
+        ic.texture = load("res://assets/ui/heart.png")
+        ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+        ic.offset_left = 6
+        ic.offset_top = 6
+        ic.offset_right = -6
+        ic.offset_bottom = -6
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(ic)
+        var paint := func():
+                ic.modulate = Color(1.0, 0.32, 0.32, 1.0) if Box.is_favorite(id) \
+                                else Color(1, 1, 1, 0.55)
+        paint.call()
+        b.pressed.connect(func():
+                var on := not Box.is_favorite(id)
+                Box.set_favorite(id, on)
+                paint.call()
+                Jukebox.sfx("confirm" if on else "click", -4.0)
+                Arc.toast(_toast, "added to favorites" if on else "removed from favorites"))
+        return b
 
 func _open_game_page(g: Dictionary) -> void:
         if _sheet_open:
@@ -1355,7 +1427,7 @@ func _open_game_page(g: Dictionary) -> void:
         var can_time := Roadmap.window_ok(id)
         var can_play := can_pay and can_batt and can_time
 
-        _header_block(content, g)
+        _header_block(content, g, false, true, scroll)
 
         # batteries + time-window info, right under the header
         if not batt.is_empty():
@@ -1518,7 +1590,7 @@ func _open_unlock_page(g: Dictionary) -> void:
         var afford := Box.coins() >= price
         var btn := Arc.coin_button("UNLOCK  %d" % price, Vector2(540, 92), 30, Arc.GOOD, func():
                 if Box.unlock_game(id, price):
-                        Jukebox.jingle_win()
+                        Jukebox.sfx("unlock", -2.0)   # v0.0.9: OWN short chime
                         _close_sheet()
                         _after_roadmap_change()
                         _open_game_page(GameReg.get_game(id))
@@ -1630,7 +1702,7 @@ func _open_mystery_page(g: Dictionary) -> void:
                                 vb.add_child(sub)
                                 if not Notify.permission_granted():
                                         vb.add_child(Arc.button("ALLOW REMINDERS", Vector2(440, 60), 20,
-                                                        Color("58a8d8"), func(): Notify.request_permission()))
+                                                        Color("58a8d8"), func(): _ask_reminders()))
                         else:
                                 vb.add_child(Arc.label("revealing...", 22, Arc.INK, false))
         tick.timeout.connect(func():
@@ -1664,6 +1736,34 @@ func _open_mystery_page(g: Dictionary) -> void:
         vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
+
+## v0.0.9 ALLOW REMINDERS - the owner tapped this three builds in a row and
+## got nothing. Native audit says the plugin, manifest and permission are all
+## present in the APK, so what is left is OEM-suppressed dialogs AND a
+## silently-failing settings intent. Every tap now answers VISIBLY, and a
+## GDScript-side watchdog is the last-resort ladder under the native one.
+func _ask_reminders() -> void:
+        if not Notify.available():
+                Arc.toast(_toast, "notification service missing on this device")
+                return
+        if Notify.permission_granted():
+                Arc.toast(_toast, "reminders are already allowed")
+                return
+        Arc.toast(_toast, "asking the system...")
+        Notify.request_permission()
+        # belt & braces: the native side has its own result-callback + 3.5s
+        # watchdog; this 5s timer only fires if BOTH went silent, and then
+        # opens the notification settings from here. If the settings page is
+        # already open, re-firing the same intent is invisible.
+        var sw := Timer.new()
+        sw.wait_time = 5.0
+        sw.one_shot = true
+        sw.autostart = true
+        add_child(sw)
+        sw.timeout.connect(func():
+                sw.queue_free()
+                if not Notify.permission_granted():
+                        Notify.open_notification_settings())
 
 # ------------------------------------------------------------ trophies & stats
 

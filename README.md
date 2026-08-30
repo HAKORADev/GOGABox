@@ -10,7 +10,7 @@ developer machine — no IDE, no manual setup, no mystery steps.
 >    on anyone's workspace; a fresh clone is a complete source of truth.
 
 ```
-clone → ./tools/bootstrap.sh → ./build.sh jellyjump     # that's the whole pipeline
+clone → ./tools/bootstrap.sh → ./build.sh gogabox      # that's the whole pipeline
 ```
 
 ## Repo map
@@ -33,8 +33,6 @@ clone → ./tools/bootstrap.sh → ./build.sh jellyjump     # that's the whole p
 
 | project | status | ABIs | monetization |
 |---|---|---|---|
-| `jellyjump` | playable, CI-green | arm64-v8a, armeabi-v7a | Unity Ads: interstitial every 3 runs, rewarded revive + double coins, menu banner |
-| `candyrush` | playable, CI-green | arm64-v8a, armeabi-v7a | Unity Ads: interstitial every 2 levels, rewarded +5 moves / double coins, menu banner |
 | `gogabox` | playable (6 games + 8 SOON tiles), CI-green | arm64-v8a, armeabi-v7a | Unity Ads REAL ads: banner on box menu, interstitial every 3 runs, rewarded double GOGACoins; GOGACoin economy, unlocks, skins shop |
 
 ## Quickstart (local)
@@ -43,9 +41,9 @@ Ubuntu (24.04 tested) with `curl unzip zip jq python3` — then:
 
 ```bash
 ./tools/bootstrap.sh                 # JDK17 + Android SDK + Godot 4.7.2 (cached in .cache/)
-./tools/test.sh jellyjump            # headless integration tests
-./build.sh jellyjump                 # both ABIs → dist/jellyjump/*.apk
-./build.sh jellyjump --abi arm64-v8a # single ABI
+./tools/test.sh gogabox              # headless integration tests
+./build.sh gogabox                   # both ABIs → dist/gogabox/*.apk
+./build.sh gogabox --abi arm64-v8a   # single ABI
 ```
 
 Details & troubleshooting: [docs/SETUP.md](docs/SETUP.md)
@@ -55,7 +53,7 @@ Details & troubleshooting: [docs/SETUP.md](docs/SETUP.md)
 One obvious step, then real work:
 
 ```bash
-git pull && ./tools/bootstrap.sh && ./tools/test.sh jellyjump
+git pull && ./tools/bootstrap.sh && ./tools/test.sh gogabox
 ```
 
 Then read [docs/AGENTS.md](docs/AGENTS.md) — how everything works: ads IDs,
@@ -88,7 +86,7 @@ Per-game provenance: `projects/<game>/assets.manifest.json` and
 
 ## Adding a new game
 
-Copy `projects/jellyjump` as a template, add one entry to `config/projects.json`,
+Copy `projects/gogabox` as a template, add one entry to `config/projects.json`,
 push — CI picks it up automatically. Full checklist: [docs/ADDING_A_GAME.md](docs/ADDING_A_GAME.md).
 
 ## Release checklist (per game)

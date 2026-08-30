@@ -34,7 +34,13 @@ var desktop_sim := false             # true on non-Android builds
 var _runs_since_interstitial := 0
 var _pending_cb: Callable = Callable()
 var _last_result_ok := false
-var _pending_since_ms := 0
+# v0.0.9: the watchdog now works with a DEADLINE that depends on what the ad
+# is doing. The old fixed 8s hard-resolve fired WHILE a rewarded load was
+# still in flight (rewarded reloads after a close are slow) - it consumed the
+# caller's callback, the "ad closed early" toast popped out of nowhere, and
+# when the ad finally loaded there was no callback left to pay it ("watched a
+# full second ad and got nothing").
+var _pending_deadline_ms := 0
 var _banner_wanted := false        # banner requested before init finished
 var _showing := false              # an ad is on screen (watchdog paused)
 var _load_retries := {}            # placement -> retries while a cb waits
@@ -152,11 +158,19 @@ func show_rewarded(cb: Callable) -> void:
                 _simulate(true, cb)
                 return
         _pending_cb = cb
-        _pending_since_ms = 0
         if native and native.is_loaded(placement("rewarded")):
+                _arm_watchdog(8.0)
                 _showing = true
+                # FALLBACK STAMP: if the native ad_shown signal ever gets
+                # missed, the watch time still starts from HERE (a zero watch
+                # time on a fully-watched ad was the "second ad paid nothing"
+                # bug).
+                _ad_start_ms = Time.get_ticks_msec()
                 native.show(placement("rewarded"))
         else:
+                # a load is in flight: loads (especially right after a close)
+                # can easily take longer than 8s - give it 20s
+                _arm_watchdog(20.0)
                 native.load(placement("rewarded"))
 
 func show_interstitial(cb: Callable = Callable()) -> void:
@@ -167,12 +181,18 @@ func show_interstitial(cb: Callable = Callable()) -> void:
                 _simulate(false, cb)
                 return
         _pending_cb = cb
-        _pending_since_ms = 0
         if native and native.is_loaded(placement("interstitial")):
+                _arm_watchdog(8.0)
                 _showing = true
+                _ad_start_ms = Time.get_ticks_msec()
                 native.show(placement("interstitial"))
         else:
+                _arm_watchdog(20.0)
                 native.load(placement("interstitial"))
+
+## Watchdog arming: the deadline is absolute (ms) and axis-dependent.
+func _arm_watchdog(seconds: float) -> void:
+        _pending_deadline_ms = Time.get_ticks_msec() + int(seconds * 1000.0)
 
 func banner_show() -> void:
         if not enabled_ok() or not bool(cfg.banner_enabled):
@@ -219,13 +239,16 @@ func _on_native_loaded(placement_id: String) -> void:
         _load_retries[placement_id] = 0
         if _pending_cb.is_valid() and (placement_id == placement("rewarded") \
                         or placement_id == placement("interstitial")):
+                _arm_watchdog(8.0)
                 _showing = true
+                _ad_start_ms = Time.get_ticks_msec()   # fallback stamp (see show_rewarded)
                 native.show(placement_id)
 
 func _on_native_failed(placement_id: String, _message: String) -> void:
         # load/show failed: NEVER leave the caller's callback dangling (this was
         # the "back to box hangs" bug). Retry ONCE quietly, then skip the ad.
         _showing = false
+        _pending_deadline_ms = 0
         if not _pending_cb.is_valid():
                 return
         var kind := _kind_of(placement_id)
@@ -234,6 +257,7 @@ func _on_native_failed(placement_id: String, _message: String) -> void:
         var tries := int(_load_retries.get(placement_id, 0))
         if tries < 1 and native != null:
                 _load_retries[placement_id] = tries + 1
+                _arm_watchdog(20.0)   # quiet retry - another load window
                 native.load(placement_id)   # loaded -> _on_native_loaded shows it
                 return
         _load_retries[placement_id] = 0
@@ -248,17 +272,19 @@ func _kind_of(placement_id: String) -> String:
 
 func _process(_delta: float) -> void:
         # watchdog: if a pending ad never resolves (no fill + no failed event),
-        # release the caller after 8s so the game never stalls. While an ad is
-        # actually SHOWING (can be 30s+), the watchdog stays paused.
+        # release the caller so the game never stalls. While an ad is SHOWING
+        # (can be 30s+) the watchdog stays paused; while a LOAD is in flight it
+        # waits up to 20s (see _arm_watchdog) instead of the old blind 8s.
         if not _pending_cb.is_valid() or _showing:
                 return
-        if _pending_since_ms == 0:
-                _pending_since_ms = Time.get_ticks_msec()
+        if _pending_deadline_ms <= 0:
+                _arm_watchdog(8.0)
                 return
-        if Time.get_ticks_msec() - _pending_since_ms > 8000:
+        if Time.get_ticks_msec() > _pending_deadline_ms:
+                _pending_deadline_ms = 0
                 var cb := _pending_cb
                 _pending_cb = Callable()
-                _pending_since_ms = 0
+                print("[ads] watchdog released a pending ad callback")
                 if cb.get_argument_count() >= 3:
                         cb.call(false, 0.0, 0.0)
                 else:
@@ -286,7 +312,7 @@ func _on_native_closed(placement_id: String, completion_state: int) -> void:
         # UnityAdsShowCompletionState ordinals: SKIPPED=0, COMPLETED=1
         var watched := completion_state >= 1  # SKIPPED=0, COMPLETED=1 (ordinal)
         _showing = false
-        _pending_since_ms = 0
+        _pending_deadline_ms = 0
         # watch-time = show-start -> close. This drives the tiered payout:
         # 15s+ = half, 20s+ = 75%, 30s+ = full (reward_tiers in config).
         var secs := 0.0
@@ -294,6 +320,10 @@ func _on_native_closed(placement_id: String, completion_state: int) -> void:
                 secs = float(Time.get_ticks_msec() - _ad_start_ms) / 1000.0
         _ad_start_ms = 0
         var mult := reward_mult(secs) if watched else 0.0
+        # diagnosis line: if a payout ever looks wrong on device, logcat has
+        # the exact numbers (state, seconds, tier multiplier).
+        print("[ads] closed %s state=%d watched=%s secs=%.1f mult=%.2f" \
+                        % [placement_id, completion_state, watched, secs, mult])
         _resolve_cb(watched, mult, secs)
 
 # ------------------------------------------------------------------ desktop sim

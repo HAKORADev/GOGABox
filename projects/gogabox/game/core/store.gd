@@ -27,6 +27,7 @@ func _defaults() -> Dictionary:
                 "runs_since_interstitial": 0,
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
+                "favorites": [],              # favorited game ids (heart in the pre-play menu)
                 "box_batteries": {"count": BOX_BATTERY_CAP, "ts": 0},   # ts-based pool (charges ALWAYS)
                 "game_batteries": {},         # id -> {"count": n, "ts": unix} (refills always)
         }
@@ -45,6 +46,8 @@ func _load() -> void:
                 data["owned"] = ["snake"]
         if not (data["owned"] as Array).has("snake"):
                 (data["owned"] as Array).append("snake")
+        if not (data["favorites"] is Array):
+                data["favorites"] = []
         _migrate_box_pool()
 
 ## v0.0.7: the box bank used to be a plain int that only recharged while the
@@ -128,6 +131,21 @@ func mark_seen(id: String) -> void:
         _slot(id)["seen"] = true
         _slot(id)["badge"] = ""      # any badge dies with the first tap
         save()
+
+# ------------------------------------------------------------- favorites (v0.0.9)
+## The heart in the pre-play menu. Favorites are a box-level list (NOT a
+## per-game slot) so the FAVORITES feed in search can read it in one call.
+func is_favorite(id: String) -> bool:
+        return (data["favorites"] as Array).has(id)
+
+func set_favorite(id: String, on: bool) -> void:
+        var arr := data["favorites"] as Array
+        if on and not arr.has(id):
+                arr.append(id)
+                save()
+        elif not on and arr.has(id):
+                arr.erase(id)
+                save()
 
 # --------------------------------------------------- feed badges (v0.0.7)
 ## Two-level badge per game tile (owner rule):
@@ -411,6 +429,8 @@ func get_progress(id: String, key: String, def: Variant = null) -> Variant:
         return _slot(id)["progress"].get(key, def)
 
 func reset_game(id: String) -> void:
+        # a game progress wipe does NOT touch the favorite mark (that is a
+        # library opinion, not a run stat)
         data["games"][id] = {
                 "best": 0, "last": 0, "plays": 0,
                 "time": 0.0, "spent": 0, "earned": 0,

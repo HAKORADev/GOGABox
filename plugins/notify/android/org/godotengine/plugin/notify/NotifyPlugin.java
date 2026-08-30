@@ -162,7 +162,11 @@ public class NotifyPlugin extends GodotPlugin {
     }
 
     /** Opens this app's system notification settings page (user flips the
-     *  toggle by hand when the runtime dialog is gone for good). */
+     *  toggle by hand when the runtime dialog is gone for good).
+     *  v0.0.9: some OEMs silently FAIL the notification-settings intent -
+     *  that was the last "dead tap" path. If it does not start, fall back to
+     *  the app DETAILS page (every Android has it, and it carries the
+     *  notification toggle too). Never a silent no-op again. */
     @UsedByGodot
     public void openNotificationSettings() {
         if (activity == null) {
@@ -171,18 +175,32 @@ public class NotifyPlugin extends GodotPlugin {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    android.content.Intent i =
-                            new android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                    i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
-                            activity.getPackageName());
-                    i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                    activity.startActivity(i);
-                } catch (Exception ignored) {
-                    // ancient OEM without the settings screen - nothing else we can do
+                android.content.Intent i =
+                        new android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
+                        activity.getPackageName());
+                if (tryStartActivity(i)) {
+                    return;
                 }
+                // OEM-proof fallback: the app details screen
+                android.content.Intent d = new android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                d.setData(android.net.Uri.parse("package:" + activity.getPackageName()));
+                d.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                tryStartActivity(d);
             }
         });
+    }
+
+    /** startActivity with no throws - returns whether it started. */
+    private boolean tryStartActivity(android.content.Intent i) {
+        try {
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(i);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @UsedByGodot

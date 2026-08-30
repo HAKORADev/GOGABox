@@ -7,6 +7,8 @@ var fails := 0
 func _ready() -> void:
         print("=== GOGABox flow test ===")
         fails += _test("store: wallet roundtrip", _t_wallet())
+        fails += _test("store: favorites roundtrip", _t_favorites())
+        fails += _test("ui: bonus ratio + badge rules", _t_bonus_badges())
         fails += _test("store: unlocks + anti-softlock", _t_unlocks())
         fails += _test("store: stats/achievements/skins", _t_slots())
         fails += _test("store: time/spent/earned tracking", _t_accounting())
@@ -44,6 +46,41 @@ func _t_wallet() -> int:
         ok += _check(Box.spend(30), "spend ok")
         ok += _check(Box.coins() == 170, "balance 170")
         ok += _check(not Box.spend(999999), "over-spend refused")
+        return ok
+
+## v0.0.9: the pre-play heart. Favorites are a box-level list; a game
+## progress wipe must NOT drop the favorite (library opinion, not a stat).
+func _t_favorites() -> int:
+        Box.reset_all()
+        var ok := _check(not Box.is_favorite("snake"), "snake not favorited at start")
+        Box.set_favorite("snake", true)
+        ok += _check(Box.is_favorite("snake"), "heart adds snake to favorites")
+        ok += _check(not Box.is_favorite("rally"), "rally untouched")
+        Box.set_favorite("snake", false)
+        ok += _check(not Box.is_favorite("snake"), "heart removes it again")
+        Box.set_favorite("snake", true)
+        Box.reset_game("snake")
+        ok += _check(Box.is_favorite("snake"), "reset_game keeps the favorite")
+        Box.reset_all()
+        ok += _check(not Box.is_favorite("snake"), "reset_all clears favorites")
+        return ok
+
+## v0.0.9: the modular score-bonus ratio text + the badge rule set.
+func _t_bonus_badges() -> int:
+        var ok := _check(Arc.bonus_ratio_text(230, 2) == "230/2 = 115",
+                "ratio text /2 (snake)")
+        ok += _check(Arc.bonus_ratio_text(45, 100) == "45/100 = 0",
+                "ratio text floors below the divider")
+        ok += _check(Arc.bonus_ratio_text(7, 0) == "7", "ratio text div-0 safe")
+        Box.reset_all()
+        Box.record_run("snake", 10)   # chain rule: snake played -> rally revealed
+        ok += _check(Roadmap.state("rally") == "LOCKED", "rally buyable after snake played")
+        Roadmap.tick()
+        ok += _check(Box.badge("rally") == "unlocked",
+                "LOCKED wears UNLOCKED! (%s)" % Box.badge("rally"))
+        Box.mark_seen("rally")
+        ok += _check(Box.badge("rally") == "", "tap clears the badge")
+        Box.reset_all()
         return ok
 
 func _t_unlocks() -> int:
@@ -196,19 +233,16 @@ func _t_roadmap() -> int:
         ok += _check(Roadmap.state("rally") == "HIDDEN", "rally hidden before first play")
         ok += _check(Roadmap.state("dario") == "MYSTERY", "dario mystery teaser from start")
         ok += _check(Roadmap.state("maze") == "HIDDEN", "maze hidden (appear_after 2)")
-        # daily picks: deterministic per day, EVERYTHING visible (owned +
-        # teasers - the owner use case: "don't know what to pick? pick here"), <= 5
+        # daily picks: deterministic per day, OWNED games only (v0.0.9 owner
+        # rule - mystery boxes in picks were "kind of funny but wrong"), <= 5
         var picks := Roadmap.daily_picks()
         var picks2 := Roadmap.daily_picks()
-        ok += _check(picks.size() >= 4 and picks.size() <= 5,
-                "daily picks visible-pool 4..5 (%d)" % picks.size())
-        var has_owned := false
-        var has_teaser := false
+        ok += _check(picks.size() >= 1 and picks.size() <= 5,
+                "daily picks owned-pool 1..5 (%d)" % picks.size())
+        var all_owned := true
         for p in picks:
-                var st := Roadmap.state(String(p["id"]))
-                has_owned = has_owned or st == "OWNED"
-                has_teaser = has_teaser or (st != "OWNED" and st != "HIDDEN")
-        ok += _check(has_owned and has_teaser, "picks mix owned + teasers")
+                all_owned = all_owned and Box.owns_game(String(p["id"]))
+        ok += _check(all_owned, "picks are owned-only")
         ok += _check(picks.size() == picks2.size(), "daily picks stable in a day")
         var same := true
         for i in picks.size():
@@ -249,8 +283,17 @@ func _t_roadmap() -> int:
         # gated: maze needs 2 owned games (snake + rally = 2 -> teaser appears)
         Box.unlock_game("rally", 0)
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze mystery at 2 owned")
+        # v0.0.9 badge rules: GATED/SOON never wear UNLOCKED! - that badge is
+        # for BUYABLE (LOCKED) tiles only; fresh appearances wear NEW!
+        # (matcher: appear_after 2 -> visible, needs_games 3 -> GATED at 2 owned)
+        Roadmap.tick()
+        ok += _check(Roadmap.state("matcher") == "GATED", "matcher gated at 2 owned")
+        ok += _check(Box.badge("matcher") == "new",
+                "GATED wears NEW! (%s)" % Box.badge("matcher"))
         Box.unlock_game("lanes", 0)
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze still mystery (orders pending)")
+        ok += _check(Box.badge("dario") == "new" or Box.is_seen("dario"),
+                "SOON/mystery teasers keep NEW! semantics")
         # timed mystery
         ok += _check(Roadmap.time_left("spud") > 23.0 * 3600.0, "spud ~24h left")
         ok += _check(Roadmap.inbox_left("hen") > 19.0 * 60.0, "hen ~20min box time left")
@@ -496,21 +539,25 @@ func _t_menu() -> int:
         ok += _check(grid != null and grid.get_child_count() >= 2,
                 "menu grid has tiles (%s)" % (grid.get_child_count() if grid else -1))
         ok += _check(menu._root.size.x > 0 and menu._root.size.y > 0, "menu root sized")
-        # v0.0.7 feed: picks carousel (arrows + dots) + the three stat strips
-        ok += _check(menu._picks.size() >= 1 and menu._picks.size() <= 5,
-                "picks carousel filled (%d)" % menu._picks.size())
-        ok += _check(menu._pick_holder.get_child_count() == 1, "one pick card shown")
-        ok += _check(menu._dots_row.get_child_count() == menu._picks.size(),
-                "dots == picks (%d dots)" % menu._dots_row.get_child_count())
-        var before_idx: int = menu._pick_idx
-        if menu._picks.size() > 1:
-                menu._pick_move(1)
-                ok += _check(menu._pick_idx != before_idx, "arrow advances the carousel")
-        else:
-                menu._pick_move(1)   # single pick: wraps onto itself, must not crash
-                ok += _check(menu._pick_idx == before_idx, "single pick stays put")
-        ok += _check(menu._dots_row.get_child_count() == menu._picks.size(),
-                "dots rebuilt after paging")
+        # v0.0.9 carousel: ONE strip, 4 lists, arrows switch lists, dots = lists
+        ok += _check(menu._lists_data.size() == 4, "carousel has 4 lists")
+        ok += _check(menu._strip_title.text == "TODAY'S PICKS",
+                "strip starts on TODAY'S PICKS (%s)" % menu._strip_title.text)
+        ok += _check(menu._dots_row.get_child_count() == 4,
+                "dots == lists (%d)" % menu._dots_row.get_child_count())
+        var owned_only := true
+        for it in menu._lists_data[0]["items"]:
+                owned_only = owned_only and Box.owns_game(String(it["g"]["id"]))
+        ok += _check(owned_only, "TODAY'S PICKS draws from owned games only")
+        menu._list_move(1)
+        ok += _check(menu._strip_title.text == "LAST PLAYED",
+                "arrow switched to LAST PLAYED (%s)" % menu._strip_title.text)
+        ok += _check(menu._dots_row.get_child_count() == 4, "dots rebuilt after list switch")
+        menu._list_move(2)   # wraps around to ... NOT PLAYED YET (idx 3)
+        ok += _check(menu._strip_title.text == "NOT PLAYED YET",
+                "wrap lands on NOT PLAYED YET (%s)" % menu._strip_title.text)
+        menu._list_move(1)   # back to TODAY'S PICKS
+        ok += _check(menu._strip_title.text == "TODAY'S PICKS", "carousel wraps cleanly")
         # every sheet opens without script errors
         menu._open_settings()
         await get_tree().process_frame
@@ -522,6 +569,9 @@ func _t_menu() -> int:
         await get_tree().process_frame
         menu._close_sheet()
         menu._open_game_page(GameReg.get_game("snake"))
+        await get_tree().process_frame
+        menu._close_sheet()
+        menu._open_search()
         await get_tree().process_frame
         menu._close_sheet()
         ok += _check(true, "sheets open/close cleanly")
@@ -580,11 +630,8 @@ func _t_isolation() -> int:
         ok += _check(not menu._layer.visible, "menu CanvasLayer hidden (the v0.0.4 leak)")
         ok += _check(menu.process_mode == Node.PROCESS_MODE_DISABLED, "menu processing stopped")
         ok += _check(menu._feed_scroll.input_locked, "feed scroll locked")
-        var list_locked := true
-        for sc in menu._list_scrolls:
-                list_locked = list_locked and (sc as BoxScroll).input_locked
-        ok += _check(list_locked and menu._list_scrolls.size() == 3,
-                "stat strips locked (%d)" % menu._list_scrolls.size())
+        ok += _check(menu._strip_scroll != null and menu._strip_scroll.input_locked,
+                "carousel strip locked")
 
         # ---- close restores everything (main.on_game_closed -> set_active) ----
         host._quit_to_menu()

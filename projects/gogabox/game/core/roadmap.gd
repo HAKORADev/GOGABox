@@ -196,14 +196,18 @@ static func tick() -> void:
                         # a permanent ribbon)
                         if st != "OWNED" and not Box.is_seen(id) and Box.badge(id) == "":
                                 Box.set_badge(id, "new")
-                if (prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED") \
+                # "" counts as a fresh save seeing the teaser resolve directly
+                # (e.g. save-meta wipe): the upgrade must still land.
+                if (prev == "" or prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED") \
                                 and (st == "GATED" or st == "SOON" or st == "LOCKED"):
                         # a teaser just resolved into something tangible -> celebrate
                         Notify.cancel(_notify_id(id))
                         Notify.play_kind_sfx("game_ready")   # in-app ping
                         Box.reveal_changed.emit(id)
-                        # ...and its badge upgrades to UNLOCKED! (green)
-                        if not Box.is_seen(id):
+                        # v0.0.9 owner rule: the green UNLOCKED! badge belongs to
+                        # BUYABLE tiles ONLY (it used to smear onto gated/soon
+                        # tiles - "unlock badge appears to whatever game appears")
+                        if st == "LOCKED" and not Box.is_seen(id):
                                 Box.set_badge(id, "unlocked")
                 _heal_badge(id, st)
         Box.save()
@@ -211,12 +215,14 @@ static func tick() -> void:
 ## v0.0.7 migration: saves from before the badge system have seen=false games
 ## sitting in visible states with no badge. Derive the level from the state
 ## once; tap-to-clear then works exactly like fresh badges.
+## v0.0.9 rule set: NEW! = "this tile just appeared" (any teaser state);
+## UNLOCKED! = "this tile is buyable" (LOCKED only).
 static func _heal_badge(id: String, st: String) -> void:
         if Box.is_seen(id) or Box.badge(id) != "":
                 return
         match st:
-                "MYSTERY": Box.set_badge(id, "new")
-                "LOCKED", "GATED", "SOON": Box.set_badge(id, "unlocked")
+                "MYSTERY", "GATED", "SOON": Box.set_badge(id, "new")
+                "LOCKED": Box.set_badge(id, "unlocked")
 
 ## Baselines are already stamped when a teaser first appears; nothing to do
 ## for ach_in / ach_exact (they read live trophy counts).
@@ -250,10 +256,9 @@ static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
 
 ## The feed has no real "hot" metric (everything is local), so the owner
 ## redefined it: up to 5 games picked by a daily seed - the same handful all
-## day, reshuffled at midnight. v0.0.8: the pool is EVERYTHING visible in the
-## box (owned + locked + gated + soon + mystery teasers) - "if someone does
-## not know what to pick, they pick from here". Owned-only made the carousel
-#  a one-game strip (and the arrows looked dead).
+## day, reshuffled at midnight. v0.0.9 owner rule: the picks pool is OWNED
+## games only - mystery boxes in "today's picks" read as a joke ("kind of
+## funny but wrong"), and the strip must suggest what to PLAY tonight.
 static func daily_picks() -> Array:
         var d := Time.get_date_dict_from_system()
         var seed_text := "%s-%s-%s-gogabox" % [d["year"], d["month"], d["day"]]
@@ -261,8 +266,7 @@ static func daily_picks() -> Array:
         rng.seed = hash(seed_text)
         var pool := []
         for g in GameReg.GAMES:
-                var id := String(g["id"])
-                if state(id) == "HIDDEN":
+                if not Box.owns_game(String(g["id"])):
                         continue
                 pool.append(g)
         # Fisher-Yates with the day's rng

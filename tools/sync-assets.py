@@ -3,7 +3,7 @@
 
 Usage (from repo root):
     python3 tools/sync-assets.py              # every project
-    python3 tools/sync-assets.py jellyjump    # one project
+    python3 tools/sync-assets.py gogabox     # one project
 
 Behavior:
 - Downloads every source pack (zip) into .cache/assets/ and extracts it.

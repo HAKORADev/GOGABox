@@ -81,8 +81,9 @@ func _next() -> void:
         var tw := panel.create_tween()
         tw.tween_property(panel, "position:y", target_y, 0.45) \
                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-        Jukebox.sfx("star", -2.0)
-        Jukebox.sfx("win", -6.0)
+        # v0.0.9 owner rule: trophies get their OWN longer, slower fanfare
+        # (was star + win - the exact same sounds as unlocks/death)
+        Jukebox.sfx("achievement", -2.0)
         Arc.confetti(root, Vector2(pw / 2.0, 90), 18)
         tw.tween_interval(2.1)
         tw.tween_property(panel, "position:y", -panel.size.y - 30.0, 0.35) \

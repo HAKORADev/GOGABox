@@ -15,7 +15,7 @@ This file is about *operating* the repo: resuming, changing, shipping.
 cd godot-android-arsenal        # fresh sandbox? see §7 first
 git pull                        # fast-forward to latest main
 ./tools/bootstrap.sh            # idempotent: ~1 min warm, ~10 min cold
-./tools/test.sh <game>          # jellyjump | candyrush | gogabox - must end ALL PASS
+./tools/test.sh <game>          # gogabox (the projects/ registry decides) - must end ALL PASS
 ```
 
 Then, in order:
@@ -39,7 +39,7 @@ Two products share this repo. Keep them separated:
 `docs/` = **general guides** (any project, any machine).
 `projects/<g>/docs/` = **this-game notes** (its asset packs, its ad
 placements, its quirks). Rule of thumb: if a doc answer starts with
-"for jellyjump …", that content belongs in the project folder.
+"for gogabox …", that content belongs in the project folder.
 
 ## 2. Ground rules (non-negotiable)
 
@@ -105,16 +105,16 @@ are staged in at build time from `plugins/<backend>/`, selected by
 
 **ACTIVE backend — Unity Ads direct** (`use_plugins: ["unity_ads"]`):
 
-| thing | jellyjump | candyrush | gogabox |
+| thing | gogabox |
 |---|---|---|---|
 | Unity Game ID (Android) | `5770940` | `5770940` (owner decision: reuse the arsenal's first ID) | `5770940` (owner decision: reuse the arsenal's first ID) |
 | test_mode | `true` | `false` (real ads) | `false` (real ads) |
 | interstitial placement | `Interstitial_Android` | `Interstitial_Android` | `Interstitial_Android` |
 | rewarded placement | `Rewarded_Android` | `Rewarded_Android` | `Rewarded_Android` |
 | banner placement | `Banner_Android` | `Banner_Android` | `Banner_Android` |
-| package name | `com.zai.jellyjump` | `com.zai.candyrush` | `com.zai.gogabox` |
+| package name | `hakora.dev.gogabox` |
 | dashboard | Unity Publishing dashboard → Monetization → Projects. NOTE: per-package dashboard entries may be needed later if Unity restricts serving for unregistered packages — create them, then paste each new Game ID into that project's `config/ads_config.json`. Placements and the plugin contract stay identical. |||
-| config file | `projects/jellyjump/config/ads_config.json` | `projects/candyrush/config/ads_config.json` | `projects/gogabox/config/ads_config.json` |
+| config file | `projects/gogabox/config/ads_config.json` |
 
 **LevelPlay mediation — built, verified, then rolled back (see §4.3):**
 
@@ -190,10 +190,10 @@ before). Details: `plugins/unity_ads/README.md`.
 ## 5. Developing & building
 
 ```bash
-./tools/test.sh jellyjump              # desktop integration test (ads simulated, no device)
-./build.sh jellyjump                   # both ABIs → dist/jellyjump/*.apk
-./build.sh jellyjump --abi arm64-v8a   # fast single-ABI loop
-./build.sh jellyjump --aab             # Play Store bundle
+./tools/test.sh gogabox                # desktop integration test (ads simulated, no device)
+./build.sh gogabox                     # both ABIs → dist/gogabox/*.apk
+./build.sh gogabox --abi arm64-v8a     # fast single-ABI loop
+./build.sh gogabox --aab               # Play Store bundle
 ```
 
 - Godot binary: `.cache/godot/bin/godot` (or `source .cache/env.sh`).
@@ -241,7 +241,7 @@ The workspace has been wiped **twice**; both times full recovery took
 1. `git clone https://github.com/HAKORADev/godot-android-arsenal.git`
    (public — no auth needed).
 2. `./tools/bootstrap.sh`.
-3. `./tools/test.sh jellyjump` — if this passes, you are fully back.
+3. `./tools/test.sh gogabox` — if this passes, you are fully back.
 
 Notes:
 

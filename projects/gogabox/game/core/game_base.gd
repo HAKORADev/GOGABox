@@ -26,11 +26,15 @@ var _toast: Dictionary
 var _ach_clock := 0.0
 var _hud_row: HBoxContainer   # the top bar (v0.0.8: game buttons live IN it)
 var _flow_btns := 0           # game buttons inserted after the back button
+# v0.0.9: live "score bonus S/D = B" line (modular - Arc.bonus_ratio_text)
+var _bonus_label: Label
+var _bonus_div := 0
 
 func _ready() -> void:
         tk = TouchKit.new()
         add_child(tk)
         _build_hud()
+        _build_bonus_line()
         _toast = Arc.toast_overlay(_overlay_root)
         _goga_setup()
 
@@ -50,6 +54,7 @@ func _goga_input(_event: InputEvent) -> void:
 func set_score(v: int) -> void:
         score = v
         _score_label.text = str(v)
+        _update_bonus_line()
 
 func add_score(v: int) -> void:
         set_score(score + v)
@@ -159,6 +164,30 @@ func _build_hud() -> void:
         _coins_label = coins_panel.get_child(0).get_child(coins_panel.get_child(0).get_child_count() - 1)
         _coins_label.text = "0"
         top.add_child(coins_panel)
+
+## v0.0.9 owner rule ("show the score bonus ratio so users who are
+## interested to know, know"): every game prints the LIVE ratio under the
+## top bar, right under the score chip. Text comes from ONE helper
+## (Arc.bonus_ratio_text) so the dead menu and any future screen match.
+func _build_bonus_line() -> void:
+        _bonus_div = int(GameReg.get_game(game_id).get("coin_div", 100))
+        if _bonus_div <= 0:
+                return
+        _bonus_label = Arc.label("", 16, Color(1, 1, 1, 0.5), false)
+        _bonus_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+        _bonus_label.offset_left = 20
+        _bonus_label.offset_right = -20
+        _bonus_label.offset_top = 82
+        _bonus_label.offset_bottom = 104
+        _bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        _overlay_root.add_child(_bonus_label)
+        _update_bonus_line()
+
+func _update_bonus_line() -> void:
+        if _bonus_label == null or not is_instance_valid(_bonus_label):
+                return
+        _bonus_label.text = "" if score <= 0 \
+                        else "score bonus " + Arc.bonus_ratio_text(score, _bonus_div)
 
 func set_hud_score_prefix(prefix: String) -> void:
         _score_label.text = prefix + " " + str(score)

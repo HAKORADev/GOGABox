@@ -163,14 +163,33 @@ static func _battery_level(count: int, cap: int) -> float:
 static func coin_chip() -> PanelContainer:
         return chip(str(Box.coins()), "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 28, COIN)
 
-static func toast_overlay(parent: Control) -> Dictionary:
+## THE score-bonus ratio, in ONE place (owner rule: "show the score bonus
+## ratio so users who are interested to know, know"). Every screen that
+## prints the bonus prints THIS text - game HUD, dead menu, anything later.
+static func bonus_ratio_text(score: int, div: int) -> String:
+        if div <= 0:
+                return "%d" % score
+        return "%d/%d = %d" % [score, div, score / div]
+
+## Bottom-anchored toast on ITS OWN top CanvasLayer (v0.0.9 owner report:
+## "filters applied" and "ad closed early" showed up BEHIND sheets/panels -
+## layer 100 paints above every sheet, dim and the achievement popup while
+## staying at the bottom of the room).
+static func toast_overlay(parent: Node) -> Dictionary:
+        var cl := CanvasLayer.new()
+        cl.layer = 100
+        var root := Control.new()
+        root.set_anchors_preset(Control.PRESET_FULL_RECT)
+        root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        cl.add_child(root)
         var t := label("", 28, CARD)
         t.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
         offset_bottom_safe(t)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         t.modulate.a = 0.0
-        parent.add_child(t)
-        return {"label": t}
+        root.add_child(t)
+        parent.add_child(cl)
+        return {"label": t, "layer": cl}
 
 ## Bottom-anchored toast that stays above the banner safe area in any
 ## orientation (fixed y=1040 broke landscape / tall screens).
