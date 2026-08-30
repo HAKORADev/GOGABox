@@ -118,7 +118,7 @@ one-shot dialog flag spent with the settings intent silently failing.
 ## 16. Ship
 - [x] config/projects.json -> 0.0.9, version_code_base 30180 (arm64 30182,
       arm32 30181).
-- [ ] flow_test.gd: picks owned-only, favorites roundtrip, bonus ratio text,
+- [x] flow_test.gd: picks owned-only, favorites roundtrip, bonus ratio text,
       badge rules, carousel lists.
-- [ ] All tests green headless -> build both APKs -> push -> CI green ->
+- [x] All tests green headless -> build both APKs -> push -> CI green ->
       artifacts verified -> backups in the sandbox download/ folder.
