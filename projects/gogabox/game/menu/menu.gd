@@ -5,7 +5,10 @@ extends Node2D
 ## teasers, resolve into locked/soon tiles, and get a "New!" badge until tapped.
 
 const COIN_ICON := "res://assets/ui/coin.png"
-const BANNER_SAFE := 78.0      # reserves room for the 52dp ad banner
+# v0.1.0: computed at _ready for the LIVE density (physical 52dp banner
+# divided by real-px-per-logical-px) - a fixed 78 was tuned for the old 1.5x
+# stretch and under-reserved once the viewport became device-native.
+var banner_safe := 78.0
 
 var _layer: CanvasLayer
 var _root: Control
@@ -55,6 +58,7 @@ var _filter_sub := ""
 var _filter_state := ""          # "" = all | "favorites" | "mystery" (single-select)
 
 func _ready() -> void:
+        banner_safe = _banner_safe_px()
         _layer = CanvasLayer.new()
         _layer.layer = -1          # menu lives UNDER games (fixes games invisible)
         add_child(_layer)
@@ -78,7 +82,7 @@ func _ready() -> void:
         _margin.add_theme_constant_override("margin_left", 16)
         _margin.add_theme_constant_override("margin_right", 16)
         _margin.add_theme_constant_override("margin_top", 22)
-        _margin.add_theme_constant_override("margin_bottom", int(BANNER_SAFE))
+        _margin.add_theme_constant_override("margin_bottom", int(banner_safe))
         _margin.mouse_filter = Control.MOUSE_FILTER_PASS
         _root.add_child(_margin)
 
@@ -390,6 +394,17 @@ func _pool_timer_text(count: int, cap: int, regen_in: int) -> String:
         var next_in := maxi(1, regen_in)
         var full_in := (cap - count - 1) * Box.BATTERY_STEP + next_in
         return "+1 in %s  ·  full in %s" % [Roadmap.fmt_clock(float(next_in)), Roadmap.fmt_clock(float(full_in))]
+
+## The 52dp Unity banner is a NATIVE view - its height is in REAL screen px.
+## Convert: physical px per logical px = window px / viewport px; reserve the
+## banner + a little breathing room in logical units, with a sane floor.
+func _banner_safe_px() -> float:
+        var dpi := DisplayServer.screen_get_dpi()
+        var win := DisplayServer.window_get_size()
+        var vp := get_viewport_rect().size
+        var px_per_logical := float(win.y) / maxf(1.0, vp.y)
+        var phys := 52.0 * dpi / 160.0 + 12.0   # the 52dp banner + breathing room
+        return maxf(64.0, ceilf(phys / px_per_logical))
 
 func _icon_button(icon_path: String, cb: Callable) -> Button:
         var b := Button.new()
@@ -726,14 +741,22 @@ func _ribbon(b: Control, txt: String, bg: Color, top_right := true) -> void:
         var rib := Panel.new()
         rib.add_theme_stylebox_override("panel", Arc.panel_style(bg, 12))
         rib.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # v0.1.0 THE "k IS OUT OF THE WIDGET" FIX: the panel was a fixed
+        # 112px strip while "UNLOCKED!" at font 22 measures ~135px in the
+        # display font - the tail glyphs spilled out of the green widget AND
+        # off the tile. Measure the REAL text and fit the panel to it; the
+        # anchor pins the fixed edge so it grows inward, never off the tile.
+        var txt_w := Arc.font_big().get_string_size(
+                        txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+        var w := ceilf(txt_w) + 24.0
         if top_right:
                 rib.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-                rib.offset_left = -122
+                rib.offset_left = -10.0 - w
                 rib.offset_right = -10
         else:
                 rib.set_anchors_preset(Control.PRESET_TOP_LEFT)
                 rib.offset_left = 12
-                rib.offset_right = 124
+                rib.offset_right = 12.0 + w
         rib.offset_top = 10
         rib.offset_bottom = 52
         b.add_child(rib)
@@ -851,10 +874,10 @@ func _tile(g: Dictionary, st: String) -> Control:
                         var chip := Arc.chip("mystery", "", Color(0.25, 0.16, 0.3, 1), 18, Color(1, 1, 1, 0.9))
                         chip.position = Vector2(14, 272)
                         b.add_child(chip)
-                        # v0.0.9: fresh mysteries show NEW! too (it was computed
-                        # but never rendered on the black tile - "where is the
-                        # New! badge gone?")
-                        _feed_ribbon(b, bd)
+                        # v0.1.0 owner rule: NO badge ever renders on a black
+                        # box - "they are glitched in them, black boxes just
+                        # stay a mystery". (v0.0.9 rendered NEW! there; the
+                        # badge STATE is still tracked, just never shown here.)
         _feed_scroll.register_tappable(b, func(): _tap_tile(g, st, b))
         return b
 

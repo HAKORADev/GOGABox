@@ -9,6 +9,16 @@ var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
+        # v0.1.0 THE DENSITY RULE (owner: "make the resolution bigger / use the
+        # phone native resolution so things look smaller"). With stretch
+        # canvas_items+expand the 720 base was stretched 1.5x on a 1080-wide
+        # phone, so every control rendered 1.5x bigger than its designer px.
+        # We instead target a LOGICAL viewport equal to the device's real
+        # pixels (clamped): content_scale_factor = 720 / short_side_px.
+        #   1080x2400 phone -> 1080x2400 logical viewport (1.5x more room,
+        #   everything physically smaller, text still rasterized sharp).
+        # MUST run before the menu builds (it reads the viewport size).
+        _apply_density()
         # menu is built immediately, the splash covers it while the engine warms up
         _menu = Node2D.new()
         _menu.name = "Menu"
@@ -23,6 +33,23 @@ func _ready() -> void:
         add_child(achiever)
 
         _show_splash()
+
+## Content scale factor = 720 / target, where target = the device's short
+## side in REAL px clamped to [840, 1152]:
+##   - 1080p-class phones  -> ~0.667 (native logical resolution - the owner's
+##     device; probe-verified: top bar + carousel arrows all fit),
+##   - 1440p-class flagships -> capped at 0.625 so UI never gets microscopic,
+##   - small/720p-class devices -> floored at 0.857 (logical 840 wide). The
+##     measured UI needs ~796 logical px (top bar 764 + margins) - below that
+##     the gear icon and the top-picks right arrow hang off-screen (probe:
+##     config A). 840 leaves ~40px headroom for wider battery-chip labels.
+## Headless tests: the virtual window is 720x1280 -> the floor applies ->
+## tests see 840x1493. Rotation never changes the short side.
+func _apply_density() -> void:
+        var screen := DisplayServer.screen_get_size()
+        var short_px := float(mini(screen.x, screen.y))
+        var target := clampf(short_px, 840.0, 1152.0)
+        get_window().content_scale_factor = 720.0 / target
 
 ## A game is its OWN WORLD: while it runs the menu is fully hidden AND stops
 ## processing - no layering weirdness, no taps leaking into the feed, no

@@ -390,8 +390,12 @@ func _t_fitsheet() -> int:
                         sc._hit_tappable(b3.get_global_rect().get_center())
                         ok += _check(hit[0], "tap on wrapped button fires its press")
         if pc != null:
-                ok += _check(pc.size.y <= 1280.0 and pc.size.x <= 640.0,
-                                "panel clamped inside the screen (%dx%d)" % [int(pc.size.x), int(pc.size.y)])
+                # v0.1.0: compare against the REAL viewport (density rule
+                # changed the headless logical size from 720x1280)
+                var vp := pc.get_viewport_rect().size
+                ok += _check(pc.size.y <= vp.y and pc.size.x <= vp.x,
+                                "panel clamped inside the screen (%dx%d vs vp %.0fx%.0f)"
+                                % [int(pc.size.x), int(pc.size.y), vp.x, vp.y])
                 ok += _check(pc.size.y < 20.0 * 84.0,
                                 "panel no longer stacks all 20 buttons raw (%d)" % int(pc.size.y))
         root.queue_free()
