@@ -105,3 +105,36 @@ Verification tool: `godot --headless --path projects/gogabox -s
 res://tests/geometry_probe.gd` — boots the real main scene at floor/phone/
 cap logical viewports and FAILS on any control outside the viewport. Run it
 before shipping any layout change.
+
+## 6. THE UNIVERSAL RESOLUTION (v0.1.1 — the density rule was also replaced)
+
+The v0.1.0 density rule derived the logical viewport from the DEVICE
+(`720 / clamp(short_side)`). The owner relitigated it again and was right
+once more: per-device math means every device sees a slightly different
+ROOM, and rotation bugs fall out of it ("if the phone was horizontal and
+opened a vertical game, the game hard-switches the phone BUT uses the same
+old orientation resolution - it appears too small"). Working on unknown
+sets of resolutions would keep biting later.
+
+**The rule now** (owner's phone FHD is THE design; everyone else scales):
+
+```
+project.godot:  viewport 1080x2400, stretch canvas_items, aspect KEEP
+portrait  design: 1080x2400   (menu, portrait games)
+landscape design: 2400x1080   (landscape games, rotated menu)
+runtime:      content_scale_size swaps between the two on rotation
+              (menu._apply_base / host_node._apply_orientation) - nothing
+              else is per-device anywhere anymore.
+letterboxing: non-20:9 devices get bars painted in the box brown
+              (rendering/environment/defaults/default_clear_color).
+```
+
+- The owner's 1080x2400 phone renders the design 1:1 (scale 1.0).
+- Every other device gets the SAME design scaled up or down. One design =
+  one layout math = games are designed once, forever.
+- The v0.1.0 `_apply_density()` is DELETED. `_banner_safe_px()` still
+  converts the native 52dp banner to logical px, now via the true KEEP
+  scale `min(win.x/vp.x, win.y/vp.y)`.
+- Verification: geometry_probe boots the REAL scene at BOTH designs and
+  fails on any control outside the design viewport. flow_test asserts the
+  portrait design is restored after every game closes.

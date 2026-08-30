@@ -136,6 +136,30 @@ static func inbox_left(id: String) -> float:
                 return 0.0
         return maxf(0.0, float(rv.get("minutes", 30)) * 60.0 - Box.total_time())
 
+## THE one playability answer (v0.1.1): entry fee vs wallet, BOTH battery
+## pools (a charged round drinks from the game pool AND the box bank), and
+## the time-of-day window. The pre-play page's PLAY button and the feed's
+## "ready to play" chip both read THIS, so the chip can never promise a
+## button that won't open (and the button can never ignore a dry box bank -
+## that mismatch shipped in v0.0.9..v0.1.0).
+static func can_play_now(id: String) -> bool:
+        var g := GameReg.get_game(id)
+        if g.is_empty() or g.get("coming_soon", false) or not Box.owns_game(id):
+                return false
+        if not window_ok(id):
+                return false
+        var fee := int(g.get("fee", 0))
+        # anti-softlock, snake only: the starter game is ALWAYS playable
+        var free_play := id == "snake" and fee > 0 and Box.coins() < fee
+        if fee > 0 and not free_play and Box.coins() < fee:
+                return false
+        var b := Box.game_battery(id)
+        if not b.is_empty():
+                var need := int(b["per_round"])
+                if int(b["count"]) < need or Box.box_batteries() < need:
+                        return false
+        return true
+
 # ------------------------------------------------------- play-time windows
 
 ## Inside a "from".."to" local-hour window (wrap-safe).
@@ -278,6 +302,37 @@ static func daily_picks() -> Array:
         return pool.slice(0, mini(5, pool.size()))
 
 # ------------------------------------------------------------------ format
+
+## v0.1.1 THE OWNER FEED ORDER (replaces raw registry order, which interleaved
+## states "uncannily" - an owned game buried between black boxes): OWNED
+## games first (oldest unlock first - the save's owned[] append order), then
+## the revealed locked/gated/soon tiles (catalog order = the box's growth
+## order), then the mysteries (catalog order). HIDDEN games never appear.
+## [ {g, st, bucket, ord} ]
+static func feed_rows() -> Array:
+        var owned_idx := {}
+        var i := 0
+        for oid in (Box.data["owned"] as Array):
+                owned_idx[String(oid)] = i
+                i += 1
+        var reg_idx := {}
+        for k in GameReg.GAMES.size():
+                reg_idx[String(GameReg.GAMES[k]["id"])] = k
+        var rows: Array = []
+        for g in GameReg.GAMES:
+                var id := String(g["id"])
+                var st := state(id)
+                if st == "HIDDEN":
+                        continue
+                var bucket := 0 if st == "OWNED" else (2 if st == "MYSTERY" else 1)
+                var ord := int(owned_idx.get(id, 100000)) if bucket == 0 \
+                                else int(reg_idx.get(id, 100000))
+                rows.append({"g": g, "st": st, "bucket": bucket, "ord": ord})
+        rows.sort_custom(func(a, b):
+                if int(a["bucket"]) != int(b["bucket"]):
+                        return int(a["bucket"]) < int(b["bucket"])
+                return int(a["ord"]) < int(b["ord"]))
+        return rows
 
 static func fmt_clock(seconds: float) -> String:
         var s := int(maxf(0.0, seconds))

@@ -12,7 +12,7 @@ run/main_scene="res://main.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.227451, 0.137255, 0.074510, 1)
-boot_splash/image="res://assets/ui/splash.png"
+boot_splash/image="res://assets/ui/logo.png"
 boot_splash/fullsize=false
 config/icon="res://icon.svg"
 
@@ -25,11 +25,16 @@ Ads="*res://addons/unity_ads/ads.gd"
 
 [display]
 
-window/size/viewport_width=720
-window/size/viewport_height=1280
+; v0.1.1 THE UNIVERSAL RESOLUTION (owner rule): ONE design size per
+; orientation - 1080x2400 portrait / 2400x1080 landscape (the owner phone's
+; FHD). Every device scales this design up or down (aspect KEEP, so odd
+; aspects get letterbox bars painted in the box brown below). One design =
+; one layout math everywhere, and rotation switches DESIGN, not scale.
+window/size/viewport_width=1080
+window/size/viewport_height=2400
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
+window/stretch/aspect="keep"
 
 [input_devices]
 
@@ -38,5 +43,7 @@ pointing/emulate_touch_from_mouse=true
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+; letterbox bars (aspect KEEP on non-20:9 screens) melt into the box brown
+environment/defaults/default_clear_color=Color(0.227451, 0.137255, 0.074510, 1)
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true

@@ -61,6 +61,7 @@ public class UnityAdsPlugin extends GodotPlugin {
     private LinearLayout bannerHolder = null;
     private boolean bannerVisible = false;
     private boolean bannerWanted = false;
+    private boolean bannerLoading = false;   // v0.1.1: a load is in flight - never double-load
     private String bannerPlacement = "";
     private long bannerShownAtMs = 0L;
     private int bannerRetries = 0;
@@ -193,11 +194,18 @@ public class UnityAdsPlugin extends GodotPlugin {
                         && bannerShownAtMs > 0
                         && System.currentTimeMillis() - bannerShownAtMs > BANNER_STALE_MS;
                 if (bannerAd != null && !stale) {
-                    // fresh banner already loaded -> just reveal it
+                    // fresh banner already loaded -> just reveal it. With
+                    // banner_preload() armed at startup this is the NORMAL
+                    // path: zero network latency between app open and ad.
                     bannerHolder.setVisibility(View.VISIBLE);
                     bannerVisible = true;
                     bannerShownAtMs = System.currentTimeMillis();
                     scheduleBannerRefresh();
+                } else if (bannerLoading) {
+                    // a load (startup preload or retry) is already in flight;
+                    // onAdLoaded flips the holder visible because bannerWanted
+                    // is already true - do NOT stack a second load on top.
+                    bannerVisible = false;
                 } else {
                     // no banner yet, or the current one is stale (banners
                     // expire -> blank view). Load a FRESH one and retry with
@@ -206,6 +214,27 @@ public class UnityAdsPlugin extends GodotPlugin {
                     bannerVisible = false;
                     bannerAd = null;
                     loadBanner(placement);
+                }
+            }
+        });
+    }
+
+    /** v0.1.1 THE INSTANT BANNER (owner: "banners take too much time to show
+     *  an ad in the box menu while other types of ads load fast"): start the
+     *  banner load at APP STARTUP (the Unity SDK init callback), hidden, so
+     *  the first banner_show() after the splash is a visibility flip instead
+     *  of SDK-init + network latency. Banners are the long-term earner -
+     *  every open should already have one ready. */
+    @UsedByGodot
+    public void banner_preload(final String placement) {
+        if (!bannerEnabled || !initialized) return;
+        bannerPlacement = placement;
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ensureBannerHolder();
+                if (bannerAd == null && !bannerLoading) {
+                    loadBanner(placement);   // holder stays GONE until wanted
                 }
             }
         });
@@ -249,10 +278,13 @@ public class UnityAdsPlugin extends GodotPlugin {
     }
 
     private void loadBanner(final String placement) {
+        if (bannerLoading) return;   // one load at a time, ever
+        bannerLoading = true;
         try {
             BannerShowListener showListener = new BannerShowListener() {
                 @Override
                 public void onImpression(BannerAd ad) {
+                    bannerLoading = false;
                     emitSignal("banner_loaded");
                     bannerRetries = 0;
                     bannerShownAtMs = System.currentTimeMillis();
@@ -264,6 +296,7 @@ public class UnityAdsPlugin extends GodotPlugin {
 
                 @Override
                 public void onFailedToShow(BannerAd ad, UnityAdsError error) {
+                    bannerLoading = false;
                     emitSignal("banner_failed", String.valueOf(error));
                     // the view is dead from here on - drop it and go again
                     activity.runOnUiThread(new Runnable() {
@@ -286,6 +319,7 @@ public class UnityAdsPlugin extends GodotPlugin {
             BannerAd.load(config, new LoadListener<BannerAd>() {
                 @Override
                 public void onAdLoaded(BannerAd ad, UnityAdsError error) {
+                    bannerLoading = false;
                     if (ad == null) {
                         emitSignal("banner_failed", String.valueOf(error));
                         retryBannerLater(placement);
@@ -320,6 +354,7 @@ public class UnityAdsPlugin extends GodotPlugin {
                 // onAdLoaded(null, error) - covered above.
             });
         } catch (Throwable t) {
+            bannerLoading = false;
             emitSignal("banner_failed", String.valueOf(t));
             retryBannerLater(placement);
         }
@@ -328,9 +363,10 @@ public class UnityAdsPlugin extends GodotPlugin {
     /** Retry ladder: a fast burst (6 tries, 10s apart), then a slow 60s pulse
      *  that NEVER gives up while the banner is wanted. The v0.0.5 hard stop
      *  after 6 tries is why banners "appeared rarely": if fill was dry for
-     *  that first minute, nothing re-armed until another banner_show call. */
+     *  that first minute, nothing re-armed until another banner_show call.
+     *  v0.1.1: also re-arms the STARTUP PRELOAD when the app is not showing
+     *  the banner yet (bannerWanted=false) - the next open finds one ready. */
     private void retryBannerLater(final String placement) {
-        if (!bannerWanted) return;
         bannerRetries++;
         final long delay = bannerRetries <= BANNER_MAX_RETRIES ? BANNER_RETRY_MS : BANNER_SLOW_RETRY_MS;
         mainHandler.postDelayed(new Runnable() {
@@ -338,6 +374,9 @@ public class UnityAdsPlugin extends GodotPlugin {
             public void run() {
                 if (bannerWanted && bannerAd == null) {
                     loadBanner(placement);
+                } else if (!bannerWanted && bannerAd == null && !bannerLoading
+                                && bannerRetries <= BANNER_MAX_RETRIES) {
+                    loadBanner(placement);   // keep a hidden one ready anyway
                 }
             }
         }, delay);

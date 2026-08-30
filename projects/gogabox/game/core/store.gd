@@ -16,6 +16,9 @@ var data := {}
 
 func _ready() -> void:
         _load()
+        # v0.1.1: cold start after the process was killed - credit the time
+        # the box spent CLOSED (same math as APPLICATION_RESUMED; idempotent).
+        _credit_offline()
 
 # ------------------------------------------------------------- persistence
 
@@ -28,8 +31,14 @@ func _defaults() -> Dictionary:
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
                 "favorites": [],              # favorited game ids (heart in the pre-play menu)
-                "box_batteries": {"count": BOX_BATTERY_CAP, "ts": 0},   # ts-based pool (charges ALWAYS)
-                "game_batteries": {},         # id -> {"count": n, "ts": unix} (refills always)
+                # v0.1.1 THE BOX BANK CHARGES ONLY WHILE GOGABOX IS CLOSED
+                # (owner rule, replaces the v0.0.7 "charges ALWAYS" model):
+                #   ts  = unix moment the charging window OPENED (app paused /
+                #         process died). 0 while the app is open.
+                #   rem = closed-seconds already banked toward the next +1
+                #         (carries the remainder between sessions).
+                "box_batteries": {"count": BOX_BATTERY_CAP, "ts": 0, "rem": 0},
+                "game_batteries": {},         # id -> {"count": n, "ts": unix} (refill always)
         }
 
 func _load() -> void:
@@ -50,21 +59,27 @@ func _load() -> void:
                 data["favorites"] = []
         _migrate_box_pool()
 
-## v0.0.7: the box bank used to be a plain int that only recharged while the
-## app was CLOSED (closed_ts math). It now charges ALWAYS (+1 / 5 min, same
-## as every game pool) via a {count, ts} pair. Old saves migrate here and
-## still get the credit for the time the app was off.
+## v0.1.1: the box bank charges ONLY while the app is CLOSED (owner rule -
+## "the GOGABox battery bank still charges even inside the app... i have
+## never said that"). The v0.0.7 always-on ts pool is migrated: its pending
+## regen state was already paid out on reads, so the clock just resets here.
 func _migrate_box_pool() -> void:
-        var v: Variant = data.get("box_batteries", BOX_BATTERY_CAP)
-        if v is Dictionary:
-                return
         var now := int(Time.get_unix_time_from_system())
-        var count := clampi(int(v), 0, BOX_BATTERY_CAP)
-        var elapsed := now - int(data["meta"].get("closed_ts", now))
-        if elapsed > 0 and count < BOX_BATTERY_CAP:
-                count = mini(BOX_BATTERY_CAP, count + elapsed / BATTERY_STEP)
-        data["box_batteries"] = {"count": count, "ts": now}
-        save()
+        var v: Variant = data.get("box_batteries", BOX_BATTERY_CAP)
+        if not (v is Dictionary):
+                var count := clampi(int(v), 0, BOX_BATTERY_CAP)
+                data["box_batteries"] = {"count": count, "ts": now, "rem": 0}
+                save()
+                return
+        var p: Dictionary = v
+        p["ts"] = int(p.get("ts", 0))
+        if not (p.get("rem", 0) is int):
+                p["rem"] = int(float(p.get("rem", 0)))
+        # pre-v0.1.1 saves carry no "rem" - start the offline clock clean
+        if not p.has("rem"):
+                p["rem"] = 0
+                p["ts"] = now
+                save()
 
 func _merge(base: Dictionary, over: Dictionary) -> void:
         for k in over:
@@ -164,44 +179,57 @@ func set_badge(id: String, level: String) -> void:
 
 # ------------------------------------------------------------- GOGABatteries
 
-## Global pool. v0.0.7: charges ALWAYS - +1 / 5 min while the app is open
-## AND while it is closed (timestamp math covers both; no more "only while
-## closed" fine print). Lazy-regenerated on every read, like game pools.
+## Global pool. v0.1.1 OWNER RULE: this bank is a REAL battery bank - it
+## charges ONLY while GOGABox is closed, NEVER while the app is open. Reads
+## are pure (no lazy regen, no save): charging happens exclusively in
+## _credit_offline(), when the app comes back (resume / cold start).
 func box_batteries() -> int:
         var p: Dictionary = data["box_batteries"]
-        var count := clampi(int(p.get("count", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
-        if count >= BOX_BATTERY_CAP:
-                p["count"] = BOX_BATTERY_CAP
-                p["ts"] = int(Time.get_unix_time_from_system())
-                return BOX_BATTERY_CAP
+        return clampi(int(p.get("count", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
+
+## Convert the closed window (now - ts, plus any banked remainder) into
+## batteries. Called on APPLICATION_RESUMED and on cold start. Idempotent:
+## the window is stamped shut (ts = now) on every credit.
+func _credit_offline() -> void:
+        var p: Dictionary = data["box_batteries"]
+        var stamp := int(p.get("ts", 0))
         var now := int(Time.get_unix_time_from_system())
-        var elapsed := now - int(p.get("ts", now))
-        var regen := elapsed / BATTERY_STEP
-        if regen > 0:
-                count = mini(BOX_BATTERY_CAP, count + regen)
-                p["ts"] = now - (elapsed % BATTERY_STEP)
-                p["count"] = count
+        if stamp <= 0:
+                p["ts"] = 0          # open right now - no charging window
+                return
+        var away := now - stamp
+        p["ts"] = 0                  # window shut: we are (back) in the app
+        if away <= 0:
+                return
+        var total := int(p.get("rem", 0)) + away
+        var add := total / BATTERY_STEP
+        p["rem"] = total % BATTERY_STEP
+        if add > 0:
+                var before := int(p.get("count", 0))
+                p["count"] = clampi(before + add, 0, BOX_BATTERY_CAP)
                 save()
-                if count >= BOX_BATTERY_CAP:
-                        _battery_full_sfx()   # this pool just filled up
-        return count
+                batteries_changed.emit()
+                if int(p["count"]) >= BOX_BATTERY_CAP and before < BOX_BATTERY_CAP:
+                        _battery_full_sfx()   # filled up while we were away
 
-func box_battery_cap() -> int:
-        return BOX_BATTERY_CAP
-
-## Write access used by spends/refills/tests (keeps the regen clock intact).
-func set_box_batteries(n: int) -> void:
-        data["box_batteries"]["count"] = clampi(n, 0, BOX_BATTERY_CAP)
-        save()
-        batteries_changed.emit()
-
-## Seconds until the next +1 (0 when full) - feeds the live battery sheet.
+## Closed time still needed for the next +1 (0 when full). CONSTANT while
+## the app is open (the bank only moves while closed) - the battery sheet
+## prints it as "away time", which is exactly what it is.
 func box_regen_in() -> int:
         if box_batteries() >= BOX_BATTERY_CAP:
                 return 0
         var p: Dictionary = data["box_batteries"]
-        var now := int(Time.get_unix_time_from_system())
-        return BATTERY_STEP - ((now - int(p.get("ts", now))) % BATTERY_STEP)
+        return BATTERY_STEP - (int(p.get("rem", 0)) % BATTERY_STEP)
+
+func box_battery_cap() -> int:
+        return BOX_BATTERY_CAP
+
+## Write access used by spends/refills/tests (the offline clock is NOT
+## touched: spending batteries while open has no effect on charging).
+func set_box_batteries(n: int) -> void:
+        data["box_batteries"]["count"] = clampi(n, 0, BOX_BATTERY_CAP)
+        save()
+        batteries_changed.emit()
 
 ## Per-game pool: fully modular per game (registry `charges`):
 ##   per_round      batteries one play costs
@@ -268,16 +296,17 @@ func refill_game_from_box(id: String) -> int:
         _sync_battery_notifications()
         return move
 
-## v0.0.7: the box bank regenerates itself on every READ (ts math), so the
-## pause/resume pair only has to manage the away-notifications. closed_ts is
-## still stamped on pause - it feeds the "while you were away" schedule math.
+## v0.1.1: pause OPENS the charging window (the box starts "charging on the
+## shelf"); resume / cold start banks the closed time. The pause stamp also
+## feeds the "while you were away" notification schedule.
 func _notification(what: int) -> void:
         if what == NOTIFICATION_APPLICATION_PAUSED:
-                meta()["closed_ts"] = int(Time.get_unix_time_from_system())
+                data["box_batteries"]["ts"] = int(Time.get_unix_time_from_system())
+                meta()["closed_ts"] = int(data["box_batteries"]["ts"])
                 save()
                 _schedule_battery_notifications()
         elif what == NOTIFICATION_APPLICATION_RESUMED:
-                box_batteries()      # credit the closed time right away
+                _credit_offline()      # credit the closed time right away
                 _cancel_battery_notifications()
 
 ## In-app "pool just hit full" ping (the device channel handles the away-case).
@@ -302,7 +331,7 @@ func _battery_notify_id(key: String) -> int:
 func _schedule_battery_notifications() -> void:
         var gb := box_batteries()
         if gb < BOX_BATTERY_CAP:
-                var secs := (BOX_BATTERY_CAP - gb) * BATTERY_STEP
+                var secs := (BOX_BATTERY_CAP - gb) * BATTERY_STEP - int(data["box_batteries"].get("rem", 0))
                 Notify.schedule(_battery_notify_id("box"), "GOGABatteries",
                         "Your GOGABatteries are fully charged - %d/%d!" % [BOX_BATTERY_CAP, BOX_BATTERY_CAP],
                         maxi(60, secs), "battery_full")

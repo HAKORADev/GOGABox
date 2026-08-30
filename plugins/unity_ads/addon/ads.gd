@@ -228,8 +228,18 @@ func _on_native_init_complete() -> void:
         ready_ok = true
         init_complete.emit()
         _preload_all()
-        if _banner_wanted and native:
-                native.banner_show(placement("banner"))
+        # v0.1.1 THE INSTANT BANNER (owner: "figure out a way to make banner
+        # ads load instantly... banners is the most long-term profitable ad"):
+        # the FIRST banner used to start loading only when the splash ended
+        # (menu.on_splash_done -> banner_show), so the strip sat empty for the
+        # whole SDK init + load latency. Now the banner starts loading the
+        # moment the SDK is up - hidden - so the reveal is a visibility flip,
+        # not a network round trip.
+        if native and bool(cfg.banner_enabled):
+                if _banner_wanted:
+                        native.banner_show(placement("banner"))   # asked before init
+                else:
+                        native.banner_preload(placement("banner"))
 
 func _on_native_init_failed() -> void:
         ready_ok = false

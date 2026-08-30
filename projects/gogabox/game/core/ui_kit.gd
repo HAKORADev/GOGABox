@@ -37,6 +37,25 @@ static func label(txt: String, size: int, color := INK, use_display := true) -> 
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return l
 
+## v0.1.1 OWNER RULE ("long names will go out of space"): dynamic text size
+## for fixed-width spots - the more text, the smaller the font, so the name
+## ALWAYS fits its box. Steps the font down from `size` until the text fits
+## `max_w` (floor 12). Used by every feed tile + carousel card title; the
+## pre-play page keeps its scroll, so it stays big there.
+static func fit_label(txt: String, size: int, color: Color, max_w: float,
+                use_display := true) -> Label:
+        var f := font_big() if use_display else font_ui()
+        var fs := size
+        while fs > 12 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > max_w:
+                fs -= 1
+        return label(txt, fs, color, use_display)
+
+## Rendered width of a text in the Box fonts (chips position themselves with
+## this instead of guessing - the "k outside the widget" bug family).
+static func text_width(txt: String, size: int, use_display := false) -> float:
+        var f := font_big() if use_display else font_ui()
+        return f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+
 static func panel_style(bg: Color, radius := 22, margin := 0) -> StyleBoxFlat:
         var sb := StyleBoxFlat.new()
         sb.bg_color = bg

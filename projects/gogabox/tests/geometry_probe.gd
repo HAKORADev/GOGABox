@@ -1,23 +1,22 @@
 extends SceneTree
-## GOGABox geometry probe (v0.1.0): boots the REAL main scene at the logical
-## viewports produced by main.gd's density rule and reports ANY visible
-## Control poking outside the viewport. Exit 0 = everything fits.
+## GOGABox geometry probe (v0.1.1): boots the REAL main scene at the TWO
+## universal designs - portrait 1080x2400 and landscape 2400x1080 - and
+## reports ANY visible Control poking outside the design viewport.
+## Exit 0 = everything fits.
 ##
-## Headless Windows report fake sizes, so the probe pins the stretch math
-## directly (aspect KEEP + explicit css/factor) - the exact same numbers the
-## engine computes on real hardware:
-##   config A: f=1.000  ->  720 x 1280  (720p-class phones, v0.0.9 geometry)
-##   config B: f=0.667  -> 1080 x 1920  (owner's 1080-wide phone class;
-##              on the real 9:20 device expand grows the room to 1080x2400 -
-##              more height only adds scroll room, width is the binding axis)
-##   config C: f=0.625  -> 1152 x 2048  (the density-rule cap)
+## v0.1.1 THE UNIVERSAL RESOLUTION: stretch is canvas_items + aspect KEEP
+## with a FIXED design per orientation, so the logical room IS the design on
+## EVERY device - other window sizes only scale it up/down (letterboxed on
+## odd aspects). There is no per-device density math left to probe; these
+## two configs cover the whole matrix. The probe pins the stretch math
+## directly (headless Windows report fake sizes) - the exact numbers the
+## engine computes on real hardware.
 ##
 ## Run: godot --headless --path projects/gogabox -s res://tests/geometry_probe.gd
 
 const CONFIGS := [
-        {"name": "A 840x1493 (f=0.857, small-screen floor)", "f": 720.0 / 840.0},
-        {"name": "B 1080x1920 (f=0.667, 1080-phone)", "f": 720.0 / 1080.0},
-        {"name": "C 1152x2048 (f=0.625, cap)", "f": 720.0 / 1152.0},
+        {"name": "portrait 1080x2400 (universal design)", "css": Vector2i(1080, 2400)},
+        {"name": "landscape 2400x1080 (universal design)", "css": Vector2i(2400, 1080)},
 ]
 
 var cfg := 0
@@ -37,15 +36,15 @@ func _spawn() -> void:
                 scene_root.free()
         var ps: PackedScene = load("res://main.tscn")
         scene_root = ps.instantiate()
-        root.add_child(scene_root)     # main._ready applies its own f (headless -> 1.0)
+        root.add_child(scene_root)     # main builds the menu at the pinned design
         phase = 1
         offenders = []
 
 func _tick() -> void:
-        # re-pin the density AFTER main._ready and on every frame (menu's
-        # _apply_base writes css back to 720x1280 - same value we want)
-        root.content_scale_size = Vector2i(720, 1280)
-        root.content_scale_factor = CONFIGS[cfg]["f"]
+        # re-pin the design EVERY frame (headless window is fake 720x1280;
+        # with aspect KEEP the visible rect equals the design regardless)
+        root.content_scale_size = CONFIGS[cfg]["css"]
+        root.content_scale_factor = 1.0
         if phase < 12:
                 phase += 1
                 return
@@ -54,7 +53,7 @@ func _tick() -> void:
         offenders = []
         _scan(scene_root, vp_size)
         if offenders.is_empty():
-                print("  FIT: all controls inside the viewport")
+                print("  FIT: all controls inside the design viewport")
         else:
                 print("  OUT OF BOUNDS (%d):" % offenders.size())
                 for o in offenders:

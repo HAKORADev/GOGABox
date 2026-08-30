@@ -9,16 +9,15 @@ var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
-        # v0.1.0 THE DENSITY RULE (owner: "make the resolution bigger / use the
-        # phone native resolution so things look smaller"). With stretch
-        # canvas_items+expand the 720 base was stretched 1.5x on a 1080-wide
-        # phone, so every control rendered 1.5x bigger than its designer px.
-        # We instead target a LOGICAL viewport equal to the device's real
-        # pixels (clamped): content_scale_factor = 720 / short_side_px.
-        #   1080x2400 phone -> 1080x2400 logical viewport (1.5x more room,
-        #   everything physically smaller, text still rasterized sharp).
-        # MUST run before the menu builds (it reads the viewport size).
-        _apply_density()
+        # v0.1.1 THE UNIVERSAL RESOLUTION (owner rule, replaces the v0.1.0
+        # density rule): ONE pre-set design size per orientation - 1080x2400
+        # portrait / 2400x1080 landscape (the owner phone's FHD). The engine
+        # scales that design to ANY window (stretch canvas_items + aspect
+        # KEEP), so games and menu are designed ONCE and every other device
+        # just gets the scale-up/down. No per-device math anywhere anymore,
+        # and the "landscape phone opens a portrait game and it renders with
+        # the old orientation's resolution, too small" bug is structurally
+        # impossible: rotation now swaps the DESIGN, never the scale.
         # menu is built immediately, the splash covers it while the engine warms up
         _menu = Node2D.new()
         _menu.name = "Menu"
@@ -34,22 +33,10 @@ func _ready() -> void:
 
         _show_splash()
 
-## Content scale factor = 720 / target, where target = the device's short
-## side in REAL px clamped to [840, 1152]:
-##   - 1080p-class phones  -> ~0.667 (native logical resolution - the owner's
-##     device; probe-verified: top bar + carousel arrows all fit),
-##   - 1440p-class flagships -> capped at 0.625 so UI never gets microscopic,
-##   - small/720p-class devices -> floored at 0.857 (logical 840 wide). The
-##     measured UI needs ~796 logical px (top bar 764 + margins) - below that
-##     the gear icon and the top-picks right arrow hang off-screen (probe:
-##     config A). 840 leaves ~40px headroom for wider battery-chip labels.
-## Headless tests: the virtual window is 720x1280 -> the floor applies ->
-## tests see 840x1493. Rotation never changes the short side.
-func _apply_density() -> void:
-        var screen := DisplayServer.screen_get_size()
-        var short_px := float(mini(screen.x, screen.y))
-        var target := clampf(short_px, 840.0, 1152.0)
-        get_window().content_scale_factor = 720.0 / target
+## v0.1.1: the v0.1.0 per-device density rule is GONE - the universal design
+## resolution lives in project.godot (1080x2400, aspect KEEP) and the only
+## runtime knobs left are the two pre-set designs swapped on rotation
+## (host_node._apply_orientation / menu._apply_base).
 
 ## A game is its OWN WORLD: while it runs the menu is fully hidden AND stops
 ## processing - no layering weirdness, no taps leaking into the feed, no
@@ -59,6 +46,11 @@ func _apply_density() -> void:
 ##   2) launch() was handed the MENU as router, so this method never ran.
 ## menu.set_active() now handles BOTH the Node2D and the CanvasLayer.
 func on_game_entered() -> void:
+        # v0.1.1 OWNER RULE: the box theme is BOX-ONLY. It used to keep
+        # looping under every game (the menu player was never told to stop -
+        # a design flaw, not a leak). Stop it on the way in; the menu brings
+        # it back on the way out.
+        Jukebox.stop_music()
         if _menu != null and is_instance_valid(_menu) and _menu.has_method("set_active"):
                 _menu.call("set_active", false)
 
@@ -67,6 +59,8 @@ func on_game_closed() -> void:
                 _menu.call("set_active", true)
                 if _menu.has_method("on_game_closed"):
                         _menu.call("on_game_closed")
+                # box theme back - it NEVER plays inside a game scene
+                Jukebox.play_music_menu()
 
 func _show_splash() -> void:
         _splash_layer = CanvasLayer.new()
@@ -79,22 +73,29 @@ func _show_splash() -> void:
         _splash_layer.add_child(_splash_root)
 
         # opaque veil FIRST - without it the feed renders for a frame or two
-        # while splash.png decodes (the "menu flashes before the splash" glitch)
+        # while the logo decodes (the "menu flashes before the splash" glitch)
         var veil := ColorRect.new()
         veil.color = Color(0.227451, 0.137255, 0.074510, 1.0)
         veil.set_anchors_preset(Control.PRESET_FULL_RECT)
         veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _splash_root.add_child(veil)
 
+        # v0.1.1 OWNER RULE (brainstorm): the old splash.png poster (G icon +
+        # striped background + subtitle) is gone - the splash is THE LOGO
+        # ONLY, centered on the flat box brown. Cleaner, and the boot splash
+        # (project.godot) now matches it exactly.
+        var center := CenterContainer.new()
+        center.set_anchors_preset(Control.PRESET_FULL_RECT)
+        center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _splash_root.add_child(center)
+
         var art := TextureRect.new()
-        art.texture = load("res://assets/ui/splash.png")
-        art.set_anchors_preset(Control.PRESET_FULL_RECT)
+        art.texture = load("res://assets/ui/logo.png")
+        art.custom_minimum_size = Vector2(560.0, 560.0 * 148.0 / 500.0)
         art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        # FIT (not COVER): COVER crops top/bottom on 20:9 screens and the
-        # wordmark left the screen. The veil behind matches the art's bg color.
         art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _splash_root.add_child(art)
+        center.add_child(art)
 
         # fade in + a slow gentle zoom (feels alive, not a static image)
         _splash_root.modulate.a = 0.0

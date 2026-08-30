@@ -17,6 +17,7 @@ func _ready() -> void:
         fails += _test("meta: registry metadata sane", _t_meta())
         fails += _test("registry: entries sane", _t_registry())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
+        fails += _test("roadmap: owner feed order + playability oracle", _t_feed_order())
         fails += _test("scroll: BoxScroll drag/tap", await _t_scroll())
         fails += _test("host: launch + finish + economy", await _t_host_flow())
         fails += _test("games: all playable boot", await _t_all_games())
@@ -171,11 +172,38 @@ func _t_batteries() -> int:
         Box.data["game_batteries"]["rally"]["count"] = 5
         Box.set_box_batteries(0)
         ok += _check(Box.refill_game_from_box("rally") == 0, "dry bank: nothing moves")
-        # v0.0.7: the bank charges ALWAYS via timestamps (open or closed)
-        Box.data["box_batteries"] = {"count": 0, "ts": int(Time.get_unix_time_from_system()) - 620}
-        ok += _check(Box.box_batteries() == 2, "620s elapsed -> +2 box batteries")
-        ok += _check(Box.box_regen_in() > 0 and Box.box_regen_in() <= Box.BATTERY_STEP,
-                "regen countdown sane")
+        # v0.1.1 OWNER RULE: the BOX BANK charges ONLY while the app is
+        # CLOSED. Reads are pure (no lazy regen) - a stale ts must not move
+        # the pool while the app is open.
+        Box.data["box_batteries"] = {"count": 0,
+                "ts": int(Time.get_unix_time_from_system()) - 620, "rem": 0}
+        ok += _check(Box.box_batteries() == 0, "open app never self-charges (stale ts ignored)")
+        Box._credit_offline()   # coming back: 620s closed -> +2, remainder 20
+        ok += _check(Box.box_batteries() == 2, "620s closed -> +2 box batteries")
+        ok += _check(int(Box.data["box_batteries"]["rem"]) == 20, "remainder banked toward next +1 (20s)")
+        ok += _check(Box.box_regen_in() == Box.BATTERY_STEP - 20,
+                "next +1 after %ds away" % (Box.BATTERY_STEP - 20))
+        # pause opens the charging window, resume banks it (the real loop)
+        Box.set_box_batteries(0)
+        Box._notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+        ok += _check(int(Box.data["box_batteries"]["ts"]) > 0, "pause opens the charging window")
+        Box.data["box_batteries"]["ts"] = int(Time.get_unix_time_from_system()) - 310
+        Box._notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+        ok += _check(Box.box_batteries() == 1, "310s closed -> +1 battery on resume")
+        ok += _check(int(Box.data["box_batteries"]["ts"]) == 0, "window shut while the app is open")
+        # the game pools still refill ALWAYS (only the bank is offline-only)
+        Box.data["game_batteries"]["rally"] = {"count": 0, "ts": int(Time.get_unix_time_from_system()) - 620}
+        ok += _check(int(Box.game_battery("rally")["count"]) == 2, "game pool still refills live (+2)")
+        # v0.1.1: the ONE playability oracle (feed chip + pre-play button)
+        Box.reset_all()
+        ok += _check(Roadmap.can_play_now("snake"), "snake is always ready (starter)")
+        ok += _check(not Roadmap.can_play_now("rally"), "locked rally is not playable")
+        Box.unlock_game("rally", 150)   # wallet drained to 0
+        ok += _check(not Roadmap.can_play_now("rally"), "rally needs its 8-coin fee")
+        Box.earn(8)
+        ok += _check(Roadmap.can_play_now("rally"), "rally ready: coins + both pools full")
+        Box.set_box_batteries(1)
+        ok += _check(not Roadmap.can_play_now("rally"), "a round also needs 2 bank batteries")
         Box.reset_all()
         return ok
 
@@ -303,6 +331,40 @@ func _t_roadmap() -> int:
 
 # ------------------------------------------------------------------ scroll
 
+## v0.1.1 OWNER FEED ORDER: owned (oldest unlock first) -> locked/soon ->
+## mysteries, each block oldest->newest. Plus the can_play_now oracle that
+## both the feed chip and the pre-play button read.
+func _t_feed_order() -> int:
+        Box.reset_all()
+        Box.record_run("snake", 10)   # reveals rally (chain) + the mysteries
+        Roadmap.tick()
+        var rows := Roadmap.feed_rows()
+        var ids: Array = []
+        var buckets: Array = []
+        for r in rows:
+                ids.append(String(r["g"]["id"]))
+                buckets.append(int(r["bucket"]))
+        var ok := _check(ids.size() >= 4, "feed has rows (%d)" % ids.size())
+        ok += _check(String(ids[0]) == "snake", "owned block first (snake is index 0: %s)" % ids[0])
+        var sorted_b := buckets.duplicate()
+        sorted_b.sort()
+        ok += _check(buckets == sorted_b, "buckets ascend owned->locked->mystery %s" % [buckets])
+        ok += _check(buckets.has(0) and buckets.has(1) and buckets.has(2),
+                "all three buckets present %s" % [buckets])
+        # within the owned block: acquisition order (owned[] append order)
+        Box.unlock_game("rally", 0)
+        rows = Roadmap.feed_rows()
+        var owned_ids: Array = []
+        for r in rows:
+                if int(r["bucket"]) == 0:
+                        owned_ids.append(String(r["g"]["id"]))
+        ok += _check(owned_ids == ["snake", "rally"],
+                "owned block is unlock order %s" % [owned_ids])
+        ok += _check(Roadmap.can_play_now("snake"), "oracle: snake always playable")
+        ok += _check(Roadmap.can_play_now("dario") == false, "oracle: workshop teaser not playable")
+        Box.reset_all()
+        return ok
+
 func _t_scroll() -> int:
         var ok := 0
         var sc: BoxScroll = load("res://game/core/scroll_box.gd").new()
@@ -354,8 +416,9 @@ func _t_fitsheet() -> int:
         root.set_anchors_preset(Control.PRESET_FULL_RECT)
         add_child(root)
         var vb := Arc.sheet(root, 0.0)
-        # deliberately oversized content: 20 big buttons + a CLOSE tail
-        for i in 20:
+        # deliberately oversized content: v0.1.1 design is 1080x2400, so it
+        # takes 40 big buttons to overflow it (20 fit inside 0.94*2400 now)
+        for i in 40:
                 vb.add_child(Arc.button("B %d" % i, Vector2(480, 84), 24, Arc.ACCENT))
         vb.add_child(Arc.button("TAIL", Vector2(480, 64), 22, Color(0.42, 0.30, 0.16),
                 func(): pass))
@@ -375,7 +438,7 @@ func _t_fitsheet() -> int:
         ok += _check(tail_found, "tail button pinned outside the scroll")
         if sc != null:
                 ok += _check(sc.game_safe, "sheet scroll works inside game sessions")
-                ok += _check(sc._tappables.size() >= 20,
+                ok += _check(sc._tappables.size() >= 40,
                                 "wrapped buttons auto-registered (%d)" % sc._tappables.size())
                 # a registered tap REPLAYS the real press on the wrapped button
                 var inner: VBoxContainer = sc.get_child(0)
@@ -396,8 +459,8 @@ func _t_fitsheet() -> int:
                 ok += _check(pc.size.y <= vp.y and pc.size.x <= vp.x,
                                 "panel clamped inside the screen (%dx%d vs vp %.0fx%.0f)"
                                 % [int(pc.size.x), int(pc.size.y), vp.x, vp.y])
-                ok += _check(pc.size.y < 20.0 * 84.0,
-                                "panel no longer stacks all 20 buttons raw (%d)" % int(pc.size.y))
+                ok += _check(pc.size.y < 40.0 * 84.0,
+                                "panel no longer stacks all 40 buttons raw (%d)" % int(pc.size.y))
         root.queue_free()
         await get_tree().process_frame
         Box.reset_all()
@@ -526,8 +589,8 @@ func _t_all_games() -> int:
                 ok += _check(Box.stat(id, "plays") == 1, id + " play recorded")
                 host._quit_to_menu()
                 await get_tree().process_frame
-                ok += _check(get_window().content_scale_size == Vector2i(720, 1280),
-                        id + " orientation restored to portrait")
+                ok += _check(get_window().content_scale_size == Vector2i(1080, 2400),
+                        id + " orientation restored to portrait design (1080x2400)")
         Box.reset_all()
         return ok
 
@@ -630,6 +693,12 @@ func _t_isolation() -> int:
                         ok += _check(bgc != null and bgc.size.x > 100.0 and bgc.size.y > 100.0,
                                 "bg covers the real viewport (%s)" % (bgc.size if bgc else Vector2()))
 
+        # ---- v0.1.1 OWNER RULE: the box theme is BOX-ONLY. It used to keep
+        # looping under every game scene (the menu player was never stopped).
+        ok += _check(not Jukebox._music.playing,
+                "box theme STOPPED inside the game scene")
+        ok += _check(Jukebox._current_music == "", "jukebox forgot the menu track in-game")
+
         # ---- menu really hides: Node2D AND CanvasLayer AND processing ----
         ok += _check(not menu.visible, "menu node hidden")
         ok += _check(not menu._layer.visible, "menu CanvasLayer hidden (the v0.0.4 leak)")
@@ -644,6 +713,7 @@ func _t_isolation() -> int:
         ok += _check(menu.visible and menu._layer.visible, "menu fully visible again")
         ok += _check(menu.process_mode == Node.PROCESS_MODE_INHERIT, "menu processing restored")
         ok += _check(load("res://game/core/game_host.gd").active_host == null, "session ended")
+        ok += _check(Jukebox._music.playing, "box theme back after closing the game")
 
         stage.queue_free()
         await get_tree().process_frame

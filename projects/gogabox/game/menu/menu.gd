@@ -69,13 +69,7 @@ func _ready() -> void:
         _layer.add_child(_root)
         _root.resized.connect(_on_resized)
 
-        var bg := TextureRect.new()
-        bg.texture = load("res://assets/ui/bg_main.png")
-        bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-        bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-        bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _root.add_child(bg)
+        _build_background()
 
         _margin = MarginContainer.new()
         _margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -162,19 +156,18 @@ func _on_resized() -> void:
         if GameHost.active_host != null:
                 return
         _apply_base()
+        _update_background()
         _layout()
 
-## THE SCALING FIX: with stretch aspect "expand" the base viewport grows in
-## whichever direction the device is, so the UI keeps its physical size ONLY
-## if content_scale_size matches the orientation. Re-apply on EVERY resize
-## (launch state, rotation, game return) - comparing only transitions left
-## half-swapped states: landscape-from-launch got a different scale than
-## portrait-then-rotate, and the top bar went off-screen.
+## THE SCALING RULE (v0.1.1 universal resolution): the design is a FIXED
+## 1080x2400 portrait / 2400x1080 landscape (aspect KEEP - the engine scales
+## it to the window). Re-apply the matching design on EVERY resize (launch
+## state, rotation, game return) so the swap is instant and total.
 func _apply_base() -> void:
         var s := _root.size
         if s.x <= 0.0 or s.y <= 0.0:
                 return
-        var want := Vector2i(1280, 720) if s.x > s.y else Vector2i(720, 1280)
+        var want := Vector2i(2400, 1080) if s.x > s.y else Vector2i(1080, 2400)
         var win := get_window()
         if win.content_scale_size != want:
                 win.content_scale_size = want
@@ -192,21 +185,25 @@ func _build_top_bar() -> void:
 
         var logo := TextureRect.new()
         logo.texture = load("res://assets/ui/logo.png")
-        logo.custom_minimum_size = Vector2(214, 74)
+        # v0.1.1: the rebuilt wordmark (un-clipped G) is a little wider - the
+        # slot grows with it so the mark renders at full width, G included
+        logo.custom_minimum_size = Vector2(240, 74)
         logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
         bar.add_child(logo)
 
+        # v0.1.1 OWNER RULE: the battery bank chip sits RIGHT AFTER the logo
+        # (far left) - it used to hug the coin chip and read as one crowded
+        # cluster; the universal 1080 design has the room to spread out now.
+        _battery_box = HBoxContainer.new()
+        _battery_box.add_theme_constant_override("separation", 8)
+        bar.add_child(_battery_box)
+
         var spacer := Control.new()
         spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
         bar.add_child(spacer)
-
-        # GOGABatteries chip (dynamic meter + count)
-        _battery_box = HBoxContainer.new()
-        _battery_box.add_theme_constant_override("separation", 8)
-        bar.add_child(_battery_box)
 
         var wchip := PanelContainer.new()
         wchip.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.42), 26, 10))
@@ -309,9 +306,9 @@ func _open_batteries() -> void:
         bh.add_child(bank_meter)
         var bank_lbl := Arc.label("BOX BANK   %d/%d" % [n, cap], 24, Arc.INK)
         bh.add_child(bank_lbl)
-        var bt := Arc.label(_pool_timer_text(n, cap, Box.box_regen_in()), 18, Color("6a4a28"), false)
+        var bt := Arc.label(_box_timer_text(), 18, Color("6a4a28"), false)
         bv.add_child(bt)
-        var bn := Arc.label("+1 every 5 min  ·  charges while the app is open AND closed",
+        var bn := Arc.label("+1 every 5 min  ·  charges only while GOGABox is closed",
                         16, Color("8a6a40"), false)
         bv.add_child(bn)
         v.add_child(bank)
@@ -384,7 +381,12 @@ func _open_batteries() -> void:
                                 extra = "%d per round  ·  +1 every %d min  ·  " % [int(bb["per_round"]), step / 60]
                         (e["meter"] as Control).get_meta("set_level").call(count, ccap)
                         (e["meter"] as Control).queue_redraw()
-                        (e["timer"] as Label).text = extra + _pool_timer_text(count, ccap, rin))
+                        # the box bank counts AWAY time (offline-only charging);
+                        # game pools keep their live regen countdowns
+                        if String(e["id"]) == "":
+                                (e["timer"] as Label).text = _box_timer_text()
+                        else:
+                                (e["timer"] as Label).text = extra + _pool_timer_text(count, ccap, rin))
 
 ## Honest countdown: seconds until THIS pool's next +1 (from its own regen
 ## clock), not the wall-clock 5-minute boundary the v0.0.7 build showed.
@@ -395,16 +397,32 @@ func _pool_timer_text(count: int, cap: int, regen_in: int) -> String:
         var full_in := (cap - count - 1) * Box.BATTERY_STEP + next_in
         return "+1 in %s  ·  full in %s" % [Roadmap.fmt_clock(float(next_in)), Roadmap.fmt_clock(float(full_in))]
 
-## The 52dp Unity banner is a NATIVE view - its height is in REAL screen px.
-## Convert: physical px per logical px = window px / viewport px; reserve the
-## banner + a little breathing room in logical units, with a sane floor.
+## Same, but for the BOX BANK (v0.1.1 offline-only charging): the pool only
+## moves while the app is CLOSED, so the honest unit is AWAY time.
+func _box_timer_text() -> String:
+        var count := Box.box_batteries()
+        var cap := Box.box_battery_cap()
+        if count >= cap:
+                return "FULL"
+        var next_in := maxi(1, Box.box_regen_in())
+        var full_in := (cap - count - 1) * Box.BATTERY_STEP + next_in
+        return "+1 after %s away  ·  full after %s away" \
+                        % [Roadmap.fmt_clock(float(next_in)), Roadmap.fmt_clock(float(full_in))]
+
+## v0.1.1 THE 52dp Unity banner is a NATIVE view - its height is in REAL
+## screen px. Convert with the REAL stretch scale: with aspect KEEP the
+## engine scales the design by min(win/design) per axis (the letterbox axis
+## binds). Reserve the banner + breathing room in logical units, floored.
+## (headless/fake windows report size 0 -> floor only, no division blowups)
 func _banner_safe_px() -> float:
         var dpi := DisplayServer.screen_get_dpi()
         var win := DisplayServer.window_get_size()
         var vp := get_viewport_rect().size
-        var px_per_logical := float(win.y) / maxf(1.0, vp.y)
+        if win.x <= 0 or win.y <= 0 or vp.x <= 0.0 or vp.y <= 0.0:
+                return 64.0
+        var px_per_logical := minf(float(win.x) / vp.x, float(win.y) / vp.y)
         var phys := 52.0 * dpi / 160.0 + 12.0   # the 52dp banner + breathing room
-        return maxf(64.0, ceilf(phys / px_per_logical))
+        return maxf(64.0, ceilf(phys / maxf(0.05, px_per_logical)))
 
 func _icon_button(icon_path: String, cb: Callable) -> Button:
         var b := Button.new()
@@ -530,7 +548,7 @@ func _apply_list() -> void:
 func _strip_card(g: Dictionary, stat_txt: String) -> Control:
         var b := _card_base(Vector2(300, 208), true)
         _add_thumb(b, g, 58)
-        var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
+        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 272)
         name_l.position = Vector2(14, 150)
         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(name_l)
@@ -636,11 +654,13 @@ func _refresh() -> void:
         _all_head.text = "FAVORITES" if _filter_state == "favorites" \
                         else "MYSTERY" if _filter_state == "mystery" else "ALL GAMES"
         var tiles := 0
-        for g in GameReg.GAMES:
+        # v0.1.1 OWNER FEED ORDER: owned (oldest unlock first) -> locked/soon
+        # (catalog order) -> mysteries (catalog order). No more "uncanny"
+        # interleaving of states.
+        for row in Roadmap.feed_rows():
+                var g: Dictionary = row["g"]
                 var id := String(g["id"])
-                var st := Roadmap.state(id)
-                if st == "HIDDEN":
-                        continue
+                var st := String(row["st"])
                 match _filter_state:
                         "favorites":
                                 if st != "OWNED" or not Box.is_favorite(id):
@@ -767,15 +787,32 @@ func _ribbon(b: Control, txt: String, bg: Color, top_right := true) -> void:
         rib.add_child(l)
 
 ## Two-level feed badge (owner rule v0.0.9):
-##   NEW!      orange    - the tile just APPEARED (any teaser state)
-##   UNLOCKED! green - it resolved into a BUYABLE tile (LOCKED only)
+##   NEW!       orange    - the tile just APPEARED (any teaser state)
+##   AVAILABLE! green     - it resolved into a BUYABLE tile (LOCKED only)
 ## Badges ALWAYS own the top-right corner; static ribbons (SOON) sit top-left.
 ## Any tap on the tile clears the level (Box.mark_seen).
 func _feed_ribbon(b: Control, level: String) -> void:
         if level == "new":
                 _ribbon(b, "NEW!", Arc.HOT, true)
         elif level == "unlocked":
-                _ribbon(b, "UNLOCKED!", Arc.GOOD, true)
+                # v0.1.1 OWNER WORDING: "available", not "unlocked" - the tile
+                # means BUYABLE, the player still has to purchase the game.
+                _ribbon(b, "AVAILABLE!", Arc.GOOD, true)
+
+## v0.1.1 OWNED-TILE CHIPS (owner spec):
+##   LEFT  "ready to play" - ONLY when the pre-play PLAY button would really
+##         open (Roadmap.can_play_now: fee + BOTH battery pools + window).
+##         Snake never wears it (it is somehow always ready to be played).
+##   RIGHT "best nn" - the best score, ALL owned games incl. snake. It used
+##         to REPLACE the ready chip on the left ("ready to play" vs "best
+##         nn" fighting for one slot) - now each owns its own corner.
+## Bottom-RIGHT-anchored chip measured from the real text width (the "best
+## nn" corner - it must never collide with the left chips).
+func _right_chip(b: Control, txt: String, y: float, icon := "") -> void:
+        var chip := Arc.chip(txt, icon, Color(0, 0, 0, 0.12), 18, Color("8a6a40"))
+        var w := Arc.text_width(txt, 18) + 16.0
+        chip.position = Vector2(334.0 - 14.0 - w, y)
+        b.add_child(chip)
 
 func _tile(g: Dictionary, st: String) -> Control:
         var b := _card_base(Vector2(334, 312))
@@ -784,19 +821,21 @@ func _tile(g: Dictionary, st: String) -> Control:
         match st:
                 "OWNED":
                         _add_thumb(b, g, 70)
-                        var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
+                        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
+                        if id != "snake" and Roadmap.can_play_now(id):
+                                var chip := Arc.chip("ready to play", "", Color(0, 0, 0, 0.12), 18, Color("8a6a40"))
+                                chip.position = Vector2(14, 272)
+                                b.add_child(chip)
                         var best := Box.stat(id, "best")
-                        var chip_txt := "best %d" % best if best > 0 else "ready to play"
-                        var chip := Arc.chip(chip_txt, "", Color(0, 0, 0, 0.12), 18, Color("8a6a40"))
-                        chip.position = Vector2(14, 272)
-                        b.add_child(chip)
+                        if best > 0:
+                                _right_chip(b, "best %d" % best, 272)
                 "LOCKED":
                         var th := _add_thumb(b, g, 70, true)
                         th.modulate = Color(1, 1, 1, 0.45)
-                        var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
+                        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
@@ -818,7 +857,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                 "GATED":
                         var th := _add_thumb(b, g, 70, true)
                         th.modulate = Color(1, 1, 1, 0.22)
-                        var name_l := Arc.label(String(g["title"]), 24, Color(0.45, 0.38, 0.3))
+                        var name_l := Arc.fit_label(String(g["title"]), 24, Color(0.45, 0.38, 0.3), 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
@@ -838,7 +877,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         _feed_ribbon(b, bd)
                 "SOON":
                         _add_thumb(b, g, 70)
-                        var name_l := Arc.label(String(g["title"]), 24, Arc.INK)
+                        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 260)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
@@ -887,6 +926,36 @@ var _fx: Control
 var _fx_dots: Array = []   # {pos, spd, size, phase}
 var _fx_night := false
 
+# v0.1.1 OWNER BRAINSTORM: the drifting neon STRIPES are gone ("i will remove
+# that effect of weird strips") - the striped bg_main.png itself now drifts
+# DOWN slowly instead ("the background move down slowly since it's stripped").
+# A Sprite2D with a repeated region does the scroll; the pattern wraps forever.
+var _bg: Sprite2D
+var _bg_off := 0.0
+const BG_SPEED := 14.0     # logical px per second - a slow, calm drift
+
+func _build_background() -> void:
+        _bg = Sprite2D.new()
+        _bg.texture = load("res://assets/ui/bg_main.png")
+        _bg.centered = false
+        _bg.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+        _bg.region_enabled = true
+        _root.add_child(_bg)
+        _update_background()
+
+func _update_background() -> void:
+        if _bg == null or not is_instance_valid(_bg):
+                return
+        var vp := _root.size
+        if vp.x <= 0.0 or vp.y <= 0.0:
+                return
+        # cover the viewport (KEEP_ASPECT_COVERED equivalent), crop the rest
+        var tex := _bg.texture.get_size()
+        var s := maxf(vp.x / tex.x, vp.y / tex.y)
+        _bg.scale = Vector2(s, s)
+        # region window = the visible slice of the (repeating) texture
+        _bg.region_rect = Rect2(0, -_bg_off, vp.x / s, vp.y / s)
+
 func _build_particles() -> void:
         _fx = Control.new()
         _fx.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -896,38 +965,40 @@ func _build_particles() -> void:
         _root.move_child(_fx, 1)   # above bg, below everything interactive
         var hour := int(Time.get_time_dict_from_system()["hour"])
         _fx_night = hour >= 19 or hour < 6
-        for i in 26:
+        # dust spawn field uses the REAL design viewport (1080x2400)
+        for i in 34:
                 _fx_dots.append({
-                        "pos": Vector2(randf() * 720.0, randf() * 1280.0),
+                        "pos": Vector2(randf() * _root.size.x, randf() * _root.size.y),
                         "spd": 8.0 + randf() * 16.0,
                         "size": 2.0 + randf() * 3.5,
                         "phase": randf() * TAU,
                 })
 
 func _process(delta: float) -> void:
+        # the striped background drifts slowly DOWN (v0.1.1 owner brainstorm)
+        if _bg != null and is_instance_valid(_bg):
+                _bg_off = fmod(_bg_off + delta * BG_SPEED, 1280.0)
+                var vp := _root.size
+                if vp.x > 0.0 and vp.y > 0.0:
+                        var s: float = _bg.scale.x
+                        _bg.region_rect = Rect2(0, -_bg_off, vp.x / s, vp.y / s)
         if _fx == null or not is_instance_valid(_fx):
                 return
-        var vp := _root.size
+        var vr := _root.size
         for d in _fx_dots:
                 d["pos"] = d["pos"] + Vector2(sin(d["phase"] + Time.get_ticks_msec() / 1900.0) * 6.0, -d["spd"]) * delta
                 if d["pos"].y < -12.0:
-                        d["pos"] = Vector2(randf() * vp.x, vp.y + 12.0)
+                        d["pos"] = Vector2(randf() * vr.x, vr.y + 12.0)
                 if d["pos"].x < -12.0:
-                        d["pos"].x = vp.x + 12.0
-                elif d["pos"].x > vp.x + 12.0:
+                        d["pos"].x = vr.x + 12.0
+                elif d["pos"].x > vr.x + 12.0:
                         d["pos"].x = -12.0
         _fx.queue_redraw()
 
 func _draw_fx() -> void:
-        var vp := _root.size
-        var drift := fmod(Time.get_ticks_msec() / 1000.0 * 7.0, vp.y + 400.0) - 200.0
-        # slow diagonal neon stripes
-        var line_col := Color(1.0, 0.78, 0.3, 0.05) if not _fx_night \
-                        else Color(0.62, 0.78, 1.0, 0.05)
-        for i in 3:
-                var off := drift + i * (vp.y / 3.0)
-                _fx.draw_line(Vector2(-100, vp.y - off), Vector2(vp.x + 100, -off), line_col, 26.0)
-        # floating dust
+        # v0.1.1: ONLY the floating dust now - the "weird strips" (the slow
+        # diagonal neon lines) are REMOVED per the owner brainstorm; the
+        # background motion itself is the effect now.
         var dot_col := Color(1.0, 0.85, 0.45, 0.5) if not _fx_night \
                         else Color(0.75, 0.85, 1.0, 0.5)
         for d in _fx_dots:
@@ -1446,9 +1517,15 @@ func _open_game_page(g: Dictionary) -> void:
         var can_batt: bool = true
         var batt := Box.game_battery(id)
         if not batt.is_empty():
-                can_batt = int(batt["count"]) >= int(batt["per_round"])
+                # v0.1.1: a round drinks from the game pool AND the box bank
+                # (store rule) - the button must check BOTH or it enables a
+                # play that launch() will refuse.
+                can_batt = int(batt["count"]) >= int(batt["per_round"]) \
+                                and Box.box_batteries() >= int(batt["per_round"])
         var can_time := Roadmap.window_ok(id)
         var can_play := can_pay and can_batt and can_time
+        # NOTE: the feed tile's "ready to play" chip calls Roadmap.can_play_now,
+        # the same fee + pools + window oracle this page mirrors line by line.
 
         _header_block(content, g, false, true, scroll)
 

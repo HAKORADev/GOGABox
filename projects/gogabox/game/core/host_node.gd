@@ -84,19 +84,25 @@ func _flush_time() -> void:
                 _accum = 0.0
 
 func _apply_orientation(landscape: bool) -> void:
+        # v0.1.1 UNIVERSAL RESOLUTION: the two pre-set designs. The old
+        # 720x1280/1280x720 pins are why a landscape phone opening a portrait
+        # game rendered with the OLD orientation's resolution ("too small"):
+        # with aspect=expand the content scale size fought the real window.
+        # Now the design swaps with the orientation and the engine scales it
+        # to whatever the window is - same look on every device.
         var root := get_window()
         if landscape:
-                root.content_scale_size = Vector2i(1280, 720)
+                root.content_scale_size = Vector2i(2400, 1080)
                 DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
         else:
-                root.content_scale_size = Vector2i(720, 1280)
+                root.content_scale_size = Vector2i(1080, 2400)
                 DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_PORTRAIT)
 
 func _restore() -> void:
         # box level: free rotation again; the menu re-lays itself out on resize
         _flush_time()
         var root := get_window()
-        root.content_scale_size = Vector2i(720, 1280)
+        root.content_scale_size = Vector2i(1080, 2400)
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:
