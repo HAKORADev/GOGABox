@@ -116,3 +116,25 @@ THE ONE HARDening PASS (game-specific leftovers -> registry policy):
 - Owner test path: v0.1.6 will be tested on top of this - check the dots
   are gone and fire the dry-bank toast (GIVE CHARGES on an empty bank) to
   see the toast fit itself.
+
+## 6. ADDENDUM - root cause closed at the source (post-ship follow-up)
+
+Owner follow-up questions (particles intact? area under the dots repainted?)
+triggered a re-verification pass that caught real residue: the r9-disc
+diffusion inpaint dampened the 30 baked png dots ~12x but left ~1/3-strength
+traces (max residual 10 vs 31, 270 hit px in 32 clusters). Deeper dig found
+the TRUE origin: derive_assets.py bg_main() itself paints a 5x6 grid of
+alpha-14 "arcade carpet" ellipses (72+144x, 90+220y, r5) - the generator was
+the dot factory, so any future asset re-derivation would resurrect the dots.
+
+Fix (no version bump):
+- carpet loop retired in derive_assets.py (commented out + do-not-reintroduce
+  owner-call note) - the generator now derives pure gradient + stripes
+- bg_main.png regenerated from the fixed generator: 0 dot pixels by
+  construction (detector max interior residual 3.0 = stripe softness only);
+  diffs vs v0.1.4 and vs the v0.1.5 inpaint are confined to exactly the 30
+  former dot patches - everything else bit-true
+- day/night particles re-verified intact (separate _build_particles system in
+  menu.gd - never touched by any dot work)
+- zero player-visible impact: the live bg is bg_stripe.gdshader; bg_main.png
+  is reference/derivation source only

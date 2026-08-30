@@ -85,10 +85,15 @@ def bg_main():
         d.polygon([(i, H), (i + 34, H), (i + H + 34, 0), (i + H, 0)],
                   fill=(255, 176, 32, 10))
     # soft vignette dots (arcade carpet)
-    for gy in range(6):
-        for gx in range(5):
-            x, y = 72 + gx * 144, 90 + gy * 220
-            d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 220, 160, 14))
+    # v0.1.5 OWNER CALL ("weird dots, 3 dots per line"): RETIRED. This 5x6
+    # grid of alpha-14 ellipses was the true source of the baked dots - the
+    # shader recreation AND this generator both carried them. The carpet is
+    # gone everywhere now; the field is pure gradient + stripes. Do NOT
+    # reintroduce dot overlays here without an owner call.
+    # for gy in range(6):
+    #     for gx in range(5):
+    #         x, y = 72 + gx * 144, 90 + gy * 220
+    #         d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 220, 160, 14))
     img.save(out("ui/bg_main.png"))
     print("ui/bg_main.png")
 
