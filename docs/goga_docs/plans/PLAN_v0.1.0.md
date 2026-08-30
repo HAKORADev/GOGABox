@@ -27,25 +27,34 @@ your time doing the repo stuff first, then after that do the v0.1.0").
 
 ## B. Game fixes (v0.1.0 build)
 
-- [ ] **Resolution/scale**: raise internal resolution toward the phone's
-      native (owner: 1080x2400) so things render smaller — owner: "fixing
-      the resolution and scale thing will fix this and the buttons issue".
-      Update docs/RESOLUTION_RULE.md decision (owner relitigated it).
-- [ ] **Top-picks right arrow out of resolution** — must sit fully on screen
-- [ ] **UNLOCKED! badge clipping** — the "k" literally out of the green
-      widget and out of the thumbnail; size the ribbon from the real text width
-- [ ] **NEW! on mystery black boxes** — owner never asked for that; black
-      boxes stay a mystery (no badge rendering on mystery tiles at all)
-- [ ] **Score-bonus ratio dead-menu ONLY** — remove the per-game in-game HUD
-      line added in v0.0.9 (owner: "not for each game in-game scene, i said
-      dead menu only"); keep the dead-menu line
-- [ ] **Allow reminders STILL dead** — owner: study the notify plugin + the
-      Godot version + real examples; make it SIMPLE (just ask for the
-      notifications permission); no weird slop fallbacks (ladders/watchdogs out)
+- [x] **Resolution/scale**: DENSITY RULE in main.gd — content_scale_factor =
+      720/clamp(device_short_px, 840..1152): the owner's 1080x2400 phone now
+      runs a ~1080x2400 logical viewport (things render smaller, +50% room,
+      text still sharp). Small devices floored at 840, flagships capped at
+      1152. Verified by the NEW tests/geometry_probe.gd (boots the real main
+      scene, fails on any control outside the viewport — all 3 configs FIT;
+      it also PROVED the two reported 720-width overflows). Banner reserve is
+      now computed from real dpi. docs/RESOLUTION_RULE.md §5 written.
+- [x] **Top-picks right arrow out of resolution** — probe-measured root
+      cause: carousel row 764px wide vs 720 logical width; fits at every
+      density the rule now produces
+- [x] **UNLOCKED! badge clipping** — _ribbon sizes the panel from the real
+      text width (Kenney_Rocket.get_string_size) + padding, grows inward
+- [x] **NEW! on mystery black boxes** — never rendered anymore (owner:
+      "black boxes just stay a mystery"); badge state still tracked in Box
+- [x] **Score-bonus ratio dead-menu ONLY** — game_base.gd HUD line removed;
+      Arc.bonus_ratio_text + the host_node dead-menu line stay
+- [x] **Allow reminders STILL dead** — ROOT CAUSE FOUND + fixed: Godot
+      android plugins do no snake_case→camelCase conversion (docs: "There is
+      no coercing snake_case to camelCase"); the addon called
+      native.request_permission() while Java had requestPermission() — every
+      call silently errored since v0.0.6. Java methods renamed to snake_case,
+      ladder/watchdog slop deleted (plain official ask), NEW flow_test
+      name-parity test parses every native.* call against the Java class
 
 ## C. Ship
 
-- [ ] `config/projects.json` → 0.1.0 / 30190
+- [x] `config/projects.json` → 0.1.0 / 30190
 - [ ] flow_test.gd updated + ALL PASS
 - [ ] Build both ABIs, verify signature == arsenal cert, backup to download/
 - [ ] Push, CI green, worklog entry

@@ -65,8 +65,43 @@ What read as "small internal resolution" on a 1080x2400 phone was:
    menu top bar. That was a LAYOUT bug, not a resolution one. Fixed by
    measuring the chip and giving the button its real width (v0.0.9).
 
-DECISION (do not relitigate without the owner): the logical layout stays
+DECISION (v0.0.9, SUPERSEDED by §5 below): the logical layout stayed
 720-based. Rewriting every coordinate/font/asset to a 1080 base would buy
 nothing the engine does not already do (text renders at native res) and
 would risk regression across ~4000 lines of UI code. Sharpness comes from
 hi-res art; placement comes from anchors; the ROOM comes from `expand`.
+
+## 5. THE DENSITY RULE (v0.1.0 — owner relitigated it, and was right)
+
+Owner, after v0.0.9: "make the app scale/resolution bigger so things look
+smaller... using the phone native resolution could fix most of the annoying
+stuff... make it accurately." He was correct: the v0.0.9 answer ("720 base
+is free because text renders sharp") was true for SHARPNESS and false for
+LAYOUT ROOM. The geometry probe (tests/geometry_probe.gd) proved the 720
+logical width left the top bar 764px wide (gear icon off-screen) and the
+carousel row 764px wide (top-picks right arrow off-screen) — the exact bugs
+reported from the device.
+
+**The rule now** (main.gd `_apply_density`, runs before the menu builds):
+
+```
+content_scale_factor = 720 / clamp(device_short_side_px, 840, 1152)
+```
+
+- 1080x2400 phone -> factor 0.667 -> **1080x2400 logical viewport** (native
+  room; everything physically smaller; text still rasterized sharp).
+- 1440p flagships -> capped at 0.625 (logical 1152) so UI stays readable.
+- Small devices -> floored at 0.857 (logical 840): the measured UI needs
+  ~796 logical px; below that the gear icon and right arrow hang off-screen
+  (probe config A). 840 leaves ~40px headroom.
+- Headless tests: the virtual window is 720x1280 -> the floor applies ->
+  tests see 840x1493. fit_sheet-style checks must read the REAL viewport
+  (`get_viewport_rect()`), never hardcode 720x1280 (flow_test does this).
+- Banner safe area is no longer a constant: `menu.gd _banner_safe_px()`
+  converts the native 52dp banner into logical px via real dpi and the
+  px-per-logical ratio.
+
+Verification tool: `godot --headless --path projects/gogabox -s
+res://tests/geometry_probe.gd` — boots the real main scene at floor/phone/
+cap logical viewports and FAILS on any control outside the viewport. Run it
+before shipping any layout change.
