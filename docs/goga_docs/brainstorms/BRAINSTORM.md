@@ -37,3 +37,26 @@
   maybe plain opt-in name entry.
 - Fruit Slasher frenzy power-up (rewarded ad: 10s slow-mo).
 - Snake shield: one free crash per run via rewarded ad.
+
+## v0.1.2 owner directives (verbatim, 2026-08-31)
+- "the horizontal position is now corrupted, it just uses the vertical
+  resolution and shows it in vertical area at the middle and the sides are
+  black" -> the landscape fix (RESOLUTION_RULE section 7).
+- "make the universal scale just 1920x1080 ... 9:16 and 16:9 based on the
+  position ... not too much small while still giving us better space" ->
+  the FHD designs.
+- "make sure the internal resolution scaler will handle different phones
+  aspect ratios so things do not go out of screen ... still the same in
+  different phones" -> aspect KEEP letterboxing, brown bars.
+- "moving background ... i see a duplicated image with lower opacity and
+  moves to make the illusion, i recommend you to use code directly after
+  you see the background and detect the two main colors and control them
+  to make the move in a cool way" -> bg_stripe.gdshader (colors detected:
+  #261508 / #35200d / #422a16; drift + parallax dots + 26s sheen sweep).
+- "there is an SFX for battery recharged while in the app, can you update
+  so it be batteries-for-a-round recharged instead? this will let the user
+  be notified when an enough capacity for a game is ready for extra round"
+  -> battery_round_ready crossing ping.
+- "i tested the notifications system for the GOGABatteries full, it showed
+  the notification but i heard no audio for it" -> v3 channels + migration
+  + logcat diagnostics; phone-side checklist in PLAN_v0.1.2 section 5.

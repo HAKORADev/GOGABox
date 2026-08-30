@@ -68,6 +68,13 @@ func _ready() -> void:
         _root.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _layer.add_child(_root)
         _root.resized.connect(_on_resized)
+        # v0.1.2 THE ROTATION HOOK: _root.resized alone can NEVER fire on a
+        # plain rotation - with aspect KEEP the visible rect IS the old design
+        # until the design swaps, so nothing told the menu "the window turned"
+        # (the root cause of the v0.1.1 stuck-portrait landscape). The WINDOW
+        # resize signal is the honest one: it fires on the device with real
+        # pixel changes, then _apply_base re-decides the design from pixels.
+        get_window().size_changed.connect(_apply_base)
 
         _build_background()
 
@@ -110,6 +117,7 @@ func _ready() -> void:
         t.autostart = true
         t.timeout.connect(func():
                 Roadmap.tick()
+                Box.poll_game_batteries()   # v0.1.2: round-ready pings tick live
                 _update_battery_chip())
         add_child(t)
 
@@ -146,6 +154,12 @@ func set_active(on: bool) -> void:
                 (_toast["layer"] as CanvasLayer).visible = on
         process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
         _set_feed_lock(not on)
+        if on:
+                # v0.1.2: the host's _restore pins the portrait design blindly -
+                # re-decide from the REAL window on the way out (a landscape-held
+                # phone must get the landscape design NOW, not after the next
+                # rotation). GameHost.end_session already ran -> no guard fight.
+                _apply_base()
 
 # ---------------------------------------------------------------- layout
 
@@ -156,18 +170,33 @@ func _on_resized() -> void:
         if GameHost.active_host != null:
                 return
         _apply_base()
-        _update_background()
         _layout()
 
-## THE SCALING RULE (v0.1.1 universal resolution): the design is a FIXED
-## 1080x2400 portrait / 2400x1080 landscape (aspect KEEP - the engine scales
-## it to the window). Re-apply the matching design on EVERY resize (launch
-## state, rotation, game return) so the swap is instant and total.
+## v0.1.2 test hook: the geometry probe drives orientation headless (the
+## fake window never rotates there). "" = decide from the real window, the
+## device behavior.
+var orientation_override := ""
+
+## THE SCALING RULE (v0.1.2 universal FHD): the design is a FIXED 1080x1920
+## portrait / 1920x1080 landscape (9:16 / 16:9 - the owner's FHD+ phone
+## renders it at exactly 1:1 native pixels, and every other aspect just
+## letterboxes with box-brown bars under aspect KEEP).
+## v0.1.2 THE LANDSCAPE FIX: the decision reads the REAL WINDOW PIXELS
+## (DisplayServer), never _root.size. _root lives in DESIGN space, so once
+## the portrait design is applied its rect is 1080x1920-shaped forever - the
+## old "s.x > s.y" check could never flip, and landscape rendered the
+## portrait design letterboxed dead-center (the owner's black-sides bug).
 func _apply_base() -> void:
-        var s := _root.size
-        if s.x <= 0.0 or s.y <= 0.0:
-                return
-        var want := Vector2i(2400, 1080) if s.x > s.y else Vector2i(1080, 2400)
+        var want := Vector2i(1080, 1920)
+        if orientation_override == "landscape":
+                want = Vector2i(1920, 1080)
+        elif orientation_override == "portrait":
+                pass
+        else:
+                var ws := DisplayServer.window_get_size()
+                if ws.x <= 0 or ws.y <= 0:
+                        return
+                want = Vector2i(1920, 1080) if ws.x > ws.y else Vector2i(1080, 1920)
         var win := get_window()
         if win.content_scale_size != want:
                 win.content_scale_size = want
@@ -926,35 +955,29 @@ var _fx: Control
 var _fx_dots: Array = []   # {pos, spd, size, phase}
 var _fx_night := false
 
-# v0.1.1 OWNER BRAINSTORM: the drifting neon STRIPES are gone ("i will remove
-# that effect of weird strips") - the striped bg_main.png itself now drifts
-# DOWN slowly instead ("the background move down slowly since it's stripped").
-# A Sprite2D with a repeated region does the scroll; the pattern wraps forever.
-var _bg: Sprite2D
-var _bg_off := 0.0
-const BG_SPEED := 14.0     # logical px per second - a slow, calm drift
+# v0.1.2 OWNER DIRECTIVE: the v0.1.1 region-scrolled bg_main.png Sprite2D
+# read as "a duplicated image with lower opacity moving to make the illusion".
+# The background is now DRAWN IN CODE (bg_stripe.gdshader): the two main
+# colors DETECTED from bg_main.png (scripts/v012_bg_colors.py -> base
+# #261508, stripe #35200d, dots #422a16) drive a 45-degree stripe field +
+# staggered dot grid that drift forever - fract() math, so the loop is
+# mathematically seamless, always FULL opacity (no ghost copy). A soft sheen
+# band sweeps down every 26s: the cool, alive version of "move the bg".
+const BG_BASE := Color("261508")
+const BG_STRIPE := Color("35200d")
+const BG_DOT := Color("422a16")
 
 func _build_background() -> void:
-        _bg = Sprite2D.new()
-        _bg.texture = load("res://assets/ui/bg_main.png")
-        _bg.centered = false
-        _bg.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-        _bg.region_enabled = true
-        _root.add_child(_bg)
-        _update_background()
-
-func _update_background() -> void:
-        if _bg == null or not is_instance_valid(_bg):
-                return
-        var vp := _root.size
-        if vp.x <= 0.0 or vp.y <= 0.0:
-                return
-        # cover the viewport (KEEP_ASPECT_COVERED equivalent), crop the rest
-        var tex := _bg.texture.get_size()
-        var s := maxf(vp.x / tex.x, vp.y / tex.y)
-        _bg.scale = Vector2(s, s)
-        # region window = the visible slice of the (repeating) texture
-        _bg.region_rect = Rect2(0, -_bg_off, vp.x / s, vp.y / s)
+        var bg := ColorRect.new()
+        bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+        bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var mat := ShaderMaterial.new()
+        mat.shader = load("res://assets/ui/bg_stripe.gdshader")
+        mat.set_shader_parameter("base_col", BG_BASE)
+        mat.set_shader_parameter("stripe_col", BG_STRIPE)
+        mat.set_shader_parameter("dot_col", BG_DOT)
+        bg.material = mat
+        _root.add_child(bg)
 
 func _build_particles() -> void:
         _fx = Control.new()
@@ -962,10 +985,10 @@ func _build_particles() -> void:
         _fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _fx.draw.connect(_draw_fx)
         _root.add_child(_fx)
-        _root.move_child(_fx, 1)   # above bg, below everything interactive
+        _root.move_child(_fx, 1)   # above the shader bg (child 0), below the feed
         var hour := int(Time.get_time_dict_from_system()["hour"])
         _fx_night = hour >= 19 or hour < 6
-        # dust spawn field uses the REAL design viewport (1080x2400)
+        # dust spawn field uses the REAL design viewport (1080x1920)
         for i in 34:
                 _fx_dots.append({
                         "pos": Vector2(randf() * _root.size.x, randf() * _root.size.y),
@@ -975,13 +998,6 @@ func _build_particles() -> void:
                 })
 
 func _process(delta: float) -> void:
-        # the striped background drifts slowly DOWN (v0.1.1 owner brainstorm)
-        if _bg != null and is_instance_valid(_bg):
-                _bg_off = fmod(_bg_off + delta * BG_SPEED, 1280.0)
-                var vp := _root.size
-                if vp.x > 0.0 and vp.y > 0.0:
-                        var s: float = _bg.scale.x
-                        _bg.region_rect = Rect2(0, -_bg_off, vp.x / s, vp.y / s)
         if _fx == null or not is_instance_valid(_fx):
                 return
         var vr := _root.size
@@ -996,9 +1012,8 @@ func _process(delta: float) -> void:
         _fx.queue_redraw()
 
 func _draw_fx() -> void:
-        # v0.1.1: ONLY the floating dust now - the "weird strips" (the slow
-        # diagonal neon lines) are REMOVED per the owner brainstorm; the
-        # background motion itself is the effect now.
+        # v0.1.2: ONLY the floating dust - the background motion itself is
+        # the effect now (bg_stripe.gdshader stripes + dots + sheen).
         var dot_col := Color(1.0, 0.85, 0.45, 0.5) if not _fx_night \
                         else Color(0.75, 0.85, 1.0, 0.5)
         for d in _fx_dots:

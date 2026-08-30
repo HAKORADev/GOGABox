@@ -25,13 +25,15 @@ Ads="*res://addons/unity_ads/ads.gd"
 
 [display]
 
-; v0.1.1 THE UNIVERSAL RESOLUTION (owner rule): ONE design size per
-; orientation - 1080x2400 portrait / 2400x1080 landscape (the owner phone's
-; FHD). Every device scales this design up or down (aspect KEEP, so odd
-; aspects get letterbox bars painted in the box brown below). One design =
-; one layout math everywhere, and rotation switches DESIGN, not scale.
+; v0.1.2 THE UNIVERSAL FHD RESOLUTION (owner rule): ONE design size per
+; orientation - 1080x1920 portrait / 1920x1080 landscape (9:16 / 16:9; the
+; owner's FHD+ phone renders them at exactly 1:1 native pixels). Every
+; device scales this design up or down (aspect KEEP, so odd aspects get
+; letterbox bars painted in the box brown below). One design = one layout
+; math everywhere; rotation swaps DESIGN (host_node / menu._apply_base),
+; decided from the REAL window pixels.
 window/size/viewport_width=1080
-window/size/viewport_height=2400
+window/size/viewport_height=1920
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"

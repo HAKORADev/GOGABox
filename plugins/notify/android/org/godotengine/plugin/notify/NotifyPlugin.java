@@ -46,12 +46,18 @@ public class NotifyPlugin extends GodotPlugin {
     private static final String KEY_PENDING = "pending";
     private static final int REQ_POST_NOTIFICATIONS = 4711;
 
-    // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
-    // new sounds need new ids on already-installed devices). Each channel has
-    // its own raw-resource sound: batteries-full / game-ready / general.
-    private static final String CHANNEL_GENERAL = "gogabox_general_v2";
-    private static final String CHANNEL_BATTERY = "gogabox_battery_v2";
-    private static final String CHANNEL_READY = "gogabox_ready_v2";
+    // MODULAR SOUND CHANNELS (v3 ids: channel sound is FIXED at creation and
+    // channels are immutable, so any suspected corruption/legacy state on an
+    // installed device can only be recovered with NEW ids - v0.1.2 owner
+    // report: the batteries-full notification arrived SILENT). Each channel
+    // has its own raw-resource sound: batteries / game-ready / general.
+    // The v2 ids (v0.0.5..v0.1.1) are deleted on upgrade + migrated so no
+    // silent ghost channels linger in the system settings.
+    private static final String CHANNEL_GENERAL = "gogabox_general_v3";
+    private static final String CHANNEL_BATTERY = "gogabox_battery_v3";
+    private static final String CHANNEL_READY = "gogabox_ready_v3";
+    private static final String[] LEGACY_CHANNELS = {
+            "gogabox_general_v2", "gogabox_battery_v2", "gogabox_ready_v2"};
 
     private final android.app.Activity activity;
 
@@ -247,6 +253,10 @@ public class NotifyPlugin extends GodotPlugin {
         if (Build.VERSION.SDK_INT >= 26) {
             createChannels(nm, ctx);
             b = new Notification.Builder(ctx, channelId);
+            NotificationChannel live = nm.getNotificationChannel(channelId);
+            android.util.Log.i("GOGANotify", "post id=" + id + " channel=" + channelId
+                    + " sound=" + (live != null ? String.valueOf(live.getSound()) : "MISSING")
+                    + " importance=" + (live != null ? live.getImportance() : -1));
         } else {
             b = new Notification.Builder(ctx);
         }
@@ -267,12 +277,17 @@ public class NotifyPlugin extends GodotPlugin {
         post(ctx, id, title, body, CHANNEL_GENERAL);
     }
 
-    /** Creates the three sound-equipped channels (idempotent). */
+    /** Creates the three sound-equipped channels (idempotent). Deletes the
+     *  legacy v2 ids first (channel settings are immutable - the only
+     *  upgrade path past any silent legacy state is fresh ids). */
     private static void createChannels(NotificationManager nm, Context ctx) {
+        for (String oldId : LEGACY_CHANNELS) {
+            nm.deleteNotificationChannel(oldId);
+        }
         makeChannel(nm, ctx, CHANNEL_GENERAL, "GOGABox",
                 "General GOGABox news", "notify_general");
         makeChannel(nm, ctx, CHANNEL_BATTERY, "GOGABatteries",
-                "Batteries fully charged reminders", "notify_battery");
+                "Batteries charged reminders", "notify_battery");
         makeChannel(nm, ctx, CHANNEL_READY, "Games ready",
                 "Revealed and ready-to-play announcements", "notify_ready");
     }
@@ -295,8 +310,14 @@ public class NotifyPlugin extends GodotPlugin {
                                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                                 .build();
                 ch.setSound(soundUri, attrs);
+            } else {
+                android.util.Log.w("GOGANotify", "raw resource missing for channel "
+                        + channelId + " (" + rawSound + ") - channel would be SILENT");
             }
+            ch.enableVibration(true);
             nm.createNotificationChannel(ch);
+            android.util.Log.i("GOGANotify", "channel " + channelId + " created sound="
+                    + ch.getSound() + " importance=" + ch.getImportance());
         }
     }
 
@@ -307,9 +328,25 @@ public class NotifyPlugin extends GodotPlugin {
         if (e == null) {
             return;
         }
-        String channel = e.optString("channel", CHANNEL_GENERAL);
+        String channel = migrateChannel(e.optString("channel", CHANNEL_GENERAL));
         post(ctx, id, e.optString("title", "GOGABox"), e.optString("body", ""), channel);
         unpersist(ctx, id);
+    }
+
+    /** Schedules persisted by older builds may carry a legacy channel id;
+     *  posting to a deleted channel would fall back to a silent system
+     *  bucket - remap them to the live v3 channels. */
+    static String migrateChannel(String ch) {
+        if ("gogabox_general_v2".equals(ch)) {
+            return CHANNEL_GENERAL;
+        }
+        if ("gogabox_battery_v2".equals(ch)) {
+            return CHANNEL_BATTERY;
+        }
+        if ("gogabox_ready_v2".equals(ch)) {
+            return CHANNEL_READY;
+        }
+        return ch == null || ch.isEmpty() ? CHANNEL_GENERAL : ch;
     }
 
     /** App context: the activity when alive, else the engine context. */

@@ -6,6 +6,7 @@ signal coins_changed(total: int)
 signal game_unlocked(id: String)
 signal reveal_changed(id: String)   # a game's feed state changed (mystery->locked...)
 signal batteries_changed
+signal battery_round_ready          # v0.1.2: an extra ROUND just became affordable
 
 const SAVE_PATH := "user://gogabox.json"
 const START_COINS := 150
@@ -209,8 +210,10 @@ func _credit_offline() -> void:
                 p["count"] = clampi(before + add, 0, BOX_BATTERY_CAP)
                 save()
                 batteries_changed.emit()
-                if int(p["count"]) >= BOX_BATTERY_CAP and before < BOX_BATTERY_CAP:
-                        _battery_full_sfx()   # filled up while we were away
+                # v0.1.2 OWNER RULE: ping "a round became ready", not "full" -
+                # here the BANK crossed one round's worth while we were away
+                if before < _round_need() and int(p["count"]) >= _round_need():
+                        _battery_round_sfx()
 
 ## Closed time still needed for the next +1 (0 when full). CONSTANT while
 ## the app is open (the bank only moves while closed) - the battery sheet
@@ -252,12 +255,18 @@ func game_battery(id: String) -> Dictionary:
                 var elapsed := now - int(p.get("ts", now))
                 var regen := elapsed / step
                 if regen > 0:
+                        var before := count
                         count = mini(cap, count + regen)
                         p["ts"] = now - (elapsed % step)
                         p["count"] = count
                         save()
-                        if count >= cap:
-                                _battery_full_sfx()   # this pool just filled up
+                        # v0.1.2 OWNER RULE: the in-app sound is "batteries for
+                        # a ROUND recharged" - the pool just crossed one round's
+                        # worth (below per_round before, at/above it now). The
+                        # old pool-is-full ping is GONE ("instead", owner).
+                        var need := int(g["charges"].get("per_round", 2))
+                        if before < need and count >= need:
+                                _battery_round_sfx()
         var regen_in := 0
         if count < cap:
                 regen_in = step - ((now - int(p.get("ts", now))) % step)
@@ -309,15 +318,40 @@ func _notification(what: int) -> void:
                 _credit_offline()      # credit the closed time right away
                 _cancel_battery_notifications()
 
-## In-app "pool just hit full" ping (the device channel handles the away-case).
-## Cooldown keeps lazy regen reads from spamming the sound.
-func _battery_full_sfx() -> void:
+## v0.1.2 menu-tick helper: read every owned charged game's pool so lazy
+## regen (and the round-ready ping) happens LIVE while the player sits in
+## the box - not only when a sheet or pre-play page happens to read it.
+## Pure reads at steady state (no save, no signal unless regen moved a pool).
+func poll_game_batteries() -> void:
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if owns_game(id):
+                        game_battery(id)
+
+## In-app "a round just became ready" ping (v0.1.2 owner rule - REPLACES the
+## old pool-is-full ping: "can you update so it be batteries-for-a-round
+## recharged instead?"). Cooldown keeps regen reads from spamming the sound.
+func _battery_round_sfx() -> void:
         var now := int(Time.get_unix_time_from_system())
-        if now - int(meta().get("batt_full_sfx_at", 0)) < 90:
+        if now - int(meta().get("batt_ping_at", 0)) < 90:
                 return
-        meta()["batt_full_sfx_at"] = now
+        meta()["batt_ping_at"] = now
         save()
+        battery_round_ready.emit()
         Notify.play_kind_sfx("battery_full")
+
+## One round's cost on the GLOBAL side: the fattest per_round among owned
+## charged games (a round spends it from the game pool AND the bank).
+func _round_need() -> int:
+        var need := 0
+        for g in GameReg.playable():
+                if not owns_game(String(g["id"])):
+                        continue
+                var ch: Dictionary = g.get("charges", {})
+                if ch.is_empty():
+                        continue
+                need = maxi(need, int(ch.get("per_round", 2)))
+        return need if need > 0 else 2
 
 func _battery_notify_id(key: String) -> int:
         var h := 0

@@ -9,16 +9,16 @@ var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
-        # v0.1.1 THE UNIVERSAL RESOLUTION (owner rule, replaces the v0.1.0
-        # density rule): ONE pre-set design size per orientation - 1080x2400
-        # portrait / 2400x1080 landscape (the owner phone's FHD). The engine
-        # scales that design to ANY window (stretch canvas_items + aspect
-        # KEEP), so games and menu are designed ONCE and every other device
-        # just gets the scale-up/down. No per-device math anywhere anymore,
-        # and the "landscape phone opens a portrait game and it renders with
-        # the old orientation's resolution, too small" bug is structurally
-        # impossible: rotation now swaps the DESIGN, never the scale.
-        # menu is built immediately, the splash covers it while the engine warms up
+        # v0.1.2 THE UNIVERSAL FHD RESOLUTION (owner rule): ONE pre-set design
+        # size per orientation - 1080x1920 portrait / 1920x1080 landscape
+        # (9:16 / 16:9). The engine scales that design to ANY window (stretch
+        # canvas_items + aspect KEEP), so games and menu are designed ONCE and
+        # every other device just gets the scale-up/down (odd aspects get
+        # box-brown letterbox bars). v0.1.2 THE LANDSCAPE FIX: the menu now
+        # decides the design from the REAL window pixels (menu._apply_base) +
+        # the window size_changed signal - rotation can never stick it in the
+        # wrong design again. menu is built immediately, the splash covers it
+        # while the engine warms up
         _menu = Node2D.new()
         _menu.name = "Menu"
         _menu.set_script(load("res://game/menu/menu.gd"))
@@ -33,10 +33,10 @@ func _ready() -> void:
 
         _show_splash()
 
-## v0.1.1: the v0.1.0 per-device density rule is GONE - the universal design
-## resolution lives in project.godot (1080x2400, aspect KEEP) and the only
-## runtime knobs left are the two pre-set designs swapped on rotation
-## (host_node._apply_orientation / menu._apply_base).
+## v0.1.2: the design resolution lives in project.godot (1080x1920, aspect
+## KEEP) and the only runtime knobs left are the two pre-set designs swapped
+## on rotation (host_node._apply_orientation / menu._apply_base - the menu
+## re-decides from the real window pixels on set_active(true) too).
 
 ## A game is its OWN WORLD: while it runs the menu is fully hidden AND stops
 ## processing - no layering weirdness, no taps leaking into the feed, no

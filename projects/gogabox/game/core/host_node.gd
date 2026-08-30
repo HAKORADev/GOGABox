@@ -84,25 +84,27 @@ func _flush_time() -> void:
                 _accum = 0.0
 
 func _apply_orientation(landscape: bool) -> void:
-        # v0.1.1 UNIVERSAL RESOLUTION: the two pre-set designs. The old
-        # 720x1280/1280x720 pins are why a landscape phone opening a portrait
-        # game rendered with the OLD orientation's resolution ("too small"):
-        # with aspect=expand the content scale size fought the real window.
-        # Now the design swaps with the orientation and the engine scales it
-        # to whatever the window is - same look on every device.
+        # v0.1.2 UNIVERSAL FHD RESOLUTION: the two pre-set designs are now
+        # 1080x1920 portrait / 1920x1080 landscape (9:16 / 16:9 - the owner's
+        # FHD+ panel renders them at exactly 1:1 native px, and every other
+        # aspect letterboxes under aspect KEEP). The design swaps with the
+        # orientation and the engine scales it to whatever the window is -
+        # same look on every device.
         var root := get_window()
         if landscape:
-                root.content_scale_size = Vector2i(2400, 1080)
+                root.content_scale_size = Vector2i(1920, 1080)
                 DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
         else:
-                root.content_scale_size = Vector2i(1080, 2400)
+                root.content_scale_size = Vector2i(1080, 1920)
                 DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_PORTRAIT)
 
 func _restore() -> void:
-        # box level: free rotation again; the menu re-lays itself out on resize
+        # box level: free rotation again. The portrait pin is just the safe
+        # default - menu.set_active(true) re-decides the design from the REAL
+        # window pixels the moment the session ends (v0.1.2).
         _flush_time()
         var root := get_window()
-        root.content_scale_size = Vector2i(1080, 2400)
+        root.content_scale_size = Vector2i(1080, 1920)
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:

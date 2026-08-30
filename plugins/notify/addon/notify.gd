@@ -17,10 +17,14 @@ extends Node
 ## new kind = one entry in KINDS below + one raw wav. Nothing else.
 
 ## kind -> {channel: android channel id, sfx: Jukebox name}
+## v0.1.2: channel ids bumped v2 -> v3. Channels are immutable on the
+## device, so the only cure for a silent legacy channel state (the owner's
+## silent batteries notification) is FRESH ids; the Java side deletes the
+## v2 ids + migrates pending schedules on upgrade.
 const KINDS := {
-        "general": {"channel": "gogabox_general_v2", "sfx": "general"},
-        "battery_full": {"channel": "gogabox_battery_v2", "sfx": "battery_full"},
-        "game_ready": {"channel": "gogabox_ready_v2", "sfx": "game_ready"},
+        "general": {"channel": "gogabox_general_v3", "sfx": "general"},
+        "battery_full": {"channel": "gogabox_battery_v3", "sfx": "battery_full"},
+        "game_ready": {"channel": "gogabox_ready_v3", "sfx": "game_ready"},
 }
 
 var native: Object = null

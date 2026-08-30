@@ -138,3 +138,38 @@ letterboxing: non-20:9 devices get bars painted in the box brown
 - Verification: geometry_probe boots the REAL scene at BOTH designs and
   fails on any control outside the design viewport. flow_test asserts the
   portrait design is restored after every game closes.
+
+## 7. THE UNIVERSAL FHD RESOLUTION (v0.1.2 — 16:9/9:16 designs + the landscape fix)
+
+Owner feedback after testing v0.1.1 on the FHD+ phone:
+
+- LANDSCAPE WAS CORRUPTED: "it just uses the vertical resolution and shows
+  it in vertical area at the middle and the sides are black". Root cause
+  found in code: `menu._apply_base()` decided the orientation from
+  `_root.size` — but `_root` lives in DESIGN space. Once the portrait
+  design was applied, its rect was 1080x2400-shaped FOREVER, so the
+  `s.x > s.y` check could never flip, and the engine letterboxed the
+  portrait design dead-center on the landscape window. (The reverse
+  rotation looked "fixed" only because portrait was already the design.)
+- The fixes, structural:
+  1. The decision reads the REAL WINDOW PIXELS (`DisplayServer.window_get_size()`),
+     never design space.
+  2. A plain rotation never fires `_root.resized` (the visible rect does
+     not change until the design swaps) — so the menu also hooks
+     `get_window().size_changed`, which DOES fire on the device.
+  3. `menu.set_active(true)` re-decides the design when a game ends (the
+     host's `_restore()` pins portrait blindly; a landscape-held phone
+     must get the landscape design immediately).
+- NEW DESIGN SIZES (owner): 1080x1920 portrait / 1920x1080 landscape —
+  9:16 / 16:9. The owner's FHD+ panel renders them at exactly 1:1 native
+  pixels; UI elements stay physically identical on 16:9 and 20:9 phones
+  ("not too much small while still giving us better space").
+- Aspect-ratio safety (owner: "handle different phones aspect ratios so
+  things do not go out of screen ... and still the same in different
+  phones"): stretch canvas_items + aspect KEEP — every phone sees the
+  SAME logical room; taller/wider screens get letterbox bars painted in
+  the box brown. Nothing can ever lay out off-screen.
+- Verification: geometry_probe no longer pins the design itself — it sets
+  `menu.orientation_override` and lets the REAL `_apply_base` code apply
+  the design, then fails if the visible rect is not exactly the design or
+  any control pokes out. This is the exact regression that was broken.
