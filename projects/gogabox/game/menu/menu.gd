@@ -928,7 +928,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                                                 Color(0, 0, 0, 0.4), 16, Color(1, 1, 1, 0.85))
                                 dchip.position = Vector2(14, 272)
                                 b.add_child(dchip)
-                        elif id != "snake" and Roadmap.can_play_now(id):
+                        elif not Box.pays_partial_fee(id) and Roadmap.can_play_now(id):
                                 var chip := Arc.chip("ready to play", "", Color(0, 0, 0, 0.12), 18, Color("8a6a40"))
                                 chip.position = Vector2(14, 272)
                                 b.add_child(chip)
@@ -1057,13 +1057,15 @@ var _fx_night := false
 # read as "a duplicated image with lower opacity moving to make the illusion".
 # The background is now DRAWN IN CODE (bg_stripe.gdshader): the two main
 # colors DETECTED from bg_main.png (scripts/v012_bg_colors.py -> base
-# #261508, stripe #35200d, dots #422a16) drive a 45-degree stripe field +
-# staggered dot grid that drift forever - fract() math, so the loop is
-# mathematically seamless, always FULL opacity (no ghost copy). A soft sheen
-# band sweeps down every 26s: the cool, alive version of "move the bg".
+# #261508, stripe #35200d) drive a 45-degree stripe field that drifts
+# forever - fract() math, so the loop is mathematically seamless, always
+# FULL opacity (no ghost copy). A soft sheen band sweeps down every 26s: the
+# cool, alive version of "move the bg".
+# v0.1.5 OWNER CALL: the recreated dot grid (and the png's own baked dots,
+# inpainted away) are RETIRED - "weird dots, 3 dots per line". BG_DOT is no
+# longer a thing; the field is pure stripes + shade + sheen.
 const BG_BASE := Color("261508")
 const BG_STRIPE := Color("35200d")
-const BG_DOT := Color("422a16")
 
 func _build_background() -> void:
         var bg := ColorRect.new()
@@ -1073,7 +1075,6 @@ func _build_background() -> void:
         mat.shader = load("res://assets/ui/bg_stripe.gdshader")
         mat.set_shader_parameter("base_col", BG_BASE)
         mat.set_shader_parameter("stripe_col", BG_STRIPE)
-        mat.set_shader_parameter("dot_col", BG_DOT)
         _bg_mat = mat
         bg.material = mat
         _root.add_child(bg)
@@ -1413,7 +1414,8 @@ func _open_guide(g: Dictionary) -> void:
         var gid2 := String(g["id"])
         facts += "entry fee %d GOGACoins" % int(g.get("fee", 0))
         # v0.1.4 owner rule, stated in plain words where players read
-        if gid2 == "snake" and int(g.get("fee", 0)) > 0:
+        # (v0.1.5: any game wearing the shared partial-pay entry policy)
+        if Box.pays_partial_fee(gid2) and int(g.get("fee", 0)) > 0:
                 facts += " (less coins in the box? you play for ALL of them)"
         if g.has("daily_rounds") or g.has("daily_minutes"):
                 facts += "\ndaily limit: %s - resets at 12 AM" % Roadmap.daily_text(gid2)
@@ -1634,9 +1636,10 @@ func _open_game_page(g: Dictionary) -> void:
         # v0.1.4 OWNER RULE (snake entry): the starter charges min(fee, wallet)
         # - a thin wallet pays EVERY coin ("use all money so the player plays
         # and have 0 coins"), an empty wallet plays free. Other games demand
-        # the full fee (nothing changed for them).
-        var partial := id == "snake" and fee > 0
-        var pay := Box.snake_entry_cost(fee) if partial else fee
+        # the full fee (nothing changed for them). v0.1.5: read from the
+        # registry's shared entry policy - no game name hardcoded here.
+        var partial := Box.pays_partial_fee(id) and fee > 0
+        var pay := Box.entry_cost(id, fee) if partial else fee
         var free_play: bool = partial and pay <= 0
         var can_pay: bool = pay <= 0 or Box.coins() >= pay
         var can_batt: bool = true

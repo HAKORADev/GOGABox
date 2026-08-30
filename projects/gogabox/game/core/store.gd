@@ -451,14 +451,31 @@ func give_charges(id: String, n: int) -> int:
         charges_changed.emit(id)
         return move
 
-## v0.1.4 OWNER RULE (snake entry): the old "coins < 10 -> free play" was an
-## exploit - a 9-coin player farmed forever without paying. Now the starter
-## charges min(fee, wallet): a fat wallet pays the fee, a thin wallet pays
-## EVERY coin it has, an empty wallet plays free (anti-softlock stays).
-func snake_entry_cost(fee: int) -> int:
+## v0.1.5 THE SHARED ENTRY POLICY (the v0.1.4 snake rule, generalized - the
+## owner's "expand the code, don't replace it" call): a game whose registry
+## entry wears "entry": {"partial_pay": true} charges min(fee, wallet) at
+## entry AND retry - a fat wallet pays the fee, a thin wallet pays EVERY
+## coin it has, an empty wallet plays free (anti-softlock stays). Games
+## without the key still demand the full fee. The BOX reads the key; no
+## game is ever hardcoded by name again.
+func pays_partial_fee(id: String) -> bool:
+        var g := GameReg.get_game(id)
+        return not g.is_empty() and bool(g.get("entry", {}).get("partial_pay", false))
+
+## What game `id` actually pays for one entry/retry with registry fee `fee`:
+## full fee, min(fee, wallet) under the partial-pay policy, or 0 (no fee /
+## empty wallet under partial pay - still playable).
+func entry_cost(id: String, fee: int) -> int:
         if fee <= 0:
                 return 0
-        return mini(fee, maxi(0, coins()))
+        if pays_partial_fee(id):
+                return mini(fee, maxi(0, coins()))
+        return fee
+
+## v0.1.4 original helper, kept working (tests + callers): the snake flavor
+## of the shared entry_cost policy. Same numbers it always gave.
+func snake_entry_cost(fee: int) -> int:
+        return entry_cost("snake", fee)
 
 ## Anti-softlock: the cheapest fee across owned, playable games.
 func cheapest_owned_fee() -> int:

@@ -39,16 +39,24 @@ static func label(txt: String, size: int, color := INK, use_display := true) -> 
 
 ## v0.1.1 OWNER RULE ("long names will go out of space"): dynamic text size
 ## for fixed-width spots - the more text, the smaller the font, so the name
-## ALWAYS fits its box. Steps the font down from `size` until the text fits
-## `max_w` (floor 12). Used by every feed tile + carousel card title; the
+## ALWAYS fits its box. Used by every feed tile + carousel card title; the
 ## pre-play page keeps its scroll, so it stays big there.
 static func fit_label(txt: String, size: int, color: Color, max_w: float,
                 use_display := true) -> Label:
-        var f := font_big() if use_display else font_ui()
+        return label(txt, fit_size(txt, size, max_w, null, use_display), color, use_display)
+
+## v0.1.5 THE ONE MEASURER (shared, was fit_label's private loop): step a
+## font size down until the rendered line lands inside `max_w`. Any screen
+## with a new text spot reuses THIS - no second guess-the-width rule.
+## `f == null` -> the standard Box font for `use_display`. The floor keeps
+## microscopic sizes out (callers pick their own floor when they care).
+static func fit_size(txt: String, size: int, max_w: float, f: Font,
+                use_display := true, floor_size := 12) -> int:
+        var font := f if f != null else (font_big() if use_display else font_ui())
         var fs := size
-        while fs > 12 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > max_w:
+        while fs > floor_size and font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > max_w:
                 fs -= 1
-        return label(txt, fs, color, use_display)
+        return fs
 
 ## Rendered width of a text in the Box fonts (chips position themselves with
 ## this instead of guessing - the "k outside the widget" bug family).
@@ -221,6 +229,19 @@ static func offset_bottom_safe(t: Label) -> void:
 static func toast(t: Dictionary, msg: String) -> void:
         var l: Label = t["label"]
         l.text = msg
+        # v0.1.5 OWNER RULE ("hardcoded text size"): the popup measures the
+        # REAL line against the LIVE canvas every time it fires - the font
+        # steps down until every letter lands inside the safe 24px side
+        # margins (floor 14, single line). Short toasts keep the base size;
+        # long ones shrink themselves at any resolution the box runs at -
+        # design px in, design px out (the stretch system makes the viewport
+        # rect the universal ruler).
+        var base: int = l.get_theme_font_size("font_size")
+        if base <= 0:
+                base = 28   # the overlay's default, if a theme ever hides the override
+        var avail: float = maxf(240.0, l.get_viewport_rect().size.x - 48.0)
+        l.add_theme_font_size_override("font_size",
+                        fit_size(msg, base, avail, l.get_theme_font("font"), true, 14))
         l.modulate.a = 1.0
         var tw := l.create_tween()
         tw.tween_interval(1.3)

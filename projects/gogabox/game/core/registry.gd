@@ -15,6 +15,20 @@ extends RefCounted
 ##   hours    {"from": h, "to": h}  playable only inside the window (local time)
 ##   blocked_hours {"from": h, "to": h}     NOT playable inside the window
 ##   reveal   {"kind": "chain"|"orders"|"inbox"|"real"|"direct", ...}
+##
+## v0.1.5 THE SHARED UNLOCK VOCABULARY (the owner's "make it a GOGABox
+## shared system" rule): EVERY way a game gets owned / played is a
+## declarative registry key - a future game picks a COMBINATION, the box
+## code reads the keys and never learns a new game by name. Nothing here
+## replaced an older path; each version ADDED a key:
+##   price + shop        buy with GOGACoins (the original path)
+##   reveal.*             how the tile appears (chain/orders/inbox/real/direct)
+##   reveal.needs_games  must own N games before the buy resolves
+##   charge_unlock       GOGACharges meter to pour in (100/200 tiers) pre-buy
+##   entry.partial_pay   thin wallet pays min(fee, ALL coins) at entry/retry
+##   hours/blocked_hours time-of-day windows (live "unlocks at nn AM/PM")
+##   daily_rounds / daily_minutes  per-day caps, 12AM 00:00 lazy reset
+##   charges             per-game GOGABattery pool (per_round/capacity/regen)
 
 const GAMES := [
         {
@@ -24,6 +38,11 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 2, "price": 0, "fee": 10, "shop": true,
                 "banner": true,
+                # v0.1.5 SHARED ENTRY POLICY (was the v0.1.4 snake-only
+                # hardcode): partial_pay = a thin wallet pays min(fee, ALL
+                # its coins) at entry AND retry, empty wallet plays free.
+                # Declarative now - any future game just wears the same key.
+                "entry": {"partial_pay": true},
                 "desc": "Steer the snake, eat apples, grab GOGACoins. Every apple makes you longer and faster - walls and your own tail end the run.",
                 "controls": ["swipe anywhere to steer", "each apple = 1 score point", "grab the spinning coin for +1 GOGACoin", "the run ends when you bite yourself or a wall"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},

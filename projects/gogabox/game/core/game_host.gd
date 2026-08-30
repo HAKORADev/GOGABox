@@ -21,10 +21,12 @@ static func launch(router: Node, id: String) -> bool:
         var fee := int(g["fee"])
         # v0.1.4 OWNER RULE (snake entry): "if money is +0 and -10, use all
         # money so the player plays and have 0 coins". The old "coins < fee ->
-        # free" let a 9-coin player farm forever. Now the starter charges
+        # free" let a 9-coin player farm forever. The starter charges
         # min(fee, wallet); every other game still demands the full fee.
-        var partial := id == "snake" and fee > 0
-        var pay := Box.snake_entry_cost(fee) if partial else fee
+        # v0.1.5: the rule is the registry's shared entry policy now - the
+        # box reads the key, no game is hardcoded by name here.
+        var partial := Box.pays_partial_fee(id) and fee > 0
+        var pay := Box.entry_cost(id, fee) if partial else fee
         if pay > 0:
                 if not Box.spend(pay):
                         return false

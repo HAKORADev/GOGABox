@@ -489,6 +489,14 @@ func _t_snake_pay() -> int:
         Box.unlock_game("rally", 0)   # free unlock (price 0) - only the FEE matters here
         ok += _check(not load("res://game/core/game_host.gd").launch(router, "rally"),
                 "rally refuses at 5 < 8 coins (the exploit dies with snake-only partial pay)")
+        # v0.1.5 SHARED ENTRY POLICY: the rule is registry data now - the box
+        # never hardcodes a game name, a future game just wears the same key.
+        ok += _check(Box.pays_partial_fee("snake") and not Box.pays_partial_fee("rally"),
+                "partial-pay is a registry policy (snake yes, rally no)")
+        ok += _check(Box.entry_cost("rally", 8) == 8 and Box.entry_cost("snake", 10) == 5,
+                "entry_cost: rally pays full 8, snake's thin wallet pays ALL 5")
+        ok += _check(Box.snake_entry_cost(10) == Box.entry_cost("snake", 10),
+                "the v0.1.4 helper stays alive as the snake flavor of entry_cost")
         router.queue_free()
         Box.reset_all()
         return ok

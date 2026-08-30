@@ -290,7 +290,7 @@ func _on_finish(final_score: int, earned: int) -> void:
         # BEFORE any coin moves, so a refused retry never eats the wallet.
         var pay_now := fee
         if partial:
-                pay_now = Box.snake_entry_cost(fee)
+                pay_now = Box.entry_cost(id, fee)
         var again_free := pay_now <= 0
         var again_txt := "PLAY AGAIN FREE" if again_free else "PLAY AGAIN  -%d" % pay_now
         if not again_free and not partial and Box.coins() < fee:
@@ -304,7 +304,7 @@ func _on_finish(final_score: int, earned: int) -> void:
                         Jukebox.sfx("click", -4.0)
                         # re-derive the truth at tap time - the wallet moved while
                         # the sheet was open (rewarded DOUBLE may have paid out)
-                        var pay := Box.snake_entry_cost(fee) if partial else fee
+                        var pay := Box.entry_cost(id, fee) if partial else fee
                         if not Box.daily_ok(id):
                                 Arc.toast(game._toast_ref(), "daily limit reached - get back tomorrow to play")
                                 return

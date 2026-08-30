@@ -200,8 +200,10 @@ static func can_play_now(id: String) -> bool:
                 return false
         var fee := int(g.get("fee", 0))
         # v0.1.4 snake partial-pay: the starter is playable at ANY wallet -
-        # a thin wallet just pays every coin it has (see Box.snake_entry_cost)
-        var can_pay := fee <= 0 or id == "snake" or Box.coins() >= fee
+        # a thin wallet just pays every coin it has. v0.1.5: read as the
+        # registry's shared entry policy (Box.pays_partial_fee), so any
+        # future game wearing the key behaves identically.
+        var can_pay := fee <= 0 or Box.pays_partial_fee(id) or Box.coins() >= fee
         if not can_pay:
                 return false
         var b := Box.game_battery(id)
