@@ -10,9 +10,5 @@
         "interstitial_every_runs": 3,
         "banner_height": 52,
         "banner_enabled": true,
-        "reward_tiers": { "half": 15, "p75": 20, "full": 30 },
-        "test_device": {
-                "name": "XRN124G",
-                "gaid": "08dabd21-c11a-4893-9207-f22f6403e46f"
-        }
+        "reward_tiers": { "half": 15, "p75": 20, "full": 30 }
 }

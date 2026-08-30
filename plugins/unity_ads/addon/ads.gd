@@ -23,10 +23,7 @@ const DEFAULTS := {
         "banner_enabled": true,
         # TIERED rewarded payouts (owner rule: 5s ads pay nothing):
         #   watch >= half -> 50%, >= p75 -> 75%, >= full -> 100%
-        "reward_tiers": {"half": 15, "p75": 20, "full": 30},
-        # OWNER TEST DEVICE: test ads serve ONLY on this advertising id
-        # (matched natively at startup). Empty gaid = everyone gets real ads.
-        "test_device": {"name": "XRN124G", "gaid": ""}
+        "reward_tiers": {"half": 15, "p75": 20, "full": 30}
 }
 
 var cfg: Dictionary = {}
@@ -56,8 +53,6 @@ func _ready() -> void:
                 native.connect("ad_shown", _on_native_shown)
                 native.connect("banner_loaded", func(): _banner_retrying = false)
                 native.connect("banner_failed", func(_m): _schedule_banner_retry())
-                var td: Dictionary = cfg.get("test_device", {})
-                native.set_test_device(String(td.get("name", "")), String(td.get("gaid", "")))
                 native.configure(String(cfg.game_id), bool(cfg.test_mode), bool(cfg.banner_enabled))
                 _preload_all()
         elif OS.has_feature("android"):

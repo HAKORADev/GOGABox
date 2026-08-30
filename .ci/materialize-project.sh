@@ -71,6 +71,33 @@ PYEOF
   gda_log "materialize[$KEY]: slim packaging enabled (legacy jniLibs compression)"
 fi
 
+# ---------------------------------------------------------------- 1.6 signing schemes
+# Explicit v2 + v3 APK signature schemes on the release config. Godot's
+# template leaves them to the AGP defaults, which produced v2-only APKs
+# (verified with apksigner). v3 adds key-rotation proofing and a fuller
+# signature chain - cheap good hygiene for sideload trust (Play Protect).
+# Idempotent: skips when the marker is present.
+if ! grep -q "GDA_SIGN_SCHEMES" "$PROJ/android/build/build.gradle"; then
+  python3 - "$PROJ/android/build/build.gradle" <<'PYEOF'
+import re, sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+block = """            // GDA_SIGN_SCHEMES: explicit signature chain (v2 + v3)
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+"""
+# anchor: top of the release signingConfig (OUTSIDE the keystore-if, so the
+# schemes hold even if only the fallback debug keystore is used)
+anchor = "            File keystoreFile = new File(getReleaseKeystoreFile())"
+if anchor not in s:
+    sys.exit("could not find release signingConfig in " + p)
+s = s.replace(anchor, block + anchor, 1)
+open(p, "w", encoding="utf-8").write(s)
+PYEOF
+  gda_log "materialize[$KEY]: signing schemes v1+v2+v3 enabled"
+fi
+
 # ---------------------------------------------------------------- 2. project overlay
 gda_log "materialize[$KEY]: applying android-overlay"
 cp -a "$PROJ/android-overlay/." "$PROJ/android/build/"

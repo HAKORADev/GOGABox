@@ -17,8 +17,6 @@ import org.godotengine.godot.plugin.GodotPlugin;
 import org.godotengine.godot.plugin.SignalInfo;
 import org.godotengine.godot.plugin.UsedByGodot;
 
-import com.google.android.gms.ads.identifier.AdvertisingIdClient;
-
 import android.app.Activity;
 import android.view.Gravity;
 import android.view.View;
@@ -57,12 +55,6 @@ public class UnityAdsPlugin extends GodotPlugin {
     private boolean initialized = false;
 
     private final Set<String> loadedPlacements = new HashSet<>();
-
-    // OWNER TEST DEVICE (v0.0.7): Unity Ads 4.x has no per-device test API,
-    // so we resolve the device's GAID at startup and flip TEST ADS on ONLY
-    // when it matches the owner's advertising id. Everyone else gets real ads.
-    private String testDeviceName = "";
-    private String testDeviceGaid = "";
 
     // banner state
     private BannerAd bannerAd = null;
@@ -115,7 +107,6 @@ public class UnityAdsPlugin extends GodotPlugin {
             emitSignal("init_failed", "empty game id");
             return;
         }
-        maybeMatchTestDevice();
         UnityAds.setDebugMode(testMode);
         UnityAds.initialize(activity, gameId, testMode, new IUnityAdsInitializationListener() {
             @Override
@@ -129,46 +120,6 @@ public class UnityAdsPlugin extends GodotPlugin {
                 emitSignal("init_failed", String.valueOf(error) + ": " + message);
             }
         });
-    }
-
-    /**
-     * Register the owner's phone: test ads ONLY there. name is a human tag
-     * ("XRN124G"), gaid is the advertising id to compare at runtime. The
-     * lookup needs a background thread (AdvertisingIdClient throws on main).
-     */
-    @UsedByGodot
-    public void setTestDevice(final String name, final String gaid) {
-        this.testDeviceName = name == null ? "" : name;
-        this.testDeviceGaid = gaid == null ? "" : gaid;
-    }
-
-    private void maybeMatchTestDevice() {
-        if (testDeviceGaid.isEmpty()) {
-            return;
-        }
-        final String want = testDeviceGaid;
-        final String tag = testDeviceName.isEmpty() ? "device" : testDeviceName;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    AdvertisingIdClient.Info info =
-                            AdvertisingIdClient.getAdvertisingIdInfo(getContext());
-                    if (info == null || info.getId() == null) {
-                        return;
-                    }
-                    if (want.equalsIgnoreCase(info.getId().trim())) {
-                        testMode = true;
-                        UnityAds.setDebugMode(true);
-                        android.util.Log.i("UnityAdsPlugin",
-                                "test device MATCHED (" + tag + ") - test ads ON");
-                    }
-                } catch (Exception e) {
-                    // no play services / ad id unavailable: real ads, quietly
-                    android.util.Log.i("UnityAdsPlugin", "test device lookup skipped: " + e);
-                }
-            }
-        }).start();
     }
 
     @UsedByGodot

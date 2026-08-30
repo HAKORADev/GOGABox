@@ -24,7 +24,8 @@ var _coins_label: Label
 var _overlay_root: Control
 var _toast: Dictionary
 var _ach_clock := 0.0
-var _hud_buttons := 0      # collision-free HUD stacking (see add_hud_button)
+var _hud_row: HBoxContainer   # the top bar (v0.0.8: game buttons live IN it)
+var _flow_btns := 0           # game buttons inserted after the back button
 
 func _ready() -> void:
         tk = TouchKit.new()
@@ -125,9 +126,20 @@ func _build_hud() -> void:
         _hud.add_child(_overlay_root)
 
         var top := HBoxContainer.new()
-        top.position = Vector2(14, 12)
+        # v0.0.8 THE OVERLAP FIX: the bar must span the full width. Under a
+        # CanvasLayer it had no anchors, so its width collapsed to its minimum
+        # and the spacer did nothing - score/coins sat in the left half, right
+        # where the floating SHOP button landed ("shop overlaps the coins
+        # widget, score under the shop button"). TOP_WIDE + offsets: back on
+        # the left, game buttons in the flow, score/coins on the TRUE right.
+        top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+        top.offset_left = 14
+        top.offset_right = -14
+        top.offset_top = 12
+        top.offset_bottom = 76
         top.add_theme_constant_override("separation", 10)
         _hud.add_child(top)
+        _hud_row = top
 
         var back := Arc.button("<", Vector2(64, 64), 30, Color(0.16, 0.10, 0.05, 0.85),
                 func(): _pause_open())
@@ -152,18 +164,20 @@ func set_hud_score_prefix(prefix: String) -> void:
         _score_label.text = prefix + " " + str(score)
 
 ## Games with shops call this during _goga_setup() to get a HUD button.
-## BUTTON SAFETY SYSTEM (floating flavor): buttons stack side by side after
-## the back button instead of one fixed spot (two callers = overlap), and
-## clamp to the screen edge so nothing ever runs off-screen.
+## BUTTON SAFETY SYSTEM v0.0.8: buttons join the top bar BETWEEN the back
+## button and the spacer - they stack side by side in normal flow, can never
+## overlap each other or the right-aligned score/coins chips, and the bar
+## wraps nothing off-screen (the old floating fixed-position layout put SHOP
+## right on top of the score chip).
 func add_hud_button(txt: String, cb: Callable) -> void:
+        if _hud_row == null or not is_instance_valid(_hud_row):
+                return
         var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85), cb)
-        var vw := get_viewport_rect().size.x
-        var col := _hud_buttons % 5
-        var row := int(_hud_buttons / 5.0)
-        var x := minf(88.0 + float(col) * 104.0, maxf(88.0, vw - 104.0))
-        b.position = Vector2(x, 16.0 + float(row) * 64.0)
-        _hud_buttons += 1
-        _hud.add_child(b)
+        _hud_row.add_child(b)
+        # children: [back, spacer, score, coins] -> insert right after back,
+        # keeping every previously added game button in order
+        _hud_row.move_child(b, 1 + _flow_btns)
+        _flow_btns += 1
 
 func _score_label_ref() -> Label:
         return _score_label

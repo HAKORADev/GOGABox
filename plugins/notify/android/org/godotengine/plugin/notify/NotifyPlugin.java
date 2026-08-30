@@ -16,6 +16,8 @@ import android.content.SharedPreferences;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -40,6 +42,7 @@ public class NotifyPlugin extends GodotPlugin {
     private static final String PREFS = "goga_notify";
     private static final String KEY_PENDING = "pending";
     private static final String KEY_ASKED_DIALOG = "asked_dialog_v3";
+    private static final int REQ_POST_NOTIFICATIONS = 4711;
 
     // MODULAR SOUND CHANNELS (v2 ids: channel sound is fixed at creation, so
     // new sounds need new ids on already-installed devices). Each channel has
@@ -49,6 +52,13 @@ public class NotifyPlugin extends GodotPlugin {
     private static final String CHANNEL_READY = "gogabox_ready_v2";
 
     private final android.app.Activity activity;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Set once the request RESOLVES (result callback). A silent OEM that
+     *  never shows the dialog and never resolves never sets this - the
+     *  watchdog below is what rescues that case. */
+    private boolean requestResolved = false;
+    /** Guards against double-opening settings (result path + watchdog). */
+    private boolean fallbackOpened = false;
 
     public NotifyPlugin(Godot godot) {
         super(godot);
@@ -79,13 +89,17 @@ public class NotifyPlugin extends GodotPlugin {
      * (GodotPlugin methods arrive on the GL thread - off-thread requests
      * silently do nothing).
      *
-     * v0.0.7 DETERMINISTIC LADDER (the "allow reminders did nothing" bug):
-     * many OEMs (Transsion/XOS among them) silently no-op repeat permission
-     * requests and some report misleading rationale flags, so heuristics can
-     * dead-end with NO visible reaction. Now:
-     *   tap 1  -> the real system permission dialog (exactly once ever)
-     *   tap 2+ -> this app's notification settings page (ALWAYS reacts, and
-     *             the toggle there is the one that actually counts)
+     * v0.0.8 NO-DEAD-TAP LADDER ("still pressing allow reminders does
+     * nothing"): some OEMs silently suppress the runtime dialog - they fire
+     * NO dialog and NO result, so tap 1 looked completely dead. Now every
+     * path ends in something VISIBLE:
+     *   tap 1  -> the real system permission dialog (exactly once ever);
+     *             if it RESOLVES as denied (instant or by the user) we open
+     *             this app's notification settings right away;
+     *             watchdog: if NOTHING resolved within 3.5s (suppressed),
+     *             the settings page opens anyway - no dead tap, ever;
+     *   tap 2+ -> this app's notification settings page directly (ALWAYS
+     *             reacts, and the toggle there is the one that counts).
      */
     @UsedByGodot
     public void requestPermission() {
@@ -103,10 +117,48 @@ public class NotifyPlugin extends GodotPlugin {
                     return;
                 }
                 sp.edit().putBoolean(KEY_ASKED_DIALOG, true).apply();
+                requestResolved = false;
+                fallbackOpened = false;
                 activity.requestPermissions(
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4711);
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIFICATIONS);
+                // THE WATCHDOG: a healthy system resolves the request (dialog
+                // answered, or instant-deny) well inside 3.5s. An OEM that
+                // silently drops it resolves nothing - so we open the settings
+                // page ourselves. The only false positive (user stares at the
+                // real dialog for 3.5s+) lands on the page we wanted anyway.
+                mainHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!requestResolved && !fallbackOpened && !permissionGranted()) {
+                            fallbackOpened = true;
+                            openNotificationSettings();
+                        }
+                    }
+                }, 3500L);
             }
         });
+    }
+
+    /** Godot routes the platform result to every plugin via this hook
+     *  (GodotPlugin#onMainRequestPermissionsResult). Denied (instant
+     *  silent-deny included) -> open the settings page IMMEDIATELY so the
+     *  tap always produces a visible reaction. */
+    @Override
+    public void onMainRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode != REQ_POST_NOTIFICATIONS) {
+            return;
+        }
+        requestResolved = true;
+        boolean granted = false;
+        for (int r : grantResults) {
+            if (r == PackageManager.PERMISSION_GRANTED) {
+                granted = true;
+            }
+        }
+        if (!granted && !fallbackOpened && activity != null) {
+            fallbackOpened = true;
+            openNotificationSettings();
+        }
     }
 
     /** Opens this app's system notification settings page (user flips the

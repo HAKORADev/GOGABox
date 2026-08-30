@@ -221,15 +221,23 @@ func _on_finish(final_score: int, earned: int) -> void:
                 var reward_line := Arc.label("", 20, Arc.GOOD, false)
                 reward_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 reward_line.visible = false
+                # v0.0.8: closed-early no longer dead-ends on a green "TRY
+                # AGAIN (15s+)" that had to burn another ad first. The button
+                # goes GRAY with "AD CLOSED EARLY - NO REWARDS" and stays
+                # clickable: one tap = straight back into a fresh ad.
                 var dbl_btn := Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
+                                var btn: Button = dbl[0]
+                                btn.text = "DOUBLE  (watch ad)"
+                                Arc.repaint_button(btn, Arc.GOOD)
                                 Ads.show_rewarded(func(watched: bool, mult: float, _secs: float):
-                                                var btn: Button = dbl[0]
-                                                if not watched:
-                                                        Arc.toast(game._toast_ref(), "ad closed early - no bonus")
-                                                        return
-                                                if mult <= 0.0:
-                                                        Arc.toast(game._toast_ref(), "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half"))
-                                                        btn.text = "TRY AGAIN  (%ds+)" % Ads.tier_secs("half")
+                                                var b2: Button = dbl[0]
+                                                if not watched or mult <= 0.0:
+                                                        b2.text = "AD CLOSED EARLY  -  NO REWARDS"
+                                                        Arc.gray_out_button(b2)
+                                                        var why := "ad closed early - no bonus"
+                                                        if mult <= 0.0 and watched:
+                                                                why = "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half")
+                                                        Arc.toast(game._toast_ref(), why)
                                                         return
                                                 var extra := int(round(float(total) * mult))
                                                 Box.earn(extra)
@@ -246,8 +254,8 @@ func _on_finish(final_score: int, earned: int) -> void:
                                                 roll.tween_callback(func(): Jukebox.sfx("coin"))
                                                 # the button TELLS the story: rewarded state,
                                                 # grayed out, with the real amount on it
-                                                btn.text = "REWARDED!  +%d" % extra
-                                                btn.disabled = true
+                                                b2.text = "REWARDED!  +%d" % extra
+                                                b2.disabled = true
                                                 var msg := "FULL reward! +%d more GOGACoins!" % extra
                                                 if mult < 1.0:
                                                         msg = "%d%% reward: +%d more GOGACoins" % [int(round(mult * 100.0)), extra]

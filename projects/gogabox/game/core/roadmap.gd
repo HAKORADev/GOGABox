@@ -250,17 +250,21 @@ static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
 
 ## The feed has no real "hot" metric (everything is local), so the owner
 ## redefined it: up to 5 games picked by a daily seed - the same handful all
-## day for everyone, reshuffled at midnight. OWNED games only (pickable).
+## day, reshuffled at midnight. v0.0.8: the pool is EVERYTHING visible in the
+## box (owned + locked + gated + soon + mystery teasers) - "if someone does
+## not know what to pick, they pick from here". Owned-only made the carousel
+#  a one-game strip (and the arrows looked dead).
 static func daily_picks() -> Array:
         var d := Time.get_date_dict_from_system()
         var seed_text := "%s-%s-%s-gogabox" % [d["year"], d["month"], d["day"]]
         var rng := RandomNumberGenerator.new()
         rng.seed = hash(seed_text)
         var pool := []
-        for g in GameReg.playable():
+        for g in GameReg.GAMES:
                 var id := String(g["id"])
-                if Box.owns_game(id):
-                        pool.append(g)
+                if state(id) == "HIDDEN":
+                        continue
+                pool.append(g)
         # Fisher-Yates with the day's rng
         for i in range(pool.size() - 1, 0, -1):
                 var j := rng.randi_range(0, i)

@@ -196,10 +196,19 @@ func _t_roadmap() -> int:
         ok += _check(Roadmap.state("rally") == "HIDDEN", "rally hidden before first play")
         ok += _check(Roadmap.state("dario") == "MYSTERY", "dario mystery teaser from start")
         ok += _check(Roadmap.state("maze") == "HIDDEN", "maze hidden (appear_after 2)")
-        # daily picks: deterministic per day, owned games only, <= 5
+        # daily picks: deterministic per day, EVERYTHING visible (owned +
+        # teasers - the owner use case: "don't know what to pick? pick here"), <= 5
         var picks := Roadmap.daily_picks()
         var picks2 := Roadmap.daily_picks()
-        ok += _check(picks.size() >= 1 and picks.size() <= 5, "daily picks 1..5 (%d)" % picks.size())
+        ok += _check(picks.size() >= 4 and picks.size() <= 5,
+                "daily picks visible-pool 4..5 (%d)" % picks.size())
+        var has_owned := false
+        var has_teaser := false
+        for p in picks:
+                var st := Roadmap.state(String(p["id"]))
+                has_owned = has_owned or st == "OWNED"
+                has_teaser = has_teaser or (st != "OWNED" and st != "HIDDEN")
+        ok += _check(has_owned and has_teaser, "picks mix owned + teasers")
         ok += _check(picks.size() == picks2.size(), "daily picks stable in a day")
         var same := true
         for i in picks.size():
@@ -570,7 +579,7 @@ func _t_isolation() -> int:
         ok += _check(not menu.visible, "menu node hidden")
         ok += _check(not menu._layer.visible, "menu CanvasLayer hidden (the v0.0.4 leak)")
         ok += _check(menu.process_mode == Node.PROCESS_MODE_DISABLED, "menu processing stopped")
-        ok += _check(menu._grid_scroll.input_locked, "feed scrolls locked")
+        ok += _check(menu._feed_scroll.input_locked, "feed scroll locked")
         var list_locked := true
         for sc in menu._list_scrolls:
                 list_locked = list_locked and (sc as BoxScroll).input_locked

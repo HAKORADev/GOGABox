@@ -295,6 +295,38 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1) -> void:
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, _tap_emitter(b))
 
+## Make an existing button LOOK disabled while staying clickable (owner rule
+## for the rewarded button: after an early close it turns gray and says what
+## happened, but a tap still retries the ad).
+static func gray_out_button(b: Button) -> void:
+        var sb := panel_style(Color(0.45, 0.42, 0.38), int(b.size.y / 2.6) if b.size.y > 0 else 24)
+        sb.shadow_color = Color(0, 0, 0, 0.25)
+        sb.shadow_size = 4
+        sb.shadow_offset = Vector2(0, 3)
+        for st in ["normal", "hover", "pressed", "disabled"]:
+                b.add_theme_stylebox_override(st, sb)
+        b.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+        b.add_theme_color_override("font_hover_color", Color(1, 1, 1, 0.75))
+        b.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.75))
+
+## Undo gray_out_button - restore the palette of a fresh Arc.button.
+static func repaint_button(b: Button, bg: Color) -> void:
+        var sb := panel_style(bg, int(b.size.y / 2.6) if b.size.y > 0 else 24)
+        sb.shadow_color = Color(0, 0, 0, 0.35)
+        sb.shadow_size = 6
+        sb.shadow_offset = Vector2(0, 4)
+        b.add_theme_stylebox_override("normal", sb)
+        var sbh := sb.duplicate() as StyleBoxFlat
+        sbh.bg_color = bg.lightened(0.08)
+        b.add_theme_stylebox_override("hover", sbh)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = bg.darkened(0.18)
+        sbp.shadow_size = 2
+        b.add_theme_stylebox_override("pressed", sbp)
+        b.add_theme_color_override("font_color", Color.WHITE)
+        b.add_theme_color_override("font_hover_color", Color.WHITE)
+        b.add_theme_color_override("font_pressed_color", CARD)
+
 ## Replays a real press on a Button living inside a BoxScroll (raw emulated
 ## mouse is swallowed there). Toggle buttons replay a toggle instead.
 static func _tap_emitter(btn: BaseButton) -> Callable:
