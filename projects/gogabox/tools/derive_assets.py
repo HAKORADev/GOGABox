@@ -312,6 +312,101 @@ def slasher_sprites():
 
 # ============================================================ thumbnails
 
+def dario_sprites():
+    """v0.1.7 - Dario the platformer. Chunky painted style, same family as
+    the hopper/slasher sprites. hero_idle + hero_jump, walker, brick,
+    ground, flag."""
+    d_dir = out("games/dario")
+    os.makedirs(d_dir, exist_ok=True)
+
+    def hero(jump):
+        img = Image.new("RGBA", (88, 96), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        skin, cap, shirt, pants = (255, 214, 170), (226, 58, 46), (66, 152, 176), (52, 60, 88)
+        # legs / shoes
+        if jump:   # tucked
+            rounded(d, [18, 66, 40, 84], 9, fill=pants)
+            rounded(d, [48, 66, 70, 84], 9, fill=pants)
+            rounded(d, [14, 78, 42, 92], 7, fill=(94, 62, 38))
+            rounded(d, [46, 78, 74, 92], 7, fill=(94, 62, 38))
+        else:      # standing
+            rounded(d, [20, 62, 40, 88], 9, fill=pants)
+            rounded(d, [48, 62, 68, 88], 9, fill=pants)
+            rounded(d, [16, 82, 44, 94], 6, fill=(94, 62, 38))
+            rounded(d, [44, 82, 72, 94], 6, fill=(94, 62, 38))
+        # torso (shirt)
+        rounded(d, [20, 34, 68, 74], 14, fill=shirt)
+        # arms: down when idle, up when jumping
+        if jump:
+            rounded(d, [4, 14, 22, 44], 9, fill=shirt)
+            rounded(d, [66, 14, 84, 44], 9, fill=shirt)
+            d.ellipse([6, 8, 24, 26], fill=skin)
+            d.ellipse([64, 8, 82, 26], fill=skin)
+        else:
+            rounded(d, [6, 38, 24, 70], 9, fill=shirt)
+            rounded(d, [64, 38, 82, 70], 9, fill=shirt)
+            d.ellipse([8, 62, 26, 80], fill=skin)
+            d.ellipse([62, 62, 80, 80], fill=skin)
+        # head
+        d.ellipse([22, 6, 66, 50], fill=skin)
+        # eyes (low enough to stay clear of the cap brim)
+        d.ellipse([34, 28, 42, 38], fill=(30, 30, 30))
+        d.ellipse([50, 28, 58, 38], fill=(30, 30, 30))
+        # cap + brim (clear of the eyes)
+        d.pieslice([20, -12, 68, 30], 180, 360, fill=cap)
+        rounded(d, [12, 14, 74, 25], 6, fill=cap)
+        return img
+
+    hero(False).save(os.path.join(d_dir, "hero_idle.png"))
+    hero(True).save(os.path.join(d_dir, "hero_jump.png"))
+
+    # walker - the stompable critter
+    img = Image.new("RGBA", (88, 80), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    rounded(d, [14, 64, 34, 78], 6, fill=(96, 58, 36))    # feet
+    rounded(d, [54, 64, 74, 78], 6, fill=(96, 58, 36))
+    d.ellipse([8, 12, 80, 74], fill=(172, 92, 58))        # dome
+    d.ellipse([24, 34, 64, 72], fill=(214, 150, 102))     # belly
+    d.ellipse([22, 24, 40, 44], fill=(255, 255, 255))     # eyes
+    d.ellipse([48, 24, 66, 44], fill=(255, 255, 255))
+    d.ellipse([28, 30, 36, 40], fill=(30, 30, 30))
+    d.ellipse([52, 30, 60, 40], fill=(30, 30, 30))
+    d.polygon([(18, 18), (40, 26), (20, 32)], fill=(120, 62, 38))   # brows
+    d.polygon([(70, 18), (48, 26), (68, 32)], fill=(120, 62, 38))
+    img.save(os.path.join(d_dir, "walker.png"))
+
+    # brick tile
+    img = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    rounded(d, [0, 0, 96, 96], 10, fill=(196, 108, 62))
+    rounded(d, [0, 0, 96, 14], 7, fill=(216, 130, 78))    # top light
+    for y in (30, 62):                                     # mortar seams
+        d.line([(4, y), (92, y)], fill=(162, 84, 48), width=6)
+    d.line([(32, 8), (32, 30)], fill=(162, 84, 48), width=5)
+    d.line([(64, 34), (64, 58)], fill=(162, 84, 48), width=5)
+    d.line([(30, 66), (30, 92)], fill=(162, 84, 48), width=5)
+    img.save(os.path.join(d_dir, "brick.png"))
+
+    # ground tile (dirt, tan crust)
+    img = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    rounded(d, [0, 0, 96, 96], 8, fill=(146, 96, 54))
+    rounded(d, [0, 0, 96, 18], 8, fill=(206, 156, 92))
+    for sx, sy in [(18, 40), (52, 56), (76, 34), (34, 74), (70, 78)]:
+        d.ellipse([sx - 4, sy - 3, sx + 4, sy + 3], fill=(122, 78, 44))
+    img.save(os.path.join(d_dir, "ground.png"))
+
+    # goal flag
+    img = Image.new("RGBA", (96, 176), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([40, 10, 52, 170], radius=6, fill=(120, 116, 130))
+    d.ellipse([36, 0, 56, 20], fill=(255, 201, 60))
+    d.polygon([(52, 26), (94, 46), (52, 66)], fill=(255, 176, 32))
+    d.polygon([(52, 30), (86, 46), (52, 62)], fill=(255, 201, 60))
+    img.save(os.path.join(d_dir, "flag.png"))
+    print("games/dario/*")
+
+
 def _thumb_base(w=480, h=320):
     img = Image.new("RGB", (w, h))
     d = ImageDraw.Draw(img)
@@ -346,135 +441,14 @@ def _thumb_title(img, text, sub=""):
 
 
 def thumbs():
-    t = os.path.join(ASSETS, "thumbs")
-    os.makedirs(t, exist_ok=True)
-
-    # v0.1.6: SNAKE and PONG RALLY thumbs are CAPTURED REAL GAMEPLAY now
-    # (dev/thumb_capture + post.py -> 960x640, no text). The hand-drawn
-    # scenes below are RETIRED for those two - do NOT re-run them, they
-    # would clobber the captured assets. See docs/THUMBNAILS.md.
-    #
-    # SNAKE (retired v0.1.6 - superseded by the capture pipeline)
-    # img, d = _thumb_base()
-    # for i in range(480):
-    #     d.line([(i, 0), (i, 320)], fill=(30 + i // 20, 60, 32))
-    # for gy in range(6):
-    #     for gx in range(9):
-    #         if (gx + gy) % 2 == 0:
-    #             d.rectangle([gx * 56, gy * 56, gx * 56 + 56, gy * 56 + 56],
-    #                         fill=(34, 72, 36))
-    # img = img.convert("RGBA")
-    # body = Image.open(os.path.join(ASSETS, "games/snake/body_classic.png"))
-    # head = Image.open(os.path.join(ASSETS, "games/snake/head_classic.png"))
-    # apple = Image.open(os.path.join(ASSETS, "games/snake/apple.png"))
-    # for i, c in enumerate([(120, 180), (176, 180), (232, 180), (232, 124), (232, 68)]):
-    #     img.alpha_composite(body.resize((56, 56)), c)
-    # img.alpha_composite(head.resize((56, 56)), (288, 180))
-    # img.alpha_composite(apple.resize((56, 56)), (392, 124))
-    # _thumb_title(img, "SNAKE", "eat, grow, grab coins")
-    # img.convert("RGB").save(os.path.join(t, "snake.png"))
-    #
-    # PONG RALLY (retired v0.1.6 - superseded by the capture pipeline)
-    # img, d = _thumb_base()
-    # d.rectangle([0, 0, 480, 320], fill=(26, 16, 48))
-    # for i in range(8):
-    #     d.rectangle([236, i * 42, 244, i * 42 + 22], fill=(255, 255, 255, 24))
-    # d.rounded_rectangle([40, 60, 90, 130], radius=16, fill=HOT)
-    # d.rounded_rectangle([390, 190, 440, 260], radius=16, fill=ACCENT)
-    # d.ellipse([210, 130, 270, 190], fill=(255, 255, 255))
-    # _thumb_title(img, "PONG RALLY", "how long can you return?")
-    # img.convert("RGB").save(os.path.join(t, "rally.png"))
-
-    # GEOMETRY FLASH
-    img, d = _thumb_base()
-    d.rectangle([0, 0, 480, 320], fill=(20, 16, 40))
-    for i in range(4):
-        d.line([(120 + i * 80, 0), (120 + i * 80, 320)], fill=(0, 229, 255), width=3)
-    ship = Image.open(os.path.join(ASSETS, "games/lanes/ship.png")).resize((96, 96))
-    block = Image.open(os.path.join(ASSETS, "games/lanes/block.png")).resize((80, 80))
-    img = img.convert("RGBA")
-    img.alpha_composite(block, (136, 60))
-    img.alpha_composite(block, (296, 140))
-    img.alpha_composite(ship, (196, 200))
-    _thumb_title(img, "GEOMETRY FLASH", "dodge the grid")
-    img.convert("RGB").save(os.path.join(t, "lanes.png"))
-
-    # FRUIT SLASHER
-    img, d = _thumb_base()
-    d.rectangle([0, 0, 480, 320], fill=(74, 47, 24))
-    d.rectangle([0, 200, 480, 320], fill=(94, 62, 32))
-    img = img.convert("RGBA")
-    for i in range(3):
-        f = Image.open(os.path.join(ASSETS, "games/slasher/fruit_%d.png" % i)).resize((96, 96))
-        img.alpha_composite(f, (60 + i * 140, 60 + (i % 2) * 40))
-    bomb = Image.open(os.path.join(ASSETS, "games/slasher/bomb.png")).resize((96, 96))
-    img.alpha_composite(bomb, (340, 120))
-    d = ImageDraw.Draw(img)
-    d.line([(30, 260), (180, 170), (330, 210), (450, 120)], fill=(255, 255, 255), width=8)
-    _thumb_title(img, "FRUIT SLASHER", "swipe sharp, slash smart")
-    img.convert("RGB").save(os.path.join(t, "slasher.png"))
-
-    # SNOWY TOWER
-    img, d = _thumb_base()
-    for y in range(320):
-        t2 = y / 320
-        d.line([(0, y), (480, y)],
-               fill=(int(140 + 70 * t2), int(200 + 30 * t2), int(235 + 20 * t2)))
-    img = img.convert("RGBA")
-    plat = Image.open(os.path.join(ASSETS, "games/hopper/platform.png")).resize((200, 50))
-    player = Image.open(os.path.join(ASSETS, "games/hopper/player.png")).resize((72, 72))
-    img.alpha_composite(plat, (30, 210))
-    img.alpha_composite(plat, (260, 140))
-    img.alpha_composite(plat, (110, 70))
-    img.alpha_composite(player, (160, 20))
-    d = ImageDraw.Draw(img)
-    for i in range(24):
-        x, y = (i * 53) % 480, (i * 97) % 320
-        d.ellipse([x, y, x + 6, y + 6], fill=(255, 255, 255))
-    _thumb_title(img, "SNOWY TOWER", "climb till you slip")
-    img.convert("RGB").save(os.path.join(t, "hopper.png"))
-
-    # 2048
-    img, d = _thumb_base()
-    d.rectangle([0, 0, 480, 320], fill=(187, 173, 160))
-    vals = [(2, "efe6d8"), (4, "edd9b0"), (8, "f2b179"), (16, "f59563"),
-            (32, "f67c5f"), (64, "f65e3b"), (128, "edcf72"), (256, "edcc61")]
-    f = font(52)
-    for i, (v, c) in enumerate(vals):
-        x, y = 24 + (i % 4) * 112, 24 + (i // 4) * 112
-        d.rounded_rectangle([x, y, x + 100, y + 100], radius=12, fill="#" + c)
-        bb = d.textbbox((0, 0), str(v), font=f)
-        d.text((x + (100 - bb[2] + bb[0]) / 2 - bb[0], y + (100 - bb[3] + bb[1]) / 2 - bb[1]),
-               str(v), font=f, fill=INK)
-    _thumb_title(img, "2048", "swipe and double")
-    img.convert("RGB").save(os.path.join(t, "merge.png"))
-
-    # coming soon tiles - v0.1.6: universal 960x640 canvas (rule R1), same
-    # design, everything scaled 2x from the old 480x320
-    _thumbs_soon(t)
-    print("thumbs/*")
-
-
-def _thumbs_soon(t):
-    names = {"dario": "DARIO", "hen": "HEN INVADERS", "spud": "COSMIC SPUD",
-             "maze": "ESCAPE THE MAZE", "matcher": "MATCHER", "xo": "XO LADDER",
-             "keys": "KEY SINGER", "poptd": "POP TD"}
-    for key, title in names.items():
-        img = Image.new("RGB", (960, 640))
-        d = ImageDraw.Draw(img)
-        d.rectangle([0, 0, 960, 640], fill=(52, 42, 66))
-        for i in range(-640, 960, 180):
-            d.polygon([(i, 640), (i + 60, 640), (i + 700, 0), (i + 640, 0)],
-                      fill=(64, 52, 84))
-        f = font(240)
-        bb = d.textbbox((0, 0), "?", font=f)
-        d.text(((960 - bb[2] + bb[0]) / 2, 80), "?", font=f, fill=(122, 108, 180))
-        f2 = font(60)
-        bb2 = d.textbbox((0, 0), title, font=f2)
-        d.text(((960 - bb2[2] + bb2[0]) / 2, 420), title, font=f2, fill=(210, 200, 240))
-        f3 = font(40, False)
-        d.text(((960 - 128) / 2, 524), "SOON", font=f3, fill=(150, 130, 210))
-        img.save(os.path.join(t, "%s.png" % key))
+    # v0.1.7: ALL thumbnails come from thumb_composer.py - the programmable
+    # scene maker (real assets, posed specs, 960x640, deterministic). The
+    # old inline 480x320 scenes and the v0.1.6 capture detour are both
+    # retired; see docs/THUMBNAILS.md. Re-runs of this file can never
+    # regress the thumbs again - the composer owns them.
+    import thumb_composer
+    thumb_composer.install(
+        sorted(thumb_composer.SCENES) + sorted(thumb_composer.SOON_NAMES))
 
 
 # ============================================================ audio
@@ -566,6 +540,7 @@ if __name__ == "__main__":
     if not ok:
         print("WARNING: Kenney fonts missing; PIL/Godot will use fallback")
     bg_main(); logo(); coin(); icons()
-    snake_sprites(); lanes_sprites(); rally_sprites(); hopper_sprites(); slasher_sprites()
+    snake_sprites(); lanes_sprites(); rally_sprites(); hopper_sprites()
+    slasher_sprites(); dario_sprites()
     thumbs(); audio(); app_icon()
     print("GOGABox assets derived OK")

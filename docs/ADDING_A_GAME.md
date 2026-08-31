@@ -14,11 +14,12 @@
    (see `docs/goga_docs/plans/BOX_CORE_DESIGN.md` for the contract:
    `_build_hud`, `set_score`, payouts, death-menu hooks).
 3. **Thumbnail** — `projects/gogabox/assets/thumbs/<id>.png`, **960x640**
-   (universal canvas). Real games get CAPTURED GAMEPLAY through the
-   pipeline: write a drive in `projects/gogabox/dev/thumb_capture/drives/`
-   and follow **`docs/THUMBNAILS.md`** (no baked text; the vision pass
-   picks the frame). Until the game is playable, ship a SOON-style
-   placeholder (`derive_assets.py _thumbs_soon()`).
+   (universal canvas). Real games get a COMPOSED SCENE: add a scene
+   function + a SPEC dict to `projects/gogabox/tools/thumb_composer.py`
+   and follow **`docs/THUMBNAILS.md`** (posed real assets, no baked text;
+   the spec is a few lines the owner can re-direct any time - "make the
+   snake appear with tail up to 9..."). Until the game is playable, ship
+   a SOON-style placeholder (`SOON_NAMES` in the same file).
 4. **Wire it into the box** — the box feed/carousel, store page and search
    read the registry; a PLAYABLE game appears automatically.
 5. **Tests** — extend `projects/gogabox/tests/flow_test.gd` (unlock, play,

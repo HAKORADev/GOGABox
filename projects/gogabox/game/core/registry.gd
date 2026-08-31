@@ -153,6 +153,41 @@ const GAMES := [
                         {"id": "tile_2048", "title": "The Real 2048", "desc": "Create the 2048 tile"},
                 ],
         },
+        {
+                "id": "dario", "title": "Dario", "tag": "run, jump, stomp",
+                "script": "res://game/games/dario/dario.gd",
+                "thumb": "res://assets/thumbs/dario.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 60, "price": 350, "fee": 12, "shop": false,
+                "reveal": {"kind": "chain"},
+                "desc": "A proper little platformer - run, jump, stomp. Three levels of pits, walkers and coins, and a flag at the end of each.",
+                "controls": ["hold the left / right half to walk", "JUMP button (or swipe up) to jump", "land on walkers to squash them (+5)", "touch a walker sideways or fall into a pit and the run ends", "reach the flag to clear the level"],
+                "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "retro", "singleplayer"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "stomp_25", "title": "Big Boot", "desc": "Squash 25 walkers total"},
+                        {"id": "clear_all", "title": "Flag Bearer", "desc": "Clear all three levels in one run"},
+                        {"id": "score_100", "title": "Coin Mountain", "desc": "Score 100 in one run"},
+                ],
+        },
+        {
+                "id": "xo", "title": "XO Ladder", "tag": "climb the machine",
+                "script": "res://game/games/xo/xo.gd",
+                "thumb": "res://assets/thumbs/xo.png",
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 150, "price": 450, "fee": 10, "shop": false,
+                "banner": true,   # turn-based: banner is safe here
+                "reveal": {"kind": "chain"},
+                "desc": "Tic-tac-toe against a climbing AI ladder. Ten rungs from sloppy to perfect - win to climb, lose and you slip. Cash out any time.",
+                "controls": ["tap a cell to place your X", "win to climb one rung, lose and you slip one", "rung 10 never loses - how far can you get?", "CASH OUT banks the run and keeps your rung"],
+                "genres": {"main": ["strategy", "puzzle"], "sub": ["turnbased", "competitive", "singleplayer"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "rung_5", "title": "Halfway Up", "desc": "Reach rung 5"},
+                        {"id": "rung_top", "title": "Ladder Legend", "desc": "Reach rung 10"},
+                        {"id": "streak_3", "title": "On Fire", "desc": "Win 3 in a row"},
+                ],
+        },
 
         # ---- the workshop (not built yet, but ALREADY in the feed as teasers so
         # the box keeps growing. Kinds:
@@ -170,17 +205,6 @@ const GAMES := [
         # v0.1.4 THE MYSTERY QUEUE: only the first 4 mystery-able teasers
         # (catalog order) exist at once - the rest stay inexistent until a
         # queue slot frees (Roadmap.MYSTERY_CAP).
-        {"id": "dario", "title": "Dario", "tag": "platformer port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/dario.png",
-                "desc": "A proper little platformer - run, jump, stomp.",
-                "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "retro"]},
-                "age": "everyone",
-                "reveal": {"kind": "orders", "appear_after": 1, "price": 350, "needs_games": 0,
-                        "orders": [
-                                {"type": "spend_in", "game": "snake", "amount": 120},
-                                {"type": "plays", "game": "snake", "count": 3},
-                                {"type": "ach_in", "game": "snake", "count": 2},
-                        ]}},
         {"id": "hen", "title": "Hen Invaders", "tag": "1P shooter port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/hen.png",
                 "desc": "The sky is full of angry hens. Shoot them down, wave after wave.",
@@ -217,18 +241,6 @@ const GAMES := [
                 "age": "everyone",
                 "charge_unlock": 100,
                 "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3}},
-        {"id": "xo", "title": "XO Ladder", "tag": "AI streaks port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/xo.png",
-                "desc": "Tic-tac-toe against a climbing AI ladder. It learns. It wins.",
-                "genres": {"main": ["strategy", "puzzle"], "sub": ["turnbased", "competitive"]},
-                "age": "everyone",
-                "reveal": {"kind": "orders", "appear_after": 3, "price": 450, "needs_games": 3,
-                        "orders": [
-                                {"type": "plays", "game": "hopper", "count": 5},
-                                {"type": "beat_best", "game": "slasher"},
-                                {"type": "ach_exact", "game": "rally", "ach": "rally_30"},
-                        ]}},
-        # keys = the 200-charge meter (the bigger, later game)
         {"id": "keys", "title": "Key Singer", "tag": "rhythm rework", "coming_soon": true,
                 "thumb": "res://assets/thumbs/keys.png",
                 "desc": "Hit the keys on the beat. The better your timing, the louder the song.",

@@ -1,0 +1,777 @@
+#!/usr/bin/env python3
+# ============================================================================
+# thumb_composer.py - THE PROGRAMMABLE THUMBNAIL MAKER (v0.1.7).
+#
+# Hand-designed scenes in code, driven by a tiny per-game SPEC the dev can
+# re-tune in seconds when the owner says e.g.:
+#
+#   "make the snake appear with tail to be up to 9 and straight to left
+#    then straight to up before apple by 3 steps"
+#
+#   -> SNAKE_SPEC = dict(length=9, path=[("L", 5), ("U", 3)],
+#                        apple=("ahead", 3))
+#
+# That is the whole point: thumbnails are POSED, not captured, not painted
+# by hand. Every scene draws the game's REAL assets (assets/games/<id>/)
+# on the universal 960x640 canvas (rule R1) and is deterministic -
+# re-runs are pixel-identical. No baked titles on real-game thumbs (R2);
+# the composer's text() exists for SOON tiles and owner opt-ins only.
+#
+# Usage:
+#   python3 tools/thumb_composer.py --game snake
+#   python3 tools/thumb_composer.py --all
+#   python3 tools/thumb_composer.py --game snake --out /tmp/snake.png
+#   python3 tools/thumb_composer.py --sheet /tmp/sheet.png
+# ============================================================================
+import argparse
+import math
+import os
+import sys
+
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from derive_assets import font, INK, CARD, ACCENT, HOT, GOOD, COIN, BAD  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # projects/gogabox
+ASSETS = os.path.join(ROOT, "assets")
+W, H = 960, 640                 # rule R1: the universal canvas
+
+# Direction letters -> unit vectors (grid space: x right, y DOWN).
+DIRS = {"L": (-1, 0), "R": (1, 0), "U": (0, -1), "D": (0, 1)}
+
+
+# ----------------------------------------------------------------- helpers
+
+def game_asset(rel):
+    return os.path.join(ASSETS, rel)
+
+
+def load_sprite(rel, size=None):
+    """Load a real game sprite, optionally resized (BICUBIC keeps the
+    painted style soft; use nearest=0 default)."""
+    img = Image.open(game_asset(rel)).convert("RGBA")
+    if size:
+        img = img.resize((size, size), Image.BICUBIC)
+    return img
+
+
+def grid_dir_rotation(fx, fy):
+    """PIL rotate() degrees so an UP-facing sprite faces (fx, fy)."""
+    return math.degrees(math.atan2(-fx, -fy))
+
+
+# ------------------------------------------------------------------- Scene
+
+class Scene:
+    """960x640 canvas with simple layer compositing.
+
+    backdrop()/solid() paint the BASE. Everything after goes to the working
+    layer. fade_below(a) fades EVERYTHING drawn so far to `a` alpha and
+    opens a fresh layer - that is the owner's matcher recipe
+    ("make the grid, fade the image out a little, composite 3 candies on
+    top"). stamp() pastes real sprites center-anchored.
+    """
+
+    def __init__(self, w=W, h=H):
+        self.w, self.h = w, h
+        self.base = Image.new("RGBA", (w, h))
+        self.baked = []                      # faded layers so far
+        self.work = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        self.d = ImageDraw.Draw(self.work)
+
+    # -- base -----------------------------------------------------------
+    def solid(self, rgb):
+        self.base.paste(Image.new("RGBA", (self.w, self.h), rgb), (0, 0))
+        return self
+
+    def backdrop(self, top, bottom):
+        """Vertical gradient."""
+        g = Image.new("RGBA", (1, self.h))
+        px = []
+        for y in range(self.h):
+            t = y / max(1, self.h - 1)
+            px.append((
+                int(top[0] + (bottom[0] - top[0]) * t),
+                int(top[1] + (bottom[1] - top[1]) * t),
+                int(top[2] + (bottom[2] - top[2]) * t), 255))
+        g.putdata(px)
+        self.base.paste(g.resize((self.w, self.h)), (0, 0))
+        return self
+
+    # -- layer ops -------------------------------------------------------
+    def fade_below(self, alpha):
+        """Fade everything drawn so far to `alpha` (0..255); new layer opens."""
+        acc = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
+        for layer in self.baked + [self.work]:
+            acc.alpha_composite(layer)
+        a = acc.getchannel("A").point(lambda v: int(v * alpha / 255.0))
+        acc.putalpha(a)
+        self.baked = [acc]
+        self.work = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
+        self.d = ImageDraw.Draw(self.work)
+        return self
+
+    # -- shapes (on the working layer) ------------------------------------
+    def rect(self, box, r=0, fill=None, outline=None, width=1):
+        if r > 0:
+            self.d.rounded_rectangle(box, radius=r, fill=fill,
+                                     outline=outline, width=width)
+        else:
+            self.d.rectangle(box, fill=fill, outline=outline, width=width)
+        return self
+
+    def line(self, pts, fill, width=4):
+        self.d.line(pts, fill=fill, width=width, joint="curve")
+        return self
+
+    def ellipse(self, box, fill=None, outline=None, width=1):
+        self.d.ellipse(box, fill=fill, outline=outline, width=width)
+        return self
+
+    def polygon(self, pts, fill):
+        self.d.polygon(pts, fill=fill)
+        return self
+
+    # -- stamps -----------------------------------------------------------
+    def stamp(self, img, cx, cy, scale=1.0, rot=0, alpha=255):
+        """Paste a real sprite centered at (cx, cy), scaled, rotated
+        (PIL degrees, positive = CCW), faded to `alpha`."""
+        if isinstance(img, str):
+            img = load_sprite(img)
+        if scale != 1.0:
+            img = img.resize((max(1, int(img.width * scale)),
+                              max(1, int(img.height * scale))), Image.BICUBIC)
+        if rot:
+            img = img.rotate(rot, expand=True, resample=Image.BICUBIC)
+        if alpha < 255:
+            img = img.copy()
+            img.putalpha(img.getchannel("A").point(
+                lambda v: int(v * alpha / 255.0)))
+        self.work.alpha_composite(img, (int(cx - img.width / 2),
+                                        int(cy - img.height / 2)))
+        return self
+
+    def glow(self, cx, cy, r, rgb, alpha=110):
+        """Soft radial halo behind a sprite (the 'pop' for key objects).
+        True radial falloff - no square edges, no smear."""
+        r = int(r)
+        m = Image.new("L", (r * 2, r * 2), 0)
+        md = ImageDraw.Draw(m)
+        steps = 14
+        for i in range(steps):
+            t = i / (steps - 1)                      # 0 -> 1
+            rr = max(1, int(r * (1.0 - t)))          # big+faint first ...
+            a = int(alpha * t ** 1.6)                # ... small+bright last
+            md.ellipse([r - rr, r - rr, r + rr, r + rr], fill=a)
+        halo = Image.new("RGBA", (r * 2, r * 2), rgb + (0,))
+        halo.putalpha(m)
+        self.work.alpha_composite(halo, (int(cx - r), int(cy - r)))
+        return self
+
+    # -- finish -----------------------------------------------------------
+    def vignette(self, strength=110):
+        ov = Image.new("L", (self.w, self.h), 0)
+        od = ImageDraw.Draw(ov)
+        od.rectangle([0, 0, self.w, self.h], outline=90, width=120)
+        ov = ov.filter(ImageFilter.GaussianBlur(100))
+        dark = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 255))
+        dark.putalpha(ov.point(lambda v: min(strength, v)))
+        self.work.alpha_composite(dark)
+        return self
+
+    def text(self, txt, size, cx, cy, fill=(255, 250, 240),
+             big=True, shadow=True):
+        """SOON tiles + owner opt-ins only (rule R2 keeps real thumbs clean)."""
+        f = font(size, big=big)
+        bb = self.d.textbbox((0, 0), txt, font=f)
+        tw, th = bb[2] - bb[0], bb[3] - bb[1]
+        x, y = cx - tw // 2 - bb[0], cy - th // 2 - bb[1]
+        if shadow:
+            self.d.text((x + 3, y + 3), txt, font=f, fill=(0, 0, 0))
+        self.d.text((x, y), txt, font=f, fill=fill)
+        return self
+
+    def render(self):
+        out = self.base.copy()
+        for layer in self.baked + [self.work]:
+            out.alpha_composite(layer)
+        return out.convert("RGB")
+
+
+# ============================================================================
+# THE SPECS - this is what the owner edits through me. One dict per game,
+# plain keys, measured in the game's own units (cells, lanes, tiles).
+# The snake spec below IS the owner's example sentence, verbatim.
+# ============================================================================
+
+SNAKE_SPEC = dict(
+    board=(9, 7),                 # cols x rows on screen (poster board)
+    cell=84,                      # px per cell -> 756x588 board
+    length=9,                     # "tail to be up to 9"
+    path=[("L", 5), ("U", 3)],    # "straight to left then straight to up"
+    apple=("ahead", 3),           # "before apple by 3 steps" (ahead of head)
+    coin=(7, 2),                  # stage a GOGACoin in the open board space
+    skin="classic",
+)
+
+
+def snake_cells(spec):
+    """Expand the pose spec into board cells. Path runs start at the TAIL;
+    the head is the END of the path and faces the last run's direction.
+    Returns (cells, facing, apple_cell). The apple ("ahead", n) sits n cells
+    beyond the head and is INCLUDED in the fit box, so a pose plus its apple
+    always lands fully on the board (clamped, never clipped)."""
+    cols, rows = spec["board"]
+    cells = [(0, 0)]                      # tail at origin (re-anchored later)
+    facing = DIRS["D"]
+    for run in spec["path"]:
+        letter, n = run
+        facing = DIRS[letter]
+        for _ in range(n):
+            x, y = cells[-1]
+            cells.append((x + facing[0], y + facing[1]))
+    cells = cells[-int(spec["length"]):]          # cap at `length` segments
+    head = cells[-1]
+    apple = None
+    if isinstance(spec.get("apple"), tuple) and spec["apple"][0] == "ahead":
+        n = int(spec["apple"][1])
+        apple = (head[0] + facing[0] * n, head[1] + facing[1] * n)
+    elif spec.get("apple"):
+        apple = tuple(spec["apple"])
+    # fit cells + apple together, centered, clamped onto the board
+    pts = cells + ([apple] if apple else [])
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    pw, ph = max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+    if pw > cols or ph > rows:
+        raise SystemExit(
+            "snake pose (%dx%d cells incl. apple) does not fit the %dx%d "
+            "board - shorten the path/apple or grow spec['board']"
+            % (pw, ph, cols, rows))
+    ox = (cols - pw) // 2 - min(xs)
+    oy = (rows - ph) // 2 - min(ys)
+    ox += max(0, -min(p[0] + ox for p in pts)) \
+        - max(0, max(p[0] + ox for p in pts) - (cols - 1))
+    oy += max(0, -min(p[1] + oy for p in pts)) \
+        - max(0, max(p[1] + oy for p in pts) - (rows - 1))
+    cells = [(c[0] + ox, c[1] + oy) for c in cells]
+    if apple:
+        apple = (apple[0] + ox, apple[1] + oy)
+    return cells, facing, apple
+
+
+def scene_snake(spec=SNAKE_SPEC):
+    cols, rows = spec["board"]
+    cell = spec["cell"]
+    bw, bh = cols * cell, rows * cell
+    bx, by = (W - bw) // 2, (H - bh) // 2
+    sc = Scene()
+    sc.backdrop((16, 34, 18), (10, 22, 12))
+    # board panel + checker (the game's own colors: panel 1e3320, alt 224824)
+    sc.rect([bx - 12, by - 12, bx + bw + 12, by + bh + 12], r=22,
+            fill=(30, 51, 32))
+    for gy in range(rows):
+        for gx in range(cols):
+            if (gx + gy) % 2 == 0:
+                sc.rect([bx + gx * cell, by + gy * cell,
+                         bx + (gx + 1) * cell, by + (gy + 1) * cell],
+                        fill=(34, 72, 36))
+    sc.vignette(90)
+
+    cells, facing, apple = snake_cells(spec)
+    body = load_sprite("games/snake/body_%s.png" % spec["skin"], int(cell * 0.98))
+    head = load_sprite("games/snake/head_%s.png" % spec["skin"], int(cell * 0.98))
+    apple_img = load_sprite("games/snake/apple.png", int(cell * 0.94))
+
+    def cc(c):
+        return (bx + c[0] * cell + cell // 2, by + c[1] * cell + cell // 2)
+
+    # staged coin (the GOGACoin story) - default: two cells right of tail
+    coin = spec.get("coin")
+    if coin:
+        cx, cy = cc(coin)
+        sc.glow(cx, cy, int(cell * 0.8), (255, 201, 60), 80)
+        sc.stamp("ui/coin.png", cx, cy, scale=cell * 0.8 / 128.0)
+    # apple with a warm glow (the objective must read instantly)
+    ax, ay = cc(apple)
+    sc.glow(ax, ay, int(cell * 0.85), (255, 120, 90), 90)
+    sc.stamp(apple_img, ax, ay)
+    # body cells first, then the HEAD (end of the path) rotated to its facing
+    for c in cells[:-1]:
+        x, y = cc(c)
+        sc.stamp(body, x, y)
+    hx, hy = cc(cells[-1])
+    sc.stamp(head, hx, hy, rot=grid_dir_rotation(facing[0], facing[1]))
+    return sc.render()
+
+
+# ------------------------------------------------------------------- rally
+
+RALLY_SPEC = dict(
+    court_pad=64,                 # court margin from canvas edge
+    player_x=200,                 # player paddle column (left side)
+    player_y=0.62,                # paddle center as H fraction (0..1)
+    ai_x=W - 200,                 # AI paddle column
+    ai_y=0.38,
+    ball=(0.31, 0.62),            # ball just off the player paddle
+    speed_lines=True,             # motion streaks trailing the smash
+)
+
+
+def scene_rally(spec=RALLY_SPEC):
+    sc = Scene()
+    sc.solid((26, 16, 48))
+    # court: soft inner panel like the real game's dark stage
+    p = spec["court_pad"]
+    sc.rect([p, p, W - p, H - p], r=28, fill=(34, 22, 60))
+    # center net (dashed)
+    for i in range(9):
+        y0 = p + 18 + i * ((H - 2 * p - 18) / 9.0)
+        sc.rect([W // 2 - 4, y0, W // 2 + 4, y0 + (H - 2 * p) / 9.0 * 0.55],
+                fill=(255, 255, 255))
+    # top/bottom rails
+    sc.rect([p, p - 10, W - p, p + 10], r=5, fill=(64, 48, 100))
+    sc.rect([p, H - p - 10, W - p, H - p + 10], r=5, fill=(64, 48, 100))
+    sc.vignette(100)
+
+    paddle = load_sprite("games/rally/paddle.png")
+    ball = load_sprite("games/rally/ball.png")
+    py = spec["player_y"] * H
+    ay = spec["ai_y"] * H
+    bx, by = spec["ball"][0] * W, spec["ball"][1] * H
+    # motion trail: fading dots behind the ball (it just got smashed left)
+    if spec.get("speed_lines"):
+        for k in range(3):
+            tr = 30 - k * 7
+            sc.ellipse([bx + 64 + k * 30 - tr, by - tr,
+                        bx + 64 + k * 30 + tr, by + tr],
+                       fill=(255, 255, 255, 150 - k * 45))
+    # AI paddle (top-right), player paddle catching the ball (bottom-left)
+    sc.stamp(paddle, spec["ai_x"], ay, rot=90)
+    sc.glow(bx, by, 66, (255, 200, 120), 70)
+    sc.stamp(paddle, spec["player_x"], py, rot=90)
+    sc.stamp(ball, bx, by, scale=0.9)
+    return sc.render()
+
+
+# ------------------------------------------------------------------- lanes
+
+LANES_SPEC = dict(
+    lane_xs=(1 / 6.0, 0.5, 5 / 6.0),   # lane centers as W fractions
+    ship_lane=1, ship_y=0.80,
+    blocks=((0, 0.30, 1.0), (2, 0.46, 0.86), (1, 0.14, 0.72)),  # (lane, y, scale)
+    near_miss=True,               # block right above the ship = the story
+)
+
+
+def scene_lanes(spec=LANES_SPEC):
+    sc = Scene()
+    sc.backdrop((20, 16, 40), (12, 10, 26))
+    lx = spec["lane_xs"]
+    # lane rails (cyan, like the real grid)
+    for f in (0.0, 1/3.0, 2/3.0, 1.0):
+        sc.line([(f * W, 0), (f * W, H)], (0, 229, 255, 60), width=3)
+    for gy in range(8):                        # faint grid ticks
+        y = gy * H / 8.0
+        sc.line([(0, y), (W, y)], (0, 229, 255, 18), width=2)
+    sc.vignette(90)
+    block = load_sprite("games/lanes/block.png")
+    ship = load_sprite("games/lanes/ship.png")
+    for lane, fy, s in spec["blocks"]:
+        sc.stamp(block, lx[lane] * W, fy * H, scale=s)
+    sx, sy = lx[spec["ship_lane"]] * W, spec["ship_y"] * H
+    # near-miss: a block nose-down right above the ship
+    if spec.get("near_miss"):
+        sc.stamp(block, sx, sy - 190, scale=1.0)
+    sc.glow(sx, sy, 90, (0, 229, 255), 60)
+    sc.stamp(ship, sx, sy, scale=1.05)
+    # engine sparks
+    sc.line([(sx - 14, sy + 62), (sx - 14, sy + 96)], (255, 176, 32, 200), 8)
+    sc.line([(sx + 14, sy + 62), (sx + 14, sy + 96)], (255, 122, 26, 200), 8)
+    return sc.render()
+
+
+# ----------------------------------------------------------------- slasher
+
+SLASHER_SPEC = dict(
+    fruits=((0, 0.30, 0.30, 1.05), (1, 0.52, 0.22, 0.92),
+            (2, 0.70, 0.42, 1.0)),      # (kind, fx, fy, scale)
+    bomb=(0.87, 0.66, 0.95),
+    slash=((0.08, 0.86), (0.36, 0.60), (0.62, 0.70), (0.92, 0.24)),
+    gold=(0.16, 0.44, 0.8),
+)
+
+
+def scene_slasher(spec=SLASHER_SPEC):
+    sc = Scene()
+    sc.solid((74, 47, 24))
+    sc.rect([0, H * 0.62, W, H], fill=(94, 62, 32))    # the board planks
+    for i in range(5):                                 # plank seams
+        y = H * 0.62 + i * H * 0.078
+        sc.line([(0, y), (W, y)], (74, 47, 24, 120), width=3)
+    sc.vignette(100)
+    for kind, fx, fy, s in spec["fruits"]:
+        x, y = fx * W, fy * H
+        sc.glow(x, y, 80, (255, 220, 150), 45)
+        sc.stamp("games/slasher/fruit_%d.png" % kind, x, y, scale=s)
+    if spec.get("gold"):
+        fx, fy, s = spec["gold"]
+        sc.glow(fx * W, fy * H, 86, (255, 210, 80), 90)
+        sc.stamp("games/slasher/fruit_gold.png", fx * W, fy * H, scale=s)
+    if spec.get("bomb"):
+        fx, fy, s = spec["bomb"]
+        sc.stamp("games/slasher/bomb.png", fx * W, fy * H, scale=s)
+    # the blade trail (the player's finger)
+    pts = [(fx * W, fy * H) for fx, fy in spec["slash"]]
+    sc.line(pts, (255, 255, 255, 235), width=9)
+    return sc.render()
+
+
+# ------------------------------------------------------------------ hopper
+
+HOPPER_SPEC = dict(
+    platforms=((0.24, 0.78, 1.0), (0.62, 0.58, 1.0), (0.40, 0.34, 1.0)),
+    player=(0.46, 0.20, 1.0),     # mid-air between plat 2 and 3
+    snow=26,
+)
+
+
+def scene_hopper(spec=HOPPER_SPEC):
+    sc = Scene()
+    sc.backdrop((140, 200, 235), (214, 238, 252))
+    # soft clouds
+    for cx, cy, s in ((0.18, 0.16, 1.0), (0.78, 0.30, 0.8), (0.55, 0.72, 0.9)):
+        x, y = cx * W, cy * H
+        sc.ellipse([x - 90 * s, y - 26 * s, x + 90 * s, y + 26 * s],
+                   fill=(255, 255, 255, 160))
+        sc.ellipse([x - 46 * s, y - 44 * s, x + 40 * s, y + 8 * s],
+                   fill=(255, 255, 255, 170))
+    plat = load_sprite("games/hopper/platform.png")
+    player = load_sprite("games/hopper/player.png")
+    for fx, fy, s in spec["platforms"]:
+        sc.stamp(plat, fx * W, fy * H, scale=s)
+    px, py, s = spec["player"]
+    sc.glow(px * W, py * H, 84, (255, 255, 255), 60)
+    sc.stamp(player, px * W, py * H, scale=s)
+    # snow (deterministic sprinkle)
+    for i in range(spec.get("snow", 0)):
+        x = (i * 367) % W
+        y = (i * 211 + 40) % H
+        r = 3 + (i % 3)
+        sc.ellipse([x, y, x + r, y + r], fill=(255, 255, 255, 220))
+    return sc.render()
+
+
+# ------------------------------------------------------------------- merge
+
+# A satisfying late-game snake pattern; None = empty cell. Classic palette.
+MERGE_SPEC = dict(
+    grid=[
+        ["1024", "512", "256", "128"],
+        ["8", "16", "32", "64"],
+        ["4", "2", None, "8"],
+        ["2", None, None, "4"],
+    ],
+    colors={"2": "efe6d8", "4": "edd9b0", "8": "f2b179", "16": "f59563",
+            "32": "f67c5f", "64": "f65e3b", "128": "edcf72", "256": "edcc61",
+            "512": "edc22e", "1024": "edc850"},
+    light_ink={"efe6d8", "edd9b0", "edcf72", "edcc61", "edc850", "edc22e"},
+    tile=132, gap=10,
+    hero="1024",                  # the tile that gets the glow
+)
+
+
+def scene_merge(spec=MERGE_SPEC):
+    sc = Scene()
+    sc.solid((187, 173, 160))
+    t, g = spec["tile"], spec["gap"]
+    grid = spec["grid"]
+    bw = 4 * t + 5 * g
+    bx, by = (W - bw) // 2, (H - bw) // 2
+    sc.rect([bx - 8, by - 8, bx + bw + 8, by + bw + 8], r=18,
+            fill=(160, 145, 132))
+    for r_i, row in enumerate(grid):
+        for c_i, label in enumerate(row):
+            x = bx + g + c_i * (t + g)
+            y = by + g + r_i * (t + g)
+            if label is None:
+                sc.rect([x, y, x + t, y + t], r=12, fill=(171, 157, 144))
+                continue
+            color = spec["colors"][label]
+            sc.rect([x, y, x + t, y + t], r=12, fill="#" + color)
+            if label == spec.get("hero"):
+                sc.glow(x + t / 2, y + t / 2, int(t * 0.9), (255, 220, 90), 80)
+            # fit the label inside the tile by MEASUREMENT (the game scales
+            # fonts too; Kenney Rocket runs wide)
+            size = int(t * 0.44)
+            fd = ImageDraw.Draw(sc.work)
+            max_w = t * 0.84
+            while size > 12:
+                f = font(size)
+                bb = fd.textbbox((0, 0), label, font=f)
+                if bb[2] - bb[0] <= max_w and bb[3] - bb[1] <= t * 0.7:
+                    break
+                size -= 2
+            ink = INK if color in spec["light_ink"] else (255, 255, 255)
+            fd.text((x + (t - bb[2] + bb[0]) / 2, y + (t - bb[3] + bb[1]) / 2),
+                    label, font=f, fill=ink)
+    sc.vignette(70)
+    return sc.render()
+
+
+# ------------------------------------------------------------------- dario
+
+DARIO_SPEC = dict(
+    ground_y=0.80,                # ground top as H fraction
+    gap=(0.40, 0.60),             # pit x-range (fractions) - the jump story
+    platform=(0.57, 2.4),         # floating brick ledge (fx, rows above ground)
+    hero=(0.38, 0.42, -10),       # hero mid-air over the pit (fx, fy, tilt)
+    hero_scale=1.5,
+    coins=((0.46, 0.27), (0.53, 0.21), (0.60, 0.27)),
+    walker=(0.75, 1.3),           # enemy on the far ground (fx, scale)
+    flag=(0.93, 1.12),
+    brick_scale=1.0,
+)
+
+
+def scene_dario(spec=DARIO_SPEC):
+    sc = Scene()
+    sc.backdrop((110, 190, 235), (196, 232, 250))
+    gy = spec["ground_y"] * H
+    # distant hills peeking over the ground line
+    sc.ellipse([-220, gy - 150, W * 0.34, gy + 260], fill=(96, 168, 92, 255))
+    sc.ellipse([W * 0.58, gy - 110, W + 260, gy + 300],
+               fill=(88, 158, 84, 255))
+    gx0, gx1 = spec["gap"][0] * W, spec["gap"][1] * W
+    sc.rect([gx0, gy, gx1, H], fill=(44, 28, 16))      # the pit is DARK
+    brick = load_sprite("games/dario/brick.png")
+    ground = load_sprite("games/dario/ground.png")
+    ts = int(brick.width * spec["brick_scale"])
+    # ground rows (brick rim + dirt) split by THE pit
+    x = 0
+    while x < W:
+        cx = x + ts / 2
+        if gx0 - 4 <= cx <= gx1 + 4:
+            x += ts
+            continue
+        sc.stamp(brick, cx, gy + ts / 2, scale=spec["brick_scale"])
+        sc.stamp(ground, cx, gy + ts * 1.5, scale=spec["brick_scale"])
+        x += ts
+    # floating brick ledge over the pit (the brave route)
+    pfx, prow = spec["platform"]
+    px, py = pfx * W, gy - prow * ts
+    sc.stamp(brick, px - ts / 2, py, scale=spec["brick_scale"])
+    sc.stamp(brick, px + ts / 2, py, scale=spec["brick_scale"])
+    # coins arcing over the pit
+    coin = load_sprite("ui/coin.png")
+    for fx, fy in spec["coins"]:
+        sc.glow(fx * W, fy * H, 52, (255, 201, 60), 85)
+        sc.stamp(coin, fx * W, fy * H, scale=0.62)
+    # the enemy waiting on the far side + the goal flag
+    wfx, ws = spec["walker"]
+    walker = load_sprite("games/dario/walker.png")
+    sc.stamp(walker, wfx * W, gy - walker.height * ws / 2, scale=ws)
+    ffx, fs = spec["flag"]
+    flag = load_sprite("games/dario/flag.png")
+    sc.stamp(flag, ffx * W, gy - flag.height * fs / 2, scale=fs)
+    # THE HERO - mid-leap from the left ledge, tilted into the jump
+    hero = load_sprite("games/dario/hero_jump.png")
+    hx, hy, tilt = spec["hero"]
+    sc.glow(hx * W, hy * H, 110, (255, 255, 255), 60)
+    sc.stamp(hero, hx * W, hy * H, scale=spec["hero_scale"], rot=tilt)
+    sc.vignette(70)
+    return sc.render()
+
+
+# ---------------------------------------------------------------------- xo
+
+XO_SPEC = dict(
+    board_c=(0.66, 0.50),         # board center (fractions)
+    cell=150,                     # px per cell
+    lines=((0, 0), (1, 0), (2, 0)),   # X's near-win row (the drama)
+    os=((1, 1), (2, 2), (0, 2)),      # O's blocks
+    next_mark=(2, 0),             # the empty cell X is about to take
+    ladder=(0.13, 10, 6),         # (fx, rungs, marker position 1-based)
+)
+
+
+def scene_xo(spec=XO_SPEC):
+    sc = Scene()
+    sc.backdrop((38, 30, 64), (24, 18, 44))
+    bcx, bcy = spec["board_c"][0] * W, spec["board_c"][1] * H
+    cell = spec["cell"]
+    half = cell * 1.5
+    # board plate
+    sc.rect([bcx - half - 26, bcy - half - 26, bcx + half + 26, bcy + half + 26],
+            r=26, fill=(52, 42, 86))
+    for i in (1, 2):   # grid lines
+        off = -half + i * cell
+        sc.line([(bcx + off, bcy - half + 8), (bcx + off, bcy + half - 8)],
+                (210, 200, 240, 90), width=10)
+        sc.line([(bcx - half + 8, bcy + off), (bcx + half - 8, bcy + off)],
+                (210, 200, 240, 90), width=10)
+
+    def cc(cxy):
+        return (bcx - half + cxy[0] * cell + cell / 2,
+                bcy - half + cxy[1] * cell + cell / 2)
+
+    def cross(x, y, r, col, width):
+        sc.line([(x - r, y - r), (x + r, y + r)], col, width)
+        sc.line([(x - r, y + r), (x + r, y - r)], col, width)
+
+    def ring(x, y, r, col, width):
+        sc.ellipse([x - r, y - r, x + r, y + r], outline=col, width=width)
+
+    XCOL, OCOL = (255, 138, 60), (120, 220, 180)
+    # the near-win X row glows; the winning tap pulses
+    for cxy in spec["lines"]:
+        x, y = cc(cxy)
+        hot = cxy == tuple(spec["next_mark"])
+        if hot:
+            sc.glow(x, y, cell * 0.75, (255, 138, 60), 95)
+        cross(x, y, cell * 0.30, XCOL + ((255,) if not hot else (255,)), 16)
+    for cxy in spec["os"]:
+        x, y = cc(cxy)
+        ring(x, y, cell * 0.30, OCOL + (255,), 16)
+    # the ladder (the game's identity): rungs + the climbing marker
+    lfx, rungs, marker = spec["ladder"]
+    lx = lfx * W
+    top, bot = H * 0.16, H * 0.84
+    for i in range(rungs):
+        y = bot - i * (bot - top) / (rungs - 1)
+        w = 120 if i % 2 == 0 else 96
+        on = (i + 1) <= marker
+        sc.rect([lx - w / 2, y - 9, lx + w / 2, y + 9], r=8,
+                fill=(150, 130, 210) if on else (72, 62, 110))
+    my = bot - (marker - 1) * (bot - top) / (rungs - 1)
+    sc.glow(lx, my, 52, (255, 176, 32), 120)
+    cross(lx, my, 26, (255, 176, 32, 255), 14)
+    sc.vignette(90)
+    return sc.render()
+
+
+# ----------------------------------------------------------- registry/CLI
+
+# Real-game scenes (composed, 960x640, no baked text - rule R2).
+SCENES = {
+    "snake": scene_snake,
+    "rally": scene_rally,
+    "lanes": scene_lanes,
+    "slasher": scene_slasher,
+    "hopper": scene_hopper,
+    "merge": scene_merge,
+    "dario": scene_dario,
+    "xo": scene_xo,
+}
+
+# SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks
+# as games leave the workshop - dario/xo left in v0.1.7.
+SOON_NAMES = {"hen": "HEN INVADERS", "spud": "COSMIC SPUD",
+              "maze": "ESCAPE THE MAZE", "matcher": "MATCHER",
+              "keys": "KEY SINGER", "poptd": "POP TD"}
+
+
+def scene_soon(title):
+    sc = Scene()
+    sc.solid((52, 42, 66))
+    for i in range(-640, W, 180):
+        sc.polygon([(i, H), (i + 60, H), (i + 700, 0), (i + 640, 0)],
+                   (64, 52, 84, 255))
+    sc.text("?", 240, W // 2, 200, fill=(122, 108, 180))
+    sc.text(title, 60, W // 2, 500, fill=(210, 200, 240))
+    sc.text("SOON", 40, W // 2, 564, fill=(150, 130, 210), big=False,
+            shadow=False)
+    return sc.render()
+
+
+def compose(game):
+    if game in SCENES:
+        return SCENES[game]()
+    if game in SOON_NAMES:
+        return scene_soon(SOON_NAMES[game])
+    raise SystemExit("unknown game: %s (have %s + SOON %s)" % (
+        game, ", ".join(sorted(SCENES)), ", ".join(sorted(SOON_NAMES))))
+
+
+def install(games):
+    """Write thumbs straight into assets/thumbs (same contract as
+    derive_assets.py thumbs()). Deterministic: same spec -> same pixels."""
+    tdir = os.path.join(ASSETS, "thumbs")
+    os.makedirs(tdir, exist_ok=True)
+    for g in games:
+        compose(g).save(os.path.join(tdir, "%s.png" % g))
+        print("thumb: %s.png" % g)
+
+
+def sheet(out_path, games=None):
+    """Contact sheet of every composed scene (the vision-review helper)."""
+    games = games or sorted(SCENES) + ["__SOON__"]
+    cols = 4
+    tw, th = 480, 320
+    rows = (len(games) + cols - 1) // cols
+    sh = Image.new("RGB", (cols * tw + (cols + 1) * 8,
+                           rows * th + (rows + 1) * 8), (20, 18, 28))
+    for i, g in enumerate(games):
+        img = (scene_soon("WORKSHOP") if g == "__SOON__" else compose(g)) \
+            .resize((tw, th), Image.LANCZOS)
+        x = 8 + (i % cols) * (tw + 8)
+        y = 8 + (i // cols) * (th + 8)
+        sh.paste(img, (x, y))
+    sh.save(out_path)
+    print("sheet:", out_path)
+
+
+def compare(out_path, old_dir, games):
+    """Before/after proof: old thumb LEFT, composed thumb RIGHT."""
+    tw, th = 480, 320
+    pad = 34
+    rows = len(games)
+    sh = Image.new("RGB", (2 * tw + 3 * pad, rows * th + (rows + 1) * pad + 8),
+                   (20, 18, 28))
+    d = ImageDraw.Draw(sh)
+    d.text((pad, 8), "BEFORE", font=font(26), fill=(232, 87, 74))
+    d.text((tw + 2 * pad, 8), "AFTER (composed 960x640)", font=font(26),
+           fill=(88, 196, 112))
+    for i, g in enumerate(games):
+        y = pad + 8 + i * th + i * 26
+        old = os.path.join(old_dir, "%s.png" % g)
+        if os.path.exists(old):
+            o = Image.open(old).convert("RGB")
+            o = o.resize((tw, int(o.height * tw / o.width)), Image.LANCZOS)
+            sh.paste(o, (pad, y + (th - o.height) // 2))
+        new = compose(g).resize((tw, th), Image.LANCZOS)
+        sh.paste(new, (tw + 2 * pad, y))
+        d.text((pad + 4, y + 4), g, font=font(20), fill=(255, 220, 170))
+    sh.save(out_path)
+    print("compare:", out_path)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="GOGABox programmable thumbnail composer (960x640)")
+    ap.add_argument("--game", help="one game id")
+    ap.add_argument("--all", action="store_true", help="install all thumbs")
+    ap.add_argument("--out", help="write single scene to this path")
+    ap.add_argument("--sheet", help="write a contact sheet to this path")
+    ap.add_argument("--compare", nargs=2, metavar=("OLD_DIR", "OUT_PNG"),
+                    help="before/after proof sheet")
+    args = ap.parse_args()
+    if args.compare:
+        old_dir, out_png = args.compare
+        compare(out_png, old_dir, sorted(SCENES))
+    elif args.sheet:
+        sheet(args.sheet)
+    elif args.out and args.game:
+        compose(args.game).save(args.out)
+        print("wrote", args.out)
+    elif args.all:
+        install(sorted(SCENES) + sorted(SOON_NAMES))
+    elif args.game:
+        compose(args.game).show()
+    else:
+        ap.print_help()
+
+
+if __name__ == "__main__":
+    main()

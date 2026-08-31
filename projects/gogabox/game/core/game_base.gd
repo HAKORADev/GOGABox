@@ -108,6 +108,13 @@ func check_achievements() -> int:
                         "tile_256": ok = Box.counter(game_id, "max_tile") >= 256
                         "tile_512": ok = Box.counter(game_id, "max_tile") >= 512
                         "tile_2048": ok = Box.counter(game_id, "max_tile") >= 2048
+                        # v0.1.7 - dario
+                        "stomp_25": ok = Box.counter(game_id, "stomped") >= 25
+                        "clear_all": ok = Box.counter(game_id, "levels_done") >= 3
+                        # v0.1.7 - xo
+                        "rung_5": ok = Box.counter(game_id, "rung") >= 5
+                        "rung_top": ok = Box.counter(game_id, "rung") >= 10
+                        "streak_3": ok = Box.counter(game_id, "streak") >= 3
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)

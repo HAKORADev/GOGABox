@@ -64,3 +64,29 @@ Owner decisions from the v0.1.6 chat, now locked:
 - v0.1.6 shipped snake + rally through the pipeline with before/after proof
   (download/thumbs_before_after.png); the other four games keep legacy
   thumbs until their capture passes.
+
+---
+
+## 4. RESOLVED (v0.1.7) — the owner reversed the production path
+
+The v0.1.6 captured frames landed and the owner looked at them:
+*"the gameplay capturing is not that good yet, i still prefers the
+hand-drawn one"*. And since the games themselves will keep changing for
+a while, crafting final thumbnails now is premature anyway. Decisions,
+locked:
+
+- **Production = the programmable composer** (`tools/thumb_composer.py`):
+  hand-designed scenes in code, built from the game's REAL sprites,
+  driven by tiny per-game SPEC dicts the owner can re-direct any time
+  ("later i tell you make the snake appear with tail to be up to 9 and
+  straight to left then straight to up before apple by 3 steps" - that
+  sentence is literally a spec now).
+- **Automated capture is NOT recommended at this point** (owner, with the
+  🌚). The v0.1.6 harness stays in dev/ (it works mechanically and it is
+  half the video-dream infrastructure), but nobody extends it for thumbs.
+- All 6 pre-v0.1.7 real games were recomposed at 960x640 through the
+  composer (the legacy 480x320 scenes are deleted from derive_assets, so
+  re-derives can never regress), and the two NEW games (dario, xo) shipped
+  with composed thumbs from day one.
+- Final crafting of any thumb waits for its game to settle; specs make
+  that a five-minute job when the owner calls for it.
