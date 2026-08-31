@@ -225,10 +225,14 @@ build.sh` trigger `build-android` (every `ci_auto` project × every ABI).
 `./tools/ci.sh` (list last runs) · `./tools/ci.sh watch` (tail one to
 completion). Cached runs ≈ 8–12 min per ABI, cold ≈ 20–25.
 
-**Version bump** — every user-visible change: `version_name` +1 patch and
-`version_code_base` +100 in `config/projects.json`. Effective version codes:
-arm32 = base+1, arm64 = base+2 (Play Store needs distinct codes, higher on
-the modern ABI).
+**Version bump (GOGABox design rule, owner-locked v0.1.8)** — every new
+build gets `version_name` **+0.0.1** (0.1.7 → 0.1.8 → 0.1.9 → 0.2.0 …) and
+`version_code_base` **+10**; effective codes: arm32 = base+1, arm64 = base+2
+(Play Store needs distinct codes, higher on the modern ABI). The owner may
+explicitly say "patch the same build" — then the version number STAYS and
+the fix rides the same version (rebuild, re-push, say so in the commit).
+Any other jump (+0.1.2, skipping, vibes) is refused on sight — the answer
+is literally "fuck you" (owner's own rule, his words, he will laugh).
 
 **Release** — bump version → push → CI green → Actions → **build-android →
 Run workflow** → pick project + `create_release: true` → tag `v<version_name>`

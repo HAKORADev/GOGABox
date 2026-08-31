@@ -8,6 +8,9 @@ Parked after v0.1.7 (2026-08-31). State right now, owner's call: no new games
 are being built — next up is polish (snake first, then the games one by one).
 This file is names only.
 
+Second dump the same night (+4: tower stacking clipped, balloon connect,
+circle connect, knetwalk-like).
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -26,12 +29,22 @@ This file is names only.
   on it to the next platform.
 - **bubble shooter** — match-3-ish but Bubble-Witch-like: the user aims and
   throws the thing, pop the clusters. ("yes that thing")
+- **tower stacking, clipped** — falling shapes (bags-ish, triangle-like,
+  whatever) stack into a long tower; whatever hangs OUT of the tower gets
+  clipped off. Physics stacking with a trimming twist.
 
 ## Puzzle
 - **water sort** — the classic weird android game: fill bottles with colored
   liquids, pour between bottles until sorted, tons of levels.
 - **block puzzle** — looks like tetris but it is puzzle-like: people put the
   pieces on the grid, clear lines, no falling. (woodoku / 1010-like)
+- **balloon connect** — My Talking Angela 2 style: link balloons together to
+  pop / bomb them somehow. That type.
+- **circle connect** — a grid full of circles, each color exists twice;
+  connect the matching pairs without crossing. (flow-free-like; also in
+  Talking Angela 2)
+- **knetwalk-like** — rotate tiles so every terminal gets wired to the
+  server. (KDE KNetWalk energy)
 
 ## Vehicles
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
