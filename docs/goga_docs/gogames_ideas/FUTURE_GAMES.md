@@ -11,6 +11,12 @@ This file is names only.
 Second dump the same night (+4: tower stacking clipped, balloon connect,
 circle connect, knetwalk-like).
 
+Third dump, still the same night, right before the v0.1.8 test (+14: jetpack,
+flappy, helix 3D, banana kong, red ball 4, ludo, stress ball, mouse maze,
+crazy fishing, match-3 fighter, omnitrix hero, crazy flight, zombie tsunami,
+get-over-it 2D) — plus a **Things to study** section at the bottom: boxes
+full of mini-games to mine for even more names.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -21,6 +27,8 @@ circle connect, knetwalk-like).
 - **brick-breaker-like** — paddle + ball + the brick wall.
 - **jumping-cube territory capture** — KJumpingCube-like: tap cells to grow
   their value, overflow spills into neighbors, capture the board.
+- **ludo** — the dice race classic: roll, run the loop, climb your color's
+  arm, get all four home.
 
 ## Arcade & one-touch
 - **knife circle** — throw a knife at a moving/rotating circle without
@@ -32,6 +40,20 @@ circle connect, knetwalk-like).
 - **tower stacking, clipped** — falling shapes (bags-ish, triangle-like,
   whatever) stack into a long tower; whatever hangs OUT of the tower gets
   clipped off. Physics stacking with a trimming twist.
+- **jetpack joyride-like** — hold to rise, release to fall; fly a scrolling
+  gauntlet of zappers and lasers, distance run.
+- **flappy bird-like** — tap to flap through the gaps. (Horizontal tap-flap —
+  a different niche than Snowy Tower's doodle-jump, so both can live.)
+- **banana kong-like** — one-button jungle runner: jump/dive, ride animals,
+  hoard the bananas.
+- **zombie tsunami-like** — horde runner: bite civilians to GROW the mob,
+  lose them to obstacles, keep the wave alive.
+- **omnitrix hero-like** — Ben 10 Omnitrix Hero energy: side-scroller where
+  you swipe / tap specific areas to attack.
+- **crazy flight-like** — Adventure Time Crazy Flight: hold / draw the flight
+  path, swoop the collectibles, thread the hazards.
+- **crazy fishing-like** — We Bare Bears Crazy Fishing: cast the hook, snag
+  the fish, dodge the stingers, haul the catch up.
 
 ## Puzzle
 - **water sort** — the classic weird android game: fill bottles with colored
@@ -45,6 +67,16 @@ circle connect, knetwalk-like).
   Talking Angela 2)
 - **knetwalk-like** — rotate tiles so every terminal gets wired to the
   server. (KDE KNetWalk energy)
+- **mouse maze-like** — Tom & Jerry Mouse Maze: place the bait to lure the
+  mouse through trap mazes — plan the path, spring the hazards.
+- **match-3 fighter** — Mao Mao / Slugterra 2 type: match-3 IS the combat —
+  matched gems power the attacks.
+
+## Platformers & rage climbs
+- **red-ball-4-like** — rolling-ball physics platformer; owner wants BOTH the
+  movement AND the style vibe of it.
+- **get-over-it-2d** — Getting Over It + Only Up mashed into 2D: one brutal
+  vertical climb, falling loses everything, keep going anyway. (rage game)
 
 ## Vehicles
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
@@ -58,8 +90,29 @@ circle connect, knetwalk-like).
     separate doodle-jump clone. Snowy Tower owns that niche.
 
 ## 3D shelf (low priority — owner: "i will focus more on 2D anyway")
+- **helix-jump-like** — owner described it precisely: a long cylindrical
+  tower, platforms spiral around it, the ball bounces down and SHATTERS the
+  platforms it lands on — avoid the black segments.
+- **stress-ball-3d-like** — stabilize the wobbly 3D ball, keep it steady.
 - **crowd runner** — that walking low-poly blue character that gets
   multiplied and divided through gates (count-masters-like).
 - **3D variants** of dominoes / chess, or two versions of each.
 - **"these weird games"** — the odd hyper-casual 3D bucket; more names land
   here as they are remembered.
+
+## Things to study — the idea mines
+NOT games to build — boxes FULL of mini-games. Study them to mine more names
+for the list above. Several of tonight's dump already came out of these
+(omnitrix hero, crazy flight, crazy fishing are Cartoon Network box games;
+balloon connect + circle connect were mined from My Talking Angela 2).
+- **my talking tom 1 & 2** — the original pet box, mini-games galore.
+- **my talking angela 2** — already paid out twice (balloon connect,
+  circle connect); keep mining.
+- **talking tom & friends 1 & 2** — the wider Talking Tom suite.
+- **cartoon network game box** — the CN brand mini-game vault; the source of
+  half of tonight's dump.
+- **pou** — the classic pet box with its own mini-game wall.
+- **budge game time** — Budge Studios' mini-game collection.
+- **gumball's amazing party game** — Gumball party mini-games.
+- **we bare bears free fur all** — We Bare Bears mini-game collection
+  (crazy fishing's home).
