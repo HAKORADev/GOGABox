@@ -32,10 +32,12 @@ extends RefCounted
 
 const GAMES := [
         {
-                "id": "snake", "title": "Snake", "tag": "the classic, hungry",
+                "id": "snake", "title": "Snake", "tag": "the classic, silky",
                 "script": "res://game/games/snake/snake.gd",
                 "thumb": "res://assets/thumbs/snake.png",
-                "orientation": "portrait", "dim": "2d",
+                # v0.1.8: BOTH orientations - the mode is chosen once, when
+                # the game loads, from how the phone is held right then.
+                "orientation": "auto", "dim": "2d",
                 "coin_div": 2, "price": 0, "fee": 10, "shop": true,
                 "banner": true,
                 # v0.1.5 SHARED ENTRY POLICY (was the v0.1.4 snake-only
@@ -43,8 +45,11 @@ const GAMES := [
                 # its coins) at entry AND retry, empty wallet plays free.
                 # Declarative now - any future game just wears the same key.
                 "entry": {"partial_pay": true},
-                "desc": "Steer the snake, eat apples, grab GOGACoins. Every apple makes you longer and faster - walls and your own tail end the run.",
-                "controls": ["swipe anywhere to steer", "each apple = 1 score point", "grab the spinning coin for +1 GOGACoin", "the run ends when you bite yourself or a wall"],
+                "desc": "The classic, now silky - steer a smooth snake around the full screen, eat apples and watch the blue melt into milk as you grow.",
+                "controls": ["hold the LEFT / RIGHT half of the screen to steer",
+                        "each apple = 1 point, +length and a little width (there is a limit)",
+                        "grab the spinning coin for +1 GOGACoin",
+                        "walls and your own body end the run"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [

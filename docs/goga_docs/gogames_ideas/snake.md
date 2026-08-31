@@ -97,3 +97,47 @@ below is the contract for v0.1.8.
 - Portal walls vs deadly walls — walls are deadly today; owner never asked
   to change it.
 - Skins shop refresh with named palette swatches in the sheet — parked.
+
+## 2026-08-31 04:52 — v0.1.8 SHIPPED: implementation notes + the look pass
+
+Everything in the 04:20 entry is now real, plus what building it taught:
+
+- **Structure**: the whole game is ONE view node; `_paint()` draws field,
+  deco, walls, rings, coin, apple, then the snake (tail first, head on
+  top). State: heading + trail (`Array[Vector2]`, newest last, trimmed to
+  body length); body = arc-samples every 11px with a taper to a fine tail
+  tip; head = 1.22x disc with eyes (+ x-eyes on death) and the tongue
+  UNDER the head disc.
+- **The gradient, tuned**: the transition IS the body - gradient length =
+  0.96 x body length, so a baby snake is a full blue->milk sweep and a
+  long snake carries a LONG sweep. (First attempt had a fixed-ish
+  gradient longer than the body - the tail never reached milk. The
+  owner's sentence, re-read literally, fixed it.)
+- **Width/growth**: starts 26 design-px wide, +1.6/apple, hard cap 64
+  ("wide with a limit"). Length +70/apple, eases toward the target so
+  growth looks smooth. Speed 430 -> +6/apple -> cap 880.
+- **Self-bite fairness**: neck arc ignored (2.2 x width + 10px), bite
+  threshold 0.58x(head+body radius) - forgiving on curves, honest on
+  loops.
+- **Visual QA loop**: captured REAL rendered frames via the v0.1.6 Xvfb
+  harness (rewrote snake_drive for the smooth era: tap-to-start, steer at
+  the apple, wall avoidance via board-center aim, quiet respawn) in BOTH
+  orientations at native res. Fixes driven by looking: circle spacing
+  16->11 (beaded -> silky), deco blobs quieter (6, alpha .38), coin 54px,
+  eyes bigger.
+- **New test**: tests/snake_probe.tscn boots a real run headless, starts
+  it, steers it, force-eats an apple, caps width, executes the whole
+  paint pass via a real redraw, then wall-crashes and asserts the
+  finish_run handover + music stop. ALL PASS, geometry probe PASS,
+  flow_test ALL PASS.
+- **Juice inventory**: eat burst (red/milk/blue motes + ring), coin
+  sparkle, death puff + snake-only red blink x3, apple pop-in with ring
+  and breathing idle (BACK ease, no alpha fade anywhere), tongue flicks
+  on a 1.4-2.8s timer and when an apple is near ahead, TAP ANYWHERE TO
+  START card pops in and pops out.
+- **Shop**: same 4 skins, now palettes over one gradient system - classic
+  renamed "Blue Melt" in the sheet. Bought skins keep working.
+- **Music**: 9.6s seamless warm lo-fi loop (Cmaj7-Am7-Fmaj7-G7, cycle-
+  locked frequencies so the waveform itself is seam-continuous), starts
+  with the run, dies with the run. Eat/die/start SFX synthesized in
+  tools/snake_audio.py (re-runnable).

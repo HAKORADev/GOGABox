@@ -290,6 +290,11 @@ func _t_registry() -> int:
                 ok2 = ok2 and ResourceLoader.exists(String(g["thumb"]))
         ok += _check(ok2, "every playable game has script+thumb; teasers have reveals")
         ok += _check(GameReg.get_game("nope").is_empty(), "unknown game resolves empty")
+        # v0.1.8: snake supports BOTH orientations; the mode is chosen at
+        # load (host_node reads the real window shape - headless falls back
+        # to portrait, and the boot test below exercises that exact path)
+        ok += _check(String(GameReg.get_game("snake").get("orientation")) == "auto",
+                "snake auto orientation (mode chosen at load)")
         return ok
 
 # ------------------------------------------------------------------ xo AI
@@ -1013,9 +1018,14 @@ func _t_isolation() -> int:
 
         # ---- v0.1.1 OWNER RULE: the box theme is BOX-ONLY. It used to keep
         # looping under every game scene (the menu player was never stopped).
-        ok += _check(not Jukebox._music.playing,
+        # v0.1.8 REFINEMENT: a game may now own its OWN track (snake does) -
+        # the invariant that matters is only that the BOX theme never plays
+        # inside a game scene.
+        ok += _check(not Jukebox._music.playing
+                        or Jukebox._current_music.find("box_theme") == -1,
                 "box theme STOPPED inside the game scene")
-        ok += _check(Jukebox._current_music == "", "jukebox forgot the menu track in-game")
+        ok += _check(Jukebox._current_music.find("box_theme") == -1,
+                "jukebox never serves the menu track in-game")
 
         # ---- menu really hides: Node2D AND CanvasLayer AND processing ----
         ok += _check(not menu.visible, "menu node hidden")

@@ -31,7 +31,18 @@ func configure(g: Dictionary, router_: Node, fee_: int, partial_: bool) -> void:
         partial = partial_
 
 func _ready() -> void:
-        var landscape := String(game_def.get("orientation", "portrait")) == "landscape"
+        # v0.1.8 "auto" orientation (owner: mode chosen WHEN THE GAME LOADS,
+        # before the run): a game may support BOTH orientations - the REAL
+        # window shape at load decides (hold vertical -> portrait design,
+        # hold horizontal -> landscape design), then the sensor locks it for
+        # the session. "portrait"/"landscape" pins stay exactly as before.
+        var orient := String(game_def.get("orientation", "portrait"))
+        var landscape: bool
+        if orient == "auto":
+                var ws := DisplayServer.window_get_size()
+                landscape = ws.x > 0 and ws.y > 0 and ws.x > ws.y
+        else:
+                landscape = orient == "landscape"
         _apply_orientation(landscape)
         await get_tree().process_frame
         await get_tree().process_frame

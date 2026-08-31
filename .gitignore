@@ -35,3 +35,6 @@ WORKLOG.md
 Thumbs.db
 *.tmp
 *.swp
+
+# ---- never ship binaries from the working tree ----
+download/
