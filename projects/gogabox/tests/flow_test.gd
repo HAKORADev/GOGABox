@@ -81,7 +81,7 @@ func _t_bonus_badges() -> int:
                 "ratio text floors below the divider")
         ok += _check(Arc.bonus_ratio_text(7, 0) == "7", "ratio text div-0 safe")
         Box.reset_all()
-        Box.record_run("snake", 10)   # chain rule: snake played -> rally revealed
+        Box.record_started("snake")   # v0.1.9: 'played' = a run STARTED
         ok += _check(Roadmap.state("rally") == "LOCKED", "rally buyable after snake played")
         Roadmap.tick()
         ok += _check(Box.badge("rally") == "unlocked",
@@ -106,11 +106,16 @@ func _t_unlocks() -> int:
 
 func _t_slots() -> int:
         Box.reset_all()
+        # v0.1.9 OWNER FIX: plays count at START (a mid-turn quit stays played);
+        # record_run keeps only the score story.
+        Box.record_started("snake")
+        Box.record_started("snake")
         Box.record_run("snake", 42)
         Box.record_run("snake", 17)
         var ok := _check(Box.stat("snake", "best") == 42, "best kept")
         ok += _check(Box.stat("snake", "last") == 17, "last updated")
-        ok += _check(Box.stat("snake", "plays") == 2, "plays counted")
+        ok += _check(Box.stat("snake", "plays") == 2, "plays counted at START")
+        ok += _check(Box.last_played_at("snake") > 0, "last_ts set for the lists")
         Box.bump_counter("snake", "apples", 10)
         Box.bump_counter("snake", "apples", 5)
         ok += _check(Box.counter("snake", "apples") == 15, "counters add")
@@ -122,6 +127,19 @@ func _t_slots() -> int:
         Box.earn(400)
         ok += _check(Box.buy_skin("snake", "gold", 300), "skin bought")
         ok += _check(Box.skin_on("snake") == "gold", "skin auto-equipped")
+        # v0.1.9 shop shelves: items + unlocks (fruits / power-ups / pack)
+        ok += _check(not Box.item_owned("snake", "fruit", "banana"), "fruit not owned")
+        ok += _check(Box.buy_item("snake", "fruit", "banana", 80), "fruit bought")
+        ok += _check(Box.item_owned("snake", "fruit", "banana"), "fruit owned after buy")
+        ok += _check((Box.items_owned("snake", "fruit") as Array).has("banana"),
+                "items_owned lists it")
+        ok += _check(Box.buy_item("snake", "fruit", "banana", 80) == false,
+                "double buy refused")
+        ok += _check(not Box.unlock_owned("snake", "powerups"), "powerups locked")
+        Box.earn(600)   # fund the shelf unlocks
+        ok += _check(Box.buy_unlock("snake", "powerups", 400), "system unlock bought")
+        ok += _check(Box.unlock_owned("snake", "powerups"), "powerups unlocked")
+        ok += _check(Box.item_on("snake", "fruit") == "banana", "last buy auto-armed")
         Box.reset_game("snake")
         ok += _check(Box.stat("snake", "best") == 0 and Box.counter("snake", "apples") == 0,
                 "reset_game wipes slot")
@@ -205,13 +223,18 @@ func _t_batteries() -> int:
         # tried on device and reverted ("the old design when it's complete
         # full is much better"). battery_full_reached mirrors the ping.
         var pings := [0]
-        var ping_cb := func(): pings[0] += 1
+        var ping_titles: Array = []
+        var ping_cb := func(title: String):
+                pings[0] += 1
+                ping_titles.append(title)   # v0.1.9: the signal names the pool
         Box.battery_full_reached.connect(ping_cb)
         Box.data["game_batteries"]["rally"] = {"count": 8,
                 "ts": int(Time.get_unix_time_from_system()) - 620}
         Box.meta().erase("batt_ping_at")
         Box.game_battery("rally")            # 8 -> 10 FULL -> PING
         ok += _check(pings[0] == 1, "pool reaching FULL pings once")
+        ok += _check(ping_titles.size() == 1 and String(ping_titles[0]) == "Pong Rally",
+                "the ping carries WHICH game filled (%s)" % str(ping_titles))
         Box.game_battery("rally")            # steady full - no new ping
         ok += _check(pings[0] == 1, "no repeat ping while the pool sits full")
         Box.data["game_batteries"]["rally"] = {"count": 0,
@@ -393,7 +416,7 @@ func _t_roadmap() -> int:
         Roadmap.tick()
         ok += _check(Box.badge("hen") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("hen"))
         # playing snake reveals rally (chain) but it stays hidden until Roadmap.tick stamps it
-        Box.record_run("snake", 10)
+        Box.record_started("snake")
         ok += _check(Roadmap.state("rally") == "LOCKED", "rally revealed after snake played")
         Roadmap.tick()
         ok += _check(Box.badge("rally") == "unlocked", "resolved tile badge UNLOCKED! (%s)" % Box.badge("rally"))
@@ -403,11 +426,11 @@ func _t_roadmap() -> int:
         # dario played -> xo becomes buyable
         Box.unlock_game("merge", 0)
         ok += _check(Roadmap.state("dario") == "HIDDEN", "dario still hidden (merge owned, unplayed)")
-        Box.record_run("merge", 100)
+        Box.record_started("merge")
         ok += _check(Roadmap.state("dario") == "LOCKED", "dario LOCKED after merge played")
         Box.unlock_game("dario", 0)
         ok += _check(Roadmap.state("xo") == "HIDDEN", "xo still hidden (dario owned, unplayed)")
-        Box.record_run("dario", 100)
+        Box.record_started("dario")
         ok += _check(Roadmap.state("xo") == "LOCKED", "xo LOCKED after dario played")
         # maze keeps the orders vocabulary alive (beat_best/earn_in/charges)
         var lines := Roadmap.order_lines("maze")
@@ -569,7 +592,7 @@ func _t_daily() -> int:
         ok += _check(int(u["rounds_cap"]) == 6 and int(u["mins_cap"]) == 0,
                 "rally: 6 rounds/day")
         for i in 6:
-                Box.record_run("rally", 1)
+                Box.record_started("rally")   # v0.1.9: rounds burn at START
         ok += _check(not Box.daily_ok("rally"), "6 rounds: rally is done for today")
         ok += _check(Roadmap.daily_text("rally") == "6/6 rounds",
                 "daily text live (%s)" % Roadmap.daily_text("rally"))
@@ -582,7 +605,7 @@ func _t_daily() -> int:
         ok += _check(int(u["rounds_cap"]) == 6 and int(u["mins_cap"]) == 15,
                 "lanes: 6 rounds AND 15 min")
         for i in 6:
-                Box.record_run("lanes", 1)
+                Box.record_started("lanes")
         ok += _check(not Box.daily_ok("lanes"), "lanes dead via rounds")
         Box.data["games"]["lanes"]["daily"]["day"] = "2000-01-01"
         Box.add_time("lanes", 15.0 * 60.0)
@@ -637,7 +660,7 @@ func _t_time_fmt() -> int:
 ## both the feed chip and the pre-play button read.
 func _t_feed_order() -> int:
         Box.reset_all()
-        Box.record_run("snake", 10)   # reveals rally (chain) + the mysteries
+        Box.record_started("snake")   # reveals rally (chain) + the mysteries
         Roadmap.tick()
         var rows := Roadmap.feed_rows()
         var ids: Array = []
@@ -938,6 +961,24 @@ func _t_menu() -> int:
                 "wrap lands on NOT PLAYED YET (%s)" % menu._strip_title.text)
         menu._list_move(1)   # back to TODAY'S PICKS
         ok += _check(menu._strip_title.text == "TODAY'S PICKS", "carousel wraps cleanly")
+        # v0.1.9 OWNER FIX: LEAST PLAYED lists every owned+played game (it used
+        # to EXCLUDE the LAST PLAYED set and go empty), fewest plays first
+        Box.unlock_game("rally", 0)
+        Box.record_started("rally")
+        Box.record_started("rally")
+        Box.record_started("snake")
+        Box.record_run("rally", 5)
+        Box.record_run("snake", 7)
+        menu._refresh()
+        menu._list_idx = 2
+        menu._apply_list()
+        var least: Array = menu._lists_data[2]["items"]
+        ok += _check(least.size() == 2, "LEAST PLAYED lists ALL played games (%d)" % least.size())
+        if least.size() == 2:
+                ok += _check(String(least[0]["g"]["id"]) == "snake",
+                        "fewest plays first (snake 1 play < rally 2: got %s)" % String(least[0]["g"]["id"]))
+                ok += _check(String(least[0]["stat"]).begins_with("plays 1"),
+                        "stat line is the play count (%s)" % String(least[0]["stat"]))
         # every sheet opens without script errors
         menu._open_settings()
         await get_tree().process_frame

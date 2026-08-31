@@ -215,3 +215,34 @@ Fixes first, additions second, "work slowly, no skipping, no weak designs".
 - Powers apply to the AI too (symmetry), and each power re-writes part of
   the AI's behavior table (the owner: "make a proper design that modifies
   the AI system for each different power-up").
+
+---
+
+## 2026-08-31 — v0.1.9 SHIPPED (the build record)
+
+Everything in the entry above is IN. Implementation notes worth keeping:
+- The war lives in FOUR files now: snake.gd (orchestration + paint + shop),
+  snake_body.gd (one SnakeBody per snake - physics, trail, the RIBBON),
+  snake_ai.gd (the brain + the per-power behavior table), snake_fruits.gd
+  (catalogs + the vector fruit painters).
+- The ribbon: trail resampled at 11px arc steps -> left/right edges by
+  local normal -> tail cap fan -> ONE closed polygon with per-vertex
+  gradient colors, draw_polygon in a single call, over a +3.5px darkened
+  outline pass. Wrap breaks (segments > 220px) split the sampling so
+  NO-WALLS teleport lines never paint across the field.
+- The wheel: first finger = wheel center, stick = drag offset, deadzone
+  12px, stick angle = ABSOLUTE target heading, capped bend 4.6 rad/s.
+- The orientation ask letterboxes the FIELD (9:16 / 16:9) inside any
+  device orientation; the mode menu carries the OPTIONALS strip (a
+  game_safe BoxScroll) - enemy open from day one, the rest unlocked in
+  the shop, locked boxes wear lock + coin price and tap into the shop.
+- The powers table (weights 12-22, cooldowns 8-22s, durations 7-12s) is
+  in snake_fruits.gd POWERS - adding a power = one dict entry + one
+  behavior-table row + one chip glyph.
+- Tests: flow_test grew record_started semantics + the shop-item API +
+  the LEAST PLAYED regression + the battery-ping title; snake_probe grew
+  to 30 checks (the whole war walked headless); visual QA ran REAL
+  frames through Xvfb (landscape gameplay + the three screens) and caught
+  two real layout bugs pre-build (optionals strip overflow; Kenney Rocket
+  section labels blowing the shop sheet's min width - fit_label or die).
+- Version 0.1.9, base 30280 (arm32 30281, arm64 30282).

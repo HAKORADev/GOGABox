@@ -707,19 +707,23 @@ func _refresh() -> void:
                         played.append({"g": g, "plays": plays, "ts": ts})
                 else:
                         never.append({"g": g, "stat": "new game"})
-        var by_recents := played.duplicate()
+        var by_recents := []
+        for it in played:
+                # v0.1.9: FRESH dicts per list - the two strips show different
+                # stat lines for the same game ("2h ago" vs "plays 3") and the
+                # dicts used to be shared (one strip's stat overwrote the other's).
+                by_recents.append({"g": it["g"], "plays": it["plays"], "ts": it["ts"],
+                                "stat": _ago(int(it["ts"]))})
         by_recents.sort_custom(func(a, b): return int(a["ts"]) > int(b["ts"]))
         by_recents = by_recents.slice(0, 10)
-        var last_ids := []
-        for it in by_recents:
-                last_ids.append(String(it["g"]["id"]))
-        for it in by_recents:
-                it["stat"] = _ago(int(it["ts"]))
+        # v0.1.9 OWNER FIX: LEAST PLAYED used to EXCLUDE everything already in
+        # the LAST PLAYED strip - a box with few played games showed an EMPTY
+        # list. It now always lists every owned+played game, fewest plays
+        # first, oldest-play tie-break (owner: "first is snake, second is pong").
         var by_least := []
         for it in played:
-                if not last_ids.has(String(it["g"]["id"])):
-                        it["stat"] = "plays %d" % int(it["plays"])
-                        by_least.append(it)
+                by_least.append({"g": it["g"], "plays": it["plays"], "ts": it["ts"],
+                                "stat": "plays %d" % int(it["plays"])})
         by_least.sort_custom(func(a, b):
                 var pa := int(a["plays"])
                 var pb := int(b["plays"])

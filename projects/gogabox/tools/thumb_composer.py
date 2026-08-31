@@ -672,13 +672,44 @@ SOON_NAMES = {"hen": "HEN INVADERS", "spud": "COSMIC SPUD",
               "keys": "KEY SINGER", "poptd": "POP TD"}
 
 
+def q_mark(size, fill):
+    """The Kenney_Rocket ? is DOTLESS with a stub tail - it never read like
+    a real question mark. v0.1.9 owner fix: 'add more blocks to make the
+    tail a little longer like a real ?' - the stub grows into a proper
+    straight drop and the dot lands below it, with a gap (same surgery
+    language as the v0.0.9 mystery_q fix). Returns a cropped RGBA glyph."""
+    f = font(size, big=True)
+    img = Image.new("RGBA", (size * 2 + 40, size * 2 + 40), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.text((20, 20), "?", font=f, fill=fill)
+    bb = img.getbbox()
+    px = img.load()
+    gh = bb[3] - bb[1]
+    # the tail stub = whatever ink the bottom rows carry (x-range of the
+    # lowest stem)
+    xs = [x for x in range(img.width) if px[x, bb[3] - 2][3] > 40]
+    if xs and gh > 0:
+        x0, x1 = min(xs), max(xs)
+        drop = int(gh * 0.36)
+        d.rectangle([x0, bb[3] - 2, x1, bb[3] + drop], fill=fill)
+        # the dot below the tail, with a gap - that is what makes it a
+        # REAL ?  (hook + drop + dot)
+        gap = int(size * 0.10)
+        dot = int((x1 - x0) * 1.12)
+        dcx = (x0 + x1) // 2
+        d.rounded_rectangle([dcx - dot // 2, bb[3] + drop + gap,
+                             dcx + dot // 2, bb[3] + drop + gap + dot],
+                            radius=max(3, dot // 6), fill=fill)
+    return img.crop(img.getbbox())
+
+
 def scene_soon(title):
     sc = Scene()
     sc.solid((52, 42, 66))
     for i in range(-640, W, 180):
         sc.polygon([(i, H), (i + 60, H), (i + 700, 0), (i + 640, 0)],
                    (64, 52, 84, 255))
-    sc.text("?", 240, W // 2, 200, fill=(122, 108, 180))
+    sc.stamp(q_mark(240, (122, 108, 180, 255)), W // 2, 218)
     sc.text(title, 60, W // 2, 500, fill=(210, 200, 240))
     sc.text("SOON", 40, W // 2, 564, fill=(150, 130, 210), big=False,
             shadow=False)

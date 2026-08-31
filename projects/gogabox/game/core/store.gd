@@ -6,7 +6,7 @@ signal coins_changed(total: int)
 signal game_unlocked(id: String)
 signal reveal_changed(id: String)   # a game's feed state changed (mystery->locked...)
 signal batteries_changed
-signal battery_full_reached        # v0.1.3: a pool just charged back to FULL
+signal battery_full_reached(title: String)  # v0.1.3, v0.1.9: carries WHICH pool filled
 signal charges_changed(id: String) # v0.1.4: a game's GOGACharges meter moved
 
 const SAVE_PATH := "user://gogabox.json"
@@ -268,8 +268,9 @@ func game_battery(id: String) -> Dictionary:
                         # when the pool charges back to COMPLETELY FULL - the
                         # v0.1.2 per-round ping felt spammy with many games, so
                         # the owner picked the old full-pool design again.
+                        # v0.1.9: the popup names the game whose pool filled.
                         if before < cap and count >= cap:
-                                _battery_full_sfx()
+                                _battery_full_sfx(String(g.get("title", id)))
         var regen_in := 0
         if count < cap:
                 regen_in = step - ((now - int(p.get("ts", now))) % step)
@@ -335,13 +336,15 @@ func poll_game_batteries() -> void:
 ## In-app "a pool charged back to FULL" ping (v0.1.3 owner rule - the
 ## v0.1.2 round-ready ping is REVERTED: "the old design when it's complete
 ## full is much better"). Cooldown keeps regen reads from spamming the sound.
-func _battery_full_sfx() -> void:
+## v0.1.9: the signal now carries WHICH pool filled ("" = the box bank)
+## so the menu can pop "<game> batteries are fully charged".
+func _battery_full_sfx(title := "") -> void:
         var now := int(Time.get_unix_time_from_system())
         if now - int(meta().get("batt_ping_at", 0)) < 90:
                 return
         meta()["batt_ping_at"] = now
         save()
-        battery_full_reached.emit()
+        battery_full_reached.emit(title)
         Notify.play_kind_sfx("battery_full")
 
 func _battery_notify_id(key: String) -> int:
@@ -505,11 +508,21 @@ func _slot(id: String) -> Dictionary:
 func stat(id: String, key: String) -> int:
         return int(_slot(id).get(key, 0))
 
+## v0.1.9 OWNER FIX ("i played pong and exited without finishing the turn,
+## it is still marked not played"): a play counts the moment the run STARTS.
+## The host calls this the instant the game instance exists - quitting
+## mid-turn, crashing, finishing, everything counts. Daily rounds move here
+## too: the fee + batteries were consumed at entry, so the round was paid.
+func record_started(id: String) -> void:
+        var s := _slot(id)
+        s["plays"] = int(s["plays"]) + 1
+        _daily(id)["rounds"] = int(_daily(id).get("rounds", 0)) + 1
+        s["last_ts"] = int(Time.get_unix_time_from_system())
+        save()
+
 func record_run(id: String, score: int) -> Dictionary:
         var s := _slot(id)
         s["last"] = score
-        s["plays"] = int(s["plays"]) + 1
-        _daily(id)["rounds"] = int(_daily(id).get("rounds", 0)) + 1   # v0.1.4 daily rounds
         s["last_ts"] = int(Time.get_unix_time_from_system())   # last-played lists
         var new_best := score > int(s["best"])
         if new_best:
@@ -621,6 +634,48 @@ func has_achievement(id: String, ach_id: String) -> bool:
 ## How many trophies this game has granted (achievement mystery orders).
 func ach_count(id: String) -> int:
         return (_slot(id)["ach"] as Dictionary).size()
+
+# ------------------------------------------------- per-game shop items (v0.1.9)
+## Generic shop shelves for games that sell MORE than skins (snake v0.1.9
+## sells fruits / power-ups / bugs / obstacles / enemy packs). Same
+## vocabulary as skins - owned[], "on" - kept per category so a future game
+## can wear several shelves without new save schema. Skins keep their own
+## dedicated API (it predates this and the tests pin it).
+
+func _items(game_id: String, cat: String) -> Dictionary:
+        var s := _slot(game_id)
+        if not s.has("shop_items"):
+                s["shop_items"] = {}
+        var c: Dictionary = s["shop_items"]
+        if not c.has(cat):
+                c[cat] = {"owned": [], "on": ""}
+        return c[cat]
+
+func item_owned(game_id: String, cat: String, item: String) -> bool:
+        return (_items(game_id, cat)["owned"] as Array).has(item)
+
+func items_owned(game_id: String, cat: String) -> Array:
+        return (_items(game_id, cat)["owned"] as Array)
+
+func item_on(game_id: String, cat: String) -> String:
+        return String(_items(game_id, cat)["on"])
+
+func buy_item(game_id: String, cat: String, item: String, price: int) -> bool:
+        if item_owned(game_id, cat, item) or not spend(price):
+                return false
+        (_items(game_id, cat)["owned"] as Array).append(item)
+        _items(game_id, cat)["on"] = item
+        add_spent(game_id, price)
+        save()
+        return true
+
+## Category-level unlock (power-ups/bugs/obstacles systems, enemy pack):
+## one purchase flips the whole shelf on - stored as owning the cat key.
+func buy_unlock(game_id: String, cat: String, price: int) -> bool:
+        return buy_item(game_id, cat, "__on__", price)
+
+func unlock_owned(game_id: String, cat: String) -> bool:
+        return item_owned(game_id, cat, "__on__")
 
 # ------------------------------------------------------------- skins (per game)
 

@@ -80,6 +80,9 @@ func _ready() -> void:
         game.request_finish.connect(_on_finish)
         game.request_quit.connect(_quit_to_menu)
         add_child(game)
+        # v0.1.9 OWNER FIX: the play counts at START (quit-mid-turn stays
+        # "played"). record_run at finish keeps score/best only.
+        Box.record_started(id)
 
 func _process(delta: float) -> void:
         # play-time accounting for the global stats screen
@@ -340,7 +343,9 @@ func _on_finish(final_score: int, earned: int) -> void:
                         game.game_id = id
                         game.request_finish.connect(_on_finish)
                         game.request_quit.connect(_quit_to_menu)
-                        add_child(game))
+                        add_child(game)
+                        # v0.1.9: replays count at start too
+                        Box.record_started(id))
         sheet.add_child(again_btn)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():
