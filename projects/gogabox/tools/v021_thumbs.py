@@ -27,8 +27,11 @@ def _save(img, name):
 
 
 def _snake_body(d, pts, w0, c_head, c_tail, outline=(20, 14, 8)):
-    """A smooth tapered ribbon snake from center points (the game's own
-    language: one part, gradient, dark outline, rounded closed tail)."""
+    """A smooth tapered ribbon snake from center points - pts[0] IS THE HEAD
+    (the game's own language: one part, gradient, dark outline, rounded
+    closed tail AND closed tip). v0.2.1a re-program: every scene feeds the
+    points head-first (head near the apple, tail back at its wall) - the old
+    scenes had heads pressed against the walls looking AWAY from the apple."""
     def norm(p, q):
         dx, dy = q[0] - p[0], q[1] - p[1]
         L = max(0.001, math.hypot(dx, dy))
@@ -52,6 +55,12 @@ def _snake_body(d, pts, w0, c_head, c_tail, outline=(20, 14, 8)):
                     for k in range(3))
         seg = [left[i], left[i + 1], right[i + 1], right[i]]
         d.polygon(seg, fill=col)
+    # closed tail tip: a dark cap + a fill cap (the game's rounded tail)
+    tx, ty = pts[-1]
+    tw = w0 * 0.45
+    d.ellipse([tx - tw - 3, ty - tw - 3, tx + tw + 3, ty + tw + 3],
+              fill=outline)
+    d.ellipse([tx - tw, ty - tw, tx + tw, ty + tw], fill=c_tail)
     # head disc + eyes
     hx, hy = pts[0]
     d.ellipse([hx - w0 * 1.1, hy - w0 * 1.1, hx + w0 * 1.1, hy + w0 * 1.1],
@@ -297,8 +306,10 @@ def _field_bg():
 
 
 def snake_v1():
-    """VERSION A - the siege: three enemies at three sides, the user snake
-    darting in from the left, one apple in the middle (classic place)."""
+    """VERSION A (v0.2.1a re-program) - the siege done RIGHT: three enemies
+    and the user snake each arrive from their own side, every HEAD is at the
+    apple end looking AT it, every tail trails back to its wall (the old
+    scene had the heads pressed against the walls staring outward)."""
     img, d = _field_bg()
 
     def body(pts, w0, head_c, tail_c, dirdeg, eyes=True):
@@ -307,101 +318,121 @@ def snake_v1():
             _eyes(d, h, dirdeg)
         return h
 
-    def curve(p0, p1, p2, n=16):
+    def curve(head, ctrl, tail, n=16):
+        # quadratic bezier from the HEAD back to the TAIL
         pts = []
         for i in range(n + 1):
             t = i / n
-            x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t ** 2 * p2[0]
-            y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t ** 2 * p2[1]
+            x = (1 - t) ** 2 * head[0] + 2 * (1 - t) * t * ctrl[0] \
+                    + t ** 2 * tail[0]
+            y = (1 - t) ** 2 * head[1] + 2 * (1 - t) * t * ctrl[1] \
+                    + t ** 2 * tail[1]
             pts.append((x, y))
         return pts
 
-    # green from the top, heading down
-    body(curve((520, 60), (500, 190), (430, 300)), 30, (63, 174, 92),
-         (216, 240, 220), 115)
-    # ember from the right, curling
-    body(curve((910, 380), (740, 420), (620, 350)), 28, (232, 99, 42),
-         (255, 233, 201), 190)
-    # violet from the bottom
-    body(curve((300, 600), (360, 480), (450, 420)), 28, (138, 86, 200),
-         (232, 220, 248), 285)
-    # the user: blue, darting right at the apple
-    body(curve((70, 330), (200, 300), (330, 330)), 32, (63, 127, 212),
-         (250, 243, 227), 8)
-    _apple(d, (400, 330), 30)
-    _coin(d, (700, 200))
+    apple_at = (480, 332)
+
+    # green dives in from the top, eyes locked on the apple
+    body(curve((508, 238), (540, 150), (552, 78)), 28, (63, 174, 92),
+         (216, 240, 220), 106)
+    # ember sweeps in from the right wall
+    body(curve((578, 372), (740, 400), (882, 330)), 27, (232, 99, 42),
+         (255, 233, 201), 203)
+    # violet pushes up from the bottom
+    body(curve((442, 428), (420, 510), (392, 572)), 26, (138, 86, 200),
+         (232, 220, 248), 292)
+    # the user: blue, the closest lunge - a hair from the apple, tongue out
+    h = body(curve((388, 318), (250, 290), (96, 330)), 30, (63, 127, 212),
+             (250, 243, 227), 9)
+    hx, hy, w = h
+    d.line([hx + w, hy + 1, hx + w * 2.1, hy + 3], fill=(232, 64, 47),
+           width=6)
+    _apple(d, apple_at, 30)
+    _coin(d, (700, 210))
     _save(img, "snake_v1")
 
 
 def snake_v2():
-    """VERSION B - the chase: one long user snake racing the green rival to
-    the apple, the pack right behind (dramatic diagonal)."""
+    """VERSION B (v0.2.1a re-program) - the chase: the LONG user snake has
+    the shortest road (head an inch from the apple), the green rival slides
+    in from the top-right, two more head-first trails behind."""
     img, d = _field_bg()
 
-    def curve(p0, p1, p2, n=16):
+    def curve(head, ctrl, tail, n=16):
         pts = []
         for i in range(n + 1):
             t = i / n
-            x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t ** 2 * p2[0]
-            y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t ** 2 * p2[1]
+            x = (1 - t) ** 2 * head[0] + 2 * (1 - t) * t * ctrl[0] \
+                    + t ** 2 * tail[0]
+            y = (1 - t) ** 2 * head[1] + 2 * (1 - t) * t * ctrl[1] \
+                    + t ** 2 * tail[1]
             pts.append((x, y))
         return pts
 
-    # the user snake: LONG, from bottom-left sweeping to the apple
+    # the user: LONG, from the bottom-left wall to a head just off the apple
     pts = []
     for i in range(22):
         t = i / 21
-        x = 60 + t * 620
-        y = 520 - 300 * t + 60 * math.sin(t * 5.2)
+        x = 402 - t * 342
+        y = 362 + t * 208 - 54 * math.sin(t * 4.6)
         pts.append((x, y))
-    h = _snake_body(d, pts, 34, (63, 127, 212), (250, 243, 227))
-    _eyes(d, h, -22)
-    # the green rival: a neck behind the apple
-    h2 = _snake_body(d, curve((900, 90), (760, 180), (640, 220)), 30,
+    h = _snake_body(d, pts, 32, (63, 127, 212), (250, 243, 227))
+    _eyes(d, h, -19)
+    # the green rival: head sliding in from the top-right, eyes on the prize
+    h2 = _snake_body(d, curve((560, 258), (700, 168), (852, 96)), 29,
                      (63, 174, 92), (216, 240, 220))
-    _eyes(d, h2, 165)
-    # violet + ember in the far back
-    _snake_body(d, curve((920, 560), (760, 560), (660, 500)), 26,
-                (138, 86, 200), (232, 220, 248))
-    _snake_body(d, curve((500, 90), (420, 170), (330, 190)), 24,
-                (232, 99, 42), (255, 233, 201))
-    _apple(d, (560, 240), 30)
+    _eyes(d, h2, 138)
+    # violet + ember closing in too, heads first
+    h3 = _snake_body(d, curve((698, 558), (790, 522), (880, 420)), 25,
+                     (138, 86, 200), (232, 220, 248))
+    _eyes(d, h3, 226)
+    h4 = _snake_body(d, curve((242, 122), (300, 90), (380, 62)), 23,
+                     (232, 99, 42), (255, 233, 201))
+    _eyes(d, h4, 41)
+    _apple(d, (480, 332), 30)
     _coin(d, (170, 190))
     _save(img, "snake_v2")
 
 
 def snake_v3():
-    """VERSION C - the moment before: the user head an inch from the apple,
-    the green rival's open charge mirrored across the field."""
+    """VERSION C (v0.2.1a re-program) - the moment before: the user head an
+    inch from the apple with the tongue out, the green rival's charge from
+    the top-right, the pack still hunting."""
     img, d = _field_bg()
 
-    def curve(p0, p1, p2, n=16):
+    def curve(head, ctrl, tail, n=16):
         pts = []
         for i in range(n + 1):
             t = i / n
-            x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t ** 2 * p2[0]
-            y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t ** 2 * p2[1]
+            x = (1 - t) ** 2 * head[0] + 2 * (1 - t) * t * ctrl[0] \
+                    + t ** 2 * tail[0]
+            y = (1 - t) ** 2 * head[1] + 2 * (1 - t) * t * ctrl[1] \
+                    + t ** 2 * tail[1]
             pts.append((x, y))
         return pts
 
-    # user: BIG in the foreground, lunging right
-    pts = [(140 + i * 58, 400 + 46 * math.sin(i * 0.9)) for i in range(9)]
+    # user: BIG in the foreground, head a breath from the apple
+    pts = [(330 - i * 34, 420 + 14 * math.sin(i * 0.9)) for i in range(9)]
     h = _snake_body(d, pts, 44, (63, 127, 212), (250, 243, 227))
-    _eyes(d, h, 0, 1.25)
+    _eyes(d, h, -6, 1.25)
     # tongue!
     hx, hy, w = h
-    d.line([hx + w, hy, hx + w * 2.3, hy], fill=(232, 64, 47), width=7)
-    _apple(d, (hx + w * 3.1, hy), 36)
-    # green: charging from the top-right corner
-    h2 = _snake_body(d, curve((940, 60), (760, 120), (620, 150)), 34,
+    d.line([hx + w, hy - 1, hx + w * 2.2, hy - 3], fill=(232, 64, 47),
+           width=7)
+    apple_at = (hx + w * 3.2, hy - 8)
+    # green: charging in from the top-right corner, head-first
+    h2 = _snake_body(d, curve((700, 220), (820, 150), (916, 84)), 38,
                      (63, 174, 92), (216, 240, 220))
-    _eyes(d, h2, 187, 1.1)
-    # the pack far behind
-    _snake_body(d, curve((900, 600), (740, 580), (620, 560)), 26,
-                (138, 86, 200), (232, 220, 248))
-    _snake_body(d, curve((60, 90), (170, 150), (280, 160)), 26,
-                (232, 99, 42), (255, 233, 201))
-    _coin(d, (860, 320))
+    _eyes(d, h2, 140, 1.1)
+    # the pack far behind, heads first
+    h3 = _snake_body(d, curve((760, 520), (830, 560), (900, 578)), 26,
+                     (138, 86, 200), (232, 220, 248))
+    _eyes(d, h3, 200)
+    h4 = _snake_body(d, curve((200, 180), (140, 150), (70, 130)), 26,
+                     (232, 99, 42), (255, 233, 201))
+    _eyes(d, h4, 41)
+    _apple(d, apple_at, 36)
+    _coin(d, (860, 330))
     _save(img, "snake_v3")
 
 

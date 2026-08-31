@@ -354,6 +354,12 @@ func bite_back(hp: Vector2, board: Rect2) -> float:
 ## a quad per sample step (per-vertex gradient kept) + a joint disc wherever
 ## the path bends. Overlap just overpaints - flicker is impossible, and the
 ## "one smooth part" look survives (discs are joint fillers, not beads).
+##
+## v0.2.1a PAINTER LAW (owner: "the new part gets LOWER than the old parts
+## and this is wrong"): pieces assemble OLDEST FIRST - the tail cap opens
+## the paint, quads walk tail -> head, older portal-runs paint before the
+## fresh head run. At a self-crossing the NEWER loop paints LAST and rides
+## on top, the way a real snake stacks itself. Draw order = time order.
 func ribbon(grow := 0.0, col_override := Color(0, 0, 0, 0)) -> Array:
         var pieces: Array = []
         var pts := body_points()
@@ -368,13 +374,17 @@ func ribbon(grow := 0.0, col_override := Color(0, 0, 0, 0)) -> Array:
                 else:
                         run.append(pts[i])
         runs.append(run)
-        for r in runs:
+        # OLDEST RUN FIRST: runs[0] holds the head (the freshest path) -
+        # painting it LAST puts the new body over everything older.
+        for ri in range(runs.size() - 1, -1, -1):
+                var r: Array = runs[ri]
                 var n: int = r.size()
                 if n < 2:
                         continue
                 var edges_l := PackedVector2Array()
                 var edges_r := PackedVector2Array()
                 var cols := PackedColorArray()
+                var bend_discs := {}
                 for i in n:
                         var p: Vector2 = r[i][0]
                         var d: float = r[i][1]
@@ -394,19 +404,26 @@ func ribbon(grow := 0.0, col_override := Color(0, 0, 0, 0)) -> Array:
                                 var t0 := ((r[i - 1][0] as Vector2) - p).normalized()
                                 var t1 := (p - (r[i + 1][0] as Vector2)).normalized()
                                 if absf(t0.angle_to(t1)) > 0.22:
-                                        pieces.append(_disc_piece(p, rr, c))
-                for i in range(n - 1):
+                                        bend_discs[i] = _disc_piece(p, rr, c)
+                var rp: Array = []
+                # the closed tail cap paints FIRST - the oldest end; anything
+                # the body does after this rides over it
+                var tail_d: float = r[n - 1][1]
+                var tc := col_override if col_override.a > 0.0 else body_color(tail_d)
+                rp.append(_disc_piece(r[n - 1][0],
+                                half_width(tail_d) + grow, tc))
+                # quads tail -> head; a joint disc paints right after the
+                # tail-side quad it decorates
+                for i in range(n - 2, -1, -1):
                         var quad := PackedVector2Array([
                                 edges_l[i], edges_l[i + 1],
                                 edges_r[i + 1], edges_r[i]])
                         var qc := PackedColorArray([cols[i], cols[i + 1],
                                         cols[i + 1], cols[i]])
-                        pieces.append({"pts": quad, "cols": qc})
-                # the closed tail cap: a disc at the tip, as fat as the body
-                var tail_d: float = r[n - 1][1]
-                var tc := col_override if col_override.a > 0.0 else body_color(tail_d)
-                pieces.append(_disc_piece(r[n - 1][0],
-                                half_width(tail_d) + grow, tc))
+                        rp.append({"pts": quad, "cols": qc})
+                        if bend_discs.has(i):
+                                rp.append(bend_discs[i])
+                pieces.append_array(rp)
         return pieces
 
 

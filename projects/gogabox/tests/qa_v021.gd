@@ -42,6 +42,22 @@ func _run() -> void:
         game.game_id = "snake"
         add_child(game)
         await get_tree().create_timer(0.5).timeout
+        # --- v0.2.1a: the ask listens to the WINDOW - a stale pref in the
+        # save must NOT light the wrong card (the owner's hang repro) ---
+        await _shot("ask_fresh_boot")
+        var bogus := "horizontal" if game._auto_orient() == "vertical" \
+                        else "vertical"
+        Box.set_progress("snake", "orient_pref", bogus)
+        var ga: GogaGame = load("res://game/games/snake/snake.gd").new()
+        ga.game_id = "snake"
+        add_child(ga)
+        await get_tree().create_timer(0.5).timeout
+        await _shot("ask_window_not_pref")
+        ga._orient_choice(ga._auto_orient())   # the CURRENT shape: proceeds
+        await get_tree().create_timer(0.3).timeout
+        await _shot("ask_accepted_mode_menu")
+        ga.queue_free()
+        await get_tree().process_frame
         game._show_mode_select()
         game._show_ready_card()
         game._start()

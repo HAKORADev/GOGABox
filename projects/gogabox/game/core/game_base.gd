@@ -26,6 +26,14 @@ var tk: TouchKit
 ## Set by the host BEFORE the game enters the tree when the game was
 ## reloaded for a picked orientation - the ask screens can skip themselves.
 var start_orientation := ""
+
+## v0.2.1a: the host could NOT switch to the asked position (the window
+## refused the sensor override). The ask resolves into the position the
+## window actually kept - games with a position ask override this
+## (snake returns to its mode menu in the current shape).
+func orientation_settled() -> void:
+        pass
+
 ## v0.2.0 PEACE rule, modular: a game style can zero the score->coins
 ## bonus (peace play gives up the bonus by design). The host reads this
 ## one flag - no game names in the economy.

@@ -38,6 +38,13 @@ func _check(cond: bool, msg: String) -> void:
         if not cond:
                 fails += 1
 
+func _piece_centroid(pc: Dictionary) -> Vector2:
+        var pts: PackedVector2Array = pc["pts"]
+        var c := Vector2.ZERO
+        for p in pts:
+                c += p
+        return c / float(pts.size())
+
 func _run() -> void:
         Box.reset_all()
         var game: GogaGame = load("res://game/games/snake/snake.gd").new()
@@ -52,6 +59,35 @@ func _run() -> void:
                         "no food exists before the run")
         _check(game.enemies.is_empty() and game.bugs.is_empty()
                         and game.obstacles.is_empty(), "no war exists before the run")
+
+        # ---- v0.2.1a THE ASK LAW (owner: "listen to what current resolution
+        # is set"): the saved pref NEVER decides - the window shape does ----
+        var bogus := "horizontal" if game._auto_orient() == "vertical" \
+                        else "vertical"
+        Box.set_progress("snake", "orient_pref", bogus)
+        var g2: GogaGame = load("res://game/games/snake/snake.gd").new()
+        g2.game_id = "snake"
+        add_child(g2)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        _check(g2._phase == "orient", "the ask boots with a stale pref in the save")
+        _check(g2.orient == g2._auto_orient() and g2.orient != bogus,
+                        "THE DETECTOR FIX: the highlight is the WINDOW, not the pref")
+        g2._orient_choice(g2._auto_orient())
+        _check(g2._phase == "mode",
+                        "tapping the CURRENT shape proceeds (the hang is dead)")
+        var asks: Array = []
+        g2.request_orientation_reload.connect(
+                        func(o: String): asks.append(o))
+        g2._show_orient_select()   # back on the ask, like the device flow
+        g2._orient_choice(bogus)
+        _check(asks == [bogus] and g2._phase == "orient",
+                        "tapping the OTHER shape asks the host to reload")
+        g2.orientation_settled()
+        _check(g2._phase == "mode",
+                        "a refused rotation SETTLES the ask (no dead end)")
+        g2.queue_free()
+        await get_tree().process_frame
 
         # ---- the STRAIGHT-LINE wrap (owner v0.2.1: exit at 80 -> enter at
         # 80, same heading - the path is one line continued; NO mirroring)
@@ -193,6 +229,18 @@ func _run() -> void:
                         filled += 1
         _check(filled > pieces.size() - 3,
                 "every piece stays opaque under self-overlap (no flicker)")
+        # v0.2.1a PAINTER LAW: draw order = time order - the oldest end
+        # paints FIRST, the fresh head side paints LAST (new rides OVER old,
+        # the owner's "realistic" stack)
+        var bp: Array = coil.body_points()
+        var tail_tip: Vector2 = bp[bp.size() - 1][0]
+        var head_pt: Vector2 = bp[0][0]
+        var c_first := _piece_centroid(pieces[0])
+        var c_last := _piece_centroid(pieces[pieces.size() - 1])
+        _check(c_first.distance_to(tail_tip) < 30.0,
+                "the FIRST painted piece is the tail cap (oldest first)")
+        _check(c_last.distance_to(head_pt) < 60.0,
+                "the LAST painted piece sits at the head (new over old)")
 
         # ---- self-bite is REAL again (straight wrap made it impossible) ----
         var sb := SnakeBody.new()

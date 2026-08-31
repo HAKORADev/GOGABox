@@ -91,22 +91,39 @@ func _ready() -> void:
 ## v0.2.0 - a game picked a DIFFERENT play position: unload it and reload
 ## it in that position. The session (fee, play count, host chrome) is kept
 ## - the game reboots, nothing else. Same position = nothing happens.
+## v0.2.1a OWNER FIX: every decision here is verified against the REAL
+## window (the game now judges picks against the live window too), and a
+## REFUSED rotation settles the ask in the current shape instead of
+## reloading into a lie - no path can leave the ask hanging.
 func _on_orientation_reload(o: String) -> void:
         if o != "vertical" and o != "horizontal":
                 return
+        var vps := get_viewport_rect().size
         if o == _orient_now:
-                return   # same position: do nothing (owner rule)
-        _orient_now = o
+                if (vps.x > vps.y) == (o == "horizontal"):
+                        return   # the window truly sits there: do nothing
+                _orient_now = ""   # bookkeeping desynced - force the switch
         _apply_orientation(o == "horizontal")
         # wait until the window actually reflects the new design (a rotation on
         # device is async; desktop/headless flips immediately) - capped wait
+        var rotated := false
         for i in 30:
                 await get_tree().process_frame
-                var vps := get_viewport_rect().size
-                if (vps.x > vps.y) == (o == "horizontal"):
+                var vps2 := get_viewport_rect().size
+                if (vps2.x > vps2.y) == (o == "horizontal"):
+                        rotated = true
                         break
         if not _session_open:
                 return
+        if not rotated:
+                # the window REFUSED the position: resync from the real
+                # window and let the live game settle its ask in THIS shape
+                var vps3 := get_viewport_rect().size
+                _orient_now = "horizontal" if vps3.x > vps3.y else "vertical"
+                if game != null and is_instance_valid(game):
+                        game.orientation_settled()
+                return
+        _orient_now = o
         _close_over_sheet()
         _clear_game()
         game = (load(String(game_def["script"])) as GDScript).new()

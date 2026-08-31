@@ -166,9 +166,13 @@ func _goga_setup() -> void:
         score_bonus_enabled = not peace
         # v0.2.0 universal reload: the host may TELL us the picked position
         # (the game was unloaded + reloaded for it) - the ask is answered.
+        # v0.2.1a OWNER FIX (the broken detector): the ask listens to the
+        # CURRENT RESOLUTION only - never to the saved preference, never to
+        # how the phone is physically held. The pref is remembered when a
+        # card is tapped but decides NOTHING (the old pref-driven highlight
+        # disagreed with the real window: taps hung on the mismatch).
         var forced := start_orientation
-        var pref := String(Box.get_progress(game_id, "orient_pref", ""))
-        orient = forced if forced != "" else (pref if pref != "" else _auto_orient())
+        orient = forced if forced != "" else _auto_orient()
         wrap_mode = bool(Box.get_progress(game_id, "mode_nowalls", false))
         _build_field()
         player = SnakeBody.new()
@@ -409,20 +413,36 @@ func _show_orient_select() -> void:
         row.add_theme_constant_override("separation", 18)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
         vb.add_child(row)
+        # v0.2.1a: the highlight is the LIVE window shape (what the game IS
+        # right now) - a stale saved pref can no longer light the wrong card.
+        orient = _auto_orient()
         for choice in ["vertical", "horizontal"]:
                 var on: bool = orient == choice
                 var card := _phone_card(choice, on)
-                card.pressed.connect(func():
-                                Jukebox.sfx("confirm", -4.0)
-                                Box.set_progress(game_id, "orient_pref", choice)
-                                if choice == orient:
-                                        # same position: do nothing (no reload - the owner rule)
-                                        _show_mode_select()
-                                else:
-                                        # a different position: reload THE GAME in it
-                                        request_orientation_reload.emit(choice))
+                card.pressed.connect(func(): _orient_choice(choice))
                 row.add_child(card)
         _overlay_panel = dim
+
+## THE TAP LAW (owner: "listen to what current resolution is set"): a pick
+## is judged against the LIVE window, read fresh at tap time. Same shape =
+## the game is already there (straight to the mode menu, no reload). A
+## different shape = the host reloads the game in it. The pref is remembered
+## but decides nothing - the ask can never hang on a pref/window mismatch.
+func _orient_choice(choice: String) -> void:
+        Jukebox.sfx("confirm", -4.0)
+        Box.set_progress(game_id, "orient_pref", choice)
+        if choice == _auto_orient():
+                _show_mode_select()
+        else:
+                request_orientation_reload.emit(choice)
+
+## The host could NOT rotate the window (the capped wait expired - an OEM
+## refused the sensor override): the ask settles into the position the
+## window actually KEPT. Never a reload into a lie, never a hanging ask.
+func orientation_settled() -> void:
+        if _phase == "orient":
+                orient = _auto_orient()
+                _show_mode_select()
 
 func _phone_card(kind: String, selected: bool) -> Button:
         var b := Button.new()

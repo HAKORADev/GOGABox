@@ -47,3 +47,41 @@ owner's dev cheats. Version 0.2.1, base code **30300**.
   stay off. gogacoins shows the plain 0 in the UI while the LOGIC reads
   an extreme value and the real wallet is untouched; battery reads 10K.
   A games index lists every registry game with its state.
+
+## PATCH (v0.2.1a - same version, same codes, owner review round)
+
+The owner kept playing the v0.2.1 build and filed three defects; this
+patch fixes them WITHOUT a version bump (still 0.2.1 / base 30300).
+
+## SNAKE
+1. THE POSITION DETECTOR (the reported hang): the ask highlighted the
+   SAVED PREF, so a window/pref mismatch (rotation-locked portrait while
+   the save said horizontal) lit the wrong card, tapping the true current
+   shape emitted a reload the host answered with "same position, do
+   nothing" - a soft-dead tap - and tapping the lit card kept the field
+   vertical. THE LAW NOW: the ask listens to the CURRENT RESOLUTION ONLY
+   (owner's own prescription) - the highlight is the live window shape,
+   every tap is judged against a fresh window read at tap time (same =
+   proceed, other = reload), the pref is remembered but decides NOTHING.
+   Host hardening: the early-out verifies the real window too, a stale
+   bookkeeping resyncs instead of eating the tap, and a REFUSED rotation
+   (capped wait expired) settles the ask in the kept shape via the new
+   universal GogaGame.orientation_settled() - no reload into a lie, no
+   path can leave the ask hanging. Probe laws: stale pref never wins the
+   highlight, tap-current proceeds, tap-other asks, settle resolves.
+2. THE PEACE STACK (z-order): ribbon pieces painted head-first, so at a
+   self-crossing the OLDER loops painted LAST and rode OVER the fresh
+   body. PAINTER LAW now: draw order = time order - tail cap first,
+   quads walk tail -> head, older portal-runs paint before the head run;
+   at a crossing the NEWER loop paints LAST and sits on top, the way a
+   real snake stacks. Probe proves first-piece = tail cap, last-piece =
+   the head; Xvfb ring shots read naturally.
+3. THE THUMBNAIL SIEGE re-programmed: the scenes fed the ribbon tail-first
+   (pts[0] = the wall end), so every head pressed a wall and stared AWAY
+   from the apple. All three versions are authored head-first now (head
+   at the apple, eyes locked on it, tail back at its wall, closed tip
+   caps added); V1 (the literal siege) ships as snake.png.
+4. FOUND BY THE REVIEW ROUND: place_classic.png never existed (the
+   classic place came back in v0.2.1 but only day/night had icons) - the
+   optionals PLACE box rendered a blank in the DEFAULT state. Drawn in
+   the v0.2.0 icon language (tools/v021a_assets.py).
