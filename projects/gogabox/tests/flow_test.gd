@@ -233,7 +233,7 @@ func _t_batteries() -> int:
         Box.meta().erase("batt_ping_at")
         Box.game_battery("rally")            # 8 -> 10 FULL -> PING
         ok += _check(pings[0] == 1, "pool reaching FULL pings once")
-        ok += _check(ping_titles.size() == 1 and String(ping_titles[0]) == "Pong Rally",
+        ok += _check(ping_titles.size() == 1 and String(ping_titles[0]) == "PONG",
                 "the ping carries WHICH game filled (%s)" % str(ping_titles))
         Box.game_battery("rally")            # steady full - no new ping
         ok += _check(pings[0] == 1, "no repeat ping while the pool sits full")

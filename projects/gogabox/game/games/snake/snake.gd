@@ -48,12 +48,20 @@ const BUG_SCORE_PENALTY := 5
 const MAGNET_RANGE := 330.0
 const POWER_BOARD_LIFE := 10.0  # the aura fruit expires (Snake3D rule)
 
+# JUMPING FRUITS (owner v0.2.2): a random live window, a short void, a new
+# spot - catchable, never comfortable
+const JUMP_WINDOW_MIN := 4.0
+const JUMP_WINDOW_MAX := 7.5
+const JUMP_GAP_MIN := 0.7
+const JUMP_GAP_MAX := 1.5
+
 # shop (every price wears the coin icon - AGENTS.md price rule)
 const PRICE_POWERUPS := 400
 const PRICE_BUGS := 350
 const PRICE_OBSTACLES := 300
 const PRICE_ENEMIES := 1200     # THE most expensive thing in the shop
 const PRICE_NIGHT := 250        # the night garden place
+const PRICE_JUMP := 350         # JUMPING FRUITS (owner v0.2.2)
 
 # ---------------------------------------------------------- palette (skins)
 const TONGUE_RED := Color("e8402f")
@@ -142,6 +150,10 @@ var _steer_hot := false
 var _view: Node2D
 var _chips: Control
 var _overlay_panel: Control     # the live select screen (orient/mode)
+var _score_acc := 0.0           # v0.2.2: the multiplier's fractional carry
+var jump_on := false            # JUMPING FRUITS this run
+var jump_t := 0.0               # seconds left before the fruit jumps
+var jump_gap := 0.0             # void countdown between two jumps
 var _ready_card: Control
 
 # snake draws itself + the field through one view node
@@ -334,6 +346,7 @@ func _add_enemy(i: int) -> void:
                 "body": b,
                 "ai": SnakeAI.new(b, i),
                 "score": 0,
+                "acc": 0.0,
                 "name": SnakeFruits.ENEMY_NAMES[i % 10],
                 "bite_cd": 0.0,
         })
@@ -638,6 +651,9 @@ func _start() -> void:
                 return
         _phase = "run"
         _populate_world()
+        # JUMPING FRUITS live only when bought AND toggled (owner v0.2.2)
+        jump_on = _opt_on("jump") and Box.unlock_owned(game_id, "jump")
+        jump_gap = 0.0
         _sync_speeds()
         Jukebox.sfx("snake_start", -4.0)
         if _ready_card != null and is_instance_valid(_ready_card):
@@ -716,6 +732,7 @@ func _goga_tick(delta: float) -> void:
                         _die()
                 else:
                         _tick_pickups()
+                        _tick_jump(delta)
                         _tick_power_cycle(delta)
                         _tick_magnet(delta)
                         _tick_enemies(delta)
@@ -739,6 +756,57 @@ func _goga_tick(delta: float) -> void:
 ## fruits (sprint/slog) and the live powers multiply ON TOP of it.
 func _score_speed_mult(s: int) -> float:
         return pow(SPEED_SCORE_MULT, float(int(s / float(SPEED_SCORE_STEP))))
+
+## THE SCORE LAW (owner v0.2.2): the speed multiplier lives INSIDE the
+## score, in CORRECT integers. Every award feeds a hidden accumulator and
+## whole points pop out the moment the math crosses 1 - at x1.2 the fruits
+## pay 1,1,1,1,2: the FIFTH fruit gives the 2 (5 x 0.2 = the extra whole
+## point). Negative awards (a bitten-off part of yourself) drain the same
+## accumulator, so the economy stays exact in BOTH directions.
+func _award_pts(base: float, is_player: bool, e := {}) -> void:
+        if is_player:
+                _score_acc += base * _score_speed_mult(score)
+        else:
+                _score_acc = float(e.get("acc", 0.0)) \
+                                + base * _score_speed_mult(int(e["score"]))
+        while _score_acc >= 1.0:
+                if is_player:
+                        set_score(score + 1)
+                else:
+                        e["score"] = int(e["score"]) + 1
+                _score_acc -= 1.0
+        while _score_acc <= -1.0:
+                if is_player:
+                        set_score(maxi(0, score - 1))
+                else:
+                        e["score"] = maxi(0, int(e["score"]) - 1)
+                _score_acc += 1.0
+        if not is_player:
+                e["acc"] = _score_acc
+
+## KILL REWARDS (owner v0.2.2): a snake that dies ON another snake gifts
+## its points to the killer - hunting the war has a meaning now. The haul
+## transfers EXACTLY (no multiplier games on a kill).
+func _victim_points_to(victim: Dictionary, killer: Dictionary) -> int:
+        var haul := int(victim["score"])
+        if haul > 0:
+                victim["score"] = 0
+                victim["acc"] = 0.0
+                if killer.is_empty():
+                        set_score(score + haul)   # the player is the killer
+                else:
+                        killer["score"] = int(killer["score"]) + haul
+        return haul
+
+## The player died ON this snake - it inherits the run's points.
+func _give_points_to(e: Dictionary) -> void:
+        if score > 0:
+                var lost := score
+                e["score"] = int(e["score"]) + lost
+                set_score(0)
+                _score_acc = 0.0
+                _toast_show("%s takes your %d points" %
+                                [String(e.get("name", "the enemy")), lost])
 
 func _sync_speeds() -> void:
         player.base_speed = clampf(START_SPEED * _score_speed_mult(score),
@@ -780,6 +848,29 @@ func _fruit_hit_r() -> float:
 func _fruit_hit_pos() -> Vector2:
         return apple_pos + Vector2(SnakeFruits.hit_meta(edible_id)["hit"]) * apple_r
 
+## JUMPING FRUITS (owner v0.2.2): the fruit lives a random window (4-7.5s),
+## vanishes with a poof, and reappears elsewhere after a short void (0.7-
+## 1.5s) - the hunt never settles into one safe lane.
+func _tick_jump(delta: float) -> void:
+        if not jump_on:
+                return
+        if jump_gap > 0.0:
+                # the void phase - the fruit is GONE but the clock runs
+                jump_gap -= delta
+                if jump_gap <= 0.0:
+                        _spawn_fruit()
+                return
+        if not apple_live:
+                return
+        jump_t -= delta
+        if jump_t <= 0.0:
+                _burst(_fruit_hit_pos(), [SnakeFruits.fruit_body(edible_id),
+                                Color("fff3dc")], 8)
+                _ring(apple_pos, SnakeFruits.fruit_body(edible_id))
+                Jukebox.sfx("portal", -14.0, 1.35)
+                apple_live = false
+                jump_gap = randf_range(JUMP_GAP_MIN, JUMP_GAP_MAX)
+
 func _tick_pickups() -> void:
         var hr := player.head_r()
         if apple_live and apple_pop > 0.5 \
@@ -807,13 +898,13 @@ func _eat_fruit(by: SnakeBody, is_player: bool) -> void:
                 _burst(apple_pos, [Color("8ac44a"), Color("8a6a40")], 9)
         else:
                 by.len_target += SnakeBody.LEN_PER_APPLE
-                var pts: int = 3 if golden else 1
+                var pts: float = 3.0 if golden else 1.0
                 if is_player:
                         _eaten += 1
-                        set_score(score + pts)
+                        _award_pts(pts, true)
                         achievement_count("apples", 1)
                 else:
-                        e["score"] += pts
+                        _award_pts(pts, false, e)
                 Jukebox.sfx("snake_eat", -4.0, 1.0 + 0.016 * mini(24, _eaten))
                 _burst(apple_pos, [SnakeFruits.fruit_body(edible_id),
                                 SnakeFruits.FRUITS[edible_id]["acc"],
@@ -915,6 +1006,7 @@ func _spawn_fruit(first := false) -> void:
         apple_r = clampf(player.width * 0.85, 22.0, 42.0)
         apple_live = true
         apple_pop = 0.0
+        jump_t = randf_range(JUMP_WINDOW_MIN, JUMP_WINDOW_MAX)
         if _apple_tween != null and _apple_tween.is_valid():
                 _apple_tween.kill()
         _apple_tween = create_tween()
@@ -1085,7 +1177,12 @@ func _tick_enemies(delta: float) -> void:
                                 player.length_px = maxf(SnakeBody.LEN_FLOOR,
                                                 player.length_px - EATER_BITE_PX)
                                 b.len_target += EATER_GROW_PX
-                                e["score"] += 1
+                                # v0.2.2: the enemy eats by the SAME value law -
+                                # it gains your part's value, you pay for it
+                                _award_pts(EATER_BITE_PX / SnakeBody.LEN_PER_APPLE,
+                                                false, e)
+                                _award_pts(-EATER_BITE_PX / SnakeBody.LEN_PER_APPLE,
+                                                true)
                                 Jukebox.sfx("tail_bite", -2.0)
                                 _burst(bite_pt[0] if bite_pt.size() > 0 else b.head_pos,
                                                 [b.pal["pri"], FLASH_RED], 10)
@@ -1094,7 +1191,26 @@ func _tick_enemies(delta: float) -> void:
                         continue
                 if player.alive and player.body_hit(b.head_pos, b.head_r() * 0.9,
                                 0.0, [], board):
+                        # it wrapped into YOUR body - you take its points
+                        var haul := _victim_points_to(e, {})
+                        if haul > 0:
+                                _toast_show("+%d - %s ran into you" % [haul,
+                                                String(e.get("name", "the enemy"))])
                         _kill_enemy(e)
+                        continue
+                # enemy vs enemy: the body's owner inherits the runner's points
+                var died := false
+                for e2 in enemies:
+                        if e2 == e:
+                                continue
+                        var b2: SnakeBody = e2["body"]
+                        if b2.alive and b2.body_hit(b.head_pos, b.head_r() * 0.9,
+                                        0.0, [], board):
+                                _victim_points_to(e, e2)
+                                _kill_enemy(e)
+                                died = true
+                                break
+                if died:
                         continue
                 # pickups
                 if apple_live and apple_pop > 0.5 and \
@@ -1210,20 +1326,27 @@ func _check_player_collisions() -> void:
                 if not peace and _in_obstacle(player.head_pos, -hr * 0.45):
                         _die()
                         return
-                # enemy bodies are death
+                # enemy bodies are death - and your points go to the snake
+                # you crashed into (owner v0.2.2: the war has a meaning)
                 for e in enemies:
                         var b: SnakeBody = e["body"]
                         if b.alive and b.body_hit(player.head_pos, hr * 0.9, 0.0, [], board):
+                                _give_points_to(e)
                                 _die()
                                 return
-        # head-to-head: the LONGER snake survives the meeting
+        # head-to-head: the LONGER snake survives the meeting - the winner
+        # takes the loser's points
         for e in enemies:
                 var b: SnakeBody = e["body"]
                 if b.alive and _portal_touch(player.head_pos, b.head_pos,
                                 (hr + b.head_r()) * 0.72):
                         if player.length_px >= b.length_px:
+                                var haul := _victim_points_to(e, {})
+                                if haul > 0:
+                                        _toast_show("+%d - the head-on duel" % haul)
                                 _kill_enemy(e)
                         elif not ghost:
+                                _give_points_to(e)
                                 _die()
                                 return
 
@@ -1246,6 +1369,8 @@ func _self_bite_eat() -> void:
                 Jukebox.sfx("tail_bite", -2.0, 0.9)
                 _burst(player.head_pos, [_pal["pri"], Color("58c470")], 8)
                 _cut_fx(player, new_len, _pal["pri"])
+                # v0.2.2: the eaten part had a VALUE - the score pays for it
+                _award_pts(-removed / SnakeBody.LEN_PER_APPLE, true)
                 _toast_show("you ate yourself -%d px" % int(removed))
 
 ## SNAKE-EATER (player side): touch the enemy's TAIL ONLY - bite segments
@@ -1267,7 +1392,11 @@ func _tick_bites(delta: float) -> void:
                         b.length_px = maxf(SnakeBody.LEN_FLOOR,
                                         b.length_px - EATER_BITE_PX)
                         player.len_target += EATER_GROW_PX
-                        set_score(score + 1)
+                        # v0.2.2: a bite is worth the FRUITS that part cost -
+                        # the eater gains the value, the victim loses the same
+                        _award_pts(EATER_BITE_PX / SnakeBody.LEN_PER_APPLE, true)
+                        _award_pts(-EATER_BITE_PX / SnakeBody.LEN_PER_APPLE,
+                                        false, e)
                         Jukebox.sfx("tail_bite", -2.0)
                         _burst(bite_pt[0] if bite_pt.size() > 0 else player.head_pos,
                                         [b.pal["pri"], Color("58c470")], 10)
@@ -1953,6 +2082,12 @@ func _shop_fill(v: VBoxContainer) -> void:
         v.add_child(_unlock_row("OBSTACLES", "three block clusters per round",
                         "obstacles", PRICE_OBSTACLES))
 
+        # ---- JUMPING FRUITS (owner v0.2.2) ----
+        v.add_child(_section_label("JUMPING FRUITS - the snack won't wait"))
+        v.add_child(_unlock_row("JUMPING FRUITS",
+                        "the fruit lives a random window, vanishes, reappears elsewhere",
+                        "jump", PRICE_JUMP))
+
         # ---- ENEMIES ----
         v.add_child(_section_label("ENEMIES - the pack"))
         var pack_owned := Box.unlock_owned(game_id, "pack")
@@ -2243,6 +2378,11 @@ func _build_optionals_strip() -> Control:
                         func(): return _place_state_txt(),
                         true, 0,
                         func(): _cycle_place()))
+        # JUMPING FRUITS (owner v0.2.2) - the snack will not sit still
+        row.add_child(_optional_box("opt_jump.png", "JUMP FRUITS",
+                        func(): return "ON" if _opt_on("jump") else "OFF",
+                        Box.unlock_owned(game_id, "jump"), PRICE_JUMP,
+                        func(): _set_opt("jump", not _opt_on("jump"))))
         # register all boxes as BoxScroll tappables (BoxScroll owns taps)
         for b in row.get_children():
                 if b is Button:

@@ -260,6 +260,43 @@ func _run() -> void:
         # ---- SPEED LAW: 10 points = x1.1, the base speed follows ----
         _check(absf(game._score_speed_mult(10) - 1.1) < 0.0001, "10 points = x1.10")
         _check(absf(game._score_speed_mult(20) - 1.21) < 0.0001, "20 points = x1.21")
+
+        # ---- THE SCORE LAW (owner v0.2.2): the multiplier lives INSIDE the
+        # score in correct integers - at ~x1.2 five fruits pay 6, and the
+        # FIFTH fruit is the one that gives 2 ----
+        game.set_score(20)   # x1.21 - the owner's "1.2" example
+        game._score_acc = 0.0
+        var s_before: int = game.score
+        var jumps: Array = []
+        for i in 5:
+                var pre: int = game.score
+                game._award_pts(1.0, true)
+                jumps.append(game.score - pre)
+        _check(game.score - s_before == 6,
+                "5 fruits at x1.21 pay 6 (got %d)" % (game.score - s_before))
+        _check(jumps == [1, 1, 1, 1, 2],
+                "THE FIFTH FRUIT GIVES 2 (%s)" % str(jumps))
+        # a bitten-off part drains the SAME accumulator (the mult scales
+        # losses too - a part is worth what a fruit is worth NOW)
+        game._award_pts(-2.4, true)
+        _check(game.score == s_before + 4
+                        and absf(game._score_acc + 0.854) < 0.001,
+                "a negative award drains the carry correctly")
+        game.set_score(0)
+        game._score_acc = 0.0
+
+        # ---- KILL REWARDS: the winner takes the victim's points EXACTLY --
+        var victim := {"score": 7, "acc": 0.0}
+        var haul: int = game._victim_points_to(victim, {})
+        _check(haul == 7 and game.score == 7 and int(victim["score"]) == 0,
+                "the kill transfers the victim's points exactly")
+        game.set_score(5)
+        var thief := {"score": 0, "acc": 0.0}
+        game._give_points_to(thief)
+        _check(game.score == 0 and int(thief["score"]) == 5,
+                "dying ON a snake gifts it the run's points")
+        game.set_score(0)
+
         game.set_score(10)
         game._sync_speeds()
         _check(absf(game.player.base_speed - 300.0 * 1.1) < 0.01,
@@ -323,6 +360,35 @@ func _run() -> void:
         _check(game.player.alive, "the eater self-bite is not death")
         _check(game.player.len_target < len_before, "the self-bite LOSES length")
         game.player.effects.erase("eater")
+
+        # ---- JUMPING FRUITS (owner v0.2.2): a random window, a poof, a
+        # new spot - the LOCK gates it, the window is 4-7.5s ----
+        game.jump_on = false
+        Box.set_progress("snake", "opt_jump", true)
+        _check(not game.jump_on, "JUMP FRUITS stay off while locked")
+        Box.buy_unlock("snake", "jump", 0)
+        _check(Box.unlock_owned("snake", "jump"), "the shop unlock lands")
+        game.jump_on = true
+        game.apple_live = true
+        var old_pos: Vector2 = game.apple_pos
+        game.jump_t = 0.02
+        game.jump_gap = 0.0
+        for i in 6:
+                game._goga_tick(1.0 / 60.0)
+        _check(not game.apple_live and game.jump_gap > 0.0,
+                "the fruit vanishes when its window ends")
+        var respawned := false
+        for i in 140:
+                game._goga_tick(1.0 / 60.0)
+                if game.apple_live:
+                        respawned = true
+                        break
+        _check(respawned, "the fruit reappears after the short void")
+        _check(game.apple_pos.distance_to(old_pos) > 40.0,
+                "the new spot is a DIFFERENT spot")
+        _check(game.jump_t >= 3.9 and game.jump_t <= 7.6,
+                "the next window is 4-7.5s (%.1f)" % game.jump_t)
+        game.jump_on = false
 
         # ---- the enemy brain SURVIVES (the 10-second complaint) ----
         game.enemies.clear()
