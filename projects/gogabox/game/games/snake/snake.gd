@@ -1,37 +1,42 @@
 extends GogaGame
-## Snake v0.1.9 - THE SNAKE GOES TO WAR. Built on the owner's v0.1.8 verdict:
+## Snake v0.2.0 - THE MIRROR WORLD. Built on the owner's v0.1.9 verdict:
 ##
-##   FIXES: the snake starts SLOWER; the body is ONE smooth part (a ribbon
-##   polygon - no circles, no beads); steering is an INVISIBLE ANALOG WHEEL
-##   (touch anywhere, drag = absolute screen-space heading - "left when the
-##   head is upside down stays left"); the eat particles wear the EATEN
-##   thing's colors; the position (vertical/horizontal) is ASKED before the
-##   run with phone art and OVERWRITES the auto choice; then the MODE menu
-##   (classic walls / NO-WALLS wrap) with the scrollable OPTIONALS strip.
+##   THE WRAP: no-walls is a MIRROR now - exit the top wall at 80/100 and
+##   the snake enters the bottom wall at 20/100 (owner's own spec). The
+##   tail follows the head THROUGH the wall (mirrored continuation stubs
+##   paint outside the wall), the path math is exact (the 30-degree drift
+##   loop is dead) and eating yourself THROUGH a wall is real again.
 ##
-##   WAR: green enemy snakes with a real brain (coins weigh more than
-##   apples, noose-encirclement when big, permanent deaths, the run only
-##   ends when the USER dies), power fruits with auras (slower/faster/ghost/
-##   magnet/golden/wither/snake-eater - every one with its own spawn rhythm
-##   and duration, every one rewriting the AI), bugs that steal fruit and
-##   bite WITHOUT killing, solid obstacles, a fruit wardrobe, and a shop
-##   with labeled sections where every price wears the GOGACoin icon and
-##   unaffordable things are grayed out and dead.
+##   THE CONTROLS: the head is driven like a MOUSE - swipe direction aims,
+##   swipe speed sets the turn urgency, slow drags are fine control, a
+##   resting finger never moves the head. Screen-space: left stays left
+##   when the head is upside down, both orientations, bend-capped.
 ##
-## Reference study: HAKORADev/Python_Game_Box_PGB - snake.py (A* brain) and
-## the Snake3D store (the powers table, the bug penalty design, the CPU
-## BFS+flood logic). This game is its own thing - smooth, not grid.
+##   THE FLOW: nothing spawns before the run (the optionals toggle PREFS
+##   only - no world reloads); closing the shop always RESTORES the phase
+##   screen (the dead-end bug is dead); picking a different position
+##   UNLOADS AND RELOADS the game through the universal host path.
+##
+##   PEACE: a STYLE above the modes - fruits only, no coins, no score
+##   bonus, no enemies/bugs/obstacles/power-ups, and you cannot die on
+##   yourself. SNAKE-EATER bites YOU: self-collision while wearing it
+##   costs that body part instead of the run. Death is a COLLAPSE - the
+##   tail races into the head. Width follows length BOTH ways. Speed =
+##   x1.1 per 10 score, shown next to the score; SPRINT/SLOG rewrite it
+##   permanently. PLACES: day garden (sun + shadows) and night garden
+##   (moon, stars and the tiny flies from the owner's 3D snake).
+##
+## Reference study stays: HAKORADev/Python_Game_Box_PGB (Snake3D store -
+## the powers table, the fireflies) and the Smooth-era ribbon design.
 
-const START_SPEED := 300.0      # owner: "a little slower than that"
-const SPEED_PER_APPLE := 6.0
-const SPEED_MAX := 780.0
-const START_LEN := 320.0
-const LEN_PER_APPLE := 70.0
-const WIDTH_START := 26.0
-const WIDTH_PER_APPLE := 1.6
-const WIDTH_MAX := 64.0         # "wide with a limit"
-const TURN_RATE := 4.6          # rad/s - the wheel's bend budget
-const WHEEL_DEADZONE := 12.0    # resting fingers never jitter the head
+const START_SPEED := 300.0
+const SPEED_HARD_MIN := 150.0   # the slog can only go so slow
+const SPEED_HARD_MAX := 900.0   # ... and so fast
+const SPEED_SCORE_STEP := 10    # each 10 points...
+const SPEED_SCORE_MULT := 1.1   # ...is x1.1 (owner spec)
+const TURN_RATE := 4.6          # rad/s - the bend budget (exploit cap)
+const STEER_MIN_SPEED := 230.0  # px/s of finger motion before it steers
+const STEER_URGENCY_MAX := 1.7  # fast swipes bend harder (still capped)
 
 # war tuning
 const ENEMY_SPEED_RATIO := 0.92
@@ -41,19 +46,15 @@ const BUG_LEN_PENALTY := 66.0   # ~3 apples of body - hurts, never kills
 const BUG_SCORE_PENALTY := 5
 const MAGNET_RANGE := 330.0
 const POWER_BOARD_LIFE := 10.0  # the aura fruit expires (Snake3D rule)
-const LEN_FLOOR := 160.0        # no snake (or curse) grinds you to nothing
 
 # shop (every price wears the coin icon - AGENTS.md price rule)
 const PRICE_POWERUPS := 400
 const PRICE_BUGS := 350
 const PRICE_OBSTACLES := 300
 const PRICE_ENEMIES := 1200     # THE most expensive thing in the shop
+const PRICE_NIGHT := 250        # the night garden place
 
-# ---------------------------------------------------------- palette (feel)
-const FIELD := Color("f6e7cd")
-const FIELD_DECO := Color("ecd9b4")
-const WALL := Color("d9c39a")
-const WRAP_LINE := Color("9ec49a")
+# ---------------------------------------------------------- palette (skins)
 const TONGUE_RED := Color("e8402f")
 const EYE_WHITE := Color("fdfaf2")
 const EYE_INK := Color("35210f")
@@ -62,6 +63,10 @@ const OBST_FILL := Color("cbb28a")
 const OBST_EDGE := Color("8a6a40")
 const BUG_SHELL := Color("4a3a20")
 const BUG_BODY := Color("c4783c")
+const SUN_CORE := Color("ffe89a")
+const SUN_WARM := Color("ffd25a")
+const MOON_CORE := Color("eef4ff")
+const MOON_GLOW := Color("9ab8e8")
 
 # skins survive as palettes over ONE gradient system: primary (head) ->
 # milk (tail). classic is the owner's blue-melt design.
@@ -77,6 +82,8 @@ var board := Rect2(0, 0, 100, 100)
 var banner_on := false
 var orient := "vertical"        # the ASKED play position (overwrites auto)
 var wrap_mode := false          # NO-WALLS mode
+var peace := false              # PEACE STYLE (owner v0.2.0)
+var place := "day"              # the garden: "day" / "night"
 var _phase := "orient"          # orient -> mode -> ready -> run
 var _time := 0.0
 var _pal: Dictionary = PALETTES["classic"]
@@ -85,6 +92,7 @@ var player: SnakeBody
 var enemies: Array = []         # [{body: SnakeBody, ai: SnakeAI, score, name, bite_cd}]
 var bugs: Array = []            # [{pos, dir, phase, munch, hit_cd}]
 var obstacles: Array = []       # Array[Rect2]
+var _dying: Array = []          # SnakeBody mid-collapse (enemy deaths)
 
 var edible_id := "apple"
 var apple_pos := Vector2.ZERO
@@ -112,14 +120,21 @@ var _bite_cd := 0.0
 var _eaten := 0
 var _motes: Array = []
 var _rings: Array = []
-var _deco: Array = []
+var _stars: Array = []          # night garden stars (void area)
+var _flies: Array = []          # night garden fireflies (Snake3D port)
 var _tongue_cd := 1.6
 var _tongue_t := 0.0
+var _collapse_t := -1.0         # >= 0 = the death collapse is playing
+var _collapse_rate := 900.0
+var _speed_lbl: Label           # the x1.23 chip next to the score
 
-# the invisible analog wheel
-var _wheel_idx := -1
-var _wheel_center := Vector2.ZERO
-var _wheel_stick := Vector2.ZERO
+# mouse-style steering: the finger's MOTION drives the head
+var _steer_idx := -1
+var _steer_last := Vector2.ZERO
+var _steer_ms := 0
+var _steer_vel := Vector2.ZERO
+var _steer_target := 0.0
+var _steer_hot := false
 
 var _view: Node2D
 var _chips: Control
@@ -139,9 +154,18 @@ class SnakeView:
 func _goga_setup() -> void:
         banner_on = bool(GameReg.get_game(game_id).get("banner", false))
         _load_skin()
-        # the ASKED orientation overwrites the auto-sense every load
+        place = String(Box.get_progress(game_id, "place", "day"))
+        if not SnakeFruits.PLACES.has(place):
+                place = "day"
+        peace = bool(Box.get_progress(game_id, "style_peace", false))
+        # PEACE zeros the score bonus through the MODULAR flag - the payout
+        # path reads it, no game names anywhere near the economy.
+        score_bonus_enabled = not peace
+        # v0.2.0 universal reload: the host may TELL us the picked position
+        # (the game was unloaded + reloaded for it) - the ask is answered.
+        var forced := start_orientation
         var pref := String(Box.get_progress(game_id, "orient_pref", ""))
-        orient = pref if pref != "" else _auto_orient()
+        orient = forced if forced != "" else (pref if pref != "" else _auto_orient())
         wrap_mode = bool(Box.get_progress(game_id, "mode_nowalls", false))
         _build_field()
         player = SnakeBody.new()
@@ -153,10 +177,13 @@ func _goga_setup() -> void:
         add_child(_view)
         _coin_tex = load("res://assets/ui/coin.png")
         _build_chips()
+        _speed_lbl = add_hud_chip("x1.00")
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/snake_theme.wav")
-        _new_run_objects()
-        _show_orient_select()
+        if forced != "":
+                _show_mode_select()      # reload path: the ask is behind us
+        else:
+                _show_orient_select()
 
 func _auto_orient() -> String:
         var vp := get_viewport_rect().size
@@ -181,17 +208,52 @@ func _build_field() -> void:
                 h = w / target_aspect
         var origin := Vector2((vp.x - w) / 2.0, top + (avail.y - h) / 2.0)
         board = Rect2(origin, Vector2(w, h))
-        _deco.clear()
+        _build_garden()
+
+## The garden dressing: deco blobs (both places), stars + fireflies (night).
+func _build_garden() -> void:
         var rng := RandomNumberGenerator.new()
         rng.seed = 7
+        # deco blobs live in board space (fractions of the field)
+        var deco: Array = []
         for i in 6:
-                _deco.append({
+                deco.append({
                         "fx": rng.randf_range(0.08, 0.92),
                         "fy": rng.randf_range(0.08, 0.92),
                         "r": rng.randf_range(18.0, 44.0),
                         "ph": rng.randf_range(0.0, TAU),
                         "amp": rng.randf_range(6.0, 18.0),
                 })
+        set_meta("deco", deco)
+        # stars fill the VOID around the board (night only, but always built)
+        var vp := get_viewport_rect().size
+        var stars: Array = []
+        for i in 64:
+                var p := Vector2(rng.randf_range(10.0, vp.x - 10.0),
+                                rng.randf_range(10.0, vp.y - 10.0))
+                if board.grow(-6.0).has_point(p):
+                        continue
+                stars.append({
+                        "p": p, "r": rng.randf_range(1.2, 2.8),
+                        "ph": rng.randf_range(0.0, TAU),
+                })
+        _stars = stars
+        # the tiny flies (the owner's 3D snake, ported): wander + layered blink
+        var flies: Array = []
+        for i in 20:
+                flies.append({
+                        "base": Vector2(rng.randf_range(board.position.x + 30.0,
+                                        board.end.x - 30.0),
+                                        rng.randf_range(board.position.y + 30.0,
+                                        board.end.y - 30.0)),
+                        "speed": rng.randf_range(0.25, 0.75),
+                        "phase": rng.randf_range(0.0, TAU),
+                        "drift": rng.randf_range(16.0, 44.0),
+                        "blink": rng.randf_range(1.2, 3.4),
+                        "bph": rng.randf_range(0.0, TAU),
+                        "lift": rng.randf_range(4.0, 14.0),
+                })
+        _flies = flies
 
 ## The 52dp Unity banner is a NATIVE view in REAL px (menu.gd math).
 func _banner_safe_px() -> float:
@@ -215,31 +277,42 @@ func _load_skin() -> void:
 
 # ------------------------------------------------- world population
 
-## (Re)builds everything that exists on the field for the CURRENT options.
-func _new_run_objects() -> void:
+## Wipe the field back to "player only". Menus show THIS - the owner's
+## v0.2.0 rule: nothing exists before the run does.
+func _reset_world() -> void:
         _eaten = 0
         enemies.clear()
         bugs.clear()
         obstacles.clear()
+        _dying.clear()
         apple_live = false
         coin_live = false
         power_live = false
+        power_cd.clear()
+        _collapse_t = -1.0
         player.setup(board.get_center(), 0.0, _pal["pri"], _pal["milk"])
         player.base_speed = START_SPEED
         player.speed = START_SPEED
-        if _opt_on("obstacles") and Box.unlock_owned(game_id, "obstacles"):
+
+## The war, assembled THE MOMENT the run starts (never before).
+func _populate_world() -> void:
+        var war := not peace
+        if war and _opt_on("obstacles") and Box.unlock_owned(game_id, "obstacles"):
                 _spawn_obstacles()
-        if _opt_on("bugs") and Box.unlock_owned(game_id, "bugs"):
+        if war and _opt_on("bugs") and Box.unlock_owned(game_id, "bugs"):
                 for i in 2:
                         bugs.append(_new_bug())
-        if _opt_on("enemies"):
+        if war and _opt_on("enemies"):
                 var n := 1
                 if Box.unlock_owned(game_id, "pack"):
                         n = clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
                 for i in n:
                         _add_enemy(i)
         _spawn_fruit(true)
-        _maybe_coin()
+        if not peace:
+                _maybe_coin()
+                # the first power fruit arrives late - the field starts honest
+                power_next_at = _time + randf_range(6.0, 9.0)
 
 func _opt_on(key: String) -> bool:
         return bool(Box.get_progress(game_id, "opt_" + key, key == "enemies"))
@@ -297,7 +370,7 @@ func _spawn_obstacles() -> void:
                                 break
 
 # ============================================================== PHASES
-# orient -> mode -> ready -> run. Every screen rebuilds the world under it.
+# orient -> mode -> ready -> run. Menus NEVER build the war; the run does.
 
 func _clear_overlay_panel() -> void:
         if _overlay_panel != null and is_instance_valid(_overlay_panel):
@@ -305,7 +378,10 @@ func _clear_overlay_panel() -> void:
         _overlay_panel = null
 
 ## Screen 1: HOW DO YOU HOLD IT - the position ask (phone-position art),
-## preselected from the last choice; picking OVERWRITES the auto sense.
+## preselected from the last choice. THE UNIVERSAL RELOAD (owner v0.2.0):
+## same position picked = do nothing; a different one = the game UNLOADS
+## and RELOADS in that position through the host (no re-fee, no second
+## play count - the session continues).
 func _show_orient_select() -> void:
         _phase = "orient"
         _clear_overlay_panel()
@@ -341,12 +417,13 @@ func _show_orient_select() -> void:
                 var card := _phone_card(choice, on)
                 card.pressed.connect(func():
                                 Jukebox.sfx("confirm", -4.0)
-                                orient = choice
                                 Box.set_progress(game_id, "orient_pref", choice)
-                                _build_field()
-                                _new_run_objects()
-                                _view.queue_redraw()
-                                _show_mode_select())
+                                if choice == orient:
+                                        # same position: do nothing (no reload - the owner rule)
+                                        _show_mode_select()
+                                else:
+                                        # a different position: reload THE GAME in it
+                                        request_orientation_reload.emit(choice))
                 row.add_child(card)
         _overlay_panel = dim
 
@@ -381,10 +458,9 @@ func _phone_card(kind: String, selected: bool) -> Button:
         vb.add_child(l)
         return b
 
-## Screen 2: the mode menu + the OPTIONALS strip (left-right scrollable
-## boxes). No-walls and the enemy are OPEN FROM START; power-ups / bugs /
-## obstacles / fruits unlock in the shop - locked boxes wear a lock + coin
-## price and tap through to the shop.
+## Screen 2: PEACE (a STYLE, on top of the two modes) + CLASSIC / NO-WALLS
+## + the OPTIONALS strip. Toggles SAVE PREFS ONLY - the world is built
+## when the run starts, never on a selection change (owner v0.2.0).
 func _show_mode_select() -> void:
         _phase = "mode"
         _clear_overlay_panel()
@@ -407,6 +483,8 @@ func _show_mode_select() -> void:
         var t := Arc.label("CHOOSE MODE", 38, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
+        # PEACE - the style ABOVE the modes (runs with walls OR no-walls)
+        vb.add_child(_peace_card())
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 14)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -415,12 +493,12 @@ func _show_mode_select() -> void:
                         func():
                                 wrap_mode = false
                                 Box.set_progress(game_id, "mode_nowalls", false)
-                                _mode_picked()))
+                                _show_ready_card()))
         row.add_child(_mode_card("NO-WALLS", "wrap edge to edge", wrap_mode,
                         func():
                                 wrap_mode = true
                                 Box.set_progress(game_id, "mode_nowalls", true)
-                                _mode_picked()))
+                                _show_ready_card()))
         var ot := Arc.label("OPTIONALS", 26, Color("6a5ab8"))
         ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(ot)
@@ -430,11 +508,6 @@ func _show_mode_select() -> void:
         hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(hint)
         _overlay_panel = dim
-
-func _mode_picked() -> void:
-        _new_run_objects()
-        _view.queue_redraw()
-        _show_ready_card()
 
 func _mode_card(txt: String, sub: String, selected: bool, cb: Callable) -> Button:
         var b := Button.new()
@@ -458,163 +531,47 @@ func _mode_card(txt: String, sub: String, selected: bool, cb: Callable) -> Butto
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(l)
         var s := Arc.label(sub, 17, Color(0.35, 0.28, 0.18) if selected \
-                        else Color(0.55, 0.48, 0.38), false)
+                                else Color(0.55, 0.48, 0.38), false)
         s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         s.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(s)
         b.pressed.connect(func():
-                        Jukebox.sfx("click", -4.0)
-                        cb.call())
+                                Jukebox.sfx("click", -4.0)
+                                cb.call())
         return b
 
-## One optionals box: glyph + name + state line. Unlocked = toggle (enemy
-## cycles the pack count when owned; fruits cycle their selector). Locked =
-## gray, lock, coin price, tap opens the shop.
-func _optional_box(icon: String, name_: String, state_fn: Callable,
-                unlocked: bool, price: int, tap: Callable) -> Button:
+func _peace_card() -> Button:
         var b := Button.new()
-        b.custom_minimum_size = Vector2(150, 160)
-        var sb := Arc.panel_style(Arc.CARD, 18, 8)
+        b.custom_minimum_size = Vector2(574, 86)
+        var sb := Arc.panel_style(Color("9ad8a8") if peace else Arc.CARD, 20, 10)
+        if not peace:
+                sb.set_border_width_all(3)
+                sb.border_color = Color("9ad8a8")
         b.add_theme_stylebox_override("normal", sb)
         var sbp := sb.duplicate() as StyleBoxFlat
         sbp.bg_color = sbp.bg_color.darkened(0.06)
         b.add_theme_stylebox_override("pressed", sbp)
-        var vb := VBoxContainer.new()
-        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
-        vb.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_theme_constant_override("separation", 6)
-        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        b.add_child(vb)
-        var ic := TextureRect.new()
-        ic.texture = load("res://assets/ui/%s" % icon)
-        ic.custom_minimum_size = Vector2(72, 72)
-        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(ic)
-        var l := Arc.label(name_, 20, Arc.INK)
-        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var hb := HBoxContainer.new()
+        hb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        hb.alignment = BoxContainer.ALIGNMENT_CENTER
+        hb.add_theme_constant_override("separation", 14)
+        hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(hb)
+        var col := Arc.INK if peace else Color("4e8a5a")
+        var l := Arc.label("PEACE", 30, col)
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(l)
-        var st := Arc.label(String(state_fn.call()), 16, Color("6a4a28"), false)
-        st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        hb.add_child(l)
+        var st := Arc.label("ON - the quiet garden" if peace else "OFF", 16,
+                        col if peace else Color(0.55, 0.48, 0.38), false)
         st.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        st.name = "state"
-        vb.add_child(st)
-        if not unlocked:
-                b.disabled = true
-                var sbd := Arc.panel_style(Color(0.82, 0.78, 0.7, 0.9), 18, 8)
-                b.add_theme_stylebox_override("disabled", sbd)
-                l.add_theme_color_override("font_color", Color(0.55, 0.5, 0.42))
-                var lock_ic := TextureRect.new()
-                lock_ic.texture = load("res://assets/ui/icon_lock.png")
-                lock_ic.custom_minimum_size = Vector2(34, 34)
-                lock_ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                lock_ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                lock_ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                lock_ic.position = Vector2(8, 8)
-                b.add_child(lock_ic)
-                # THE PRICE RULE: the GOGACoin icon rides every price
-                var chip := Arc.chip(str(price), "res://assets/ui/coin.png",
-                                Color(0, 0, 0, 0.55), 16, Arc.COIN)
-                chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                chip.position = Vector2(30, 122)
-                b.add_child(chip)
+        hb.add_child(st)
         b.pressed.connect(func():
-                        if not unlocked:
-                                Jukebox.sfx("error", -4.0)
-                                _shop_open()
-                                return
-                        Jukebox.sfx("click", -4.0)
-                        tap.call()
-                        # refresh the state line + the world behind the dim
-                        st.text = String(state_fn.call())
-                        _new_run_objects()
-                        _view.queue_redraw())
+                        Jukebox.sfx("confirm" if not peace else "click", -4.0)
+                        peace = not peace
+                        Box.set_progress(game_id, "style_peace", peace)
+                        score_bonus_enabled = not peace
+                        _show_mode_select())
         return b
-
-func _build_optionals_strip() -> Control:
-        var sc := BoxScroll.new()
-        sc.game_safe = true
-        sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-        sc.custom_minimum_size = Vector2(596, 176)   # scrolls INSIDE the panel
-        var row := HBoxContainer.new()
-        row.add_theme_constant_override("separation", 12)
-        sc.add_child(row)
-        # ENEMY - open from the start; the pack makes the count selectable
-        var pack := Box.unlock_owned(game_id, "pack")
-        row.add_child(_optional_box("opt_enemy.png", "ENEMY",
-                        func(): return _enemy_state_txt(pack), true, 0,
-                        func():
-                                var on := not _opt_on("enemies")
-                                if on:
-                                        _set_opt("enemies", true)
-                                elif pack:
-                                        # OFF -> tap again cycles the count
-                                        var n := clampi(int(Box.get_progress(
-                                                game_id, "enemy_count", 1)), 1, 10)
-                                        n = n % 10 + 1
-                                        Box.set_progress(game_id, "enemy_count", n)
-                                        _set_opt("enemies", true)
-                                else:
-                                        _set_opt("enemies", false)))
-        # POWER-UPS
-        var pu_unlocked := Box.unlock_owned(game_id, "powerups")
-        row.add_child(_optional_box("opt_power.png", "POWER-UPS",
-                        func(): return "ON" if _opt_on("powerups") else "OFF",
-                        pu_unlocked, PRICE_POWERUPS,
-                        func(): _set_opt("powerups", not _opt_on("powerups"))))
-        # BUGS
-        var bug_unlocked := Box.unlock_owned(game_id, "bugs")
-        row.add_child(_optional_box("opt_bugs.png", "BUGS",
-                        func(): return "ON" if _opt_on("bugs") else "OFF",
-                        bug_unlocked, PRICE_BUGS,
-                        func(): _set_opt("bugs", not _opt_on("bugs"))))
-        # OBSTACLES
-        var ob_unlocked := Box.unlock_owned(game_id, "obstacles")
-        row.add_child(_optional_box("opt_obst.png", "OBSTACLES",
-                        func(): return "ON" if _opt_on("obstacles") else "OFF",
-                        ob_unlocked, PRICE_OBSTACLES,
-                        func(): _set_opt("obstacles", not _opt_on("obstacles"))))
-        # FRUITS - the wardrobe selector (needs at least one owned fruit)
-        var owned := Box.items_owned(game_id, "fruit")
-        row.add_child(_optional_box("opt_fruit.png", "FRUITS",
-                        func(): return _fruit_state_txt(owned),
-                        owned.size() > 0, 80,
-                        func(): _cycle_fruit_mode(owned)))
-        # register all boxes as BoxScroll tappables (BoxScroll owns taps)
-        for b in row.get_children():
-                if b is Button:
-                        b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                        sc.register_tappable(b, Arc._tap_emitter(b))
-        return sc
-
-func _enemy_state_txt(pack: bool) -> String:
-        if not _opt_on("enemies"):
-                return "OFF"
-        if not pack:
-                return "1 GREEN"
-        var n := clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
-        return "%d SNAKES" % n
-
-func _fruit_state_txt(owned: Array) -> String:
-        var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
-        if mode == "all":
-                return "ALL OWNED"
-        if SnakeFruits.FRUITS.has(mode):
-                return String(SnakeFruits.FRUITS[mode]["name"]).to_upper()
-        return "APPLE"
-
-func _cycle_fruit_mode(owned: Array) -> void:
-        var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
-        var pool := ["apple", "all"]
-        for f in owned:
-                pool.append(String(f))
-        var i := pool.find(mode)
-        Box.set_progress(game_id, "fruit_mode", pool[(i + 1) % pool.size()])
-
-# ------------------------------------------------------- ready / start
 
 func _show_ready_card() -> void:
         _phase = "ready"
@@ -625,12 +582,19 @@ func _show_ready_card() -> void:
         var panel := PanelContainer.new()
         panel.add_theme_stylebox_override("panel",
                         Arc.panel_style(Color(1, 1, 1, 0.82), 20))
+        var sub := Arc.label(_ready_subline(), 18, Color("6a4a28"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         var lbl := Arc.label("TAP ANYWHERE TO START", 40, Arc.INK)
         lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        panel.add_child(lbl)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
+        v.add_child(lbl)
+        v.add_child(sub)
+        panel.add_child(v)
         cc.add_child(panel)
         panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
         lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
         cc.modulate.a = 0.0
         _overlay_root_ref().add_child(cc)
         _ready_card = cc
@@ -638,6 +602,13 @@ func _show_ready_card() -> void:
         tw.tween_property(cc, "modulate:a", 1.0, 0.18)
         tw.parallel().tween_method(_card_step.bind(cc), 0.7, 1.0, 0.26) \
                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _ready_subline() -> String:
+        var place_name: String = SnakeFruits.PLACES[place]["name"]
+        var bits := [place_name, "NO-WALLS - mirrored wrap" if wrap_mode else "CLASSIC walls"]
+        if peace:
+                bits.append("PEACE")
+        return "  ·  ".join(bits)
 
 func _card_step(s: float, cc: Control) -> void:
         if not is_instance_valid(cc):
@@ -649,6 +620,8 @@ func _start() -> void:
         if _phase != "ready" or not player.alive:
                 return
         _phase = "run"
+        _populate_world()
+        _sync_speeds()
         Jukebox.sfx("snake_start", -4.0)
         if _ready_card != null and is_instance_valid(_ready_card):
                 var cc := _ready_card
@@ -661,11 +634,11 @@ func _start() -> void:
                 tw.tween_callback(cc.queue_free)
 
 # ============================================================== INPUT
-# The INVISIBLE ANALOG WHEEL: the first finger to touch the field becomes
-# the wheel center; the drag vector is the stick. The stick's angle is the
-# head's TARGET heading in ABSOLUTE screen space - drag left = aim left,
-# even when the head is upside down (owner's exact rule). The actual
-# bending respects the capped turn rate. Release keeps the heading.
+# MOUSE-STYLE STEERING (owner v0.2.0): the head is driven by the finger's
+# MOTION, not by a stick position. Swipe direction aims, swipe SPEED sets
+# the urgency, slow drags are fine control, a resting finger steers nothing.
+# Screen-space: left stays left when the head is upside down; identical in
+# vertical and horizontal. The bend budget still caps everything.
 
 func _goga_input(event: InputEvent) -> void:
         if event is InputEventScreenTouch:
@@ -673,27 +646,39 @@ func _goga_input(event: InputEvent) -> void:
                 if t.pressed:
                         if _phase == "ready" and player.alive:
                                 _start()
-                        if _phase == "run" and _wheel_idx == -1:
-                                _wheel_idx = t.index
-                                _wheel_center = t.position
-                                _wheel_stick = Vector2.ZERO
-                elif t.index == _wheel_idx:
-                        _wheel_idx = -1
-                        _wheel_stick = Vector2.ZERO
+                        if _phase == "run" and _steer_idx == -1:
+                                _steer_idx = t.index
+                                _steer_last = t.position
+                                _steer_ms = Time.get_ticks_msec()
+                                _steer_vel = Vector2.ZERO
+                                _steer_hot = false
+                elif t.index == _steer_idx:
+                        _steer_idx = -1
+                        _steer_hot = false
         elif event is InputEventScreenDrag:
                 var d := event as InputEventScreenDrag
-                if d.index == _wheel_idx:
-                        _wheel_stick = d.position - _wheel_center
+                if d.index == _steer_idx:
+                        var now := Time.get_ticks_msec()
+                        var dt := maxf(0.004, float(now - _steer_ms) / 1000.0)
+                        _steer_ms = now
+                        var v := (d.position - _steer_last) / dt
+                        _steer_vel = _steer_vel.lerp(v, 0.35)
+                        _steer_last = d.position
 
 func _steer(delta: float) -> void:
-        var stick := _wheel_stick
-        if stick.length() < WHEEL_DEADZONE:
+        if _steer_idx == -1:
                 return
-        var target := stick.angle()
-        var diff := wrapf(target - player.head_dir, -PI, PI)
-        var max_step := TURN_RATE * delta
+        var sp := _steer_vel.length()
+        if sp < STEER_MIN_SPEED:
+                _steer_hot = false
+                return
+        _steer_hot = true
+        _steer_target = _steer_vel.angle()
+        var urgency := clampf(sp / 1500.0, 0.45, STEER_URGENCY_MAX)
+        var diff := wrapf(_steer_target - player.head_dir, -PI, PI)
+        var max_step := TURN_RATE * urgency * delta
         if absf(diff) <= max_step:
-                player.head_dir = target
+                player.head_dir = _steer_target
         else:
                 player.head_dir += signf(diff) * max_step
 
@@ -707,6 +692,9 @@ func _goga_tick(delta: float) -> void:
                 _steer(delta)
                 var adv := player.advance(delta, board, wrap_mode)
                 player.tick_effects(delta)
+                _sync_speeds()
+                if adv["wrapped"]:
+                        Jukebox.sfx("portal", -12.0)   # the mirror-wall whoosh
                 if adv["hit_wall"]:
                         _die()
                 else:
@@ -717,10 +705,34 @@ func _goga_tick(delta: float) -> void:
                         _tick_bugs(delta)
                         _check_player_collisions()
                         _tick_bites(delta)
+        elif _collapse_t >= 0.0:
+                _tick_collapse(delta)
+                # the field keeps living while the snake folds: enemies slither on
+                for e in enemies:
+                        var b: SnakeBody = e["body"]
+                        if b.alive:
+                                b.advance(delta, board, wrap_mode)
         if _view != null and is_instance_valid(_view):
                 _view.queue_redraw()
         if _chips != null and is_instance_valid(_chips):
                 _chips.queue_redraw()
+
+## THE SPEED LAW (owner v0.2.0): each 10 points is x1.1, and it shows next
+## to the score. Base speed follows the score multiplier; the permanent
+## fruits (sprint/slog) and the live powers multiply ON TOP of it.
+func _score_speed_mult(s: int) -> float:
+        return pow(SPEED_SCORE_MULT, float(int(s / float(SPEED_SCORE_STEP))))
+
+func _sync_speeds() -> void:
+        player.base_speed = clampf(START_SPEED * _score_speed_mult(score),
+                        SPEED_HARD_MIN, SPEED_HARD_MAX)
+        player.speed = player.base_speed
+        for e in enemies:
+                var b: SnakeBody = e["body"]
+                b.base_speed = clampf(START_SPEED * ENEMY_SPEED_RATIO
+                                * _score_speed_mult(int(e["score"])),
+                                SPEED_HARD_MIN * 0.92, SPEED_HARD_MAX * 0.92)
+                b.speed = b.base_speed
 
 ## World getters the AI reads.
 func player_body() -> SnakeBody:
@@ -735,37 +747,47 @@ func all_bodies() -> Array:
 
 # ------------------------------------------------------------- pickups
 
+## Portal-aware touch: `a` counts if it OR any near-edge mirror copy of it
+## is within `r` of `b` (eating through a wall is eating - owner mirror).
+func _portal_touch(a: Vector2, b: Vector2, r: float) -> bool:
+        if a.distance_to(b) < r:
+                return true
+        for img in player.portal_images(a, board):
+                if img.distance_to(b) < r:
+                        return true
+        return false
+
 func _tick_pickups() -> void:
         var hr := player.head_r()
         if apple_live and apple_pop > 0.5 \
-                        and player.head_pos.distance_to(apple_pos) < hr + apple_r * 0.8:
+                        and _portal_touch(player.head_pos, apple_pos, hr + apple_r * 0.8):
                 _eat_fruit(player, true)
         if coin_live and coin_pop > 0.5 \
-                        and player.head_pos.distance_to(coin_pos) < hr + 24.0:
+                        and _portal_touch(player.head_pos, coin_pos, hr + 24.0):
                 _take_coin(true, {})
         if power_live and power_pop > 0.5 \
-                        and player.head_pos.distance_to(power_pos) < hr + apple_r:
+                        and _portal_touch(player.head_pos, power_pos, hr + apple_r):
                 _apply_power(player, power_id, true)
 
 ## Eater = the eater GROWS, the eaten SHRINKS. Wither curse inverts the
 ## fruit: it eats YOU instead (the owner's power-down). Score x3 while
 ## GOLDEN is live (the AI feels it too - "apples become profitable").
+## Width is DERIVED from length now - no manual bumps anywhere.
 func _eat_fruit(by: SnakeBody, is_player: bool) -> void:
         var e := _enemy_of(by) if not is_player else {}
         var golden: bool = by.has_power("golden")
         if by.has_power("wither"):
-                by.len_target = maxf(LEN_FLOOR, by.len_target - LEN_PER_APPLE)
-                by.length_px = minf(by.length_px, by.len_target + LEN_PER_APPLE)
+                by.len_target = maxf(SnakeBody.LEN_FLOOR,
+                                by.len_target - SnakeBody.LEN_PER_APPLE)
                 Jukebox.sfx("power_bad", -4.0)
                 _burst(apple_pos, [Color("8ac44a"), Color("8a6a40")], 9)
         else:
-                by.len_target += LEN_PER_APPLE
-                by.width = minf(by.width + WIDTH_PER_APPLE, WIDTH_MAX)
-                by.speed = minf(by.speed + SPEED_PER_APPLE, SPEED_MAX)
+                by.len_target += SnakeBody.LEN_PER_APPLE
                 var pts: int = 3 if golden else 1
                 if is_player:
                         _eaten += 1
                         set_score(score + pts)
+                        achievement_count("apples", 1)
                 else:
                         e["score"] += pts
                 Jukebox.sfx("snake_eat", -4.0, 1.0 + 0.016 * mini(24, _eaten))
@@ -783,23 +805,10 @@ func _enemy_of(b: SnakeBody) -> Dictionary:
         return {}
 
 ## one pickup = ONE GOGACoin (owner rule). The enemy collects coins too -
-## a stolen coin is a lost coin (owner economy design).
-func _take_coin(is_player: bool, e := {}) -> void:
-        if is_player:
-                add_run_coins(1)
-                achievement_count("coins_taken", 1)
-                achievement_max("coins_got", run_coins)
-        else:
-                e["score"] += 1
-        Jukebox.sfx("coin", -4.0 if is_player else -8.0)
-        _burst(coin_pos, [Arc.COIN, Color("fff3dc")], 9)
-        _ring(coin_pos, Arc.COIN)
-        coin_live = false
-        coin_pop = 0.0
-        coin_pos = Vector2(-100, -100)
-        _maybe_coin()
-
+## a stolen coin is a lost coin (owner economy design). PEACE spawns none.
 func _maybe_coin() -> void:
+        if peace:
+                return
         if coin_live:
                 return
         if randf() < 0.45:
@@ -819,6 +828,27 @@ func _maybe_coin() -> void:
                                 _coin_tween.tween_property(self, "coin_pop", 1.0, 0.22) \
                                                 .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
                                 return
+
+## one pickup = ONE GOGACoin (owner rule). The enemy collects coins too -
+## a stolen coin is a lost coin (owner economy design). PEACE spawns none
+## (and after the last coin is taken _maybe_coin stays honest about it).
+func _take_coin(is_player: bool, e := {}) -> void:
+        if is_player:
+                add_run_coins(1)
+                achievement_count("coins_taken", 1)
+                achievement_max("coins_got", run_coins)
+        else:
+                e["score"] += 1
+        Jukebox.sfx("coin", -4.0 if is_player else -8.0)
+        _burst(coin_pos, [Arc.COIN, Color("fff3dc")], 9)
+        _ring(coin_pos, Arc.COIN)
+        coin_live = false
+        coin_pop = 0.0
+        coin_pos = Vector2(-100, -100)
+        _maybe_coin()
+
+## one pickup = ONE GOGACoin (owner rule). The enemy collects coins too -
+## a stolen coin is a lost coin (owner economy design). PEACE spawns none.
 
 ## MAGNET: a nearby coin flies to you "from further area" (owner power).
 func _tick_magnet(delta: float) -> void:
@@ -874,16 +904,20 @@ func _near_any_body(p: Vector2, r: float) -> bool:
                         continue
                 var step := 0.0
                 var acc := 0.0
-                var tr: Array[Vector2] = s.trail
-                for i in range(tr.size() - 1, 0, -1):
-                        var seg := tr[i].distance_to(tr[i - 1])
-                        if seg > 220.0:
+                for i in range(s.trail.size() - 1, 0, -1):
+                        if s.trail_brk[i]:
+                                acc += s.trail_warp[i]
+                                if acc > s.length_px + 40.0:
+                                        break
+                                continue
+                        var seg: float = s.trail[i].distance_to(s.trail[i - 1])
+                        if seg > SnakeBody.MAX_SEG:
                                 acc += seg
                                 step += seg
                                 continue
                         while step <= acc + seg:
                                 var t := (step - acc) / maxf(seg, 0.001)
-                                if tr[i].lerp(tr[i - 1], t).distance_to(p) < r:
+                                if s.trail[i].lerp(s.trail[i - 1], t).distance_to(p) < r:
                                         return true
                                 step += 22.0
                         acc += seg
@@ -900,6 +934,10 @@ func _in_obstacle(p: Vector2, pad: float) -> bool:
 # ------------------------------------------------------------- powers
 
 func _tick_power_cycle(delta: float) -> void:
+        if peace:
+                if power_live:
+                        power_live = false
+                return
         if not (_opt_on("powerups") and Box.unlock_owned(game_id, "powerups")):
                 if power_live:
                         power_live = false
@@ -962,15 +1000,26 @@ func _despawn_power() -> void:
         power_next_at = _time + randf_range(4.5, 8.0)
 
 ## The effect lands on WHOEVER ate it - the player AND the AI (symmetry).
+## PERMANENT fruits (sprint/slog) rewrite perm_mult forever - no timer,
+## no chip, a toast so the player knows the deal (owner v0.2.0).
 func _apply_power(by: SnakeBody, id: String, is_player: bool) -> void:
         var p: Dictionary = SnakeFruits.POWERS[id]
-        by.apply_power(id, float(p["dur"]))
+        if float(p.get("perm", 0.0)) != 0.0:
+                by.perm_mult = clampf(by.perm_mult * float(p["perm"]), 0.34, 3.0)
+                _sync_speeds()
+                if is_player:
+                        if float(p["perm"]) > 1.0:
+                                _toast_show("SPRINT!  +50% speed - forever")
+                        else:
+                                _toast_show("SLOG...  -50% speed - forever")
+        else:
+                by.apply_power(id, float(p["dur"]))
         if bool(p["good"]):
                 if id == "ghost":
                         Jukebox.sfx("ghost", -4.0)
                 else:
                         var pitch := 1.0
-                        if id == "faster":
+                        if id == "faster" or id == "sprint":
                                 pitch = 1.15
                         elif id == "slower":
                                 pitch = 0.92
@@ -979,7 +1028,7 @@ func _apply_power(by: SnakeBody, id: String, is_player: bool) -> void:
                 Jukebox.sfx("power_bad", -2.0)
         _burst(power_pos, [p["aura"], Color("fff3dc")], 12)
         _ring(power_pos, p["aura"])
-        if is_player:
+        if is_player and float(p.get("perm", 0.0)) == 0.0:
                 _toast_show("%s  %s" % [p["name"],
                                 "DOWN - fruits shrink you!" if not bool(p["good"])
                                 else "UP!"])
@@ -995,7 +1044,7 @@ func _tick_enemies(delta: float) -> void:
                 b.tick_effects(delta)
                 (e["ai"] as SnakeAI).think(delta, self)
                 var adv := b.advance(delta, board, wrap_mode)
-                if adv["hit_wall"] or b.self_bite(b.head_pos, b.head_r()) \
+                if adv["hit_wall"] or b.self_bite(b.head_pos, b.head_r(), board) \
                                 or _in_obstacle(b.head_pos, -b.head_r() * 0.3):
                         _kill_enemy(e)
                         continue
@@ -1004,12 +1053,12 @@ func _tick_enemies(delta: float) -> void:
                 var bite_pt: Array = []
                 if b.has_power("eater") and player.alive \
                                 and player.body_hit(b.head_pos, b.head_r() * 0.9,
-                                        0.30, bite_pt):
+                                                0.30, bite_pt, board):
                         if float(e["bite_cd"]) <= 0.0:
                                 e["bite_cd"] = 0.45
-                                player.len_target = maxf(LEN_FLOOR,
+                                player.len_target = maxf(SnakeBody.LEN_FLOOR,
                                                 player.len_target - EATER_BITE_PX)
-                                player.length_px = maxf(LEN_FLOOR,
+                                player.length_px = maxf(SnakeBody.LEN_FLOOR,
                                                 player.length_px - EATER_BITE_PX)
                                 b.len_target += EATER_GROW_PX
                                 e["score"] += 1
@@ -1017,28 +1066,39 @@ func _tick_enemies(delta: float) -> void:
                                 _burst(bite_pt[0] if bite_pt.size() > 0 else b.head_pos,
                                                 [b.pal["pri"], FLASH_RED], 10)
                         continue
-                if player.alive and player.body_hit(b.head_pos, b.head_r() * 0.9):
+                if player.alive and player.body_hit(b.head_pos, b.head_r() * 0.9,
+                                0.0, [], board):
                         _kill_enemy(e)
                         continue
                 # pickups
                 if apple_live and apple_pop > 0.5 and \
-                                b.head_pos.distance_to(apple_pos) < b.head_r() + apple_r * 0.8:
+                                _portal_touch(b.head_pos, apple_pos, b.head_r() + apple_r * 0.8):
                         _eat_fruit(b, false)
                 if coin_live and coin_pop > 0.5 and \
-                                b.head_pos.distance_to(coin_pos) < b.head_r() + 24.0:
+                                _portal_touch(b.head_pos, coin_pos, b.head_r() + 24.0):
                         _take_coin(false, e)
                 if power_live and power_pop > 0.5 and \
-                                b.head_pos.distance_to(power_pos) < b.head_r() + apple_r:
+                                _portal_touch(b.head_pos, power_pos, b.head_r() + apple_r):
                         _apply_power(b, power_id, false)
                 e["bite_cd"] = float(e["bite_cd"]) - delta
 
 func _kill_enemy(e: Dictionary) -> void:
         var b: SnakeBody = e["body"]
         b.alive = false
+        b.dying = true
+        _dying.append(b)
+        b.flash = 1.0
         Jukebox.sfx("snake_die", -4.0, 0.8)
         _burst(b.head_pos, [b.pal["pri"], FLASH_RED, Color("fff3dc")], 14)
         _ring(b.head_pos, b.pal["pri"])
-        # permanent for this round - no respawn (owner rule)
+        # permanent for this round - no respawn (owner rule); the body COLLAPSES
+
+## dead enemies fold into themselves too, quickly, then vanish
+func _tick_dying(delta: float) -> void:
+        for b in _dying:
+                b.length_px = maxf(0.0, b.length_px - 1500.0 * delta)
+                b.flash = maxf(0.0, b.flash - 2.0 * delta)
+        _dying = _dying.filter(func(b): return b.length_px > 8.0)
 
 # ------------------------------------------------------------- bugs
 
@@ -1065,17 +1125,19 @@ func _tick_bugs(delta: float) -> void:
                 b["pos"] = np
                 # steal the fruit (Snake3D: the bug eats your food)
                 if apple_live and apple_pop > 0.5 and \
-                                        np.distance_to(apple_pos) < 26.0:
+                                np.distance_to(apple_pos) < 26.0:
                         b["munch"] = 0.6
                         _burst(apple_pos, [SnakeFruits.fruit_body(edible_id)], 6)
                         Jukebox.sfx("pop_deep", -8.0)
                         _spawn_fruit()
                 # bite the player: length + score bleed, NEVER death (owner/Snake3D)
                 if b["hit_cd"] <= 0.0 and player.alive and not player.has_power("ghost") \
-                                        and np.distance_to(player.head_pos) < player.head_r() + 16.0:
+                                and np.distance_to(player.head_pos) < player.head_r() + 16.0:
                         b["hit_cd"] = 1.5
-                        player.len_target = maxf(LEN_FLOOR, player.len_target - BUG_LEN_PENALTY)
-                        player.length_px = maxf(LEN_FLOOR, player.length_px - BUG_LEN_PENALTY * 0.5)
+                        player.len_target = maxf(SnakeBody.LEN_FLOOR,
+                                        player.len_target - BUG_LEN_PENALTY)
+                        player.length_px = maxf(SnakeBody.LEN_FLOOR,
+                                        player.length_px - BUG_LEN_PENALTY * 0.5)
                         set_score(maxi(0, score - BUG_SCORE_PENALTY))
                         Jukebox.sfx("bug_hit", -2.0)
                         _burst(np, [BUG_BODY, FLASH_RED], 10)
@@ -1084,9 +1146,10 @@ func _tick_bugs(delta: float) -> void:
                 for e in enemies:
                         var eb: SnakeBody = e["body"]
                         if eb.alive and b["hit_cd"] <= 0.0 and \
-                                                np.distance_to(eb.head_pos) < eb.head_r() + 16.0:
+                                        np.distance_to(eb.head_pos) < eb.head_r() + 16.0:
                                 b["hit_cd"] = 1.5
-                                eb.len_target = maxf(LEN_FLOOR, eb.len_target - BUG_LEN_PENALTY * 0.6)
+                                eb.len_target = maxf(SnakeBody.LEN_FLOOR,
+                                                eb.len_target - BUG_LEN_PENALTY * 0.6)
 
 # ------------------------------------------------------- player collisions
 
@@ -1102,28 +1165,53 @@ func _check_player_collisions() -> void:
                         _die()
                         return
         if not ghost:
-                if player.self_bite(player.head_pos, hr):
-                        _die()
-                        return
-                if _in_obstacle(player.head_pos, -hr * 0.45):
+                # PEACE: you cannot die on yourself - phase through (owner rule)
+                if player.self_bite(player.head_pos, hr, board):
+                        if peace:
+                                pass
+                        elif player.has_power("eater"):
+                                _self_bite_eat()
+                        else:
+                                _die()
+                                return
+                if not peace and _in_obstacle(player.head_pos, -hr * 0.45):
                         _die()
                         return
                 # enemy bodies are death
                 for e in enemies:
                         var b: SnakeBody = e["body"]
-                        if b.alive and b.body_hit(player.head_pos, hr * 0.9):
+                        if b.alive and b.body_hit(player.head_pos, hr * 0.9, 0.0, [], board):
                                 _die()
                                 return
         # head-to-head: the LONGER snake survives the meeting
         for e in enemies:
                 var b: SnakeBody = e["body"]
-                if b.alive and player.head_pos.distance_to(b.head_pos) \
-                                < (hr + b.head_r()) * 0.72:
+                if b.alive and _portal_touch(player.head_pos, b.head_pos,
+                                (hr + b.head_r()) * 0.72):
                         if player.length_px >= b.length_px:
                                 _kill_enemy(e)
                         elif not ghost:
                                 _die()
                                 return
+
+## SNAKE-EATER ON YOURSELF (owner v0.2.0): eating yourself while wearing
+## the eater is a BITE - that part of the body is REMOVED and the length
+## is LOST. No death, no score - just the price of sloppy driving.
+func _self_bite_eat() -> void:
+        if _bite_cd > 0.0:
+                return
+        var d := player.bite_back(player.head_pos, board)
+        if d < 20.0:
+                return
+        _bite_cd = 0.5
+        var new_len := maxf(SnakeBody.LEN_FLOOR, d - 6.0)
+        if new_len < player.len_target:
+                player.len_target = new_len
+                player.length_px = minf(player.length_px, new_len)
+                Jukebox.sfx("tail_bite", -2.0, 0.9)
+                _burst(player.head_pos, [_pal["pri"], Color("58c470")], 10)
+                _ring(player.head_pos, _pal["pri"])
+                _toast_show("you ate yourself -%d" % int(SnakeBody.LEN_PER_APPLE))
 
 ## SNAKE-EATER (player side): touch the enemy's TAIL ONLY - bite segments
 ## off it, grow, score. The tail zone is the tailmost 30% (owner: "from
@@ -1137,10 +1225,12 @@ func _tick_bites(delta: float) -> void:
                 if not b.alive:
                         continue
                 var bite_pt: Array = []
-                if b.body_hit(player.head_pos, player.head_r() * 0.9, 0.30, bite_pt):
+                if b.body_hit(player.head_pos, player.head_r() * 0.9, 0.30, bite_pt, board):
                         _bite_cd = 0.45
-                        b.len_target = maxf(LEN_FLOOR, b.len_target - EATER_BITE_PX)
-                        b.length_px = maxf(LEN_FLOOR, b.length_px - EATER_BITE_PX)
+                        b.len_target = maxf(SnakeBody.LEN_FLOOR,
+                                        b.len_target - EATER_BITE_PX)
+                        b.length_px = maxf(SnakeBody.LEN_FLOOR,
+                                        b.length_px - EATER_BITE_PX)
                         player.len_target += EATER_GROW_PX
                         set_score(score + 1)
                         Jukebox.sfx("tail_bite", -2.0)
@@ -1150,21 +1240,35 @@ func _tick_bites(delta: float) -> void:
 
 # ------------------------------------------------------------- death
 
+## THE COLLAPSE (owner v0.2.0): the tail races INTO the head - the whole
+## body folds away in under a second, red pulse, x-eyes, then the final
+## burst and the dead menu. Dramatic on purpose.
 func _die() -> void:
         if not player.alive:
                 return
         player.alive = false
+        _collapse_t = 0.95
+        _collapse_rate = maxf(700.0, player.length_px / 0.62)
         Jukebox.sfx("snake_die", -2.0)
+        Jukebox.sfx("collapse", -3.0)   # the fold razzle
         Jukebox.stop_music()   # the run's music dies with the run
         achievement_max("length", 3 + _eaten)
+        achievement_max("max_score", score)
         check_achievements()
         _burst(player.head_pos, [_pal["pri"], FLASH_RED, Color("fff3dc")], 12)
         _ring(player.head_pos, FLASH_RED)
-        # OWNER FIX (stays from v0.1.8): flash ONLY the snake.
-        var tw := create_tween().set_loops(3)
-        tw.tween_property(player, "flash", 1.0, 0.09)
-        tw.tween_property(player, "flash", 0.0, 0.09)
-        tw.finished.connect(func(): finish_run(score))
+
+func _tick_collapse(delta: float) -> void:
+        _collapse_t -= delta
+        player.flash = 0.35 + 0.35 * sin(_time * 26.0)
+        player.head_dir += sin(_time * 42.0) * 2.2 * delta   # the head shakes
+        player.length_px = maxf(0.0, player.length_px - _collapse_rate * delta)
+        if player.length_px <= 6.0 or _collapse_t <= 0.0:
+                _collapse_t = -1.0
+                player.flash = 0.0
+                _burst(player.head_pos, [_pal["pri"], FLASH_RED, Color("fff3dc")], 18)
+                _ring(player.head_pos, FLASH_RED)
+                finish_run(score)
 
 # ----------------------------------------------------------------- fx
 
@@ -1179,6 +1283,7 @@ func _tick_fx(delta: float) -> void:
         _rings = _rings.filter(func(r): return float(r["life"]) > 0.0)
         if coin_pop > 0.0:
                 coin_rot += 3.4 * delta
+        _tick_dying(delta)
 
 func _burst(p: Vector2, cols: Array, n: int) -> void:
         for i in n:
@@ -1216,25 +1321,48 @@ func _tongue_out() -> float:
         return out
 
 # ================================================================== PAINT
-## Everything the player sees, one pass: field, deco, border (walls OR the
-## wrap markers), obstacles, rings, coin, fruit, power fruit, bugs, enemy
-## snakes, the player snake, motes.
+## Everything the player sees, one pass: the PLACE (void sky, sun/moon,
+## stars), field, deco, border (walls OR the wrap dashes - no arrows),
+## shadows, obstacles, rings, coin, fruit, power fruit, bugs, fireflies,
+## enemy snakes, the player snake, motes.
+
+func _pl() -> Dictionary:
+        return SnakeFruits.PLACES.get(place, SnakeFruits.PLACES["day"])
 
 func _paint(v: Node2D) -> void:
         var vp := get_viewport_rect().size
-        v.draw_rect(Rect2(Vector2.ZERO, vp), FIELD)
+        var pl := _pl()
+        var night := place == "night"
+        # the void AROUND the field: night wears a sky with stars + the moon
+        v.draw_rect(Rect2(Vector2.ZERO, vp), pl["void"])
+        if night:
+                for s in _stars:
+                        var tw := 0.5 + 0.5 * sin(_time * 1.6 + float(s["ph"]))
+                        var c: Color = MOON_CORE
+                        c.a = 0.25 + 0.55 * tw
+                        v.draw_circle(s["p"], float(s["r"]), c)
+                _paint_moon(v, Vector2(86.0, 96.0))
+        else:
+                _paint_sun(v, Vector2(vp.x - 88.0, 92.0))
+        # the field itself
+        v.draw_rect(board, pl["field"])
         # drifting deco blobs (super subtle, alive) - also OUTSIDE the field
-        for d in _deco:
+        var deco: Array = get_meta("deco", [])
+        for d in deco:
                 var p := Vector2(
                                 board.position.x + float(d["fx"]) * board.size.x
                                                 + sin(_time * 0.22 + float(d["ph"])) * float(d["amp"]),
                                 board.position.y + float(d["fy"]) * board.size.y
                                                 + cos(_time * 0.18 + float(d["ph"]) * 1.7)
                                                 * float(d["amp"]))
-                v.draw_circle(p, float(d["r"]), Color(FIELD_DECO, 0.38))
+                v.draw_circle(p, float(d["r"]), Color(pl["deco"], 0.5))
+                v.draw_circle(p + Vector2(float(d["r"]) * 0.4, float(d["r"]) * 0.3),
+                                float(d["r"]) * 0.55, Color(pl["deco2"], 0.4))
         _paint_border(v)
         # obstacles
         for o in obstacles:
+                _ground_shadow(v, (o as Rect2).get_center(),
+                                maxf((o as Rect2).size.x, (o as Rect2).size.y) * 0.5, 1.0)
                 v.draw_rect((o as Rect2).grow(3.0), OBST_EDGE, false, 4.0)
                 v.draw_rect(o as Rect2, OBST_FILL)
                 # brick seams
@@ -1251,6 +1379,7 @@ func _paint(v: Node2D) -> void:
                                 40, col, 4.0, true)
         # coin (under the snakes)
         if coin_live and coin_pop > 0.0 and _coin_tex != null:
+                _ground_shadow(v, coin_pos, 24.0, 0.8)
                 var cpop := (1.0 + 0.08 * sin(_time * 4.2)) * coin_pop
                 var cs := 54.0 / float(_coin_tex.get_width())
                 v.draw_set_transform(coin_pos, coin_rot,
@@ -1259,7 +1388,8 @@ func _paint(v: Node2D) -> void:
                 v.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
         # the edible (pop + breathing - never an alpha fade)
         if apple_live and apple_pop > 0.0:
-                SnakeFruits.paint_fruit(v, edible_id, apple_pos, apple_r * apple_pop, _time)
+                SnakeFruits.paint_fruit(v, edible_id, apple_pos,
+                                apple_r * apple_pop, _time, true)
         # the power fruit (the aura IS the type signal)
         if power_live and power_pop > 0.0:
                 var blink := 1.0
@@ -1269,11 +1399,15 @@ func _paint(v: Node2D) -> void:
                                 apple_r * power_pop * blink, _time)
         # bugs on top of food, under snakes
         for b in bugs:
+                _ground_shadow(v, b["pos"], 16.0, 0.7)
                 _paint_bug(v, b)
+        # the tiny flies (night garden) wander between the food and the snakes
+        if night:
+                _paint_flies(v)
         # snakes: enemies first (the player rides on top)
         for e in enemies:
                 var b: SnakeBody = e["body"]
-                if b.alive:
+                if b.alive or b.dying:
                         _paint_snake(v, b, false)
         if player != null:
                 _paint_snake(v, player, true)
@@ -1284,11 +1418,58 @@ func _paint(v: Node2D) -> void:
                 col.a = a
                 v.draw_circle(m["p"], float(m["r"]) * (0.5 + 0.5 * a), col)
 
-## CLASSIC: the rounded deadly wall line. NO-WALLS: a dashed open border +
-## outward chevrons at the edge midpoints (this edge is a DOOR).
+## soft ground shadow (day garden = the sun's; night = faint moon shade)
+func _ground_shadow(v: Node2D, at: Vector2, r: float, scale: float) -> void:
+        var c: Color = _pl()["shadow"]
+        c.a *= scale
+        v.draw_circle(at + Vector2(r * 0.14, r * 0.34), r * 0.9, c)
+
+## DAY GARDEN: a warm sun with slow rays in the void corner
+func _paint_sun(v: Node2D, at: Vector2) -> void:
+        v.draw_circle(at, 64.0, Color(SUN_WARM, 0.16))
+        v.draw_circle(at, 46.0, Color(SUN_WARM, 0.3))
+        v.draw_circle(at, 30.0, SUN_CORE)
+        for i in 12:
+                var a := _time * 0.16 + TAU * float(i) / 12.0
+                var d := Vector2.from_angle(a)
+                v.draw_line(at + d * 36.0, at + d * 52.0,
+                                Color(SUN_WARM, 0.55), 3.0, true)
+
+## NIGHT GARDEN: the moon with a halo and craters (the light of the place)
+func _paint_moon(v: Node2D, at: Vector2) -> void:
+        v.draw_circle(at, 58.0, Color(MOON_GLOW, 0.14))
+        v.draw_circle(at, 42.0, Color(MOON_GLOW, 0.22))
+        v.draw_circle(at, 27.0, MOON_CORE)
+        v.draw_circle(at + Vector2(8, -6), 6.0, Color(MOON_GLOW, 0.5))
+        v.draw_circle(at + Vector2(-7, 5), 4.0, Color(MOON_GLOW, 0.45))
+        v.draw_circle(at + Vector2(2, 10), 3.0, Color(MOON_GLOW, 0.4))
+
+## THE TINY FLIES (the owner's 3D snake, ported): wandering glows with a
+## layered blink - sin drift on two axes + a slow envelope under a fast
+## blink, so no two flies ever pulse together.
+func _paint_flies(v: Node2D) -> void:
+        for f in _flies:
+                var t := _time * float(f["speed"]) + float(f["phase"])
+                var p: Vector2 = f["base"] \
+                                + Vector2(sin(t * 0.7), cos(t * 0.5)) * float(f["drift"]) \
+                                + Vector2(0, sin(t * 0.9) * float(f["lift"]))
+                var blink_cycle := sin(t * float(f["blink"]) + float(f["bph"]))
+                var blink_on := maxf(0.0, sin(blink_cycle * PI * 0.8))
+                var env := maxf(0.0, sin(t * 0.5 + float(f["phase"])) * 0.5 + 0.5)
+                var br := blink_on * env
+                if br < 0.05:
+                        continue
+                var glow := Color("ffe866")
+                v.draw_circle(p, 9.0 + 5.0 * br, Color(glow, 0.10 * br))
+                v.draw_circle(p, 4.0 + 2.0 * br, Color(glow, 0.35 * br))
+                v.draw_circle(p, 1.8, Color(Color("fff6c0"), 0.9 * br))
+
+## CLASSIC: the rounded deadly wall line. NO-WALLS: a dashed open border
+## ONLY - the green dashes are the whole announcement (owner: no arrows).
 func _paint_border(v: Node2D) -> void:
+        var pl := _pl()
         if not wrap_mode:
-                v.draw_polyline(_rounded_rect(board, 26.0), WALL, 5.0, true)
+                v.draw_polyline(_rounded_rect(board, 26.0), pl["wall"], 5.0, true)
                 return
         var pts := _rounded_rect(board, 26.0)
         var dashed := PackedVector2Array()
@@ -1307,44 +1488,42 @@ func _paint_border(v: Node2D) -> void:
                         if run > 26.0:
                                 run = 0.0
                                 draw_on = not draw_on
-        v.draw_polyline(dashed, WRAP_LINE, 4.0, false)
-        for i in 4:
-                var mid := Vector2(board.get_center().x, board.position.y) \
-                                if i == 0 else \
-                                Vector2(board.end.x, board.get_center().y) if i == 1 \
-                                else Vector2(board.get_center().x, board.end.y) if i == 2 \
-                                else Vector2(board.position.x, board.get_center().y)
-                var out_dir := Vector2.UP if i == 0 else Vector2.RIGHT if i == 1 \
-                                else Vector2.DOWN if i == 2 else Vector2.LEFT
-                for s in [-1.0, 1.0]:
-                        var tip: Vector2 = mid + out_dir * 20.0
-                        var wing: Vector2 = out_dir.rotated(PI * 0.5) * 13.0 * s
-                        v.draw_polyline(PackedVector2Array([mid - out_dir * 4.0 + wing,
-                                        tip, mid - out_dir * 4.0 - wing]),
-                                        WRAP_LINE, 4.0, true)
+        v.draw_polyline(dashed, pl["wrap"], 4.0, false)
 
-## ONE snake = TWO polygons (the soft dark outline pass, then the gradient
-## ribbon) + the head. No circles. TOO smooth.
+## ONE snake = ribbon STRIPS (split at the mirror portals) + the head.
+## Each strip end near a wall paints its mirrored continuation OUTSIDE the
+## wall - the tail visibly follows the head through (owner v0.2.0).
 func _paint_snake(v: Node2D, s: SnakeBody, is_player: bool) -> void:
         var ghost_a := 0.5 if s.has_power("ghost") else 1.0
-        # outline pass: the same ribbon, 3.5px fatter, inked
-        var under := s.ribbon(3.5,
-                        (s.pal["pri"] as Color).darkened(0.45) * Color(1, 1, 1, ghost_a))
-        if under.is_empty():
-                return
-        v.draw_polygon(under["pts"], under["cols"])
-        var rib := s.ribbon()
-        if ghost_a < 1.0:
-                # per-vertex alpha for the ghost phase
-                var pts2: PackedVector2Array = rib["pts"]
-                var cols2 := PackedColorArray()
-                for c in rib["cols"]:
-                        var cc: Color = c
-                        cc.a = ghost_a
-                        cols2.append(cc)
-                v.draw_polygon(pts2, cols2)
-        else:
-                v.draw_polygon(rib["pts"], rib["cols"])
+        var outline: Color = (s.pal["pri"] as Color).darkened(0.45) \
+                        * Color(1, 1, 1, ghost_a)
+        _ground_shadow(v, s.head_pos, s.head_r() * 1.1, 0.9)
+        # outline pass
+        for st in s.ribbon(3.5, outline):
+                v.draw_polygon(st["pts"], st["cols"])
+        # the body
+        for st in s.ribbon():
+                if ghost_a < 1.0:
+                        var pts2: PackedVector2Array = st["pts"]
+                        var cols2 := PackedColorArray()
+                        for c in st["cols"]:
+                                var cc: Color = c
+                                cc.a = ghost_a
+                                cols2.append(cc)
+                        v.draw_polygon(pts2, cols2)
+                else:
+                        v.draw_polygon(st["pts"], st["cols"])
+        # mirrored wall stubs - the through-the-wall continuation
+        if wrap_mode and s.alive or (wrap_mode and s.dying):
+                for run in s.wall_stubs(board):
+                        var cols := PackedColorArray()
+                        for c in run["cols"]:
+                                var cc: Color = c
+                                cc.a = ghost_a * 0.92
+                                cols.append(cc)
+                        var st2 := s.stub_ribbon(run)
+                        if not st2.is_empty():
+                                v.draw_polygon(st2["pts"], st2["cols"])
         _paint_head(v, s, is_player)
 
 func _paint_head(v: Node2D, s: SnakeBody, is_player: bool) -> void:
@@ -1446,8 +1625,8 @@ func _rounded_rect(rc: Rect2, rad: float) -> PackedVector2Array:
 
 # ------------------------------------------------------------- HUD chips
 ## Under the top bar: LEFT = the player's active powers (glyph + shrinking
-## timer bar in the aura color), RIGHT = enemy score chips in their colors
-## (dead ones gray out - "killed, and it stays dead").
+## timer bar in the aura color). RIGHT = enemy score chips in their colors
+## - DEAD ONES ARE GONE (owner v0.2.0), and each chip shows score + speed.
 
 func _build_chips() -> void:
         _chips = Control.new()
@@ -1461,6 +1640,9 @@ func _build_chips() -> void:
 func _paint_chips(c: Control) -> void:
         if _phase != "run" or player == null:
                 return
+        if _speed_lbl != null and is_instance_valid(_speed_lbl):
+                _speed_lbl.text = "x%.2f" % (player.speed * player.speed_mult()
+                                / START_SPEED)
         var f := Arc.font_ui()
         var x := 16.0
         # active powers, oldest activation first
@@ -1482,25 +1664,26 @@ func _paint_chips(c: Control) -> void:
                                 String(p["name"]), HORIZONTAL_ALIGNMENT_LEFT,
                                 w - 36, 14, Color(1, 1, 1, 0.9))
                 x += w + 8
-        # enemy score chips, right-aligned
+        # enemy chips, right-aligned - the dead leave no badge (owner rule)
         var xr := c.get_viewport_rect().size.x - 16.0
         for i in range(enemies.size() - 1, -1, -1):
                 var e: Dictionary = enemies[i]
                 var b: SnakeBody = e["body"]
-                var w := 84.0
+                if not b.alive:
+                        continue
+                var w := 100.0
                 xr -= w
                 var rect := Rect2(xr, 2, w, 40)
                 var col: Color = b.pal["pri"]
-                var alive: bool = b.alive
-                c.draw_rect(rect, Color(0.16, 0.10, 0.05, 0.55 if alive else 0.3))
-                c.draw_rect(rect, col * Color(1, 1, 1, 1.0 if alive else 0.4),
-                                false, 2.5)
-                c.draw_circle(rect.position + Vector2(16, 20), 7.0,
-                                col * Color(1, 1, 1, 1.0 if alive else 0.35))
-                c.draw_string(f, rect.position + Vector2(30, 27),
-                                str(e["score"]), HORIZONTAL_ALIGNMENT_LEFT,
-                                w - 32, 18,
-                                Color(1, 1, 1, 0.92 if alive else 0.4))
+                c.draw_rect(rect, Color(0.16, 0.10, 0.05, 0.55))
+                c.draw_rect(rect, col, false, 2.5)
+                c.draw_circle(rect.position + Vector2(16, 20), 7.0, col)
+                c.draw_string(f, rect.position + Vector2(30, 19),
+                                str(e["score"]), HORIZONTAL_ALIGNMENT_LEFT, w - 32, 17,
+                                Color(1, 1, 1, 0.92))
+                c.draw_string(f, rect.position + Vector2(30, 35),
+                                "x%.2f" % (b.speed * b.speed_mult() / START_SPEED),
+                                HORIZONTAL_ALIGNMENT_LEFT, w - 32, 12, Color(1, 1, 1, 0.6))
 
 ## tiny vector glyphs for the power chips
 func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
@@ -1543,6 +1726,14 @@ func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
                         c.draw_polyline(PackedVector2Array([
                                         at + Vector2(-3, 5), at + Vector2(0, 8),
                                         at + Vector2(3, 5)]), col, 2.2, true)
+                "sprint":   # lightning bolt
+                        c.draw_colored_polygon(PackedVector2Array([
+                                        at + Vector2(2, -8), at + Vector2(-4, 1),
+                                        at + Vector2(0, 1), at + Vector2(-2, 8),
+                                        at + Vector2(4, -1), at + Vector2(0, -1)]), col)
+                "slog":     # anchor drop - a weight on a line
+                        c.draw_line(at + Vector2(0, -7), at + Vector2(0, 2), col, 2.4)
+                        c.draw_circle(at + Vector2(0, 4), 3.6, col)
                 "eater":    # two fangs
                         c.draw_colored_polygon(PackedVector2Array([
                                         at + Vector2(-6, -7), at + Vector2(-1, -7),
@@ -1552,9 +1743,11 @@ func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
                                         at + Vector2(3.5, 4)]), col)
 
 # ================================================================== SHOP
-## Scrollable, labeled sections in the owner's order: SKINS / FRUITS /
-## POWER-UPS / BUGS / OBSTACLES / ENEMIES. EVERY price wears the GOGACoin
-## icon (AGENTS.md price rule); unaffordable = grayed out AND dead.
+## FIXED SIZE, ALWAYS SCROLLING (owner v0.2.0): the shop is a smaller
+## panel (~56% of the screen) with the content in a BoxScroll and the
+## wallet + CLOSE pinned. Sections: SKINS / PLACES / FRUITS / POWER-UPS /
+## BUGS / OBSTACLES / ENEMIES. EVERY price wears the GOGACoin icon
+## (AGENTS.md price rule); unaffordable = grayed out AND dead.
 
 func _shop_open() -> void:
         if paused:
@@ -1576,9 +1769,32 @@ func _shop_rebuild() -> void:
         var wallet := Arc.coin_chip()
         wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         sheet.add_child(wallet)
+        # the FIXED scroll: a smaller panel that always scrolls inside
+        var vp := get_viewport_rect().size
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.custom_minimum_size = Vector2(0, clampf(vp.y * 0.52, 300.0, 560.0))
+        var inner := VBoxContainer.new()
+        inner.add_theme_constant_override("separation", 12)
+        inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(inner)
+        sheet.add_child(sc)
+        _shop_fill(inner)
+        sheet.add_child(Arc.button("CLOSE", Vector2(500, 70), 24, Arc.ACCENT, func():
+                        _shop_close()))
+        # register the shop's buttons as BoxScroll tappables (BoxScroll owns
+        # taps) - DISABLED ones stay unregistered: gray = DEAD (the price rule;
+        # a tappable would replay .pressed even on a disabled button)
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
 
+func _shop_fill(v: VBoxContainer) -> void:
         # ---- SKINS ----
-        sheet.add_child(_section_label("SKINS"))
+        v.add_child(_section_label("SKINS"))
         for entry in [
                 {"id": "classic", "name": "Blue Melt", "price": 0},
                 {"id": "lava", "name": "Lava", "price": 120},
@@ -1606,44 +1822,68 @@ func _shop_rebuild() -> void:
                                         Vector2(500, 66), 22, col,
                                         func(): _buy_skin_action(String(entry["id"])))
                         _gray_if_broke(b, int(entry["price"]))
-                sheet.add_child(b)
+                v.add_child(b)
+
+        # ---- PLACES (the gardens) ----
+        v.add_child(_section_label("PLACES - the garden you play in"))
+        for pid in ["day", "night"]:
+                var pl: Dictionary = SnakeFruits.PLACES[pid]
+                var price := int(pl["price"])
+                var owned2: bool = price == 0 or Box.item_owned(game_id, "place", pid)
+                var on2: bool = place == pid
+                var txt2 := String(pl["name"])
+                if on2:
+                        txt2 += "  (ON)"
+                elif owned2:
+                        txt2 += "  - VISIT"
+                var col2: Color = pl["field"] if pid == "day" else pl["wall"]
+                var b2: Button
+                if owned2:
+                        b2 = Arc.button(txt2, Vector2(500, 64), 21, col2.darkened(0.05),
+                                        func(): _pick_place(pid))
+                else:
+                        b2 = Arc.coin_button(txt2 + "  %d" % price, Vector2(500, 64), 21,
+                                        col2.darkened(0.05),
+                                        func(): _buy_place(pid, price))
+                        _gray_if_broke(b2, price)
+                v.add_child(b2)
 
         # ---- FRUITS ----
-        sheet.add_child(_section_label("FRUITS - your edible wardrobe"))
+        v.add_child(_section_label("FRUITS - your edible wardrobe"))
         for id in SnakeFruits.FRUITS:
                 var f: Dictionary = SnakeFruits.FRUITS[id]
                 var price := int(f["price"])
-                var owned2: bool = price == 0 or Box.item_owned(game_id, "fruit", id)
-                var b: Button
-                if owned2:
-                        b = Arc.button("%s  - OWNED" % String(f["name"]).to_upper(),
+                var owned3: bool = price == 0 or Box.item_owned(game_id, "fruit", id)
+                var b3: Button
+                if owned3:
+                        b3 = Arc.button("%s  - OWNED" % String(f["name"]).to_upper(),
                                         Vector2(500, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1))
-                        b.disabled = true
+                        b3.disabled = true
                 else:
-                        b = Arc.coin_button("%s  %d" % [String(f["name"]).to_upper(), price],
+                        b3 = Arc.coin_button("%s  %d" % [String(f["name"]).to_upper(), price],
                                         Vector2(500, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1),
                                         func(): _buy_item_action("fruit", id, price))
-                        _gray_if_broke(b, price)
-                sheet.add_child(b)
+                        _gray_if_broke(b3, price)
+                v.add_child(b3)
 
         # ---- POWER-UPS ----
-        sheet.add_child(_section_label("POWER-UPS - aura fruits"))
-        sheet.add_child(_unlock_row("POWER FRUITS",
-                        "slower / faster / ghost / magnet / golden / wither",
+        v.add_child(_section_label("POWER-UPS - aura fruits"))
+        v.add_child(_unlock_row("POWER FRUITS",
+                        "slower / faster / ghost / magnet / golden / wither / sprint / slog",
                         "powerups", PRICE_POWERUPS))
 
         # ---- BUGS ----
-        sheet.add_child(_section_label("BUGS - they bite, never kill"))
-        sheet.add_child(_unlock_row("BUGS", "two beetles roam and steal fruit",
+        v.add_child(_section_label("BUGS - they bite, never kill"))
+        v.add_child(_unlock_row("BUGS", "two beetles roam and steal fruit",
                         "bugs", PRICE_BUGS))
 
         # ---- OBSTACLES ----
-        sheet.add_child(_section_label("OBSTACLES - deadly for everyone"))
-        sheet.add_child(_unlock_row("OBSTACLES", "three block clusters per round",
+        v.add_child(_section_label("OBSTACLES - deadly for everyone"))
+        v.add_child(_unlock_row("OBSTACLES", "three block clusters per round",
                         "obstacles", PRICE_OBSTACLES))
 
         # ---- ENEMIES ----
-        sheet.add_child(_section_label("ENEMIES - the pack"))
+        v.add_child(_section_label("ENEMIES - the pack"))
         var pack_owned := Box.unlock_owned(game_id, "pack")
         if pack_owned:
                 var info := Arc.fit_label("OWNED - up to 10 snakes, each its own color. Pick the count from the ENEMY box in the optionals.",
@@ -1651,22 +1891,17 @@ func _shop_rebuild() -> void:
                 info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 info.custom_minimum_size = Vector2(540, 0)
-                sheet.add_child(info)
+                v.add_child(info)
                 var ebtn := Arc.button("UNLOCKS SNAKE-EATER", Vector2(500, 62), 20,
                                 Color("e8402f"))
                 ebtn.disabled = true
-                sheet.add_child(ebtn)
+                v.add_child(ebtn)
         else:
                 var eb := Arc.coin_button("ENEMY PACK x10  %d" % PRICE_ENEMIES,
                                 Vector2(500, 66), 22, Color("3fae5c"),
                                 func(): _buy_pack_action())
                 _gray_if_broke(eb, PRICE_ENEMIES)
-                sheet.add_child(eb)
-
-        sheet.add_child(Arc.button("CLOSE", Vector2(500, 70), 24, Arc.ACCENT, func():
-                        _shop_close()))
-        # THE scrollable sheet: overflow wraps into a BoxScroll, CLOSE pinned
-        Arc.fit_sheet(sheet, 1)
+                v.add_child(eb)
 
 func _section_label(txt: String) -> Label:
         # v0.1.5 lesson: Kenney Rocket runs WIDE - long section names blew the
@@ -1691,15 +1926,15 @@ func _unlock_row(name_: String, sub: String, cat: String, price: int) -> Control
                 s2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 row2.add_child(s2)
                 return row2
-        var v := VBoxContainer.new()
+        var vb := VBoxContainer.new()
         var b := Arc.coin_button("%s  %d" % [name_, price], Vector2(500, 66), 22,
                         Color("6a5ab8"), func(): _buy_unlock_action(cat, name_, price))
         _gray_if_broke(b, price)
-        v.add_child(b)
+        vb.add_child(b)
         var s := Arc.fit_label(sub, 16, Color("8a6a40"), 540, false)
         s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        v.add_child(s)
-        return v
+        vb.add_child(s)
+        return vb
 
 func _shop_action_common() -> void:
         _shop_rebuild()
@@ -1748,15 +1983,242 @@ func _buy_pack_action() -> void:
                 _toast_show("THE PACK! 10 colors - SNAKE-EATER power unlocked!")
         _shop_action_common()
 
+func _pick_place(pid: String) -> void:
+        place = pid
+        Box.set_progress(game_id, "place", pid)
+        Jukebox.sfx("confirm", -4.0)
+        _build_field()
+        _view.queue_redraw()
+        _shop_action_common()
+
+func _buy_place(pid: String, price: int) -> void:
+        if Box.coins() < price:
+                Jukebox.sfx("error", -4.0)
+                return
+        if Box.buy_item(game_id, "place", pid, price):
+                Jukebox.sfx("buy")
+                _toast_show("%s unlocked!" % SnakeFruits.PLACES[pid]["name"])
+        _pick_place(pid)
+
+## THE DEAD-END FIX (owner's worst bug): closing the shop RESTORES the
+## phase screen that was under it - the mode menu (or the ask, or the
+## ready card) always comes back and the game always runs.
 func _shop_close() -> void:
         get_tree().paused = false
         paused = false
         for k in _overlay_root_ref().get_children():
                 if k != _toast_ref()["layer"]:
                         k.queue_free()
+        _overlay_panel = null
+        _ready_card = null
         _load_skin()
-        if _phase != "run":
-                _new_run_objects()
+        match _phase:
+                "orient":
+                        _show_orient_select()
+                "mode":
+                        _show_mode_select()
+                "ready":
+                        _show_ready_card()
+                _:
+                        pass
         _view.queue_redraw()
+
+# ------------------------------------------------------------- optionals
+## One optionals box: glyph + name + state line. Unlocked = toggle. Locked
+## = gray, lock, coin price, tap opens the shop. PEACE-LOCKED = gray with
+## a peace tag, tap explains why (the style locks the war - owner v0.2.0).
+
+func _optional_box(icon: String, name_: String, state_fn: Callable,
+                unlocked: bool, price: int, tap: Callable, peace_locked := false) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(150, 160)
+        var sb := Arc.panel_style(Arc.CARD, 18, 8)
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var vb := VBoxContainer.new()
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_theme_constant_override("separation", 6)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(vb)
+        var ic := TextureRect.new()
+        ic.texture = load("res://assets/ui/%s" % icon)
+        ic.custom_minimum_size = Vector2(72, 72)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(ic)
+        var l := Arc.label(name_, 20, Arc.INK)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(l)
+        var st := Arc.label(String(state_fn.call()), 16, Color("6a4a28"), false)
+        st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        st.name = "state"
+        vb.add_child(st)
+        if peace_locked:
+                b.disabled = true
+                var sbp2 := Arc.panel_style(Color(0.78, 0.86, 0.78, 0.92), 18, 8)
+                b.add_theme_stylebox_override("disabled", sbp2)
+                l.add_theme_color_override("font_color", Color(0.45, 0.55, 0.45))
+                var pc := Arc.chip("PEACE", "", Color("4e8a5a", 0.85), 14,
+                                Color("f0f8e8"))
+                pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                pc.position = Vector2(38, 8)
+                b.add_child(pc)
+        elif not unlocked:
+                b.disabled = true
+                var sbd := Arc.panel_style(Color(0.82, 0.78, 0.7, 0.9), 18, 8)
+                b.add_theme_stylebox_override("disabled", sbd)
+                l.add_theme_color_override("font_color", Color(0.55, 0.5, 0.42))
+                var lock_ic := TextureRect.new()
+                lock_ic.texture = load("res://assets/ui/icon_lock.png")
+                lock_ic.custom_minimum_size = Vector2(34, 34)
+                lock_ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                lock_ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                lock_ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                lock_ic.position = Vector2(8, 8)
+                b.add_child(lock_ic)
+                # THE PRICE RULE: the GOGACoin icon rides every price
+                var chip := Arc.chip(str(price), "res://assets/ui/coin.png",
+                                Color(0, 0, 0, 0.55), 16, Arc.COIN)
+                chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                chip.position = Vector2(30, 122)
+                b.add_child(chip)
+        if peace_locked:
+                b.pressed.connect(func():
+                                Jukebox.sfx("click", -6.0)
+                                _toast_show("PEACE keeps the garden quiet"))
+        elif not unlocked:
+                b.pressed.connect(func():
+                                Jukebox.sfx("error", -4.0)
+                                _shop_open())
+        else:
+                b.pressed.connect(func():
+                                Jukebox.sfx("click", -4.0)
+                                tap.call()
+                                # refresh the state line only - the world is NOT rebuilt
+                                # (owner v0.2.0: selection changes never reload the game)
+                                st.text = String(state_fn.call()))
+        return b
+
+func _build_optionals_strip() -> Control:
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+        sc.custom_minimum_size = Vector2(596, 176)   # scrolls INSIDE the panel
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 12)
+        sc.add_child(row)
+        # PEACE locks the whole war: enemy / power-ups / bugs / obstacles
+        var war_locked := peace
+        # ENEMY - open from the start; the pack makes the count selectable
+        var pack := Box.unlock_owned(game_id, "pack")
+        row.add_child(_optional_box("opt_enemy.png", "ENEMY",
+                        func(): return _enemy_state_txt(pack), true, 0,
+                        func():
+                                var on := not _opt_on("enemies")
+                                if on:
+                                        _set_opt("enemies", true)
+                                elif pack:
+                                        # OFF -> tap again cycles the count
+                                        var n := clampi(int(Box.get_progress(
+                                                        game_id, "enemy_count", 1)), 1, 10)
+                                        n = n % 10 + 1
+                                        Box.set_progress(game_id, "enemy_count", n)
+                                        _set_opt("enemies", true)
+                                else:
+                                        _set_opt("enemies", false),
+                        war_locked))
+        # POWER-UPS
+        var pu_unlocked := Box.unlock_owned(game_id, "powerups")
+        row.add_child(_optional_box("opt_power.png", "POWER-UPS",
+                        func(): return "ON" if _opt_on("powerups") else "OFF",
+                        pu_unlocked, PRICE_POWERUPS,
+                        func(): _set_opt("powerups", not _opt_on("powerups")),
+                        war_locked))
+        # BUGS
+        var bug_unlocked := Box.unlock_owned(game_id, "bugs")
+        row.add_child(_optional_box("opt_bugs.png", "BUGS",
+                        func(): return "ON" if _opt_on("bugs") else "OFF",
+                        bug_unlocked, PRICE_BUGS,
+                        func(): _set_opt("bugs", not _opt_on("bugs")),
+                        war_locked))
+        # OBSTACLES
+        var ob_unlocked := Box.unlock_owned(game_id, "obstacles")
+        row.add_child(_optional_box("opt_obst.png", "OBSTACLES",
+                        func(): return "ON" if _opt_on("obstacles") else "OFF",
+                        ob_unlocked, PRICE_OBSTACLES,
+                        func(): _set_opt("obstacles", not _opt_on("obstacles")),
+                        war_locked))
+        # FRUITS - the wardrobe selector (always allowed - peace keeps fruits)
+        var owned := Box.items_owned(game_id, "fruit")
+        row.add_child(_optional_box("opt_fruit.png", "FRUITS",
+                        func(): return _fruit_state_txt(owned),
+                        true, 0,
+                        func(): _cycle_fruit_mode(owned)))
+        # PLACE - the garden selector (day free; night is a shop unlock)
+        row.add_child(_optional_box("place_%s.png" % place, "PLACE",
+                        func(): return _place_state_txt(),
+                        true, 0,
+                        func(): _cycle_place()))
+        # register all boxes as BoxScroll tappables (BoxScroll owns taps)
+        for b in row.get_children():
+                if b is Button:
+                        b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                        sc.register_tappable(b, Arc._tap_emitter(b))
+        return sc
+
+func _enemy_state_txt(pack: bool) -> String:
+        if peace:
+                return "PEACE"
+        if not _opt_on("enemies"):
+                return "OFF"
+        if not pack:
+                return "1 GREEN"
+        var n := clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
+        return "%d SNAKES" % n
+
+func _fruit_state_txt(owned: Array) -> String:
+        var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
+        if mode == "all":
+                return "ALL OWNED"
+        if SnakeFruits.FRUITS.has(mode):
+                return String(SnakeFruits.FRUITS[mode]["name"]).to_upper()
+        return "APPLE"
+
+func _cycle_fruit_mode(owned: Array) -> void:
+        var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
+        var pool := ["apple", "all"]
+        for f in owned:
+                pool.append(String(f))
+        var i := pool.find(mode)
+        Box.set_progress(game_id, "fruit_mode", pool[(i + 1) % pool.size()])
+
+func _place_state_txt() -> String:
+        return String(SnakeFruits.PLACES[place]["name"])
+
+func _cycle_place() -> void:
+        if place == "day":
+                if Box.item_owned(game_id, "place", "night"):
+                        place = "night"
+                        Box.set_progress(game_id, "place", place)
+                        _build_field()
+                        _view.queue_redraw()
+                else:
+                        Jukebox.sfx("error", -4.0)
+                        _toast_show("NIGHT GARDEN lives in the shop")
+                        return
+        else:
+                place = "day"
+                Box.set_progress(game_id, "place", place)
+                _build_field()
+                _view.queue_redraw()
+        Jukebox.sfx("confirm", -4.0)
+
 
 

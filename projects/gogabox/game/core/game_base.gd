@@ -10,6 +10,12 @@ extends Node2D
 
 signal request_finish(score: int, coins_earned: int)
 signal request_quit
+## v0.2.0 THE UNIVERSAL POSITION RELOAD (owner rule): a game that asks for
+## vertical/horizontal emits this with "vertical" or "horizontal"; the host
+## UNLOADS and RELOADS the game in that position (same paid session - no
+## second fee, no second play count). Any future game with position-specific
+## play reuses exactly this path.
+signal request_orientation_reload(orient: String)
 
 var game_id := ""
 var score := 0
@@ -17,6 +23,13 @@ var run_coins := 0
 var over := false
 var paused := false
 var tk: TouchKit
+## Set by the host BEFORE the game enters the tree when the game was
+## reloaded for a picked orientation - the ask screens can skip themselves.
+var start_orientation := ""
+## v0.2.0 PEACE rule, modular: a game style can zero the score->coins
+## bonus (peace play gives up the bonus by design). The host reads this
+## one flag - no game names in the economy.
+var score_bonus_enabled := true
 
 var _hud: CanvasLayer
 var _score_label: Label
@@ -194,6 +207,17 @@ func add_hud_button(txt: String, cb: Callable) -> void:
         # keeping every previously added game button in order
         _hud_row.move_child(b, 1 + _flow_btns)
         _flow_btns += 1
+
+## A live-updating HUD chip inserted next to the score (the speed chip
+## today, anything tomorrow). Returns the inner Label - write .text to it.
+func add_hud_chip(txt: String, icon_path := "") -> Label:
+        if _hud_row == null or not is_instance_valid(_hud_row):
+                return null
+        var chip := Arc.chip(txt, icon_path, Color(0, 0, 0, 0.4), 22, Arc.CARD)
+        _hud_row.add_child(chip)
+        # sits right before the coins chip (children: back..score, chip, coins)
+        _hud_row.move_child(chip, _hud_row.get_child_count() - 2)
+        return chip.get_child(0).get_child(chip.get_child(0).get_child_count() - 1)
 
 func _score_label_ref() -> Label:
         return _score_label

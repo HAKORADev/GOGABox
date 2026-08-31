@@ -246,3 +246,66 @@ Everything in the entry above is IN. Implementation notes worth keeping:
   two real layout bugs pre-build (optionals strip overflow; Kenney Rocket
   section labels blowing the shop sheet's min width - fit_label or die).
 - Version 0.1.9, base 30280 (arm32 30281, arm64 30282).
+
+## 2026-09-01 — v0.2.0 THE MIRROR WORLD (the owner's v0.1.9 verdict, item by item)
+
+The owner tested the war build on device. Ten numbered bugs, one "not a bug",
+and a pile of design notes - all in. What shipped and WHY:
+
+- THE WRAP REBUILT (his 1 + 1.5 + the mirror note): the old no-walls TRIMMED
+  the trail at the last wrap break - the whole body teleported (the "vanished
+  and appeared" report), self-eat was impossible, and the fake arc across the
+  break drifted every crossing (his 10-20-30 loop). Now the wrap is a MIRROR
+  (his own spec: exit top at 80/100 -> enter bottom at 20/100), the trail
+  keeps BOTH sides of a break with the true traveled distance, and the ribbon
+  paints as strips with mirrored continuation stubs poking out of the wall -
+  the tail visibly follows the head through. Collision checks test portal
+  images, so eating yourself through a wall is real again.
+- THE CONTROLS (his 1.75): the invisible wheel is dead; the head is driven by
+  the finger's MOTION now - swipe direction aims, swipe speed sets urgency,
+  slow drags are fine control, resting finger = straight. Still screen-space,
+  still bend-capped (no spin exploit).
+- THE FLOW (his 4 + 5 + 7): nothing spawns before the run - menus toggle
+  PREFS only, the world assembles at the tap; the shop's close now RESTORES
+  the phase screen (the dead-end bug - his "worst bug for now" - is dead);
+  and the position ask went UNIVERSAL: same pick does nothing, a different
+  pick emits request_orientation_reload and the HOST unloads + reloads the
+  game in that position (no re-fee, no second play count, the new instance
+  skips the answered ask). Any future vertical/horizontal game reuses it.
+- PEACE (his 9): a STYLE above the modes, runs with walls or without. Locks
+  enemies/bugs/obstacles/power-ups, keeps fruits, spawns NO coins, and zeros
+  the score bonus through the new modular GogaGame.score_bonus_enabled flag
+  the payout reads. Self-collision never kills in peace.
+- SNAKE-EATER BITES YOU (his 10): self-collision while wearing eater costs
+  that body part (bite_back) instead of the run.
+- DEATH = THE COLLAPSE: the tail races into the head (length -> 0 in under a
+  second, red pulse, x-eyes, final burst) - then the dead menu. Enemies fold
+  the same way when they die.
+- WIDTH SYMMETRY: width is DERIVED from target length now - bites, bugs and
+  wither slim the body exactly the reverse of apples (his standing note).
+- THE SPEED LAW: each 10 points = x1.1 (score-based, replacing per-apple
+  speed), shown next to the score as x1.23; SPRINT (+50% forever) and SLOG
+  (-50% forever) join the power table with their own weights/cooldowns/
+  auras; enemy chips show score AND speed, and dead enemies leave NO badge.
+- PLACES: DAY GARDEN (lawn green, sun with rays, soft shadows) and NIGHT
+  GARDEN (moonlight, stars, and the tiny flies ported from the owner's 3D
+  snake: wander + layered blink + additive-ish glow). Night is a 250-coin
+  shop unlock; the optionals PLACE box toggles live.
+- SHOP: fixed smaller panel (~52% of the screen) that ALWAYS scrolls inside,
+  wallet + CLOSE pinned, PLACES section added, and gray buttons are truly
+  dead (not registered as BoxScroll tappables - a tappable would replay
+  .pressed on a disabled button).
+- NO-WALLS arrows are gone (his 8) - the dashed green border is the whole
+  announcement. The AI got a ROLLOUT brain: 13 candidate headings walked 4
+  steps into a simulated future, scored by clearance against walls/
+  obstacles/every body (portal-aware); the probe proves it stands 12s+ in an
+  open mirror field. Fruits re-crafted (the banana finally IS a banana -
+  spine-arc + tapered belly + stem/tip + speckles, verified on the QA sheet);
+  portal whoosh + collapse razzle SFX; phone art ask unchanged.
+- Tests: flow_test untouched and green; snake_probe rewritten for the mirror
+  world (45 checks - wrap math, no-drift, spawn-on-start, peace, speed law,
+  permanence, self-bite, AI survival, the dead-end fix, the collapse);
+  geometry probe green; visual QA through Xvfb caught the peace-card
+  overflow and the v1 banana pre-build (the owner was right about looking at
+  your own art).
+- Version 0.2.0, base 30290 (arm32 30291, arm64 30292).

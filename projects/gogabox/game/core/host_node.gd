@@ -17,6 +17,7 @@ var H := 1280.0
 var _session_open := true
 var _accum := 0.0        # play seconds accumulated since last flush
 var _over_sheet_pair: Array = []   # [center, dim] of the live game-over sheet
+var _orient_now := ""    # v0.2.0: the orientation the game is CURRENTLY in
 
 func _close_over_sheet() -> void:
         for n in _over_sheet_pair:
@@ -43,6 +44,7 @@ func _ready() -> void:
                 landscape = ws.x > 0 and ws.y > 0 and ws.x > ws.y
         else:
                 landscape = orient == "landscape"
+        _orient_now = "horizontal" if landscape else "vertical"
         _apply_orientation(landscape)
         await get_tree().process_frame
         await get_tree().process_frame
@@ -79,10 +81,42 @@ func _ready() -> void:
         game.game_id = id
         game.request_finish.connect(_on_finish)
         game.request_quit.connect(_quit_to_menu)
+        # v0.2.0 THE UNIVERSAL POSITION RELOAD: the game asks, the host reloads
+        game.request_orientation_reload.connect(_on_orientation_reload)
         add_child(game)
         # v0.1.9 OWNER FIX: the play counts at START (quit-mid-turn stays
         # "played"). record_run at finish keeps score/best only.
         Box.record_started(id)
+
+## v0.2.0 - a game picked a DIFFERENT play position: unload it and reload
+## it in that position. The session (fee, play count, host chrome) is kept
+## - the game reboots, nothing else. Same position = nothing happens.
+func _on_orientation_reload(o: String) -> void:
+        if o != "vertical" and o != "horizontal":
+                return
+        if o == _orient_now:
+                return   # same position: do nothing (owner rule)
+        _orient_now = o
+        _apply_orientation(o == "horizontal")
+        # wait until the window actually reflects the new design (a rotation on
+        # device is async; desktop/headless flips immediately) - capped wait
+        for i in 30:
+                await get_tree().process_frame
+                var vps := get_viewport_rect().size
+                if (vps.x > vps.y) == (o == "horizontal"):
+                        break
+        if not _session_open:
+                return
+        _close_over_sheet()
+        _clear_game()
+        game = (load(String(game_def["script"])) as GDScript).new()
+        game.game_id = String(game_def["id"])
+        game.start_orientation = o   # the ask screens skip themselves
+        game.request_finish.connect(_on_finish)
+        game.request_quit.connect(_quit_to_menu)
+        game.request_orientation_reload.connect(_on_orientation_reload)
+        add_child(game)
+        # play count stays: one session = one play (the fee was never re-taken)
 
 func _process(delta: float) -> void:
         # play-time accounting for the global stats screen
@@ -343,6 +377,7 @@ func _on_finish(final_score: int, earned: int) -> void:
                         game.game_id = id
                         game.request_finish.connect(_on_finish)
                         game.request_quit.connect(_quit_to_menu)
+                        game.request_orientation_reload.connect(_on_orientation_reload)
                         add_child(game)
                         # v0.1.9: replays count at start too
                         Box.record_started(id))
@@ -406,6 +441,10 @@ func _score_to_coins(s: int) -> int:
         # divider a run earns nothing ("easy 500-score game -> /100" style).
         # Games with in-run collectables can still rely on pickups; the divider
         # is just the predictable fallback. No key -> default /100.
+        # v0.2.0: the game can ZERO its own bonus through the modular
+        # score_bonus_enabled flag (snake PEACE style gives the bonus up).
+        if game != null and is_instance_valid(game) and not game.score_bonus_enabled:
+                return 0
         var div := int(game_def.get("coin_div", 100))
         if div <= 0 or s < div:
                 return 0
