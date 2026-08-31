@@ -187,6 +187,8 @@ func set_badge(id: String, level: String) -> void:
 ## are pure (no lazy regen, no save): charging happens exclusively in
 ## _credit_offline(), when the app comes back (resume / cold start).
 func box_batteries() -> int:
+        if dev_cheat("battery") == 1:
+                return 10000   # EXTREME - the owner's cheat value
         var p: Dictionary = data["box_batteries"]
         return clampi(int(p.get("count", BOX_BATTERY_CAP)), 0, BOX_BATTERY_CAP)
 
@@ -274,12 +276,17 @@ func game_battery(id: String) -> Dictionary:
         var regen_in := 0
         if count < cap:
                 regen_in = step - ((now - int(p.get("ts", now))) % step)
+        if dev_cheat("battery") == 1:
+                count = 10000
+                regen_in = 0
         return {"count": count, "cap": cap, "step": step,
                 "per_round": int(g["charges"].get("per_round", 2)), "regen_in": regen_in}
 
 ## Spend one round: takes from BOTH the game pool AND the box bank (owner
 ## rule). False (and nothing spent) unless both can afford it.
 func consume_round_batteries(id: String) -> bool:
+        if dev_cheat("battery") == 1:
+                return true   # the cheat never runs dry (and never spends)
         var b := game_battery(id)
         if b.is_empty():
                 return true   # game plays without charges
@@ -389,10 +396,38 @@ func _sync_battery_notifications() -> void:
 
 # ------------------------------------------------------------------ wallet
 
+## ---- DEV CHEATS (owner-only, v0.2.1) ----
+## Four switches stored under the "__dev__" pseudo-game, ALL defaulting to
+## 0 = defaults (the owner: "do not toggle anything for now"):
+##   owned     1 = every game unlocked to play instantly
+##   all_owned 1 = everything owned (games + shop items + skins)
+##   gogacoins 1 = the wallet LOGIC reads an EXTREME value while the app
+##               shows the plain 0 (owner: "visualized as the 0 number but
+##               it's internal value really EXTREME") - the real wallet is
+##               never touched
+##   battery   1 = every battery pool reads 10K - rounds never run dry
+func dev_cheat(name: String) -> int:
+        return int(get_progress("__dev__", "cheat_" + name, 0))
+
+func dev_set_cheat(name: String, v: int) -> void:
+        set_progress("__dev__", "cheat_" + name, clampi(v, 0, 1))
+
+const DEV_CHEATS := ["owned", "all_owned", "gogacoins", "battery"]
+
 func coins() -> int:
+        if dev_cheat("gogacoins") == 1:
+                return 999999999   # EXTREME - logic only, see coins_display
         return int(data["coins"])
 
+## What the UI prints (owner spec: the cheat wallet shows the 0 number).
+func coins_display() -> String:
+        if dev_cheat("gogacoins") == 1:
+                return "0"
+        return str(int(data["coins"]))
+
 func earn(amount: int) -> void:
+        if dev_cheat("gogacoins") == 1:
+                return   # the real wallet stays untouched under the cheat
         if amount <= 0:
                 return
         data["coins"] = int(data["coins"]) + amount
@@ -400,6 +435,8 @@ func earn(amount: int) -> void:
         coins_changed.emit(coins())
 
 func spend(amount: int) -> bool:
+        if dev_cheat("gogacoins") == 1:
+                return true   # everything is affordable, nothing is deducted
         if coins() < amount:
                 return false
         data["coins"] = int(data["coins"]) - amount
@@ -410,6 +447,8 @@ func spend(amount: int) -> bool:
 # ------------------------------------------------------------------ unlocks
 
 func owns_game(id: String) -> bool:
+        if dev_cheat("owned") == 1 or dev_cheat("all_owned") == 1:
+                return true
         return (data["owned"] as Array).has(id)
 
 func unlock_game(id: String, price: int) -> bool:
@@ -652,6 +691,8 @@ func _items(game_id: String, cat: String) -> Dictionary:
         return c[cat]
 
 func item_owned(game_id: String, cat: String, item: String) -> bool:
+        if dev_cheat("all_owned") == 1:
+                return true
         return (_items(game_id, cat)["owned"] as Array).has(item)
 
 func items_owned(game_id: String, cat: String) -> Array:
@@ -680,6 +721,8 @@ func unlock_owned(game_id: String, cat: String) -> bool:
 # ------------------------------------------------------------- skins (per game)
 
 func skin_owned(game_id: String, skin_id: String) -> bool:
+        if dev_cheat("all_owned") == 1:
+                return true
         return (_slot(game_id)["skins"]["owned"] as Array).has(skin_id)
 
 func skin_on(game_id: String) -> String:

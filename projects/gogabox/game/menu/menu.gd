@@ -97,7 +97,7 @@ func _ready() -> void:
         _build_grid()
 
         _toast = Arc.toast_overlay(_root)
-        Box.coins_changed.connect(func(_t: int): _wallet_label.text = str(Box.coins()))
+        Box.coins_changed.connect(func(_t: int): _wallet_label.text = Box.coins_display())
         Box.game_unlocked.connect(func(_id: String): _after_roadmap_change())
         Box.reveal_changed.connect(func(_id: String): _after_roadmap_change())
         Box.batteries_changed.connect(_update_battery_chip)
@@ -279,7 +279,11 @@ func _build_top_bar() -> void:
         logo.custom_minimum_size = Vector2(240, 74)
         logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # v0.2.1 DEV CHEATS: five taps on the wordmark open the owner's sheet
+        logo.mouse_filter = Control.MOUSE_FILTER_STOP
+        logo.gui_input.connect(func(ev: InputEvent):
+                if ev is InputEventScreenTouch and ev.pressed:
+                        _dev_tap())
         bar.add_child(logo)
 
         # v0.1.1 OWNER RULE: the battery bank chip sits RIGHT AFTER the logo
@@ -306,7 +310,7 @@ func _build_top_bar() -> void:
         coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
         wh.add_child(coin)
-        _wallet_label = Arc.label(str(Box.coins()), 30, Arc.COIN, false)
+        _wallet_label = Arc.label(Box.coins_display(), 30, Arc.COIN, false)
         wh.add_child(_wallet_label)
         bar.add_child(wchip)
 
@@ -570,8 +574,10 @@ func _build_carousel() -> void:
         # inertia and owns taps (cards are registered tappables)
         _strip_scroll = BoxScroll.new()
         _strip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        _strip_scroll.custom_minimum_size = Vector2(0, 208)
+        _strip_scroll.custom_minimum_size = Vector2(0, 186)
         _strip_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        # v0.2.1 owner fix: clip_the_top - the card is smaller now
+        _strip_scroll.clip_contents = false
         row.add_child(_strip_scroll)
         _strip_row = HBoxContainer.new()
         _strip_row.add_theme_constant_override("separation", 12)
@@ -580,7 +586,7 @@ func _build_carousel() -> void:
         row.add_child(_pick_next)
 
 func _arrow_btn(txt: String, cb: Callable) -> Button:
-        var b := Arc.button(txt, Vector2(64, 208), 44, Color(0.16, 0.10, 0.05, 0.85), cb)
+        var b := Arc.button(txt, Vector2(64, 186), 44, Color(0.16, 0.10, 0.05, 0.85), cb)
         b.mouse_filter = Control.MOUSE_FILTER_IGNORE   # feed scroll owns taps
         return b
 
@@ -619,7 +625,7 @@ func _apply_list() -> void:
         _strip_scroll.scroll_horizontal = 0
         var items: Array = _lists_data[_list_idx]["items"]
         if items.is_empty():
-                var hint := _card_base(Vector2(300, 208), true)
+                var hint := _card_base(Vector2(252, 186), true)
                 var hl := Arc.label(LIST_HINTS[_list_idx], 22, Color(0.55, 0.42, 0.25), false)
                 hl.set_anchors_preset(Control.PRESET_FULL_RECT)
                 hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -635,14 +641,14 @@ func _apply_list() -> void:
 ## Big owned-game card for the strip: thumb + name + one stat line. ALL
 ## carousel lists are owned-only, so a tap opens the pre-play page.
 func _strip_card(g: Dictionary, stat_txt: String) -> Control:
-        var b := _card_base(Vector2(300, 208), true)
-        _add_thumb(b, g, 58)
-        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 272)
-        name_l.position = Vector2(14, 150)
+        var b := _card_base(Vector2(252, 186), true)
+        _add_thumb(b, g, 54)
+        var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 224)
+        name_l.position = Vector2(14, 132)
         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(name_l)
-        var stat_l := Arc.label(stat_txt, 17, Color("6a4a28"), false)
-        stat_l.position = Vector2(14, 180)
+        var stat_l := Arc.label(stat_txt, 16, Color("6a4a28"), false)
+        stat_l.position = Vector2(14, 160)
         stat_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(stat_l)
         _feed_scroll.register_tappable(b, func():
@@ -774,7 +780,7 @@ func _refresh() -> void:
                 empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 empty.custom_minimum_size = Vector2(0, 120)
                 _grid.add_child(empty)
-        _wallet_label.text = str(Box.coins())
+        _wallet_label.text = Box.coins_display()
         _update_battery_chip()
 
 func _passes_filters(g: Dictionary) -> bool:
@@ -1469,6 +1475,76 @@ func _set_feed_lock(locked: bool) -> void:
                 _feed_scroll.input_locked = locked
         if _strip_scroll != null and is_instance_valid(_strip_scroll):
                 _strip_scroll.input_locked = locked
+
+## ---- DEV CHEATS (owner-only) ---- five taps on the wordmark. Everything
+## defaults to 0 = defaults; nothing is toggled on unless the owner does it.
+var _dev_taps := 0
+var _dev_tap_ms := 0
+
+func _dev_tap() -> void:
+        var now := Time.get_ticks_msec()
+        if now - _dev_tap_ms > 2200:
+                _dev_taps = 0
+        _dev_tap_ms = now
+        _dev_taps += 1
+        if _dev_taps >= 5:
+                _dev_taps = 0
+                Jukebox.sfx("confirm", -4.0)
+                _open_dev_sheet()
+
+func _open_dev_sheet() -> void:
+        _close_sheet()
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
+        var t := Arc.label("DEV CHEATS", 40, Arc.HOT)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var sub := Arc.label("owner only - 0 = defaults, 1 = on", 18,
+                Color("8a6a40"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 240)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 10)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
+        # the four switches
+        v.add_child(Arc.label("SWITCHES", 24, Arc.HOT))
+        for name in Box.DEV_CHEATS:
+                var n: String = name
+                var on: int = Box.dev_cheat(n)
+                var b := Arc.button("%s  =  %d" % [n.to_upper(), on],
+                                Vector2(560, 64), 22,
+                                Arc.GOOD if on == 1 else Color(0.45, 0.42, 0.38),
+                                func():
+                                        Box.dev_set_cheat(n,
+                                                        1 - Box.dev_cheat(n))
+                                        _open_dev_sheet())
+                scroll.register_tappable(b, Arc._tap_emitter(b))
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                v.add_child(b)
+        # the games index
+        v.add_child(Arc.label("GAMES INDEX", 24, Arc.HOT))
+        for g in GameReg.GAMES:
+                var id := String(g["id"])
+                var st := "owned" if Box.owns_game(id) else "locked"
+                if bool(g.get("coming_soon", false)):
+                        st = "soon"
+                var row := Arc.label("%s  -  %s  -  %s" % [id, st,
+                                String(g.get("tag", ""))], 18,
+                        Arc.INK if Box.owns_game(id) else Color(0.55, 0.48, 0.38),
+                        false)
+                row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                row.custom_minimum_size = Vector2(560, 0)
+                v.add_child(row)
+        var note := Arc.label("cheats overwrite the real save ONLY while on - turn them off to go back to your progress", 16,
+                Color("8a6a40"), false)
+        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        note.custom_minimum_size = Vector2(560, 0)
+        v.add_child(note)
 
 func _sheet_base(h := 0.0) -> VBoxContainer:
         _sheet_open = true

@@ -51,20 +51,26 @@ const POWERS := {
 }
 
 ## ------------------------------------------------------------- places
-## The garden the run plays in (owner v0.2.0): DAY GARDEN - green grass,
-## a warm sun, soft shadows; NIGHT GARDEN - moonlight, stars and the tiny
-## flies from the owner's 3D snake. Chosen before the run (optionals box +
-## shop), night is a shop unlock. Everything the field painter needs lives
-## here so the game stays one paint pass.
+## The garden the run plays in: CLASSIC - the original milk-cream field
+## (the default, free - the owner brought it back); DAY GARDEN - green
+## grass, a warm sun, soft shadows (shop unlock); NIGHT GARDEN - moonlight,
+## stars and the tiny flies from the owner's 3D snake (shop unlock).
 const PLACES := {
-        "day":   {"name": "DAY GARDEN",   "price": 0,
+        "classic": {"name": "CLASSIC", "price": 0,
+                "field": Color("f6e7cd"), "deco": Color("ecd9b4"), "deco2": Color("f7ecd6"),
+                "wall": Color("d9c39a"), "wrap": Color("9ec49a"), "ink": Color("35210f"),
+                "void": Color("f6e7cd"), "shadow": Color(0.35, 0.25, 0.12, 0.10),
+                "sky": false},
+        "day":   {"name": "DAY GARDEN", "price": 150,
                 "field": Color("aed886"), "deco": Color("98cc72"), "deco2": Color("c2e49c"),
                 "wall": Color("5f9444"), "wrap": Color("4f8a3e"), "ink": Color("2e4a1e"),
-                "void": Color("8cc46a"), "shadow": Color(0.10, 0.22, 0.06, 0.16)},
+                "void": Color("8cc46a"), "shadow": Color(0.10, 0.22, 0.06, 0.16),
+                "sky": "day"},
         "night": {"name": "NIGHT GARDEN", "price": 250,
                 "field": Color("2c3f55"), "deco": Color("26374c"), "deco2": Color("334962"),
                 "wall": Color("5d82a6"), "wrap": Color("7ab8d8"), "ink": Color("cfe4f4"),
-                "void": Color("1c2a3d"), "shadow": Color(0.02, 0.05, 0.12, 0.22)},
+                "void": Color("1c2a3d"), "shadow": Color(0.02, 0.05, 0.12, 0.22),
+                "sky": "night"},
 }
 
 ## ------------------------------------------------------------- enemies
@@ -87,6 +93,26 @@ const ENEMY_NAMES := ["GREEN", "EMBER", "VIOLET", "CYAN", "PINK", "LIME",
 ## A soft milk companion color for any body color (the gradient tail).
 static func milk_for(c: Color) -> Color:
         return c.lerp(Color("faf3e3"), 0.72)
+
+
+## Per-fruit HIT + SHADOW meta (owner v0.2.1: "the banana collision uses the
+## same as the apple" was a bug): hit = the eat-circle center offset as a
+## fraction of r, hr = the eat-circle radius multiplier, shadow = the ground
+## shadow [dx, dy, rx, ry] as fractions of r (ellipse). Everything else
+## defaults to the honest circle.
+const HIT := {
+        "apple":  {"hit": Vector2.ZERO, "hr": 1.0, "shadow": [0.18, 0.9, 0.92, 0.5]},
+        "banana": {"hit": Vector2(0, 0.05), "hr": 1.35, "shadow": [0.0, 0.62, 1.5, 0.42]},
+        "watermelon": {"hit": Vector2(0, 0.15), "hr": 1.15, "shadow": [0.1, 0.75, 1.15, 0.45]},
+        "lemon":  {"hit": Vector2.ZERO, "hr": 1.15, "shadow": [0.12, 0.6, 1.25, 0.5]},
+        "pineapple": {"hit": Vector2(0, 0.1), "hr": 1.05, "shadow": [0.1, 0.85, 0.85, 0.55]},
+        "grapes": {"hit": Vector2(0, 0.25), "hr": 1.1, "shadow": [0.1, 0.95, 0.95, 0.45]},
+        "strawberry": {"hit": Vector2(0, 0.1), "hr": 1.05, "shadow": [0.08, 0.85, 0.8, 0.55]},
+}
+
+static func hit_meta(id: String) -> Dictionary:
+        return HIT.get(id, {"hit": Vector2.ZERO, "hr": 1.0,
+                "shadow": [0.18, 0.9, 0.92, 0.5]})
 
 
 static func fruit_body(id: String) -> Color:
@@ -119,7 +145,7 @@ static func paint_fruit(v: CanvasItem, id: String, pos: Vector2, r: float,
         var wob := 1.0 + 0.035 * sin(t * 3.1)
         r *= wob
         if shadow:
-                _ground_shadow(v, pos, r)
+                _fruit_shadow(v, id, pos, r)
         match id:
                 "banana": _banana(v, pos, r)
                 "cherry": _cherry(v, pos, r)
@@ -134,9 +160,22 @@ static func paint_fruit(v: CanvasItem, id: String, pos: Vector2, r: float,
                 _: _apple(v, pos, r)
 
 
-static func _ground_shadow(v: CanvasItem, pos: Vector2, r: float) -> void:
-        v.draw_circle(pos + Vector2(r * 0.18, r * 0.9), r * 0.92,
-                        Color(0.08, 0.16, 0.04, 0.16))
+## The ground shadow follows the FRUIT's true footprint (owner v0.2.1: the
+## banana is not an apple) - an ellipse from the per-fruit meta.
+static func _fruit_shadow(v: CanvasItem, id: String, pos: Vector2, r: float) -> void:
+        var m := hit_meta(id)
+        var sh: Array = m["shadow"]
+        var at := pos + Vector2(r * float(sh[0]), r * float(sh[1]))
+        v.draw_circle(at, r * 0.5 * float(sh[2]) + r * 0.45 * float(sh[3]),
+                        Color(0.08, 0.16, 0.04, 0.14))
+        # a flat ellipse pass for wide fruits (banana / lemon)
+        if float(sh[2]) > 1.1:
+                var pts := PackedVector2Array()
+                for i in 16:
+                        var a := TAU * float(i) / 16.0
+                        pts.append(at + Vector2(cos(a) * r * float(sh[2]) * 0.55,
+                                        sin(a) * r * float(sh[3]) * 0.62))
+                v.draw_colored_polygon(pts, Color(0.08, 0.16, 0.04, 0.10))
 
 
 static func _ellipse(v: CanvasItem, c: Vector2, rx: float, ry: float,
@@ -216,8 +255,10 @@ static func _banana(v: CanvasItem, pos: Vector2, r: float) -> void:
         var rim := body.darkened(0.35)
         var tipc := Color("6a4a14")
         # a REAL banana: one spine arc, tapered width (fat belly, pointy ends),
-        # both edges offset RADIALLY so the curve stays honest
-        var c := pos + Vector2(0, r * 1.05)
+        # both edges offset RADIALLY so the curve stays honest. Centered on pos
+        # (owner v0.2.1: the drawing hung below the eat circle - fixed by
+        # construction: the arc's centroid sits on the fruit's true center).
+        var c := pos + Vector2(0, -r * 0.62)
         var R := r * 1.35
         var a0 := deg_to_rad(25.0)
         var a1 := deg_to_rad(155.0)

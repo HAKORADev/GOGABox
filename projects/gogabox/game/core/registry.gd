@@ -45,13 +45,14 @@ const GAMES := [
                 # its coins) at entry AND retry, empty wallet plays free.
                 # Declarative now - any future game just wears the same key.
                 "entry": {"partial_pay": true},
-                "desc": "The classic gone to war - steer a smooth one-part snake with an invisible analog wheel, pick your position and mode (walls or no-walls), dress your fruit, and face green AI snakes that hunt, encircle and steal coins.",
-                "controls": ["touch anywhere and DRAG like an invisible wheel - the head aims where your finger points (screen directions, always)",
-                        "each fruit = 1 point, +length and a little width (there is a limit); GOLDEN makes fruit worth x3",
-                        "grab the spinning coin for +1 GOGACoin - but enemy snakes grab coins too",
-                        "power fruits wear auras: slower, faster, ghost, magnet, golden, wither (careful), snake-eater (bite tails!)",
-                        "bugs steal the fruit and bite (length + score, never death); obstacles kill everyone",
-                        "big enemies try to wrap around you - the run only ends when YOU die"],
+                "desc": "The classic gone to war - steer a smooth one-part snake with mouse-style swipes, pick your position and place (classic milk, day garden, night garden), choose PEACE or the war, and outsmart AI snakes that hunt, encircle and steal coins. Death folds the whole body into the head.",
+                "controls": ["touch anywhere and SWIPE - the head bends where your finger moves; swipe speed = turn sharpness, resting finger = straight",
+                        "each fruit = 1 point, +length (width follows, both ways); the speed grows x1.1 every 10 points - watch the x1.00 chip",
+                        "NO-WALLS mode wraps edge to edge as a straight line - exit at 80, enter at 80, same heading; you CAN bite yourself",
+                        "PEACE style: fruits only, no coins, no score bonus, and you can never die on yourself",
+                        "power fruits wear auras: slower, faster, ghost, magnet, golden, wither, SPRINT/SLOG (+/-50% speed FOREVER), snake-eater - it bites tails AND your own body costs length, not the run",
+                        "PLACES live in the shop: classic is free, the day garden (sun + shadows) and the night garden (moon, stars and tiny flies) cost GOGACoins",
+                        "bugs steal the fruit and bite (never death); obstacles kill everyone; big enemies try to wrap around you - the run only ends when YOU die"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [

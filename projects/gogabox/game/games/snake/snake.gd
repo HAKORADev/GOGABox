@@ -1,11 +1,12 @@
 extends GogaGame
 ## Snake v0.2.0 - THE MIRROR WORLD. Built on the owner's v0.1.9 verdict:
 ##
-##   THE WRAP: no-walls is a MIRROR now - exit the top wall at 80/100 and
-##   the snake enters the bottom wall at 20/100 (owner's own spec). The
-##   tail follows the head THROUGH the wall (mirrored continuation stubs
-##   paint outside the wall), the path math is exact (the 30-degree drift
-##   loop is dead) and eating yourself THROUGH a wall is real again.
+##   THE WRAP (owner v0.2.1 clarification): no-walls is a STRAIGHT LINE -
+##   the head's angle vs the wall is kept and the field translates, so
+##   exiting at 80 re-enters at 80 and the path is the same line continued
+##   (his "degree mirroring"). The tail follows through via translated
+##   stubs, the drift loop stays dead, and eating yourself through a wall
+##   is real.
 ##
 ##   THE CONTROLS: the head is driven like a MOUSE - swipe direction aims,
 ##   swipe speed sets the turn urgency, slow drags are fine control, a
@@ -126,6 +127,8 @@ var _tongue_cd := 1.6
 var _tongue_t := 0.0
 var _collapse_t := -1.0         # >= 0 = the death collapse is playing
 var _collapse_rate := 900.0
+var _collapse_l0 := 320.0       # length at death (the fold baseline)
+var _collapse_w0 := 26.0
 var _speed_lbl: Label           # the x1.23 chip next to the score
 
 # mouse-style steering: the finger's MOTION drives the head
@@ -154,9 +157,9 @@ class SnakeView:
 func _goga_setup() -> void:
         banner_on = bool(GameReg.get_game(game_id).get("banner", false))
         _load_skin()
-        place = String(Box.get_progress(game_id, "place", "day"))
-        if not SnakeFruits.PLACES.has(place):
-                place = "day"
+        place = String(Box.get_progress(game_id, "place", "classic"))
+        if not SnakeFruits.PLACES.has(place) or not _place_owned(place):
+                place = "classic"   # migration: unowned places fall back to classic
         peace = bool(Box.get_progress(game_id, "style_peace", false))
         # PEACE zeros the score bonus through the MODULAR flag - the payout
         # path reads it, no game names anywhere near the economy.
@@ -189,25 +192,19 @@ func _auto_orient() -> String:
         var vp := get_viewport_rect().size
         return "horizontal" if vp.x > vp.y else "vertical"
 
-## The field is the ASKED shape: vertical = ~9:16, horizontal = ~16:9,
-## letterboxed inside whatever the device is doing (owner: the choice
-## overwrites the sensor - the base for position-specific play later).
+## The field IS the screen now (owner v0.2.1: "use the screen resolution
+## instead of letting it for nothing") - the full available canvas in BOTH
+## orientations; the position ask rotates the device and reloads the game,
+## the field shape follows the real window.
 func _build_field() -> void:
         var vp := get_viewport_rect().size
         var top := 108.0
         var bottom := 14.0
         if banner_on:
                 bottom = _banner_safe_px()
-        var avail := Vector2(maxf(100.0, vp.x - 20.0),
-                        maxf(100.0, vp.y - top - bottom - 8.0))
-        var target_aspect := 9.0 / 16.0 if orient == "vertical" else 16.0 / 9.0
-        var w := avail.y * target_aspect
-        var h := avail.y
-        if w > avail.x:
-                w = avail.x
-                h = w / target_aspect
-        var origin := Vector2((vp.x - w) / 2.0, top + (avail.y - h) / 2.0)
-        board = Rect2(origin, Vector2(w, h))
+        var w := maxf(100.0, vp.x - 16.0)
+        var h := maxf(100.0, vp.y - top - bottom - 8.0)
+        board = Rect2(Vector2((vp.x - w) / 2.0, top + 4.0), Vector2(w, h))
         _build_garden()
 
 ## The garden dressing: deco blobs (both places), stars + fireflies (night).
@@ -605,7 +602,7 @@ func _show_ready_card() -> void:
 
 func _ready_subline() -> String:
         var place_name: String = SnakeFruits.PLACES[place]["name"]
-        var bits := [place_name, "NO-WALLS - mirrored wrap" if wrap_mode else "CLASSIC walls"]
+        var bits := [place_name, "NO-WALLS - wrap walls" if wrap_mode else "CLASSIC walls"]
         if peace:
                 bits.append("PEACE")
         return "  ·  ".join(bits)
@@ -757,10 +754,17 @@ func _portal_touch(a: Vector2, b: Vector2, r: float) -> bool:
                         return true
         return false
 
+func _fruit_hit_r() -> float:
+        return apple_r * float(SnakeFruits.hit_meta(edible_id)["hr"])
+
+func _fruit_hit_pos() -> Vector2:
+        return apple_pos + Vector2(SnakeFruits.hit_meta(edible_id)["hit"]) * apple_r
+
 func _tick_pickups() -> void:
         var hr := player.head_r()
         if apple_live and apple_pop > 0.5 \
-                        and _portal_touch(player.head_pos, apple_pos, hr + apple_r * 0.8):
+                        and _portal_touch(player.head_pos, _fruit_hit_pos(),
+                        hr + _fruit_hit_r() * 0.8):
                 _eat_fruit(player, true)
         if coin_live and coin_pop > 0.5 \
                         and _portal_touch(player.head_pos, coin_pos, hr + 24.0):
@@ -1065,6 +1069,8 @@ func _tick_enemies(delta: float) -> void:
                                 Jukebox.sfx("tail_bite", -2.0)
                                 _burst(bite_pt[0] if bite_pt.size() > 0 else b.head_pos,
                                                 [b.pal["pri"], FLASH_RED], 10)
+                                _cut_fx(player, player.len_target, FLASH_RED)
+                                player._bp_dirty = true
                         continue
                 if player.alive and player.body_hit(b.head_pos, b.head_r() * 0.9,
                                 0.0, [], board):
@@ -1072,7 +1078,8 @@ func _tick_enemies(delta: float) -> void:
                         continue
                 # pickups
                 if apple_live and apple_pop > 0.5 and \
-                                _portal_touch(b.head_pos, apple_pos, b.head_r() + apple_r * 0.8):
+                                _portal_touch(b.head_pos, _fruit_hit_pos(),
+                                b.head_r() + _fruit_hit_r() * 0.8):
                         _eat_fruit(b, false)
                 if coin_live and coin_pop > 0.5 and \
                                 _portal_touch(b.head_pos, coin_pos, b.head_r() + 24.0):
@@ -1093,11 +1100,17 @@ func _kill_enemy(e: Dictionary) -> void:
         _ring(b.head_pos, b.pal["pri"])
         # permanent for this round - no respawn (owner rule); the body COLLAPSES
 
-## dead enemies fold into themselves too, quickly, then vanish
+## dead enemies fold into themselves too, quickly, then VANISH (owner
+## v0.2.1 bug 11: the corpse used to linger forever - the same stale
+## sample cache plus a dying flag that never cleared)
 func _tick_dying(delta: float) -> void:
         for b in _dying:
                 b.length_px = maxf(0.0, b.length_px - 1500.0 * delta)
                 b.flash = maxf(0.0, b.flash - 2.0 * delta)
+                b._bp_dirty = true
+                b.width = maxf(2.0, b.width - 60.0 * delta)
+                if b.length_px <= 8.0:
+                        b.dying = false   # stops painting - it is GONE
         _dying = _dying.filter(func(b): return b.length_px > 8.0)
 
 # ------------------------------------------------------------- bugs
@@ -1206,12 +1219,14 @@ func _self_bite_eat() -> void:
         _bite_cd = 0.5
         var new_len := maxf(SnakeBody.LEN_FLOOR, d - 6.0)
         if new_len < player.len_target:
+                var removed: float = player.len_target - new_len
                 player.len_target = new_len
                 player.length_px = minf(player.length_px, new_len)
+                player._bp_dirty = true   # the cut shows THIS frame
                 Jukebox.sfx("tail_bite", -2.0, 0.9)
-                _burst(player.head_pos, [_pal["pri"], Color("58c470")], 10)
-                _ring(player.head_pos, _pal["pri"])
-                _toast_show("you ate yourself -%d" % int(SnakeBody.LEN_PER_APPLE))
+                _burst(player.head_pos, [_pal["pri"], Color("58c470")], 8)
+                _cut_fx(player, new_len, _pal["pri"])
+                _toast_show("you ate yourself -%d px" % int(removed))
 
 ## SNAKE-EATER (player side): touch the enemy's TAIL ONLY - bite segments
 ## off it, grow, score. The tail zone is the tailmost 30% (owner: "from
@@ -1236,6 +1251,8 @@ func _tick_bites(delta: float) -> void:
                         Jukebox.sfx("tail_bite", -2.0)
                         _burst(bite_pt[0] if bite_pt.size() > 0 else player.head_pos,
                                         [b.pal["pri"], Color("58c470")], 10)
+                        _cut_fx(b, b.len_target, b.pal["pri"])
+                        b._bp_dirty = true
                         break
 
 # ------------------------------------------------------------- death
@@ -1247,8 +1264,11 @@ func _die() -> void:
         if not player.alive:
                 return
         player.alive = false
+        player.dying = true
         _collapse_t = 0.95
-        _collapse_rate = maxf(700.0, player.length_px / 0.62)
+        _collapse_l0 = maxf(1.0, player.length_px)
+        _collapse_w0 = player.width
+        _collapse_rate = maxf(700.0, _collapse_l0 / 0.62)
         Jukebox.sfx("snake_die", -2.0)
         Jukebox.sfx("collapse", -3.0)   # the fold razzle
         Jukebox.stop_music()   # the run's music dies with the run
@@ -1263,9 +1283,18 @@ func _tick_collapse(delta: float) -> void:
         player.flash = 0.35 + 0.35 * sin(_time * 26.0)
         player.head_dir += sin(_time * 42.0) * 2.2 * delta   # the head shakes
         player.length_px = maxf(0.0, player.length_px - _collapse_rate * delta)
+        # THE FOLD (owner v0.2.1: the body must really collapse, not leave a
+        # thin frozen ribbon + a wandering dot - the stale sample cache was
+        # the whole bug): re-dirty the samples every frame, and fold the
+        # WIDTH into the head for the last stretch so nothing lingers
+        player._bp_dirty = true
+        var fold := clampf(player.length_px / maxf(1.0, _collapse_l0 * 0.45),
+                        0.1, 1.0)
+        player.width = _collapse_w0 * fold
         if player.length_px <= 6.0 or _collapse_t <= 0.0:
                 _collapse_t = -1.0
                 player.flash = 0.0
+                player.dying = false
                 _burst(player.head_pos, [_pal["pri"], FLASH_RED, Color("fff3dc")], 18)
                 _ring(player.head_pos, FLASH_RED)
                 finish_run(score)
@@ -1295,6 +1324,26 @@ func _burst(p: Vector2, cols: Array, n: int) -> void:
                         "life": randf_range(0.35, 0.65),
                         "max": 0.65,
                 })
+
+## THE CUT (owner v0.2.1): a bitten-off section does not just vanish -
+## motes rain along the removed arc and a ring marks the bite point.
+func _cut_fx(s: SnakeBody, keep_len: float, col: Color) -> void:
+        var pts := s.body_points()
+        for pinfo in pts:
+                var d: float = pinfo[1]
+                if d < keep_len:
+                        continue
+                if randf() < 0.4:
+                        _motes.append({
+                                "p": pinfo[0],
+                                "v": Vector2.from_angle(randf() * TAU)
+                                                * randf_range(60.0, 220.0),
+                                "r": randf_range(3.0, 7.0),
+                                "c": col,
+                                "life": randf_range(0.3, 0.55),
+                                "max": 0.55,
+                        })
+        _ring(s.head_pos, col)
 
 func _ring(p: Vector2, col: Color) -> void:
         _rings.append({"p": p, "r0": 8.0, "r1": 74.0, "life": 0.34, "max": 0.34,
@@ -1332,17 +1381,20 @@ func _pl() -> Dictionary:
 func _paint(v: Node2D) -> void:
         var vp := get_viewport_rect().size
         var pl := _pl()
-        var night := place == "night"
-        # the void AROUND the field: night wears a sky with stars + the moon
+        var sky_v: Variant = pl.get("sky", false)
+        var sky := String(sky_v) if typeof(sky_v) == TYPE_STRING else ""
+        var night := sky == "night"
+        # the void AROUND the field: classic stays plain milk; the gardens
+        # wear a sky (day sun / night moon + stars)
         v.draw_rect(Rect2(Vector2.ZERO, vp), pl["void"])
-        if night:
+        if sky == "night":
                 for s in _stars:
                         var tw := 0.5 + 0.5 * sin(_time * 1.6 + float(s["ph"]))
                         var c: Color = MOON_CORE
                         c.a = 0.25 + 0.55 * tw
                         v.draw_circle(s["p"], float(s["r"]), c)
                 _paint_moon(v, Vector2(86.0, 96.0))
-        else:
+        elif sky == "day":
                 _paint_sun(v, Vector2(vp.x - 88.0, 92.0))
         # the field itself
         v.draw_rect(board, pl["field"])
@@ -1513,17 +1565,16 @@ func _paint_snake(v: Node2D, s: SnakeBody, is_player: bool) -> void:
                         v.draw_polygon(pts2, cols2)
                 else:
                         v.draw_polygon(st["pts"], st["cols"])
-        # mirrored wall stubs - the through-the-wall continuation
-        if wrap_mode and s.alive or (wrap_mode and s.dying):
+        # translated wall stubs - the through-the-wall continuation
+        if wrap_mode and (s.alive or s.dying):
                 for run in s.wall_stubs(board):
-                        var cols := PackedColorArray()
-                        for c in run["cols"]:
-                                var cc: Color = c
-                                cc.a = ghost_a * 0.92
-                                cols.append(cc)
-                        var st2 := s.stub_ribbon(run)
-                        if not st2.is_empty():
-                                v.draw_polygon(st2["pts"], st2["cols"])
+                        for st2 in s.stub_ribbon(run):
+                                var cols := PackedColorArray()
+                                for c in st2["cols"]:
+                                        var cc: Color = c
+                                        cc.a = ghost_a * 0.92
+                                        cols.append(cc)
+                                v.draw_polygon(st2["pts"], cols)
         _paint_head(v, s, is_player)
 
 func _paint_head(v: Node2D, s: SnakeBody, is_player: bool) -> void:
@@ -1781,7 +1832,7 @@ func _shop_rebuild() -> void:
         sc.add_child(inner)
         sheet.add_child(sc)
         _shop_fill(inner)
-        sheet.add_child(Arc.button("CLOSE", Vector2(500, 70), 24, Arc.ACCENT, func():
+        sheet.add_child(Arc.button("CLOSE", Vector2(560, 70), 24, Arc.ACCENT, func():
                         _shop_close()))
         # register the shop's buttons as BoxScroll tappables (BoxScroll owns
         # taps) - DISABLED ones stay unregistered: gray = DEAD (the price rule;
@@ -1815,21 +1866,21 @@ func _shop_fill(v: VBoxContainer) -> void:
                         txt += "  - EQUIP"
                 var b: Button
                 if owned:
-                        b = Arc.button(txt, Vector2(500, 66), 22, col,
+                        b = Arc.button(txt, Vector2(560, 66), 22, col,
                                         func(): _buy_skin_action(String(entry["id"])))
                 else:
                         b = Arc.coin_button(txt + "  %d" % int(entry["price"]),
-                                        Vector2(500, 66), 22, col,
+                                        Vector2(560, 66), 22, col,
                                         func(): _buy_skin_action(String(entry["id"])))
                         _gray_if_broke(b, int(entry["price"]))
                 v.add_child(b)
 
         # ---- PLACES (the gardens) ----
         v.add_child(_section_label("PLACES - the garden you play in"))
-        for pid in ["day", "night"]:
+        for pid in ["classic", "day", "night"]:
                 var pl: Dictionary = SnakeFruits.PLACES[pid]
                 var price := int(pl["price"])
-                var owned2: bool = price == 0 or Box.item_owned(game_id, "place", pid)
+                var owned2: bool = _place_owned(pid)
                 var on2: bool = place == pid
                 var txt2 := String(pl["name"])
                 if on2:
@@ -1839,10 +1890,10 @@ func _shop_fill(v: VBoxContainer) -> void:
                 var col2: Color = pl["field"] if pid == "day" else pl["wall"]
                 var b2: Button
                 if owned2:
-                        b2 = Arc.button(txt2, Vector2(500, 64), 21, col2.darkened(0.05),
+                        b2 = Arc.button(txt2, Vector2(560, 64), 21, col2.darkened(0.05),
                                         func(): _pick_place(pid))
                 else:
-                        b2 = Arc.coin_button(txt2 + "  %d" % price, Vector2(500, 64), 21,
+                        b2 = Arc.coin_button(txt2 + "  %d" % price, Vector2(560, 64), 21,
                                         col2.darkened(0.05),
                                         func(): _buy_place(pid, price))
                         _gray_if_broke(b2, price)
@@ -1857,11 +1908,11 @@ func _shop_fill(v: VBoxContainer) -> void:
                 var b3: Button
                 if owned3:
                         b3 = Arc.button("%s  - OWNED" % String(f["name"]).to_upper(),
-                                        Vector2(500, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1))
+                                        Vector2(560, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1))
                         b3.disabled = true
                 else:
                         b3 = Arc.coin_button("%s  %d" % [String(f["name"]).to_upper(), price],
-                                        Vector2(500, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1),
+                                        Vector2(560, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1),
                                         func(): _buy_item_action("fruit", id, price))
                         _gray_if_broke(b3, price)
                 v.add_child(b3)
@@ -1887,18 +1938,18 @@ func _shop_fill(v: VBoxContainer) -> void:
         var pack_owned := Box.unlock_owned(game_id, "pack")
         if pack_owned:
                 var info := Arc.fit_label("OWNED - up to 10 snakes, each its own color. Pick the count from the ENEMY box in the optionals.",
-                                20, Color("6a4a28"), 540, false)
+                                20, Color("6a4a28"), 596, false)
                 info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                info.custom_minimum_size = Vector2(540, 0)
+                info.custom_minimum_size = Vector2(596, 0)
                 v.add_child(info)
-                var ebtn := Arc.button("UNLOCKS SNAKE-EATER", Vector2(500, 62), 20,
+                var ebtn := Arc.button("UNLOCKS SNAKE-EATER", Vector2(560, 62), 20,
                                 Color("e8402f"))
                 ebtn.disabled = true
                 v.add_child(ebtn)
         else:
                 var eb := Arc.coin_button("ENEMY PACK x10  %d" % PRICE_ENEMIES,
-                                Vector2(500, 66), 22, Color("3fae5c"),
+                                Vector2(560, 66), 22, Color("3fae5c"),
                                 func(): _buy_pack_action())
                 _gray_if_broke(eb, PRICE_ENEMIES)
                 v.add_child(eb)
@@ -1907,7 +1958,7 @@ func _section_label(txt: String) -> Label:
         # v0.1.5 lesson: Kenney Rocket runs WIDE - long section names blew the
         # sheet's min width up and shifted/ clipped the whole shop (seen in
         # the visual QA pass). fit or die.
-        return Arc.fit_label(txt, 26, Arc.HOT, 540)
+        return Arc.fit_label(txt, 26, Arc.HOT, 596)
 
 ## THE RULE, enforced at the source: a price the wallet cannot pay is a
 ## GRAY, DEAD button (never a "buy" that just errors).
@@ -1919,19 +1970,19 @@ func _unlock_row(name_: String, sub: String, cat: String, price: int) -> Control
         if Box.unlock_owned(game_id, cat):
                 var row2 := VBoxContainer.new()
                 var l := Arc.fit_label("%s  - OWNED (toggle it in the optionals)" % name_,
-                                20, Color("58c470"), 540)
+                                20, Color("58c470"), 596)
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 row2.add_child(l)
-                var s2 := Arc.fit_label(sub, 16, Color("8a6a40"), 540, false)
+                var s2 := Arc.fit_label(sub, 16, Color("8a6a40"), 596, false)
                 s2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 row2.add_child(s2)
                 return row2
         var vb := VBoxContainer.new()
-        var b := Arc.coin_button("%s  %d" % [name_, price], Vector2(500, 66), 22,
+        var b := Arc.coin_button("%s  %d" % [name_, price], Vector2(560, 66), 22,
                         Color("6a5ab8"), func(): _buy_unlock_action(cat, name_, price))
         _gray_if_broke(b, price)
         vb.add_child(b)
-        var s := Arc.fit_label(sub, 16, Color("8a6a40"), 540, false)
+        var s := Arc.fit_label(sub, 16, Color("8a6a40"), 596, false)
         s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(s)
         return vb
@@ -1982,6 +2033,10 @@ func _buy_pack_action() -> void:
                 Jukebox.sfx("buy")
                 _toast_show("THE PACK! 10 colors - SNAKE-EATER power unlocked!")
         _shop_action_common()
+
+func _place_owned(pid: String) -> bool:
+        return int(SnakeFruits.PLACES[pid]["price"]) == 0 \
+                or Box.item_owned(game_id, "place", pid)
 
 func _pick_place(pid: String) -> void:
         place = pid
@@ -2050,11 +2105,13 @@ func _optional_box(icon: String, name_: String, state_fn: Callable,
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(ic)
-        var l := Arc.label(name_, 20, Arc.INK)
+        # v0.2.1 owner rule: the box labels use the menu-title fit trick -
+        # long names step their font DOWN instead of leaving the box
+        var l := Arc.fit_label(name_, 20, Arc.INK, 128)
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(l)
-        var st := Arc.label(String(state_fn.call()), 16, Color("6a4a28"), false)
+        var st := Arc.fit_label(String(state_fn.call()), 16, Color("6a4a28"), 132, false)
         st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         st.mouse_filter = Control.MOUSE_FILTER_IGNORE
         st.name = "state"
@@ -2203,22 +2260,24 @@ func _place_state_txt() -> String:
         return String(SnakeFruits.PLACES[place]["name"])
 
 func _cycle_place() -> void:
-        if place == "day":
-                if Box.item_owned(game_id, "place", "night"):
-                        place = "night"
+        var order := ["classic", "day", "night"]
+        var i := order.find(place)
+        var locked := ""
+        for k in order.size() - 1:
+                var cand: String = order[(i + 1 + k) % order.size()]
+                if _place_owned(cand):
+                        place = cand
                         Box.set_progress(game_id, "place", place)
                         _build_field()
                         _view.queue_redraw()
-                else:
-                        Jukebox.sfx("error", -4.0)
-                        _toast_show("NIGHT GARDEN lives in the shop")
+                        Jukebox.sfx("confirm", -4.0)
                         return
-        else:
-                place = "day"
-                Box.set_progress(game_id, "place", place)
-                _build_field()
-                _view.queue_redraw()
-        Jukebox.sfx("confirm", -4.0)
+                if locked == "":
+                        locked = cand
+        if locked != "":
+                Jukebox.sfx("error", -4.0)
+                _toast_show("%s lives in the shop"
+                                % SnakeFruits.PLACES[locked]["name"])
 
 
 

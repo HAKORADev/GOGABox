@@ -84,47 +84,39 @@ func _trail_push(p: Vector2, brk: bool, warp: float) -> void:
         trail_warp.append(warp)
 
 
-## THE MIRROR WRAP. Crossing a wall flips the ALONG-WALL coordinate once
-## (owner: top at 80 -> bottom at 20) and keeps the heading. Returns the
-## wrapped point + which portals fired (for the trail break marks).
+## THE STRAIGHT-LINE WRAP (owner v0.2.1 clarification - NOT a coordinate
+## mirror): the head's angle against the wall is preserved and the field
+## translates - exit the top wall at x=80 and you enter the bottom wall at
+## THE SAME x=80, still moving up, so the path is literally the same
+## straight line continued. Pure torus math, no flips anywhere.
 func wrap_point(p: Vector2, board: Rect2) -> Dictionary:
         var out := p
         var portals := 0
-        if out.x < board.position.x:
-                out.x = board.end.x - (board.position.x - out.x)
-                out.y = board.end.y - (out.y - board.position.y)
+        var lx := out.x - board.position.x
+        if lx < 0.0 or lx >= board.size.x:
+                out.x = board.position.x + fposmod(lx, board.size.x)
                 portals += 1
-        elif out.x > board.end.x:
-                out.x = board.position.x + (out.x - board.end.x)
-                out.y = board.end.y - (out.y - board.position.y)
-                portals += 1
-        if out.y < board.position.y:
-                out.y = board.end.y - (board.position.y - out.y)
-                out.x = board.end.x - (out.x - board.position.x)
-                portals += 1
-        elif out.y > board.end.y:
-                out.y = board.position.y + (out.y - board.end.y)
-                out.x = board.end.x - (out.x - board.position.x)
+        var ly := out.y - board.position.y
+        if ly < 0.0 or ly >= board.size.y:
+                out.y = board.position.y + fposmod(ly, board.size.y)
                 portals += 1
         return {"pos": out, "wrapped": portals > 0}
 
 
-## The portal image of a point through the NEAR edges (the mirror map).
-## A body point near the bottom wall is "really" right outside the top wall
-## at the flipped x - collisions and pickups test these copies.
+## The portal image of a point through the NEAR edges (torus translation:
+## a copy of `p` shifted by one field in each near-axis - collisions and
+## pickups test these copies so eating/being-eaten works through walls).
 func portal_images(p: Vector2, board: Rect2) -> Array:
         var out: Array = []
         var m := PORTAL_MARGIN
-        var fx := board.end.x - (p.x - board.position.x)
-        var fy := board.end.y - (p.y - board.position.y)
         if p.x - board.position.x < m:
-                out.append(Vector2(board.end.x + (p.x - board.position.x), fy))
+                out.append(p + Vector2(board.size.x, 0))
         if board.end.x - p.x < m:
-                out.append(Vector2(board.position.x - (board.end.x - p.x), fy))
+                out.append(p - Vector2(board.size.x, 0))
         if p.y - board.position.y < m:
-                out.append(Vector2(fx, board.end.y + (p.y - board.position.y)))
+                out.append(p + Vector2(0, board.size.y))
         if board.end.y - p.y < m:
-                out.append(Vector2(fx, board.position.y - (board.end.y - p.y)))
+                out.append(p - Vector2(0, board.size.y))
         return out
 
 
@@ -354,17 +346,19 @@ func bite_back(hp: Vector2, board: Rect2) -> float:
         return best_d
 
 
-## THE RIBBON STRIPS: one closed polygon per portal-run (left edge -> tail
-## cap -> right edge) with per-vertex gradient colors. `grow` widens (the
-## outline pass). Returns an Array of {pts, cols} - the game paints each
-## strip plus its mirrored wall stubs.
+## THE RIBBON (v0.2.1 REBUILD - the peace flicker fix): the body used to be
+## ONE closed polygon per portal-run, and a snake overlapping ITSELF (peace
+## pass-through, tight coils, the noose) made that polygon SELF-INTERSECT -
+## Godot's triangulation breaks on self-intersection, so the FILL flickered
+## away and left a naked outline. Now the ribbon is a list of CONVEX pieces:
+## a quad per sample step (per-vertex gradient kept) + a joint disc wherever
+## the path bends. Overlap just overpaints - flicker is impossible, and the
+## "one smooth part" look survives (discs are joint fillers, not beads).
 func ribbon(grow := 0.0, col_override := Color(0, 0, 0, 0)) -> Array:
+        var pieces: Array = []
         var pts := body_points()
-        var strips: Array = []
-        if pts.size() < 3:
-                return strips
-        # split the sampled path at portal jumps (consecutive samples farther
-        # apart than MAX_SEG can only be a break)
+        if pts.size() < 2:
+                return pieces
         var runs: Array = []
         var run: Array = [pts[0]]
         for i in range(1, pts.size()):
@@ -375,69 +369,64 @@ func ribbon(grow := 0.0, col_override := Color(0, 0, 0, 0)) -> Array:
                         run.append(pts[i])
         runs.append(run)
         for r in runs:
-                var st := _ribbon_of_run(r, grow, col_override)
-                if not st.is_empty():
-                        strips.append(st)
-        return strips
+                var n: int = r.size()
+                if n < 2:
+                        continue
+                var edges_l := PackedVector2Array()
+                var edges_r := PackedVector2Array()
+                var cols := PackedColorArray()
+                for i in n:
+                        var p: Vector2 = r[i][0]
+                        var d: float = r[i][1]
+                        var a: Vector2 = r[maxi(0, i - 1)][0]
+                        var b: Vector2 = r[mini(n - 1, i + 1)][0]
+                        var tangent := (a - b).normalized()
+                        if tangent == Vector2.ZERO:
+                                tangent = Vector2.from_angle(head_dir)
+                        var nrm := Vector2(-tangent.y, tangent.x)
+                        var rr := half_width(d) + grow
+                        var c := col_override if col_override.a > 0.0 else body_color(d)
+                        edges_l.append(p + nrm * rr)
+                        edges_r.append(p - nrm * rr)
+                        cols.append(c)
+                        # joint disc where the path bends (fills the wedge gap)
+                        if i > 0 and i < n - 1:
+                                var t0 := ((r[i - 1][0] as Vector2) - p).normalized()
+                                var t1 := (p - (r[i + 1][0] as Vector2)).normalized()
+                                if absf(t0.angle_to(t1)) > 0.22:
+                                        pieces.append(_disc_piece(p, rr, c))
+                for i in range(n - 1):
+                        var quad := PackedVector2Array([
+                                edges_l[i], edges_l[i + 1],
+                                edges_r[i + 1], edges_r[i]])
+                        var qc := PackedColorArray([cols[i], cols[i + 1],
+                                        cols[i + 1], cols[i]])
+                        pieces.append({"pts": quad, "cols": qc})
+                # the closed tail cap: a disc at the tip, as fat as the body
+                var tail_d: float = r[n - 1][1]
+                var tc := col_override if col_override.a > 0.0 else body_color(tail_d)
+                pieces.append(_disc_piece(r[n - 1][0],
+                                half_width(tail_d) + grow, tc))
+        return pieces
 
 
-func _ribbon_of_run(pts: Array, grow: float, col_override: Color) -> Dictionary:
-        var n := pts.size()
-        if n < 3:
-                return {}
-        var left := PackedVector2Array()
-        var right := PackedVector2Array()
+func _disc_piece(at: Vector2, rr: float, c: Color) -> Dictionary:
+        var pts := PackedVector2Array()
+        for i in 12:
+                var a := TAU * float(i) / 12.0
+                pts.append(at + Vector2.from_angle(a) * rr)
         var cols := PackedColorArray()
-        var cols_r := PackedColorArray()
-        for i in n:
-                var p: Vector2 = pts[i][0]
-                var d: float = pts[i][1]
-                var a: Vector2 = pts[maxi(0, i - 1)][0]
-                var b: Vector2 = pts[mini(n - 1, i + 1)][0]
-                var tangent := (a - b).normalized()
-                if tangent == Vector2.ZERO:
-                        tangent = Vector2.from_angle(head_dir)
-                var nrm := Vector2(-tangent.y, tangent.x)
-                var r := half_width(d) + grow
-                var c := col_override if col_override.a > 0.0 else body_color(d)
-                left.append(p + nrm * r)
-                right.append(p - nrm * r)
+        for i in 12:
                 cols.append(c)
-                cols_r.append(c)
-        # tail cap: a rounded arc around the tip tangent - the body ends CLOSED
-        var tail_p: Vector2 = pts[n - 1][0]
-        var tail_d: float = pts[n - 1][1]
-        var a2: Vector2 = pts[n - 2][0]
-        var tangent2 := (tail_p - a2).normalized()
-        if tangent2 == Vector2.ZERO:
-                tangent2 = Vector2.from_angle(head_dir)
-        var nrm2 := Vector2(-tangent2.y, tangent2.x)
-        var r2 := half_width(tail_d) + grow
-        var cap := PackedVector2Array()
-        var cap_cols := PackedColorArray()
-        var base_a := nrm2.angle()
-        for i in range(1, 7):
-                var ang := base_a + PI * float(i) / 7.0
-                cap.append(tail_p + Vector2.from_angle(ang) * r2)
-                cap_cols.append(col_override if col_override.a > 0.0 else body_color(tail_d))
-        var poly := PackedVector2Array()
-        var pc := PackedColorArray()
-        for i in left.size():
-                poly.append(left[i])
-                pc.append(cols[i])
-        for i in cap.size():
-                poly.append(cap[i])
-                pc.append(cap_cols[i])
-        for i in range(right.size() - 1, -1, -1):
-                poly.append(right[i])
-                pc.append(cols_r[i])
-        return {"pts": poly, "cols": pc}
+        return {"pts": pts, "cols": cols}
 
 
-## Wall continuation runs for the MIRROR portals (v0.2.0): sample runs whose
-## head-side or tail-side end sits near a wall, mapped through that wall's
-## mirror - these paint OUTSIDE the wall so the tail visibly follows the
-## head through (the see-through trick the owner asked for).
+## Wall continuation runs for the portals (v0.2.1, torus): for every run
+## that ENDS AT a break, the samples past the wall are this run's own end
+## samples TRANSLATED by the cell offset to the neighboring run - exactly
+## where the path continues. No wall detection, no phantom stubs (the old
+## near-wall stubs flickered lines across the field - dead). Returns runs
+## of [pos, d] ready for stub_ribbon.
 const STUB_PX := 64.0
 
 func wall_stubs(board: Rect2) -> Array:
@@ -455,24 +444,34 @@ func wall_stubs(board: Rect2) -> Array:
                 else:
                         run.append(pts[i])
         runs.append(run)
-        for r in runs:
+        for k in runs.size():
+                var r: Array = runs[k]
                 if r.size() < 2:
                         continue
-                for at_end in [false, true]:
-                        var tip: Vector2 = (r[r.size() - 1] if at_end else r[0])[0]
-                        var img := mirror_point(tip, board)
-                        if tip.distance_to(img) < 1.0:
-                                continue   # not near any wall
-                        # collect up to 6 samples from that end, mirrored
-                        var mapped: Array = []
-                        var n := mini(6, r.size())
-                        for k in n:
-                                var idx: int = r.size() - 1 - k if at_end else k
-                                var info: Array = r[idx]
-                                mapped.append([mirror_point(info[0], board), info[1]])
-                        if not at_end:
+                # the head-side end continues into run k-1 (older path, across a wall)
+                if k > 0:
+                        var prev: Array = runs[k - 1]
+                        var off: Vector2 = (prev[prev.size() - 1][0] as Vector2) \
+                                        - (r[0][0] as Vector2)
+                        if off.length() > MAX_SEG:   # only real portal offsets
+                                var mapped: Array = []
+                                for kk in mini(6, r.size()):
+                                        var info: Array = r[kk]
+                                        mapped.append([(info[0] as Vector2) + off, info[1]])
                                 mapped.reverse()
-                        out.append(mapped)
+                                out.append(mapped)
+                # the tail-side end continues into run k+1
+                if k < runs.size() - 1:
+                        var next: Array = runs[k + 1]
+                        var off2: Vector2 = (next[0][0] as Vector2) \
+                                        - (r[r.size() - 1][0] as Vector2)
+                        if off2.length() > MAX_SEG:
+                                var mapped2: Array = []
+                                var n := mini(6, r.size())
+                                for kk in n:
+                                        var info2: Array = r[r.size() - 1 - kk]
+                                        mapped2.append([(info2[0] as Vector2) + off2, info2[1]])
+                                out.append(mapped2)
         return out
 
 
@@ -483,29 +482,25 @@ func _brk_any() -> bool:
         return false
 
 
-## Map a near-wall point through ITS nearest wall's mirror (the same map
-## wrap_point applies at the crossing).
+## Translate a near-wall point one field over through its nearest wall
+## (the torus continuation of the path).
 func mirror_point(p: Vector2, board: Rect2) -> Vector2:
         if p.y - board.position.y < STUB_PX:
-                return Vector2(board.end.x - (p.x - board.position.x),
-                                board.end.y + (p.y - board.position.y))
+                return p + Vector2(0, board.size.y)
         if board.end.y - p.y < STUB_PX:
-                return Vector2(board.end.x - (p.x - board.position.x),
-                                board.position.y - (board.end.y - p.y))
+                return p - Vector2(0, board.size.y)
         if p.x - board.position.x < STUB_PX:
-                return Vector2(board.end.x + (p.x - board.position.x),
-                                board.end.y - (p.y - board.position.y))
+                return p + Vector2(board.size.x, 0)
         if board.end.x - p.x < STUB_PX:
-                return Vector2(board.position.x - (board.end.x - p.x),
-                                board.end.y - (p.y - board.position.y))
+                return p - Vector2(board.size.x, 0)
         return p
 
 
-## Build a small ribbon polygon for a mirrored stub run (same vertex
-## scheme as _ribbon_of_run - widths and gradient colors ride along).
-func stub_ribbon(run: Array) -> Dictionary:
+## Build ribbon pieces for a translated stub run (convex pieces like the
+## body - the stub overlaps the wall line cleanly).
+func stub_ribbon(run: Array) -> Array:
         if run.size() < 3:
-                return {}
+                return []
         # pad the tip so the stub has body on both sides of the wall line
         var padded := run.duplicate()
         var tip: Array = run[run.size() - 1]
@@ -513,9 +508,44 @@ func stub_ribbon(run: Array) -> Dictionary:
         var tan := ((tip[0] as Vector2) - (pre[0] as Vector2)).normalized()
         if tan == Vector2.ZERO:
                 tan = Vector2.from_angle(head_dir)
-        var ext: Array = [(tip[0] as Vector2) + tan * SAMPLE_STEP, tip[1]]
-        padded.append(ext)
-        return _ribbon_of_run(padded, 0.0, Color(0, 0, 0, 0))
+        padded.append([(tip[0] as Vector2) + tan * SAMPLE_STEP, tip[1]])
+        return _pieces_of_run(padded, 0.0, Color(0, 0, 0, 0))
+
+
+## The piece builder for arbitrary sample runs (the stubs): quads + joint
+## discs, same language as ribbon().
+func _pieces_of_run(r: Array, grow: float, col_override: Color) -> Array:
+        var pieces: Array = []
+        var n := r.size()
+        if n < 2:
+                return pieces
+        var edges_l := PackedVector2Array()
+        var edges_r := PackedVector2Array()
+        var cols := PackedColorArray()
+        for i in n:
+                var p: Vector2 = r[i][0]
+                var d: float = r[i][1]
+                var a: Vector2 = r[maxi(0, i - 1)][0]
+                var b: Vector2 = r[mini(n - 1, i + 1)][0]
+                var tangent := (a - b).normalized()
+                if tangent == Vector2.ZERO:
+                        tangent = Vector2.from_angle(head_dir)
+                var nrm := Vector2(-tangent.y, tangent.x)
+                var rr := half_width(d) + grow
+                var c := col_override if col_override.a > 0.0 else body_color(d)
+                edges_l.append(p + nrm * rr)
+                edges_r.append(p - nrm * rr)
+                cols.append(c)
+        for i in range(n - 1):
+                var quad := PackedVector2Array([
+                        edges_l[i], edges_l[i + 1], edges_r[i + 1], edges_r[i]])
+                var qc := PackedColorArray([cols[i], cols[i + 1],
+                                cols[i + 1], cols[i]])
+                pieces.append({"pts": quad, "cols": qc})
+        var tail_d: float = r[n - 1][1]
+        var tc := col_override if col_override.a > 0.0 else body_color(tail_d)
+        pieces.append(_disc_piece(r[n - 1][0], half_width(tail_d) + grow, tc))
+        return pieces
 
 
 ## Total half width at the head (the head disc radius).

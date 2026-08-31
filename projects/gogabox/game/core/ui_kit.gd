@@ -188,7 +188,7 @@ static func _battery_level(count: int, cap: int) -> float:
         return clampf(float(count) / float(cap), 0.0, 1.0)
 
 static func coin_chip() -> PanelContainer:
-        return chip(str(Box.coins()), "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 28, COIN)
+        return chip(Box.coins_display(), "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 28, COIN)
 
 ## THE score-bonus ratio, in ONE place (owner rule: "show the score bonus
 ## ratio so users who are interested to know, know"). Every screen that

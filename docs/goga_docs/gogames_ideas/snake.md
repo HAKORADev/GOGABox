@@ -309,3 +309,44 @@ and a pile of design notes - all in. What shipped and WHY:
   overflow and the v1 banana pre-build (the owner was right about looking at
   your own art).
 - Version 0.2.0, base 30290 (arm32 30291, arm64 30292).
+
+## 2026-09-01 — v0.2.1 THE STRAIGHT LINE (the second verdict, all in)
+
+- THE WRAP, finally right (his clarification): torus TRANSLATION - the
+  head's angle vs the wall is preserved, exit at 80 -> enter at 80, the
+  path is one straight line continued. The v0.2.0 "mirror" was a
+  misunderstanding; the probe now proves the heading survives EXACTLY and
+  the successive-entry constant-delta law holds. The phantom flicker lines
+  near walls died with the translated-break stubs (stubs only ever attach
+  to real portal breaks now).
+- THE COLLAPSE BUG was a stale `_bp_dirty` cache: length shrank while the
+  paint served the frozen sample array - the thin frozen ribbon + the
+  wandering sliver, exactly what he saw. Collapse re-dirties every frame
+  and FOLDS THE WIDTH into the head; dying enemies do the same and clear
+  their dying flag so corpses vanish.
+- THE PEACE FLICKER was deeper: the ribbon was ONE self-intersecting
+  polygon and Godot's triangulation breaks on self-overlap - the fill
+  vanished (reproduced on camera: a naked outline "C"). The ribbon is
+  convex pieces now: a quad per sample step + joint discs on bends + a
+  closed tip disc. The probe coils a 700px snake and asserts every piece
+  stays opaque.
+- The tail is closed BY CONSTRUCTION (tip disc), banana re-centered with
+  per-fruit HIT circles + shadows (SnakeFruits.HIT, data-driven), eater
+  bites rain motes along the removed arc (THE CUT), the field uses the
+  FULL resolution (letterbox dead), the shop is wider (560), optionals
+  labels fit themselves (the menu-title trick), the milk place is BACK as
+  the default CLASSIC (day 150 / night 250; unowned migrates home), and
+  the place cycle skips locked gardens to reach owned ones.
+- BOX: locked non-mystery games wear FINAL thumbnails (hen/spud/maze/
+  matcher/keys/poptd crafted as scene art - mysteries stay black boxes),
+  and the top-picks card is smaller (252x186) so the covered art keeps its
+  top (the apple survives the crop; verified on the owner-resolution
+  screenshot).
+- MORE: the snake thumbnail is now the programmatic V1 "siege" scene (the
+  owner's literal spec: 3 enemies + the user snake, each at a side, one
+  apple; V2 chase and V3 close-up live in tools/v021_thumbs.py for
+  re-runs), the ? guide was rewritten for the v0.2.1 mechanics, and the
+  DEV CHEATS sheet (five taps on the wordmark) ships: owned / all_owned /
+  gogacoins (UI shows the plain 0, the logic reads EXTREME, the real
+  wallet is never touched) / battery (10K) - ALL default 0 and OFF, plus
+  the games index. Version 0.2.1, base 30300 (arm32 30301, arm64 30302).

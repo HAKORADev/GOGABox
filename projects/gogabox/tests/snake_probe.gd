@@ -14,7 +14,7 @@ extends Node
 var fails := 0
 
 func _ready() -> void:
-        print("=== GOGABox snake probe (v0.2.0 mirror world) ===")
+        print("=== GOGABox snake probe (v0.2.1 straight-line world) ===")
         await _run()
         print("=== snake probe %s ===" % ("PASS" if fails == 0 else "FAIL"))
         get_tree().quit(1 if fails > 0 else 0)
@@ -53,19 +53,41 @@ func _run() -> void:
         _check(game.enemies.is_empty() and game.bugs.is_empty()
                         and game.obstacles.is_empty(), "no war exists before the run")
 
-        # ---- the MIRROR wrap math (owner: 80 from 0-100 -> 20 on the other side)
+        # ---- the STRAIGHT-LINE wrap (owner v0.2.1: exit at 80 -> enter at
+        # 80, same heading - the path is one line continued; NO mirroring)
         var sb0 := SnakeBody.new()
         var b1 := Rect2(0, 0, 1000, 1000)
         var w1: Dictionary = sb0.wrap_point(Vector2(800.0, -10.0), b1)
-        _check(absf(w1["pos"].x - 200.0) < 0.001
+        _check(absf(w1["pos"].x - 800.0) < 0.001
                         and absf(w1["pos"].y - 990.0) < 0.001,
-                        "top exit at x=800 enters the bottom at x=200 (mirror)")
+                        "top exit at x=800 enters the bottom at THE SAME x=800")
         var w2: Dictionary = sb0.wrap_point(Vector2(1010.0, 300.0), b1)
         _check(absf(w2["pos"].x - 10.0) < 0.001
-                        and absf(w2["pos"].y - 700.0) < 0.001,
-                        "right exit at y=300 enters the left at y=700 (mirror)")
+                        and absf(w2["pos"].y - 300.0) < 0.001,
+                        "right exit at y=300 enters the left at THE SAME y=300")
         var w4: Dictionary = sb0.wrap_point(Vector2(500.0, 500.0), b1)
         _check(not bool(w4["wrapped"]), "the middle of the field never wraps")
+        # the angle vs the wall is PRESERVED: a 30-degree line stays 30 degrees
+        var wb := SnakeBody.new()
+        wb.setup(Vector2(500.0, 500.0), -PI / 6.0, Color.BLUE, Color.WHITE)
+        wb.len_target = 200.0
+        wb.length_px = 200.0
+        wb.speed = 400.0
+        var slope_before := 0.0
+        var slope_after := 0.0
+        var saw_break := false
+        var prev := wb.head_pos
+        for i in 240:
+                wb.advance(1.0 / 60.0, b1, true)
+                if bool(wb.trail_brk[wb.trail_brk.size() - 1]):
+                        saw_break = true
+                        slope_before = (prev - wb.trail[wb.trail.size() - 3]).angle()
+                elif saw_break and slope_after == 0.0:
+                        slope_after = (wb.head_pos - prev).angle()
+                prev = wb.head_pos
+        _check(saw_break, "a crossing happened")
+        _check(absf(wrapf(slope_after - slope_before, -PI, PI)) < 0.05,
+                        "the heading survives the wall EXACTLY (degree math)")
 
         # ---- same position picked = no reload; straight to the mode menu ----
         game._show_mode_select()
@@ -122,6 +144,7 @@ func _run() -> void:
         var brk_synced := false
         var strips_at := 1
         var wrap_frame := -1
+        var _entry_y := -1.0
         for i in 60 * 12:
                 var adv: Dictionary = p.advance(1.0 / 60.0, b2, true)
                 if bool(adv["wrapped"]):
@@ -136,14 +159,40 @@ func _run() -> void:
                 if wrap_frame >= 0 and i == wrap_frame + 12:
                         # the head-side strip needs samples before it can ribbon
                         strips_at = p.ribbon().size()
-                if bool(adv["wrapped"]) and p.head_pos.x < 40.0 \
-                                and absf(p.head_pos.y - 785.0) > 16.0:
-                        side_entry_ok = false
+                # torus drift law: successive left-wall entries differ by
+                # EXACTLY -W*tan(30 deg) (mod H) = -577.4 - a drifting line
+                # breaks this constant step (the owner's 10-20-30 bug)
+                if bool(adv["wrapped"]) and p.head_pos.x < 40.0:
+                        if _entry_y > 0.0 and absf(wrapf(
+                                        p.head_pos.y - _entry_y + 577.4,
+                                        -500.0, 500.0)) > 14.0:
+                                side_entry_ok = false
+                        _entry_y = p.head_pos.y
         _check(crossings >= 3, "a 30-degree line repeats its crossings (%d)" % crossings)
         _check(side_entry_ok, "the crossing line does NOT drift (the loop bug is dead)")
         _check(brk_found, "wrap breaks are recorded at the crossing")
         _check(brk_synced, "break bookkeeping stays in sync with the trail")
         _check(strips_at >= 2, "the ribbon paints as strips through a wall (%d)" % strips_at)
+        # the ribbon is CONVEX PIECES now (quads + joint discs) - a coiled
+        # snake keeps its fill (the old single polygon flickered itself away)
+        var coil := SnakeBody.new()
+        coil.setup(Vector2(500.0, 500.0), 0.0, Color.BLUE, Color.WHITE)
+        coil.len_target = 700.0
+        coil.length_px = 700.0
+        coil.speed = 300.0
+        for i in 200:
+                coil.head_dir += 0.085
+                coil.advance(1.0 / 60.0, b2, false)
+        var pieces: Array = coil.ribbon()
+        _check(pieces.size() > 40, "a coiled body renders as convex pieces (%d)"
+                        % pieces.size())
+        var filled := 0
+        for pc in pieces:
+                var cc: Color = (pc["cols"] as PackedColorArray)[0]
+                if cc.a > 0.9:
+                        filled += 1
+        _check(filled > pieces.size() - 3,
+                "every piece stays opaque under self-overlap (no flicker)")
 
         # ---- self-bite is REAL again (straight wrap made it impossible) ----
         var sb := SnakeBody.new()
