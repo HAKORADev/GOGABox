@@ -234,6 +234,15 @@ the fix rides the same version (rebuild, re-push, say so in the commit).
 Any other jump (+0.1.2, skipping, vibes) is refused on sight — the answer
 is literally "fuck you" (owner's own rule, his words, he will laugh).
 
+**Price display (GOGABox design rule, owner-locked v0.1.9)** — ANYTHING that
+costs GOGACoins shows the GOGACoin icon next to its price, everywhere
+(shop rows, unlock buttons, tiles, hints). Never print a naked number —
+"120" means nothing; games may carry their own currencies someday, so the
+coin icon is what says "this price is GOGACoins". Companion rule:
+unaffordable items are GRAYED OUT (disabled, dead to taps) — a dry wallet
+must never "buy" something it cannot pay for (error-sfx-only buying is a
+bug, not a design).
+
 **Release** — bump version → push → CI green → Actions → **build-android →
 Run workflow** → pick project + `create_release: true` → tag `v<version_name>`
 gets both APKs. Re-running the same version clobbers the previous assets.

@@ -141,3 +141,77 @@ Everything in the 04:20 entry is now real, plus what building it taught:
   locked frequencies so the waveform itself is seam-continuous), starts
   with the run, dies with the run. Eat/die/start SFX synthesized in
   tools/snake_audio.py (re-runnable).
+
+---
+
+## 2026-08-31 — v0.1.9 "the snake goes to war" (the owner played v0.1.8)
+
+The owner tested and the verdict came in one long voice-note of a message.
+Fixes first, additions second, "work slowly, no skipping, no weak designs".
+
+**What he saw (the fixes):**
+- The snake starts TOO FAST - "a little slower than that".
+- The body is "connected circles" - it must be ONE PART, no other objects,
+  no weird circles, "like... too smooth!". The beaded look dies.
+- The controls are broken-ish: tap-left/right-halves is not what he wants.
+  He wants HOLDING and MOVING the finger like an invisible analog gamepad
+  wheel. CRITICAL: the wheel controls the HEAD in absolute screen space -
+  "left when the head is upside down stays left", never relative steering.
+  Must handle vertical AND horizontal accurately.
+- Eat particles were blue; they belong to the thing being eaten (apple=red).
+- Before "tap anywhere to start": ASK the play mode - vertical or horizontal,
+  with assets showing the phone position. NOT auto-sensed - the choice
+  overwrites the auto. (Future-proofing: position-specific ways to play.)
+
+**What he wants added (the war):**
+- Mode menu AFTER the position menu: NO-WALLS (edge-to-edge wrap) plus
+  classic. And inside the mode menu, a left-right scrollable area of
+  boxes called the OPTIONALS: enemy / power-ups / bugs / obstacles / fruits.
+- Study HIS snake games first (HAKORADev/Python_Game_Box_PGB): the python
+  snake (grid, A*, temp obstacles) and the Snake3D web game he spent a week
+  on - THAT one carries the super powers system, and "bugs hit you without
+  dying" is confirmed in its constants (BUG_PENALTY_LENGTH/SCORE, no death).
+  Its power spread (20% chance, weighted types, 10s board expiry, 25s
+  speed/slow, black apple = -5 length) is the design baseline.
+- GREEN enemy snake with real AI: it eats apples AND coins; coins weigh
+  more than apples (two apples = one coin, each coin = one) but score
+  power-ups make apples profitable again. When it gets BIG it tries to
+  WRAP ITSELF AROUND the player's snake to end him. Enemy death is
+  permanent for the round; the game only ends when the USER dies.
+- Shop becomes scrollable with labeled sections: skins, fruits, power-ups,
+  bugs, obstacles, enemies. Prices wear the GOGACoin icon; unaffordable
+  items gray out. (Design law -> AGENTS.md: ANY price gets the coin icon,
+  because games may have their own currencies someday.)
+- Fruits = customization for the edible thing (banana, cherry, orange,
+  grapes, strawberry, pear, lemon, peach, watermelon, pineapple); owned
+  fruits feed an optionals selector (one / specific / all - randomized).
+- Power-ups AND power-downs live in special fruits with auras; never the
+  same spawn-randomness, spawn-time, or activation time. SLOWER, FASTER,
+  GHOST, MAGNET (coins come to you from further), SNAKE-EATER (bite snakes
+  from their TAILS ONLY - shorter them, bigger you; needs the enemies
+  pack), WITHER (the power-down: fruits REDUCE length while cursed).
+- ENEMIES PACK: up to 10 enemies at once, each a different color, THE most
+  expensive thing in the shop.
+- HUD: power icon + timer, enemy score. SFX: eating tails, power-ups,
+  power-downs.
+
+**Design decisions recorded (mine, from his words):**
+- The analog wheel = touch anywhere, that point is the wheel center, the
+  drag vector's angle is the head's target heading (absolute), rotate at
+  a capped rate, release keeps the heading. Deadzone 12px so resting
+  fingers don't jitter the head.
+- The one-part body = a single ribbon polygon: the trail is resampled at
+  fine arc steps, smoothed, and extruded into a closed polygon with
+  per-vertex half-width (taper to a fine tail) and per-vertex gradient
+  color (the blue->melt rule stays). draw_polygon paints it in ONE call.
+  A slightly larger darkened outline polygon under it keeps the pop.
+- The orientation choice letterboxes the FIELD: vertical = ~9:16 field
+  centered, horizontal = ~16:9 field centered, whatever the device is
+  doing. The choice overwrites the v0.1.8 auto-sense every load.
+- AI value function: value/target-distance with coin=1.0, apple=0.5,
+  apple=x1.5 while golden/score-boost is live; obstacle probing ahead;
+  wrap-aware pathing in no-walls; encircle = orbit the player's head and
+  tighten when enemy_len >= 2x player_len.
+- Powers apply to the AI too (symmetry), and each power re-writes part of
+  the AI's behavior table (the owner: "make a proper design that modifies
+  the AI system for each different power-up").
