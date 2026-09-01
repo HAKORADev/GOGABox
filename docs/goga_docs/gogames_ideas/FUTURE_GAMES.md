@@ -51,6 +51,10 @@ changes....yet!" (that "yet" is doing some heavy lifting). +4: KDE
 KSquares-like, the big-fish-eats-small-fish swimmer, the Subway-Surfers 3D
 run, and a 2D mid-traffic drifter with real drifts and turns.
 
+Eighth dump - minutes after the seventh, same review round, same rule (no
+game code touched): +1, the angry-birds-like. The owner keeps testing Space
+Dash, keeps thinking, and will name the next game when ready.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -141,6 +145,9 @@ run, and a 2D mid-traffic drifter with real drifts and turns.
   mouse through trap mazes — plan the path, spring the hazards.
 - **match-3 fighter** — Mao Mao / Slugterra 2 type: match-3 IS the combat —
   matched gems power the attacks.
+- **angry-birds-like** - the slingshot destroyer: pull back, aim the arc,
+  release, and bring the whole tower down on the pigs - each bird its own
+  trick, wood/glass/stone each breaking its own way.
 
 ## Platformers & rage climbs
 - **party-dash-like** — Cartoon Network's Party Dash energy: an endless
