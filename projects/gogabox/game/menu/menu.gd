@@ -50,6 +50,14 @@ var _battery_last := -1          # chip rebuilds only when the count changes
 var _toast: Dictionary
 var _sheet_open := false
 var _trophies_open := false
+# v0.2.3 patch THE PAIR LAW: a sheet is EXACTLY the dim + center pair its
+# _sheet_base appended to _root (Arc.sheet adds two SIBLINGS). "Free the
+# last 2 children of _root" only works while a sheet is actually up - with
+# none up, those two were the FEED MARGIN and the TOAST OVERLAY. That is
+# the real crash behind every dev-cheat toggle (the sheet's own re-open
+# called _close_sheet unconditionally, nuked the menu content + toast, and
+# the next tick/toggle/free walked into freed instances).
+var _sheet_pair: Array = []
 var _last_wide := false
 ## The launch router (main.gd). GameHost.launch MUST get this, not `self` -
 ## passing the menu was v0.0.4's big-L bug: on_game_entered lives on main.
@@ -684,7 +692,12 @@ func _strip_card(g: Dictionary, stat_txt: String) -> Control:
         stat_l.position = Vector2(14, 160)
         stat_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         b.add_child(stat_l)
-        _feed_scroll.register_tappable(b, func():
+        # v0.2.3 patch: the card lives INSIDE the nested strip scroll - the
+        # STRIP owns the touch and must dispatch the tap. Registered on the
+        # outer feed it could never fire: the strip saw the release first and
+        # marked the event handled (the dead pre-play tap the owner caught -
+        # "when i tap a game it does not show its pre-play menu")
+        _strip_scroll.register_tappable(b, func():
                 Jukebox.sfx("click", -4.0)
                 if Roadmap.state(String(g["id"])) == "OWNED":
                         _open_game_page(g)
@@ -1218,9 +1231,7 @@ func _draw_fx() -> void:
 func _open_quit_confirm() -> void:
         if _sheet_open or _trophies_open:
                 return
-        _sheet_open = true
-        _set_feed_lock(true)
-        var vb := Arc.sheet(_root)
+        var vb := _sheet_base()
         var t := Arc.label("LEAVE GOGABOX?", 40, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
@@ -1561,11 +1572,20 @@ func _set_feed_lock(locked: bool) -> void:
                 _strip_scroll.input_locked = locked
 
 ## ---- DEV CHEATS (owner-only) ---- five taps on the wordmark. Everything
-## defaults to 0 = defaults; nothing is toggled on unless the owner does it.
+## defaults to 0 = off; nothing is toggled on unless the owner does it.
+## v0.2.3 patch: the CODE switch arms the knock - 0 and the five taps do
+## NOTHING (the owner's lock for when the box leaves his hands).
 var _dev_taps := 0
 var _dev_tap_ms := 0
+# v0.2.3 patch: a flip only NOTES itself on its row - the box feed reloads
+# the moment the sheet closes (the owner: "make it just note the changes and
+# then reload the box after the settings without crashing")
+var _dev_dirty := false
 
 func _dev_tap() -> void:
+        # the CODE law: the knock is ARMED only while the switch is 1
+        if Box.dev_cheat("code") != 1:
+                return
         var now := Time.get_ticks_msec()
         if now - _dev_tap_ms > 2200:
                 _dev_taps = 0
@@ -1576,6 +1596,34 @@ func _dev_tap() -> void:
                 Jukebox.sfx("confirm", -4.0)
                 _open_dev_sheet()
 
+## One switch row. A flip NEVER rebuilds the sheet (the rebuild-inside-a-tap
+## is what crashed the owner's build after every option toggle) - the row
+## rewrites its own label + repaints itself, and the dirty flag reloads the
+## box on close.
+func _dev_switch_row(scroll: BoxScroll, n: String) -> Button:
+        # built in two steps ON PURPOSE: the flip lambda reads the button
+        # itself (self-noting row), and a lambda can never reference the var
+        # its own Arc.button(...) initializer is still declaring
+        var b := Arc.button("%s  =  %d" % [n.to_upper(), Box.dev_cheat(n)],
+                        Vector2(560, 64), 22,
+                        Arc.GOOD if Box.dev_cheat(n) == 1
+                                        else Color(0.45, 0.42, 0.38))
+        b.pressed.connect(func():
+                var nv := 1 - Box.dev_cheat(n)
+                Box.dev_set_cheat(n, nv)
+                b.text = "%s  =  %d" % [n.to_upper(), nv]
+                Arc.repaint_button(b, Arc.GOOD if nv == 1
+                                else Color(0.45, 0.42, 0.38))
+                _dev_dirty = true
+                var msg := "noted - the box reloads on close"
+                if n == "code":
+                        msg = "CODE %d - the 5-tap knock %s" % [nv,
+                                        "armed" if nv == 1 else "DEAD"]
+                Arc.toast(_toast, msg))
+        scroll.register_tappable(b, Arc._tap_emitter(b))
+        b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        return b
+
 func _open_dev_sheet() -> void:
         _close_sheet()
         var h := _sheet_height()
@@ -1583,8 +1631,8 @@ func _open_dev_sheet() -> void:
         var t := Arc.label("DEV CHEATS", 40, Arc.HOT)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
-        var sub := Arc.label("owner only - 0 = defaults, 1 = on", 18,
-                Color("8a6a40"), false)
+        var sub := Arc.label("owner only - 0 = off, 1 = on - the box reloads" \
+                        + " on close", 18, Color("8a6a40"), false)
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(sub)
         var scroll := BoxScroll.new()
@@ -1595,66 +1643,14 @@ func _open_dev_sheet() -> void:
         v.add_theme_constant_override("separation", 10)
         v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(v)
-        # the four switches
+        # the switches (v0.2.3 patch: the "owned" switch is GONE - the owner:
+        # "removing it and keeping all owned is much better anyway"; the GAME
+        # OPTIONALS section is gone too - "i can buy using the infinite
+        # money". What stays: all_owned, the EXTREME wallet, the full
+        # batteries, and CODE - the knock's arm switch.)
         v.add_child(Arc.label("SWITCHES", 24, Arc.HOT))
         for name in Box.DEV_CHEATS:
-                var n: String = name
-                var on: int = Box.dev_cheat(n)
-                var b := Arc.button("%s  =  %d" % [n.to_upper(), on],
-                                Vector2(560, 64), 22,
-                                Arc.GOOD if on == 1 else Color(0.45, 0.42, 0.38),
-                                func():
-                                        Box.dev_set_cheat(n,
-                                                        1 - Box.dev_cheat(n))
-                                        _open_dev_sheet())
-                scroll.register_tappable(b, Arc._tap_emitter(b))
-                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                v.add_child(b)
-        # v0.2.3 patch: the GAME OPTIONALS - both games' own feature switches
-        # (plus the war styles), flip-able right here. A row flipping ON also
-        # grants its shop unlock FOR REAL so the toggle can actually bite;
-        # RESET OPTIONALS returns every flip and un-does exactly the grants.
-        v.add_child(Arc.label("GAME OPTIONALS", 24, Arc.HOT))
-        var sweep := HBoxContainer.new()
-        sweep.add_theme_constant_override("separation", 10)
-        v.add_child(sweep)
-        for pair in [["ALL ON", true], ["ALL OFF", false], ["RESET", null]]:
-                var on: Variant = pair[1]
-                var sb := Arc.button(str(pair[0]), Vector2(180, 56), 19,
-                                Arc.GOOD if on == true else
-                                Color(0.45, 0.42, 0.38) if on == false else Arc.BAD,
-                                func():
-                                        if on == null:
-                                                Box.dev_reset_optionals()
-                                        else:
-                                                Box.dev_all_optionals(bool(on))
-                                        _open_dev_sheet())
-                scroll.register_tappable(sb, Arc._tap_emitter(sb))
-                sb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                sweep.add_child(sb)
-        for rc in Box.DEV_OPTIONALS:
-                var row_cfg: Dictionary = rc
-                var cur: Variant = Box.dev_optional_value(row_cfg)
-                var val: String
-                var hot: bool
-                if row_cfg.has("cycle"):
-                        # str(), NEVER String(): a cycle value can be an int
-                        # (the enemy pack size) and String(int) is an invalid
-                        # constructor call in Godot 4 - it aborts the sheet
-                        val = str(cur).to_upper()
-                        hot = str(cur) != str(row_cfg.get("def"))
-                else:
-                        hot = bool(cur)
-                        val = "ON" if hot else "OFF"
-                var rb := Arc.button("%s  =  %s" % [str(row_cfg["label"]), val],
-                                Vector2(560, 56), 19,
-                                Arc.GOOD if hot else Color(0.45, 0.42, 0.38),
-                                func():
-                                        Box.dev_flip_optional(row_cfg)
-                                        _open_dev_sheet())
-                scroll.register_tappable(rb, Arc._tap_emitter(rb))
-                rb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                v.add_child(rb)
+                v.add_child(_dev_switch_row(scroll, String(name)))
         # the games index
         v.add_child(Arc.label("GAMES INDEX", 24, Arc.HOT))
         for g in GameReg.GAMES:
@@ -1669,26 +1665,50 @@ func _open_dev_sheet() -> void:
                 row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 row.custom_minimum_size = Vector2(560, 0)
                 v.add_child(row)
-        var note := Arc.label("switches overwrite the save ONLY while on. optionals flips are REAL settings - RESET returns them to defaults and removes the granted unlocks (real coin purchases survive)", 16,
+        var note := Arc.label("switches overwrite the save ONLY while on. a flip is noted on its row - closing this sheet (DONE or back) reloads the box feed. RESTART BOX reboots the whole box", 16,
                 Color("8a6a40"), false)
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         note.custom_minimum_size = Vector2(560, 0)
         v.add_child(note)
+        # the pinned actions: DONE applies + closes, RESTART BOX reboots all
+        var acts := HBoxContainer.new()
+        acts.add_theme_constant_override("separation", 10)
+        acts.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_child(acts)
+        acts.add_child(Arc.button("DONE", Vector2(270, 74), 24, Arc.GOOD,
+                        func(): _close_sheet()))
+        acts.add_child(Arc.button("RESTART BOX", Vector2(270, 74), 22, Arc.BAD,
+                        func():
+                                Jukebox.sfx("confirm", -4.0)
+                                Box.save()
+                                _close_sheet()
+                                get_tree().call_deferred(
+                                                "reload_current_scene")))
 
 func _sheet_base(h := 0.0) -> VBoxContainer:
         _sheet_open = true
         _set_feed_lock(true)
         var vb := Arc.sheet(_root, h)
+        var kids := _root.get_children()
+        _sheet_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
         return vb
 
 func _close_sheet() -> void:
         _sheet_open = false
         _trophies_open = false
         _set_feed_lock(false)
-        # Arc.sheet() appended exactly 2 controls (dim + center) at the end
-        var kids := _root.get_children()
-        for i in range(maxi(0, kids.size() - 2), kids.size()):
-                kids[i].queue_free()
+        # free EXACTLY the pair this sheet appended (see _sheet_pair) -
+        # never "the last children of _root"
+        for n in _sheet_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _sheet_pair = []
+        # v0.2.3 patch THE APPLY LAW: the dev flips only NOTED themselves -
+        # closing the sheet is what applies them to the feed (owned tiles,
+        # wallet, battery chips), with no rebuild inside any tap callback
+        if _dev_dirty:
+                _dev_dirty = false
+                _refresh()
 
 func _sheet_height(default_h := 880.0) -> float:
         return clampf(_root.size.y * 0.88, 480.0, default_h)

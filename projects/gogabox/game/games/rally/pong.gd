@@ -47,7 +47,13 @@ const PU_MAX_T := 18.0
 const PU_R := 22.0
 const SCORE_PER_COIN := 3        # every 3 points = one bonus coin
 const AI_SPEED := 430.0          # the main rival
-const AI_SPEED_EXTRA := 356.0    # the extra walls hunt slower
+# v0.2.3 patch (owner: "the more enemies platforms are slower while they
+# have the widest walls, make them faster and more smarter"): the extra
+# walls now hunt FASTER than the main rival. Their guard is small, so
+# speed IS their game - and it is the owner's own prescribed fix for their
+# short land of view (AI_VISION is a fraction of the field depth, so the
+# small-wall pads get a short absolute read; quick feet cover it).
+const AI_SPEED_EXTRA := 500.0
 const AI_THINK := 0.13           # reaction lag (not stupid, not a wall)
 const AI_VISION := 0.42          # owner v0.2.3: the AI only READS the ball
                                  # inside this fraction of the field depth
@@ -332,6 +338,14 @@ func _options_strip() -> Control:
                                         Box.set_progress(game_id,
                                                 "opt_" + String(cfg["key"]),
                                                 not _opt_on(cfg["key"]))
+                                        # v0.2.3 patch OWNER CALL: a toggle
+                                        # lands THE SECOND you tap it - the
+                                        # world rebuilds here, never "next
+                                        # boot". The other options already
+                                        # obey: the powerup pool reads size/
+                                        # speed live, the sparkles read live,
+                                        # and START below rebuilds once more.
+                                        _rebuild_for_orientation()
                                         _show_options())
                 else:
                         b.pressed.connect(func(): _shop_open())
@@ -347,13 +361,28 @@ func _options_strip() -> Control:
 ## ON/EQUIP exactly like the snake shop does; (3) opening the shop WHILE
 ## THE GAME RUNS hung the sheet - the run pauses the tree, so the sheet
 ## gets PROCESS_MODE_ALWAYS like every other in-game sheet.
+var _shop_pair: Array = []   # [dim, center] of the LIVE shop sheet (both
+                             # Arc.sheet siblings - freeing one frees neither)
+
 func _shop_open() -> void:
         if _phase == "run":
                 paused = true
                 get_tree().paused = true
-        _clear_overlay()
-        var sheet := Arc.sheet(_overlay_root_ref(), 0.0)
+        # v0.2.3 patch THE DARK-OVERLAY FIX (owner: "if i opened the shop and
+        # bought something or used another skin, it makes the game with like
+        # there is a dark overlay and can not accept touches"): a buy/skin
+        # re-opens the shop WHILE it is open. The old teardown freed only the
+        # sheet's panel - Arc.sheet's dim+center are SIBLINGS, so every rebuy
+        # leaked one more full-screen STOP-mouse dim; the leaked stack WAS the
+        # dark overlay eating every touch after the first purchase. The shop
+        # now owns its exact dim+center pair and frees BOTH, every time.
+        _shop_sheet_down()
+        _clear_overlay()   # the options/ask overlay behind us, if any
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
         sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        var kids := root.get_children()
+        _shop_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
         var t := Arc.label("PONG SHOP", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -420,7 +449,16 @@ func _shop_open() -> void:
                         continue
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
-        _overlay_panel = sheet.get_parent()
+        # _overlay_panel must NOT point into the shop sheet - the shop tears
+        # down through its OWN pair (_shop_sheet_down); a half-free here was
+        # the leak. Leaving it null keeps _clear_overlay hands-off the shop.
+        _overlay_panel = null
+
+func _shop_sheet_down() -> void:
+        for n in _shop_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _shop_pair = []
 
 func _shop_label(txt: String) -> Label:
         return Arc.fit_label(txt, 24, Arc.HOT, 560)
@@ -475,10 +513,7 @@ func _goga_pause_end_ok() -> bool:
         return _phase == "run"
 
 func _shop_close() -> void:
-        # Arc.sheet appended dim + center at the end of the overlay root
-        var kids := _overlay_root_ref().get_children()
-        for i in range(maxi(0, kids.size() - 2), kids.size()):
-                kids[i].queue_free()
+        _shop_sheet_down()   # frees BOTH the shop's dim and center - always
         _overlay_panel = null
         if _phase == "run":
                 get_tree().paused = false
@@ -493,12 +528,16 @@ func _rebuild_for_orientation() -> void:
         _build_world()
 
 func _add_pad(id: String, is_user: bool, edge: String, axis: int,
-                c: Vector2, ai_speed: float) -> void:
+                c: Vector2, ai_speed: float, extra := false) -> void:
         var p := {
                 "id": id, "user": is_user, "edge": edge, "axis": axis,
                 "c": c, "len": PAD_NORMAL, "mega_t": 0.0, "mega_len": 0.0,
                 "ai_speed": ai_speed, "ai_target": 0.0, "ai_t": 0.0,
                 "err": 0.0,
+                # v0.2.3 patch: per-pad brain knobs - the extra walls think
+                # faster and steadier (the owner's "more smarter")
+                "think": 0.10 if extra else AI_THINK,
+                "err_k": 0.18 if extra else 0.30,
         }
         pads.append(p)
         pads_by_id[id] = p
@@ -511,44 +550,30 @@ func _build_world() -> void:
                                         maxf(200.0, vp.y - top - 24.0)))
         pads.clear()
         pads_by_id.clear()
-        var main_axis := 0 if not landscape else 1   # 0 = moves along X
+        # v0.2.3 patch THE TWO COURTS REALLY DIFFER (owner: "change the user
+        # to be in the bottom wide side and the enemy on the upper one, the
+        # more enemies on the small walls, this way vertical and horizontal
+        # really differ and not just another angles"). BOTH courts seat the
+        # USER at the bottom and the enemy up top; the COURT is what differs:
+        # vertical crosses the LONG depth (a long narrow field, wide warning
+        # time, the extra walls are the LONG side edges), horizontal defends
+        # the WIDE bottom (short warning, a huge span to cover, and the
+        # more-enemy walls are the SMALL left/right edges).
         var off := 54.0
-        if not landscape:
-                _add_pad("user", true, "bottom", main_axis,
-                                Vector2(field.get_center().x,
-                                                field.end.y - off), 0.0)
-                _add_pad("enemy", false, "top", main_axis,
-                                Vector2(field.get_center().x,
-                                                field.position.y + off),
-                                AI_SPEED)
-                if _opt_on("more") and _owned("pong_more"):
-                        _add_pad("extra_l", false, "left", 1,
-                                        Vector2(field.position.x + 40.0,
-                                                        field.get_center().y),
-                                        AI_SPEED_EXTRA)
-                        _add_pad("extra_r", false, "right", 1,
-                                        Vector2(field.end.x - 40.0,
-                                                        field.get_center().y),
-                                        AI_SPEED_EXTRA)
-        else:
-                # v0.2.3 OWNER CALL: in horizontal the USER holds the RIGHT
-                # edge (swapped with the enemy - "will be better!")
-                _add_pad("user", true, "right", main_axis,
-                                Vector2(field.end.x - off,
-                                                field.get_center().y), 0.0)
-                _add_pad("enemy", false, "left", main_axis,
-                                Vector2(field.position.x + off,
+        _add_pad("user", true, "bottom", 0,
+                        Vector2(field.get_center().x, field.end.y - off), 0.0)
+        _add_pad("enemy", false, "top", 0,
+                        Vector2(field.get_center().x, field.position.y + off),
+                        AI_SPEED)
+        if _opt_on("more") and _owned("pong_more"):
+                _add_pad("extra_l", false, "left", 1,
+                                Vector2(field.position.x + 40.0,
                                                 field.get_center().y),
-                                AI_SPEED)
-                if _opt_on("more") and _owned("pong_more"):
-                        _add_pad("extra_t", false, "top", 0,
-                                        Vector2(field.get_center().x,
-                                                        field.position.y + 40.0),
-                                        AI_SPEED_EXTRA)
-                        _add_pad("extra_b", false, "bottom", 0,
-                                        Vector2(field.get_center().x,
-                                                        field.end.y - 40.0),
-                                        AI_SPEED_EXTRA)
+                                AI_SPEED_EXTRA, true)
+                _add_pad("extra_r", false, "right", 1,
+                                Vector2(field.end.x - 40.0,
+                                                field.get_center().y),
+                                AI_SPEED_EXTRA, true)
         coins.clear()
         pus.clear()
         trail.clear()
@@ -574,6 +599,10 @@ func _build_shreds() -> void:
                 })
 
 func _begin_run() -> void:
+        # v0.2.3 patch: a run ALWAYS starts on a world that matches the
+        # CURRENT options - nothing survives from a previous boot (the belt
+        # for the live-toggle law above)
+        _build_world()
         _clear_overlay()
         _phase = "run"
         goals_user = 0
@@ -940,8 +969,9 @@ func _ai_return_axis(p: Dictionary, out_n: Vector2, tvec: Vector2,
 func _tick_ai(p: Dictionary, delta: float) -> void:
         p["ai_t"] = float(p["ai_t"]) - delta
         if float(p["ai_t"]) <= 0.0:
-                p["ai_t"] = AI_THINK
-                p["err"] = randf_range(-1.0, 1.0) * float(p["len"]) * 0.30
+                p["ai_t"] = float(p["think"])
+                p["err"] = randf_range(-1.0, 1.0) * float(p["len"]) \
+                                * float(p["err_k"])
         var axis := _axis_of(p)
         var out_n := _edge_inward(String(p["edge"]))
         var toward := ball_dir.dot(out_n) < -0.05 and serve_t <= 0.0
@@ -1221,19 +1251,14 @@ func _paint_shreds(v: Node2D) -> void:
                 v.draw_circle(p, r, col)
 
 func _paint_court(v: Node2D) -> void:
-        # the center line, dashed
+        # the center line, dashed - BOTH courts run user-bottom/enemy-top
+        # now, so the line always lies along X (v0.2.3 patch)
         var mid := field.get_center()
         var n := 11
         for i in range(0, n, 2):
                 var t := (float(i) + 0.5) / float(n)
-                if landscape:
-                        var y := lerpf(field.position.y, field.end.y, t)
-                        v.draw_rect(Rect2(mid.x - 2.5, y - 14.0, 5.0, 28.0),
-                                        COL_LINE)
-                else:
-                        var x := lerpf(field.position.x, field.end.x, t)
-                        v.draw_rect(Rect2(x - 14.0, mid.y - 2.5, 28.0, 5.0),
-                                        COL_LINE)
+                var x := lerpf(field.position.x, field.end.x, t)
+                v.draw_rect(Rect2(x - 14.0, mid.y - 2.5, 28.0, 5.0), COL_LINE)
         # the guarded edges wear their owner's color
         var u: Dictionary = pads_by_id.get("user", null)
         if u != null:

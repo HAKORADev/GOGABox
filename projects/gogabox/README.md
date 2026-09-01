@@ -13,7 +13,7 @@ contract that makes "adding a game = blinking".
 |---|---|---|
 | Snake | swipe, eat, grab coins, skin shop | 10 |
 | Pong Rally | endless survival rally vs ramping AI | 8 |
-| Geometry Flash | 3-lane dodge, tap/swipe | 10 |
+| Space Dodge | 3-lane dodge, tap/swipe (was "Geometry Flash" until the v0.2.3 patch - the real Geometry Flash is its own SOON teaser now) | 10 |
 | Fruit Slasher | landscape swipe slasher, combos | 15 |
 | Snowy Tower | hop upward forever | 12 |
 | 2048 | swipe merge puzzle | 15 |

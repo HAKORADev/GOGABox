@@ -31,7 +31,7 @@ func _ready() -> void:
         fails += _test("capacity: the hold while a game is open", await _t_capacity_hold())
         fails += _test("menu: the SOON ? law - tiles AND pages", await _t_soon_art())
         fails += _test("snake: peace END banks, bonus /0", await _t_peace_end())
-        fails += _test("dev: optionals, flips, grants, reset", await _t_dev_optionals())
+        fails += _test("dev: switches, code arm, all_owned-only, sheet", await _t_dev_cheats())
         fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
@@ -306,7 +306,18 @@ func _t_meta() -> int:
 
 func _t_registry() -> int:
         var ok := _check(GameReg.playable().size() == 8, "8 playable games")
-        ok += _check(GameReg.workshop().size() == 6, "6 workshop teasers")
+        # v0.2.3 patch: 7 teasers - the REAL Geometry Flash joined the
+        # workshop as a SOON tile when the lane-dodger became Space Dodge
+        ok += _check(GameReg.workshop().size() == 7, "7 workshop teasers")
+        ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dodge",
+                "the lane-dodger ships as SPACE DODGE (rename law)")
+        ok += _check(String(GameReg.get_game("geometry")["title"]) \
+                        == "Geometry Flash",
+                "the REAL Geometry Flash waits as its own teaser")
+        var geo: Dictionary = GameReg.get_game("geometry")
+        ok += _check(bool(geo.get("coming_soon", false)) \
+                        and int(geo["reveal"]["appear_after"]) == 0,
+                "geometry flash is a SOON tile visible from the start")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -1362,83 +1373,37 @@ func _t_peace_end() -> int:
         Box.reset_all()
         return ok
 
-## THE DEV SHEET'S GAME OPTIONALS (owner: "use dev cheats and toggle
-## everything so i test the games more and more") - table sanity, real
-## flips, real grants, the place cycle, the ALL ON / ALL OFF sweep, and a
-## RESET that un-does exactly the grants (real purchases survive).
-func _dev_row(game_id: String, key: String) -> Dictionary:
-        for rc in Box.DEV_OPTIONALS:
-                if String(rc["game"]) == game_id and String(rc["key"]) == key:
-                        return rc
-        return {}
-
-func _t_dev_optionals() -> int:
+## THE DEV CHEATS v0.2.3 patch (owner round): the "owned" switch is GONE
+## (all_owned is THE ownership cheat), the GAME OPTIONALS table is gone
+## ("i can buy using the infinite money"), CODE arms the five-tap knock,
+## a flip only NOTES itself (no rebuild inside a tap = no crash) and the
+## box feed reloads when the sheet CLOSES. The carousel cards dispatch on
+## the STRIP scroll and the feed defers to the nested scroll (the dead
+## pre-play tap fix).
+func _t_dev_cheats() -> int:
         Box.reset_all()
-        var ok := _check(Box.DEV_OPTIONALS.size() >= 12, "the optionals table is present")
-        var ids := {}
-        for g in GameReg.GAMES:
-                ids[String(g["id"])] = true
-        var uniq := {}
-        for rc in Box.DEV_OPTIONALS:
-                var gid := String(rc["game"])
-                ok += _check(ids.has(gid), "entry points at a real game: " + gid)
-                var k := gid + "/" + String(rc["key"])
-                ok += _check(not uniq.has(k), "entry is unique: " + k)
-                uniq[k] = true
-                if rc.has("cycle"):
-                        ok += _check((rc["cycle"] as Array).has(Box.dev_optional_value(rc)),
-                                "cycle default is a legal value (%s)" % k)
-                else:
-                        ok += _check(bool(Box.dev_optional_value(rc)) == bool(rc.get("def", false)),
-                                "bool default reads through (%s)" % k)
-        # a REAL purchase first - it must outlive every dev sweep
-        ok += _check(Box.buy_unlock("snake", "bugs", 0), "a real bugs purchase lands")
-        # a flip is a REAL setting AND grants the shop unlock for real
+        var ok := _check(not Box.DEV_CHEATS.has("owned"),
+                "the owned switch is gone - all_owned is THE ownership cheat")
+        ok += _check(Box.DEV_CHEATS.has("code"), "the CODE switch exists")
+        ok += _check(Box.dev_cheat("code") == 1,
+                "CODE arms at 1 by default (the knock works out of the box)")
+        Box.dev_set_cheat("code", 0)
+        ok += _check(Box.dev_cheat("code") == 0, "CODE flips to 0 and sticks")
+        Box.dev_set_cheat("code", 1)
+        ok += _check(Box.dev_cheat("code") == 1, "CODE flips back to 1")
+        # ownership rides all_owned ONLY now
         Box.dev_set_cheat("all_owned", 0)
-        ok += _check(not Box.unlock_owned("rally", "pong_sparkles"),
-                "sparkles locked before the flip")
-        var on: bool = Box.dev_flip_optional(_dev_row("rally", "opt_sparkles"))
-        ok += _check(on, "the sparkles row flips ON")
-        ok += _check(Box.unlock_owned("rally", "pong_sparkles"),
-                "the flip granted the shop unlock FOR REAL")
-        # the place cycle grants its garden per value
-        var pv: Variant = Box.dev_flip_optional(_dev_row("snake", "place"))
-        ok += _check(String(pv) == "day", "place cycles classic -> day (%s)" % String(pv))
-        ok += _check(Box.item_owned("snake", "place", "day"),
-                "the cycle granted the day garden")
-        # ALL ON lights every FEATURE row (the peace style stays alone)
-        Box.dev_all_optionals(true)
-        var allon := true
-        for rc in Box.DEV_OPTIONALS:
-                if rc.has("solo") or rc.has("cycle"):
-                        continue
-                allon = allon and bool(Box.dev_optional_value(rc))
-        ok += _check(allon, "ALL ON lights every feature row")
-        ok += _check(Box.unlock_owned("rally", "pong_speed"), "ALL ON grants as it goes")
-        ok += _check(not bool(Box.dev_optional_value(_dev_row("snake", "style_peace"))),
-                "the peace style is solo - ALL ON leaves it alone")
-        Box.dev_all_optionals(false)
-        var any_on := false
-        for rc in Box.DEV_OPTIONALS:
-                if rc.has("solo") or rc.has("cycle"):
-                        continue
-                any_on = any_on or bool(Box.dev_optional_value(rc))
-        ok += _check(not any_on, "ALL OFF kills every feature row")
-        # THE RESET: progress to defaults, exactly the grants die
-        Box.dev_reset_optionals()
-        ok += _check(Box.unlock_owned("snake", "bugs"),
-                "the REAL purchase survives the reset")
-        ok += _check(not Box.unlock_owned("rally", "pong_sparkles"),
-                "the granted unlock is removed by the reset")
-        ok += _check(not Box.item_owned("snake", "place", "day"),
-                "the granted garden is removed by the reset")
-        ok += _check(String(Box.dev_optional_value(_dev_row("snake", "place"))) == "classic",
-                "place back to classic after the reset")
-        ok += _check(bool(Box.dev_optional_value(_dev_row("snake", "opt_enemies"))),
-                "defaults are back (enemies default ON)")
-        # the sheet itself builds with the new section - EVERY row rendered
-        # (the first build aborted mid-way on a String(int) constructor, the
-        # sheet_open flag alone would never catch that)
+        ok += _check(not Box.owns_game("merge"), "all_owned 0 -> nothing owned")
+        Box.dev_set_cheat("all_owned", 1)
+        ok += _check(Box.owns_game("merge") and Box.owns_game("hen"),
+                "all_owned 1 -> everything owned (games AND teasers)")
+        # the optionals machinery is gone from the store entirely
+        ok += _check(Box.get("DEV_OPTIONALS") == null,
+                "the DEV_OPTIONALS table is gone from the store")
+        ok += _check(Box.get("dev_flip_optional") == null,
+                "the optionals flip machinery is gone")
+        # the sheet: builds, renders every row, NO optionals rows
+        Box.dev_set_cheat("all_owned", 0)   # the row must read = 0 below
         var menu := Node2D.new()
         menu.set_script(load("res://game/menu/menu.gd"))
         add_child(menu)
@@ -1446,14 +1411,59 @@ func _t_dev_optionals() -> int:
         await get_tree().process_frame
         menu._open_dev_sheet()
         await get_tree().process_frame
-        ok += _check(menu._sheet_open, "the dev sheet builds with the optionals section")
-        for wanted in ["SNAKE - MORE ENEMIES", "SNAKE - ENEMY PACK SIZE  =  1",
-                        "SNAKE - PLACE  =  CLASSIC", "PONG - SPARKLES  =  OFF",
-                        "RESET"]:
+        ok += _check(menu._sheet_open, "the dev sheet builds")
+        for wanted in ["ALL_OWNED  =  0", "GOGACOINS  =  0", "BATTERY  =  0",
+                        "CODE  =  1", "DONE", "RESTART BOX"]:
                 ok += _check(_find_button(menu, wanted) != null,
                                 "dev sheet rendered: %s" % wanted)
+        ok += _check(_find_button(menu, "SNAKE - ") == null
+                        and _find_button(menu, "PONG - ") == null,
+                "the game optionals rows are gone from the sheet")
+        # a flip NOTES itself: the row flips in place, NO rebuild (the crash
+        # the owner reported lived in the rebuild-inside-a-tap)
+        var row := _find_button(menu, "ALL_OWNED  =  0")
+        ok += _check(row != null, "the all_owned row is on screen")
+        if row != null:
+                row.pressed.emit()   # the exact tap-emitter path
+                await get_tree().process_frame
+                ok += _check(menu._sheet_open,
+                        "a flip does NOT rebuild the sheet (the crash is dead)")
+                ok += _check(Box.dev_cheat("all_owned") == 1,
+                        "the flip wrote the value for real")
+                ok += _check(String(row.text) == "ALL_OWNED  =  1",
+                        "the row NOTED the change on itself")
+                ok += _check(bool(menu._dev_dirty),
+                        "the flip flagged the box dirty")
+        # closing APPLIES: the feed reloads from the live cheats
+        var grid_tiles_before: int = menu._grid.get_child_count()
         menu._close_sheet()
+        await get_tree().process_frame
+        ok += _check(not bool(menu._dev_dirty),
+                "closing the sheet consumed the dirty flag")
+        ok += _check(menu._grid.get_child_count() != grid_tiles_before
+                        or menu._lists_data.size() > 0,
+                "the feed reloaded after the settings (the apply law)")
+        # the carousel cards dispatch on the STRIP scroll, and the feed
+        # DEFERS to its nested scroll (the dead pre-play tap fix)
+        Box.dev_set_cheat("all_owned", 1)
+        menu._refresh()
+        await get_tree().process_frame
+        await get_tree().process_frame
+        ok += _check(menu._strip_scroll._tappables.size() > 0,
+                "the carousel cards are the STRIP scroll's tappables")
+        if menu._strip_scroll._tappables.size() > 0:
+                var card_c: Vector2 = (menu._strip_scroll._tappables[0]["ctrl"] \
+                                as Control).get_global_rect().get_center()
+                ok += _check(menu._feed_scroll._nested_scroll_at(card_c) \
+                                == menu._strip_scroll,
+                        "a touch on a card belongs to the STRIP (feed defers)")
+                ok += _check(menu._strip_scroll \
+                                ._nested_scroll_at(card_c) == null,
+                        "the strip has no deeper scroll - it takes the touch")
+        Box.dev_set_cheat("all_owned", 0)
+        menu._refresh()
         menu.queue_free()
         await get_tree().process_frame
         Box.reset_all()
         return ok
+

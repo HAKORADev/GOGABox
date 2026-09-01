@@ -154,3 +154,92 @@ verified the dev sheet layout and the soon-page purple ?.
 
 Version: stays 0.2.3 (base 30320: arm32 30321, arm64 30322), the v0.2.1a
 precedent. Signature family SHA-256 6db87aca... unchanged.
+
+## PATCH ROUND 2 - the owner's next-batch list (same version, same codes)
+
+20. **Dev cheats: the toggle crash is DEAD - twice over.** Two real defects
+    were behind "crash after each option toggle": (a) every flip REBUILT the
+    sheet inside the tap callback, and (b) the rebuild's `_close_sheet`
+    freed "the last 2 children of _root" - with no sheet yet up those two
+    were the FEED MARGIN and the TOAST OVERLAY, so the first open nuked the
+    menu content and the next tick/toggle walked into freed instances
+    (signal 11, reproduced headless). THE PAIR LAW: `_sheet_base` records
+    the exact dim+center pair it appended; `_close_sheet` frees exactly
+    that pair - never "the last children". The quit-confirm rides
+    `_sheet_base` now too. AND the flips no longer rebuild anything: a
+    switch row rewrites its own label, repaints itself, toasts "noted -
+    the box reloads on close", and the feed reloads from the live cheats
+    when the sheet CLOSES (DONE button or back).
+
+21. **Dev cheats: RESTART BOX.** The pinned action row (DONE + RESTART BOX)
+    sits under the sheet; RESTART saves and reboots the whole box via a
+    deferred scene reload.
+
+22. **Dev cheats: "owned" is gone, optionals are gone, CODE is in.** The
+    switch list is ALL_OWNED / GOGACOINS / BATTERY / CODE - all_owned is
+    THE ownership cheat (the owner: "removing it and keeping all owned is
+    much better anyway"); the whole GAME OPTIONALS table + its grant/reset
+    machinery left the store (the owner: "i can buy using the infinite
+    money"). CODE is the five-tap knock's arm switch: 1 (default) = the
+    knock opens the sheet, 0 = the five taps do NOTHING.
+
+23. **The carousel pre-play tap works.** The strip cards were registered on
+    the OUTER feed scroll, but the nested strip scroll (also a BoxScroll)
+    captured the touch first and marked the release handled - the tap never
+    fired ("when i tap a game it does not show its pre-play menu"). THE
+    NESTED-SCROLL LAW: `_nested_scroll_at` - a BoxScroll never captures a
+    touch that lands inside a deeper BoxScroll; the cards now register on
+    the strip itself, and the feed's index can never stick.
+
+24. **Pong: the shop's dark overlay is dead.** A buy/skin re-opened the
+    shop INSIDE the open shop, and the old teardown freed only the sheet's
+    panel - Arc.sheet's dim+center are SIBLINGS, so every rebuy leaked one
+    more full-screen STOP-mouse dim: the leaked stack WAS the dark overlay
+    that ate every touch. The shop now owns its exact dim+center pair
+    (`_shop_sheet_down`) and frees BOTH on every open/close.
+
+25. **Pong: options land THE SECOND you tap them.** The optionals strip
+    rebuilds the world on every toggle (`_rebuild_for_orientation`), and
+    `_begin_run` rebuilds once more so every run starts on a world that
+    matches the CURRENT options - size/speed/sparkles already read live;
+    more-enemies spawned/despawned next boot ("fix this and make sure it
+    does not happen with other stuff").
+
+26. **Pong: the two courts really differ.** BOTH courts seat the USER at
+    the bottom and the enemy up top; horizontal defends the WIDE bottom
+    (short warning, huge span) with the more-enemy walls on the SMALL
+    left/right edges, vertical crosses the LONG depth with the extras on
+    the LONG side edges - "not just another angles". The center line lies
+    along X in both.
+
+27. **Pong: the extra walls are faster and smarter.** AI_SPEED_EXTRA
+    356 -> 500 (quicker than the main rival - the owner's own prescribed
+    fix for their short land of view on the small walls); per-pad brain
+    knobs: extras think every 0.10s (main 0.13) and steady their aim
+    (err 0.18 of the pad, main 0.30).
+
+28. **Space Dodge.** The lane-dodger shipped as "Geometry Flash" but it was
+    never the owner's Geometry Flash - it is SPACE DODGE now (id stays
+    `lanes`; saves, orders and tests untouched; the spaceship thumb already
+    fit). The REAL Geometry Flash joins the workshop as a SOON teaser
+    (id `geometry`, direct reveal, visible from the start, never a
+    mystery) - "put it as soon".
+
+29. **The parking lot grew.** FUTURE_GAMES.md fourth dump: sokoban-like,
+    amaze-go arrow maze (every tile wears an arrow, the rider SLIDES the
+    chain), tomb-of-the-mask old maze (the character takes the WHOLE line,
+    not steps), and Geometry Flash documented as the name that came home.
+
+Tests: flow_test grew the dev-cheats suite (no owned switch, CODE arm +
+default-1, all_owned-only ownership, optionals machinery gone, every sheet
+row renders, a flip notes itself WITHOUT a rebuild, the feed reloads on
+close, the strip tappables + the nested-defer law) and the registry suite
+grew the rename + the 7th teaser; pong_probe grew the live-toggle, the two
+courts and the extras-brain laws; snake_probe + geometry green; Xvfb QA
+verified the new dev sheet (4 toggle rounds, zero crashes) and shot both
+courts. Found on the way: a lambda can never reference the button its own
+`Arc.button(...)` initializer is still declaring - build the row, THEN
+connect.
+
+Version: stays 0.2.3 (base 30320: arm32 30321, arm64 30322). Signature
+family SHA-256 6db87aca... unchanged.

@@ -175,7 +175,7 @@ future 3D game (Pop TD 3D?) plugs in without core changes. v0.0.1 ships 2D.
 |---|---|---|---|---|
 | Snake | snake | free | 10 | shipped (skins shop) |
 | Pong (vs AI -> endless rally) | rally | 150 | 8 | shipped |
-| Geometry Flash | lanes | 200 | 10 | shipped |
+| Space Dodge (was Geometry Flash; the name returned to the workshop as the `geometry` SOON teaser, v0.2.3 patch) | lanes | 200 | 10 | shipped |
 | Fruit Slasher | slasher | 250 | 15 | shipped (landscape) |
 | Snowy Tower | hopper | 300 | 12 | shipped |
 | 2048 (solo) | merge | 400 | 15 | shipped |

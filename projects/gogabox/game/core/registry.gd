@@ -82,7 +82,13 @@ const GAMES := [
                 ],
         },
         {
-                "id": "lanes", "title": "Geometry Flash", "tag": "dodge the grid",
+                # v0.2.3 patch RENAME (owner: "the current game called
+                # geometry flash is not like my geometry flash game, rename
+                # it to space dodge, we will work on it later"): same game,
+                # same id, same thumb - the name is honest now. The REAL
+                # Geometry Flash returns to the workshop below as a SOON
+                # teaser + the parking lot doc.
+                "id": "lanes", "title": "Space Dodge", "tag": "dodge the grid",
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
@@ -266,6 +272,19 @@ const GAMES := [
                                 {"type": "spend_in", "game": "merge", "amount": 200},
                                 {"type": "plays", "game": "lanes", "count": 10},
                         ]}},
+        # v0.2.3 patch (owner: "add a game called geometry flash put it as
+        # 'soon' because the current one will be a new game instead of the
+        # geometry flash game i planned for"): the REAL Geometry Flash takes
+        # its name back and waits in the workshop as a SOON tile - direct
+        # reveal, visible right away, never a mystery. Its dodge-game
+        # namesake lives on as Space Dodge above.
+        {"id": "geometry", "title": "Geometry Flash", "tag": "the real one", "coming_soon": true,
+                "thumb": "res://assets/thumbs/soon.png",
+                "desc": "The owner's own Geometry Flash - the name the lane-dodger borrowed until it grew into Space Dodge. The real thing is still to come.",
+                "genres": {"main": ["action", "arcade"], "sub": ["rhythm", "singleplayer"]},
+                "age": "everyone",
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
+                        "needs_games": 2}},
 ]
 
 static func get_game(id: String) -> Dictionary:

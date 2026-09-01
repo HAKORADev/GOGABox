@@ -245,6 +245,19 @@ func _run() -> void:
                         extras += 1
         _check(extras == 2, "the extras guard the other two edges")
 
+        # ---- THE LIVE TOGGLE (owner v0.2.3 patch: "if more enemies got
+        # toggled on or off, it does not take effect until next game boot,
+        # fix this") - the world rebuilds on the toggle AND on every START ----
+        Box.set_progress("rally", "opt_more", false)
+        g._begin_run()
+        _check(g._phase == "run" and g.pads.size() == 2,
+                "the toggle lands THE SECOND it flips (off -> 2 walls now)")
+        Box.set_progress("rally", "opt_more", true)
+        g._begin_run()
+        _check(g.pads.size() == 4,
+                "and back on -> 4 walls, same run path, no reboot")
+        g.serve_t = 0.0
+
         # ---- the AI tracks (not stupid): an incoming ball INSIDE its
         # vision range draws real movement ----
         var en: Dictionary = g.pads_by_id["enemy"]
@@ -321,18 +334,56 @@ func _run() -> void:
         _check(near_x < far_x - 40.0,
                 "inside the range the pad READS the ball and chases its x")
 
-        # ---- HORIZONTAL SWAP (owner v0.2.3): the USER holds the RIGHT edge
+        # ---- THE TWO COURTS (owner v0.2.3 patch: "change the user to be
+        # in the bottom wide side and the enemy on the upper one, the more
+        # enemies on the small walls, this way vertical and horizontal
+        # really differ and not just another angles") - BOTH courts seat
+        # the user at the BOTTOM and the enemy on TOP; the court shape and
+        # the extra walls are what differ. ----
         var g2: GogaGame = load("res://game/games/rally/pong.gd").new()
         g2.game_id = "rally"
         g2.start_orientation = "horizontal"
         add_child(g2)
         await get_tree().process_frame
         _check(g2.landscape, "the forced ask builds the horizontal court")
-        _check(String(g2.pads_by_id["user"]["edge"]) == "right",
-                "horizontal: the USER's platform is on the RIGHT")
-        _check(String(g2.pads_by_id["enemy"]["edge"]) == "left",
-                "horizontal: the enemy took the LEFT edge")
+        _check(String(g2.pads_by_id["user"]["edge"]) == "bottom",
+                "horizontal: the USER holds the WIDE bottom edge")
+        _check(String(g2.pads_by_id["enemy"]["edge"]) == "top",
+                "horizontal: the enemy sits on the top edge")
+        _check(int(g2.pads_by_id["user"]["axis"]) == 0,
+                "horizontal: the user's platform slides ALONG the wide side")
+        Box.set_progress("rally", "opt_more", true)
+        Box.buy_unlock("rally", "pong_more", 0)
+        g2.landscape = true          # hold the forced court (headless lies)
+        g2._build_world()
+        _check(String(g2.pads_by_id["extra_l"]["edge"]) == "left" \
+                        and String(g2.pads_by_id["extra_r"]["edge"]) == "right",
+                "horizontal: the more-enemy walls take the SMALL left/right")
+        # the vertical court: same seats, the LONG field
+        var g3: GogaGame = load("res://game/games/rally/pong.gd").new()
+        g3.game_id = "rally"
+        g3.start_orientation = "vertical"
+        add_child(g3)
+        await get_tree().process_frame
+        _check(not g3.landscape, "the forced ask builds the vertical court")
+        _check(String(g3.pads_by_id["user"]["edge"]) == "bottom",
+                "vertical: the USER holds the bottom edge too")
+        _check(String(g3.pads_by_id["enemy"]["edge"]) == "top",
+                "vertical: the enemy took the top edge too")
+        # ---- THE MORE-ENEMIES BRAIN (owner: "make them faster and more
+        # smarter" - speed is also his prescribed fix for their short land
+        # of view on the small walls) ----
+        for inst in [g2, g3]:
+                var em: Dictionary = inst.pads_by_id["extra_l"]
+                var mn: Dictionary = inst.pads_by_id["enemy"]
+                _check(float(em["ai_speed"]) > float(mn["ai_speed"]),
+                        "the extra walls hunt FASTER than the main rival")
+                _check(float(em["think"]) < float(mn["think"]),
+                        "the extra walls think FASTER (smarter)")
+                _check(float(em["err_k"]) < float(mn["err_k"]),
+                        "the extra walls aim STEADIER (smarter)")
         g2.queue_free()
+        g3.queue_free()
         await get_tree().process_frame
 
         # ---- END banks the run ----

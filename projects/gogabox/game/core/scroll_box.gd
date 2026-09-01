@@ -47,6 +47,24 @@ func _init() -> void:
 func register_tappable(ctrl: Control, cb: Callable) -> void:
         _tappables.append({"ctrl": ctrl, "cb": cb})
 
+## v0.2.3 patch THE NESTED-SCROLL LAW: the box feed and the carousel strip
+## are BOTH BoxScrolls stacked on the same screen spot. When both captured a
+## touch, the DEEPER one (the strip) dispatched the release first and marked
+## the event handled - the outer feed never saw the release, its captured
+## index stuck, and the tap went nowhere (the owner's "when i tap a game in
+## the top-picks line it does not show its pre-play menu"). Law: if another
+## BoxScroll LIVES inside me and covers this point, the touch belongs to IT.
+func _nested_scroll_at(pos: Vector2) -> BoxScroll:
+        var stack := get_children()
+        while not stack.is_empty():
+                var n: Node = stack.pop_back()
+                if n is BoxScroll and (n as Control).is_visible_in_tree() \
+                                and (n as Control).get_global_rect() \
+                                                .has_point(pos):
+                        return n
+                stack.append_array(n.get_children())
+        return null
+
 func _prune_tappables() -> void:
         _tappables = _tappables.filter(func(t): return is_instance_valid(t["ctrl"]))
 
@@ -92,6 +110,11 @@ func _owns(pos: Vector2) -> bool:
 func _touch(t: InputEventScreenTouch) -> void:
         if t.pressed:
                 if _owns(t.position):
+                        # the nested law: a BoxScroll INSIDE me owns this
+                        # touch - I never capture it, so my index can never
+                        # stick waiting for a release the inner already ate
+                        if _nested_scroll_at(t.position) != null:
+                                return
                         _idx = t.index
                         _start = t.position
                         _last = t.position

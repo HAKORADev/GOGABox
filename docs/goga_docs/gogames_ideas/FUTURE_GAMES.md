@@ -17,6 +17,13 @@ crazy fishing, match-3 fighter, omnitrix hero, crazy flight, zombie tsunami,
 get-over-it 2D) — plus a **Things to study** section at the bottom: boxes
 full of mini-games to mine for even more names.
 
+Fourth dump — the v0.2.3 patch round (2026-09-01, +4: sokoban-like, amaze-go
+arrow maze, tomb-of-the-mask line mover, geometry flash). THE NAME CAME HOME:
+the shipped lane-dodger that had borrowed the "Geometry Flash" name is now
+**Space Dodge**, and the owner's REAL Geometry Flash waits in the box as a
+SOON workshop tile (registry id `geometry`, direct reveal) until it gets its
+own build.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -33,6 +40,10 @@ full of mini-games to mine for even more names.
 ## Arcade & one-touch
 - **knife circle** — throw a knife at a moving/rotating circle without
   hitting another knife. ("yes that type")
+- **tomb-of-the-mask-old-maze-like** — the owner's "tomb of the mask: old
+  maze" energy: swipe a direction and the character takes the WHOLE line
+  until a wall, not step by step. Line-rides, spikes, coins, momentum
+  puzzles on a grid maze.
 - **stick hero** — hold to make the stick long, release, the character walks
   on it to the next platform.
 - **bubble shooter** — match-3-ish but Bubble-Witch-like: the user aims and
@@ -56,6 +67,12 @@ full of mini-games to mine for even more names.
   the fish, dodge the stingers, haul the catch up.
 
 ## Puzzle
+- **sokoban-like** — the crate classic: push every box onto its target,
+  one push at a time (never a pull), walls and tight corridors make the
+  order matter. Undo + restart, handcrafted level ladders.
+- **amaze-go-like** — the arrow maze: every floor tile wears an arrow; tap
+  a tile and your rider SLIDES the arrow's way, chaining tile to tile until
+  a wall stops the ride. Plan the chain, reach the goal, collect on the way.
 - **water sort** — the classic weird android game: fill bottles with colored
   liquids, pour between bottles until sorted, tons of levels.
 - **block puzzle** — looks like tetris but it is puzzle-like: people put the

@@ -1,5 +1,7 @@
 extends GogaGame
-## Geometry Flash — 3-lane dodge. Tap left/right thirds (or swipe) to switch.
+## SPACE DODGE (the game the box shipped as "Geometry Flash" until the
+## v0.2.3 patch renamed it - the owner's real Geometry Flash is a future
+## game) — 3-lane dodge. Tap left/right thirds (or swipe) to switch.
 ## Speed ramps every 20s PGB-style (+10%). Coins float between obstacles.
 
 const LANES := 3
