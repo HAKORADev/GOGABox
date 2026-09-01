@@ -151,21 +151,54 @@ const GAMES := [
                 ],
         },
         {
+                # v0.2.5 THE REDESIGN (owner GDD, whole contract - the PGB
+                # v1.3.8 platform types live again, but everything around
+                # them grew up): the tap-hop doodle clone is GONE. Snowy
+                # Tower is now a REAL climber: 5 platform types from the
+                # python original (static/moving/blinking/disappearing/
+                # moving_blinking + the reliability law), TWO walls that
+                # keep platforms AND player on screen, the scroll starts
+                # lazy and climbs x1.1 per 10 platforms (the slide-up law),
+                # PHYSICAL snow that lands on platforms and loads the ball
+                # down (slow + heavy, sheds as you roll), arrows + a jump
+                # circle (the ball ROLLS as it walks), score = platforms
+                # climbed (skip 3 land the 4th = +1, lower landings = 0),
+                # GOGACoins every 5-25 platforms counted from the last coin
+                # ON SCREEN, run-end bonus score/10 (registry coin_div).
+                # SHOP: 4 powerups that spawn in runs (x2 double jump / up
+                # arrow big jump / >> speed / -50% slow slide, 10s each,
+                # the life ring lives inside the jump button), 4 characters
+                # (ball / square / triangle / egg - different physics,
+                # different spin, different snow reaction), 4 platform
+                # skins (sand free + rock/metal/grass - shader-cut, not
+                # color swaps), and the NIGHT place (day/night really feel
+                # different). Everything drawn in code - designed palette,
+                # no random colors (the owner's v1.3.8 lesson). The journal
+                # is docs/goga_docs/gogames_ideas/tower.md.
                 "id": "hopper", "title": "Snowy Tower", "tag": "climb till you slip",
                 "script": "res://game/games/hopper/hopper.gd",
                 "thumb": "res://assets/thumbs/hopper.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 60, "price": 300, "fee": 12, "shop": false,
+                "coin_div": 10, "price": 300, "fee": 12, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "hours": {"from": 16, "to": 22},
-                "desc": "Hop up an endless snowy tower of icy platforms. The camera never waits - climb fast or freeze at the bottom.",
-                "controls": ["tap / hold sides to hop between platforms", "height is score", "fall below the screen and the run ends"],
+                "desc": "Climb an endless tower of icy platforms while real snow falls, lands and loads you down. Five platform kinds, two walls, a scroll that never waits - and the run bonus is yours at the bottom.",
+                "controls": [
+                        "hold the LEFT / RIGHT arrows to walk - the ball rolls as it moves",
+                        "tap the JUMP circle to hop - one press, one jump",
+                        "score is platforms climbed: land higher than ever for +1, skipping platforms still pays 1, landing lower pays nothing",
+                        "the scroll starts after 2 platforms and climbs x1.1 every 10 - falling below the screen ends the run",
+                        "real snow lands on platforms and piles on YOU: loaded down you accelerate slower and jump weaker - roll to shed it",
+                        "powerups bought in the shop spawn on platforms: x2 double jump, up arrow big jump, >> speed, -50% slow slide - each 10s, the ring inside the jump button drains as time runs out",
+                        "GOGACoins hang between platforms - one every 5-25 platforms, counted from the last coin on screen",
+                        "the shop sells characters (ball/square/triangle/egg, each with its own physics), platform skins (sand/rock/metal/grass), the night place and the powerups"],
                 "genres": {"main": ["arcade", "adventure"], "sub": ["platformer", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
-                        {"id": "height_500", "title": "Frosty Start", "desc": "Climb 500"},
-                        {"id": "height_1500", "title": "Cloud Toucher", "desc": "Climb 1500"},
+                        {"id": "tower_30", "title": "Warming Up", "desc": "Climb 30 platforms in one run"},
+                        {"id": "tower_80", "title": "Above the Clouds", "desc": "Climb 80 platforms in one run"},
+                        {"id": "tower_150", "title": "The Stratosphere", "desc": "Climb 150 platforms in one run"},
                         {"id": "hops_50", "title": "Bunny Boots", "desc": "Jump 50 times total"},
                 ],
         },

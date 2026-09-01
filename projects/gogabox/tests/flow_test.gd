@@ -337,6 +337,28 @@ func _t_registry() -> int:
         ok += _check(String(GameReg.get_game("geometry")["title"]) \
                         == "Geometry Flash",
                 "the REAL Geometry Flash waits as its own teaser")
+        # v0.2.5: SNOWY TOWER grew up (the owner's GDD + the PGB reference)
+        var hop: Dictionary = GameReg.get_game("hopper")
+        ok += _check(int(hop["coin_div"]) == 10, "snowy tower score / 10")
+        ok += _check(bool(hop["shop"]), "snowy tower wears a shop now")
+        var HO := load("res://game/games/hopper/hopper.gd")
+        ok += _check(HO.POWERUPS.size() == 4, "four powerups live in the shop")
+        ok += _check(HO.CHARS.size() == 4 and HO.PLATS.size() == 4 \
+                        and HO.PLACES.size() == 2,
+                "4 characters + 4 platform skins + 2 places (the shop full)")
+        var hop_floor := 999999
+        for c_id in HO.CHARS:
+                var cp: int = int(HO.CHARS[c_id]["price"])
+                if cp > 0:
+                        hop_floor = mini(hop_floor, cp)
+        for pl_id in HO.PLATS:
+                var pp: int = int(HO.PLATS[pl_id]["price"])
+                if pp > 0:
+                        hop_floor = mini(hop_floor, pp)
+        for pc_id in HO.POWERUPS:
+                hop_floor = mini(hop_floor, int(HO.POWERUPS[pc_id]["price"]))
+        ok += _check(hop_floor >= 250,
+                "the tower shop keeps a real price floor (cheapest = %d)" % hop_floor)
         var geo: Dictionary = GameReg.get_game("geometry")
         ok += _check(bool(geo.get("coming_soon", false)) \
                         and int(geo["reveal"]["appear_after"]) == 0,
@@ -1436,6 +1458,19 @@ func _t_dev_cheats() -> int:
         Box.dev_set_cheat("all_owned", 1)
         ok += _check(Box.owns_game("merge") and Box.owns_game("hen"),
                 "all_owned 1 -> everything owned (games AND teasers)")
+        # v0.2.5 THE ALWAYS-PLAYABLE CHEAT (owner: "ignores all limits and
+        # make the games always playable even if there is no enough
+        # coins/batteries/playtime-window and like that")
+        ok += _check(Box.daily_ok("hopper"),
+                "all_owned: the daily caps can never block")
+        ok += _check(Roadmap.can_play_now("hopper"),
+                "all_owned: the window-gated tower answers PLAYABLE right now")
+        Box.dev_set_cheat("all_owned", 0)
+        Box.unlock_game("hopper", 0)
+        var window_gate_works := not Roadmap.can_play_now("hopper") \
+                        or Roadmap.window_ok("hopper")
+        ok += _check(window_gate_works,
+                "with the cheat OFF the tower obeys its window again")
         # the optionals machinery is gone from the store entirely
         ok += _check(Box.get("DEV_OPTIONALS") == null,
                 "the DEV_OPTIONALS table is gone from the store")

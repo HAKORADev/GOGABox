@@ -225,3 +225,6 @@ balloon connect + circle connect were mined from My Talking Angela 2).
   economy (fees, GOGACoins, GOGABatteries per device) works way better with
   a device per player than one-device-many-players. Keep this in mind when
   mining this box.
+- **tap the frog** — the owner's add (the v0.2.5 round, while Snowy Tower
+  was being rebuilt): a whole box of quick tap-timing mini-games around one
+  frog. Mine it for reflex/timing mini-game shapes.

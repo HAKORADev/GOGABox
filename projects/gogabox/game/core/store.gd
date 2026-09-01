@@ -459,7 +459,10 @@ func _sync_battery_notifications() -> void:
 ##     using the infinite money") - the shop + the EXTREME wallet cover it.
 ##   - CODE joins: the arm switch of the five-tap title knock. 0 = the five
 ##     taps do NOTHING (the owner's lock when the box leaves his hands).
-##   all_owned  1 = everything owned (games + shop items + skins)
+##   all_owned  1 = everything owned (games + shop items + skins) AND
+##              v0.2.5: EVERY limit ignored - windows, daily caps, fees,
+##              batteries; every owned game is always playable (owner:
+##              "ignores all limits and make the games always playable")
 ##   gogacoins  1 = the wallet LOGIC reads an EXTREME value while the app
 ##              shows the plain 0 - the real wallet is never touched
 ##   battery    1 = every battery pool reads 10K - rounds never run dry
@@ -709,8 +712,12 @@ func daily_usage(id: String) -> Dictionary:
         }
 
 ## Can this game still be played TODAY (both caps respected)? Games without
-## caps always answer true.
+## caps always answer true. v0.2.5: the always-playable cheat answers true
+## too - all_owned ignores every limit (owner spec), so the game-over
+## sheet's PLAY AGAIN can never be daily-blocked under it either.
 func daily_ok(id: String) -> bool:
+        if dev_cheat("all_owned") == 1:
+                return true
         var u := daily_usage(id)
         if int(u["rounds_cap"]) > 0 and int(u["rounds"]) >= int(u["rounds_cap"]):
                 return false

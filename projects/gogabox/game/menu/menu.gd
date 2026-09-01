@@ -1873,6 +1873,12 @@ func _open_game_page(g: Dictionary) -> void:
         # registry's shared entry policy - no game name hardcoded here.
         var partial := Box.pays_partial_fee(id) and fee > 0
         var pay := Box.entry_cost(id, fee) if partial else fee
+        # v0.2.5 THE ALWAYS-PLAYABLE CHEAT: under all_owned the page mirrors
+        # what launch now does - FREE and UNLIMITED (the window/daily/battery
+        # rows stay visible as info, but nothing blocks and nothing fades).
+        var cheat_play: bool = Box.dev_cheat("all_owned") == 1
+        if cheat_play:
+                pay = 0
         var free_play: bool = partial and pay <= 0
         var can_pay: bool = pay <= 0 or Box.coins() >= pay
         var can_batt: bool = true
@@ -1886,14 +1892,14 @@ func _open_game_page(g: Dictionary) -> void:
         var can_time := Roadmap.window_ok(id)
         # v0.1.4: the daily caps (rounds / playtime) gate the button too
         var can_daily := Box.daily_ok(id)
-        var can_play := can_pay and can_batt and can_time and can_daily
+        var can_play := cheat_play or (can_pay and can_batt and can_time and can_daily)
         # NOTE: the feed tile's "ready to play" chip calls Roadmap.can_play_now,
         # the same fee + pools + window + daily oracle this page mirrors.
 
         # OWNER RULE (v0.1.4): a game you cannot play RIGHT NOW wears its
         # blocker in the UI - the thumbnail fades for a closed time window
         # or a reached daily limit ("fade-out the thumbnail of it")
-        var blocked_visually := not can_time or not can_daily
+        var blocked_visually := (not can_time or not can_daily) and not cheat_play
         _header_block(content, g, blocked_visually, true, scroll)
 
         # batteries + time-window info, right under the header

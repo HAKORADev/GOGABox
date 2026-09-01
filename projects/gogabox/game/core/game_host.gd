@@ -13,6 +13,22 @@ static func launch(router: Node, id: String) -> bool:
                 return false
         if not Box.owns_game(id):
                 return false
+        # v0.2.5 THE ALWAYS-PLAYABLE CHEAT (owner: all_owned "ignores all
+        # limits and make the games always playable even if there is no
+        # enough coins/batteries/playtime-window and like that"): one flag
+        # flattens every gate below - the window, the daily caps, the fee
+        # and both battery pools. The launch is FREE and UNLIMITED.
+        if Box.dev_cheat("all_owned") == 1:
+                var stage_c := find_stage(router)
+                if stage_c == null:
+                        stage_c = router          # tests / headless: plain node
+                var host_c: Node = load("res://game/core/host_node.gd").new()
+                host_c.configure(g, stage_c, 0, false)
+                stage_c.add_child(host_c)
+                active_host = host_c
+                if stage_c.has_method("on_game_entered"):
+                        stage_c.call("on_game_entered")
+                return true
         if not Roadmap.window_ok(id):
                 return false
         # v0.1.4: a reached daily cap (rounds / playtime) refuses the launch

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://gogaboxtowerqa"]
+
+[ext_resource type="Script" path="res://tests/qa_tower.gd" id="1"]
+
+[node name="TowerQA" type="Node"]
+script = ExtResource("1")

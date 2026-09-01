@@ -193,6 +193,14 @@ static func can_play_now(id: String) -> bool:
         var g := GameReg.get_game(id)
         if g.is_empty() or g.get("coming_soon", false) or not Box.owns_game(id):
                 return false
+        # v0.2.5 THE ALWAYS-PLAYABLE CHEAT (owner: all_owned "ignores all
+        # limits and make the games always playable even if there is no
+        # enough coins/batteries/playtime-window and like that"): the
+        # ownership cheat now flattens EVERY gate below - time windows,
+        # daily caps, the entry fee and both battery pools. Ownership only:
+        # a soon tile still refuses (it has nothing to launch).
+        if Box.dev_cheat("all_owned") == 1:
+                return true
         if not window_ok(id):
                 return false
         # v0.1.4: a reached daily cap (rounds or playtime) blocks play

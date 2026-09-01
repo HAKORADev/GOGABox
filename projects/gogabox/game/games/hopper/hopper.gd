@@ -1,125 +1,1516 @@
 extends GogaGame
-## Snowy Tower — climb forever. Tap left/right half to hop that way, land on
-## platforms as they scroll down; camera follows height. Slip = run over.
+## SNOWY TOWER (v0.2.5) - the tap-hop doodle clone grew up into a REAL
+## climber. Built from the owner's GDD + the PGB v1.3.8 reference
+## (Python_Game_Box_PGB/src/python/v1.3.8/snowy_tower.py). The journal is
+## docs/goga_docs/gogames_ideas/tower.md.
+##
+## Owner contract:
+##   - the PGB platform types live again: static / moving / blinking /
+##     disappearing / moving_blinking + THE RELIABILITY LAW (an unreliable
+##     platform is always followed by a reliable one) + the start platform
+##   - TWO WALLS: platforms AND the player never leave the screen; the
+##     walls are drawn, they bounce the player, they bound every patrol
+##   - the slide-up law: the scroll wakes after 2 platforms and climbs
+##     x1.1 for every 10 platforms (the PGB 1.1 ** (score // 10) law)
+##   - score = PLATFORMS CLIMBED: landing on a higher platform than ever
+##     pays exactly +1 (skip 3 and land the 4th = +1); landing on anything
+##     at or below your best pays NOTHING
+##   - PHYSICAL SNOW: flakes fall for real, LAND on platforms (the snow
+##     cap grows) and ON THE PLAYER (you get slow and heavy) - rolling
+##     sheds it; the owner's star mechanic, tuned hard
+##   - controls: bottom-left TWO ARROWS (hold to walk, the ball ROLLS and
+##     goes upside down), bottom-right a JUMP CIRCLE (one press, one jump)
+##   - GOGACoins hang in the air: one every 5-25 platforms counted from
+##     the last coin ON SCREEN (not the last collected - coins can fall
+##     off the bottom for real here)
+##   - run-end bonus = score/10 (registry coin_div)
+##   - shop: 4 powerups that SPAWN in runs (x2 double jump / big jump /
+##     speed / -50% slow slide - 10s each, the life ring is drawn INSIDE
+##     the jump button), 4 characters (ball/square/triangle/egg - each
+##     its own physics + spin + snow reaction), 4 platform skins
+##     (sand free + rock/grass/metal - shader-cut materials, not color
+##     swaps), 2 places (day free + night - day and night really feel
+##     different: palette + modulate + stars + aurora + moonlight rim)
+##   - NO random colors (the owner's v1.3.8 lesson): one designed palette,
+##     every decoration deterministic per platform index
+##   - everything drawn in code (no vendored sprites needed); tested
+##     visually via Xvfb before shipping (the owner's rule)
+##
+## Probe contract: phase/score/platforms/pw/flakes state is public,
+## rng.seed is settable, _set_move/_do_jump drive the controls directly.
 
-const GRAV := 2200.0
-const JUMP_V := -900.0
+const DIR := "res://assets/games/hopper/"
 
+# ---------------- layout + physics (all scaled by U = width/720) ----------
+const WALL_W := 34.0                 # the two walls' thickness
+const PLAYER_R := 30.0               # the ball's radius
+const GRAV := 2500.0
+const JUMP_V := -1080.0
+const WALK_MAX := 360.0              # max horizontal speed
+const ACCEL := 2200.0                # ground acceleration
+const AIR_ACCEL := 1350.0
+const GROUND_FRICTION := 2600.0      # decel with no input
+const AIR_DRAG := 260.0
+const WALL_BOUNCE := 0.45            # vx keeps 45% reversed into the wall
+
+# ---------------- the slide-up law ----------------------------------------
+const SCROLL_BASE := 55.0            # px/s (x U) once it wakes
+const SCROLL_WAKE_AT := 2            # platforms climbed before it wakes
+const SCROLL_STEP := 10              # every 10 platforms...
+const SCROLL_MULT := 1.1             # ...x1.1 (owner)
+const SCROLL_CAP := 6.0              # never past x6 (playability)
+
+# ---------------- platform generation -------------------------------------
+const PLAT_H := 22.0
+const GAP_MIN := 115.0
+const GAP_MAX := 170.0
+const W_MIN := 95.0
+const W_MAX := 255.0
+const START_W := 320.0               # the wide start platform (PGB law)
+
+## PGB v1.3.8 TYPE WEIGHTS + THE RELIABILITY LAW: after an unreliable type
+## the next platform is ALWAYS reliable. Weights shift with score (static
+## decays) but the law never bends.
+const PTYPES := {"static": 40, "moving": 25, "blinking": 15, "vanish": 10, "mb": 10}
+const RELIABLE := ["static", "moving"]
+const MOVE_SPD_MIN := 55.0
+const MOVE_SPD_MAX := 115.0
+const BLINK_PERIOD := 1.1            # s, visible<->ghost
+const VANISH_GRACE := 0.55           # s standing on it before it drops
+const VANISH_RESPAWN := 2.2          # s until it returns
+
+# ---------------- scoring / coins / pickups --------------------------------
+const COIN_GAP_MIN := 5              # owner: coins every 5-25 platforms...
+const COIN_GAP_MAX := 25             # ...counted from the last coin ON SCREEN
+const PICKUP_GAP_MIN := 8
+const PICKUP_GAP_MAX := 16
+
+# ---------------- the four powerups (10s each, owner spec) ----------------
+const PW_TIME := 10.0
+const POWERUPS := {
+        "x2":    {"name": "Double Jump", "price": 250, "glyph": "x2",
+                        "desc": "one extra jump in the air"},
+        "big":   {"name": "Big Jump", "price": 250, "glyph": "^",
+                        "desc": "jumps 28% higher"},
+        "speed": {"name": "Speed Moves", "price": 300, "glyph": ">>",
+                        "desc": "walk 50% faster"},
+        "slow":  {"name": "Slow Slide", "price": 350, "glyph": "-50%",
+                        "desc": "the tower slides 50% slower"},
+}
+
+# ---------------- the four characters (physics per GDD) -------------------
+## g/accel/fric/jump multiply the base physics; snow_in = how fast snow
+## sticks; shed_roll = snow shed per second while rolling; shed_land =
+## fraction of snow that pops off on a landing.
+const CHARS := {
+        "ball":   {"name": "Snowball", "price": 0, "g": 1.0, "accel": 1.0,
+                        "fric": 1.0, "jump": 1.0, "snow_in": 1.0, "shed_roll": 1.0,
+                        "shed_land": 0.35, "desc": "the classic roller"},
+        "square": {"name": "Ice Cube", "price": 400, "g": 1.05, "accel": 0.82,
+                        "fric": 1.6, "jump": 0.94, "snow_in": 1.15, "shed_roll": 0.35,
+                        "shed_land": 0.6, "desc": "tumbles corner over corner"},
+        "shard":  {"name": "Shard", "price": 600, "g": 0.82, "accel": 1.18,
+                        "fric": 0.55, "jump": 1.06, "snow_in": 0.45, "shed_roll": 2.2,
+                        "shed_land": 0.5, "desc": "glass-light, snow barely sticks"},
+        "egg":    {"name": "Eggy", "price": 800, "g": 0.95, "accel": 0.9,
+                        "fric": 0.3, "jump": 1.0, "snow_in": 1.5, "shed_roll": 0.6,
+                        "shed_land": 0.25, "desc": "slides forever, snow loves it"},
+}
+
+# ---------------- platform skins (real materials, not color swaps) --------
+const PLATS := {
+        "sand":  {"name": "Sandy Ledge", "price": 0},
+        "rock":  {"name": "Rock Ledge", "price": 300},
+        "grass": {"name": "Grass Ledge", "price": 300},
+        "metal": {"name": "Steel Ledge", "price": 450},
+}
+
+# ---------------- places (day/night really feel different) ----------------
+const PLACES := {
+        "day":   {"name": "Morning Slope", "price": 0},
+        "night": {"name": "Night Slope", "price": 400},
+}
+
+# ---------------- THE DESIGNED PALETTE (owner: no random colors) ----------
+const PAL := {
+        "day": {
+                "top": Color("6fb9e8"), "hor": Color("e3f2fb"),
+                "orb": Color("fff3c8"), "mountain": Color("b7d3e8"),
+                "mountain2": Color("9dbfdf"), "tree": Color("7fa8b8"),
+                "cloud": Color(1, 1, 1, 0.85), "wall": Color("7d9fbe"),
+                "wall_hi": Color("e8f4fb"), "modulate": Color(1, 1, 1),
+                "snow": Color(1, 1, 1, 0.95),
+        },
+        "night": {
+                "top": Color("0a1a38"), "hor": Color("1d3a66"),
+                "orb": Color("f2eed8"), "mountain": Color("1d3050"),
+                "mountain2": Color("16283f"), "tree": Color("14283a"),
+                "cloud": Color(0.75, 0.82, 1.0, 0.35), "wall": Color("16263c"),
+                "wall_hi": Color("35507a"), "modulate": Color(0.78, 0.84, 1.0),
+                "snow": Color(0.88, 0.94, 1.0, 0.95),
+        },
+}
+
+# ---------------- state ----------------------------------------------------
+var phase := "ready"                 # ready | run | over
 var world: Node2D
-var player: Sprite2D
-var vy := 0.0
-var vx := 0.0
-var playing := true
-var cam_y := 0.0
-var highest := 0.0
-var platforms: Array = []     # {node, x, y, w}
-var spawn_y := 0.0
-var hops := 0
+var sky: ColorRect
+var fx: Node2D                       # the VFX painter
+var snow_layer: Node2D               # the falling-snow painter
+var far_layer: Node2D                # parallax: mountains (factor 0.16)
+var mid_layer: Node2D                # parallax: trees (factor 0.38)
+var walls_layer: Node2D              # the screen-frame walls
+var clouds: Array = []               # drifting cloud puffs
+var plat_layer: Node2D               # ALL platforms, one draw pass
+var U := 1.0                         # resolution unit (vp.x / 720)
+var cam_y := 0.0                     # world y of the screen top (<= 0 up)
+var scroll_now := 0.0                # live slide speed (px/s)
+var shake := 0.0
 
-var _plat_tex: Texture2D
-var _snowball: Texture2D
+var player: Node2D                   # drawn by _draw_player
+var px := 0.0
+var py := 0.0                        # world coords (y grows DOWN)
+var vx := 0.0
+var vy := 0.0
+var grounded := false
+var ground_plat := {}                # the platform dict we stand on
+var air_jumped := false              # used the x2 mid-air jump
+var char_id := "ball"
+var snow_load := 0.0                 # 0..1 - the snow the ball carries
+var spin := 0.0                      # the rolling spin (radians)
+var tumble_acc := 0.0                # cube: distance since last 90deg
+var tumble_rot := 0.0
+var wobble_clock := 0.0
+
+var platforms: Array = []            # dicts: see _spawn_platform
+var next_idx := 0                    # next platform index to spawn
+var highest_idx := -1                # the best platform ever landed on
+var coins: Array = []                # {x, y, idx, t}
+var next_coin_idx := 0               # spawn a coin on this platform index
+var pickups: Array = []              # {x, y, idx, kind, t}
+var next_pick_idx := 0
+var flakes: Array = []               # the physical snowfall
+var pw := {"id": "", "t": 0.0}       # the live powerup (10s life)
+
+var move_dir := 0                    # -1 | 0 | 1 from the arrows
+var hops := 0                        # NOTE: score lives in the base class
+var wall_flash := {"l": 0.0, "r": 0.0}
+var rng := RandomNumberGenerator.new()
+var _speed_chip: Label               # the live slide-speed chip
+var _shop_pair: Array = []           # THE PAIR LAW: the shop owns its pair
+var _shop_from := "ready"
+var _ready_card: Control = null
+var _time := 0.0
+
+# ============================================================ setup / build
 
 func _goga_setup() -> void:
-        tk.tapped.connect(_on_tap)
-        _plat_tex = load("res://assets/games/hopper/platform.png")
-        _snowball = load("res://assets/games/hopper/player.png")
-        _build()
-        set_hud_score_prefix("HEIGHT")
-        set_score(0)
-
-func _build() -> void:
+        rng.randomize()
         var vp := get_viewport_rect().size
-        var bg := ColorRect.new()
-        bg.color = Color("bfe3f5")
-        bg.size = vp
-        bg.z_index = -10
-        bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        add_child(bg)  # static sky: does NOT scroll with the world
+        U = vp.x / 720.0
+        char_id = _char_id()
+
         world = Node2D.new()
         add_child(world)
 
-        player = Sprite2D.new()
-        player.texture = _snowball
-        player.position = Vector2(vp.x / 2.0, vp.y - 220)
+        # --- the sky (shader: gradient + orb + stars + aurora + cloud band) ---
+        sky = ColorRect.new()
+        sky.size = vp
+        sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var mat := ShaderMaterial.new()
+        mat.shader = load(DIR + "bg_sky.gdshader")
+        _apply_place(mat)
+        sky.material = mat
+        sky.z_index = -30
+        add_child(sky)   # SCREEN space: the sky never scrolls wholesale
+
+        # --- parallax mountains (far) + tree line (mid): screen space ---
+        far_layer = Node2D.new()
+        far_layer.z_index = -20
+        far_layer.draw.connect(_draw_far)
+        add_child(far_layer)
+        mid_layer = Node2D.new()
+        mid_layer.z_index = -19
+        mid_layer.draw.connect(_draw_mid)
+        add_child(mid_layer)
+        # --- the two walls: a screen-space frame ABOVE the world ---
+        walls_layer = Node2D.new()
+        walls_layer.z_index = 9
+        walls_layer.draw.connect(_draw_walls)
+        add_child(walls_layer)
+
+        # --- drifting cloud puffs (world-anchored, weak parallax) ---
+        for i in 7:
+                clouds.append({"x": rng.randf_range(0, vp.x), "y": rng.randf_range(-vp.y, vp.y),
+                                "w": rng.randf_range(150, 320) * U, "spd": rng.randf_range(6, 20) * U,
+                                "a": rng.randf_range(0.5, 1.0)})
+
+        plat_layer = Node2D.new()
+        plat_layer.z_index = -2
+        plat_layer.draw.connect(_draw_platforms)
+        world.add_child(plat_layer)
+
+        # --- coins + pickups live in plain Node2D holders ---
+        snow_layer = Node2D.new()
+        snow_layer.z_index = 6
+        snow_layer.draw.connect(_draw_snow)
+        world.add_child(snow_layer)
+
+        fx = Node2D.new()
+        fx.z_index = 8
+        fx.draw.connect(_draw_fx)
+        world.add_child(fx)
+
+        _build_player()
+        _build_world_start()
+        _build_controls()
+        add_hud_button("SHOP", func(): _shop_open())
+        _speed_chip = add_hud_chip("x1.00")
+        set_hud_score_prefix("TOWER")
+        set_score(0)
+        _day_night()
+        Jukebox.music("res://assets/audio/music/tower_theme.wav")
+        _show_ready_card()
+
+func _apply_place(mat: ShaderMaterial) -> void:
+        var pid := _place_id()
+        var p: Dictionary = PAL[pid]
+        mat.set_shader_parameter("top_col", p["top"])
+        mat.set_shader_parameter("hor_col", p["hor"])
+        mat.set_shader_parameter("orb_col", p["orb"])
+        mat.set_shader_parameter("orb_kind", 1.0 if pid == "day" else 2.0)
+        mat.set_shader_parameter("star_amt", 0.0 if pid == "day" else 1.0)
+        mat.set_shader_parameter("aurora_amt", 0.0 if pid == "day" else 1.0)
+
+func _place_id() -> String:
+        var on := Box.item_on(game_id, "place")
+        return on if PLACES.has(on) else "day"
+
+func _char_id() -> String:
+        var on := Box.skin_on(game_id)
+        return on if CHARS.has(on) else "ball"
+
+func _plat_id() -> String:
+        var on := Box.item_on(game_id, "plat")
+        return on if PLATS.has(on) else "sand"
+
+func _pal() -> Dictionary:
+        return PAL[_place_id()]
+
+## The day/night FEELING (owner: "make day and night really give different
+## feeling than just different backgrounds"): the world itself wears the
+## place - a cool moonlit modulate at night, warm noon at day.
+func _day_night() -> void:
+        var m := CanvasModulate.new()
+        m.color = _pal()["modulate"]
+        m.name = "place_modulate"
+        var old := world.get_node_or_null("place_modulate")
+        if old != null:
+                old.queue_free()
+        world.add_child(m)
+
+# ============================================================ world building
+
+func _build_player() -> void:
+        player = Node2D.new()
+        player.z_index = 5
+        player.draw.connect(_draw_player)
         world.add_child(player)
+        px = _vp().x / 2.0
+        py = _vp().y - 240.0 * U
+        player.position = Vector2(px, py)
 
-        # starting platform right under the player
-        _spawn_platform(vp.x / 2.0, vp.y - 160, true)
-        # prefill upward
-        var next_y := vp.y - 260
-        while next_y > cam_y - 200:
-                _spawn_platform(randf_range(90, vp.x - 90), next_y)
-                next_y -= randf_range(110, 165)
+func _build_world_start() -> void:
+        var vp := _vp()
+        # THE START PLATFORM (PGB law): one wide static ledge right under the
+        # player, centered.
+        _spawn_platform(vp.x / 2.0, vp.y - 160.0 * U, START_W * U, "static")
+        # prefill the climb (reachability-checked, reliability-ruled)
+        var top := cam_y - vp.y * 0.9
+        while _last_top() > top:
+                _gen_platform()
+        for i in 30:
+                _spawn_snowflake()
 
-func _spawn_platform(x: float, y: float, wide := false) -> void:
-        var s := Sprite2D.new()
-        s.texture = _plat_tex
-        var w := randf_range(190, 260) if not wide else 300.0
-        s.scale = Vector2(w / 300.0, 1.0)
-        s.position = Vector2(x, y)
-        world.add_child(s)
-        platforms.append({"node": s, "x": x, "y": y, "w": w})
-        spawn_y = minf(spawn_y, y)
+func _last_top() -> float:
+        return float(platforms[platforms.size() - 1]["y"])
 
-func _on_tap(pos: Vector2) -> void:
-        if not playing:
-                return
-        var vp := get_viewport_rect().size
-        var side := -1.0 if pos.x < vp.x / 2.0 else 1.0
-        vy = JUMP_V
-        vx = side * 330.0
-        hops += 1
-        achievement_count("hops", 1)
-        Jukebox.sfx("hop", -6.0, 1.0 + randf() * 0.1)
+## The generator: reachability-checked like the PGB (the new platform must
+## sit inside the horizontal reach of the previous one under the jump arc),
+## wall-clamped (owner walls), type = weighted PGB set + the reliability law.
+func _gen_platform() -> void:
+        var vp := _vp()
+        var prev: Dictionary = platforms[platforms.size() - 1]
+        var gap := rng.randf_range(GAP_MIN, GAP_MAX) * U
+        var w := rng.randf_range(W_MIN, W_MAX) * U
+        # horizontal reach under the arc: the whole rise time is usable
+        var rise := absf(JUMP_V * _char()["jump"]) / GRAV     # to apex, s
+        var reach := WALK_MAX * rise * 1.15
+        var lo: float = maxf(WALL_W * U + w / 2.0 + 4.0 * U, float(prev["x"]) - reach)
+        var hi: float = minf(vp.x - WALL_W * U - w / 2.0 - 4.0 * U, float(prev["x"]) + reach)
+        if hi < lo:
+                var mid := clampf(float(prev["x"]), lo, hi)
+                lo = mid
+                hi = mid
+        var x := rng.randf_range(lo, hi)
+        var ptype := _pick_type()
+        _spawn_platform(x, _last_top() - gap, w, ptype)
+
+func _pick_type() -> String:
+        var prev_unreliable: bool = platforms.size() > 0 \
+                        and not RELIABLE.has(String(platforms[platforms.size() - 1]["type"]))
+        if prev_unreliable:
+                return RELIABLE[rng.randi() % RELIABLE.size()]
+        # the weights shift as the tower climbs: static decays, movers grow
+        var shift := minf(20.0, float(score) * 0.35)
+        var weights := {"static": maxf(14.0, 40.0 - shift), "moving": 25.0 + shift * 0.4,
+                        "blinking": 15.0, "vanish": 10.0, "mb": 10.0}
+        var total := 0.0
+        for k in weights:
+                total += weights[k]
+        var r := rng.randf() * total
+        for k in weights:
+                r -= weights[k]
+                if r <= 0.0:
+                        return k
+        return "static"
+
+## Platform dict + node bookkeeping. All platforms live in ONE painter
+## (plat_layer._draw), so a platform is pure data.
+func _spawn_platform(x: float, y: float, w: float, ptype: String) -> void:
+        var p := {"idx": next_idx, "x": x, "y": y, "w": w, "type": ptype,
+                        "snow": 0.0, "visible": true, "clock": 0.0, "ghost": false,
+                        "dir": 1.0 if rng.randf() < 0.5 else -1.0,
+                        "spd": rng.randf_range(MOVE_SPD_MIN, MOVE_SPD_MAX) * U,
+                        "dx": 0.0}
+        if ptype == "moving" or ptype == "mb":
+                p["spd"] = rng.randf_range(MOVE_SPD_MIN, MOVE_SPD_MAX) * U \
+                                * (1.0 + minf(0.6, float(next_idx) * 0.004))
+        platforms.append(p)
+        # coins: 5-25 platforms from the LAST COIN SPAWNED (owner law)
+        if next_idx == next_coin_idx:
+                coins.append({"x": x, "y": y - 64.0 * U, "idx": next_idx, "t": 0.0})
+                next_coin_idx = next_idx + rng.randi_range(COIN_GAP_MIN, COIN_GAP_MAX)
+        # powerups: owned kinds only, reliable platforms only, 8-16 apart
+        if next_idx == next_pick_idx and next_idx > 4:
+                var kinds := _owned_pws()
+                if not kinds.is_empty() and RELIABLE.has(ptype):
+                        pickups.append({"x": x, "y": y - 106.0 * U, "idx": next_idx,
+                                        "kind": kinds[rng.randi() % kinds.size()], "t": 0.0})
+                next_pick_idx = next_idx + rng.randi_range(PICKUP_GAP_MIN, PICKUP_GAP_MAX)
+        next_idx += 1
+
+func _owned_pws() -> Array:
+        var out := []
+        for k in POWERUPS:
+                if Box.item_owned(game_id, "pw", k):
+                        out.append(k)
+        return out
+
+func _char() -> Dictionary:
+        return CHARS[char_id]
+
+func _vp() -> Vector2:
+        return get_viewport_rect().size
+
+# ============================================================ the run
+
+## The slide-up law (owner): wakes after 2 platforms, x1.1 per 10.
+func _scroll_speed() -> float:
+        if phase != "run" or score < SCROLL_WAKE_AT:
+                return 0.0
+        var mult := pow(SCROLL_MULT, float(score / SCROLL_STEP))
+        mult = minf(mult, SCROLL_CAP)
+        if pw["id"] == "slow":
+                mult *= 0.5
+        return SCROLL_BASE * U * mult
 
 func _goga_tick(delta: float) -> void:
-        if not playing:
+        _time += delta
+        if shake > 0.0:
+                shake = maxf(0.0, shake - delta * 3.0)
+        if phase != "run":
+                _update_clouds(delta)
+                _update_snow(delta)
+                _update_fx(delta)
+                queue_redraw_all()
                 return
-        var vp := get_viewport_rect().size
-        vy += GRAV * delta
-        player.position.y += vy * delta
-        player.position.x += vx * delta
-        vx = lerpf(vx, 0.0, 2.2 * delta)
-        player.position.x = clampf(player.position.x, 40, vp.x - 40)
-        player.rotation += vx * delta * 0.004
+        var vp := _vp()
 
-        # land: only when falling
-        if vy > 0:
+        # ---- the slide-up: the camera RISES on its own, pushing the player
+        # toward the bottom of the screen. Falling below = end of round.
+        scroll_now = _scroll_speed()
+        cam_y -= scroll_now * delta
+
+        # ---- the powerup life (10s) ----
+        if pw["id"] != "":
+                pw["t"] -= delta
+                if pw["t"] <= 0.0:
+                        pw = {"id": "", "t": 0.0}
+                        Jukebox.sfx("tower_pw_end", -10.0)
+                        _fx_ring(Vector2(px, py), Color(0.7, 0.75, 0.9, 0.5), 30.0)
+
+        # ---- player physics (per-character modifiers) ----
+        var c := _char()
+        var g := GRAV * U * float(c["g"])
+        var accel := (ACCEL if grounded else AIR_ACCEL) * U * float(c["accel"])
+        var fric := GROUND_FRICTION * U * float(c["fric"])
+        var drag := AIR_DRAG * U
+        var vmax := WALK_MAX * U * (1.5 if pw["id"] == "speed" else 1.0) \
+                        * (1.0 - 0.25 * snow_load)
+        accel *= (1.0 - 0.45 * snow_load)      # the snow makes you heavy
+        var want := float(move_dir)
+        if want != 0.0:
+                vx += want * accel * delta
+                vx = clampf(vx, -vmax, vmax)
+        else:
+                var dec := (fric if grounded else drag) * delta
+                vx = move_toward(vx, 0.0, dec)
+        vy += g * delta
+        px += vx * delta
+        py += vy * delta
+        player.position = Vector2(px, py)   # the sprite IS the body (always)
+
+        # ---- THE WALLS: the player can never leave the screen (owner) ----
+        var wl := WALL_W * U + PLAYER_R * U
+        if px < wl:
+                px = wl
+                if vx < 0:
+                        vx = -vx * WALL_BOUNCE
+                        wall_flash["l"] = 0.22
+                        if absf(vx) > 40.0 * U:
+                                Jukebox.sfx("tower_wall", -14.0)
+                                _fx_poof(Vector2(px - PLAYER_R * U * 0.7, py), 4, 0.6)
+        if px > vp.x - wl:
+                px = vp.x - wl
+                if vx > 0:
+                        vx = -vx * WALL_BOUNCE
+                        wall_flash["r"] = 0.22
+                        if absf(vx) > 40.0 * U:
+                                Jukebox.sfx("tower_wall", -14.0)
+                                _fx_poof(Vector2(px + PLAYER_R * U * 0.7, py), 4, 0.6)
+        wall_flash["l"] = maxf(0.0, float(wall_flash["l"]) - delta)
+        wall_flash["r"] = maxf(0.0, float(wall_flash["r"]) - delta)
+
+        # ---- platforms: patrol / blink / vanish, carry the rider ----
+        _update_platforms(delta)
+        _update_landings(delta)
+
+        # ---- the spin laws per character (owner: each its own way) ----
+        _update_spin(delta)
+
+        # ---- coins + powerup pickups ----
+        _update_pickables(delta)
+
+        # ---- THE PHYSICAL SNOW (the star mechanic) ----
+        _update_snow(delta)
+        _update_fx(delta)
+
+        _refresh_jump_ui()
+        # ---- score bookkeeping: climb achievements (best tower) ----
+        achievement_max("max_tower", score)
+        achievement_max("max_height", int(maxf(0.0, (vp.y - 240.0 * U) - py)))
+        if _speed_chip != null and is_instance_valid(_speed_chip):
+                _speed_chip.text = "x%.2f" % (scroll_now / (SCROLL_BASE * U)) \
+                                if scroll_now > 0.0 else "idle"
+
+        # ---- camera: follows the player upward + the slide pushes it ----
+        var target := minf(cam_y, py - vp.y * 0.55)
+        cam_y = lerpf(cam_y, target, 1.0 - pow(0.0015, delta))
+        world.position.y = -cam_y - (6.0 * U * shake * sin(_time * 61.0))
+        if sky != null and sky.material is ShaderMaterial:
+                (sky.material as ShaderMaterial).set_shader_parameter(
+                        "shift", -cam_y * 0.00004)
+                (sky.material as ShaderMaterial).set_shader_parameter(
+                        "time_s", _time)
+
+        # ---- cull below, spawn above ----
+        _cull_and_spawn()
+
+        # ---- fell below the screen = end of round (owner) ----
+        if py - cam_y > vp.y + 70.0 * U:
+                _die()
+
+        _update_clouds(delta)
+        queue_redraw_all()
+
+func queue_redraw_all() -> void:
+        player.queue_redraw()
+        plat_layer.queue_redraw()
+        snow_layer.queue_redraw()
+        fx.queue_redraw()
+        far_layer.queue_redraw()
+        mid_layer.queue_redraw()
+        walls_layer.queue_redraw()
+        for cl in _jump_btns():
+                cl.queue_redraw()
+
+func _jump_btns() -> Array:
+        var out := []
+        if _jump_btn != null and is_instance_valid(_jump_btn):
+                out.append(_jump_btn)
+        return out
+
+# ------------------------------------------------------------- platforms
+
+func _update_platforms(delta: float) -> void:
+        var vp := _vp()
+        for p in platforms:
+                var vis: bool = bool(p["visible"])
+                var was_x: float = float(p["x"])
+                var t := String(p["type"])
+                # NOTE: "mb" does BOTH halves - a match would eat the second one
+                if t == "moving" or t == "mb":
+                        if vis:
+                                var nx: float = float(p["x"]) + float(p["spd"]) * float(p["dir"]) * delta
+                                var lo := WALL_W * U + float(p["w"]) / 2.0 + 2.0 * U
+                                var hi := vp.x - WALL_W * U - float(p["w"]) / 2.0 - 2.0 * U
+                                if nx < lo:
+                                        nx = lo
+                                        p["dir"] = 1.0
+                                elif nx > hi:
+                                        nx = hi
+                                        p["dir"] = -1.0
+                                p["x"] = nx
+                if t == "blinking" or t == "mb":
+                        p["clock"] = float(p["clock"]) + delta
+                        if float(p["clock"]) >= BLINK_PERIOD:
+                                p["clock"] = 0.0
+                                p["visible"] = not vis
+                if t == "vanish" and bool(p["ghost"]):
+                        # cracking grace, then gone for VANISH_RESPAWN, then back
+                        p["clock"] = float(p["clock"]) + delta
+                        if bool(p["visible"]) and float(p["clock"]) >= VANISH_GRACE:
+                                p["visible"] = false
+                        if float(p["clock"]) >= VANISH_GRACE + VANISH_RESPAWN:
+                                p["ghost"] = false
+                                p["visible"] = true
+                                p["clock"] = 0.0
+                p["dx"] = float(p["x"]) - was_x
+        # the rider rides (moving platforms carry the player)
+        if grounded and not ground_plat.is_empty():
+                px += float(ground_plat.get("dx", 0.0))
+
+func _update_landings(delta: float) -> void:
+        var vp := _vp()
+        if vy > 0.0:
                 for p in platforms:
-                        var top: float = float(p["y"]) - 22.0
-                        if player.position.y >= top and player.position.y <= top + 26.0 + vy * delta \
-                                        and absf(player.position.x - float(p["x"])) < float(p["w"]) / 2.0 + 16.0:
-                                player.position.y = top
-                                vy = 0
-                                vx *= 0.5
-                                Jukebox.sfx("land", -14.0)
+                        if String(p["type"]) == "vanish" and bool(p["ghost"]):
+                                continue
+                        if String(p["type"]) in ["blinking", "mb"] and not bool(p["visible"]):
+                                continue
+                        var top: float = float(p["y"]) - PLAT_H * U * 0.5 - PLAYER_R * U
+                        # SWEPT landing: the feet CROSSED the top this frame -
+                        # fps-proof (a slow frame can never tunnel through)
+                        var prev_y: float = py - vy * delta
+                        if prev_y <= top + 6.0 * U and py >= top \
+                                        and absf(px - float(p["x"])) < float(p["w"]) / 2.0 + PLAYER_R * U * 0.55:
+                                _land(p)
                                 break
+        elif grounded:
+                # still standing? (platform vanished / walked off / carried away)
+                var still: bool = ground_plat != null and not ground_plat.is_empty() \
+                                and bool(ground_plat.get("visible", true)) \
+                                and not (String(ground_plat.get("type", "")) == "vanish" and bool(ground_plat.get("ghost", false))) \
+                                and absf(px - float(ground_plat.get("x", -99999))) < float(ground_plat.get("w", 0)) / 2.0 + PLAYER_R * U * 0.55 \
+                                and absf(py - (float(ground_plat.get("y", 0)) - PLAT_H * U * 0.5 - PLAYER_R * U)) < 8.0 * U
+                if not still:
+                        grounded = false
+                        ground_plat = {}
 
-        # camera follows player upward only
-        var target_cam := minf(cam_y, player.position.y - vp.y * 0.55)
-        cam_y = lerpf(cam_y, target_cam, 1.0 - pow(0.001, delta))
-        world.position.y = -cam_y
-
-        # height score (px climbed relative to start)
-        var climbed := maxf(0.0, (vp.y - 220.0) - player.position.y + maxf(0.0, -cam_y))
-        highest = maxf(highest, climbed)
-        set_score(int(climbed))
-        achievement_max("max_height", int(climbed))
-
-        # spawn platforms above, cull below
-        if spawn_y > cam_y - 100:
-                spawn_y -= randf_range(110, 165)
-                _spawn_platform(randf_range(90, vp.x - 90), spawn_y)
-        for p in platforms.duplicate():
-                if float(p["y"]) > cam_y + vp.y + 140:
-                        platforms.erase(p)
-                        (p["node"] as Sprite2D).queue_free()
-
-        # fell off the bottom
-        if player.position.y > cam_y + vp.y + 60:
-                playing = false
-                Jukebox.sfx("boom", -4.0)
+## THE SCORING LAW (owner): land higher than EVER = +1 (skipping platforms
+## still pays exactly 1); land at or below the best = nothing.
+func _land(p: Dictionary) -> void:
+        var c := _char()
+        py = float(p["y"]) - PLAT_H * U * 0.5 - PLAYER_R * U
+        vy = 0.0
+        var was_air := not grounded
+        grounded = true
+        ground_plat = p
+        if was_air:
+                vx *= 0.55
+                Jukebox.sfx("tower_land", -13.0, 1.0 + rng.randf() * 0.12)
+                _fx_poof(Vector2(px, py + PLAYER_R * U * 0.8), 6, 0.8)
+                # the snow pops off on impact (per character)
+                var shed: float = float(c["shed_land"])
+                if snow_load > 0.02 and shed > 0.0:
+                        _fx_poof(Vector2(px, py + PLAYER_R * U), 8, 1.2)
+                snow_load = maxf(0.0, snow_load - snow_load * shed)
+                # vanish platforms start dying under your feet
+                if String(p["type"]) == "vanish" and not bool(p["ghost"]):
+                        p["ghost"] = true
+                        p["clock"] = 0.0
+                        p["visible"] = true
+                        Jukebox.sfx("tower_crack", -10.0)
+        if int(p["idx"]) > highest_idx:
+                highest_idx = int(p["idx"])
+                add_score(1)
+                _fx_pop(Vector2(px, py - 60.0 * U), "+1")
                 check_achievements()
-                var tw := create_tween()
-                tw.tween_property(world, "modulate", Color(0.7, 0.8, 1.0, 0.6), 0.3)
-                tw.tween_callback(func(): finish_run(score))
+
+# ------------------------------------------------------------- jump
+
+func _do_jump() -> void:
+        if phase != "run":
+                return
+        var c := _char()
+        if grounded:
+                var jv: float = JUMP_V * U * float(c["jump"]) \
+                                * (1.28 if pw["id"] == "big" else 1.0) \
+                                * (1.0 - 0.12 * snow_load)
+                vy = jv
+                grounded = false
+                ground_plat = {}
+                air_jumped = false
+                hops += 1
+                achievement_count("hops", 1)
+                Jukebox.sfx("tower_jump", -8.0, 1.0 + rng.randf() * 0.08)
+                _fx_poof(Vector2(px, py + PLAYER_R * U * 0.7), 7, 1.0)
+        elif pw["id"] == "x2" and not air_jumped:
+                # THE x2: one extra jump in the air (owner powerup)
+                air_jumped = true
+                vy = JUMP_V * U * float(c["jump"]) * 0.92
+                hops += 1
+                achievement_count("hops", 1)
+                Jukebox.sfx("tower_jump", -8.0, 1.22)
+                _fx_ring(Vector2(px, py + PLAYER_R * U), Color(1, 1, 1, 0.7), 26.0)
+                _fx_poof(Vector2(px, py + PLAYER_R * U), 6, 1.0)
+
+func _set_move(dir: int) -> void:
+        move_dir = clampi(dir, -1, 1)
+
+# ------------------------------------------------------------- coins / pickups
+
+func _update_pickables(delta: float) -> void:
+        # coins: collect on touch, bob forever
+        for c in coins.duplicate():
+                c["t"] = float(c["t"]) + delta
+                var cy: float = float(c["y"]) + sin(float(c["t"]) * 3.2) * 7.0 * U
+                if absf(px - float(c["x"])) < PLAYER_R * U + 26.0 * U \
+                                and absf(py - cy) < PLAYER_R * U + 26.0 * U:
+                        coins.erase(c)
+                        add_run_coins(1)
+                        Jukebox.sfx("tower_coin", -6.0, 1.0 + rng.randf() * 0.1)
+                        _fx_ring(Vector2(float(c["x"]), cy), Color(1.0, 0.85, 0.3, 0.9), 34.0)
+                        _fx_poof(Vector2(float(c["x"]), cy), 6, 1.0)
+        # pickups: touch = the powerup goes live (a second one replaces it)
+        for k in pickups.duplicate():
+                k["t"] = float(k["t"]) + delta
+                if absf(px - float(k["x"])) < PLAYER_R * U + 30.0 * U \
+                                and absf(py - float(k["y"])) < PLAYER_R * U + 30.0 * U:
+                        pickups.erase(k)
+                        var kind := String(k["kind"])
+                        var replaced := String(pw["id"]) != "" and String(pw["id"]) != kind
+                        pw = {"id": kind, "t": PW_TIME}
+                        air_jumped = false
+                        Jukebox.sfx("tower_pw", -4.0)
+                        _fx_ring(Vector2(float(k["x"]), float(k["y"])), Color(0.6, 0.9, 1.0, 0.9), 46.0)
+                        _fx_pop(Vector2(float(k["x"]), float(k["y"]) - 50.0 * U),
+                                        POWERUPS[kind]["glyph"] if kind != "x2" else "x2!")
+                        if replaced:
+                                _toast_show("%s takes over" % POWERUPS[kind]["name"])
+
+func _cull_and_spawn() -> void:
+        var vp := _vp()
+        # platforms / coins / pickups below the screen die (their coins may be
+        # gone forever - the spacing already counted them, owner note)
+        platforms = platforms.filter(func(p):
+                var alive: bool = float(p["y"]) - cam_y < vp.y + 160.0 * U
+                return alive)
+        coins = coins.filter(func(c):
+                return float(c["y"]) - cam_y < vp.y + 120.0 * U)
+        pickups = pickups.filter(func(k):
+                return float(k["y"]) - cam_y < vp.y + 120.0 * U)
+        while _last_top() > cam_y - 120.0:
+                _gen_platform()
+
+func _die() -> void:
+        if phase != "run":
+                return
+        phase = "over"
+        move_dir = 0
+        Jukebox.sfx("tower_fall", -3.0)
+        shake = 1.0
+        _fx_burst(Vector2(px, minf(py, cam_y + _vp().y - 40.0 * U)))
+        achievement_max("max_tower", score)
+        check_achievements()
+        var tw := create_tween()
+        tw.tween_property(world, "modulate", Color(0.75, 0.82, 1.0, 0.5), 0.45)
+        tw.tween_callback(func(): finish_run(score))
+
+# ------------------------------------------------------------- the SPIN LAWS
+## Owner: every character spins its OWN way while it moves.
+
+func _update_spin(delta: float) -> void:
+        var c := _char()
+        match char_id:
+                "ball":
+                        # the classic roller: the ball ROLLS - it goes upside down
+                        if grounded and absf(vx) > 12.0 * U:
+                                spin += (vx / (PLAYER_R * U)) * delta
+                        else:
+                                spin += (vx * 0.3 / (PLAYER_R * U)) * delta
+                        player.rotation = spin
+                "square":
+                        # the cube TUMBLES: it snaps corner over corner, 90deg at a time
+                        if grounded and absf(vx) > 20.0 * U:
+                                tumble_acc += vx * delta
+                                var half: float = PLAYER_R * U * 1.15
+                                if absf(tumble_acc) >= half:
+                                        tumble_acc = fmod(tumble_acc, half)
+                                        tumble_rot += (PI / 2.0) * signf(vx)
+                        player.rotation = tumble_rot
+                "shard":
+                        # the shard SPINS like a saw while it moves, drifts in the air
+                        spin += (absf(vx) * 0.011 + (0.9 if not grounded else 0.0)) * delta * signf(vx if vx != 0.0 else 1.0)
+                        player.rotation = spin
+                "egg":
+                        # the egg WOBBLES: never a full spin, always lands back up
+                        wobble_clock += delta * (9.0 if absf(vx) > 20.0 * U else 3.0)
+                        player.rotation = sin(wobble_clock) * 0.32 * clampf(absf(vx) / (WALK_MAX * U), 0.15, 1.0) * signf(vx if vx != 0.0 else 1.0)
+
+# ------------------------------------------------------------- THE SNOW
+## Real flakes fall (world space), LAND on platforms (the snow cap grows)
+## and on the PLAYER (slow + heavy). Rolling sheds it. The owner's star
+## mechanic - every number here is a tuned law, not a decoration.
+
+const SNOW_COUNT := 110
+const SNOW_CAP_MAX := 1.0
+const SNOW_ON_PLAT := 0.030        # a landed flake thickens the cap by this
+const SNOW_ON_PLAYER := 0.035      # a flake that hits you sticks by this
+const SHED_ROLL := 0.35            # load/s shed while rolling (x char)
+const SHED_AIR := 0.05             # load/s shed airborne (the wind shakes it)
+
+func _spawn_snowflake() -> void:
+        var vp := _vp()
+        flakes.append({"x": rng.randf_range(WALL_W * U + 4.0, vp.x - WALL_W * U - 4.0),
+                        "y": cam_y - rng.randf_range(10.0, 60.0) * U,
+                        "vy": rng.randf_range(46.0, 150.0) * U,
+                        "ph": rng.randf() * TAU,
+                        "sz": rng.randf_range(1.6, 4.6) * U,
+                        "fore": rng.randf() < 0.14})
+
+func _snow_wind() -> float:
+        return sin(_time * 0.32) * 30.0 * U + sin(_time * 0.13 + 1.7) * 16.0 * U
+
+func _update_snow(delta: float) -> void:
+        var vp := _vp()
+        var wind := _snow_wind()
+        var c := _char()
+        while flakes.size() < SNOW_COUNT:
+                _spawn_snowflake()
+        for f in flakes:
+                # flake physics: gravity-ish fall + the global wind sway
+                f["y"] += float(f["vy"]) * delta
+                f["x"] += (wind + sin(_time * 1.7 + float(f["ph"])) * 14.0 * U) * delta \
+                                * (1.6 if bool(f["fore"]) else 1.0)
+                # a flake that lands on a PLATFORM thickens its snow cap
+                var landed := false
+                for p in platforms:
+                        if String(p["type"]) == "vanish" and bool(p["ghost"]):
+                                continue
+                        if String(p["type"]) in ["blinking", "mb"] and not bool(p["visible"]):
+                                continue
+                        var top: float = float(p["y"]) - PLAT_H * U * 0.5
+                        var sy: float = float(f["y"])
+                        if sy >= top and sy <= top + 10.0 * U + float(f["vy"]) * delta \
+                                        and absf(float(f["x"]) - float(p["x"])) < float(p["w"]) / 2.0 \
+                                        and float(p["snow"]) < SNOW_CAP_MAX:
+                                p["snow"] = minf(SNOW_CAP_MAX, float(p["snow"]) + SNOW_ON_PLAT)
+                                landed = true
+                                break
+                if not landed and bool(f["fore"]) == false:
+                        # a flake that lands on the TOP of you sticks (slow +
+                        # heavy) - the catchment is the ball's upper cap,
+                        # not its whole column
+                        if absf(float(f["x"]) - px) < PLAYER_R * U * 0.8 \
+                                        and float(f["y"]) > py - PLAYER_R * U - 6.0 * U \
+                                        and float(f["y"]) < py - PLAYER_R * U * 0.2:
+                                snow_load = minf(1.0, snow_load + SNOW_ON_PLAYER * float(c["snow_in"]))
+                                landed = true
+                # recycle at the bottom (or on landing)
+                if landed or float(f["y"]) - cam_y > vp.y + 12.0:
+                        f["x"] = rng.randf_range(WALL_W * U + 4.0, vp.x - WALL_W * U - 4.0)
+                        f["y"] = cam_y - rng.randf_range(6.0, 40.0) * U
+        # SHEDDING: rolling shakes it off, the air dries you slowly
+        if grounded and absf(vx) > 60.0 * U:
+                var before := snow_load
+                snow_load = maxf(0.0, snow_load - SHED_ROLL * float(c["shed_roll"]) * delta)
+                if before > 0.05 and rng.randf() < 10.0 * delta:
+                        _fx_shed()
+        elif not grounded:
+                snow_load = maxf(0.0, snow_load - SHED_AIR * delta)
+
+# ------------------------------------------------------------- clouds / fx
+
+func _update_clouds(delta: float) -> void:
+        var vp := _vp()
+        for cl in clouds:
+                cl["x"] = float(cl["x"]) - float(cl["spd"]) * delta
+                if float(cl["x"]) + float(cl["w"]) < 0.0:
+                        cl["x"] = vp.x + float(cl["w"]) * 0.2
+                        cl["y"] = cam_y + rng.randf_range(-vp.y * 0.9, vp.y * 0.5)
+
+var parts: Array = []               # {x,y,vx,vy,life,max,r,col,kind}
+var pops: Array = []                # {x,y,life,txt}
+
+func _fx_poof(at: Vector2, n: int, scale: float) -> void:
+        for i in n:
+                parts.append({"x": at.x, "y": at.y,
+                                "vx": rng.randf_range(-70.0, 70.0) * U * scale,
+                                "vy": rng.randf_range(-110.0, -20.0) * U * scale,
+                                "life": rng.randf_range(0.3, 0.55), "max": 0.55,
+                                "r": rng.randf_range(2.5, 5.5) * U * scale,
+                                "col": _pal()["snow"], "kind": "snow"})
+        if parts.size() > 240:
+                parts = parts.slice(parts.size() - 240)
+
+func _fx_shed() -> void:
+        _fx_poof(Vector2(px - signf(vx) * PLAYER_R * U * 0.6, py + PLAYER_R * U * 0.5), 2, 0.7)
+
+func _fx_ring(at: Vector2, col: Color, r: float) -> void:
+        parts.append({"x": at.x, "y": at.y, "vx": 0.0, "vy": 0.0, "life": 0.4,
+                        "max": 0.4, "r": r * U, "col": col, "kind": "ring"})
+
+func _fx_burst(at: Vector2) -> void:
+        for i in 22:
+                parts.append({"x": at.x, "y": at.y,
+                                "vx": rng.randf_range(-320.0, 320.0) * U,
+                                "vy": rng.randf_range(-420.0, 60.0) * U,
+                                "life": rng.randf_range(0.5, 0.9), "max": 0.9,
+                                "r": rng.randf_range(3.0, 7.0) * U,
+                                "col": _pal()["snow"], "kind": "snow"})
+
+func _fx_pop(at: Vector2, txt: String) -> void:
+        pops.append({"x": at.x, "y": at.y, "life": 0.8, "txt": txt})
+
+func _update_fx(delta: float) -> void:
+        for p in parts.duplicate():
+                p["life"] = float(p["life"]) - delta
+                if String(p["kind"]) == "snow":
+                        p["x"] = float(p["x"]) + float(p["vx"]) * delta
+                        p["y"] = float(p["y"]) + float(p["vy"]) * delta
+                        p["vy"] = float(p["vy"]) + 900.0 * U * delta
+                if float(p["life"]) <= 0.0:
+                        parts.erase(p)
+        for p in pops.duplicate():
+                p["life"] = float(p["life"]) - delta
+                p["y"] = float(p["y"]) - 60.0 * U * delta
+                if float(p["life"]) <= 0.0:
+                        pops.erase(p)
+        fx.queue_redraw()
+        snow_layer.queue_redraw()
+
+# ============================================================ painting
+
+func _hashf(n: int, salt: float = 0.0) -> float:
+        return fmod(absf(sin(float(n) * 127.1 + salt * 311.7)) * 43758.5453, 1.0)
+
+func _draw_platforms() -> void:
+        var skin := _plat_id()
+        for p in platforms:
+                var sy: float = float(p["y"]) - 0.0   # plat_layer lives IN world
+                var sx: float = float(p["x"])
+                var w: float = float(p["w"])
+                var h: float = PLAT_H * U
+                if not bool(p["visible"]):
+                        # the ghost outline (blinking-off / vanished) - a fair hint
+                        if bool(p["ghost"]) or String(p["type"]) in ["blinking", "mb"]:
+                                plat_layer.draw_rect(Rect2(sx - w / 2.0, sy - h / 2.0, w, h),
+                                                Color(1, 1, 1, 0.10), false, 2.0 * U)
+                        continue
+                var idx: int = int(p["idx"])
+                var left := sx - w / 2.0
+                var top := sy - h / 2.0
+                var body := Rect2(left, top, w, h)
+                match skin:
+                        "sand":
+                                plat_layer.draw_rect(body, Color("c9a86a"))
+                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.42), Color("e3c98d"))
+                                plat_layer.draw_rect(Rect2(left, top + h * 0.8, w, h * 0.2), Color("a8874f"))
+                                # deterministic grains (owner: no random look)
+                                var grains := int(w / (16.0 * U))
+                                for i in grains:
+                                        var gx := left + _hashf(idx, float(i)) * w
+                                        var gy := top + (0.2 + _hashf(idx, float(i) + 7.3) * 0.7) * h
+                                        plat_layer.draw_rect(Rect2(gx, gy, 2.2 * U, 2.2 * U), Color("8f6f3e"))
+                        "rock":
+                                plat_layer.draw_rect(body, Color("8a93a8"))
+                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.34), Color("a8b2c4"))
+                                plat_layer.draw_rect(Rect2(left, top + h * 0.75, w, h * 0.25), Color("6a7386"))
+                                # facets + a crack
+                                var facets := maxi(2, int(w / (70.0 * U)))
+                                for i in facets:
+                                        var fx0 := left + (float(i) + _hashf(idx, float(i)) * 0.5) * w / float(facets)
+                                        var fy := top + h * (0.3 + _hashf(idx, float(i) + 3.1) * 0.4)
+                                        var pts := PackedVector2Array([Vector2(fx0, fy), Vector2(fx0 + 16.0 * U, fy + 5.0 * U), Vector2(fx0 + 8.0 * U, fy + h * 0.5)])
+                                        plat_layer.draw_colored_polygon(pts, Color("767f94"))
+                                plat_layer.draw_line(Vector2(left + w * 0.3, top + 2.0 * U), Vector2(left + w * 0.42, top + h - 2.0 * U), Color("5d6578"), 1.6 * U)
+                        "grass":
+                                plat_layer.draw_rect(body, Color("8a6a46"))                       # soil
+                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.45), Color("6fae5c"))
+                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.16), Color("8cc975"))
+                                var blades := int(w / (12.0 * U))
+                                for i in blades:
+                                        var bx := left + (float(i) + 0.3) * w / float(blades)
+                                        var bh := (4.0 + _hashf(idx, float(i)) * 6.0) * U
+                                        var pts := PackedVector2Array([Vector2(bx, top + 1.0), Vector2(bx + 2.6 * U, top - bh), Vector2(bx + 5.2 * U, top + 1.0)])
+                                        plat_layer.draw_colored_polygon(pts, Color("8cc975"))
+                                if _hashf(idx, 9.1) > 0.55:   # one deterministic flower
+                                        var flx := left + w * (0.2 + _hashf(idx, 4.4) * 0.6)
+                                        plat_layer.draw_circle(Vector2(flx, top - 2.0 * U), 3.4 * U, Color("f0d0e0"))
+                        "metal":
+                                plat_layer.draw_rect(body, Color("9aa4b2"))
+                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.3), Color("c8d2de"))
+                                plat_layer.draw_rect(Rect2(left, top + h * 0.55, w, h * 0.45), Color("707a8a"))
+                                plat_layer.draw_rect(Rect2(left + 6.0 * U, top + h * 0.46, w - 12.0 * U, 1.6 * U), Color("b8c2ce"))
+                                var rivets := maxi(2, int(w / (64.0 * U)))
+                                for i in rivets:
+                                        var rx := left + (float(i) + 0.5) * w / float(rivets)
+                                        plat_layer.draw_circle(Vector2(rx, top + h * 0.28), 3.0 * U, Color("5d6575"))
+                                        plat_layer.draw_circle(Vector2(rx, top + h * 0.78), 3.0 * U, Color("5d6575"))
+                # THE SNOW CAP (the physical snow that landed here)
+                var cap: float = float(p["snow"])
+                if cap > 0.005:
+                        var ct := 2.5 * U + cap * 9.0 * U
+                        var capr := Rect2(left - 2.0 * U, top - ct, w + 4.0 * U, ct + h * 0.3)
+                        plat_layer.draw_rect(capr, _pal()["snow"])
+                        plat_layer.draw_rect(Rect2(left - 2.0 * U, top - ct, (w + 4.0 * U) * 0.5, ct * 0.5), Color(1, 1, 1, 0.5))
+                # cracking preview while a vanish platform dies
+                if String(p["type"]) == "vanish" and bool(p["ghost"]) and bool(p["visible"]):
+                        var frac: float = clampf(float(p["clock"]) / VANISH_GRACE, 0.0, 1.0)
+                        var mid := Vector2(sx, sy)
+                        for i in 3:
+                                var ang := TAU * (float(i) / 3.0) + _hashf(idx, float(i)) * 2.0
+                                plat_layer.draw_line(mid, mid + Vector2(cos(ang), sin(ang)) * w * 0.24 * frac, Color("3a3028"), 1.4 * U)
+
+func _draw_walls() -> void:
+        # walls live in SCREEN space (they are the screen's frame) - drawn by
+        # the game node itself (it is a Node2D in the world's parent, so its
+        # local space = screen space)
+        var vp := _vp()
+        var w := WALL_W * U
+        var p := _pal()
+        for side in [0, 1]:
+                var x := 0.0 if side == 0 else vp.x - w
+                var col: Color = p["wall"]
+                var flash: float = float(wall_flash["l" if side == 0 else "r"])
+                var base := Rect2(x, 0, w, vp.y)
+                walls_layer.draw_rect(base, col)
+                # the bright INNER edge faces the play field (reads as ice)
+                var edge_x := x + w - 5.0 * U if side == 0 else x
+                walls_layer.draw_rect(Rect2(edge_x, 0, 5.0 * U, vp.y), p["wall_hi"])
+                # icy streaks (deterministic, scroll SLOWLY with the camera)
+                var rows := int(vp.y / (90.0 * U)) + 2
+                var off := fmod(-cam_y * 0.12, 90.0 * U)
+                for i in rows:
+                        var yy := float(i) * 90.0 * U + off - 90.0 * U
+                        var hh := (18.0 + _hashf(i, float(side) + 1.0) * 40.0) * U
+                        walls_layer.draw_rect(Rect2(x + 4.0 * U, yy, w - 8.0 * U, hh), Color(1, 1, 1, 0.10))
+                if flash > 0.0:
+                        walls_layer.draw_rect(base, Color(1, 1, 1, flash * 1.4))
+
+func _draw_far() -> void:
+        # far mountains: screen-space parallax (factor 0.16), infinite rows
+        var vp := _vp()
+        var f := 0.16
+        var tile := 300.0 * U
+        var off := fmod(-cam_y * f, tile)
+        var p := _pal()
+        var rows := int(vp.y / tile) + 3
+        var base_row := int(floor(cam_y * f / tile))
+        for r in rows:
+                var y := -tile + float(r) * tile + off
+                var idx := base_row + r
+                var n := 4
+                for i in n:
+                        var mw := vp.x / float(n) * (1.1 + _hashf(idx * 7 + i, 2.2) * 0.5)
+                        var mx := (float(i) + _hashf(idx * 7 + i, 0.7)) * vp.x / float(n) - mw * 0.25
+                        var mh := (120.0 + _hashf(idx * 7 + i, 5.5) * 130.0) * U
+                        var pts := PackedVector2Array([Vector2(mx - mw * 0.5, y + tile), Vector2(mx, y + tile - mh), Vector2(mx + mw * 0.5, y + tile)])
+                        far_layer.draw_colored_polygon(pts, p["mountain"])
+                        var pts2 := PackedVector2Array([Vector2(mx, y + tile - mh), Vector2(mx + mw * 0.5, y + tile), Vector2(mx + mw * 0.14, y + tile)])
+                        far_layer.draw_colored_polygon(pts2, p["mountain2"])
+
+func _draw_mid() -> void:
+        # tree line: screen-space parallax (factor 0.38) + drifting clouds
+        var vp := _vp()
+        var f := 0.38
+        var tile := 220.0 * U
+        var off := fmod(-cam_y * f, tile)
+        var p := _pal()
+        var rows := int(vp.y / tile) + 3
+        var base_row := int(floor(cam_y * f / tile))
+        for r in rows:
+                var y := -tile + float(r) * tile + off
+                var idx := base_row + r
+                var n := 5
+                for i in n:
+                        var tx := (float(i) + _hashf(idx * 13 + i, 1.3)) * vp.x / float(n)
+                        var th := (46.0 + _hashf(idx * 13 + i, 8.8) * 46.0) * U
+                        var tw := th * 0.42
+                        var pts := PackedVector2Array([Vector2(tx - tw, y + tile), Vector2(tx, y + tile - th), Vector2(tx + tw, y + tile)])
+                        mid_layer.draw_colored_polygon(pts, p["tree"])
+        # the clouds (world y -> screen y here, drawn behind platforms)
+        for cl in clouds:
+                var cy2: float = float(cl["y"]) - cam_y
+                var cw2: float = float(cl["w"])
+                var col2: Color = p["cloud"]
+                col2.a *= float(cl["a"])
+                for i in 4:
+                        var px2: float = float(cl["x"]) + (0.15 + 0.25 * float(i)) * cw2
+                        var py2 := cy2 + (0.5 if i == 0 or i == 3 else 0.35) * cw2 * 0.3
+                        var pr := cw2 * (0.16 + 0.07 * float(1 - (i % 2)))
+                        mid_layer.draw_circle(Vector2(px2, py2), pr, col2)
+
+func _draw_snow() -> void:
+        var p := _pal()
+        for f in flakes:
+                var col: Color = p["snow"]
+                if bool(f["fore"]):
+                        col.a = 0.55
+                        snow_layer.draw_circle(Vector2(float(f["x"]), float(f["y"])), float(f["sz"]) * 1.7, col)
+                else:
+                        col.a = 0.75 + 0.25 * _hashf(int(float(f["ph"]) * 100.0), 3.0)
+                        snow_layer.draw_circle(Vector2(float(f["x"]), float(f["y"])), float(f["sz"]), col)
+
+func _draw_fx() -> void:
+        var font := ThemeDB.fallback_font
+        for pt in parts:
+                var a: float = clampf(float(pt["life"]) / float(pt["max"]), 0.0, 1.0)
+                var col: Color = pt["col"]
+                col.a *= a
+                if String(pt["kind"]) == "ring":
+                        fx.draw_arc(Vector2(float(pt["x"]), float(pt["y"])),
+                                        float(pt["r"]) * (1.4 - a * 0.4), 0.0, TAU, 26, col, 3.0 * U)
+                else:
+                        fx.draw_circle(Vector2(float(pt["x"]), float(pt["y"])), float(pt["r"]) * (0.6 + 0.4 * a), col)
+        for pp in pops:
+                var pa: float = clampf(float(pp["life"]) / 0.8, 0.0, 1.0)
+                var col := Color(1, 1, 1, pa)
+                fx.draw_string(font, Vector2(float(pp["x"]) - 40.0 * U, float(pp["y"])),
+                                String(pp["txt"]), HORIZONTAL_ALIGNMENT_CENTER, 80.0 * U,
+                                int(30 * U), col)
+
+# ============================================================ the characters
+
+func _draw_player() -> void:
+        var R := PLAYER_R * U
+        var load_f := snow_load
+        var body: Color = _pal()["snow"]
+        # every character keeps its EYES and loses the mouth (owner rule)
+        match char_id:
+                "ball":
+                        # the snowball: white ball, a cool shaded bottom, snow rim
+                        player.draw_circle(Vector2.ZERO, R, Color("8fa9bd"))
+                        player.draw_circle(Vector2.ZERO, R - 3.0 * U, Color("dfe9f2"))
+                        player.draw_circle(Vector2(0, R * 0.18), R * 0.86, body)
+                        player.draw_circle(Vector2(-R * 0.28, -R * 0.3), R * 0.4, Color(1, 1, 1, 0.55))
+                        if load_f > 0.03:
+                                player.draw_arc(Vector2.ZERO, R * (0.86 + 0.12 * load_f),
+                                                0.0, TAU, 30, Color(1, 1, 1, 0.85), (1.5 + 5.0 * load_f) * U)
+                "square":
+                        # the ice cube: rounded square of glass with an inner shine
+                        var r := Rect2(-R * 0.92, -R * 0.92, R * 1.84, R * 1.84)
+                        player.draw_rect(r, Color("bfe0ef"))
+                        player.draw_rect(Rect2(r.position + Vector2(4, 4) * U, r.size - Vector2(8, 8) * U), Color("d8f0fa"))
+                        player.draw_rect(Rect2(-R * 0.6, -R * 0.62, R * 0.5, R * 0.42), Color(1, 1, 1, 0.5))
+                        if load_f > 0.03:
+                                player.draw_rect(Rect2(-R * 0.98, -R * 0.98 - (2.0 + 5.0 * load_f) * U, R * 1.96, (3.0 + 5.0 * load_f) * U), Color(1, 1, 1, 0.9))
+                "shard":
+                        # the shard: a glassy triangle with a facet highlight
+                        var pts := PackedVector2Array([Vector2(0, -R * 1.06), Vector2(R * 0.95, R * 0.78), Vector2(-R * 0.95, R * 0.78)])
+                        player.draw_colored_polygon(pts, Color("a8dce8"))
+                        var pts2 := PackedVector2Array([Vector2(0, -R * 1.06), Vector2(R * 0.95, R * 0.78), Vector2(R * 0.2, R * 0.78)])
+                        player.draw_colored_polygon(pts2, Color("c8ecf4"))
+                        if load_f > 0.03:
+                                player.draw_arc(Vector2.ZERO, R * 0.95, PI, TAU, 16, Color(1, 1, 1, 0.8), (1.2 + 3.0 * load_f) * U)
+                "egg":
+                        # the egg: a cream ellipse that wobbles, snow sticks to it
+                        player.draw_circle(Vector2.ZERO, R, Color("f2ead8"))
+                        var pts := PackedVector2Array()
+                        for i in 24:
+                                var a := TAU * float(i) / 24.0
+                                pts.append(Vector2(cos(a) * R * 0.88, sin(a) * R * 1.06))
+                        player.draw_colored_polygon(pts, Color("f8f2e4"))
+                        player.draw_circle(Vector2(-R * 0.3, -R * 0.42), R * 0.34, Color(1, 1, 1, 0.6))
+                        if load_f > 0.03:
+                                player.draw_arc(Vector2.ZERO, R * 1.02, 0.0, TAU, 30, Color(1, 1, 1, 0.85), (1.2 + 4.5 * load_f) * U)
+        # THE EYES (all characters) - they look where you move
+        var look := clampf(vx / (WALK_MAX * U), -1.0, 1.0) * R * 0.22
+        var eye_y := -R * 0.18
+        for s: float in [-1.0, 1.0]:
+                var ex: float = s * R * 0.34 + look * 0.6
+                player.draw_circle(Vector2(ex, eye_y), R * 0.2, Color.WHITE)
+                player.draw_circle(Vector2(ex + look * 0.5, eye_y + R * 0.03), R * 0.1, Color("1a2430"))
+
+# ============================================================ the controls
+## Bottom-left: TWO ARROWS (hold to walk). Bottom-right: THE JUMP CIRCLE
+## (one press, one jump) with the powerup glyph + life ring INSIDE it
+## (owner UI law). Custom controls for the circular mask + the life ring.
+
+class TowerHoldBtn:
+        extends Control
+        signal hold_dir(dir: int)
+        var dir := 0
+        var glyph := ""
+        var press_idx := {}
+        var down := false
+
+        func _init(d: int, g: String) -> void:
+                dir = d
+                glyph = g
+
+        func _gui_input(e: InputEvent) -> void:
+                if e is InputEventScreenTouch:
+                        var t := e as InputEventScreenTouch
+                        if t.pressed:
+                                press_idx[t.index] = true
+                                down = true
+                                hold_dir.emit(dir)
+                        elif press_idx.has(t.index):
+                                press_idx.erase(t.index)
+                                down = not press_idx.is_empty()
+                                if not down:
+                                        hold_dir.emit(0)
+                elif e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+                        var m := e as InputEventMouseButton
+                        if m.pressed and not down:
+                                down = true
+                                hold_dir.emit(dir)
+                        elif not m.pressed and down:
+                                down = false
+                                hold_dir.emit(0)
+                queue_redraw()
+
+        func _draw() -> void:
+                var r := Rect2(Vector2.ZERO, size)
+                var col := Color("2a3a52") if not down else Color("3d5273")
+                draw_rect(r, col)
+                draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, size.y * 0.3)), col.lightened(0.1))
+                var c := Color(1, 1, 1, 0.92)
+                var cx := size.x / 2.0
+                var cy := size.y / 2.0
+                var s := size.y * 0.24
+                if dir < 0:
+                        var pts := PackedVector2Array([Vector2(cx + s * 0.5, cy - s), Vector2(cx - s * 0.7, cy), Vector2(cx + s * 0.5, cy + s)])
+                        draw_polyline(pts, c, 5.0)
+                else:
+                        var pts := PackedVector2Array([Vector2(cx - s * 0.5, cy - s), Vector2(cx + s * 0.7, cy), Vector2(cx - s * 0.5, cy + s)])
+                        draw_polyline(pts, c, 5.0)
+
+class TowerJumpBtn:
+        extends Control
+        signal jump_go
+        var press_idx := {}
+        var down := false
+        var pw_id := ""
+        var pw_frac := 0.0
+        var game: Node = null
+
+        func _gui_input(e: InputEvent) -> void:
+                if e is InputEventScreenTouch:
+                        var t := e as InputEventScreenTouch
+                        var local: Vector2 = t.position - global_position
+                        if t.pressed and local.distance_to(size / 2.0) <= size.x / 2.0:
+                                press_idx[t.index] = true
+                                if not down:
+                                        down = true
+                                        jump_go.emit()
+                        elif not t.pressed and press_idx.has(t.index):
+                                press_idx.erase(t.index)
+                                down = not press_idx.is_empty()
+                elif e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+                        var m := e as InputEventMouseButton
+                        var lm: Vector2 = m.position - global_position
+                        if m.pressed and lm.distance_to(size / 2.0) <= size.x / 2.0 and not down:
+                                down = true
+                                jump_go.emit()
+                        elif not m.pressed and down:
+                                down = false
+                queue_redraw()
+
+        func _draw() -> void:
+                var c := size / 2.0
+                var R := size.x / 2.0
+                var base := Color("2a3a52") if not down else Color("415a80")
+                draw_circle(c, R, base)
+                draw_circle(c, R * 0.86, Color("dfe9f2") if not down else Color.WHITE)
+                # the powerup LIFE RING (owner): full -> empty over the 10s
+                if pw_id != "" and pw_frac > 0.0:
+                        var col := Color("4ac2e8") if pw_id != "slow" else Color("8a7ae8")
+                        if pw_id == "big":
+                                col = Color("f0b040")
+                        elif pw_id == "speed":
+                                col = Color("58c470")
+                        draw_arc(c, R * 0.93, -PI / 2.0, -PI / 2.0 + TAU * pw_frac, 40, col, 6.0)
+                # the jump chevron
+                var s := R * 0.3
+                var chev := PackedVector2Array([Vector2(c.x - s, c.y + s * 0.6), Vector2(c.x, c.y - s * 0.6), Vector2(c.x + s, c.y + s * 0.6)])
+                draw_polyline(chev, Color("2a3a52"), 6.0)
+                # the powerup glyph under the chevron
+                if pw_id != "":
+                        var font := ThemeDB.fallback_font
+                        var txt: String = {"x2": "x2", "big": "^", "speed": ">>", "slow": "-50%"}[pw_id]
+                        draw_string(font, Vector2(c.x - R * 0.5, c.y + s * 1.6), txt,
+                                        HORIZONTAL_ALIGNMENT_CENTER, R, int(R * 0.42), Color("2a3a52"))
+
+var _btn_layer: CanvasLayer
+var _btn_left: TowerHoldBtn
+var _btn_right: TowerHoldBtn
+var _jump_btn: TowerJumpBtn
+
+func _build_controls() -> void:
+        var vp := _vp()
+        _btn_layer = CanvasLayer.new()
+        add_child(_btn_layer)
+        var hold := Control.new()
+        hold.set_anchors_preset(Control.PRESET_FULL_RECT)
+        hold.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _btn_layer.add_child(hold)
+        var bs := 132.0 * U
+        var bh := 96.0 * U
+        var margin := 16.0 * U
+        _btn_left = TowerHoldBtn.new(-1, "<")
+        _btn_left.size = Vector2(bs, bh)
+        _btn_left.position = Vector2(margin + WALL_W * U, vp.y - bh - margin)
+        _btn_left.hold_dir.connect(func(d: int):
+                        if d == 0 and _btn_right.down:
+                                        _set_move(1)
+                        else:
+                                        _set_move(d))
+        hold.add_child(_btn_left)
+        _btn_right = TowerHoldBtn.new(1, ">")
+        _btn_right.size = Vector2(bs, bh)
+        _btn_right.position = Vector2(margin + WALL_W * U + bs + 14.0 * U, vp.y - bh - margin)
+        _btn_right.hold_dir.connect(func(d: int):
+                        if d == 0 and _btn_left.down:
+                                        _set_move(-1)
+                        else:
+                                        _set_move(d))
+        hold.add_child(_btn_right)
+        var js := 168.0 * U
+        _jump_btn = TowerJumpBtn.new()
+        _jump_btn.size = Vector2(js, js)
+        _jump_btn.position = Vector2(vp.x - js - margin - WALL_W * U, vp.y - js - margin)
+        _jump_btn.jump_go.connect(func(): _do_jump())
+        hold.add_child(_jump_btn)
+        _refresh_jump_ui()
+
+func _refresh_jump_ui() -> void:
+        if _jump_btn == null or not is_instance_valid(_jump_btn):
+                return
+        _jump_btn.pw_id = String(pw["id"])
+        _jump_btn.pw_frac = clampf(float(pw["t"]) / PW_TIME, 0.0, 1.0)
+        _jump_btn.queue_redraw()
+
+# ============================================================ ready / start
+
+func _show_ready_card() -> void:
+        phase = "ready"
+        _shop_pair_down()
+        var root := _overlay_root_ref()
+        if _ready_card != null and is_instance_valid(_ready_card):
+                _ready_card.queue_free()
+        var cc := CenterContainer.new()
+        cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+        cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var panel := PanelContainer.new()
+        panel.add_theme_stylebox_override("panel",
+                        Arc.panel_style(Color(0.05, 0.10, 0.18, 0.86), 24))
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
+        var t := Arc.label("TAP ANYWHERE TO START", 40, Color(0.85, 0.95, 1.0))
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var s := Arc.label("arrows walk  -  the circle jumps  -  land HIGHER for +1", 20,
+                        Color(0.85, 0.92, 1.0), false)
+        s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        v.add_child(t)
+        v.add_child(s)
+        panel.add_child(v)
+        cc.add_child(panel)
+        root.add_child(cc)
+        _ready_card = cc
+
+## tap anywhere starts (the HUD buttons consume their own touches, so a
+## shop press never starts the run - the dash law)
+func _goga_input(event: InputEvent) -> void:
+        if phase == "ready" and event is InputEventScreenTouch \
+                        and (event as InputEventScreenTouch).pressed:
+                _start()
+
+func _start() -> void:
+        if phase != "ready":
+                return
+        phase = "run"
+        Jukebox.sfx("confirm", -6.0)
+        if _ready_card != null and is_instance_valid(_ready_card):
+                var cc := _ready_card
+                _ready_card = null
+                var tw := cc.create_tween()
+                tw.tween_property(cc, "modulate:a", 0.0, 0.22)
+                tw.tween_callback(cc.queue_free)
+
+# ============================================================ the shop
+## Same bones as the Space Dash shop (THE PAIR LAW - the sheet owns its
+## dim+center pair and frees exactly that): CHARACTERS (skins), PLATFORM
+## SKINS, PLACES (day/night), POWERUPS (they spawn in runs once bought).
+
+func _shop_open() -> void:
+        _shop_from = phase
+        if phase == "run":
+                paused = true
+                get_tree().paused = true
+        _shop_pair_down()
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
+        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        var kids := root.get_children()
+        _shop_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var t := Arc.label("SNOWY TOWER SHOP", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := _vp()
+        sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.52, 300.0, 640.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        sheet.add_child(sc)
+        box.add_child(_shop_label("CHARACTERS - each its own physics + spin"))
+        for id in CHARS:
+                box.add_child(_char_row(id))
+        box.add_child(_shop_label("PLATFORM SKINS - real materials"))
+        for id in PLATS:
+                box.add_child(_plat_row(id))
+        box.add_child(_shop_label("PLACES - day and night really differ"))
+        for id in PLACES:
+                box.add_child(_place_row(id))
+        box.add_child(_shop_label("POWERUPS - they spawn in your runs"))
+        for id in POWERUPS:
+                box.add_child(_pw_row(id))
+        box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
+                        func(): _shop_close()))
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+func _shop_label(txt: String) -> Label:
+        return Arc.fit_label(txt, 24, Arc.HOT, 560)
+
+func _price_btn(txt: String, price: int, col: Color, cb: Callable) -> Button:
+        var b := Arc.coin_button("%s  %d" % [txt, price], Vector2(560, 64), 22, col, cb)
+        if Box.coins() < price:
+                b.disabled = true
+        return b
+
+func _char_row(id: String) -> Control:
+        var c: Dictionary = CHARS[id]
+        var owned := Box.skin_owned(game_id, id) or int(c["price"]) == 0
+        var on: bool = Box.skin_on(game_id) == id \
+                        or (int(c["price"]) == 0 and Box.skin_on(game_id) == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
+                                Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button("%s - EQUIP" % c["name"],
+                                Vector2(560, 60), 22, Color("4a5ab8"), func():
+                                                Box.equip_skin(game_id, id)
+                                                char_id = id
+                                                Jukebox.sfx("confirm", -4.0)
+                                                player.queue_redraw()
+                                                _shop_open())
+        return _price_btn(c["name"], int(c["price"]), Color("4a5ab8"), func():
+                        if Box.buy_skin(game_id, id, int(c["price"])):
+                                        char_id = id
+                                        Jukebox.sfx("buy")
+                                        player.queue_redraw()
+                        _shop_open())
+
+func _plat_row(id: String) -> Control:
+        var pl: Dictionary = PLATS[id]
+        var owned := Box.item_owned(game_id, "plat", id) or int(pl["price"]) == 0
+        var on := _plat_id() == id \
+                        or (int(pl["price"]) == 0 and Box.item_on(game_id, "plat") == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON)" % pl["name"], 22, Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button(pl["name"] + "  - EQUIP", Vector2(560, 60), 22,
+                                Color("8a6a3a"), func():
+                                                Box.equip_item(game_id, "plat", id)
+                                                Jukebox.sfx("confirm", -4.0)
+                                                plat_layer.queue_redraw()
+                                                _shop_open())
+        return _price_btn(pl["name"], int(pl["price"]), Color("8a6a3a"), func():
+                        if Box.buy_item(game_id, "plat", id, int(pl["price"])):
+                                        Jukebox.sfx("buy")
+                                        plat_layer.queue_redraw()
+                        _shop_open())
+
+func _place_row(id: String) -> Control:
+        var pl: Dictionary = PLACES[id]
+        var owned := Box.item_owned(game_id, "place", id) or int(pl["price"]) == 0
+        var on := _place_id() == id \
+                        or (int(pl["price"]) == 0 and Box.item_on(game_id, "place") == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON)" % pl["name"], 22, Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button(pl["name"] + "  - EQUIP", Vector2(560, 60), 22,
+                                Color("2a7a68"), func():
+                                                Box.equip_item(game_id, "place", id)
+                                                _apply_place(sky.material as ShaderMaterial)
+                                                _day_night()
+                                                Jukebox.sfx("confirm", -4.0)
+                                                _shop_open())
+        return _price_btn(pl["name"], int(pl["price"]), Color("2a7a68"), func():
+                        if Box.buy_item(game_id, "place", id, int(pl["price"])):
+                                        Jukebox.sfx("buy")
+                                        _apply_place(sky.material as ShaderMaterial)
+                                        _day_night()
+                        _shop_open())
+
+func _pw_row(id: String) -> Control:
+        var w: Dictionary = POWERUPS[id]
+        if Box.item_owned(game_id, "pw", id):
+                var l := Arc.fit_label("%s  - SPAWNS IN RUNS" % w["name"], 22,
+                                Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        return _price_btn(w["name"], int(w["price"]), Color("8a4ab8"), func():
+                        if Box.buy_item(game_id, "pw", id, int(w["price"])):
+                                        Jukebox.sfx("buy")
+                        _shop_open())
+
+func _shop_pair_down() -> void:
+        for n in _shop_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _shop_pair = []
+
+func _shop_close() -> void:
+        _shop_pair_down()
+        if _shop_from == "run":
+                get_tree().paused = false
+                paused = false
+        else:
+                _show_ready_card()
+
+
+
+
+
+
