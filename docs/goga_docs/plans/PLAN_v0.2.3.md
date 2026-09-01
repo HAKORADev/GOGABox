@@ -114,3 +114,43 @@ asked for the numbering so he can track without forgetting something).
 
 0.2.3 (base 30320: arm32 30321, arm64 30322). Version rule respected (+0.0.1 /
 +10). Signature family SHA-256 6db87aca... unchanged.
+
+## PATCH (v0.2.3 patch - same version, same codes, owner review round)
+
+The owner tested the release build: "ok all correct" + three follow-ups.
+
+17. **The SOON ? is total.** The locked and unlocked tiles were correct, but
+    the pre-play (the page a tap opens) still showed the FINAL art - the
+    sheet headers loaded `g["thumb"]` raw. `_header_block` and `_add_thumb`
+    now apply `_soon_art` themselves, so the soon page, the gated page, the
+    unlock page and the owned tiles/strips under the `all_owned` cheat all
+    wear the purple workshop ? - locked + unlocked + pre-play show ONE image.
+
+18. **Snake peace gets the END button.** Peace never dies on itself, so a
+    quiet run could never be banked. `pause_end_run = peace` (set at setup
+    and on the style toggle) gives the pause sheet its END row; the new
+    `_goga_pause_end_ok` override keeps it to `_phase == "run"` - the ask,
+    mode menu and ready card pause with the plain pair. The banking states
+    the /0 rule: the dead menu prints "peace run - score bonus = S/0"
+    instead of the fake "0 + 0" theatre, and the payout pays nothing
+    (score_bonus_enabled was already the modular zero).
+
+19. **Dev cheats toggle everything.** The dev sheet (five taps on the
+    wordmark) grew the GAME OPTIONALS section: 13 rows of the games' OWN
+    settings - snake more-enemies / pack size / power fruits / bugs /
+    obstacles / jumping fruits / peace style / no-walls / place, pong more
+    enemies / size / speed / sparkles. A flip is a REAL setting that also
+    grants its shop unlock FOR REAL (logged under `__dev__`); ALL ON / ALL
+    OFF sweep every feature row (peace style stays solo, the cycles are
+    manual); RESET returns every flip to its default and removes exactly
+    the granted unlocks - a real coin purchase survives. Found on the way:
+    Godot 4.7 refuses `String(int)` (the pack-size cycle) - `str()` is the
+    law for Variant values; the sheet-render test now walks every row.
+
+Tests: flow_test grew the SOON-law suite (tiles AND page headers), the
+peace-END economy suite (banks the score, pays zero, /0 safe) and the
+optionals suite; snake_probe + pong_probe + geometry green; Xvfb QA shots
+verified the dev sheet layout and the soon-page purple ?.
+
+Version: stays 0.2.3 (base 30320: arm32 30321, arm64 30322), the v0.2.1a
+precedent. Signature family SHA-256 6db87aca... unchanged.
