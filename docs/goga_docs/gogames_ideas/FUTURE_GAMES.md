@@ -43,12 +43,23 @@ owner: "heavy tank (or tank war, i forgot the real name)"), PopCap
 Zuma-like, PopCap Plants vs Zombies-like, and the jigsaw puzzle (the image
 broken into pieces, put it back together).
 
+Seventh dump - the same evening, mid owner-review round, DOC ONLY. The owner
+keeps testing Space Dash and is shopping for the next game to plan ("i will
+keep testing space dash and see what is the next game to start planning it's
+stuff"), and set the rule for this round themselves: "so, no code
+changes....yet!" (that "yet" is doing some heavy lifting). +4: KDE
+KSquares-like, the big-fish-eats-small-fish swimmer, the Subway-Surfers 3D
+run, and a 2D mid-traffic drifter with real drifts and turns.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
 - **chess** — owner: maybe 2D or 3D, or two versions.
 - **four-in-line** — connect-four-like: drop discs, make four.
 - **bovo-like** — five-in-a-row / gomoku-style line maker (KDE Bovo vibes).
+- **ksquares-like** - KDE KSquares: dots and boxes - take turns drawing lines
+  between the dots, close a box to claim it (your initial goes inside), most
+  boxes wins; close one and you go again. Never leave a third side open.
 - **pacman-like** — maze chomp runner. Owner: "we may add".
 - **brick-breaker-like** — paddle + ball + the brick wall.
 - **jumping-cube territory capture** — KJumpingCube-like: tap cells to grow
@@ -92,6 +103,11 @@ broken into pieces, put it back together).
   path, swoop the collectibles, thread the hazards.
 - **crazy fishing-like** — We Bare Bears Crazy Fishing: cast the hook, snag
   the fish, dodge the stingers, haul the catch up.
+- **fish-eats-fish-like** - the food-chain swimmer: start tiny, eat anything
+  smaller, GROW, and everything bigger eats you back. Feeding-Frenzy eating
+  but MORE OPEN - Hungry Shark energy: free-swim a whole map, hunt, keep the
+  hunger fed, learn which waters belong to whom. (Owner: "big fish eats small
+  fish like feeding-frenzy but more open like hungry shark".)
 
 ## Puzzle
 - **klickety-like** - KDE Klickety (SameGame/Clickomania energy): a board
@@ -144,6 +160,10 @@ broken into pieces, put it back together).
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
+- **traffic-drifter-like** - 2D car IN the traffic: weave moving cars with
+  DRIFTS and TURNS, the road bends, splits and branches - NOT one straight
+  endless lane. (Owner: "2D car driving mid-trafic game with drifts and turns
+  and not just one road".)
 
 ## Strategy lanes
 - **plants-vs-zombies-like** - PopCap PvZ: lane defense - plant your
@@ -166,6 +186,10 @@ broken into pieces, put it back together).
 - **stress-ball-3d-like** — stabilize the wobbly 3D ball, keep it steady.
 - **crowd runner** — that walking low-poly blue character that gets
   multiplied and divided through gates (count-masters-like).
+- **subway-runner-like** - the Subway Surfers 3D run: three lanes, swipe
+  between them, jump the barriers, roll under the signs, dodge the trains,
+  outrun the chase, grab everything shiny on the way. (Owner: "a game that is
+  like subway 3D game".)
 - **3D variants** of dominoes / chess, or two versions of each.
 - **"these weird games"** — the odd hyper-casual 3D bucket; more names land
   here as they are remembered.
