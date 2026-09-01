@@ -103,3 +103,13 @@ Order of work (the owner's literal order):
   director climbs, shop buys.
 - [x] Xvfb QA screenshots: menu -> shop -> run frames (beams, laser,
   thunder, bombs, elites, shatter carrier), both a blue and a green space.
+
+## 7. The same-version patch (owner verdict: ZERO bugs — keep the version)
+- [x] Shop re-priced "for real": skins 1200-5500, weapons 2500-4500,
+  shield 3000, spaces 1500/2000 (price-0 defaults stay 0).
+- [x] Score bonus slowed: coin_div 20 -> 50 (score/50 at run end).
+- [x] FUTURE_GAMES.md sixth dump: klickety-like, tetris-like,
+  snakes-and-ladders, heavy-weapon-like, zuma-like, plants-vs-zombies-like,
+  jigsaw-puzzle.
+- [x] flow_test laws: /50 + the >=1200 price floor (reads lanes.gd's real
+  constants). Same version, same codes (0.2.4 / 30330-30332).

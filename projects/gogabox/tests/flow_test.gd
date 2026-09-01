@@ -314,8 +314,26 @@ func _t_registry() -> int:
         # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
         var dash: Dictionary = GameReg.get_game("lanes")
         ok += _check(int(dash["fee"]) == 20, "space dash round costs 20")
-        ok += _check(int(dash["coin_div"]) == 20, "space dash score / 20")
+        # same-version patch: the bonus slowed /20 -> /50 (owner call)
+        ok += _check(int(dash["coin_div"]) == 50, "space dash score / 50")
         ok += _check(bool(dash["shop"]), "space dash wears a shop")
+        # same-version patch: the shop is a REAL goal ladder now - nothing
+        # (except the price-0 defaults) costs chump change any more
+        var L := load("res://game/games/lanes/lanes.gd")
+        var cheapest := 999999
+        for skin_id in L.SKINS:
+                var pr: int = int(L.SKINS[skin_id]["price"])
+                if pr > 0:
+                        cheapest = mini(cheapest, pr)
+        for w_id in L.SHOP_WEAPONS:
+                cheapest = mini(cheapest, int(L.SHOP_WEAPONS[w_id]["price"]))
+        cheapest = mini(cheapest, int(L.SHOP_SHIELD["price"]))
+        for sp_id in L.SPACES:
+                var sp: int = int(L.SPACES[sp_id]["price"])
+                if sp > 0:
+                        cheapest = mini(cheapest, sp)
+        ok += _check(cheapest >= 1200,
+                "the shop re-priced for real (cheapest priced item = %d)" % cheapest)
         ok += _check(String(GameReg.get_game("geometry")["title"]) \
                         == "Geometry Flash",
                 "the REAL Geometry Flash waits as its own teaser")

@@ -154,3 +154,32 @@ Space Dash ships in v0.2.4. The registry id stays `lanes` (ids never move).
 - More spaces / skins / a prestige weapon slot.
 - The owner will keep playing Space Dash and plan its updates from the
   feel of this first real build.
+
+---
+
+## 2026-09-02 (later) — the zero-bug verdict + the economy patch (same version)
+
+The owner played the first Space Dash build and found NOTHING to fix: "this
+is weird, likely the weirdest thing ever! THE GAME IS AMAZING WITH NO
+BUGS!?" — the first GOGABox build to land clean on the first pass. The
+owner keeps bug-hunting while planning the next game.
+
+The same-version patch (stays v0.2.4, same codes 30330/31/32) carries two
+economy calls:
+
+1. **The shop re-priced "for real"** (owner: "make things in the shop more
+   expensive, like...for real!"). The first-pass numbers were a first-
+   session sweep — the shop is a goal ladder now:
+   - skins: Azure 1200 / Verdant 1200 / Veteran 2500 / Phantom 3000 /
+     Hornet 4000 / Titan 5500 (Ember stays the free default)
+   - weapons: Red Laser 2500 / Thunder 3500 / Bomb Launcher 4500
+   - Shield Power 3000
+   - spaces: Emerald Drift 1500 / Solar Gold 2000
+2. **The run-end bonus slowed: score/50** (was score/20 — "make the score
+   bonus be /50 instead of /20"). Registry coin_div = 50; combined with the
+   re-priced shop, a good run now pays real progress, a great run pays a
+   fraction of the next goal.
+
+FUTURE_GAMES.md grew the sixth dump with it (Klickety, tetris, snakes &
+ladders, Heavy Weapon, Zuma, PvZ, jigsaw — the owner mined PopCap while
+playing).

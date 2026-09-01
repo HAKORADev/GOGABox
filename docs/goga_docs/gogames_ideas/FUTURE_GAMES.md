@@ -35,6 +35,14 @@ when every player brings their own device than with a one-device-many-players
 pass-the-phone thing. So when multiplayer ever comes, plan it as
 device-per-player local network play FIRST.
 
+Sixth dump - later the same day, right after the owner played Space Dash and
+found ZERO bugs ("likely the weirdest thing ever! THE GAME IS AMAZING WITH NO
+BUGS!?" - the first build to land clean). +7, a PopCap-flavored batch: KDE
+Klickety-like, tetris-like, snakes & ladders, PopCap Heavy Weapon-like (the
+owner: "heavy tank (or tank war, i forgot the real name)"), PopCap
+Zuma-like, PopCap Plants vs Zombies-like, and the jigsaw puzzle (the image
+broken into pieces, put it back together).
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -47,8 +55,16 @@ device-per-player local network play FIRST.
   their value, overflow spills into neighbors, capture the board.
 - **ludo** — the dice race classic: roll, run the loop, climb your color's
   arm, get all four home.
+- **snakes-and-ladders** - the board classic: roll the dice, climb the
+  ladders, slide down the snakes, first token home wins.
 
 ## Arcade & one-touch
+- **heavy-weapon-like** - PopCap's Heavy Weapon (the owner's "heavy tank
+  (or tank war, i forgot the real name)"): side-scrolling tank WAR, hold to
+  aim and spray, waves of planes, the nuke when it all gets too much.
+- **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
+  chain, match 3 of a color, pop the run - never let the chain reach the
+  hole.
 - **knife circle** — throw a knife at a moving/rotating circle without
   hitting another knife. ("yes that type")
 - **tomb-of-the-mask-old-maze-like** — the owner's "tomb of the mask: old
@@ -78,6 +94,16 @@ device-per-player local network play FIRST.
   the fish, dodge the stingers, haul the catch up.
 
 ## Puzzle
+- **klickety-like** - KDE Klickety (SameGame/Clickomania energy): a board
+  packed with colored blocks, tap a group of same-colored neighbors to
+  erase it, the board collapses and shifts - clear everything, score big
+  groups.
+- **tetris-like** - THE falling-tetromino classic: stack, rotate, clear
+  lines, never top out.
+- **jigsaw-puzzle** - the picture broken into pieces: drag the fragments,
+  put the image back together (snap-to-grid pieces, difficulty = piece
+  count). The owner: "puzzle game where it is about putting pieces
+  together to make the image".
 - **sokoban-like** — the crate classic: push every box onto its target,
   one push at a time (never a pull), walls and tight corridors make the
   order matter. Undo + restart, handcrafted level ladders.
@@ -118,6 +144,11 @@ device-per-player local network play FIRST.
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
+
+## Strategy lanes
+- **plants-vs-zombies-like** - PopCap PvZ: lane defense - plant your
+  fighters on the grid, harvest the sun economy, stop the wave before it
+  crosses the lawn.
 
 ## Ports & redesigns
 - **the rest of the python game box games** — carried over with proper

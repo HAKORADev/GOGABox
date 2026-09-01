@@ -97,11 +97,15 @@ const GAMES := [
                 # shop. Real Kenney hulls only (owner: no code ships). The
                 # id stays `lanes`; the journal lives in
                 # docs/goga_docs/gogames_ideas/dash.md.
+                # SAME-VERSION PATCH (owner: score bonus /50, shop prices
+                # "for real"): coin_div 20 -> 50, the whole shop ladder
+                # re-priced (skins 1200-5500, weapons 2500-4500, shield
+                # 3000, spaces 1500/2000).
                 "id": "lanes", "title": "Space Dash", "tag": "kill the sky",
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 20, "price": 200, "fee": 20, "shop": true,
+                "coin_div": 50, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "blocked_hours": {"from": 1, "to": 8},

@@ -20,7 +20,8 @@ extends GogaGame
 ##     bomb launcher (radius) - shop sells the last three + the shield
 ##   - shop: 7 real-art ship skins, 3 spaces (blue/green/yellow), no
 ##     optionals menu - shop, then TAP ANYWHERE TO START
-##   - round fee 20 GOGACoins, run-end bonus = score/20 (registry coin_div)
+##   - round fee 20 GOGACoins, run-end bonus = score/50 (registry
+##     coin_div - the v0.2.4 patch: /20 paid way too fast)
 ##   - NO code-generated ships: everything wears Kenney CC0 sprites
 ##     (vendored, see assets.manifest.json); effects are code.
 
@@ -101,25 +102,29 @@ const ETYPES := {
 }
 
 ## ship skins (real hulls; price 0 = owned default - the shop law)
+## v0.2.4 patch (owner: "make things in the shop more expensive, like...
+## for real!"): every price took the REAL jump - the shop is a long-game
+## goal ladder now, not a first-session sweep.
 const SKINS := {
         "orange": {"name": "Ember", "price": 0, "tex": "ship_orange.png"},
-        "blue": {"name": "Azure", "price": 250, "tex": "ship_blue.png"},
-        "green": {"name": "Verdant", "price": 250, "tex": "ship_green.png"},
-        "veteran": {"name": "Veteran", "price": 400, "tex": "ship_veteran.png"},
-        "phantom": {"name": "Phantom", "price": 450, "tex": "ship_phantom.png"},
-        "horn": {"name": "Hornet", "price": 550, "tex": "ship_horn.png"},
-        "titan": {"name": "Titan", "price": 700, "tex": "ship_titan.png"},
+        "blue": {"name": "Azure", "price": 1200, "tex": "ship_blue.png"},
+        "green": {"name": "Verdant", "price": 1200, "tex": "ship_green.png"},
+        "veteran": {"name": "Veteran", "price": 2500, "tex": "ship_veteran.png"},
+        "phantom": {"name": "Phantom", "price": 3000, "tex": "ship_phantom.png"},
+        "horn": {"name": "Hornet", "price": 4000, "tex": "ship_horn.png"},
+        "titan": {"name": "Titan", "price": 5500, "tex": "ship_titan.png"},
 }
 
 ## spaces (backgrounds) - blue default, green, yellow (owner spec)
+## v0.2.4 patch: prices joined the REAL scale (see SKINS note).
 const SPACES := {
         "blue": {"name": "Deep Blue", "price": 0, "deep": Color("060a1c"),
                 "neb1": Color("1a2f6e"), "neb2": Color("3d1f66"),
                 "star": Color(0.82, 0.90, 1.0)},
-        "green": {"name": "Emerald Drift", "price": 300, "deep": Color("04140e"),
+        "green": {"name": "Emerald Drift", "price": 1500, "deep": Color("04140e"),
                 "neb1": Color("0f5c3a"), "neb2": Color("1a3d6e"),
                 "star": Color(0.80, 1.0, 0.90)},
-        "yellow": {"name": "Solar Gold", "price": 350, "deep": Color("1a1004"),
+        "yellow": {"name": "Solar Gold", "price": 2000, "deep": Color("1a1004"),
                 "neb1": Color("8a5a14"), "neb2": Color("6e2a1a"),
                 "star": Color(1.0, 0.95, 0.80)},
 }
@@ -127,11 +132,11 @@ const SPACES := {
 ## shop weapons/shield (buying = the item EXISTS in the loot pool,
 ## "not equipped as base but bought so it exists in the game" - owner)
 const SHOP_WEAPONS := {
-        "laser": {"name": "Red Laser", "price": 450},
-        "thunder": {"name": "Thunder", "price": 600},
-        "bomb": {"name": "Bomb Launcher", "price": 700},
+        "laser": {"name": "Red Laser", "price": 2500},
+        "thunder": {"name": "Thunder", "price": 3500},
+        "bomb": {"name": "Bomb Launcher", "price": 4500},
 }
-const SHOP_SHIELD := {"name": "Shield Power", "price": 500}
+const SHOP_SHIELD := {"name": "Shield Power", "price": 3000}
 
 # ---------------------------------------------------------------- state
 var phase := "ready"                # ready | run | over
