@@ -77,8 +77,13 @@ def main() -> int:
                 print(f"  cached: {sid}")
                 continue
             url = src.get("zip")
-            if not url and "kenney.nl/assets/" in src.get("url", ""):
-                url = kenney_zip_url(src["url"])
+            if not url:
+                kurl = src.get("url", "")
+                # only a SINGLE clean kenney asset page is auto-resolvable;
+                # multi-URL note fields (e.g. the vendored-audio source) and
+                # any other prose must skip silently - they are documentation
+                if kurl.startswith("https://kenney.nl/assets/") and " " not in kurl:
+                    url = kenney_zip_url(kurl)
             if not url:
                 print(f"  ! no automatic download for {sid} - fetch manually "
                       f"from {src.get('url')} (see docs/ASSETS.md)")

@@ -357,38 +357,80 @@ def scene_rally(spec=RALLY_SPEC):
 
 # ------------------------------------------------------------------- lanes
 
+# v0.2.4 SPACE DASH - the posed battle: a fleet of real enemy hulls
+# descending five alpha lanes, the Ember hull firing yellow beams into a
+# grunt, a thunder chain arcing across, an explosion blooming, the loot
+# (coin + power pill) falling. No baked text (rule R2).
 LANES_SPEC = dict(
-    lane_xs=(1 / 6.0, 0.5, 5 / 6.0),   # lane centers as W fractions
-    ship_lane=1, ship_y=0.80,
-    blocks=((0, 0.30, 1.0), (2, 0.46, 0.86), (1, 0.14, 0.72)),  # (lane, y, scale)
-    near_miss=True,               # block right above the ship = the story
+    lane_xs=(1 / 6.0, 0.5, 5 / 6.0),   # guide rails as W fractions
+    ship=(0.40, 0.86, 1.0),            # (fx, fy, scale) the player hull
+    enemies=(                          # (sprite, fx, fy, scale, flip)
+        ("enemy_grunt", 0.40, 0.47, 0.9, False),     # the marked victim
+        ("enemy_runner", 0.68, 0.30, 0.78, False),
+        ("enemy_grunt2", 0.14, 0.34, 0.8, False),
+        ("enemy_tank", 0.86, 0.62, 1.0, False),
+        ("enemy_shooter", 0.30, 0.14, 0.7, False),
+        ("enemy_ufo_red", 0.60, 0.66, 0.8, False),   # the rare elite
+    ),
+    beams=((0.40, 0.76), (0.40, 0.63), (0.40, 0.55)),  # bolts to the victim
+    bolt_flash=(0.40, 0.51),                     # muzzle impact glow
+    thunder=((0.62, 0.72), (0.50, 0.44), (0.30, 0.20)),  # the chain arc
+    boom=(0.90, 0.20, 1.6),                      # explosion bloom, open sky
+    coin=(0.085, 0.70, 0.55),
+    pill=(0.155, 0.60, 1.4),
 )
 
 
 def scene_lanes(spec=LANES_SPEC):
     sc = Scene()
-    sc.backdrop((20, 16, 40), (12, 10, 26))
-    lx = spec["lane_xs"]
-    # lane rails (cyan, like the real grid)
-    for f in (0.0, 1/3.0, 2/3.0, 1.0):
-        sc.line([(f * W, 0), (f * W, H)], (0, 229, 255, 60), width=3)
-    for gy in range(8):                        # faint grid ticks
-        y = gy * H / 8.0
-        sc.line([(0, y), (W, y)], (0, 229, 255, 18), width=2)
-    sc.vignette(90)
-    block = load_sprite("games/lanes/block.png")
-    ship = load_sprite("games/lanes/ship.png")
-    for lane, fy, s in spec["blocks"]:
-        sc.stamp(block, lx[lane] * W, fy * H, scale=s)
-    sx, sy = lx[spec["ship_lane"]] * W, spec["ship_y"] * H
-    # near-miss: a block nose-down right above the ship
-    if spec.get("near_miss"):
-        sc.stamp(block, sx, sy - 190, scale=1.0)
-    sc.glow(sx, sy, 90, (0, 229, 255), 60)
-    sc.stamp(ship, sx, sy, scale=1.05)
-    # engine sparks
-    sc.line([(sx - 14, sy + 62), (sx - 14, sy + 96)], (255, 176, 32, 200), 8)
-    sc.line([(sx + 14, sy + 62), (sx + 14, sy + 96)], (255, 122, 26, 200), 8)
+    sc.backdrop((13, 20, 46), (5, 7, 22))
+    # nebula breath + starfield, painted soft
+    sc.glow(W * 0.72, H * 0.22, 190, (52, 78, 168), 60)
+    sc.glow(W * 0.18, H * 0.62, 160, (86, 44, 140), 46)
+    for i in range(46):
+        sx = (i * 211) % W
+        sy = (i * 137 + 29) % H
+        a = 120 + (i * 53) % 110
+        r = 1 + (i % 3)
+        sc.ellipse([sx - r, sy - r, sx + r, sy + r], fill=(220, 232, 255, a))
+    # the five ALPHA lane rails (the owner's lane law)
+    for i in range(6):
+        x = W * (0.083 + i * 0.1667)
+        sc.line([(x, 0), (x, H)], (110, 190, 255, 34), width=3)
+    # the descending fleet (real Kenney hulls, nose-down as drawn)
+    for rel, fx, fy, s, flip in spec["enemies"]:
+        img = load_sprite("games/lanes/%s.png" % rel)
+        sc.stamp(img, fx * W, fy * H, scale=s * 1.35)
+    # yellow beams climbing at the marked victim
+    for bx, by in spec["beams"]:
+        img = load_sprite("games/lanes/laser_yellow.png")
+        sc.stamp(img, bx * W, by * H, scale=3.1)
+    sc.glow(spec["bolt_flash"][0] * W, spec["bolt_flash"][1] * H, 70,
+            (255, 230, 120), 130)
+    # the thunder chain arcing between hulls
+    pts = [(fx * W, fy * H) for fx, fy in spec["thunder"]]
+    for a, b in zip(pts, pts[1:]):
+        sc.line([a, b], (235, 242, 255, 235), width=6)
+        sc.line([a, b], (255, 255, 255, 255), width=2)
+    # the bloom where an elite just died
+    bx, by, bs = spec["boom"]
+    sc.glow(bx * W, by * H, 84 * bs, (255, 176, 60), 200)
+    sc.glow(bx * W, by * H, 40 * bs, (255, 236, 180), 230)
+    # loot on the way down
+    coin = load_sprite("ui/coin.png")
+    sc.stamp(coin, spec["coin"][0] * W, spec["coin"][1] * H,
+             scale=spec["coin"][2])
+    pill = load_sprite("games/lanes/item_power.png")
+    sc.stamp(pill, spec["pill"][0] * W, spec["pill"][1] * H,
+             scale=spec["pill"][2])
+    # the player hull + its engine fire (real sprites, nose-up)
+    sx, sy, ss = spec["ship"]
+    fire = load_sprite("games/lanes/fire_00.png")
+    sc.stamp(fire, sx * W, sy * H + 78, scale=2.1)
+    sc.glow(sx * W, sy * H, 120, (90, 160, 255), 70)
+    ship = load_sprite("games/lanes/ship_orange.png")
+    sc.stamp(ship, sx * W, sy * H, scale=ss * 1.5)
+    sc.vignette(95)
     return sc.render()
 
 

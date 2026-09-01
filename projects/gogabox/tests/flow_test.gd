@@ -307,10 +307,15 @@ func _t_meta() -> int:
 func _t_registry() -> int:
         var ok := _check(GameReg.playable().size() == 8, "8 playable games")
         # v0.2.3 patch: 7 teasers - the REAL Geometry Flash joined the
-        # workshop as a SOON tile when the lane-dodger became Space Dodge
+        # workshop as a SOON tile when the lane-dodger became Space Dash
         ok += _check(GameReg.workshop().size() == 7, "7 workshop teasers")
-        ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dodge",
-                "the lane-dodger ships as SPACE DODGE (rename law)")
+        ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dash",
+                "the lane-dodger ships as SPACE DASH (rename law)")
+        # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
+        var dash: Dictionary = GameReg.get_game("lanes")
+        ok += _check(int(dash["fee"]) == 20, "space dash round costs 20")
+        ok += _check(int(dash["coin_div"]) == 20, "space dash score / 20")
+        ok += _check(bool(dash["shop"]), "space dash wears a shop")
         ok += _check(String(GameReg.get_game("geometry")["title"]) \
                         == "Geometry Flash",
                 "the REAL Geometry Flash waits as its own teaser")
@@ -427,6 +432,22 @@ func _t_roadmap() -> int:
         for i in picks.size():
                 same = same and String(picks[i]["id"]) == String(picks2[i]["id"])
         ok += _check(same, "daily picks same order within a day")
+        # v0.2.4 OWNER FIX ("in the top-picks, it lists some soon titles
+        # while it should only list owned playable games"): under the
+        # all_owned cheat owns_game() answers yes for EVERYTHING, so the
+        # picks pool must skip coming_soon teasers ITSELF.
+        Box.dev_set_cheat("all_owned", 1)
+        var cheat_picks := Roadmap.daily_picks()
+        var no_soon := true
+        for p in cheat_picks:
+                no_soon = no_soon and not bool(p.get("coming_soon", false))
+        ok += _check(no_soon and not cheat_picks.is_empty(),
+                "picks stay playable-only under all_owned (%d)" % cheat_picks.size())
+        var geo_in := false
+        for p in cheat_picks:
+                geo_in = geo_in or String(p["id"]) == "geometry"
+        ok += _check(not geo_in, "the geometry SOON teaser never picks")
+        Box.dev_set_cheat("all_owned", 0)
         # v0.0.7 two-level badges: mystery teaser wears NEW!
         Roadmap.tick()
         ok += _check(Box.badge("hen") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("hen"))

@@ -780,6 +780,16 @@ func buy_unlock(game_id: String, cat: String, price: int) -> bool:
 func unlock_owned(game_id: String, cat: String) -> bool:
         return item_owned(game_id, cat, "__on__")
 
+## v0.2.4: point a category's "on" at an already-owned item WITHOUT paying
+## (the space-dash spaces are one-at-a-time equipment that may be free).
+## The buy_item path double-taxes re-equips and breaks under the all_owned
+## cheat (already owned -> buy refused -> "on" never moves); this is the
+## equip_skin twin for plain item shelves.
+func equip_item(game_id: String, cat: String, item: String) -> void:
+        if item_owned(game_id, cat, item):
+                _items(game_id, cat)["on"] = item
+                save()
+
 # ------------------------------------------------------------- skins (per game)
 
 func skin_owned(game_id: String, skin_id: String) -> bool:

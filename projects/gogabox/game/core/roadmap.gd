@@ -382,6 +382,11 @@ static func _schedule_reveal_notification(id: String, g: Dictionary) -> void:
 ## day, reshuffled at midnight. v0.0.9 owner rule: the picks pool is OWNED
 ## games only - mystery boxes in "today's picks" read as a joke ("kind of
 ## funny but wrong"), and the strip must suggest what to PLAY tonight.
+## v0.2.4 OWNER FIX ("in the top-picks, it lists some soon titles while it
+## should only list owned playable games"): OWNED is not enough - a workshop
+## teaser never belongs here, not even under the all_owned dev cheat (which
+## makes owns_game() answer yes for EVERYTHING). The pool is owned games
+## with a REAL script behind them: coming_soon never picks.
 static func daily_picks() -> Array:
         var d := Time.get_date_dict_from_system()
         var seed_text := "%s-%s-%s-gogabox" % [d["year"], d["month"], d["day"]]
@@ -389,6 +394,8 @@ static func daily_picks() -> Array:
         rng.seed = hash(seed_text)
         var pool := []
         for g in GameReg.GAMES:
+                if g.get("coming_soon", false):
+                        continue   # the workshop is not a playlist
                 if not Box.owns_game(String(g["id"])):
                         continue
                 pool.append(g)

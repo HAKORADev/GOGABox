@@ -119,3 +119,50 @@ built yet):
   to play" tiles; pre-play time windows now live ("unlocks at 4 PM · in
   2h 13m", self-rebuilding page); and snake entry/retry charges
   min(fee, wallet) - the 9-coin free-farm exploit is dead.
+
+## Space Dash v0.2.4 design brainstorms (2026-09-02, resolved into the build)
+
+- **Invisible lanes vs alpha lanes.** The owner weighed both ("a better
+  design could be remove lanes and just make enemies move in the invisible
+  lanes? but actually i still think the lanes design is good, but make the
+  lanes as alpha values"). RESOLVED: visible-but-faint guides (alpha 0.10
+  cyan-white lines + a soft glow at the bottom edge where the ship patrols),
+  enemies locked to lane Xs like the player - the lanes ARE the game's
+  grammar (dodge = lane change, laser = lane ray, thunder = lane jump),
+  they just don't shout over the background.
+- **The 30ms spam floor.** Owner: "not just hardcode it for 30ms, i mean
+  study it". RESOLVED as a law, not a number: floor = max(0.030, one live
+  frame). At 60fps that IS 30ms; at 30fps one frame (33ms) takes over so
+  the screen can never lag behind the shot count; at 120Hz the 30ms floor
+  caps a macro at 33/s while human taps (8-12/s) always pass. Probe asserts
+  it three ways.
+- **Dynamic difficulty driver.** Owner: "based on kills (kills and not
+  score) this will make it really hard to progress endlessly". RESOLVED:
+  the director reads total kills, 10 tiers, each tier nudges spawn
+  interval 1.15 -> 0.42s, speed band, shooter ratio 0.10 -> 0.45, elite
+  odds, and +8% enemy HP every 2 tiers. Score would have been farmable
+  (hearts add score, elites pay big); kills cannot be inflated.
+- **Weapon identity = the crowd problem it solves.** Beams = chip damage,
+  laser = the column (pierces through every hull on its lane), thunder =
+  the cross-lane jumper (chain to nearest neighbor, upgrade = longer
+  chain), bomb = the cluster eraser (radius blast). Upgrades deepen the
+  identity (more beams / hotter beam, longer hotter laser, longer chains,
+  bigger bombs) instead of inflating a generic bullet.
+- **Hold vs tap per weapon.** Owner: "there will be weapons that holding
+  will make different effect than just rapid shooting". RESOLVED: beams
+  are identical (tap = shot, hold = cadence); laser while HELD is the
+  continuous piercing beam (tap = a short 0.3s pulse); thunder while HELD
+  strikes continuously for up to 5s (tap = one strike); bomb only fires
+  per tap on its 2s cooldown (holding shows the reload ring, no autofire).
+- **Shield economy.** Shop purchase = shield items EXIST in the loot pool
+  (same law as weapons: "not equipped as base but bought so it exists in
+  the game"). Aura alpha: level 1 faint, level 3 dense - "gets less alpha
+  so it feels more deeper and stronger" (reads: more present, more solid).
+- **Coins are a heartbeat, not rain.** 1 coin per 5-10 kills, counter
+  resets at collection (owner's exact words). Everything ELSE stops
+  spawning free: no floating coin spawner like the old game had.
+- **Local network multiplayer** (owner note on the "1 2 3 4 player games"
+  study app): parked as a BOX-LEVEL future direction - a device per player
+  pays the per-round economy better than pass-the-phone. When it comes,
+  it comes as a shared system (lobby + per-device wallets), not a game
+  feature bolted onto one GDD. Recorded in FUTURE_GAMES.md.

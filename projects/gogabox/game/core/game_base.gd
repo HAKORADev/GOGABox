@@ -145,6 +145,10 @@ func check_achievements() -> int:
                         "rung_5": ok = Box.counter(game_id, "rung") >= 5
                         "rung_top": ok = Box.counter(game_id, "rung") >= 10
                         "streak_3": ok = Box.counter(game_id, "streak") >= 3
+                        # v0.2.4 - space dash (kills + the max power rung)
+                        "kills_100": ok = Box.counter(game_id, "kills") >= 100
+                        "kills_300": ok = Box.counter(game_id, "kills") >= 300
+                        "dash_max": ok = Box.counter(game_id, "max_power") >= 20
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)

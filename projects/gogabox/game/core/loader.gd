@@ -138,10 +138,18 @@ func _run(g: Dictionary) -> void:
                 steps.append("wait")  # keep the flow honest even with nothing to load
 
         var t0 := Time.get_ticks_msec()
+        # v0.2.4: the await rides BATCHES, not single files - the lane-dodger
+        # grew into Space Dash and its asset folder jumped from 4 files to
+        # ~50 real sprites; one pause per file made the loading screen take
+        # seconds longer purely out of file COUNT. The progress bar still
+        # breathes ~10 times, the batch size scales with the cargo.
+        var every := maxi(1, int(ceil(steps.size() / 10.0)))
         for i in steps.size():
                 var p := String(steps[i])
                 if p != "wait" and ResourceLoader.exists(p):
                         load(p)
+                if (i % every) != every - 1 and i != steps.size() - 1:
+                        continue
                 var done := float(i + 1) / float(steps.size())
                 var elapsed := float(Time.get_ticks_msec() - t0) / 1000.0
                 var show_frac := clampf(elapsed / MIN_SHOW, 0.0, 1.0)

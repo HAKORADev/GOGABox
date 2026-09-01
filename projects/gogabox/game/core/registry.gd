@@ -88,25 +88,43 @@ const GAMES := [
                 # same id, same thumb - the name is honest now. The REAL
                 # Geometry Flash returns to the workshop below as a SOON
                 # teaser + the parking lot doc.
-                "id": "lanes", "title": "Space Dodge", "tag": "dodge the grid",
+                # v0.2.4 THE REDESIGN (owner: "renaming it again to space
+                # dash will be better for my plans" + the full GDD): the
+                # lane-dodger with falling blocks is GONE - Space Dash is a
+                # tons-of-enemies shooter now: kills are score, four
+                # weapons, loot from wrecks, hearts, per-weapon power
+                # ladders, kill-driven difficulty, skins/spaces/weapons
+                # shop. Real Kenney hulls only (owner: no code ships). The
+                # id stays `lanes`; the journal lives in
+                # docs/goga_docs/gogames_ideas/dash.md.
+                "id": "lanes", "title": "Space Dash", "tag": "kill the sky",
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 100, "price": 200, "fee": 10, "shop": false,
+                "coin_div": 20, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "blocked_hours": {"from": 1, "to": 8},
-                # v0.1.4: BOTH daily caps on one game (owner: "some games may
-                # have limited rounds and limited time btw")
                 "daily_rounds": 6, "daily_minutes": 15,
-                "desc": "Three lanes, one ship, a wall of falling blocks. Swap lanes at the last moment - the grid only gets faster.",
-                "controls": ["tap left / right side to swap lanes", "survive as long as possible", "the grid speeds up over time"],
-                "genres": {"main": ["action", "arcade"], "sub": ["retro", "singleplayer"]},
+                "desc": "Five lanes, a sky FULL of enemy ships, four weapons. Kills are score, wrecks drop loot, and the war only gets harder the more you kill. Buy ships, weapons and spaces in the shop.",
+                "controls": [
+                        "tap the LEFT / RIGHT EDGE to move one lane that way - the walls block you",
+                        "press the MIDDLE of the screen to shoot - rapid taps and holding both fire",
+                        "kills are score: every wreck pops +nn, and the deep sky only gets meaner the more you kill",
+                        "wrecks drop loot: a GOGACoin every 5-10 kills, power points for the held weapon, weapon + shield items once bought in the shop",
+                        "3 hearts; +1 heart per 1000 score; a crash costs -500 score and one heart - the last death ends the run",
+                        "yellow beams upgrade into more beams; the red laser pierces whole columns (2s live / 0.5s cd); thunder chains ship to ship (5s live / 2s cd); the bomb launcher blasts a radius (2s cd)",
+                        "weapon power ladders 0/1/3/6/10/15/20 PER weapon - dying drops the held weapon 3 rungs",
+                        "some ships wear shield bubbles; shatter carriers spin invulnerable shards - shoot the gap that faces you; rare UFO elites fire shotguns",
+                        "the shop sells ship skins, the laser/thunder/bomb weapons (they join the loot), the shield power, and 3 spaces - no options menu, just fly"],
+                "genres": {"main": ["action", "arcade", "shooter"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [
-                        {"id": "score_500", "title": "Lane Rookie", "desc": "Score 500"},
-                        {"id": "score_1500", "title": "Grid Ghost", "desc": "Score 1500"},
-                        {"id": "dodge_200", "title": "Untouchable", "desc": "Dodge 200 blocks total"},
+                        {"id": "score_500", "title": "Blooded Wings", "desc": "Score 500 in one run"},
+                        {"id": "score_1500", "title": "Sky Reaper", "desc": "Score 1500 in one run"},
+                        {"id": "kills_100", "title": "Century Hawk", "desc": "Kill 100 ships in one run"},
+                        {"id": "kills_300", "title": "Ace of Aces", "desc": "Kill 300 ships in one run"},
+                        {"id": "dash_max", "title": "Fully Armed", "desc": "Max a weapon's power (20)"},
                 ],
         },
         {
@@ -277,10 +295,10 @@ const GAMES := [
         # geometry flash game i planned for"): the REAL Geometry Flash takes
         # its name back and waits in the workshop as a SOON tile - direct
         # reveal, visible right away, never a mystery. Its dodge-game
-        # namesake lives on as Space Dodge above.
+        # namesake grew up and is SPACE DASH now (v0.2.4).
         {"id": "geometry", "title": "Geometry Flash", "tag": "the real one", "coming_soon": true,
                 "thumb": "res://assets/thumbs/soon.png",
-                "desc": "The owner's own Geometry Flash - the name the lane-dodger borrowed until it grew into Space Dodge. The real thing is still to come.",
+                "desc": "The owner's own Geometry Flash - the name the lane-dodger borrowed until it grew into Space Dash. The real thing is still to come.",
                 "genres": {"main": ["action", "arcade"], "sub": ["rhythm", "singleplayer"]},
                 "age": "everyone",
                 "reveal": {"kind": "direct", "appear_after": 0, "price": 350,

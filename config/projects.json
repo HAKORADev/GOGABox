@@ -1,31 +1,31 @@
 {
-    "schema": 1,
-    "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. version_code: arm64 gets base+2, armeabi-v7a gets base+1 (Play Store requires distinct, higher on the modern ABI).",
-    "projects": {
-        "gogabox": {
-            "display_name": "GOGABox",
-            "path": "projects/gogabox",
-            "enabled": true,
-            "ci_auto": true,
-            "apk_name": "GOGABox",
-            "package": "hakora.dev.gogabox",
-            "version_name": "0.2.3",
-            "version_code_base": 30320,
-            "aab": false,
-            "abi_presets": {
-                "arm64-v8a": "Android arm64",
-                "armeabi-v7a": "Android arm32"
-            },
-            "use_plugins": [
-                "unity_ads",
-                "notify"
-            ],
-            "ads_config": "config/ads_config.json",
-            "keystore": {
-                "path": "config/keystore/arsenal-release.jks",
-                "user": "arsenal",
-                "pass": "gogabox-arsenal-2026"
-            }
-        }
+  "schema": 1,
+  "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. version_code: arm64 gets base+2, armeabi-v7a gets base+1 (Play Store requires distinct, higher on the modern ABI).",
+  "projects": {
+    "gogabox": {
+      "display_name": "GOGABox",
+      "path": "projects/gogabox",
+      "enabled": true,
+      "ci_auto": true,
+      "apk_name": "GOGABox",
+      "package": "hakora.dev.gogabox",
+      "version_name": "0.2.4",
+      "version_code_base": 30330,
+      "aab": false,
+      "abi_presets": {
+        "arm64-v8a": "Android arm64",
+        "armeabi-v7a": "Android arm32"
+      },
+      "use_plugins": [
+        "unity_ads",
+        "notify"
+      ],
+      "ads_config": "config/ads_config.json",
+      "keystore": {
+        "path": "config/keystore/arsenal-release.jks",
+        "user": "arsenal",
+        "pass": "gogabox-arsenal-2026"
+      }
     }
+  }
 }

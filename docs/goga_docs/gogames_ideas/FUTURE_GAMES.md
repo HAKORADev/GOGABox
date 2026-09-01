@@ -24,6 +24,17 @@ the shipped lane-dodger that had borrowed the "Geometry Flash" name is now
 SOON workshop tile (registry id `geometry`, direct reveal) until it gets its
 own build.
 
+Fifth dump — the v0.2.4 round (2026-09-02, +3 games +1 study app + one
+MULTIPLAYER NOTE from the owner): a Party-Dash-like endless vertical
+platformer, a memory-cards game, and a 3D Rubik's cube. The study shelf
+grows "1 2 3 4 player games - offline". THE MULTIPLAYER NOTE (owner, kept
+verbatim in spirit): our GOGABox may stay single player OR get LOCAL NETWORK
+multiplayer - and the owner leans local net, because the way the economy
+works (per-round fees, GOGACoins, GOGABatteries) actually pays off way better
+when every player brings their own device than with a one-device-many-players
+pass-the-phone thing. So when multiplayer ever comes, plan it as
+device-per-player local network play FIRST.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -90,6 +101,14 @@ own build.
   matched gems power the attacks.
 
 ## Platformers & rage climbs
+- **party-dash-like** — Cartoon Network's Party Dash energy: an endless
+  VERTICAL action platformer, cool and fast. Up the towers, over the
+  hazards, never stop moving. (Owner: "platformer endless vertical action
+  cool game".)
+- **memory-cards-like** — the classic: a grid of face-down cards, flip two,
+  remember what hides behind each one, match every pair. Pairs, themes and
+  grid sizes scale up; fewer flips = better. (Owner: "remember the thing
+  behind this card, yes".)
 - **red-ball-4-like** — rolling-ball physics platformer; owner wants BOTH the
   movement AND the style vibe of it.
 - **get-over-it-2d** — Getting Over It + Only Up mashed into 2D: one brutal
@@ -107,6 +126,9 @@ own build.
     separate doodle-jump clone. Snowy Tower owns that niche.
 
 ## 3D shelf (low priority — owner: "i will focus more on 2D anyway")
+- **rubiks-cube-3d** — the cube thing (owner: "rupik or rupic, you got it"):
+  a real 3D Rubik's cube you twist and turn with swipes, scramble it,
+  solve it. Layer turns, timer, maybe a solver hint later.
 - **helix-jump-like** — owner described it precisely: a long cylindrical
   tower, platforms spiral around it, the ball bounces down and SHATTERS the
   platforms it lands on — avoid the black segments.
@@ -133,3 +155,11 @@ balloon connect + circle connect were mined from My Talking Angela 2).
 - **gumball's amazing party game** — Gumball party mini-games.
 - **we bare bears free fur all** — We Bare Bears mini-game collection
   (crazy fishing's home).
+- **1 2 3 4 player games - offline** — the big multi-mini-game box; study
+  HOW it splits one phone between 2-4 players AND how it paces its games.
+  THE OWNER NOTE THAT CAME WITH IT: GOGABox may stay single player or grow
+  LOCAL NETWORK multiplayer (each player on their own phone on one wifi) —
+  and the owner prefers the local net direction, because the per-round
+  economy (fees, GOGACoins, GOGABatteries per device) works way better with
+  a device per player than one-device-many-players. Keep this in mind when
+  mining this box.
