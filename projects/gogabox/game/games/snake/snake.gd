@@ -176,6 +176,10 @@ func _goga_setup() -> void:
         # PEACE zeros the score bonus through the MODULAR flag - the payout
         # path reads it, no game names anywhere near the economy.
         score_bonus_enabled = not peace
+        # v0.2.3 patch (owner): PEACE never dies on itself - the pause sheet
+        # gains the END row as the ONLY way to bank a quiet run (the pong
+        # rule). War modes end by dying, so they keep the plain pause.
+        pause_end_run = peace
         # v0.2.0 universal reload: the host may TELL us the picked position
         # (the game was unloaded + reloaded for it) - the ask is answered.
         # v0.2.1a OWNER FIX (the broken detector): the ask listens to the
@@ -207,6 +211,12 @@ func _goga_setup() -> void:
 func _auto_orient() -> String:
         var vp := get_viewport_rect().size
         return "horizontal" if vp.x > vp.y else "vertical"
+
+## v0.2.3 patch: the END row exists only for a LIVE run - pausing from the
+## position ask, the mode menu or the ready card keeps the plain pause
+## (the pong law, mirrored for the peace banking).
+func _goga_pause_end_ok() -> bool:
+        return _phase == "run"
 
 ## The field IS the screen now (owner v0.2.1: "use the screen resolution
 ## instead of letting it for nothing") - the full available canvas in BOTH
@@ -600,6 +610,7 @@ func _peace_card() -> Button:
                         peace = not peace
                         Box.set_progress(game_id, "style_peace", peace)
                         score_bonus_enabled = not peace
+                        pause_end_run = peace   # v0.2.3 patch: END follows the style
                         _show_mode_select())
         return b
 

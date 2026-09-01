@@ -466,6 +466,134 @@ func dev_set_cheat(name: String, v: int) -> void:
 
 const DEV_CHEATS := ["owned", "all_owned", "gogacoins", "battery"]
 
+## v0.2.3 patch (owner: "use dev cheats and toggle everything so i test the
+## games more and more") - the GAME OPTIONALS table behind the dev sheet's
+## second section. These are the games' OWN settings (the same progress keys
+## their optionals menus write), so a flip here behaves exactly like a flip
+## in the game. Fields:
+##   def         the progress default (what an untouched save reads)
+##   grant       shop cats owned FOR REAL when the row flips ON (no spend,
+##               no spent-stats) - a toggle that cannot bite is a trap
+##   cycle       tap advances through the values; grant_cycle grants per value
+##   solo        excluded from the ALL ON / ALL OFF sweep (a style, not a feature)
+const DEV_OPTIONALS := [
+        {"game": "snake", "key": "opt_enemies", "def": true,
+                "label": "SNAKE - MORE ENEMIES",
+                "grant": [["pack", "__on__"]]},
+        {"game": "snake", "key": "enemy_count", "def": 1,
+                "label": "SNAKE - ENEMY PACK SIZE",
+                "cycle": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
+        {"game": "snake", "key": "opt_powerups", "def": false,
+                "label": "SNAKE - POWER FRUITS",
+                "grant": [["powerups", "__on__"]]},
+        {"game": "snake", "key": "opt_bugs", "def": false,
+                "label": "SNAKE - BUGS",
+                "grant": [["bugs", "__on__"]]},
+        {"game": "snake", "key": "opt_obstacles", "def": false,
+                "label": "SNAKE - OBSTACLES",
+                "grant": [["obstacles", "__on__"]]},
+        {"game": "snake", "key": "opt_jump", "def": false,
+                "label": "SNAKE - JUMPING FRUITS",
+                "grant": [["jump", "__on__"]]},
+        {"game": "snake", "key": "style_peace", "def": false, "solo": true,
+                "label": "SNAKE - PEACE STYLE"},
+        {"game": "snake", "key": "mode_nowalls", "def": false,
+                "label": "SNAKE - NO-WALLS WRAP"},
+        {"game": "snake", "key": "place", "def": "classic",
+                "label": "SNAKE - PLACE",
+                "cycle": ["classic", "day", "night"],
+                "grant_cycle": {"day": [["place", "day"]],
+                                "night": [["place", "night"]]}},
+        {"game": "rally", "key": "opt_more", "def": false,
+                "label": "PONG - MORE ENEMIES",
+                "grant": [["pong_more", "__on__"]]},
+        {"game": "rally", "key": "opt_size", "def": false,
+                "label": "PONG - SIZE MODS",
+                "grant": [["pong_size", "__on__"]]},
+        {"game": "rally", "key": "opt_speed", "def": false,
+                "label": "PONG - SPEED",
+                "grant": [["pong_speed", "__on__"]]},
+        {"game": "rally", "key": "opt_sparkles", "def": false,
+                "label": "PONG - SPARKLES",
+                "grant": [["pong_sparkles", "__on__"]]},
+]
+
+## Write REAL ownership into a shop shelf (no spend, no spent-stats) - the
+## dev sheet's grant for a flipped optional. The grant is LOGGED under
+## __dev__ so the RESET can undo exactly the grants, never a real purchase.
+func dev_grant_unlock(game_id: String, cat: String, item: String) -> void:
+        var arr: Array = _items(game_id, cat)["owned"] as Array
+        if arr.has(item):
+                return
+        arr.append(item)
+        var log_arr: Array = get_progress("__dev__", "granted", []) as Array
+        var stamp := "%s/%s/%s" % [game_id, cat, item]
+        if not log_arr.has(stamp):
+                log_arr.append(stamp)
+        set_progress("__dev__", "granted", log_arr)
+        save()
+
+func dev_optional_value(rc: Dictionary) -> Variant:
+        return get_progress(String(rc["game"]), String(rc["key"]),
+                        rc.get("def", false))
+
+## One flip, UI-independent so the tests can walk it: bool rows toggle,
+## cycle rows advance, and the linked unlock lands with the flip (ON or
+## the cycled value). Returns the new value.
+func dev_flip_optional(rc: Dictionary) -> Variant:
+        var game_id := String(rc["game"])
+        var key := String(rc["key"])
+        if rc.has("cycle"):
+                var arr: Array = rc["cycle"]
+                var i := arr.find(dev_optional_value(rc))
+                var nxt: Variant = arr[(i + 1) % arr.size()]
+                set_progress(game_id, key, nxt)
+                if rc.has("grant_cycle"):
+                        var gc: Dictionary = rc["grant_cycle"]
+                        # str(), never String(): a cycle value may be an int
+                        if gc.has(str(nxt)):
+                                for pair in gc[str(nxt)]:
+                                        dev_grant_unlock(game_id,
+                                                        String(pair[0]), String(pair[1]))
+                return nxt
+        var on: bool = not bool(dev_optional_value(rc))
+        set_progress(game_id, key, on)
+        if on and rc.has("grant"):
+                for pair in rc["grant"]:
+                        dev_grant_unlock(game_id, String(pair[0]), String(pair[1]))
+        return on
+
+## The dev sheet's ALL ON / ALL OFF: every FEATURE row at once (solo style
+## rows and the cosmetic cycles stay untouched). Grants only ride ALL ON.
+func dev_all_optionals(on: bool) -> void:
+        for rc in DEV_OPTIONALS:
+                if rc.has("solo") or rc.has("cycle"):
+                        continue
+                set_progress(String(rc["game"]), String(rc["key"]), on)
+                if on and rc.has("grant"):
+                        for pair in rc["grant"]:
+                                dev_grant_unlock(String(rc["game"]),
+                                                String(pair[0]), String(pair[1]))
+        save()
+
+## The undo: every optional back to its default + exactly the dev-granted
+## unlocks removed (a REAL coin purchase survives - the grant log only
+## knows the stamps this sheet wrote).
+func dev_reset_optionals() -> void:
+        for rc in DEV_OPTIONALS:
+                set_progress(String(rc["game"]), String(rc["key"]),
+                                rc.get("def", false))
+        for stamp in (get_progress("__dev__", "granted", []) as Array):
+                var parts := String(stamp).split("/")
+                if parts.size() != 3:
+                        continue
+                var arr: Array = _items(parts[0], parts[1])["owned"] as Array
+                arr.erase(parts[2])
+                if String(_items(parts[0], parts[1])["on"]) == parts[2]:
+                        _items(parts[0], parts[1])["on"] = ""
+        set_progress("__dev__", "granted", [])
+        save()
+
 func coins() -> int:
         if dev_cheat("gogacoins") == 1:
                 return 999999999   # EXTREME - logic only, see coins_display

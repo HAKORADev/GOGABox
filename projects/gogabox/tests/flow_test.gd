@@ -29,6 +29,9 @@ func _ready() -> void:
         fails += _test("games: all playable boot", await _t_all_games())
         fails += _test("menu: boots and lays out", await _t_menu())
         fails += _test("capacity: the hold while a game is open", await _t_capacity_hold())
+        fails += _test("menu: the SOON ? law - tiles AND pages", await _t_soon_art())
+        fails += _test("snake: peace END banks, bonus /0", await _t_peace_end())
+        fails += _test("dev: optionals, flips, grants, reset", await _t_dev_optionals())
         fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
@@ -1239,4 +1242,218 @@ func _t_plugin_names() -> int:
                 list.sort()
                 ok += _check(missing.is_empty(),
                         "%s -> GDScript calls without exact Java match: %s" % [p["gd"].get_file(), ", ".join(list)])
+        return ok
+
+# ------------------------------------------------------------- v0.2.3 patch
+
+## THE SOON ? LAW IS TOTAL: a coming_soon game wears thumbs/soon.png in
+## EVERY art spot - grid tiles (owned-under-dev-cheats included), carousel
+## strips, AND the page headers (the soon page kept leaking the final art -
+## owner: "the pre-play shows the final art somehow").
+func _t_soon_art() -> int:
+        Box.reset_all()
+        var ok := 0
+        var teasers := GameReg.GAMES.filter(
+                        func(g): return bool(g.get("coming_soon", false)))
+        ok += _check(not teasers.is_empty(), "the workshop has coming_soon games")
+        if teasers.is_empty():
+                Box.reset_all()
+                return ok
+        var g: Dictionary = teasers[0]
+        var menu := Node2D.new()
+        menu.set_script(load("res://game/menu/menu.gd"))
+        add_child(menu)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        # the swap helper is the law's single source
+        var soon_path := String(menu._soon_art(g)["thumb"])
+        var snake_path := String(menu._soon_art(GameReg.get_game("snake"))["thumb"])
+        ok += _check(soon_path == "res://assets/thumbs/soon.png",
+                "_soon_art swaps the thumb for a coming_soon game")
+        ok += _check(not snake_path.ends_with("soon.png"),
+                "a shipped game keeps its final art")
+        # dev cheats own EVERYTHING - the owned tile must still wear the ?
+        Box.dev_set_cheat("all_owned", 1)
+        menu._refresh()
+        await get_tree().process_frame
+        ok += _check(Box.owns_game(String(g["id"])),
+                "all_owned owns the soon game too (the leak repro)")
+        var holder := Control.new()
+        add_child(holder)
+        var t: TextureRect = menu._add_thumb(holder, g, 54)
+        var t_path := String(t.texture.resource_path) if t.texture != null else ""
+        ok += _check(t_path.ends_with("soon.png"),
+                "owned soon TILE art is the purple ? (got %s)" % t_path)
+        var t2: TextureRect = menu._add_thumb(holder, GameReg.get_game("snake"), 54)
+        var t2_path := String(t2.texture.resource_path) if t2.texture != null else ""
+        ok += _check(t2_path != "" and not t2_path.ends_with("soon.png"),
+                "owned snake TILE art stays final (%s)" % t2_path)
+        # the PAGE header (soon page / pre-play) obeys the same law
+        var vb := VBoxContainer.new()
+        holder.add_child(vb)
+        menu._header_block(vb, g)
+        var head: TextureRect = vb.get_child(0).get_child(0)
+        var h_path := String(head.texture.resource_path) \
+                        if head is TextureRect and head.texture != null else ""
+        ok += _check(h_path.ends_with("soon.png"),
+                "soon PAGE header wears the purple ? (the pre-play leak, got %s)" % h_path)
+        var vb2 := VBoxContainer.new()
+        holder.add_child(vb2)
+        menu._header_block(vb2, GameReg.get_game("snake"))
+        var head2: TextureRect = vb2.get_child(0).get_child(0)
+        var h2_path := String(head2.texture.resource_path) \
+                        if head2 is TextureRect and head2.texture != null else ""
+        ok += _check(h2_path != "" and not h2_path.ends_with("soon.png"),
+                "snake PAGE header stays final art (%s)" % h2_path)
+        menu._open_soon_page(g)
+        await get_tree().process_frame
+        ok += _check(menu._sheet_open, "the soon page builds cleanly")
+        menu._close_sheet()
+        holder.queue_free()
+        menu.queue_free()
+        await get_tree().process_frame
+        Box.dev_set_cheat("all_owned", 0)
+        Box.reset_all()
+        return ok
+
+## PEACE GETS THE END (owner: "update the snake game to get the end button
+## in pause menu in peace mode") - and the banking states the /0 rule: the
+## score bonus pays NOTHING in peace (score / 0), so an END run banks the
+## SCORE and not one coin.
+func _t_peace_end() -> int:
+        Box.reset_all()
+        Box.set_progress("snake", "style_peace", true)
+        var router := Node2D.new()
+        add_child(router)
+        var host_script: GDScript = load("res://game/core/game_host.gd")
+        var launched: bool = host_script.launch(router, "snake")
+        var ok := _check(launched, "peace snake launches")
+        if not launched:
+                Box.set_progress("snake", "style_peace", false)
+                Box.reset_all()
+                return ok
+        await get_tree().create_timer(3.0).timeout   # loading screen
+        var host: Node = host_script.active_host
+        ok += _check(host != null and host.game != null, "peace snake alive")
+        if host == null or host.game == null:
+                host_script.end_session()
+                Box.set_progress("snake", "style_peace", false)
+                Box.reset_all()
+                return ok
+        var game: Node = host.game
+        ok += _check(bool(game.peace), "the peace style is on")
+        ok += _check(bool(game.pause_end_run), "the pause sheet OFFERS the END row")
+        ok += _check(not bool(game._goga_pause_end_ok()),
+                "the ask/mode screens keep the plain pause (END is run-live only)")
+        ok += _check(not bool(game.score_bonus_enabled),
+                "peace zeroes the score bonus flag")
+        ok += _check(int(host._score_to_coins(1234)) == 0,
+                "the /0 rule: the score bonus pays NOTHING")
+        # the END path IS finish_run - bank a scored peace run
+        game.set_score(55)
+        game.finish_run(55)
+        await get_tree().create_timer(2.2).timeout   # the theatre collapses
+        ok += _check(Box.stat("snake", "best") == 55, "the peace run banks its score")
+        ok += _check(Box.coins() == 150 - 10,
+                "END pays zero coins (score / 0) - wallet %d" % Box.coins())
+        host._quit_to_menu()
+        await get_tree().process_frame
+        Box.set_progress("snake", "style_peace", false)
+        Box.reset_all()
+        return ok
+
+## THE DEV SHEET'S GAME OPTIONALS (owner: "use dev cheats and toggle
+## everything so i test the games more and more") - table sanity, real
+## flips, real grants, the place cycle, the ALL ON / ALL OFF sweep, and a
+## RESET that un-does exactly the grants (real purchases survive).
+func _dev_row(game_id: String, key: String) -> Dictionary:
+        for rc in Box.DEV_OPTIONALS:
+                if String(rc["game"]) == game_id and String(rc["key"]) == key:
+                        return rc
+        return {}
+
+func _t_dev_optionals() -> int:
+        Box.reset_all()
+        var ok := _check(Box.DEV_OPTIONALS.size() >= 12, "the optionals table is present")
+        var ids := {}
+        for g in GameReg.GAMES:
+                ids[String(g["id"])] = true
+        var uniq := {}
+        for rc in Box.DEV_OPTIONALS:
+                var gid := String(rc["game"])
+                ok += _check(ids.has(gid), "entry points at a real game: " + gid)
+                var k := gid + "/" + String(rc["key"])
+                ok += _check(not uniq.has(k), "entry is unique: " + k)
+                uniq[k] = true
+                if rc.has("cycle"):
+                        ok += _check((rc["cycle"] as Array).has(Box.dev_optional_value(rc)),
+                                "cycle default is a legal value (%s)" % k)
+                else:
+                        ok += _check(bool(Box.dev_optional_value(rc)) == bool(rc.get("def", false)),
+                                "bool default reads through (%s)" % k)
+        # a REAL purchase first - it must outlive every dev sweep
+        ok += _check(Box.buy_unlock("snake", "bugs", 0), "a real bugs purchase lands")
+        # a flip is a REAL setting AND grants the shop unlock for real
+        Box.dev_set_cheat("all_owned", 0)
+        ok += _check(not Box.unlock_owned("rally", "pong_sparkles"),
+                "sparkles locked before the flip")
+        var on: bool = Box.dev_flip_optional(_dev_row("rally", "opt_sparkles"))
+        ok += _check(on, "the sparkles row flips ON")
+        ok += _check(Box.unlock_owned("rally", "pong_sparkles"),
+                "the flip granted the shop unlock FOR REAL")
+        # the place cycle grants its garden per value
+        var pv: Variant = Box.dev_flip_optional(_dev_row("snake", "place"))
+        ok += _check(String(pv) == "day", "place cycles classic -> day (%s)" % String(pv))
+        ok += _check(Box.item_owned("snake", "place", "day"),
+                "the cycle granted the day garden")
+        # ALL ON lights every FEATURE row (the peace style stays alone)
+        Box.dev_all_optionals(true)
+        var allon := true
+        for rc in Box.DEV_OPTIONALS:
+                if rc.has("solo") or rc.has("cycle"):
+                        continue
+                allon = allon and bool(Box.dev_optional_value(rc))
+        ok += _check(allon, "ALL ON lights every feature row")
+        ok += _check(Box.unlock_owned("rally", "pong_speed"), "ALL ON grants as it goes")
+        ok += _check(not bool(Box.dev_optional_value(_dev_row("snake", "style_peace"))),
+                "the peace style is solo - ALL ON leaves it alone")
+        Box.dev_all_optionals(false)
+        var any_on := false
+        for rc in Box.DEV_OPTIONALS:
+                if rc.has("solo") or rc.has("cycle"):
+                        continue
+                any_on = any_on or bool(Box.dev_optional_value(rc))
+        ok += _check(not any_on, "ALL OFF kills every feature row")
+        # THE RESET: progress to defaults, exactly the grants die
+        Box.dev_reset_optionals()
+        ok += _check(Box.unlock_owned("snake", "bugs"),
+                "the REAL purchase survives the reset")
+        ok += _check(not Box.unlock_owned("rally", "pong_sparkles"),
+                "the granted unlock is removed by the reset")
+        ok += _check(not Box.item_owned("snake", "place", "day"),
+                "the granted garden is removed by the reset")
+        ok += _check(String(Box.dev_optional_value(_dev_row("snake", "place"))) == "classic",
+                "place back to classic after the reset")
+        ok += _check(bool(Box.dev_optional_value(_dev_row("snake", "opt_enemies"))),
+                "defaults are back (enemies default ON)")
+        # the sheet itself builds with the new section - EVERY row rendered
+        # (the first build aborted mid-way on a String(int) constructor, the
+        # sheet_open flag alone would never catch that)
+        var menu := Node2D.new()
+        menu.set_script(load("res://game/menu/menu.gd"))
+        add_child(menu)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        menu._open_dev_sheet()
+        await get_tree().process_frame
+        ok += _check(menu._sheet_open, "the dev sheet builds with the optionals section")
+        for wanted in ["SNAKE - MORE ENEMIES", "SNAKE - ENEMY PACK SIZE  =  1",
+                        "SNAKE - PLACE  =  CLASSIC", "PONG - SPARKLES  =  OFF",
+                        "RESET"]:
+                ok += _check(_find_button(menu, wanted) != null,
+                                "dev sheet rendered: %s" % wanted)
+        menu._close_sheet()
+        menu.queue_free()
+        await get_tree().process_frame
+        Box.reset_all()
         return ok

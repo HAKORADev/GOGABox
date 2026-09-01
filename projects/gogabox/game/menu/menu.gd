@@ -913,7 +913,10 @@ func _card_base(size: Vector2, ignore_mouse := true) -> Button:
 func _add_thumb(b: Control, g: Dictionary, label_strip: float,
                 faded := false, fit_whole := false) -> TextureRect:
         var t := TextureRect.new()
-        var path := String(g.get("thumb", ""))
+        # v0.2.3 patch: the SOON ? law lives HERE now - every tile/strip art
+        # spot (owned tiles under dev cheats included) wears the purple ?
+        # for a coming_soon game; final art is for SHIPPED games only
+        var path := String(_soon_art(g).get("thumb", ""))
         t.texture = load(path) if ResourceLoader.exists(path) else null
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
         t.offset_bottom = -label_strip
@@ -1069,7 +1072,8 @@ func _tile(g: Dictionary, st: String) -> Control:
                         _feed_ribbon(b, bd)
                 "SOON":
                         # the purple ? stays until the game actually ships
-                        _add_thumb(b, _soon_art(g), 70)
+                        # (v0.2.3 patch: _add_thumb applies the law itself now)
+                        _add_thumb(b, g, 70)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 260)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1606,6 +1610,51 @@ func _open_dev_sheet() -> void:
                 scroll.register_tappable(b, Arc._tap_emitter(b))
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 v.add_child(b)
+        # v0.2.3 patch: the GAME OPTIONALS - both games' own feature switches
+        # (plus the war styles), flip-able right here. A row flipping ON also
+        # grants its shop unlock FOR REAL so the toggle can actually bite;
+        # RESET OPTIONALS returns every flip and un-does exactly the grants.
+        v.add_child(Arc.label("GAME OPTIONALS", 24, Arc.HOT))
+        var sweep := HBoxContainer.new()
+        sweep.add_theme_constant_override("separation", 10)
+        v.add_child(sweep)
+        for pair in [["ALL ON", true], ["ALL OFF", false], ["RESET", null]]:
+                var on: Variant = pair[1]
+                var sb := Arc.button(str(pair[0]), Vector2(180, 56), 19,
+                                Arc.GOOD if on == true else
+                                Color(0.45, 0.42, 0.38) if on == false else Arc.BAD,
+                                func():
+                                        if on == null:
+                                                Box.dev_reset_optionals()
+                                        else:
+                                                Box.dev_all_optionals(bool(on))
+                                        _open_dev_sheet())
+                scroll.register_tappable(sb, Arc._tap_emitter(sb))
+                sb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sweep.add_child(sb)
+        for rc in Box.DEV_OPTIONALS:
+                var row_cfg: Dictionary = rc
+                var cur: Variant = Box.dev_optional_value(row_cfg)
+                var val: String
+                var hot: bool
+                if row_cfg.has("cycle"):
+                        # str(), NEVER String(): a cycle value can be an int
+                        # (the enemy pack size) and String(int) is an invalid
+                        # constructor call in Godot 4 - it aborts the sheet
+                        val = str(cur).to_upper()
+                        hot = str(cur) != str(row_cfg.get("def"))
+                else:
+                        hot = bool(cur)
+                        val = "ON" if hot else "OFF"
+                var rb := Arc.button("%s  =  %s" % [str(row_cfg["label"]), val],
+                                Vector2(560, 56), 19,
+                                Arc.GOOD if hot else Color(0.45, 0.42, 0.38),
+                                func():
+                                        Box.dev_flip_optional(row_cfg)
+                                        _open_dev_sheet())
+                scroll.register_tappable(rb, Arc._tap_emitter(rb))
+                rb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                v.add_child(rb)
         # the games index
         v.add_child(Arc.label("GAMES INDEX", 24, Arc.HOT))
         for g in GameReg.GAMES:
@@ -1620,7 +1669,7 @@ func _open_dev_sheet() -> void:
                 row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 row.custom_minimum_size = Vector2(560, 0)
                 v.add_child(row)
-        var note := Arc.label("cheats overwrite the real save ONLY while on - turn them off to go back to your progress", 16,
+        var note := Arc.label("switches overwrite the save ONLY while on. optionals flips are REAL settings - RESET returns them to defaults and removes the granted unlocks (real coin purchases survive)", 16,
                 Color("8a6a40"), false)
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         note.custom_minimum_size = Vector2(560, 0)
@@ -1720,7 +1769,11 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         head.add_theme_constant_override("separation", 18)
         vb.add_child(head)
         var thumb := TextureRect.new()
-        var tp := String(g.get("thumb", ""))
+        # v0.2.3 patch: every PAGE header obeys the same SOON ? law - the
+        # soon page, gated page, unlock page and the owned pre-play under
+        # dev cheats all wore the FINAL art here (owner: "the pre-play
+        # shows the final art somehow")
+        var tp := String(_soon_art(g).get("thumb", ""))
         thumb.texture = load(tp) if ResourceLoader.exists(tp) else null
         thumb.custom_minimum_size = Vector2(220, 150)
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

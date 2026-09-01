@@ -275,14 +275,22 @@ func _on_finish(final_score: int, earned: int) -> void:
                 # collapse: two lines -> one sum line, chip pops to the total
                 pick_line.visible = false
                 bonus_line.visible = false
-                sum_line.text = "pick up + score bonus = %d + %d" % [earned, bonus]
-                sum_line.visible = true
-                show_total.call(total)
-                Jukebox.sfx("coin", -2.0)
-                earn_row.pivot_offset = earn_row.size / 2.0
-                var pulse := create_tween()
-                pulse.tween_property(earn_row, "scale", Vector2(1.12, 1.12), 0.09)
-                pulse.tween_property(earn_row, "scale", Vector2.ONE, 0.12))
+                if total > 0:
+                        sum_line.text = "pick up + score bonus = %d + %d" % [earned, bonus]
+                        sum_line.visible = true
+                        show_total.call(total)
+                        Jukebox.sfx("coin", -2.0)
+                        earn_row.pivot_offset = earn_row.size / 2.0
+                        var pulse := create_tween()
+                        pulse.tween_property(earn_row, "scale", Vector2(1.12, 1.12), 0.09)
+                        pulse.tween_property(earn_row, "scale", Vector2.ONE, 0.12)
+                elif game != null and is_instance_valid(game) \
+                                and not game.score_bonus_enabled:
+                        # v0.2.3 patch: a run with NOTHING to pay states the
+                        # rule instead of a fake "0 + 0" theatre - the game
+                        # zeroed its own bonus (peace style): score / 0 = 0
+                        sum_line.text = "peace run  -  score bonus = %d/0" % final_score
+                        sum_line.visible = true)
 
         if not res["new_best"]:
                 var hype := Arc.label("best %d" % int(res["best"]), 24, Color("8a6a40"))
