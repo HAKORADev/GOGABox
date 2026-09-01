@@ -1,12 +1,15 @@
 extends Node
-## pong_probe - v0.2.2: drives the rebuilt PONG headless. The laws:
-## the ask listens to the window, the options screen follows, the serve
-## is born at the conceder's edge, goals pay +1/-1 (clamped at 0), the
-## 3-points-per-coin bonus, the x1.1 heat (reset per serve) with boost
-## (+50% until respawn) and strike (+200% until the next hit), the FIXED
-## px size mods with their clamps, the coin economy (last kicker earns,
-## 5-20s window), the controls follow the finger ALONG the axis only,
-## and MORE ENEMIES adds two walls that all hunt the player.
+## pong_probe - v0.2.3: drives rebuilt PONG headless. The laws: the ask
+## listens to the window and says NOTHING but vertical/horizontal, the
+## serve is born at the MIDDLE flying TOWARD the conceder's platform, the
+## burn ceiling is x5 with BOOST/STRIKE riding past it, the pads are WALLS
+## (a swept fast ball bounces where it touched - never tunnels or
+## teleports), ONE coin at a time wearing the REAL GOGACoin asset, the AI
+## reads the ball only inside a SHORT vision range, goals pay +1/-1
+## (clamped at 0), the 3-points-per-coin bonus, the FIXED px size mods
+## with their clamps, the controls follow the finger ALONG the axis only,
+## MORE ENEMIES adds two walls that all hunt the player, the horizontal
+## court gives the USER the right edge, and END shows only during the run.
 ## Exit 0 = pass.
 ##
 ##   godot --headless --path projects/gogabox res://tests/pong_probe.tscn
@@ -42,6 +45,8 @@ func _run() -> void:
         await get_tree().process_frame
         _check(g._phase == "orient", "boots into the position ask")
         _check(g.pause_end_run, "END is wired - the only way to bank")
+        _check(not g._goga_pause_end_ok(),
+                "the ask/options screens show NO END row (the run hasn't begun)")
         _check(g._auto_landscape() == (g.landscape),
                         "the court matches the CURRENT window shape")
         # the stale pref never wins the highlight (the snake law, reused)
@@ -51,15 +56,22 @@ func _run() -> void:
         g._orient_choice(cur)
         _check(g._phase == "options", "tapping the CURRENT shape proceeds")
 
-        # ---- the run: the serve is born at the USER's edge ----
+        # ---- the run: the serve waits at the MIDDLE, aimed at the conceder
         g._begin_run()
         _check(g._phase == "run", "START begins the run")
+        _check(g._goga_pause_end_ok(), "pausing the RUN offers END")
         _check(g.serve_from == "user" and g.serve_t > 0.0,
-                "the first serve waits at the user's edge")
+                "the first serve waits for the user's side")
+        _check(g.ball_pos.distance_to(g.field.get_center()) < 1.0,
+                "the ball is born at the MIDDLE of the field (owner law)")
+        var u_in0: Vector2 = g._edge_inward(
+                        String(g.pads_by_id["user"]["edge"]))
+        _check(g.ball_dir.dot(u_in0) < -0.5,
+                "the serve flies TOWARD the conceder's platform")
         _check(absf(g.heat - 1.0) < 0.0001, "the ball starts cold (x1.00)")
         _check(g.pads.size() == 2, "two platforms by default")
 
-        # ---- THE HEAT LAW: every wall hit x1.1, reset per serve ----
+        # ---- THE HEAT LAW: every wall hit x1.1, reset per serve, ceiling x5
         g.serve_t = 0.0
         g.ball_pos = g.field.get_center() + Vector2(10.0, 0.0)
         g.ball_dir = Vector2(-1.0, 0.0)
@@ -69,6 +81,25 @@ func _run() -> void:
                         break
         _check(absf(g.heat - 1.1) < 0.001,
                         "one wall hit = x1.10 (got x%.3f)" % g.heat)
+        g._serve("user")
+        _check(absf(g.heat - 1.0) < 0.0001, "a serve resets the heat")
+        # ---- THE CEILING (owner v0.2.3): x5, and the powerups ride PAST it
+        g.heat = 4.9
+        g._heat_hit()
+        _check(absf(g.heat - 5.0) < 0.001,
+                "the burn ceiling is x5.00 (got x%.3f)" % g.heat)
+        g.boost_on = false
+        g.strike_on = false
+        _check(absf(g._ball_speed() - 340.0 * 5.0) < 0.01,
+                "at the ceiling the ball runs 340 x 5")
+        g.boost_on = true
+        _check(g._ball_speed() > 340.0 * 5.0,
+                "BOOST rides PAST the ceiling (x1.5 on top)")
+        g.boost_on = false
+        g.strike_on = true
+        _check(g._ball_speed() > 340.0 * 5.0 * 2.0,
+                "STRIKE rides PAST the ceiling (x3 on top)")
+        g.strike_on = false
         g._serve("user")
         _check(absf(g.heat - 1.0) < 0.0001, "a serve resets the heat")
 
@@ -105,16 +136,33 @@ func _run() -> void:
                 "3 points = +1 GOGACoin bonus")
         _check(g.next_coin_at == 6, "the next bonus waits for 6")
 
-        # ---- COINS: the last kicker earns ----
-        g.coins.append({"p": g.ball_pos + Vector2(1.0, 0.0), "pop": 1.0})
+        # ---- COINS: ONE at a time, the REAL asset, the last kicker earns --
+        g.coins.clear()
+        g.coin_t = 0.001
+        g._goga_tick(1.0 / 60.0)
+        _check(g.coins.size() == 1, "one coin spawns")
+        g.coin_t = 0.001
+        g._goga_tick(1.0 / 60.0)
+        _check(g.coins.size() == 1,
+                "the timer firing again NEVER piles a second coin (owner law)")
+        _check(g._coin_tex != null \
+                        and String(g._coin_tex.resource_path).ends_with("coin.png"),
+                "the court coin wears the REAL GOGACoin asset")
+        # walk the coin to the ball so the collection is deterministic
+        g.coins[0]["p"] = g.ball_pos + Vector2(1.0, 0.0)
         g.last_kicker = "user"
         var before: int = g.run_coins
         g._goga_tick(1.0 / 60.0)
         _check(g.run_coins == before + 1, "the user's kick takes the coin")
-        g.coins.append({"p": g.ball_pos + Vector2(1.0, 0.0), "pop": 1.0})
-        g.last_kicker = "enemy"
+        _check(g.coins.is_empty(), "the coin is GONE after the pickup")
+        g.coin_t = 0.001
         g._goga_tick(1.0 / 60.0)
-        _check(g.run_coins == before + 1, "their kick takes NOTHING")
+        _check(g.coins.size() == 1,
+                "a new coin spawns only after the last one was collected")
+        g.last_kicker = "enemy"
+        var mid_count: int = g.run_coins
+        g._goga_tick(1.0 / 60.0)
+        _check(g.run_coins == mid_count, "their kick takes NOTHING")
         _check(g.coin_t > 4.9 and g.coin_t < 20.1,
                 "the next coin waits 5-20s (%.1fs)" % g.coin_t)
 
@@ -197,16 +245,95 @@ func _run() -> void:
                         extras += 1
         _check(extras == 2, "the extras guard the other two edges")
 
-        # ---- the AI tracks (not stupid) ----
+        # ---- the AI tracks (not stupid): an incoming ball INSIDE its
+        # vision range draws real movement ----
         var en: Dictionary = g.pads_by_id["enemy"]
+        g.heat = 1.0
+        g.boost_on = false
+        g.strike_on = false
+        g.serve_t = 0.0
+        var top_plane: float = g._edge_normal_pos(String(en["edge"]))
+        g.ball_pos = Vector2(g.field.get_center().x + 260.0,
+                        top_plane + g.field.size.y * 0.30)
+        g.ball_dir = Vector2(0, -1)
         var e0 := (en["c"] as Vector2).x if int(en["axis"]) == 0 \
                         else (en["c"] as Vector2).y
-        g.serve_t = 0.0
-        for i in 40:
+        for i in 30:
                 g._goga_tick(1.0 / 60.0)
         var e1 := (en["c"] as Vector2).x if int(en["axis"]) == 0 \
                         else (en["c"] as Vector2).y
-        _check(absf(e1 - e0) > 1.0, "the AI moves with intent")
+        _check(absf(e1 - e0) > 40.0, "the AI moves with intent")
+
+        # ---- THE REAL BOUNCE (owner v0.2.3): a strike-fast ball that
+        # crosses the pad's face IN ONE FRAME still bounces where it
+        # touched - no tunneling into the goal behind the pad, no
+        # teleporting "weird spawn" ----
+        en["c"] = Vector2(g.field.get_center().x, (en["c"] as Vector2).y)
+        g.serve_t = 0.0
+        g.ball_prev = Vector2(g.field.get_center().x, top_plane + 300.0)
+        g.ball_pos = g.ball_prev + Vector2(0, -900.0)   # 900px in one step
+        g.ball_dir = Vector2(0, -1)
+        g._tick_pads()
+        _check(g.ball_dir.y > 0.0,
+                "the 900px-step ball BOUNCED off the platform (no tunnel)")
+        _check(g.ball_pos.y >= top_plane,
+                "the ball never ends up behind the pad (%.0f vs %.0f)"
+                                % [g.ball_pos.y, top_plane])
+        _check(g.ball_pos.y < top_plane + 300.0,
+                "the bounce happens AT the contact spot, not a teleport")
+        # beside the pad the goal law still decides (a real goal, no wall)
+        g.ball_prev = Vector2(g.field.position.x + 8.0, top_plane + 300.0)
+        g.ball_pos = g.ball_prev + Vector2(0, -900.0)
+        g.ball_dir = Vector2(0, -1)
+        g._tick_pads()
+        _check(g.ball_dir.y < 0.0,
+                "a ball BESIDE the pad is not bounced by it (goal zone next)")
+
+        # ---- THE AI VISION (owner v0.2.3): the pad only READS the ball
+        # inside a short range from its own edge; outside it drifts to
+        # center and can be wrong-footed. Deterministic: cold ball, the
+        # ball parked at a known x near the left wall.
+        var en2: Dictionary = g.pads_by_id["enemy"]
+        g.heat = 1.0
+        g.boost_on = false
+        g.strike_on = false
+        # FAR: incoming but beyond the range -> no read, drift toward center
+        en2["c"] = Vector2(g.field.position.x + 120.0, (en2["c"] as Vector2).y)
+        g.serve_t = 0.0
+        g.ball_pos = Vector2(g.field.position.x + 90.0,
+                        top_plane + g.field.size.y * 0.85)
+        g.ball_dir = Vector2(0, -1)
+        for i in 30:
+                g._goga_tick(1.0 / 60.0)
+        var far_x := (en2["c"] as Vector2).x
+        _check(far_x > g.field.position.x + 220.0,
+                "beyond the vision range the pad drifts BACK toward center")
+        # NEAR: the same ball INSIDE the range -> the pad READS it and
+        # chases ITS x (parked near the LEFT wall - LEFT of both the pad
+        # start and center, in every field geometry)
+        en2["c"] = Vector2(g.field.position.x + 120.0, (en2["c"] as Vector2).y)
+        g.ball_pos = Vector2(g.field.position.x + 90.0,
+                        top_plane + g.field.size.y * 0.30)
+        g.ball_dir = Vector2(0, -1)
+        for i in 30:
+                g._goga_tick(1.0 / 60.0)
+        var near_x := (en2["c"] as Vector2).x
+        _check(near_x < far_x - 40.0,
+                "inside the range the pad READS the ball and chases its x")
+
+        # ---- HORIZONTAL SWAP (owner v0.2.3): the USER holds the RIGHT edge
+        var g2: GogaGame = load("res://game/games/rally/pong.gd").new()
+        g2.game_id = "rally"
+        g2.start_orientation = "horizontal"
+        add_child(g2)
+        await get_tree().process_frame
+        _check(g2.landscape, "the forced ask builds the horizontal court")
+        _check(String(g2.pads_by_id["user"]["edge"]) == "right",
+                "horizontal: the USER's platform is on the RIGHT")
+        _check(String(g2.pads_by_id["enemy"]["edge"]) == "left",
+                "horizontal: the enemy took the LEFT edge")
+        g2.queue_free()
+        await get_tree().process_frame
 
         # ---- END banks the run ----
         g.finish_run(g.score)
@@ -218,5 +345,5 @@ func _run() -> void:
         get_tree().quit(1 if fails > 0 else 0)
 
 func _ready() -> void:
-        print("=== GOGABox pong probe (v0.2.2 goals world) ===")
+        print("=== GOGABox pong probe (v0.2.3 vision world) ===")
         await _run()

@@ -87,6 +87,9 @@ func _ready() -> void:
         # v0.1.9 OWNER FIX: the play counts at START (quit-mid-turn stays
         # "played"). record_run at finish keeps score/best only.
         Box.record_started(id)
+        # v0.2.3 CAPACITY HOLD: THIS game's pool stops recharging while its
+        # own session is open (menu / other games / closed app = charging)
+        Box.set_active_game(id)
 
 ## v0.2.0 - a game picked a DIFFERENT play position: unload it and reload
 ## it in that position. The session (fee, play count, host chrome) is kept
@@ -174,6 +177,9 @@ func _quit_to_menu() -> void:
         _session_open = false
         _close_over_sheet()
         _flush_time()
+        # v0.2.3: leaving the game releases its pool's clock (charging resumes
+        # from the moment the player is OUT of the game)
+        Box.clear_active_game()
         _restore()
         GameHost.end_session()
         if router != null and is_instance_valid(router) and router.has_method("on_game_closed"):
@@ -187,6 +193,7 @@ func request_pause() -> void:
 func _exit_tree() -> void:
         if _session_open:
                 _flush_time()
+        Box.clear_active_game()   # v0.2.3: no hold can outlive its host
 
 func _on_finish(final_score: int, earned: int) -> void:
         var id := String(game_def["id"])
@@ -397,7 +404,9 @@ func _on_finish(final_score: int, earned: int) -> void:
                         game.request_orientation_reload.connect(_on_orientation_reload)
                         add_child(game)
                         # v0.1.9: replays count at start too
-                        Box.record_started(id))
+                        Box.record_started(id)
+                        # v0.2.3: the hold survives retries (same game open)
+                        Box.set_active_game(id))
         sheet.add_child(again_btn)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():

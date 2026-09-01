@@ -25,6 +25,12 @@ var paused := false
 ## v0.2.2: a game with NO natural death (pong) sets this - the pause sheet
 ## gains an END button, the ONLY way to bank the run's earnings.
 var pause_end_run := false
+## v0.2.3: games with pause_end_run can further HIDE the END row per state
+## (pong shows END only while the run is live - pausing from the position
+## ask or the optionals screen must not offer the dead menu). Override
+## this; the default keeps the base behavior.
+func _goga_pause_end_ok() -> bool:
+        return true
 var tk: TouchKit
 ## Set by the host BEFORE the game enters the tree when the game was
 ## reloaded for a picked orientation - the ask screens can skip themselves.
@@ -256,14 +262,15 @@ func _pause_open() -> void:
         sheet.add_child(title)
         sheet.add_child(Arc.button("RESUME", Vector2(460, 84), 30, Arc.GOOD, func():
                 _pause_close()))
-        if pause_end_run:
+        var end_ok := pause_end_run and _goga_pause_end_ok()
+        if end_ok:
                 sheet.add_child(Arc.button("END", Vector2(460, 84), 30, Arc.ACCENT, func():
                         _pause_close()
                         finish_run(score)))
         sheet.add_child(Arc.button("QUIT TO BOX", Vector2(460, 84), 26, Arc.BAD, func():
                 get_tree().paused = false
                 quit_to_box()))
-        Arc.fit_sheet(sheet, 3 if pause_end_run else 2)     # pinned rows, content clamped
+        Arc.fit_sheet(sheet, 3 if end_ok else 2)     # pinned rows, content clamped
 
 func _pause_close() -> void:
         get_tree().paused = false

@@ -26,11 +26,15 @@ var _feed_vb: VBoxContainer
 # touching and left-right arrows to change list from top picks to like last
 # played and not played"). The three v0.0.8 stat strips below are gone - they
 # duplicated these lists ("last played twice" bug family).
-const LIST_TITLES := ["TODAY'S PICKS", "LAST PLAYED", "LEAST PLAYED", "NOT PLAYED YET"]
+const LIST_TITLES := ["TODAY'S PICKS", "LAST PLAYED", "LESS PLAYED",
+                "MOST PLAYED", "ABANDONED", "NOT PLAYED YET"]
 const LIST_HINTS := ["", "play something and it lands here",
                         "every game you played lines up here",
+                        "your most-played games line up here",
+                        "the games gathering dust line up here",
                         "you played everything you own!"]
 var _lists_data: Array = []      # [{items: [{g, stat}], ...}] rebuilt by _refresh
+var _ready_cache := {}           # v0.2.3: owned game id -> was it ready to play
 var _list_idx := 0
 var _strip_scroll: BoxScroll
 var _strip_row: HBoxContainer
@@ -121,6 +125,7 @@ func _ready() -> void:
                 Roadmap.tick()
                 Box.poll_game_batteries()   # v0.1.3: full-pool pings tick live
                 _update_battery_chip()
+                _ready_tick_check()   # v0.2.3: a not-ready game got ready (or drained)
                 # v0.1.4: 12AM 00:00 = the daily limits reset. The moment the
                 # local day string changes, the feed rebuilds - faded
                 # "get back tomorrow" tiles come back to life live.
@@ -260,6 +265,32 @@ func _apply_safe_margins() -> void:
 func _bg_canvas_update() -> void:
         if _bg_mat != null and is_instance_valid(_bg_mat) and _root != null:
                 _bg_mat.set_shader_parameter("canvas", _root.size)
+
+## v0.2.3 OWNER CALL: "if the game was not ready then it got ready" the
+## tile must follow - the "ready to play" chip (and the drained state
+## going the other way) used to wait for the next full refresh forever.
+## The 2s tick compares the live can_play_now oracle against this cache;
+## any flip rebuilds the feed the moment the batteries/window/daily state
+## actually changes.
+func _refresh_ready_cache() -> void:
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if not Box.owns_game(id):
+                        continue
+                _ready_cache[id] = Roadmap.can_play_now(id)
+
+func _ready_tick_check() -> void:
+        var flipped := false
+        for g in GameReg.playable():
+                var id := String(g["id"])
+                if not Box.owns_game(id):
+                        continue
+                var now_ready := Roadmap.can_play_now(id)
+                if not _ready_cache.has(id) or bool(_ready_cache[id]) != now_ready:
+                        _ready_cache[id] = now_ready
+                        flipped = true
+        if flipped:
+                _refresh()
 
 func _layout() -> void:
         var w := maxf(360.0, _root.size.x)
@@ -642,7 +673,9 @@ func _apply_list() -> void:
 ## carousel lists are owned-only, so a tap opens the pre-play page.
 func _strip_card(g: Dictionary, stat_txt: String) -> Control:
         var b := _card_base(Vector2(252, 186), true)
-        _add_thumb(b, g, 54)
+        # v0.2.3 OWNER CALL: the strip thumb's top was cut off - the whole
+        # artwork shows now, fitted
+        _add_thumb(b, g, 54, false, true)
         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 224)
         name_l.position = Vector2(14, 132)
         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -695,7 +728,12 @@ func _refresh() -> void:
         # ---- carousel lists (v0.0.9: ONE strip, arrows switch the list) ----
         # TODAY'S PICKS: daily random over OWNED games only (owner rule).
         # LAST PLAYED:   owned + played, newest first (max 10).
-        # LEAST PLAYED:  owned + played, fewest plays first (max 10).
+        # LESS PLAYED:   owned + played, fewest plays first (max 10).
+        #   (v0.2.3 owner rename: "least played" reads wrong - it is LESS)
+        # MOST PLAYED:   owned + played, MOST plays first (v0.2.3, the mirror).
+        # ABANDONED:     owned + played, the LONGEST-ago last play first,
+        #   top 10 (v0.2.3: "longest non-played one will be first and last
+        #   will be the...obviously").
         # NOT PLAYED YET: owned-never-played ONLY (owner rule: "soon" teasers
         #   never belonged here).
         var picks: Array = []
@@ -737,13 +775,38 @@ func _refresh() -> void:
                         return pa < pb
                 return int(a["ts"]) < int(b["ts"]))
         by_least = by_least.slice(0, 10)
+        # v0.2.3 THE MIRROR: most plays first, same pool as LESS PLAYED
+        var by_most := []
+        for it in played:
+                by_most.append({"g": it["g"], "plays": it["plays"], "ts": it["ts"],
+                                "stat": "plays %d" % int(it["plays"])})
+        by_most.sort_custom(func(a, b):
+                var pa := int(a["plays"])
+                var pb := int(b["plays"])
+                if pa != pb:
+                        return pa > pb
+                return int(a["ts"]) > int(b["ts"]))
+        by_most = by_most.slice(0, 10)
+        # v0.2.3 ABANDONED: the dust catchers - the longest since the last
+        # play, longest first, top 10
+        var by_gone := []
+        for it in played:
+                by_gone.append({"g": it["g"], "plays": it["plays"], "ts": it["ts"],
+                                "stat": "%s - last play" % _ago(int(it["ts"]))})
+        by_gone.sort_custom(func(a, b): return int(a["ts"]) < int(b["ts"]))
+        by_gone = by_gone.slice(0, 10)
         _lists_data = [
                 {"items": picks},
                 {"items": by_recents},
                 {"items": by_least},
+                {"items": by_most},
+                {"items": by_gone},
                 {"items": never},
         ]
         _apply_list()
+        # remember the live ready-state of every owned game (the 2s tick
+        # re-checks it - see _refresh_ready_cache)
+        _refresh_ready_cache()
         # arrows are static controls but the tappable registry was cleared:
         # re-register them (BoxScroll owns every tap inside the feed scroll)
         _feed_scroll.register_tappable(_pick_prev, Arc._tap_emitter(_pick_prev))
@@ -844,14 +907,19 @@ func _card_base(size: Vector2, ignore_mouse := true) -> Button:
 
 ## FIX (issue: thumbnails 10% + 90% white): the thumb fills the card ABOVE a
 ## fixed label strip; offsets are anchored, so any tile size works.
-func _add_thumb(b: Control, g: Dictionary, label_strip: float, faded := false) -> TextureRect:
+## v0.2.3: fit_whole = STRETCH_KEEP_ASPECT_CENTERED - the FULL artwork
+## shows (the strip cards had their top cropped by COVERED); the grid
+## tiles keep COVERED.
+func _add_thumb(b: Control, g: Dictionary, label_strip: float,
+                faded := false, fit_whole := false) -> TextureRect:
         var t := TextureRect.new()
         var path := String(g.get("thumb", ""))
         t.texture = load(path) if ResourceLoader.exists(path) else null
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
         t.offset_bottom = -label_strip
         t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if fit_whole \
+                        else TextureRect.STRETCH_KEEP_ASPECT_COVERED
         t.clip_contents = true
         t.mouse_filter = Control.MOUSE_FILTER_IGNORE
         t.modulate = Color(1, 1, 1, 0.35) if faded else Color.WHITE
@@ -914,6 +982,17 @@ func _right_chip(b: Control, txt: String, y: float, icon := "") -> void:
         var w := Arc.text_width(txt, 18) + 16.0
         chip.position = Vector2(334.0 - 14.0 - w, y)
         b.add_child(chip)
+
+## v0.2.3: a coming_soon game wears the workshop's purple question mark
+## wherever its art would show - the final art belongs to SHIPPED games
+## only ("i just forgot to include soon titles... return it!").
+const SOON_THUMB := "res://assets/thumbs/soon.png"
+func _soon_art(g: Dictionary) -> Dictionary:
+        if not bool(g.get("coming_soon", false)):
+                return g
+        var g2 := g.duplicate()
+        g2["thumb"] = SOON_THUMB
+        return g2
 
 func _tile(g: Dictionary, st: String) -> Control:
         var b := _card_base(Vector2(334, 312))
@@ -989,7 +1068,8 @@ func _tile(g: Dictionary, st: String) -> Control:
                         b.add_child(lock_ic)
                         _feed_ribbon(b, bd)
                 "SOON":
-                        _add_thumb(b, g, 70)
+                        # the purple ? stays until the game actually ships
+                        _add_thumb(b, _soon_art(g), 70)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 260)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2283,8 +2363,11 @@ func _stat_row(g: Dictionary) -> Control:
         top.add_theme_constant_override("separation", 12)
         v.add_child(top)
         var ic := TextureRect.new()
-        var tp := String(g.get("thumb", ""))
-        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        ic.texture = load(SOON_THUMB) if bool(g.get("coming_soon", false)) \
+                        and ResourceLoader.exists(SOON_THUMB) else null
+        if ic.texture == null:
+                var tp := String(g.get("thumb", ""))
+                ic.texture = load(tp) if ResourceLoader.exists(tp) else null
         ic.custom_minimum_size = Vector2(56, 40)
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED

@@ -16,11 +16,58 @@ const BOX_BATTERY_CAP := 50        # global box pool (recharges only while CLOSE
 
 var data := {}
 
+# v0.2.3 THE CAPACITY HOLD (owner anti-exploit rule): a game's own battery
+# pool recharges ONLY while the player is OUT of that game - in the menu,
+# in ANOTHER game, or with the app closed. Keeping the game open freezes
+# its pool's clock ("do not count down if the user plays the same game").
+var active_game := ""      # the game currently holding its own pool frozen
+var active_since := 0      # unix moment the hold began
+
+func set_active_game(id: String) -> void:
+        if active_game == id:
+                return
+        clear_active_game()
+        active_game = id
+        active_since = int(Time.get_unix_time_from_system())
+        # persist: a process kill mid-play must still hold on the next boot
+        meta()["active_hold"] = {"id": id, "since": active_since}
+        save()
+
+func clear_active_game() -> void:
+        if active_game == "":
+                return
+        var now := int(Time.get_unix_time_from_system())
+        _shift_pool_ts(active_game, now - active_since)
+        active_game = ""
+        active_since = 0
+        meta().erase("active_hold")
+        save()
+
+## Push a game pool's charging window PAST a spent span: the pool behaves
+## as if that time never happened (it charges before the span, then again
+## after it - nothing in between).
+func _shift_pool_ts(id: String, secs: int) -> void:
+        if secs <= 0 or not data["game_batteries"].has(id):
+                return
+        var p: Dictionary = data["game_batteries"][id]
+        p["ts"] = int(p["ts"]) + secs
+
 func _ready() -> void:
         _load()
         # v0.1.1: cold start after the process was killed - credit the time
         # the box spent CLOSED (same math as APPLICATION_RESUMED; idempotent).
         _credit_offline()
+        # v0.2.3 CAPACITY HOLD, cold-start reconciliation: the process died
+        # while a game was open. The played span must NOT charge that game's
+        # pool - shift its clock past the whole held window (launch stamp ->
+        # now), exactly like a live clear_active_game would.
+        var hold: Dictionary = meta().get("active_hold", {})
+        if not hold.is_empty():
+                var now := int(Time.get_unix_time_from_system())
+                _shift_pool_ts(String(hold.get("id", "")),
+                                now - int(hold.get("since", now)))
+                meta().erase("active_hold")
+                save()
 
 # ------------------------------------------------------------- persistence
 
@@ -253,6 +300,11 @@ func game_battery(id: String) -> Dictionary:
         var step := maxi(60, int(g["charges"].get("regen_minutes", 5)) * 60)
         var pools: Dictionary = data["game_batteries"]
         var now := int(Time.get_unix_time_from_system())
+        # v0.2.3 THE HOLD: while THIS game is open, its pool's clock is
+        # frozen at the moment the hold began - reads (and the live
+        # countdowns) tick for every OTHER game, never for the one on screen
+        if active_game == id and active_since > 0:
+                now = mini(now, active_since)
         if not pools.has(id):
                 pools[id] = {"count": cap, "ts": now}
         var p: Dictionary = pools[id]

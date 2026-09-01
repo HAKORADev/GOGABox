@@ -6,14 +6,21 @@ extends GogaGame
 ## optionals strip + the shop) -> the run. The run never ends by itself -
 ## the pause sheet's END button is the ONLY way to bank the earnings.
 ##
-## THE LAWS (owner v0.2.2):
+## THE LAWS (owner v0.2.3 round):
 ## - a goal FOR the user = +1 point; a goal ON the user = -1 point
 ## - the ball heats x1.1 per EVERY hit (wall or platform), reset per serve;
 ##   it burns yellow -> red and the tail grows with the heat (PGB v1.3.8
-##   trail, grown up)
-## - the ball respawns at the edge of the platform that conceded
-## - GOGACoins spawn every 5-20s; the last platform that kicked the ball
-##   earns the coin; every 3 points pays one bonus coin
+##   trail, grown up); the ceiling is x5 and BOOST/STRIKE ride PAST it
+## - the serve is born at the MIDDLE of the field, flying TOWARD the
+##   platform that conceded (never glued to a pad again)
+## - the platforms are WALLS: the ball's move is swept against the pad's
+##   face plane, so it bounces exactly where it touched - a fast ball can
+##   never tunnel through, teleport or "spawn weirdly" (owner report)
+## - ONE GOGACoin on the court at a time: a new one spawns 5-20s after the
+##   last one was collected; the last platform that kicked the ball earns
+##   it; every 3 points pays one bonus coin
+## - the AI reads the ball only inside a SHORT range around its own edge -
+##   beyond it the pad drifts back to center, which makes it beatable
 ## - controls: hold anywhere, the platform follows the finger ALONG its
 ##   axis only - up/down finger wander never steals the paddle
 ## - powerups ride the ball: the last kicker's platform wears size mods
@@ -24,7 +31,7 @@ extends GogaGame
 const BALL_R := 16.0
 const BALL_BASE := 340.0
 const HEAT_STEP := 1.1           # x1.1 per hit (owner spec)
-const HEAT_MAX := 3.5            # the burn ceiling (still human)
+const HEAT_MAX := 5.0            # the burn ceiling (owner: "x5 is more better")
 const SERVE_HOLD := 0.9          # the breath before the launch
 const PAD_THICK := 26.0
 const PAD_NORMAL := 168.0        # the NORMAL platform length (fixed px)
@@ -42,6 +49,10 @@ const SCORE_PER_COIN := 3        # every 3 points = one bonus coin
 const AI_SPEED := 430.0          # the main rival
 const AI_SPEED_EXTRA := 356.0    # the extra walls hunt slower
 const AI_THINK := 0.13           # reaction lag (not stupid, not a wall)
+const AI_VISION := 0.42          # owner v0.2.3: the AI only READS the ball
+                                 # inside this fraction of the field depth
+                                 # from its own edge - outside it, it drifts
+                                 # back to center and can be wrong-footed
 
 const COL_COURT := Color("0e0e13")     # the dark (the owner's 0a0a0a, warmed)
 const COL_LINE := Color(1, 1, 1, 0.07)
@@ -76,6 +87,7 @@ var field := Rect2()
 var pads: Array = []             # platform dicts (see _add_pad)
 var pads_by_id := {}
 var ball_pos := Vector2.ZERO
+var ball_prev := Vector2.ZERO    # where the ball was BEFORE this frame's move
 var ball_dir := Vector2.DOWN
 var heat := 1.0                  # the x1.1^n burn
 var boost_on := false            # +50% until respawn
@@ -100,6 +112,7 @@ var _flash_pos := Vector2.ZERO
 var _dust: Array = []            # sparkle hit dust
 var _shreds: Array = []          # the court's light shreds
 var _motes: Array = []
+var _coin_tex: Texture2D = preload("res://assets/ui/coin.png")
 var _view: Node2D
 var _goals_lbl_u: Label
 var _goals_lbl_e: Label
@@ -153,6 +166,9 @@ func _orient_choice(choice: String) -> void:
         else:
                 request_orientation_reload.emit(choice)
 
+## v0.2.3 OWNER CALL: the ask "talks too much" - it is JUST the two phone
+## cards now. No title, no subtitle, no walls line; the word under each
+## phone is the whole sentence.
 func _show_orient_select() -> void:
         _phase = "orient"
         _clear_overlay()
@@ -162,20 +178,10 @@ func _show_orient_select() -> void:
         panel.add_theme_stylebox_override("panel",
                         Arc.panel_style(Color(1, 1, 1, 0.96), 26, 24))
         cc.add_child(panel)
-        var vb := VBoxContainer.new()
-        vb.add_theme_constant_override("separation", 18)
-        panel.add_child(vb)
-        var t := Arc.label("HOW DO YOU PLAY?", 40, Arc.INK)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(t)
-        var sub := Arc.label("your court is built this way", 20,
-                        Color("8a6a40"), false)
-        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(sub)
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 18)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_child(row)
+        panel.add_child(row)
         var cur := "horizontal" if _auto_landscape() else "vertical"
         for choice in ["vertical", "horizontal"]:
                 var card := _phone_card(choice, choice == cur)
@@ -207,8 +213,8 @@ func _phone_card(kind: String, selected: bool) -> Button:
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(ic)
-        var l := Arc.label(("WALLS TOP - BOTTOM" if kind == "vertical" \
-                        else "WALLS LEFT - RIGHT"), 17,
+        var l := Arc.label(("VERTICAL" if kind == "vertical" \
+                        else "HORIZONTAL"), 17,
                         Arc.INK if not selected else Color(0.16, 0.10, 0.05))
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -281,7 +287,7 @@ func _options_strip() -> Control:
                                 "icon": "pong_opt_sparkle.png",
                                 "name": "SPARKLES"},
                 {"key": "more", "unlock": "pong_more",
-                                "icon": "pong_opt_more.png", "name": "MORE WALLS"},
+                                "icon": "pong_opt_more.png", "name": "MORE ENEMIES"},
         ]:
                 var owned: bool = _owned(cfg["unlock"])
                 var b := Button.new()
@@ -333,38 +339,52 @@ func _options_strip() -> Control:
         return row
 
 # ----------------------------------------------------------------- the shop
-
+## v0.2.3 OWNER REPORTS, all fixed here: (1) a finger that STARTED on a
+## button could never scroll the list - the shop is the snake's BoxScroll
+## language now (raw touch scrolling + registered tappables), and it works
+## in snake too because both shops share the same pattern; (2) the BLUE
+## skin was a dead 0-coin row - a price-0 skin IS the owned default, shown
+## ON/EQUIP exactly like the snake shop does; (3) opening the shop WHILE
+## THE GAME RUNS hung the sheet - the run pauses the tree, so the sheet
+## gets PROCESS_MODE_ALWAYS like every other in-game sheet.
 func _shop_open() -> void:
         if _phase == "run":
                 paused = true
                 get_tree().paused = true
         _clear_overlay()
-        var dim := _dim_layer()
-        var cc := _center_in(dim)
-        var panel := PanelContainer.new()
-        panel.add_theme_stylebox_override("panel",
-                        Arc.panel_style(Color(1, 1, 1, 0.97), 26, 20))
-        cc.add_child(panel)
-        var v := VBoxContainer.new()
-        v.add_theme_constant_override("separation", 10)
-        panel.add_child(v)
+        var sheet := Arc.sheet(_overlay_root_ref(), 0.0)
+        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
         var t := Arc.label("PONG SHOP", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        v.add_child(t)
-        var sc := ScrollContainer.new()
-        sc.custom_minimum_size = Vector2(620, 640)
-        sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        v.add_child(sc)
+        sheet.add_child(t)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        # the WIDTH lives here (the snake's sheet gets its 620 from the CLOSE
+        # button sitting outside its scroll - pong's CLOSE rides INSIDE, so
+        # the scroll itself must demand the real width or the sheet collapses)
+        sc.custom_minimum_size = Vector2(560,
+                        clampf(vp.y * 0.52, 300.0, 640.0))
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 8)
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
+        sheet.add_child(sc)
         # ---- PLATFORM SKINS ----
         box.add_child(_shop_label("PLATFORM SKINS - your color"))
         for id in SKINS:
                 var sk: Dictionary = SKINS[id]
-                var owned := Box.skin_owned(game_id, id)
-                var on: bool = Box.skin_on(game_id) == id
+                # a price-0 skin is OWNED BY DEFAULT (the blue) - never a
+                # dead 0-coin button (the snake shop's law)
+                var owned := Box.skin_owned(game_id, id) \
+                                or int(sk["price"]) == 0
+                var on: bool = Box.skin_on(game_id) == id \
+                                or (int(sk["price"]) == 0 \
+                                and Box.skin_on(game_id) == "")
                 var txt := "%s" % sk["name"]
                 if on:
                         txt += "  (ON)"
@@ -392,10 +412,18 @@ func _shop_open() -> void:
                 box.add_child(_unlock_row(key))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
                         func(): _shop_close()))
-        _overlay_panel = dim
+        # BoxScroll owns every tap inside the scroll: register the live
+        # buttons as tappables; DISABLED (unaffordable) stays unregistered =
+        # gray AND dead (the price rule)
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+        _overlay_panel = sheet.get_parent()
 
 func _shop_label(txt: String) -> Label:
-        return Arc.fit_label(txt, 24, Arc.HOT, 600)
+        return Arc.fit_label(txt, 24, Arc.HOT, 560)
 
 func _unlock_row(key: String) -> Control:
         var u: Dictionary = UNLOCKS[key]
@@ -411,7 +439,7 @@ func _unlock_row(key: String) -> Control:
         if Box.coins() < int(u["price"]):
                 b.disabled = true
         vb.add_child(b)
-        var s := Arc.fit_label(String(u["sub"]), 16, Color("8a6a40"), 600, false)
+        var s := Arc.fit_label(String(u["sub"]), 16, Color("8a6a40"), 560, false)
         s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(s)
         return vb
@@ -425,7 +453,8 @@ func _buy_unlock(key: String, price: int) -> void:
         _shop_open()
 
 func _skin_action(id: String) -> void:
-        if Box.skin_owned(game_id, id):
+        # price-0 = the default skin: equipping it is always legal
+        if Box.skin_owned(game_id, id) or int(SKINS[id]["price"]) == 0:
                 Box.equip_skin(game_id, id)
                 Jukebox.sfx("confirm", -4.0)
         else:
@@ -438,8 +467,19 @@ func _skin_action(id: String) -> void:
                         Box.equip_skin(game_id, id)
         _shop_open()
 
+## v0.2.3 OWNER CALL: the END button belongs to the RUN only. Pausing from
+## the position ask or the optionals/options screen shows RESUME + QUIT -
+## no END row at all (the dead menu is the monetization path, it must not
+## hang over a screen where nothing was earned yet).
+func _goga_pause_end_ok() -> bool:
+        return _phase == "run"
+
 func _shop_close() -> void:
-        _clear_overlay()
+        # Arc.sheet appended dim + center at the end of the overlay root
+        var kids := _overlay_root_ref().get_children()
+        for i in range(maxi(0, kids.size() - 2), kids.size()):
+                kids[i].queue_free()
+        _overlay_panel = null
         if _phase == "run":
                 get_tree().paused = false
                 paused = false
@@ -491,11 +531,13 @@ func _build_world() -> void:
                                                         field.get_center().y),
                                         AI_SPEED_EXTRA)
         else:
-                _add_pad("user", true, "left", main_axis,
-                                Vector2(field.position.x + off,
-                                                field.get_center().y), 0.0)
-                _add_pad("enemy", false, "right", main_axis,
+                # v0.2.3 OWNER CALL: in horizontal the USER holds the RIGHT
+                # edge (swapped with the enemy - "will be better!")
+                _add_pad("user", true, "right", main_axis,
                                 Vector2(field.end.x - off,
+                                                field.get_center().y), 0.0)
+                _add_pad("enemy", false, "left", main_axis,
+                                Vector2(field.position.x + off,
                                                 field.get_center().y),
                                 AI_SPEED)
                 if _opt_on("more") and _owned("pong_more"):
@@ -519,7 +561,7 @@ func _build_shreds() -> void:
         var rng := RandomNumberGenerator.new()
         rng.seed = 11
         _shreds.clear()
-        for i in 30:
+        for i in 42:
                 _shreds.append({
                         "p": Vector2(rng.randf_range(field.position.x,
                                         field.end.x),
@@ -527,7 +569,7 @@ func _build_shreds() -> void:
                                         field.end.y)),
                         "ph": rng.randf_range(0.0, TAU),
                         "spd": rng.randf_range(0.4, 1.3),
-                        "r": rng.randf_range(1.0, 2.6),
+                        "r": rng.randf_range(1.4, 3.4),
                         "drift": rng.randf_range(4.0, 14.0),
                 })
 
@@ -546,8 +588,9 @@ func _begin_run() -> void:
         _update_goals_widget()
         Jukebox.sfx("pong_serve", -6.0)
 
-## THE SERVE (owner rule): the ball is born at the edge of the platform
-## that just conceded - no farming the same side forever. Speed resets.
+## THE SERVE (owner v0.2.3): the ball is born at the MIDDLE of the field
+## and flies TOWARD the platform that conceded - never glued to a pad
+## again (the owner's spawn-location report). Speed resets.
 func _serve(from_edge: String) -> void:
         serve_from = from_edge
         heat = 1.0
@@ -558,13 +601,19 @@ func _serve(from_edge: String) -> void:
         serve_t = SERVE_HOLD
         var p: Dictionary = pads_by_id.get(from_edge,
                         pads_by_id["user"])
-        ball_pos = _pad_serve_pos(p)
+        ball_pos = field.get_center()
+        ball_prev = ball_pos
+        # "toward the platform": the conceder's inward vector points FROM
+        # their edge INTO the field, so flying at them is -inward, with a
+        # little tangent skew so it never reads as a metronome
         var inward := _edge_inward(p["edge"])
-        var skew := randf_range(-0.55, 0.55)
-        ball_dir = (inward + _edge_tangent(p["edge"]) * skew).normalized()
+        var skew := randf_range(-0.35, 0.35)
+        ball_dir = (-inward + _edge_tangent(p["edge"]) * skew).normalized()
         _update_heat_chip()
 
 func _pad_serve_pos(p: Dictionary) -> Vector2:
+        # kept as a probe helper (the pre-v0.2.3 serve spot); the live serve
+        # is born at the field center now
         var inward := _edge_inward(String(p["edge"]))
         return (p["c"] as Vector2) + inward * 74.0
 
@@ -643,6 +692,7 @@ func _goga_tick(delta: float) -> void:
                 if serve_t <= 0.0:
                         Jukebox.sfx("pong_hit", -10.0, 1.3)
         else:
+                ball_prev = ball_pos
                 var spd := _ball_speed()
                 ball_pos += ball_dir * spd * delta
                 _push_trail()
@@ -772,8 +822,16 @@ func _pad_half_len(p: Dictionary) -> float:
 func _axis_of(p: Dictionary) -> int:
         return int(p["axis"])
 
-## The ball vs the platform capsules. The user's hit steers by where it
-## lands; the AI's hit steers toward the user's edge (with avoidance).
+## THE BALL vs THE PLATFORMS - v0.2.3 THE REAL BOUNCE (owner report: near
+## a platform the ball "goes a little away and spawns weirdly, not a real
+## hit"). The old code tested only the LANDED position against a band
+## around the pad and then TELEPORTED the ball to a fixed offset inside
+## that band - a fast ball could step over the band entirely (tunnel into
+## the goal behind the pad) or reappear at a spot it never touched. Now
+## the move is SWEPT: the segment ball_prev -> ball_pos is tested against
+## the pad's face plane, the bounce happens AT the crossing point (the
+## contact spot the player sees), and the ball is simply placed there -
+## the same clean reflection a wall gets.
 func _tick_pads() -> void:
         if serve_t > 0.0:
                 return
@@ -782,21 +840,41 @@ func _tick_pads() -> void:
                 var ht := PAD_THICK * 0.5
                 var axis := _axis_of(p)
                 var c := p["c"] as Vector2
-                var dc := ball_pos - c
-                var da := dc.x if axis == 0 else dc.y
-                var dn := dc.y if axis == 0 else dc.x
-                if absf(da) > hl + BALL_R * 0.55 or absf(dn) > ht + BALL_R:
-                        continue
                 var out_n := _edge_inward(String(p["edge"]))
                 if ball_dir.dot(out_n) >= 0.0:
                         continue   # already leaving this pad
+                # signed distance along the pad's inward normal (0 = the pad
+                # CENTER plane); the ball's contact plane sits one half-
+                # thickness + one radius in front of it
+                var sdist := func(q: Vector2) -> float:
+                        var d := q - c
+                        return d.x * out_n.x + d.y * out_n.y
+                var face := ht + BALL_R
+                var s_a: float = sdist.call(ball_prev)
+                var s_b: float = sdist.call(ball_pos)
+                if s_b > face or s_a < s_b:
+                        continue   # never reached the face (or moving away)
+                # where along the move did the center cross the contact plane
+                var t_hit := 0.0
+                if s_a > face:
+                        t_hit = clampf((s_a - face) \
+                                        / maxf(0.0001, s_a - s_b), 0.0, 1.0)
+                var hit_p := ball_prev.lerp(ball_pos, t_hit)
+                # inside the pad's span (the same forgiving corner rule)?
                 var tvec := _edge_tangent(String(p["edge"]))
-                var ball_axis := ball_pos.x if axis == 0 else ball_pos.y
+                var ball_axis := hit_p.x if axis == 0 else hit_p.y
+                var c_axis := c.x if axis == 0 else c.y
+                if absf(ball_axis - c_axis) > hl + BALL_R * 0.55:
+                        continue   # beside the pad - the goal law decides
+                # ---- the bounce lands HERE (no teleport): sit on the plane
+                ball_pos = hit_p
+                var contact := hit_p - out_n * BALL_R   # on the pad's skin
                 if bool(p["user"]):
                         last_kicker = "user"
                         rally += 1
                         achievement_max("max_rally", rally)
-                        var offset := clampf(da / maxf(hl, 1.0), -1.0, 1.0)
+                        var offset := clampf((ball_axis - c_axis) \
+                                        / maxf(hl, 1.0), -1.0, 1.0)
                         ball_dir = (out_n + tvec * offset * 0.85).normalized()
                 else:
                         last_kicker = String(p["id"])
@@ -807,20 +885,15 @@ func _tick_pads() -> void:
                 if ball_dir.dot(out_n) < 0.35:
                         ball_dir = (out_n + tvec * signf(ball_dir.dot(tvec)) \
                                         * 0.55).normalized()
-                # pop the ball out of the pad band (no double-hits)
-                var cn := c.y if axis == 0 else c.x
-                var npos := cn + (ht + BALL_R + 2.0) * signf(out_n.y \
-                                if axis == 0 else out_n.x)
-                ball_pos = Vector2(npos, ball_pos.y) if axis == 0 \
-                                else Vector2(ball_pos.x, npos)
                 _heat_hit()
                 Jukebox.sfx("pong_hit", -6.0, _hit_pitch())
                 _flash_t = maxf(_flash_t, 0.12)
                 _flash_pos = ball_pos
-                if _opt_on("sparkles") and _owned("pong_sparkles"):
+                if _sparkles_on():
                         var dcol: Color = _user_col() if bool(p["user"]) \
                                         else COL_ENEMY
-                        _dust_at(ball_pos, dcol)
+                        _dust_at(contact, ball_dir, dcol)
+                break   # one honest bounce per frame
 
 ## The AI's return aim: the user's edge (ALL enemies hunt the player),
 ## with an error, nudged away from bad pickups on the way out.
@@ -857,9 +930,13 @@ func _ai_return_axis(p: Dictionary, out_n: Vector2, tvec: Vector2,
                         best = cand
         return best
 
-## NOT hard, NOT stupid: it reads the ball's arrival point (with a folded
-## wall prediction), thinks every AI_THINK seconds, carries a human error,
-## and its speed cap means the heat eventually beats it.
+## NOT hard, NOT stupid (v0.2.3 owner call: "shorter range of reading ball
+## movements"): the pad only READS the ball inside AI_VISION of the field
+## depth from its own edge. Outside that range it drifts back toward the
+## middle - it cannot pre-position for a shot it has not seen yet, so a
+## fast angled return beats it. Inside the range it still predicts with a
+## folded wall bounce, thinks every AI_THINK seconds, carries a human
+## error, and its speed cap means the heat eventually beats it too.
 func _tick_ai(p: Dictionary, delta: float) -> void:
         p["ai_t"] = float(p["ai_t"]) - delta
         if float(p["ai_t"]) <= 0.0:
@@ -871,13 +948,22 @@ func _tick_ai(p: Dictionary, delta: float) -> void:
         var c := p["c"] as Vector2
         var cur_axis := c.x if axis == 0 else c.y
         var target := cur_axis
+        # THE VISION RANGE: distance from MY edge plane to the ball, along
+        # the normal (axis 0 pads live on top/bottom edges -> the normal
+        # coordinate is y; axis 1 pads live on left/right -> x)
+        var sees := false
         if toward:
-                var baxis := ball_pos.x if axis == 0 else ball_pos.y
+                var plane := _edge_normal_pos(String(p["edge"]))
                 var bnorm := ball_pos.y if axis == 0 else ball_pos.x
+                var depth := field.size.y if axis == 0 else field.size.x
+                sees = absf(bnorm - plane) <= AI_VISION * depth
+        if toward and sees:
+                var baxis := ball_pos.x if axis == 0 else ball_pos.y
+                var bnorm2 := ball_pos.y if axis == 0 else ball_pos.x
                 var bdn := ball_dir.y if axis == 0 else ball_dir.x
                 var pn := c.y if axis == 0 else c.x
                 if absf(bdn) > 0.05:
-                        var t := (pn - bnorm) / bdn
+                        var t := (pn - bnorm2) / bdn
                         if t > 0.0:
                                 var vaxis := ball_dir.x if axis == 0 \
                                                 else ball_dir.y
@@ -910,10 +996,14 @@ func _fold_axis(v: float, lo: float, hi: float) -> float:
 # ----------------------------------------------------------------- coins
 
 func _tick_coins(delta: float) -> void:
+        # v0.2.3 OWNER LAW: ONE coin on the court at a time - a new one
+        # spawns 5-20s after the LAST COLLECTED one (the timer restarts at
+        # the spawn and again at the collection; an uncollected coin just
+        # waits, no second coin ever piles up)
         coin_t -= delta
         if coin_t <= 0.0:
                 coin_t = randf_range(COIN_MIN_T, COIN_MAX_T)
-                if coins.size() < 3:
+                if coins.is_empty():
                         coins.append({"p": _free_spot(90.0), "pop": 0.0})
         for c2 in coins:
                 c2["pop"] = minf(1.0, float(c2["pop"]) + delta * 4.0)
@@ -1057,11 +1147,16 @@ func _free_spot(margin: float) -> Vector2:
 
 # -------------------------------------------------------------------- fx
 
-func _dust_at(p: Vector2, col: Color) -> void:
-        for i in 6:
-                _dust.append({"p": p, "v": Vector2(randf_range(-130.0, 130.0),
-                                randf_range(-130.0, 130.0)),
-                                "life": 0.5, "col": col})
+func _dust_at(p: Vector2, dir: Vector2, col: Color) -> void:
+        # v0.2.3: the sparkles fly OFF THE HIT AREA - born at the contact
+        # spot on the platform's skin, thrown along the bounce direction
+        # (the owner: "sparkles appear from the area got hit by the ball")
+        for i in 8:
+                var spread := dir.rotated(randf_range(-0.9, 0.9))
+                _dust.append({"p": p + Vector2(randf_range(-4, 4), \
+                                randf_range(-4, 4)),
+                                "v": spread * randf_range(90.0, 220.0),
+                                "life": randf_range(0.35, 0.6), "col": col})
 
 func _burst(p: Vector2, cols: Array, n: int) -> void:
         for i in n:
@@ -1115,13 +1210,14 @@ func _paint_shreds(v: Node2D) -> void:
         var tint := _user_col() if _sparkles_on() else Color(1, 1, 1)
         for s in _shreds:
                 var tw := 0.5 + 0.5 * sin(float(s["ph"]) * 2.0)
-                var a := 0.04 + 0.10 * tw
+                # v0.2.3 OWNER CALL: the lights were "too mute" - brighter
+                var a := 0.10 + 0.17 * tw
                 var p := (s["p"] as Vector2) + Vector2(
                                 sin(float(s["ph"]) * 0.8), 0.0) \
                                 * float(s["drift"])
                 var r: float = float(s["r"])
                 var col := Color(tint.r, tint.g, tint.b, a)
-                v.draw_circle(p, r + 1.6, Color(col.r, col.g, col.b, a * 0.35))
+                v.draw_circle(p, r + 2.2, Color(col.r, col.g, col.b, a * 0.45))
                 v.draw_circle(p, r, col)
 
 func _paint_court(v: Node2D) -> void:
@@ -1143,7 +1239,7 @@ func _paint_court(v: Node2D) -> void:
         if u != null:
             for p in pads:
                 var col: Color = _user_col() if bool(p["user"]) else COL_ENEMY
-                col.a = 0.22 if bool(p["user"]) else 0.16
+                col.a = 0.32 if bool(p["user"]) else 0.24
                 match String(p["edge"]):
                         "top":
                                 v.draw_rect(Rect2(field.position.x,
@@ -1175,17 +1271,20 @@ func _paint_trail(v: Node2D) -> void:
                                 Color(col.r, col.g, col.b, a))
 
 func _paint_coins(v: Node2D) -> void:
+        # v0.2.3 OWNER CALL: the REAL GOGACoin asset (the wallet's coin),
+        # not a hand-drawn disc - same art as the HUD chip and the shop
         for c2 in coins:
                 var p := c2["p"] as Vector2
                 var pop := float(c2["pop"])
-                var r: float = COIN_R * (0.6 + 0.4 * pop)
-                v.draw_circle(p, r + 2.5, Color("8c6014"))
-                v.draw_circle(p, r, COL_COIN)
-                v.draw_circle(p + Vector2(-r * 0.3, -r * 0.3), r * 0.32,
-                                Color("ffe9a8"))
-                var bob := sin(_time * 3.0 + p.x) * 2.0
-                v.draw_arc(p + Vector2(0, bob), r + 5.0, 0.0, TAU, 24,
-                                Color(1.0, 0.85, 0.3, 0.18), 2.0)
+                var s: float = COIN_R * (0.62 + 0.38 * pop) * 2.35
+                var bob := sin(_time * 3.0 + p.x) * 2.5
+                var at := p + Vector2(0, bob)
+                # a soft golden halo so the coin reads on the dark court
+                v.draw_circle(at, s * 0.78,
+                                Color(1.0, 0.85, 0.3, 0.14 + 0.08 * pop))
+                v.draw_texture_rect(_coin_tex,
+                                Rect2(at - Vector2(s, s) * 0.5,
+                                Vector2(s, s)), false)
 
 func _paint_pus(v: Node2D) -> void:
         for q in pus:

@@ -28,6 +28,7 @@ func _ready() -> void:
         fails += _test("host: launch + finish + economy", await _t_host_flow())
         fails += _test("games: all playable boot", await _t_all_games())
         fails += _test("menu: boots and lays out", await _t_menu())
+        fails += _test("capacity: the hold while a game is open", await _t_capacity_hold())
         fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
@@ -942,11 +943,13 @@ func _t_menu() -> int:
         ok += _check(grid != null and grid.get_child_count() >= 2,
                 "menu grid has tiles (%s)" % (grid.get_child_count() if grid else -1))
         ok += _check(menu._root.size.x > 0 and menu._root.size.y > 0, "menu root sized")
-        # v0.0.9 carousel: ONE strip, 4 lists, arrows switch lists, dots = lists
-        ok += _check(menu._lists_data.size() == 4, "carousel has 4 lists")
+        # v0.0.9 carousel (v0.2.3: SIX lists, arrows switch, dots = lists):
+        # TODAY'S PICKS / LAST PLAYED / LESS PLAYED / MOST PLAYED / ABANDONED /
+        # NOT PLAYED YET
+        ok += _check(menu._lists_data.size() == 6, "carousel has 6 lists")
         ok += _check(menu._strip_title.text == "TODAY'S PICKS",
                 "strip starts on TODAY'S PICKS (%s)" % menu._strip_title.text)
-        ok += _check(menu._dots_row.get_child_count() == 4,
+        ok += _check(menu._dots_row.get_child_count() == 6,
                 "dots == lists (%d)" % menu._dots_row.get_child_count())
         var owned_only := true
         for it in menu._lists_data[0]["items"]:
@@ -955,30 +958,56 @@ func _t_menu() -> int:
         menu._list_move(1)
         ok += _check(menu._strip_title.text == "LAST PLAYED",
                 "arrow switched to LAST PLAYED (%s)" % menu._strip_title.text)
-        ok += _check(menu._dots_row.get_child_count() == 4, "dots rebuilt after list switch")
-        menu._list_move(2)   # wraps around to ... NOT PLAYED YET (idx 3)
+        ok += _check(menu._dots_row.get_child_count() == 6, "dots rebuilt after list switch")
+        menu._list_move(4)   # wraps around to ... NOT PLAYED YET (idx 5)
         ok += _check(menu._strip_title.text == "NOT PLAYED YET",
                 "wrap lands on NOT PLAYED YET (%s)" % menu._strip_title.text)
         menu._list_move(1)   # back to TODAY'S PICKS
         ok += _check(menu._strip_title.text == "TODAY'S PICKS", "carousel wraps cleanly")
-        # v0.1.9 OWNER FIX: LEAST PLAYED lists every owned+played game (it used
-        # to EXCLUDE the LAST PLAYED set and go empty), fewest plays first
+        # v0.1.9 OWNER FIX: LESS PLAYED (was "LEAST") lists every owned+played
+        # game (it used to EXCLUDE the LAST PLAYED set and go empty), fewest
+        # plays first
         Box.unlock_game("rally", 0)
         Box.record_started("rally")
         Box.record_started("rally")
         Box.record_started("snake")
         Box.record_run("rally", 5)
         Box.record_run("snake", 7)
+        # ABANDONED needs DISTINCT last-play stamps (real sessions are seconds
+        # apart - the same-second double-run would make the sort a coin flip)
+        var now_ts := int(Time.get_unix_time_from_system())
+        Box.data["games"]["rally"]["last_ts"] = now_ts - 5000
+        Box.data["games"]["snake"]["last_ts"] = now_ts - 60
+        Box.save()
         menu._refresh()
         menu._list_idx = 2
         menu._apply_list()
         var least: Array = menu._lists_data[2]["items"]
-        ok += _check(least.size() == 2, "LEAST PLAYED lists ALL played games (%d)" % least.size())
+        ok += _check(least.size() == 2, "LESS PLAYED lists ALL played games (%d)" % least.size())
         if least.size() == 2:
                 ok += _check(String(least[0]["g"]["id"]) == "snake",
                         "fewest plays first (snake 1 play < rally 2: got %s)" % String(least[0]["g"]["id"]))
                 ok += _check(String(least[0]["stat"]).begins_with("plays 1"),
                         "stat line is the play count (%s)" % String(least[0]["stat"]))
+        # v0.2.3 MOST PLAYED: the mirror - most plays first (rally 2 > snake 1)
+        menu._list_idx = 3
+        menu._apply_list()
+        var most: Array = menu._lists_data[3]["items"]
+        ok += _check(most.size() == 2, "MOST PLAYED lists the played games (%d)" % most.size())
+        if most.size() == 2:
+                ok += _check(String(most[0]["g"]["id"]) == "rally",
+                        "most plays first (rally 2 plays > snake 1: got %s)" % String(most[0]["g"]["id"]))
+        # v0.2.3 ABANDONED: longest since the last play FIRST (snake started
+        # after rally, so rally's last_ts is the older one -> rally first)
+        menu._list_idx = 4
+        menu._apply_list()
+        var gone: Array = menu._lists_data[4]["items"]
+        ok += _check(gone.size() == 2, "ABANDONED lists the played games (%d)" % gone.size())
+        if gone.size() == 2:
+                ok += _check(String(gone[0]["g"]["id"]) == "rally",
+                        "longest-unplayed first (rally: got %s)" % String(gone[0]["g"]["id"]))
+                ok += _check(String(gone[0]["stat"]).contains("last play"),
+                        "stat line names the last play (%s)" % String(gone[0]["stat"]))
         # every sheet opens without script errors
         menu._open_settings()
         await get_tree().process_frame
@@ -1009,6 +1038,79 @@ func _t_menu() -> int:
         ok += _check(true, "sheets open/close cleanly")
         menu.queue_free()
         await get_tree().process_frame
+        Box.reset_all()
+        return ok
+
+## v0.2.3 THE CAPACITY HOLD: a game's own pool recharges ONLY while the
+## player is OUT of that game. While the game is open its clock is frozen
+## (regen_in stands still), other games keep ticking; on release the played
+## span never charges the pool; the SOON ? law ships with it.
+func _t_capacity_hold() -> int:
+        Box.reset_all()
+        var ok := 0
+        # the SOON ? is back (owner: "return it!")
+        ok += _check(ResourceLoader.exists("res://assets/thumbs/soon.png"),
+                "soon.png exists (the purple ? thumbnail)")
+        ok += _check(ResourceLoader.exists("res://assets/ui/phone_vertical.png") \
+                and ResourceLoader.exists("res://assets/ui/phone_horizontal.png"),
+                "the position-select phone art exists")
+
+        # rally wears charges (2 per round, 5 min regen, cap 10)
+        var pool := Box.game_battery("rally")
+        ok += _check(not pool.is_empty(), "rally owns a battery pool")
+        Box.data["game_batteries"]["rally"] = {"count": 4, "ts":
+                        int(Time.get_unix_time_from_system())}
+        Box.save()
+        var before := Box.game_battery("rally")
+        ok += _check(int(before["count"]) == 4, "pool starts at 4/10")
+        var regen0 := int(before["regen_in"])
+        ok += _check(regen0 > 0 and regen0 <= 300,
+                "the countdown runs while OUT of the game (%ds)" % regen0)
+
+        # ---- open rally: its own clock FREEZES ----
+        Box.set_active_game("rally")
+        await get_tree().create_timer(1.2).timeout
+        var held := Box.game_battery("rally")
+        ok += _check(int(held["regen_in"]) == regen0,
+                "the countdown STANDS STILL while rally is open (%d vs %d)"
+                                % [int(held["regen_in"]), regen0])
+        # ...but ANOTHER charged game's pool keeps ticking (lanes wears charges)
+        Box.data["game_batteries"]["lanes"] = {"count": 2, "ts":
+                        int(Time.get_unix_time_from_system())}
+        Box.set_active_game("rally")   # idempotent
+        var lanes_now := Box.game_battery("lanes")
+        await get_tree().create_timer(1.2).timeout
+        var lanes_later := Box.game_battery("lanes")
+        ok += _check(int(lanes_now["regen_in"]) >= int(lanes_later["regen_in"]),
+                "another game's countdown keeps running while rally is open")
+
+        # ---- closing rally shifts the clock PAST the played span ----
+        var ts_before_clear := int(Box.data["game_batteries"]["rally"]["ts"])
+        Box.clear_active_game()
+        var ts_after_clear := int(Box.data["game_batteries"]["rally"]["ts"])
+        ok += _check(ts_after_clear > ts_before_clear,
+                "the played span is skipped (clock shifted past it)")
+        var released := Box.game_battery("rally")
+        ok += _check(int(released["count"]) == 4,
+                "no free battery was granted by the hold")
+        var regen_released := int(released["regen_in"])
+        ok += _check(regen_released > 0,
+                "the countdown runs again once OUT of the game (%ds)" % regen_released)
+        ok += _check(Box.active_game == "", "no hold survives the release")
+
+        # ---- switching games: the hold follows the open one ----
+        Box.set_active_game("rally")
+        var rally_held_regen := int(Box.game_battery("rally")["regen_in"])
+        ok += _check(rally_held_regen == regen0,
+                "re-opening rally freezes its clock again (%d)" % rally_held_regen)
+        Box.set_active_game("lanes")
+        ok += _check(Box.active_game == "lanes", "the hold follows the open game")
+        await get_tree().create_timer(1.2).timeout
+        var rally_open_regen := int(Box.game_battery("rally")["regen_in"])
+        ok += _check(rally_open_regen < rally_held_regen,
+                "rally's countdown runs again while LANES is open (%d < %d)"
+                                % [rally_open_regen, rally_held_regen])
+        Box.clear_active_game()
         Box.reset_all()
         return ok
 
