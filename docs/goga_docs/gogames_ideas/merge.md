@@ -78,3 +78,63 @@ puzzle and relaxing game maybe?")
 
 - more themes (candy? retro CRT? wood?), a board-frame shelf, an undo
   power-up, a daily-seed challenge mode — WAIT for the owner.
+
+## v0.2.8 — THE VERDICT ROUND II
+
+The owner played the rebuild and ruled on five things:
+
+- THE CLASSIC BACKGROUND WAS BLUE ("i guess you misunderstood me when i
+    said deep blue i just meant for the sea theme") — Classic now wears
+    the WARM PAPER of the real 2048 palette: the cream page, a whisper of
+    warm dust, soft warm vignette edges; the frame went warmer (b9a99a).
+    The deep blue belongs to Deep Sea alone.
+- THE COLLECTED COINS NEVER DISAPPEARED ("when collected it never
+    disappear until another coin appear") — root cause: the coin canvas
+    item kept its stale painting because `coin_layer.queue_redraw()` was
+    only called while a coin was ALIVE; after `_take_coin_cell()` nobody
+    repainted the layer, so the ghost coin hung around. The take now
+    repaints explicitly AND the tick repaints the layer every frame
+    (spawn, bob, glint, ERASE). The probe grew the law; the QA shot
+    03 proves the erase.
+- THE SEA WATER WAS FAKE ("just animations based on movement even if
+    there is no movement... a weird wave and not real physical-based
+    water... if a square is at the left edge and i swiped to left, i will
+    still see the water moves which is unreal") — the old code fed the
+    water from the SWIPE DIRECTION (every tile in the move list got
+    energized, stationary tiles included, and the shader kept a
+    time-driven sine). REBUILT as real physics: a per-tile damped SPRING
+    (W_K 49 / W_C 1.9 / W_ACC_K 0.00034) whose only force is the tile's
+    ACTUAL acceleration, measured from its real position deltas each
+    frame. A still tile sits still — forever; only acceleration is a
+    force (a steady coast does not re-excite the water); the surface
+    settles through a few natural swings. The shader lost the time-wave
+    and gained tilt + energy: the resting shape is a flat fill with a
+    static meniscus; ripples and foam exist ONLY while energy lives.
+    merge_probe pins four laws: stillness, motion, settle, coast.
+- THE OPTIONS MENU (owner: "add an optionals menu shows 4x4 normal and
+    6x6 and 8x8, make the others be bought first for high prices, make
+    6x6 score bonus be /80 and 8x8 /160") — the HUD grew an OPTIONS
+    button: 4x4 free (bonus /20, the registry default), 6x6 at 1800
+    (/80), 8x8 at 3600 (/160). The bonus follows the board through a
+    MODULAR `bonus_div_override` var on the game base — host_node reads
+    it in ONE place (`_live_div`) so the payout theatre, the honest-math
+    line and the dead menu all agree; no game names in the economy.
+    Switching the size starts a FRESH board (honest earnings: no mixing
+    a 6x6 run into a 4x4 score). GRID the const became `grid_n` the var;
+    every loop (slide, spawn, stuck, cascade, layout) is size-aware.
+- THE THUMB'S "41" ("if you give it a closer look, you will see an empty
+    square has number 41 which is weird") — it was the "+1" fusion pop:
+    the Kenney Rocket "1" glyph carries a bottom serif bar and read as
+    "41" over an empty hole. The pop is GONE from the scene and the
+    thumbnail is recomposed on the warm paper.
+- BONUS CATCH (the probe): the 90/10 fresh spawn could land ON the coin
+    cell — the reward got swallowed and auto-collected at the next slide.
+    `_spawn_random` now skips the coin cell; the coin owns its cell until
+    a slide really sweeps it.
+- tests: merge_probe grew the v0.2.8 chapters (sizes + divs + fresh-board
+    switch, the 6x6 slide, the options pair, the water still/motion/
+    settle/coast laws, the coin vanish); flow_test grew the size/div
+    registry laws. ALL PASS.
+- Xvfb QA (qa_v028, 12 shots eyeballed BEFORE shipping): the warm paper,
+    the coin erase, the sea still-vs-tilt pair, the options sheet, the
+    centered 6x6 — plus the whole XO remake chapter below.

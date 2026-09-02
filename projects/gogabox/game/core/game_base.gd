@@ -47,6 +47,11 @@ func orientation_settled() -> void:
 ## bonus (peace play gives up the bonus by design). The host reads this
 ## one flag - no game names in the economy.
 var score_bonus_enabled := true
+## v0.2.8 MODULAR MODE BONUS: a game whose run bonus depends on a MODE
+## (2048's board sizes: /20, /80, /160) sets this BEFORE finishing; -1
+## means "use the registry coin_div". The host reads this one var - no
+## game names in the economy.
+var bonus_div_override := -1
 
 var _hud: CanvasLayer
 var _score_label: Label
@@ -141,10 +146,11 @@ func check_achievements() -> int:
                         # v0.1.7 - dario
                         "stomp_25": ok = Box.counter(game_id, "stomped") >= 25
                         "clear_all": ok = Box.counter(game_id, "levels_done") >= 3
-                        # v0.1.7 - xo
-                        "rung_5": ok = Box.counter(game_id, "rung") >= 5
-                        "rung_top": ok = Box.counter(game_id, "rung") >= 10
-                        "streak_3": ok = Box.counter(game_id, "streak") >= 3
+                        # v0.2.8 - xo (the sketch remake: wins + streaks,
+                        # the ladder rungs are gone)
+                        "wins_10": ok = Box.counter(game_id, "wins") >= 10
+                        "wins_40": ok = Box.counter(game_id, "wins") >= 40
+                        "streak_5": ok = Box.counter(game_id, "streak") >= 5
                         # v0.2.4 - space dash (kills + the max power rung)
                         "kills_100": ok = Box.counter(game_id, "kills") >= 100
                         "kills_300": ok = Box.counter(game_id, "kills") >= 300

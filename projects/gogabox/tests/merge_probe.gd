@@ -233,6 +233,123 @@ func _run() -> void:
         _check(g2._shop_pair.size() == 2, "the shop owns its dim+center pair")
         g2._shop_close()
 
+        # ================================================================
+        # v0.2.8 THE VERDICT ROUND II
+        # ================================================================
+
+        # ---- THE BOARD SIZES (the owner's options menu) ----
+        _check(M.SIZES.size() == 3, "three sizes in the OPTIONS (4 / 6 / 8)")
+        _check(int(M.SIZES["4"]["price"]) == 0, "4 x 4 is the free normal game")
+        _check(int(M.SIZES["6"]["price"]) >= 1000 and int(M.SIZES["6"]["div"]) == 80,
+                "6 x 6 is a real purchase and pays /80 (owner)")
+        _check(int(M.SIZES["8"]["price"]) >= 2000 and int(M.SIZES["8"]["div"]) == 160,
+                "8 x 8 is a real purchase and pays /160 (owner)")
+        Box.dev_set_cheat("all_owned", 1)
+        var cell4: float = g2.cell
+        g2._apply_size("6")
+        _check(g2.grid_n == 6 and g2.size_id == "6", "6 x 6 equips")
+        _check(int(g2.bonus_div_override) == 80,
+                "the run bonus follows the board through the MODULAR override (/80)")
+        _check(g2._size_div() == 80, "the live divider reads /80")
+        _check(g2.board.size() == 6 and g2.board[0].size() == 6,
+                "the board REBUILT as 6 x 6")
+        _check(int(g2.score) == 0, "a size switch starts a FRESH board (score reset)")
+        _check(g2.tiles.size() == 2, "the fresh board dealt its two tiles")
+        _check(g2.cell < cell4, "the cells shrank to fit the bigger board")
+        var cx6: float = g2.board_rect.position.x + g2.board_rect.size.x * 0.5
+        _check(absf(cx6 - vp.x * 0.5) < 1.0, "the 6 x 6 is CENTERED too")
+        # the slide engine plays the bigger boards by the same laws
+        g2.set_score(0)
+        g2.fusions_since = 0
+        g2.tiles = {}
+        g2.board = []
+        for x in 6:
+                var col6 := []
+                col6.resize(6)
+                col6.fill(0)
+                g2.board.append(col6)
+        g2.board[0][2] = 2
+        g2.board[0][3] = 2
+        g2._slide(Vector2i(0, -1))
+        g2._finish_slide()
+        _check(int(g2.board[0][0]) == 4, "a 6 x 6 column slide fuses 2+2 into 4")
+        _check(int(g2.score) == 1, "one fusion on the 6 x 6 pays EXACTLY +1")
+        g2._apply_size("8")
+        _check(g2.grid_n == 8 and int(g2.bonus_div_override) == 160,
+                "8 x 8 equips at /160")
+        g2._apply_size("4")
+        _check(g2.grid_n == 4 and int(g2.bonus_div_override) == -1,
+                "back to 4 x 4: the registry /20 rules again (override cleared)")
+        # the options sheet owns its exact dim+center pair (THE PAIR LAW)
+        g2._options_open()
+        await get_tree().process_frame
+        _check(g2._options_pair.size() == 2, "the options sheet owns its dim+center pair")
+        g2._options_close()
+
+        # ---- THE REAL MOTION WATER (the owner: react to REAL motion,
+        # not the swipe direction; no motion = NO water motion) ----
+        Box.equip_item("merge", "theme", "sea")
+        var g3: GogaGame = M.new()
+        g3.game_id = "merge"
+        add_child(g3)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var t0: Node = M.TileNode.new()
+        t0.position = g3._cell_pos(Vector2i(1, 1))
+        t0.setup(8, g3, g3.cell)
+        g3.board_root.add_child(t0)
+        g3.tiles[Vector2i(1, 1)] = t0
+        _check(t0.mat != null, "the sea tile carries the water shader")
+        # THE STILLNESS LAW: hold the tile perfectly still - the water sits
+        # calm, no time-wave, nothing
+        for i in 90:
+                g3._goga_tick(1.0 / 60.0)
+        _check(absf(float(t0.w_off)) < 0.02,
+                "NO motion = the water sits STILL (%.4f tilt)" % absf(float(t0.w_off)))
+        _check(float(t0.w_energy) < 0.02,
+                "a still tile carries no ripple energy")
+        # THE MOTION LAW: accelerate the tile for real (growing speed, like
+        # a slide's ease) - the water PILES
+        for i in 12:
+                t0.position.x -= float(i + 1) * 2.2
+                g3._goga_tick(1.0 / 60.0)
+        _check(absf(float(t0.w_off)) > 0.008,
+                "REAL motion moves the water (%.4f tilt)" % absf(float(t0.w_off)))
+        # THE SETTLE LAW: the ride ends - a few natural swings, then calm
+        for i in 300:
+                g3._goga_tick(1.0 / 60.0)
+        _check(absf(float(t0.w_off)) < 0.05,
+                "the water SETTLES calm after the ride (%.4f)" % absf(float(t0.w_off)))
+        _check(float(t0.w_energy) < 0.05, "the ripple energy spends itself")
+        # the constant-velocity law: a tile coasting at a steady speed must
+        # NOT keep exciting the water (only ACCELERATION is a force)
+        var calm_off: float = absf(float(t0.w_off))
+        for i in 30:
+                t0.position.x -= 4.0        # steady push, no speed change
+                g3._goga_tick(1.0 / 60.0)
+        var coast_off: float = absf(float(t0.w_off))
+        _check(coast_off < calm_off + 0.06,
+                "a steady coast does not re-excite the water (%.4f -> %.4f)" % [calm_off, coast_off])
+
+        # ---- the coin VANISH law (the owner: collected coins used to hang
+        # around until the next coin appeared) ----
+        var g4: GogaGame = M.new()
+        g4.game_id = "merge"
+        add_child(g4)
+        await get_tree().process_frame
+        _grid(g4, [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
+        g4.coin_cell = Vector2i(1, 0)
+        var bc: int = int(g4.run_coins)
+        g4._slide(Vector2i(1, 0))
+        g4._finish_slide()
+        _check(int(g4.run_coins) == bc + 1, "the coin was taken (sanity)")
+        _check(g4.coin_cell.x < 0, "the coin cell is EMPTY the moment it is taken")
+        # the erase path: the tick repaints the coin layer EVERY frame now,
+        # so the stale coin cannot survive the frame after its take
+        g4._goga_tick(1.0 / 60.0)
+        _check(g4.coin_cell.x < 0,
+                "the tick holds the cell empty (the layer repaints, the coin is GONE)")
+
         print("== merge_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(1 if fails > 0 else 0)
 

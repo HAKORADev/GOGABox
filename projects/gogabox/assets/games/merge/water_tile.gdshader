@@ -1,18 +1,27 @@
 shader_type canvas_item;
-// 2048 DEEP SEA - the physical water inside every tile (v0.2.7, the owner:
-// "the higher the number the more water inside it" and "the animation and
-// movement moves the water inside, so it's a real physical based water i
-// mean and not just some static coloring").
-// Each tile owns one instance of this material:
-//   fill    = the tier (0.22 for a 2 ... 0.95 for a 2048)
-//   slosh   = the slide tilt (-1..1, set while the tile rides, decays)
-//   amp     = the wave energy (slides + merges energize it, it settles calm)
-//   time_s  = the shared clock (the surface never stops breathing)
+// 2048 DEEP SEA v0.2.8 - the water is PHYSICAL now (the owner: "i want it
+// to react based on the square movement and motion for real, not based on
+// the direction... if a square is at the left edge and i swiped to left,
+// i will still see the water moves which is unreal because the square
+// still in same place... i did not liked the weird wave so make it more
+// natural").
+//
+// The game runs a per-tile damped SPRING fed ONLY by the tile's real
+// position deltas (its container acceleration). What reaches the shader:
+//   tilt   = the spring's surface tilt (+ = higher on the right). Born 0,
+//            excited by real motion, settles calm through a few natural
+//            swings. A tile that never moves keeps it at 0.0 forever.
+//   energy = ripple + foam fuel, fed by the same motion and the merge
+//            splash. At 0 the surface is PERFECTLY still - time_s does
+//            nothing (the old time-driven "weird wave" is dead).
+//   fill   = the tier (higher tile = more water) - unchanged law.
+// The resting shape is natural: a flat fill with a slight meniscus that
+// climbs the cell walls - static geometry, not motion.
 
 uniform float fill = 0.35;
-uniform float time_s = 0.0;
-uniform float slosh = 0.0;
-uniform float amp = 0.4;
+uniform float time_s = 0.0;        // only scrolls ripple/foam WHEN energized
+uniform float tilt = 0.0;
+uniform float energy = 0.0;
 uniform float rect_px = 120.0;
 uniform float radius_px = 16.0;
 uniform vec4 glass_col : source_color = vec4(0.05, 0.13, 0.28, 1.0);
@@ -29,22 +38,27 @@ void fragment() {
         float d = sdf_round_rect(p, vec2(rect_px * 0.5), radius_px);
         float inside = 1.0 - smoothstep(-1.5, 0.5, d);
 
-        // the surface test (UV.y grows DOWN): the water surface sits at
-        // p.y = (0.5 - fill) * rect_px; a point is under water when
-        // p.y is BELOW it - `surf` is the depth below the surface in px
-        float surf = p.y - (0.5 - fill) * rect_px;
-        surf += slosh * (UV.x - 0.5) * rect_px * 0.30;
-        surf += sin(UV.x * 7.3 + time_s * 3.1) * amp * rect_px * 0.045;
-        surf += sin(UV.x * 12.7 - time_s * 2.2) * amp * rect_px * 0.025;
+        // the resting surface: the fill line + the static meniscus (water
+        // climbs the walls a hair) - this shape does NOT move by itself
+        float men = pow(abs(UV.x - 0.5) * 2.0, 3.0) * 0.022 * rect_px;
+        float surf = p.y - (0.5 - fill) * rect_px + men;
+        // the spring tilt (the real motion answer)
+        surf -= tilt * (UV.x - 0.5) * rect_px * 0.34;
+        // the ripple: TWO close, small capillary waves - natural in size,
+        // scaled by energy, so a calm tile shows NOTHING (no weird wave)
+        float rip = sin(UV.x * 23.0 + time_s * 8.0) * 0.62
+                  + sin(UV.x * 37.0 - time_s * 12.0) * 0.38;
+        surf += rip * rect_px * 0.012 * min(energy, 1.0);
 
         vec4 col = glass_col;
         if (surf > 0.0) {
                 float depth = clamp(surf / max(1.0, fill * rect_px), 0.0, 1.0);
                 col = mix(water_hi, water_col, clamp(depth * 1.7, 0.0, 1.0));
                 col = mix(col, glass_col * 1.35, depth * depth * 0.6);
-                // the bright meniscus line + a little foam
+                // the bright meniscus line + a little foam (motion only)
                 col = mix(col, water_hi, smoothstep(2.6, 0.0, abs(surf)) * 0.85);
-                float foam = step(0.82, sin(UV.x * 41.0 + time_s * 5.0)) * amp * 0.35;
+                float foam = step(0.80, sin(UV.x * 41.0 + time_s * 7.0))
+                                * min(energy, 1.0) * 0.30;
                 col.rgb += vec3(foam);
         }
         // the glass shine (a soft top-left highlight, brighter when emptier)

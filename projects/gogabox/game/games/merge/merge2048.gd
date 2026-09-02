@@ -1,55 +1,80 @@
 extends GogaGame
-## 2048 - v0.2.7 THE REBUILD. The owner played the old one and called it
-## "somehow totally broken for real" - it was a stub: a hardcoded top-left
-## board (27,250), tiles that TELEPORTED (the bookkeeping freed the source
-## node and respawned a fresh one at the destination, so the slide tween
-## almost never fired), merge-value-sum scoring, auto-granted coins, no
-## shop, no themes. This is the real game, built to beat the PGB v1.3.8
-## python one (src/python/v1.3.8/2048.py) - its pymunk particles, its move
-## lists, its board glow all live here in Godot form and then some.
+## 2048 - v0.2.8 THE VERDICT ROUND II. The owner played the v0.2.7 rebuild
+## and ruled on five things:
+##   1. "the classic theme background is blue, i guess you misunderstood
+##      me when i said deep blue i just meant for the sea theme" - Classic
+##      wears the WARM PAPER of the real 2048 palette now (cream, warm
+##      dust, soft vignette); the deep blue belongs to Deep Sea alone.
+##   2. "when collected it never disappear until another coin appear" -
+##      the coin canvas item kept the stale painting because the layer
+##      only redrawed while a coin was ALIVE. It redraws on the take and
+##      every tick now - the coin is GONE the frame it is collected.
+##   3. the sea water was "just animations based on movement even if
+##      there is no movement... a weird wave and not real physical-based
+##      water" - REBUILT: a per-tile spring driven by the tile's ACTUAL
+##      motion (its real position deltas -> container acceleration),
+##      damped settle, tilt + energy fed to the shader. No movement =
+##      NO water movement, and the weird time-wave is dead - the surface
+##      is a natural meniscus that only moves when the tile truly moves.
+##   4. "add an options menu shows 4x4 normal and 6x6 and 8x8, make the
+##      others be bought first for high prices, make 6x6 score bonus be
+##      /80 and 8x8 /160" - the OPTIONS sheet sells the boards (6x6 and
+##      8x8 are shop items), and the run bonus follows the board through
+##      a MODULAR per-game override (host_node reads bonus_div_override;
+##      no game names in the economy). Switching the size starts a
+##      fresh board.
+##   5. the thumbnail's empty square wore a "+1" whose Kenney "1" glyph
+##      reads as "41" - the pop is gone from the thumb, and the scene
+##      wears the new warm classic look.
+## (v0.2.7 history: the owner called the old stub "somehow totally broken
+## for real" - hardcoded corner board, teleporting tiles, merge-value-sum
+## score, auto coins. The rebuild: the centered board, tiles that keep
+## their identity and tween, +1 per fusion, the coin cell every 15
+## fusions, the theme shop.)
 ##
-## Owner contract (v0.2.7):
-##   - the same 4x4 grid, CENTERED and BIGGER (viewport-computed, aware of
-##     the banner strip - the old board was a fixed 660px orphan in a corner)
-##   - a cool backdrop matched to the grid (deep slate + a soft halo)
-##   - controls = swipe the finger in ANY direction (TouchKit.swiped) + a
-##     board nudge so every accepted swipe is FELT
-##   - each successful fusion worth EXACTLY 1 score point; run bonus /20
-##     (registry coin_div 20)
+## Owner contract (v0.2.7, still law):
+##   - the grid CENTERED and BIGGER (viewport-computed, aware of the
+##     banner strip)
+##   - controls = swipe the finger in ANY direction (TouchKit.swiped) +
+##     a board nudge so every accepted swipe is FELT
+##   - each successful fusion worth EXACTLY 1 score point
 ##   - after every 15 fusions, one empty cell grows a REAL GOGACoin
-##     (coin.png, fade-in, bob, glint) - slide any tile INTO that cell to
-##     take it; if the board is full when it falls due, it waits
-##   - animations and effects: tiles keep their identity and TWEEN (real
-##     slides), merges pop + ring + square-chunk particles that bounce off
-##     the board frame, floating +1, a golden pulse for big tiles, a gray
-##     cascade when the board is stuck, a 2048 burst (and endless play)
-##   - SHOP themes (a puzzle needs a wardrobe, not powerups):
-##       Classic (free) - the warm beige board on deep cool slate
-##       Minecraft (800) - stone backdrop, dirt holes, block-face tiles with
-##         deterministic pixel noise, lava-glow numbers on hot tiers + embers
-##       Deep Sea (650) - glass cells holding REAL water: a per-tile shader,
-##         the fill IS the tier, the water sloshes while the tile slides and
-##         splashes when it merges (the owner: "a real physical based water
-##         i mean and not just some static coloring")
+##     (coin.png, fade-in, bob, glint) - slide any tile INTO that cell
+##     to take it; if the board is full when it falls due, it waits
+##   - animations and effects: real slides, merges pop + ring +
+##     square-chunk particles that bounce off the board frame, floating
+##     +1, golden pulses, the gray cascade end, the 2048 burst
+##   - SHOP themes: Classic (free) / Minecraft (800) / Deep Sea (650)
 ##   - the run ends when no move is left (the classic law)
 ##   - banner: the board sits above the strip (registry banner true)
 ##
 ## Probe contract: board/tiles/_slide/coin state is public, _load_grid
 ## seeds a board directly, theme ids + prices are consts.
 
-const GRID := 4
 const COIN_EVERY := 15               # owner: one GOGACoin cell per 15 fusions
 const WIN_TILE := 2048
 const SLIDE_TIME := 0.11             # s - the tween + lock window
 const MERGE_POP := 1.24
 
+## THE BOARD SIZES (owner v0.2.8): 4x4 is the free normal game, 6x6 and
+## 8x8 are SHOP items bought for real prices first. The run bonus follows
+## the board: /20 (the registry default, div 0 = use it), /80, /160.
+const SIZES := {
+                "4": {"name": "4 x 4", "price": 0, "div": 0,
+                                "desc": "normal - the classic board, bonus /20"},
+                "6": {"name": "6 x 6", "price": 1800, "div": 80,
+                                "desc": "bigger board - score bonus /80"},
+                "8": {"name": "8 x 8", "price": 3600, "div": 160,
+                                "desc": "the monster board - score bonus /160"},
+}
+
 const THEMES := {
-        "classic": {"name": "Classic", "price": 0,
-                "desc": "the warm beige board on a deep cool slate"},
-        "minecraft": {"name": "Minecraft", "price": 800,
-                "desc": "stone backdrop, block tiles, lava-glow numbers - thuds + embers"},
-        "sea": {"name": "Deep Sea", "price": 650,
-                "desc": "glass cells with REAL water inside - the higher the tile, the more it holds"},
+                "classic": {"name": "Classic", "price": 0,
+                                "desc": "the warm paper board - the real 2048 feel"},
+                "minecraft": {"name": "Minecraft", "price": 800,
+                                "desc": "stone backdrop, block tiles, lava-glow numbers - thuds + embers"},
+                "sea": {"name": "Deep Sea", "price": 650,
+                                "desc": "glass cells with REAL water inside - the water answers the tile's true motion"},
 }
 
 ## the classic tier ramp (the 2048 law: warm and readable)
@@ -68,6 +93,8 @@ const MC_TIERS := {
 
 # ---------------- state ----------------------------------------------------
 var board: Array = []                # grid[x][y] ints (0 = empty)
+var grid_n := 4                      # THE BOARD SIZE (4 normal / 6 / 8)
+var size_id := "4"                   # the equipped size key (SIZES)
 var tiles := {}                      # Vector2i -> TileNode
 var animating := false
 var over_board := false              # no more moves (the run is finishing)
@@ -100,6 +127,15 @@ var _sea_time := 0.0
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
 var _shop_pair: Array = []
+var _options_pair: Array = []        # the OPTIONS sheet owns its pair too
+
+# the water physics constants (v0.2.8 THE REAL MOTION LAW). The surface is
+# a damped spring per tile; the container acceleration comes from the
+# tile's REAL position deltas each frame. No motion -> no force -> calm.
+const W_K := 49.0            # spring stiffness (sqrt = 7 rad/s ~ 1.1 Hz)
+const W_C := 1.9             # damping (a few natural swings, then calm)
+const W_ACC_K := 0.00034     # container acceleration -> surface force
+const W_ACC_MAX := 150000.0  # px/s^2 clamp (a slide's ease spikes)
 
 # ============================================================ setup / layout
 
@@ -130,22 +166,75 @@ func _goga_setup() -> void:
         add_child(fx_layer)
         _layout_board()
         _make_mc_textures()
+        _load_size()
         board = []
-        for x in GRID:
+        for x in grid_n:
                 var col := []
-                col.resize(GRID)
+                col.resize(grid_n)
                 col.fill(0)
                 board.append(col)
         set_hud_score_prefix("FUSIONS")
         add_hud_button("SHOP", func(): _shop_open())
+        add_hud_button("OPTIONS", func(): _options_open())
         set_score(0)
         _spawn_random()
         _spawn_random()
         Jukebox.sfx("confirm", -14.0)
 
+## THE SIZE LAW (owner v0.2.8): the equipped board size decides grid_n and
+## the run bonus. div 0 = use the registry coin_div (4x4 stays /20).
+func _load_size() -> void:
+        var on := Box.item_on(game_id, "size")
+        size_id = on if SIZES.has(on) else "4"
+        grid_n = int(size_id)
+        var div := int(SIZES[size_id]["div"])
+        bonus_div_override = div if div > 0 else -1
+
+func _size_div() -> int:
+        var div := int(SIZES[size_id]["div"])
+        return div if div > 0 else int(GameReg.get_game(game_id).get("coin_div", 100))
+
+## a size change REBUILDS the run (the honest board: fresh tiles, fresh
+## score - no mixing 6x6 earnings into a 4x4 run).
+func _apply_size(id: String) -> void:
+        size_id = id
+        grid_n = int(id)
+        var div := int(SIZES[id]["div"])
+        bonus_div_override = div if div > 0 else -1
+        for c in tiles:
+                var t: TileNode = tiles[c]
+                if is_instance_valid(t):
+                        t.queue_free()
+        tiles = {}
+        for p in _merge_victims:
+                if is_instance_valid(p):
+                        p.queue_free()
+        _merge_victims = []
+        _pending_merges = []
+        coin_cell = Vector2i(-1, -1)
+        coin_pending = false
+        fusions_since = 0
+        won = false
+        over_board = false
+        animating = false
+        _layout_board()
+        board = []
+        for x in grid_n:
+                var col := []
+                col.resize(grid_n)
+                col.fill(0)
+                board.append(col)
+        set_score(0)
+        _spawn_random()
+        _spawn_random()
+        bg_layer.queue_redraw()
+        board_layer.queue_redraw()
+        coin_layer.queue_redraw()
+        Jukebox.sfx("confirm", -6.0)
+
 ## THE CENTERING LAW (owner: "the same grid, but centered and more
-## bigger"): the board is the biggest 4x4 square that fits between the HUD
-## bar and the banner strip, centered both ways.
+## bigger"): the board is the biggest square of the CURRENT size that fits
+## between the HUD bar and the banner strip, centered both ways.
 func _layout_board() -> void:
         var vp := get_viewport_rect().size
         var top_pad := 104.0
@@ -154,8 +243,8 @@ func _layout_board() -> void:
         var side: float = minf(vp.x - 26.0, avail)
         side = maxf(side, 260.0)
         gap = side * 0.026
-        cell = (side - gap * float(GRID + 1)) / float(GRID)
-        board_side = cell * float(GRID) + gap * float(GRID + 1)
+        cell = (side - gap * float(grid_n + 1)) / float(grid_n)
+        board_side = cell * float(grid_n) + gap * float(grid_n + 1)
         var bx := (vp.x - board_side) * 0.5
         var by := top_pad + maxf(0.0, (avail - board_side) * 0.5)
         board_rect = Rect2(bx, by, board_side, board_side)
@@ -185,8 +274,16 @@ class TileNode:
         var lab: Label = null
         var mat: ShaderMaterial = null      # sea only
         var fill := 0.35                     # sea: the water level IS the tier
-        var slosh := 0.0                     # sea: -1..1 tilt while sliding
-        var amp := 0.4                       # sea: wave energy (decays calm)
+        # --- v0.2.8 THE REAL MOTION WATER: a damped surface spring per
+        # tile, fed by this node's ACTUAL position deltas (the container
+        # acceleration). Nothing here is fed by the swipe direction; a
+        # tile that never moves never excites its water.
+        var w_off := 0.0                     # surface tilt (+ = higher right)
+        var w_vel := 0.0                     # its velocity (the splash kick)
+        var w_energy := 0.0                  # ripple/foam fuel (decays calm)
+        var last_pos := Vector2.INF          # measured each sea tick
+        var last_vel := 0.0
+        var acc_s := 0.0                     # low-passed container accel
         var born_pop := false
 
         func setup(v: int, g: Node, size: float) -> void:
@@ -224,6 +321,9 @@ class TileNode:
                         mat.set_shader_parameter("rect_px", face)
                         mat.set_shader_parameter("radius_px", face * 0.14)
                         mat.set_shader_parameter("time_s", game._sea_time)
+                        mat.set_shader_parameter("tilt", w_off)
+                        mat.set_shader_parameter("energy", w_energy)
+                        last_pos = position                # the motion watch starts NOW
                         material = mat
                 else:
                         material = null
@@ -309,18 +409,29 @@ func _draw_bg() -> void:
                         bg_layer.draw_arc(Vector2(cx, cy), rr, 0.0, TAU, 14,
                                         Color(0.55, 0.8, 1.0, 0.05 * br), 1.6)
                 return
-        # classic: THE COOL SLATE (owner: "background cool color matches the
-        # grid one") - a deep desaturated indigo with a soft halo behind the
-        # board and a whisper of drifting dust
-        bg_layer.draw_rect(Rect2(Vector2.ZERO, vp), Color("27304a"))
-        bg_layer.draw_circle(board_rect.get_center(), board_side * 1.1, Color(1, 1, 1, 0.035))
-        for i in 14:
+        # classic: THE WARM PAPER (owner v0.2.8: "the classic theme
+        # background is blue, i guess you misunderstood me when i said deep
+        # blue i just meant for the sea theme - for classic, make the
+        # background really suitable"). The real 2048 palette IS warm: the
+        # cream page, a whisper of warm dust, a soft corner vignette - the
+        # beige tiles sit on their natural paper.
+        bg_layer.draw_rect(Rect2(Vector2.ZERO, vp), Color("efe7d8"))
+        var gr := board_rect.grow(board_side * 0.55)
+        bg_layer.draw_rect(gr, Color(1.0, 0.98, 0.92, 0.5))
+        # the vignette: four soft warm-brown edges (drawn as rings so it
+        # stays a rectangle shading, not a blob)
+        for i in 3:
+                var a := 0.05 - 0.013 * float(i)
+                bg_layer.draw_rect(Rect2(Vector2.ZERO, vp).grow(-float(i) * 26.0),
+                                Color(0.42, 0.34, 0.24, a), false,
+                                30.0 + float(i) * 16.0)
+        for i in 12:
                 var ph := float(i) * 2.91
                 var cx: float = fmod(absf(sin(ph * 2.13) * 173.0), 1.0) * vp.x
                 var cy: float = fmod(absf(sin(ph * 0.77 + 1.3) * 311.0), 1.0) * vp.y
                 var drift: float = sin(_time * 0.22 + ph) * 9.0
                 bg_layer.draw_circle(Vector2(cx + drift, cy + drift * 0.6),
-                                1.6 + _hashf(i, 7.7) * 2.2, Color(1, 1, 1, 0.05))
+                                1.6 + _hashf(i, 7.7) * 2.2, Color(0.55, 0.45, 0.3, 0.07))
 
 func _draw_board() -> void:
         var theme := _theme_id()
@@ -333,10 +444,10 @@ func _draw_board() -> void:
                 board_layer.draw_rect(frame, Color("0a2240"))
                 board_layer.draw_rect(frame, Color(0.45, 0.72, 0.95, 0.30), false, 2.0)
         else:
-                var sb := Arc.panel_style(Color("a89787"), int(gap * 2.4))
+                var sb := Arc.panel_style(Color("b9a99a"), int(gap * 2.4))
                 draw_style_box_on(board_layer, sb, frame)
-        for x in GRID:
-                for y in GRID:
+        for x in grid_n:
+                for y in grid_n:
                         var hole := Rect2(board_rect.position.x + gap + float(x) * (cell + gap),
                                         board_rect.position.y + gap + float(y) * (cell + gap),
                                         cell, cell)
@@ -416,16 +527,19 @@ func _slide(dirv: Vector2i) -> bool:
         var moved := false
         var merges: Array = []
         var moves: Array = []
-        var xs: Array = [0, 1, 2, 3]
-        var ys: Array = [0, 1, 2, 3]
+        var xs: Array = []
+        var ys: Array = []
+        for i in grid_n:
+                xs.append(i)
+                ys.append(i)
         if dirv.x > 0:
                 xs.reverse()
         if dirv.y > 0:
                 ys.reverse()
         var nb := []
-        for x in GRID:
+        for x in grid_n:
                 var col := []
-                col.resize(GRID)
+                col.resize(grid_n)
                 col.fill(0)
                 nb.append(col)
         var merged := {}
@@ -439,7 +553,7 @@ func _slide(dirv: Vector2i) -> bool:
                         while true:
                                 var nx: int = cx + dirv.x
                                 var ny: int = cy + dirv.y
-                                if nx < 0 or nx >= GRID or ny < 0 or ny >= GRID:
+                                if nx < 0 or nx >= grid_n or ny < 0 or ny >= grid_n:
                                         break
                                 var nv := int(nb[nx][ny])
                                 if nv == 0:
@@ -498,6 +612,11 @@ func _take_coin_cell() -> void:
         sparkles.append({"x": _cell_pos(coin_cell).x, "y": _cell_pos(coin_cell).y,
                         "life": 0.6, "max": 0.6})
         coin_cell = Vector2i(-1, -1)
+        # THE VANISH LAW (owner v0.2.8: "when collected it never disappear
+        # until another coin appear"): the coin canvas item kept the stale
+        # painting because nothing asked it to repaint while EMPTY. One
+        # explicit redraw erases it the same frame it is taken.
+        coin_layer.queue_redraw()
 
 var _pending_merges: Array = []
 
@@ -529,11 +648,12 @@ func _apply_moves(moves: Array, merges: Array, dirv: Vector2i) -> void:
                         new_tiles[dest] = t
                 var tw := t.create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
                 tw.tween_property(t, "position", _cell_pos(dest), SLIDE_TIME)
-                # the sea water reacts to the ride (the owner: the movement
-                # MOVES the water - a real physical feel, not a static tint)
-                if _theme_id() == "sea" and t.mat != null:
-                        t.amp = 1.0
-                        t.slosh = clampf(float(dirv.x) * 1.0, -1.0, 1.0)
+                # (v0.2.8: NOTHING is fed to the water here. The sea tick
+                # watches each tile's REAL position every frame - the ride's
+                # acceleration is the force. A tile that does not move
+                # (from == to) never excites its water: the owner's law -
+                # "if a square is at the left edge and i swiped to left, i
+                # will still see the water moves which is unreal".)
         tiles = new_tiles
 
 func _finish_slide() -> void:
@@ -563,7 +683,11 @@ func _finish_slide() -> void:
                 if v >= 128:
                         _pulse_board(t.position, v)
                 if _theme_id() == "sea" and t.mat != null:
-                        t.amp = 1.7                      # the splash
+                        # THE SPLASH: a fresh doubled tile drops into the
+                        # cell - the spring gets a real velocity kick (the
+                        # energy it carries decays; the surface settles)
+                        t.w_vel = _rng.randf_range(-3.2, 3.2)
+                        t.w_energy = 1.5
                 achievement_max("max_tile", v)
                 if v >= WIN_TILE and not won:
                         won = true
@@ -592,8 +716,8 @@ func _finish_slide() -> void:
 
 func _spawn_coin_cell() -> void:
         var empty: Array[Vector2i] = []
-        for x in GRID:
-                for y in GRID:
+        for x in grid_n:
+                for y in grid_n:
                         if int(board[x][y]) == 0 and not Vector2i(x, y) == coin_cell:
                                 empty.append(Vector2i(x, y))
         if empty.is_empty():
@@ -605,9 +729,13 @@ func _spawn_coin_cell() -> void:
 
 func _spawn_random() -> void:
         var empty: Array[Vector2i] = []
-        for x in GRID:
-                for y in GRID:
-                        if int(board[x][y]) == 0:
+        for x in grid_n:
+                for y in grid_n:
+                        # v0.2.8 catch: the fresh spawn must NEVER land on
+                        # the coin cell - the coin owns its cell until a
+                        # slide really sweeps it (a collision here let the
+                        # 90/10 swallow the reward and auto-collect it)
+                        if int(board[x][y]) == 0 and Vector2i(x, y) != coin_cell:
                                 empty.append(Vector2i(x, y))
         if empty.is_empty():
                 return
@@ -626,14 +754,14 @@ func _spawn_random() -> void:
 
 ## no empty cell AND no equal neighbors = stuck (the classic end law)
 func _is_stuck() -> bool:
-        for x in GRID:
-                for y in GRID:
+        for x in grid_n:
+                for y in grid_n:
                         var v := int(board[x][y])
                         if v == 0:
                                 return false
-                        if x + 1 < GRID and int(board[x + 1][y]) == v:
+                        if x + 1 < grid_n and int(board[x + 1][y]) == v:
                                 return false
-                        if y + 1 < GRID and int(board[x][y + 1]) == v:
+                        if y + 1 < grid_n and int(board[x][y + 1]) == v:
                                 return false
         return true
 
@@ -646,8 +774,8 @@ func _game_over() -> void:
         # the gray cascade: rows fade out one after another (the old stub
         # just jumped to the dead menu - no moment, no theatre)
         var row := 0
-        for y in GRID:
-                for x in GRID:
+        for y in grid_n:
+                for x in grid_n:
                         var t: TileNode = tiles.get(Vector2i(x, y))
                         if t == null or not is_instance_valid(t):
                                 continue
@@ -793,19 +921,38 @@ func _goga_tick(delta: float) -> void:
         _time += delta
         var theme := _theme_id()
         if theme == "sea":
-                # the water lives: the wave energy settles, the slosh decays,
-                # the surface keeps breathing through the shader's clock
+                # THE REAL MOTION WATER (v0.2.8): every tile's surface is a
+                # damped spring. The ONLY force is the tile's ACTUAL
+                # acceleration, measured from its real position deltas -
+                # a slide's ease, a merge pop, nothing else. No motion =
+                # no force = the water sits calm (the owner: the old
+                # direction-fed wave was "unreal").
                 _sea_time += delta
                 for t in tiles.values():
-                        if t is TileNode:
-                                t.amp = maxf(0.06, t.amp - delta * 1.5)
-                                t.slosh = move_toward(float(t.slosh), 0.0, delta * 2.6)
-                                if t.mat != null:
-                                        t.mat.set_shader_parameter("time_s", _sea_time)
-                                        t.mat.set_shader_parameter("amp", float(t.amp))
-                                        t.mat.set_shader_parameter("slosh", float(t.slosh))
+                        if not (t is TileNode):
+                                continue
+                        if t.last_pos == Vector2.INF:
+                                t.last_pos = t.position      # born this frame
+                        var rel: float = (t.position.x - t.last_pos.x) / maxf(delta, 0.0001)
+                        t.last_pos = t.position
+                        var acc: float = (rel - t.last_vel) / maxf(delta, 0.0001)
+                        t.last_vel = rel
+                        acc = clampf(acc, -W_ACC_MAX, W_ACC_MAX)
+                        t.acc_s = lerpf(t.acc_s, acc, 0.5)
+                        # the spring: natural frequency ~1.1 Hz, a few swings,
+                        # then calm (W_K / W_C / W_ACC_K in the consts)
+                        t.w_vel += (-W_K * t.w_off - W_C * t.w_vel
+                                        - W_ACC_K * t.acc_s) * delta
+                        t.w_off += t.w_vel * delta
+                        t.w_off = clampf(t.w_off, -0.85, 0.85)
+                        t.w_energy = maxf(t.w_energy - delta * 2.1,
+                                        minf(absf(t.w_vel) * 0.55 + absf(t.w_off), 1.2))
+                        if t.mat != null:
+                                t.mat.set_shader_parameter("time_s", _sea_time)
+                                t.mat.set_shader_parameter("tilt", float(t.w_off))
+                                t.mat.set_shader_parameter("energy", float(t.w_energy))
                 bg_layer.queue_redraw()          # the caustics drift
-                coin_layer.queue_redraw()
+                coin_layer.queue_redraw()        # the coin breathes AND erases
         elif theme == "minecraft":
                 # the lava tiles breathe + occasionally throw an ember
                 for t in tiles.values():
@@ -823,8 +970,7 @@ func _goga_tick(delta: float) -> void:
                 bg_layer.queue_redraw()
         else:
                 bg_layer.queue_redraw()          # the classic dust drifts
-        if coin_cell.x >= 0:
-                coin_layer.queue_redraw()
+        coin_layer.queue_redraw()        # ALWAYS: spawn, bob, glint, ERASE
         _update_fx(delta)
 
 func _goga_input(_event: InputEvent) -> void:
@@ -968,3 +1114,88 @@ func _apply_theme() -> void:
                 if is_instance_valid(t):
                         t.setup(t.value, self, cell)
         coin_layer.queue_redraw()
+
+# ============================================================ the options
+## THE BOARD SIZES (owner v0.2.8): "add an options menu shows 4x4 normal
+## and 6x6 and 8x8, make the others be bought first for high prices, make
+## 6x6 score bonus be /80 and 8x8 /160". Same sheet bones as the shop
+## (THE PAIR LAW - its own exact dim+center pair). Equipping a different
+## size starts a FRESH board with that size.
+
+func _options_open() -> void:
+        _options_pair_down()
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
+        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        var kids := root.get_children()
+        _options_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var t := Arc.label("2048 OPTIONS", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var hint := Arc.fit_label("a bigger board holds a bigger game - "
+                + "switching starts a fresh board", 19, Arc.HOT, 560)
+        hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(hint)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.46, 260.0, 540.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        sheet.add_child(sc)
+        for id in SIZES:
+                box.add_child(_size_row(id))
+        box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
+                        func(): _options_close()))
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+func _size_row(id: String) -> Control:
+        var sz: Dictionary = SIZES[id]
+        var owned := Box.item_owned(game_id, "size", id) or int(sz["price"]) == 0
+        var on := size_id == id
+        var head := Arc.label("%s%s - %s" % [sz["name"], "  (ON)" if on else "",
+                        sz["desc"]], 19,
+                        Color("58c470") if on else Arc.INK, false)
+        head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        head.custom_minimum_size = Vector2(560, 0)
+        head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 2)
+        v.add_child(head)
+        if on:
+                return v
+        if owned:
+                v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
+                                Color("4a5ab8"), func():
+                                                Box.equip_item(game_id, "size", id)
+                                                Jukebox.sfx("confirm", -4.0)
+                                                _apply_size(id)
+                                                _options_open()))
+                return v
+        var b := Arc.coin_button("BUY  %d" % int(sz["price"]),
+                        Vector2(560, 56), 22, Color("4a5ab8"), func():
+                                        if Box.buy_item(game_id, "size", id, int(sz["price"])):
+                                                Jukebox.sfx("buy")
+                                                _apply_size(id)
+                                        _options_open())
+        if Box.coins() < int(sz["price"]):
+                b.disabled = true
+        v.add_child(b)
+        return v
+
+func _options_pair_down() -> void:
+        for n in _options_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _options_pair = []
+
+func _options_close() -> void:
+        _options_pair_down()

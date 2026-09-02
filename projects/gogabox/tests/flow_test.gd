@@ -16,7 +16,7 @@ func _ready() -> void:
         fails += _test("windows: hour math", _t_windows())
         fails += _test("meta: registry metadata sane", _t_meta())
         fails += _test("registry: entries sane", _t_registry())
-        fails += _test("xo: ladder AI sanity", _t_xo_ai())
+        fails += _test("xo: sketch CPU sanity", _t_xo_ai())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -367,6 +367,23 @@ func _t_registry() -> int:
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
                 "MELTING: a real price and the x1.5 growth cap")
+        # v0.2.8: 2048's verdict round + XO's sketch remake in the registry
+        var mg: Dictionary = GameReg.get_game("merge")
+        ok += _check(String(mg["title"]) == "2048" and int(mg["coin_div"]) == 20,
+                "2048 keeps its /20 (the 4x4 default)")
+        var MO := load("res://game/games/merge/merge2048.gd")
+        ok += _check(MO.SIZES.size() == 3, "2048 sells three board sizes")
+        ok += _check(int(MO.SIZES["6"]["price"]) >= 1000 \
+                        and int(MO.SIZES["6"]["div"]) == 80,
+                "6 x 6 is a real purchase and pays /80 (owner)")
+        ok += _check(int(MO.SIZES["8"]["price"]) >= 2000 \
+                        and int(MO.SIZES["8"]["div"]) == 160,
+                "8 x 8 is a real purchase and pays /160 (owner)")
+        var xg: Dictionary = GameReg.get_game("xo")
+        ok += _check(String(xg["title"]) == "XO",
+                "the ladder word is GONE - the game is just XO (owner)")
+        ok += _check(int(xg["coin_div"]) == 2, "xo score bonus / 2 (owner)")
+        ok += _check(xg["ach"].size() == 3, "xo wears three fresh achievements")
         var geo: Dictionary = GameReg.get_game("geometry")
         ok += _check(bool(geo.get("coming_soon", false)) \
                         and int(geo["reveal"]["appear_after"]) == 0,
@@ -388,11 +405,13 @@ func _t_registry() -> int:
                 "snake auto orientation (mode chosen at load)")
         return ok
 
-# ------------------------------------------------------------------ xo AI
+# ------------------------------------------------------------------ xo CPU
 
-## v0.1.7: XO Ladder ships with a real opponent - drive its pure AI core
-## directly (no scene needed) and pin the ladder's promises: the top rung
-## is perfect, the bottom is beatable.
+## v0.2.8: XO is the SKETCH REMAKE - one adaptive opponent, four profiles,
+## a 2-round memory. Drive its pure CPU core directly (no scene needed)
+## and pin the owner's promises: it takes wins, blocks threats, it is hard
+## to beat but NOT perfect, it never repeats a burned reply to the same
+## opening, and the memory forgets after 2 rounds.
 func _t_xo_ai() -> int:
         var xo: GDScript = load("res://game/games/xo/xo.gd")
         var ok := 0
@@ -408,50 +427,78 @@ func _t_xo_ai() -> int:
         ok += _check(int(xo.winner_of([1, 2, 2, 2, 1, 0, 0, 0, 1])) == 1,
                 "winner_of: X diagonal")
         var rng := RandomNumberGenerator.new()
-        # the top of the ladder takes wins and blocks threats
-        rng.seed = 7
-        ok += _check(int(xo.ai_pick([2, 2, 0, 1, 1, 0, 0, 0, 0], 10, rng)) == 2,
-                "rung 10 takes the immediate win")
-        rng.seed = 8
-        ok += _check(int(xo.ai_pick([1, 1, 0, 2, 0, 0, 0, 2, 0], 10, rng)) == 2,
-                "rung 10 blocks the X row")
-        rng.seed = 9
-        var reply: int = xo.ai_pick([0, 0, 0, 0, 1, 0, 0, 0, 0], 10, rng)
-        ok += _check(reply == 0 or reply == 2 or reply == 6 or reply == 8,
-                "rung 10 answers a center opening with a corner (got %d)" % reply)
-        # perfect vs perfect (the machine plays BOTH sides via ai_pick):
-        # X's turn asks the swapped board (ai_pick plays bb-O = real X),
-        # O's turn asks the raw board (ai_pick plays real O). Result: the
-        # top of the ladder NEVER loses.
-        for g in range(3):
-                rng.seed = 100 + g
+        var profs: Array = xo.PROFILES.keys()
+        ok += _check(profs.size() == 4, "four profiles (the owner's law)")
+        # it takes the immediate win and blocks the threat (every profile)
+        for pr in profs:
+                rng.seed = 7
+                ok += _check(int(xo.cpu_pick([2, 2, 0, 1, 1, 0, 0, 0, 0], pr,
+                                [], rng)) == 2,
+                                "%s takes the immediate win" % pr)
+                rng.seed = 8
+                ok += _check(int(xo.cpu_pick([1, 1, 0, 2, 0, 0, 0, 2, 0], pr,
+                                [], rng)) == 2,
+                                "%s blocks the X row" % pr)
+        # it NEVER answers a center opening with the burned reply
+        var mem := []
+        mem = xo.remember(mem, {"open": 4, "reply": 0, "result": 1, "fork": false})
+        mem = xo.remember(mem, {"open": 4, "reply": 0, "result": 1, "fork": false})
+        var flags: Dictionary = xo.adapt(mem)
+        ok += _check(int(flags["burned"]) == 0,
+                "the repeated opening burned the losing reply")
+        ok += _check(bool(flags["forkry"]) == false, "no fork in memory")
+        var bad := 0
+        for s in range(40):
+                rng.seed = 500 + s
+                if int(xo.cpu_pick([0, 0, 0, 0, 1, 0, 0, 0, 0], "sage", mem,
+                                rng)) == 0:
+                        bad += 1
+        ok += _check(bad == 0,
+                "the burned reply NEVER repeats (0 picked it in 40 seeds)")
+        # the fork memory wakes the watch: a player fork marks the record
+        mem = []
+        mem = xo.remember(mem, {"open": 0, "reply": 8, "result": 1, "fork": true})
+        ok += _check(bool(xo.adapt(mem)["forkry"]), "a forked round wakes the watch")
+        mem = xo.remember(mem, {"open": 3, "reply": 1, "result": 3, "fork": false})
+        mem = xo.remember(mem, {"open": 8, "reply": 2, "result": 2, "fork": false})
+        ok += _check(mem.size() == 2, "the memory holds ONLY 2 rounds")
+        ok += _check(int(mem[0]["open"]) == 3, "the memory forgot the OLDEST round")
+        ok += _check(bool(xo.adapt(mem)["forkry"]) == false,
+                "the fork memory EXPIRED (2-round law)")
+        # the balance law: hard to beat, never perfect (vs a random player)
+        var wins := 0
+        var losses := 0
+        var games := 120
+        for g in range(games):
+                rng.seed = 9000 + g
                 var b := [0, 0, 0, 0, 0, 0, 0, 0, 0]
-                var mover: int = xo.X
-                var ended := ""
+                var pr: String = profs[g % profs.size()]
+                var mover := 1 if g % 2 == 0 else 2   # openers alternate
+                var res := 0
                 for step in range(9):
-                        var ask: Array = b.duplicate()
-                        if mover == xo.X:
-                                ask = []
-                                for v in b:
-                                        ask.append(0 if int(v) == 0 else 3 - int(v))
-                        var mv: int = xo.ai_pick(ask, 10, rng)
-                        if mv < 0:
-                                break
-                        b[mv] = mover
+                        if mover == 1:
+                                var es: Array = xo.empty_cells(b)
+                                b[es[rng.randi() % es.size()]] = 1
+                        else:
+                                var mv: int = xo.cpu_pick(b, pr, [], rng)
+                                if mv < 0:
+                                        break
+                                b[mv] = 2
                         var w: int = xo.winner_of(b)
                         if w != 0:
-                                ended = "draw" if w == 3 else "winner %d" % w
+                                res = w
                                 break
-                        mover = xo.O if mover == xo.X else xo.X
-                ok += _check(ended == "draw",
-                        "perfect-vs-perfect game %d is a draw (%s)" % [g, ended])
-        # the bottom of the ladder is beatable: rung 1 often misses the block
-        var misses := 0
-        for s in range(40):
-                rng.seed = 1000 + s
-                if int(xo.ai_pick([1, 1, 0, 0, 2, 0, 0, 0, 0], 1, rng)) != 2:
-                        misses += 1
-        ok += _check(misses > 0, "rung 1 is beatable (missed the block %d/40)" % misses)
+                        mover = 2 if mover == 1 else 1
+                if res == 2:
+                        wins += 1
+                elif res == 1:
+                        losses += 1
+        var wr := float(wins) / float(games)
+        var lr := float(losses) / float(games)
+        ok += _check(wr > 0.45 and wr < 0.95,
+                "the CPU wins most vs random but NOT always (%.0f%%)" % [wr * 100.0])
+        ok += _check(lr < 0.2,
+                "the CPU rarely LOSES vs random (%.0f%%, owner: good enough to not lose)" % [lr * 100.0])
         return ok
 
 # ------------------------------------------------------------------ roadmap

@@ -230,7 +230,7 @@ func _on_finish(final_score: int, earned: int) -> void:
         # score counts down, then both lines collapse into one sum line and
         # the chip pops to the full amount. A watched ad later shows its
         # multiplier and rolls the chip up to the doubled total.
-        var div := int(game_def.get("coin_div", 100))
+        var div := _live_div()
         var earn_row := Arc.chip("+0 GOGACoins", "res://assets/ui/coin.png",
                         Color(0, 0, 0, 0.08), 30, Color("8a5a14"))
         var cc := HBoxContainer.new()
@@ -470,6 +470,17 @@ func _reward_retry_countdown(b: Button) -> void:
                 else:
                         b.text = "RETRY IN %ds" % left[0])
 
+## v0.2.8: the LIVE bonus divider - the registry coin_div by default, but
+## a game with mode-dependent math (2048 board sizes) overrides it through
+## the modular bonus_div_override var. ONE helper so the dead menu's
+## theatre, the honest-math line and the payout all agree.
+func _live_div() -> int:
+        var div := int(game_def.get("coin_div", 100))
+        if game != null and is_instance_valid(game) \
+                        and int(game.bonus_div_override) > 0:
+                div = int(game.bonus_div_override)
+        return div
+
 func _score_to_coins(s: int) -> int:
         # MODULAR per game (registry "coin_div"): score / divider, and BELOW the
         # divider a run earns nothing ("easy 500-score game -> /100" style).
@@ -479,7 +490,7 @@ func _score_to_coins(s: int) -> int:
         # score_bonus_enabled flag (snake PEACE style gives the bonus up).
         if game != null and is_instance_valid(game) and not game.score_bonus_enabled:
                 return 0
-        var div := int(game_def.get("coin_div", 100))
+        var div := _live_div()
         if div <= 0 or s < div:
                 return 0
         return s / div

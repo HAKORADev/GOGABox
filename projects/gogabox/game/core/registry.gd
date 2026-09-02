@@ -223,12 +223,13 @@ const GAMES := [
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "daily_rounds": 8,   # v0.1.4: 8 rounds a day
-                "desc": "The classic brain cooker, rebuilt: a big centered board on a cool slate, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. Three themes: Classic, Minecraft and a Deep Sea whose tiles hold real water.",
+                "desc": "The classic brain cooker, rebuilt: a big centered board on warm paper, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. The OPTIONS sell bigger boards (6x6 and 8x8) and three themes: Classic, Minecraft and a Deep Sea whose water answers every real move.",
                 "controls": [
                         "swipe the finger in ANY direction - every tile slides that way, equal tiles merge and double",
                         "each successful fusion is worth exactly +1 score",
                         "after every 15 fusions a GOGACoin grows in an empty cell - slide any tile INTO it to collect (a tile that lands there takes it, even mid-merge)",
-                        "the SHOP sells themes: Minecraft (block tiles, lava-glow numbers, stone + lava sounds) and Deep Sea (glass cells with real sloshing water - the higher the tile, the more water it holds)",
+                        "the OPTIONS sell the bigger boards: 6 x 6 (bonus /80) and 8 x 8 (bonus /160) - bought once, switching starts a fresh board",
+                        "the SHOP sells themes: Minecraft (block tiles, lava-glow numbers, stone + lava sounds) and Deep Sea (glass cells with real water - it moves ONLY when the tile really moves)",
                         "big tiles pulse the board gold; reach 2048 and the run keeps going",
                         "the run ends when no move is left - plan the corners",
                 ],
@@ -259,21 +260,30 @@ const GAMES := [
                 ],
         },
         {
-                "id": "xo", "title": "XO Ladder", "tag": "climb the machine",
+                # v0.2.8 THE SKETCH REMAKE (the owner: "rename it to just XO
+                # without the word ladder and remake it"). No ladder, no cash
+                # out, no difficulty menu - one adaptive sketch opponent.
+                "id": "xo", "title": "XO", "tag": "sketch showdown",
                 "script": "res://game/games/xo/xo.gd",
                 "thumb": "res://assets/thumbs/xo.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 150, "price": 450, "fee": 10, "shop": false,
+                "coin_div": 2, "price": 450, "fee": 10, "shop": false,
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
-                "desc": "Tic-tac-toe against a climbing AI ladder. Ten rungs from sloppy to perfect - win to climb, lose and you slip. Cash out any time.",
-                "controls": ["tap a cell to place your X", "win to climb one rung, lose and you slip one", "rung 10 never loses - how far can you get?", "CASH OUT banks the run and keeps your rung"],
+                "desc": "Sketchbook tic-tac-toe: paper, ink and one adaptive opponent. It wears four profiles (The Wall, The Trickster, The Rusher, The Sage), remembers your last two rounds and stops falling for your patterns. Every win pays +1, every loss costs -1, a GOGACoin lands on the board after every 3 rounds - mark its cell first to take it.",
+                "controls": [
+                        "tap a cell to draw your X - the red pencil",
+                        "win = +1 score, loss = -1, draw = 0 (run bonus /2)",
+                        "the CPU is hard to beat but never perfect - it adapts to your patterns for 2 rounds, then forgets",
+                        "after every 3 rounds a GOGACoin grows in an empty cell - mark that cell FIRST and it is yours (the CPU can take it too)",
+                        "the bank is in the pause sheet: END ends the run and pays",
+                ],
                 "genres": {"main": ["strategy", "puzzle"], "sub": ["turnbased", "competitive", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
-                        {"id": "rung_5", "title": "Halfway Up", "desc": "Reach rung 5"},
-                        {"id": "rung_top", "title": "Ladder Legend", "desc": "Reach rung 10"},
-                        {"id": "streak_3", "title": "On Fire", "desc": "Win 3 in a row"},
+                        {"id": "wins_10", "title": "Pencil Pusher", "desc": "Win 10 rounds"},
+                        {"id": "wins_40", "title": "Sketch Master", "desc": "Win 40 rounds"},
+                        {"id": "streak_5", "title": "Unstoppable", "desc": "Win 5 rounds in a row"},
                 ],
         },
 

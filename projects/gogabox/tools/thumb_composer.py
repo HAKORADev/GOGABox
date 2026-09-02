@@ -549,9 +549,12 @@ def scene_hopper(spec=HOPPER_SPEC):
 
 # ------------------------------------------------------------------- merge
 
-# The v0.2.7 REBUILD look: the big centered board on the DEEP COOL SLATE
-# (the owner: "background cool color matches the grid one"), a real
-# GOGACoin grown in an empty cell, the +1 fusion pop. None = empty cell.
+# The v0.2.8 look: the big centered board on the WARM PAPER (the owner:
+# "the classic theme background is blue... for classic, make the background
+# really suitable" - the deep blue belongs to Deep Sea alone). The old
+# "+1" pop is GONE - its Kenney "1" glyph read as "41" on an empty square
+# (the owner: "an empty square has number 41 which is weird"). None =
+# empty cell.
 MERGE_SPEC = dict(
     grid=[
         ["1024", "512", "256", "128"],
@@ -560,14 +563,13 @@ MERGE_SPEC = dict(
         ["2", None, None, "4"],
     ],
     coin_cell=(1, 3),             # the empty cell wearing the GOGACoin
-    plus_at=(2, 2),               # the +1 pop floats over the empty hole
     colors={"2": "efe6d8", "4": "edd9b0", "8": "f2b179", "16": "f59563",
             "32": "f67c5f", "64": "f65e3b", "128": "edcf72", "256": "edcc61",
             "512": "edc22e", "1024": "edc850"},
     light_ink={"efe6d8", "edd9b0", "edcf72", "edcc61", "edc850", "edc22e"},
     tile=138, gap=12,
     hero="1024",                  # the tile that gets the glow
-    bg_top=(43, 51, 80), bg_bottom=(33, 40, 62),
+    bg_top=(250, 248, 239), bg_bottom=(233, 222, 202),
 )
 
 
@@ -580,9 +582,11 @@ def scene_merge(spec=MERGE_SPEC):
     bw = cols * t + (cols + 1) * g
     bh = rows * t + (rows + 1) * g
     bx, by = (W - bw) // 2, (H - bh) // 2 + 10
-    # the frame (warm gray, reads against the cool slate)
+    # the soft warm halo behind the board (the paper breathes)
+    sc.glow(W // 2, H // 2, int(bw * 0.78), (255, 252, 240), 60)
+    # the frame (the classic warm brown, reads on the cream paper)
     sc.rect([bx - 10, by - 10, bx + bw + 10, by + bh + 10], r=22,
-            fill=(150, 136, 122))
+            fill=(185, 169, 154))
     for r_i, row in enumerate(grid):
         for c_i, label in enumerate(row):
             x = bx + g + c_i * (t + g)
@@ -614,13 +618,7 @@ def scene_merge(spec=MERGE_SPEC):
             ink = INK if color in spec["light_ink"] else (255, 255, 255)
             fd.text((x + (t - bb[2] + bb[0]) / 2, y + (t - bb[3] + bb[1]) / 2),
                     label, font=f, fill=ink)
-    # the +1 fusion pop (the v0.2.7 scoring law made visible) - it floats
-    # over the empty hole like it JUST merged there
-    px, py = spec["plus_at"]
-    fx = bx + g + px * (t + g) + t / 2
-    fy = by + g + py * (t + g) + t / 2
-    sc.text("+1", int(t * 0.30), int(fx), int(fy - t * 0.10), fill=(255, 255, 255))
-    sc.vignette(84)
+    sc.vignette(64)
     return sc.render()
 
 
@@ -690,68 +688,112 @@ def scene_dario(spec=DARIO_SPEC):
 
 # ---------------------------------------------------------------------- xo
 
+# The v0.2.8 SKETCH REMAKE look (the owner: "rename it to just XO without
+# the word ladder and remake it" + his xo html): the sketchbook page, the
+# white board with the hard ink offset shadow, the red X vs the blue O,
+# the amber winning strike, and the GOGACoin waiting in an empty cell
+# (the per-3-rounds coin race). NO ladder - the ladder is gone.
 XO_SPEC = dict(
-    board_c=(0.66, 0.50),         # board center (fractions)
-    cell=150,                     # px per cell
-    lines=((0, 0), (1, 0), (2, 0)),   # X's near-win row (the drama)
-    os=((1, 1), (2, 2), (0, 2)),      # O's blocks
-    next_mark=(2, 0),             # the empty cell X is about to take
-    ladder=(0.13, 10, 6),         # (fx, rungs, marker position 1-based)
+    board_c=(0.52, 0.52),         # board center (fractions)
+    cell=172,                     # px per cell
+    xs=((0, 0), (1, 0), (2, 0)),      # X's winning row (a real 5-move game)
+    os=((1, 1), (0, 2)),              # O's two replies
+    win_line=((0, 0), (2, 0)),    # the amber strike (the drama)
+    coin_cell=(2, 2),             # the GOGACoin waiting in an empty cell
 )
 
 
 def scene_xo(spec=XO_SPEC):
     sc = Scene()
-    sc.backdrop((38, 30, 64), (24, 18, 44))
+    # the sketchbook page (warm paper, the faint ruled lines)
+    sc.backdrop((250, 249, 246), (238, 234, 226))
+    dr = ImageDraw.Draw(sc.work)
+    for y in range(40, H, 46):
+        dr.line([(0, y), (W, y)], fill=(0, 0, 0, 9), width=2)
+    dr.line([(34, 0), (34, H)], fill=(217, 90, 90, 24), width=3)
     bcx, bcy = spec["board_c"][0] * W, spec["board_c"][1] * H
     cell = spec["cell"]
     half = cell * 1.5
-    # board plate
-    sc.rect([bcx - half - 26, bcy - half - 26, bcx + half + 26, bcy + half + 26],
-            r=26, fill=(52, 42, 86))
-    for i in (1, 2):   # grid lines
-        off = -half + i * cell
-        sc.line([(bcx + off, bcy - half + 8), (bcx + off, bcy + half - 8)],
-                (210, 200, 240, 90), width=10)
-        sc.line([(bcx - half + 8, bcy + off), (bcx + half - 8, bcy + off)],
-                (210, 200, 240, 90), width=10)
 
     def cc(cxy):
         return (bcx - half + cxy[0] * cell + cell / 2,
                 bcy - half + cxy[1] * cell + cell / 2)
 
-    def cross(x, y, r, col, width):
-        sc.line([(x - r, y - r), (x + r, y + r)], col, width)
-        sc.line([(x - r, y + r), (x + r, y - r)], col, width)
+    def rough_line(p0, p1, width, col, seed):
+        # a hand-drawn stroke: wobble perpendicular, round joints
+        rr = __import__("random").Random(seed)
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        ln = max(1.0, (dx * dx + dy * dy) ** 0.5)
+        ux, uy = dx / ln, dy / ln
+        px, py = -uy, ux
+        pts = []
+        for k in range(8):
+            f = k / 7.0
+            w = (rr.uniform(-1, 1)) * 3.0
+            pts.append((p0[0] + dx * f + px * w, p0[1] + dy * f + py * w))
+        dr.line(pts, fill=col, width=width, joint="curve")
 
-    def ring(x, y, r, col, width):
-        sc.ellipse([x - r, y - r, x + r, y + r], outline=col, width=width)
-
-    XCOL, OCOL = (255, 138, 60), (120, 220, 180)
-    # the near-win X row glows; the winning tap pulses
-    for cxy in spec["lines"]:
+    def cross(cxy, col, dark, r, seed, width=17):
         x, y = cc(cxy)
-        hot = cxy == tuple(spec["next_mark"])
-        if hot:
-            sc.glow(x, y, cell * 0.75, (255, 138, 60), 95)
-        cross(x, y, cell * 0.30, XCOL + ((255,) if not hot else (255,)), 16)
+        rough_line((x - r + 4, y - r + 4), (x + r + 4, y + r + 4), width,
+                   dark + (210,), seed)
+        rough_line((x - r, y - r), (x + r, y + r), width, col + (255,), seed + 1)
+        rough_line((x - r + 4, y + r + 4), (x + r + 4, y - r + 4), width,
+                   dark + (210,), seed + 2)
+        rough_line((x - r, y + r), (x + r, y - r), width, col + (255,), seed + 3)
+
+    def ring(cxy, col, dark, r, seed, width=17):
+        x, y = cc(cxy)
+        rr = __import__("random").Random(seed)
+        a0 = rr.uniform(0, 6.28)
+        for rad, ccol in ((r + 4, dark + (210,)), (r, col + (255,))):
+            pts = []
+            for k in range(27):
+                ang = a0 + 6.283 * k / 26.0
+                wob = rr.uniform(-1, 1) * 2.6
+                pts.append((x + math.cos(ang) * (rad + wob),
+                            y + math.sin(ang) * (rad + wob)))
+            dr.line(pts, fill=ccol, width=width, joint="curve")
+
+    # the board plate: white, ink rim, hard offset shadow (the html look)
+    pad = 26
+    sc.rect([bcx - half - pad + 7, bcy - half - pad + 7,
+             bcx + half + pad + 7, bcy + half + pad + 7], r=22,
+            fill=(26, 26, 26))
+    sc.rect([bcx - half - pad, bcy - half - pad,
+             bcx + half + pad, bcy + half + pad], r=22, fill=(255, 255, 255))
+    sc.rect([bcx - half - pad, bcy - half - pad,
+             bcx + half + pad, bcy + half + pad], r=22,
+            outline=(26, 26, 26), width=5)
+    # the four wobbly grid strokes
+    for k in (1, 2):
+        off = -half + k * cell
+        rough_line((bcx + off, bcy - half + 8), (bcx + off, bcy + half - 8),
+                   7, (26, 26, 26, 205), 40 + k)
+        rough_line((bcx - half + 8, bcy + off), (bcx + half - 8, bcy + off),
+                   7, (26, 26, 26, 205), 50 + k)
+    XCOL, XDARK = (239, 68, 68), (153, 27, 27)
+    OCOL, ODARK = (59, 130, 246), (30, 64, 175)
+    # the amber winners glow behind the strike row
+    wl = spec["win_line"]
+    for cxy in wl:
+        x, y = cc(cxy)
+        sc.glow(x, y, int(cell * 0.72), (245, 158, 11), 80)
+    for cxy in spec["xs"]:
+        cross(cxy, XCOL, XDARK, int(cell * 0.29), hash(cxy) % 997)
     for cxy in spec["os"]:
-        x, y = cc(cxy)
-        ring(x, y, cell * 0.30, OCOL + (255,), 16)
-    # the ladder (the game's identity): rungs + the climbing marker
-    lfx, rungs, marker = spec["ladder"]
-    lx = lfx * W
-    top, bot = H * 0.16, H * 0.84
-    for i in range(rungs):
-        y = bot - i * (bot - top) / (rungs - 1)
-        w = 120 if i % 2 == 0 else 96
-        on = (i + 1) <= marker
-        sc.rect([lx - w / 2, y - 9, lx + w / 2, y + 9], r=8,
-                fill=(150, 130, 210) if on else (72, 62, 110))
-    my = bot - (marker - 1) * (bot - top) / (rungs - 1)
-    sc.glow(lx, my, 52, (255, 176, 32), 120)
-    cross(lx, my, 26, (255, 176, 32, 255), 14)
-    sc.vignette(90)
+        ring(cxy, OCOL, ODARK, int(cell * 0.29), hash(cxy) % 997 + 13)
+    # the amber strike across the winning row (the marker swipe)
+    x0, y0 = cc(wl[0])
+    x1, y1 = cc(wl[1])
+    rough_line((x0 - cell * 0.22, y0), (x1 + cell * 0.22, y1), 13,
+               (245, 158, 11, 235), 77)
+    # the GOGACoin waiting in an empty cell (the coin race)
+    cx, cy = cc(spec["coin_cell"])
+    sc.glow(cx, cy, int(cell * 0.6), (255, 210, 70), 95)
+    coin = load_sprite("ui/coin.png", int(cell * 0.56))
+    sc.stamp(coin, cx, cy)
+    sc.vignette(56)
     return sc.render()
 
 
