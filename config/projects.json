@@ -9,8 +9,8 @@
    "ci_auto": true,
    "apk_name": "GOGABox",
    "package": "hakora.dev.gogabox",
-   "version_name": "0.2.6",
-   "version_code_base": 30350,
+   "version_name": "0.2.7",
+   "version_code_base": 30360,
    "aab": false,
    "abi_presets": {
     "arm64-v8a": "Android arm64",

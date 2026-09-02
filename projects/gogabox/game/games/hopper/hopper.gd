@@ -36,6 +36,48 @@ extends GogaGame
 ##     calm gradient + a SMALL corner sun + drifting clouds; night is a
 ##     deep gradient + a small crescent moon + star-like lights (shader
 ##     dust + glints) + drifting night sparks (particles).
+##   - v0.2.7 THE VISIBILITY ROUND (the owner played it and the pickups were
+##     GHOSTS): coins and powerup pickups were NEVER DRAWN - the arrays fed
+##     collection logic only, so the owner "magically collected" invisible
+##     coins. Both wear the snake law now (the REAL coin.png asset) with a
+##     fade-in (the owner: "appear like the other games, but with fade
+##     effect so it feels smooth"), a glow halo, and a bob.
+##   - v0.2.7 POWERUP SPAWNS: next_pick_idx was born 0 and the old
+##     `next_idx > 4` guard skipped the branch at idx 0..4, so the match
+##     `next_idx == next_pick_idx` could NEVER fire again - not one powerup
+##     could ever spawn in any run, ever. The owner's law now: one RANDOM
+##     powerup every 20-40 platforms counted from the LAST SPAWNED
+##     (on-screen) powerup, not the last collected.
+##   - v0.2.7 BANNER: the v0.2.6 "no banner in the tower" law is REVERSED by
+##     the owner - the tower wears the banner like every other game, and the
+##     fall-death line insets above the strip.
+##   - v0.2.7 THE EMPTY WIDGET: the melt chip sat between the speed chip and
+##     the coins chip FOREVER EMPTY (it was built unconditionally). It hides
+##     itself while MELTING is off; the powerup widget moved top-LEFT next
+##     to the score (the owner: "make it to the left next to score").
+##   - v0.2.7 THE BREAK: the vanish crack was three static lines. Now the
+##     cracks are jagged, deterministic per platform, they LENGTHEN and
+##     WIDEN with the grace clock, chips pop off while it cracks, and the
+##     platform SHATTERS into physical chunks (gravity + spin + fade, sized
+##     by the platform's own width).
+##   - v0.2.7 BLINK SNOW: the cap stashes itself when the platform goes
+##     invisible and comes back with it - snow appears and disappears WITH
+##     the platform (the owner's own fix).
+##   - v0.2.7 THE SHARD MATH FIX: the old settle target (+-1.094 rad) put a
+##     SIDE ON TOP - the triangle "rested" balancing on one corner, hoisted
+##     by the support law (the owner: "it's not landing on its sides"). The
+##     true edge-down stance is +-(pi - phi), phi = atan2(edge_h, edge_w)
+##     = 2.0471 rad; the tumble pivots over the ACTUAL lowest vertex.
+##   - v0.2.7 TWO NEW PLATFORM KINDS (the owner's challenge picks):
+##     SIZE platforms (30+) breathe wide<->small smoothly, and DROPPER
+##     platforms (50+) drop out of the screen when you land on them, wait,
+##     then rise back. The reliability law covers both (dropper is
+##     unreliable; size is solid).
+##   - v0.2.7 THE RAMP (owner: "after 25 platforms start making jumps wider
+##     so there is real challenge and timing"): past platform 25 the gaps
+##     ramp toward the character's REAL jump ceiling and the horizontal
+##     spread widens under a descending-branch reach law (the time a rising
+##     jump crosses a higher platform on the way DOWN).
 ##   - GOGACoins hang in the air: one every 5-25 platforms counted from
 ##     the last coin ON SCREEN (not the last collected - coins can fall
 ##     off the bottom for real here); the FIRST coin waits 5-25 platforms
@@ -76,7 +118,13 @@ const AXIS_DEAD := 12.0              # px (x U) - the dead point at the anchor
 const AXIS_FULL := 110.0             # px (x U) - full deflection = full force
 
 # ---------------- REAL TUMBLING (v0.2.6: a side FALLS, no look-snaps) -----
-const SHARD_SETTLE_ANG := 1.094      # rad - the shard's edge-down tilt
+## v0.2.7 THE SHARD MATH FIX: the shard's verts are (0,-1.06R),
+## (+-0.95R, 0.78R) - each slanted side makes phi = atan2(1.84, 0.95) =
+## 1.0945 rad with the horizontal. The OLD settle target was phi itself,
+## which lays that side on TOP (the triangle balanced on a corner - the
+## owner's "not landing on its sides"). Resting ON the side needs the side
+## FLAT ON THE GROUND: rotation = +-(pi - phi) = +-2.0471 rad.
+const SHARD_SETTLE_ANG := 2.0474022  # rad - the TRUE edge-down stance (pi - atan2(1.84,0.95), exact)
 const SETTLE_RATE := 10.0            # the ease rate to the flat face (1/s)
 
 # ---------------- the slide-up law ----------------------------------------
@@ -96,20 +144,43 @@ const START_W := 320.0               # the wide start platform (PGB law)
 
 ## PGB v1.3.8 TYPE WEIGHTS + THE RELIABILITY LAW: after an unreliable type
 ## the next platform is ALWAYS reliable. Weights shift with score (static
-## decays) but the law never bends.
-const PTYPES := {"static": 40, "moving": 25, "blinking": 15, "vanish": 10, "mb": 10}
-const RELIABLE := ["static", "moving"]
+## decays) but the law never bends. v0.2.7: "size" (30+) is solid and joins
+## the RELIABLE set; "dropper" (50+) betrays you when you land and is
+## UNRELIABLE (the next platform is always safe).
+const PTYPES := {"static": 40, "moving": 25, "blinking": 15, "vanish": 10, "mb": 10,
+                "size": 11, "dropper": 9}
+const RELIABLE := ["static", "moving", "size"]
 const MOVE_SPD_MIN := 55.0
 const MOVE_SPD_MAX := 115.0
 const BLINK_PERIOD := 1.1            # s, visible<->ghost
 const VANISH_GRACE := 0.55           # s standing on it before it drops
 const VANISH_RESPAWN := 2.2          # s until it returns
 
+# ---------------- v0.2.7 the two NEW kinds (the owner's challenge) --------
+const SIZE_AT := 30                  # size platforms join at platform 30
+const SIZE_MIN_F := 0.55             # the width breathes 0.55x .. 1.30x
+const SIZE_MAX_F := 1.30
+const SIZE_PERIOD := 3.4             # s per full wide<->small cycle
+const DROP_AT := 50                  # dropper platforms join at platform 50
+const DROP_ACCEL := 1500.0           # px/s^2 (x U) once triggered
+const DROP_MAX := 920.0              # px/s (x U) terminal drop speed
+const DROP_WAIT := 2.4               # s below the screen before it returns
+const DROP_RISE := 300.0             # px/s (x U) return speed
+
+# ---------------- v0.2.7 the difficulty ramp (owner: 25+) -----------------
+const DIFF_AT := 25                  # past this platform the jumps widen
+const DIFF_RAMP := 90                # ...reaching full hardness over 90 more
+const GAP_HARD_MAX := 205.0          # the absolute ceiling (reach-checked)
+
 # ---------------- scoring / coins / pickups --------------------------------
 const COIN_GAP_MIN := 5              # owner: coins every 5-25 platforms...
 const COIN_GAP_MAX := 25             # ...counted from the last coin ON SCREEN
-const PICKUP_GAP_MIN := 8
-const PICKUP_GAP_MAX := 16
+## v0.2.7 THE OWNER'S PICKUP LAW: "spawn one random powerup between 20-40
+## platforms based on last on-screen powerup (not based on collected)" -
+## the counter runs from the last SPAWNED pickup (it may fall off the
+## bottom uncollected), and the first one waits 20-40 platforms up.
+const PICKUP_GAP_MIN := 20
+const PICKUP_GAP_MAX := 40
 
 # ---------------- the four powerups (10s each, owner spec) ----------------
 const PW_TIME := 10.0
@@ -232,6 +303,8 @@ var coins: Array = []                # {x, y, idx, t}
 var next_coin_idx := 0               # spawn a coin on this platform index
 var pickups: Array = []              # {x, y, idx, kind, t}
 var next_pick_idx := 0
+var pick_layer: Node2D               # coins + pickups PAINTED (v0.2.7)
+var _coin_tex: Texture2D             # the REAL GOGACoin (the snake law)
 var flakes: Array = []               # the physical snowfall
 var pw := {"id": "", "t": 0.0}       # the live powerup (10s life)
 
@@ -312,6 +385,16 @@ func _goga_setup() -> void:
         plat_layer.draw.connect(_draw_platforms)
         world.add_child(plat_layer)
 
+        # --- v0.2.7 the pickup PAINTER: coins + powerups were invisible
+        # ghosts (collection logic only, no draw) - the owner played a run
+        # and "magically collected" coins. They paint ABOVE the platforms
+        # and UNDER the player now, coin.png + fade-in + bob.
+        _coin_tex = load("res://assets/ui/coin.png")
+        pick_layer = Node2D.new()
+        pick_layer.z_index = 3
+        pick_layer.draw.connect(_draw_pickups)
+        world.add_child(pick_layer)
+
         # --- coins + pickups live in plain Node2D holders ---
         snow_layer = Node2D.new()
         snow_layer.z_index = 6
@@ -331,6 +414,12 @@ func _goga_setup() -> void:
         _melt_chip = add_hud_chip("")
         if _melt_chip != null:
                 _melt_chip.text = ""
+                # v0.2.7 THE EMPTY WIDGET FIX: the chip sat between the speed
+                # chip and the coins chip FOREVER EMPTY. Its whole panel
+                # hides while MELTING is off (a hidden child takes no slot).
+                var mc_panel := _melt_chip.get_parent().get_parent() as Control
+                if mc_panel != null:
+                        mc_panel.visible = _melt_on()
         set_hud_score_prefix("TOWER")
         set_score(0)
         _day_night()
@@ -407,6 +496,10 @@ func _build_world_start() -> void:
         # 5-25 platforms up - the phantom free coin is dead).
         highest_idx = 0
         next_coin_idx = rng.randi_range(COIN_GAP_MIN, COIN_GAP_MAX)
+        # v0.2.7: the first POWERUP also waits the owner's 20-40 platforms up
+        # (next_pick_idx used to be born 0, which - with the old broken guard
+        # - meant NEVER, and with the new guard would mean platform 1)
+        next_pick_idx = rng.randi_range(PICKUP_GAP_MIN, PICKUP_GAP_MAX)
         _spawn_platform(vp.x / 2.0, vp.y - 160.0 * U, START_W * U, "static")
         # prefill the climb (reachability-checked, reliability-ruled)
         var top := cam_y - vp.y * 0.9
@@ -421,14 +514,32 @@ func _last_top() -> float:
 ## The generator: reachability-checked like the PGB (the new platform must
 ## sit inside the horizontal reach of the previous one under the jump arc),
 ## wall-clamped (owner walls), type = weighted PGB set + the reliability law.
+## v0.2.7 THE RAMP: the first DIFF_AT platforms keep the gentle gaps; past
+## that the gap ramps toward the character's REAL jump ceiling (never past
+## it - every jump stays possible, just demanding) and the horizontal
+## spread widens. The reach law uses the DESCENDING branch: a landing above
+## happens when the rising jump CROSSES the target top while falling,
+## t = (v + sqrt(v^2 - 2 g h)) / g - so wide gaps really demand a full-speed
+## run + a late, well-timed leap (the owner's "real challenge and timing").
 func _gen_platform() -> void:
         var vp := _vp()
         var prev: Dictionary = platforms[platforms.size() - 1]
-        var gap := rng.randf_range(GAP_MIN, GAP_MAX) * U
+        var jump_v := absf(JUMP_V * U * float(_char()["jump"]))
+        var grav := GRAV * U
+        var rise_max := jump_v * jump_v / (2.0 * grav)   # the char's real ceiling (px)
+        var ramp := clampf(float(next_idx - DIFF_AT) / float(DIFF_RAMP), 0.0, 1.0)
+        var gap_cap := minf(GAP_HARD_MAX, 0.82 * rise_max / U)   # px (logical)
+        var gap_hi := lerpf(GAP_MAX, gap_cap, ramp)
+        var gap_lo := lerpf(GAP_MIN, GAP_MIN + maxf(0.0, gap_cap - GAP_MAX) * 0.35, ramp)
+        if gap_hi < gap_lo:
+                gap_hi = gap_lo
+        var gap := rng.randf_range(gap_lo, gap_hi) * U
         var w := rng.randf_range(W_MIN, W_MAX) * U
-        # horizontal reach under the arc: the whole rise time is usable
-        var rise := absf(JUMP_V * _char()["jump"]) / GRAV     # to apex, s
-        var reach := WALK_MAX * rise * 1.15
+        # horizontal reach under the arc (descending-branch crossing time)
+        var h := clampf(gap / U, 10.0, rise_max * 0.98 / U) * U
+        var disc: float = maxf(0.0, jump_v * jump_v - 2.0 * grav * h)
+        var t_cross := (jump_v + sqrt(disc)) / grav
+        var reach := WALK_MAX * U * t_cross * lerpf(0.72, 1.12, ramp)
         var lo: float = maxf(WALL_W * U + w / 2.0 + 4.0 * U, float(prev["x"]) - reach)
         var hi: float = minf(vp.x - WALL_W * U - w / 2.0 - 4.0 * U, float(prev["x"]) + reach)
         if hi < lo:
@@ -444,10 +555,15 @@ func _pick_type() -> String:
                         and not RELIABLE.has(String(platforms[platforms.size() - 1]["type"]))
         if prev_unreliable:
                 return RELIABLE[rng.randi() % RELIABLE.size()]
-        # the weights shift as the tower climbs: static decays, movers grow
+        # the weights shift as the tower climbs: static decays, movers grow;
+        # v0.2.7 the two NEW kinds join at their owner-picked depths
         var shift := minf(20.0, float(score) * 0.35)
         var weights := {"static": maxf(14.0, 40.0 - shift), "moving": 25.0 + shift * 0.4,
                         "blinking": 15.0, "vanish": 10.0, "mb": 10.0}
+        if next_idx >= SIZE_AT:
+                weights["size"] = 11.0
+        if next_idx >= DROP_AT:
+                weights["dropper"] = 9.0
         var total := 0.0
         for k in weights:
                 total += weights[k]
@@ -459,13 +575,20 @@ func _pick_type() -> String:
         return "static"
 
 ## Platform dict + node bookkeeping. All platforms live in ONE painter
-## (plat_layer._draw), so a platform is pure data.
+## (plat_layer._draw), so a platform is pure data. v0.2.7 fields: base_w
+## (size platforms breathe around it), y0 (the dropper's home height),
+## drop_v/drop_state (the dropper), dy (per-frame y motion, the rider rides
+## it like dx).
 func _spawn_platform(x: float, y: float, w: float, ptype: String) -> void:
         var p := {"idx": next_idx, "x": x, "y": y, "w": w, "type": ptype,
                         "snow": 0.0, "visible": true, "clock": 0.0, "ghost": false,
                         "dir": 1.0 if rng.randf() < 0.5 else -1.0,
                         "spd": rng.randf_range(MOVE_SPD_MIN, MOVE_SPD_MAX) * U,
-                        "dx": 0.0}
+                        "dx": 0.0, "dy": 0.0,
+                        "base_w": w, "y0": y,
+                        "drop_v": 0.0, "drop_state": "idle"}
+        if ptype == "size":
+                p["clock"] = rng.randf() * SIZE_PERIOD   # de-phased breathing
         if ptype == "moving" or ptype == "mb":
                 p["spd"] = rng.randf_range(MOVE_SPD_MIN, MOVE_SPD_MAX) * U \
                                 * (1.0 + minf(0.6, float(next_idx) * 0.004))
@@ -477,10 +600,20 @@ func _spawn_platform(x: float, y: float, w: float, ptype: String) -> void:
         if next_idx == next_coin_idx and next_idx > 0:
                 coins.append({"x": x, "y": y - 64.0 * U, "idx": next_idx, "t": 0.0})
                 next_coin_idx = next_idx + rng.randi_range(COIN_GAP_MIN, COIN_GAP_MAX)
-        # powerups: owned kinds only, reliable platforms only, 8-16 apart
-        if next_idx == next_pick_idx and next_idx > 4:
+        # v0.2.7 POWERUPS (the owner's law): one RANDOM powerup every 20-40
+        # platforms counted from the LAST SPAWNED pickup. THE OLD BUG lived
+        # here: next_pick_idx was born 0 and the `next_idx > 4` guard skipped
+        # the branch at idx 0..4, so next_pick_idx stayed 0 FOREVER and
+        # `next_idx == next_pick_idx` never matched again - no run could ever
+        # spawn a single powerup. The counter now advances with >= and the
+        # first pickup waits 20-40 platforms up. Unowned shelves still
+        # advance the counter (a buy mid-run joins the next window).
+        if next_idx >= next_pick_idx and next_idx > 0:
                 var kinds := _owned_pws()
-                if not kinds.is_empty() and RELIABLE.has(ptype):
+                # ANY platform hosts the pickup (the owner's law is the
+                # SPACING - 20-40, no exceptions; a powerup may float over a
+                # breaking ledge, that is a gift, not a bug)
+                if not kinds.is_empty():
                         pickups.append({"x": x, "y": y - 106.0 * U, "idx": next_idx,
                                         "kind": kinds[rng.randi() % kinds.size()], "t": 0.0})
                 next_pick_idx = next_idx + rng.randi_range(PICKUP_GAP_MIN, PICKUP_GAP_MAX)
@@ -627,7 +760,9 @@ func _goga_tick(delta: float) -> void:
         _cull_and_spawn()
 
         # ---- fell below the screen = end of round (owner) ----
-        if py - cam_y > vp.y + 70.0 * U:
+        # v0.2.7: the tower wears the BANNER now - the fall line insets above
+        # the strip so the player is never hidden behind it while dying.
+        if py - cam_y > vp.y - banner_bottom() + 70.0 * U:
                 _die()
 
         _update_clouds(delta)
@@ -636,6 +771,7 @@ func _goga_tick(delta: float) -> void:
 func queue_redraw_all() -> void:
         player.queue_redraw()
         plat_layer.queue_redraw()
+        pick_layer.queue_redraw()
         snow_layer.queue_redraw()
         fx.queue_redraw()
         cloud_layer.queue_redraw()
@@ -649,6 +785,7 @@ func _update_platforms(delta: float) -> void:
         for p in platforms:
                 var vis: bool = bool(p["visible"])
                 var was_x: float = float(p["x"])
+                var was_y: float = float(p["y"])
                 var t := String(p["type"])
                 # NOTE: "mb" does BOTH halves - a match would eat the second one
                 if t == "moving" or t == "mb":
@@ -666,27 +803,117 @@ func _update_platforms(delta: float) -> void:
                                 # a MOVING platform shakes its snow off (v0.2.6:
                                 # the caps are earned, and motion un-earns them)
                                 p["snow"] = maxf(0.0, float(p["snow"]) - SNOW_MOVE_SHED * delta)
+                if t == "size" and vis:
+                        # v0.2.7 THE SIZE PLATFORM (30+): the width breathes
+                        # wide<->small SMOOTHLY (a sine on its own clock), the
+                        # snow cap follows the drawn width automatically. The
+                        # walls stay honest at the widest point.
+                        p["clock"] = float(p["clock"]) + delta
+                        var ph := float(p["clock"]) * TAU / SIZE_PERIOD
+                        var f := SIZE_MIN_F + (SIZE_MAX_F - SIZE_MIN_F) * (0.5 + 0.5 * sin(ph))
+                        var nw: float = minf(float(p["base_w"]) * f,
+                                        vp.x - 2.0 * (WALL_W * U + 3.0 * U))
+                        p["w"] = nw
+                if t == "dropper":
+                        # v0.2.7 THE DROPPER (50+): landing on it triggers a
+                        # DROP - it accelerates down out of the screen, waits,
+                        # then rises back home. The rider rides it down (the
+                        # dy carry below) - jump off in time.
+                        match String(p["drop_state"]):
+                                "down":
+                                        p["drop_v"] = minf(float(p["drop_v"]) + DROP_ACCEL * U * delta, DROP_MAX * U)
+                                        p["y"] += float(p["drop_v"]) * delta
+                                        if float(p["y"]) - cam_y > vp.y + 130.0 * U:
+                                                p["drop_state"] = "wait"
+                                                p["clock"] = 0.0
+                                                p["visible"] = false
+                                "wait":
+                                        p["clock"] = float(p["clock"]) + delta
+                                        if float(p["clock"]) >= DROP_WAIT:
+                                                p["drop_state"] = "up"
+                                                p["visible"] = true
+                                "up":
+                                        p["y"] -= DROP_RISE * U * delta
+                                        if float(p["y"]) <= float(p["y0"]):
+                                                p["y"] = float(p["y0"])
+                                                p["drop_state"] = "idle"
+                                                p["drop_v"] = 0.0
                 if t == "blinking" or t == "mb":
                         p["clock"] = float(p["clock"]) + delta
                         if float(p["clock"]) >= BLINK_PERIOD:
                                 p["clock"] = 0.0
                                 p["visible"] = not vis
-                        if not bool(p["visible"]):
-                                # blink-off: the snow it caught falls through
-                                p["snow"] = maxf(0.0, float(p["snow"]) - SNOW_GHOST_SHED * delta)
+                        # v0.2.7 THE SNOW STASH (the owner's fix): the cap
+                        # disappears and reappears WITH the platform - going
+                        # ghost stashes it, coming back restores it. Nothing
+                        # sheds, nothing floats.
+                        if not bool(p["visible"]) and not p.has("snow_stash"):
+                                p["snow_stash"] = float(p["snow"])
+                                p["snow"] = 0.0
+                        elif bool(p["visible"]) and p.has("snow_stash"):
+                                p["snow"] = float(p["snow_stash"])
+                                p.erase("snow_stash")
                 if t == "vanish" and bool(p["ghost"]):
                         # cracking grace, then gone for VANISH_RESPAWN, then back
                         p["clock"] = float(p["clock"]) + delta
                         if bool(p["visible"]) and float(p["clock"]) >= VANISH_GRACE:
                                 p["visible"] = false
+                                _shatter_platform(p)     # v0.2.7 THE REAL BREAK
                         if float(p["clock"]) >= VANISH_GRACE + VANISH_RESPAWN:
                                 p["ghost"] = false
                                 p["visible"] = true
                                 p["clock"] = 0.0
+                        elif bool(p["visible"]):
+                                # chips pop off WHILE it cracks (dynamic, not static)
+                                if rng.randf() < 9.0 * delta:
+                                        var cw: float = float(p["w"])
+                                        parts.append({"x": float(p["x"]) + rng.randf_range(-cw * 0.45, cw * 0.45),
+                                                        "y": float(p["y"]),
+                                                        "vx": rng.randf_range(-40.0, 40.0) * U,
+                                                        "vy": rng.randf_range(-60.0, 10.0) * U,
+                                                        "life": 0.5, "max": 0.5,
+                                                        "w": rng.randf_range(4.0, 9.0) * U,
+                                                        "h": rng.randf_range(3.0, 6.0) * U,
+                                                        "rot": rng.randf_range(-0.5, 0.5),
+                                                        "vrot": rng.randf_range(-6.0, 6.0),
+                                                        "col": _plat_chip_col(), "kind": "chunk"})
                 p["dx"] = float(p["x"]) - was_x
-        # the rider rides (moving platforms carry the player)
+                p["dy"] = float(p["y"]) - was_y
+        # the rider rides (moving platforms carry the player, droppers drop them)
         if grounded and not ground_plat.is_empty():
                 px += float(ground_plat.get("dx", 0.0))
+                py += float(ground_plat.get("dy", 0.0))
+
+## v0.2.7 THE REAL BREAK: the platform shatters into physical chunks -
+## 4-6+ pieces sized by the platform's OWN width, each with gravity, spin
+## and a fade (the owner: "static and not dynamic based on the platform").
+func _shatter_platform(p: Dictionary) -> void:
+        var w: float = float(p["w"])
+        var n := 4 + int(w / (85.0 * U))
+        for i in n:
+                var cx: float = float(p["x"]) - w * 0.5 + (float(i) + 0.5) * w / float(n)
+                parts.append({"x": cx, "y": float(p["y"]),
+                                "vx": rng.randf_range(-95.0, 95.0) * U,
+                                "vy": rng.randf_range(-200.0, -30.0) * U,
+                                "life": rng.randf_range(0.55, 0.9), "max": 0.9,
+                                "w": w / float(n) * rng.randf_range(0.5, 0.92),
+                                "h": PLAT_H * U * rng.randf_range(0.45, 0.95),
+                                "rot": 0.0, "vrot": rng.randf_range(-8.0, 8.0),
+                                "col": _plat_chip_col(), "kind": "chunk"})
+        Jukebox.sfx("tower_break", -6.0, 1.0 + rng.randf() * 0.1)
+        shake = maxf(shake, 0.4)
+
+## the chip color follows the equipped platform skin (the break belongs to
+## the platform, not to a generic gray)
+func _plat_chip_col() -> Color:
+        match _plat_id():
+                "rock":
+                        return Color("8a93a8")
+                "grass":
+                        return Color("8a6a46")
+                "metal":
+                        return Color("9aa4b2")
+        return Color("c9a86a")   # sand
 
 func _update_landings(delta: float) -> void:
         var vp := _vp()
@@ -739,6 +966,13 @@ func _land(p: Dictionary) -> void:
                         p["clock"] = 0.0
                         p["visible"] = true
                         Jukebox.sfx("tower_crack", -10.0)
+                # v0.2.7 THE DROPPER: landing triggers the drop (the owner:
+                # "they go down when the character lands on them")
+                if String(p["type"]) == "dropper" and String(p["drop_state"]) == "idle":
+                        p["drop_state"] = "down"
+                        p["drop_v"] = 40.0 * U
+                        Jukebox.sfx("tower_crack", -12.0, 0.85)
+                        _fx_poof(Vector2(px, py + _pr() * 0.6), 6, 0.9)
         if int(p["idx"]) > highest_idx:
                 highest_idx = int(p["idx"])
                 add_score(1)
@@ -823,8 +1057,12 @@ func _update_pickables(delta: float) -> void:
 func _cull_and_spawn() -> void:
         var vp := _vp()
         # platforms / coins / pickups below the screen die (their coins may be
-        # gone forever - the spacing already counted them, owner note)
+        # gone forever - the spacing already counted them, owner note).
+        # v0.2.7: a DROPPER mid-cycle is exempt while its HOME is still in
+        # reach - it has to survive its trip below the screen to come back.
         platforms = platforms.filter(func(p):
+                if String(p["type"]) == "dropper" and String(p.get("drop_state", "idle")) != "idle":
+                        return float(p.get("y0", p["y"])) - cam_y < vp.y + 160.0 * U
                 var alive: bool = float(p["y"]) - cam_y < vp.y + 160.0 * U
                 return alive)
         coins = coins.filter(func(c):
@@ -867,7 +1105,7 @@ func _update_spin(delta: float) -> void:
                         else:
                                 spin += (vx * 0.3 / _pr()) * delta
                         player.rotation = spin
-                "square", "shard":
+                "square":
                         # v0.2.6 REAL TUMBLING (the owner: "physical movements
                         # where it flips and the side falls", the cube "flips
                         # 90 degrees yes but for real"): the body pivots over
@@ -877,11 +1115,32 @@ func _update_spin(delta: float) -> void:
                         # falling side RIDES the platform, and when you stop
                         # the body eases onto the nearest flat face and SLAPS
                         # it (a soft thud + a little dust).
-                        var pivot_r: float = _pr() * (1.41 if char_id == "square" else 0.98)
+                        # v0.2.7: the owner confirmed the cube - UNTOUCHED.
+                        var pivot_r: float = _pr() * 1.41
                         if grounded and absf(vx) > 14.0 * U:
                                 tumble_vel = vx / pivot_r
                         else:
                                 # inertia: the spin decays in the air / on stop
+                                tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
+                        tumble_rot += tumble_vel * delta
+                        if grounded and absf(vx) <= 14.0 * U and absf(tumble_vel) < 0.6:
+                                _tumble_settle(delta)
+                        else:
+                                settle_hit = false
+                        player.rotation = tumble_rot
+                "shard":
+                        # v0.2.7 THE SHARD FIX: same tumble language as the
+                        # cube, but the pivot radius is the ACTUAL lowest
+                        # vertex distance (the triangle's three corners are at
+                        # 1.06R and 1.23R - a fixed radius made it skate), and
+                        # the settle targets are the TRUE flat-side stances
+                        # (0 and +-2.0471 rad) - it lands ON its sides now.
+                        var R_l := PLAYER_R * U * char_size
+                        var pv := _lowest_shard_vert(R_l)
+                        var pivot_r: float = maxf(8.0 * U, float(pv["d"]))
+                        if grounded and absf(vx) > 14.0 * U:
+                                tumble_vel = vx / pivot_r
+                        else:
                                 tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
                         tumble_rot += tumble_vel * delta
                         if grounded and absf(vx) <= 14.0 * U and absf(tumble_vel) < 0.6:
@@ -921,6 +1180,27 @@ func _tumble_settle(delta: float) -> void:
 ## lifted so its lowest corner/vertex RIDES the platform while it flips -
 ## this is what makes a side FALL instead of sink through. Pure draw
 ## space: the physics body (px/py) never changes.
+## v0.2.7: the shard's geometry lives in ONE helper (shared by the pivot,
+## the support and the settle math) - the three verts of _draw_player.
+func _shard_verts(R: float) -> Array:
+        return [Vector2(0, -R * 1.06), Vector2(R * 0.95, R * 0.78),
+                        Vector2(-R * 0.95, R * 0.78)]
+
+## which shard vertex points lowest at the current tumble angle - and how
+## far from the body center it sits (the REAL pivot radius, it changes as
+## the triangle rolls over corners of different length)
+func _lowest_shard_vert(R: float) -> Dictionary:
+        var best_v := Vector2.ZERO
+        var best_d := 0.0
+        var best_y := -1e9
+        for v0: Vector2 in _shard_verts(R):
+                var wy: float = v0.x * sin(tumble_rot) + v0.y * cos(tumble_rot)
+                if wy > best_y:
+                        best_y = wy
+                        best_v = v0
+                        best_d = v0.length()
+        return {"v": best_v, "d": best_d, "y": best_y}
+
 func _update_support(_delta: float) -> void:
         if not (char_id == "square" or char_id == "shard"):
                 return
@@ -933,9 +1213,7 @@ func _update_support(_delta: float) -> void:
                 ext = h * (cos(th) + sin(th))
                 ext0 = h
         else:
-                var verts := [Vector2(0, -R * 1.06), Vector2(R * 0.95, R * 0.78),
-                                Vector2(-R * 0.95, R * 0.78)]
-                for v0: Vector2 in verts:
+                for v0: Vector2 in _shard_verts(R):
                         ext = maxf(ext, v0.x * sin(tumble_rot) + v0.y * cos(tumble_rot))
                 ext0 = R * 0.78
         player.position.y = py - (ext - ext0)
@@ -996,7 +1274,8 @@ const SNOW_ON_PLAYER := 0.035      # a flake that hits you sticks by this
 const SHED_ROLL := 0.35            # load/s shed while rolling (x char)
 const SHED_AIR := 0.05             # load/s shed airborne (the wind shakes it)
 const SNOW_MOVE_SHED := 0.12      # cap/s a MOVING platform shakes off
-const SNOW_GHOST_SHED := 0.09      # cap/s lost while blink-off (it falls)
+# (v0.2.7: no ghost-shed any more - blinking platforms STASH their cap and
+# restore it when they come back, the snow appears/disappears WITH them)
 
 func _spawn_snowflake() -> void:
         var vp := _vp()
@@ -1112,6 +1391,13 @@ func _update_fx(delta: float) -> void:
                         p["x"] = float(p["x"]) + float(p["vx"]) * delta
                         p["y"] = float(p["y"]) + float(p["vy"]) * delta
                         p["vy"] = float(p["vy"]) + 900.0 * U * delta
+                elif String(p["kind"]) == "chunk":
+                        # v0.2.7 the physical break chunks: gravity + spin
+                        p["x"] = float(p["x"]) + float(p["vx"]) * delta
+                        p["y"] = float(p["y"]) + float(p["vy"]) * delta
+                        p["vy"] = float(p["vy"]) + 1500.0 * U * delta
+                        p["vx"] = float(p["vx"]) * (1.0 - 0.6 * delta)
+                        p["rot"] = float(p["rot"]) + float(p["vrot"]) * delta
                 if float(p["life"]) <= 0.0:
                         parts.erase(p)
         for p in pops.duplicate():
@@ -1211,13 +1497,45 @@ func _draw_platforms() -> void:
                         plat_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
                         plat_layer.draw_rect(Rect2(left, top - 1.0 * U, w, 2.0 * U),
                                         _pal()["snow"])
-                # cracking preview while a vanish platform dies
+                # v0.2.7 THE CRACK PREVIEW: jagged, deterministic per platform,
+                # each crack a CHAIN of segments that lengthens AND widens with
+                # the grace clock (the old 3 static lines read as decoration)
                 if String(p["type"]) == "vanish" and bool(p["ghost"]) and bool(p["visible"]):
                         var frac: float = clampf(float(p["clock"]) / VANISH_GRACE, 0.0, 1.0)
-                        var mid := Vector2(sx, sy)
-                        for i in 3:
-                                var ang := TAU * (float(i) / 3.0) + _hashf(idx, float(i)) * 2.0
-                                plat_layer.draw_line(mid, mid + Vector2(cos(ang), sin(ang)) * w * 0.24 * frac, Color("3a3028"), 1.4 * U)
+                        var segs := 5
+                        for ci in 3:
+                                var ang := TAU * (float(ci) / 3.0) + _hashf(idx, float(ci)) * 1.7
+                                var dirv := Vector2(cos(ang), sin(ang) * 0.42 + 0.18).normalized()
+                                var cur := Vector2(sx + (_hashf(idx, float(ci) + 11.0) - 0.5) * w * 0.5, sy)
+                                var steps := 1 + int(frac * float(segs))
+                                for si in steps:
+                                        var seg_len: float = w * 0.085 * (0.7 + _hashf(idx, float(ci * 7 + si)) * 0.7)
+                                        var nxt := cur + dirv * seg_len
+                                        nxt.y += (_hashf(idx, float(ci * 5 + si)) - 0.5) * 7.0 * U
+                                        nxt.x = clampf(nxt.x, left + 2.0 * U, left + w - 2.0 * U)
+                                        var cc := Color("2e2620").lightened(0.18 * _hashf(idx, float(si) + ci))
+                                        plat_layer.draw_line(cur, nxt, cc, (1.3 + 2.2 * frac) * U)
+                                        # a fork now and then (a real fracture network)
+                                        if si > 0 and si < steps - 1 and _hashf(idx, float(ci * 9 + si)) > 0.6:
+                                                var fv := dirv.rotated(0.9 * signf(_hashf(idx, float(ci + si)) - 0.5))
+                                                plat_layer.draw_line(nxt, nxt + fv * seg_len * 0.55,
+                                                                cc * Color(1, 1, 1, 0.8), 1.1 * U)
+                                        cur = nxt
+                # v0.2.7 the new kinds wear a small carved mark so the player
+                # can PLAN: the dropper a down-chevron, the size platforms
+                # outward arrows (both deterministic, subtle)
+                if String(p["type"]) == "dropper":
+                        var mc := Color(0, 0, 0, 0.30)
+                        var my := sy + 1.0 * U
+                        plat_layer.draw_line(Vector2(sx - 7.0 * U, my - 3.0 * U), Vector2(sx, my + 3.0 * U), mc, 2.2 * U)
+                        plat_layer.draw_line(Vector2(sx + 7.0 * U, my - 3.0 * U), Vector2(sx, my + 3.0 * U), mc, 2.2 * U)
+                if String(p["type"]) == "size":
+                        var ac := Color(0, 0, 0, 0.26)
+                        var ay := sy
+                        plat_layer.draw_line(Vector2(left + 6.0 * U, ay), Vector2(left + 13.0 * U, ay - 4.0 * U), ac, 2.0 * U)
+                        plat_layer.draw_line(Vector2(left + 6.0 * U, ay), Vector2(left + 13.0 * U, ay + 4.0 * U), ac, 2.0 * U)
+                        plat_layer.draw_line(Vector2(left + w - 6.0 * U, ay), Vector2(left + w - 13.0 * U, ay - 4.0 * U), ac, 2.0 * U)
+                        plat_layer.draw_line(Vector2(left + w - 6.0 * U, ay), Vector2(left + w - 13.0 * U, ay + 4.0 * U), ac, 2.0 * U)
 
 func _draw_walls() -> void:
         # walls live in SCREEN space (they are the screen's frame) - drawn by
@@ -1292,6 +1610,49 @@ func _draw_snow() -> void:
                         col.a = 0.75 + 0.25 * _hashf(int(float(f["ph"]) * 100.0), 3.0)
                         snow_layer.draw_circle(Vector2(float(f["x"]), float(f["y"])), float(f["sz"]), col)
 
+## v0.2.7 THE PICKUP PAINTER - the round that made coins REAL. Coins and
+## powerups were never drawn (the owner "magically collected" them). The
+## coin wears the snake law (the REAL coin.png asset, a breathing pop) with
+## the owner's FADE-IN; the powerup is a glass capsule with its glyph.
+func _draw_pickups() -> void:
+        var font := ThemeDB.fallback_font
+        for c in coins:
+                var t: float = float(c["t"])
+                var fade: float = clampf(t / 0.35, 0.0, 1.0)          # THE FADE LAW
+                var cy: float = float(c["y"]) + sin(t * 3.2) * 7.0 * U   # = the collect law
+                var pos := Vector2(float(c["x"]), cy)
+                pick_layer.draw_circle(pos, 30.0 * U, Color(1.0, 0.85, 0.3, 0.14 * fade))
+                if _coin_tex != null:
+                        var s: float = 46.0 * U / float(_coin_tex.get_width())
+                        var pop: float = 1.0 + 0.07 * sin(t * 4.4)      # the snake breathing
+                        pick_layer.draw_set_transform(pos, 0.0,
+                                        Vector2(s * pop * fade, s / maxf(0.05, pop) * fade))
+                        pick_layer.draw_texture(_coin_tex, -_coin_tex.get_size() / 2.0,
+                                        Color(1, 1, 1, fade))
+                        pick_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+        for k in pickups:
+                var t2: float = float(k["t"])
+                var fade2: float = clampf(t2 / 0.35, 0.0, 1.0)
+                var pos2 := Vector2(float(k["x"]),
+                                float(k["y"]) + sin(t2 * 2.6) * 6.0 * U)
+                var kind := String(k["kind"])
+                var col2 := Color("4ac2e8")
+                if kind == "big":
+                        col2 = Color("f0b040")
+                elif kind == "speed":
+                        col2 = Color("58c470")
+                elif kind == "slow":
+                        col2 = Color("8a7ae8")
+                var rr: float = 30.0 * U * (0.55 + 0.45 * fade2)
+                pick_layer.draw_circle(pos2, rr + 9.0 * U,
+                                Color(col2.r, col2.g, col2.b, 0.16 * fade2))
+                pick_layer.draw_circle(pos2, rr, Color(0.06, 0.12, 0.20, 0.86 * fade2))
+                pick_layer.draw_arc(pos2, rr, 0.0, TAU, 26,
+                                Color(col2.r, col2.g, col2.b, fade2), 2.6 * U)
+                pick_layer.draw_string(font, pos2 + Vector2(-rr, rr * 0.36),
+                                POWERUPS[kind]["glyph"], HORIZONTAL_ALIGNMENT_CENTER,
+                                rr * 2.0, int(24 * U), Color(1, 1, 1, fade2))
+
 func _draw_fx() -> void:
         var font := ThemeDB.fallback_font
         for pt in parts:
@@ -1301,6 +1662,17 @@ func _draw_fx() -> void:
                 if String(pt["kind"]) == "ring":
                         fx.draw_arc(Vector2(float(pt["x"]), float(pt["y"])),
                                         float(pt["r"]) * (1.4 - a * 0.4), 0.0, TAU, 26, col, 3.0 * U)
+                elif String(pt["kind"]) == "chunk":
+                        # v0.2.7 the spinning break chunk (physical, fades out)
+                        fx.draw_set_transform(Vector2(float(pt["x"]), float(pt["y"])),
+                                        float(pt["rot"]), Vector2.ONE)
+                        var cw: float = float(pt["w"])
+                        var ch: float = float(pt["h"])
+                        fx.draw_rect(Rect2(-cw * 0.5, -ch * 0.5, cw, ch), col)
+                        var hi := col.lightened(0.25)
+                        hi.a = col.a
+                        fx.draw_rect(Rect2(-cw * 0.5, -ch * 0.5, cw, ch * 0.4), hi)
+                        fx.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
                 else:
                         fx.draw_circle(Vector2(float(pt["x"]), float(pt["y"])), float(pt["r"]) * (0.6 + 0.4 * a), col)
         for pp in pops:
@@ -1402,11 +1774,13 @@ func _build_pw_widget() -> void:
         bar_holder.add_child(_pw_bar)
         v.add_child(bar_holder)
         panel.add_child(v)
-        panel.anchor_left = 0.5
-        panel.anchor_right = 0.5
+        # v0.2.7 THE OWNER'S SPOT: "make it to the left next to score" - the
+        # widget sits top-LEFT under the HUD bar (it used to hover top-center).
+        panel.anchor_left = 0.0
+        panel.anchor_right = 0.0
         panel.anchor_top = 0.0
-        panel.offset_left = -(_pw_bar_w * 0.5 + 18.0)
-        panel.offset_right = _pw_bar_w * 0.5 + 18.0
+        panel.offset_left = 12.0
+        panel.offset_right = 12.0 + _pw_bar_w + 36.0
         panel.offset_top = 92.0
         panel.visible = false
         panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1437,15 +1811,22 @@ func _refresh_pw_ui() -> void:
                 _pw_bar.size = Vector2(bar_w * clampf(float(pw["t"]) / PW_TIME, 0.0, 1.0), 5)
         else:
                 _pw_widget.visible = false
-        # the MELT readout (a HUD chip next to the speed chip)
+        # the MELT readout: its whole PANEL hides while melting is off (the
+        # owner's empty-widget catch - it sat between speed and coins forever
+        # blank; a hidden child takes no layout slot)
         if _melt_chip != null and is_instance_valid(_melt_chip):
+                var mc_panel := _melt_chip.get_parent().get_parent() as Control
                 if _melt_on():
+                        if mc_panel != null:
+                                mc_panel.visible = true
                         var starving: bool = grounded \
                                         and float(ground_plat.get("snow", 0.0)) <= 0.004
                         _melt_chip.text = "MELT x%.2f" % char_size
                         _melt_chip.add_theme_color_override("font_color",
                                         Color("7ab8e8") if starving else Color("f0b040"))
                 else:
+                        if mc_panel != null:
+                                mc_panel.visible = false
                         _melt_chip.text = ""
 
 ## the raw input path (unhandled events): THE ZONES. NOTE: positions in the
@@ -1514,7 +1895,7 @@ func _show_ready_card() -> void:
         v.add_theme_constant_override("separation", 6)
         var t := Arc.label("TAP ANYWHERE TO START", 40, Color(0.85, 0.95, 1.0))
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        var s := Arc.label("touch LEFT + slide to move  -  tap RIGHT to jump  -  land HIGHER for +1", 18,
+        var s := Arc.label("touch LEFT + slide to move  -  tap RIGHT to jump  -  land HIGHER for +1  -  grab the coins + powerups", 18,
                         Color(0.85, 0.92, 1.0), false)
         s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         v.add_child(t)

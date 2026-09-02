@@ -175,3 +175,56 @@ root-caused and fixed:
   ALL PASS. Xvfb QA re-shot 16 and eyeballed BEFORE shipping (the
   owner's rule) — it caught the square stars, the ball-snow and the
   stretched orb, none of which any headless law would catch.
+
+## v0.2.7 — THE VISIBILITY ROUND + the challenge picks (owner verdict II)
+
+The owner played v0.2.6 on the phone. The tower's bones held (controls,
+snow, melt) but the pickups were GHOSTS and the game was too easy. The
+round:
+
+- THE COINS WERE NEVER DRAWN. The arrays fed collection logic only — the
+  owner "magically collected" invisible coins. The pickup painter landed
+  (pick_layer): the REAL coin.png (the snake law) + the owner's FADE-IN
+  (~0.35s alpha+scale ramp) + breathing pop + a warm halo; powerup pickups
+  paint their glass capsule + glyph with the same fade law. (The v0.2.6 QA
+  shot 06 parked a coin and eyeballed nothing — the lesson: an eyeball shot
+  of an EMPTY spot proves nothing; the shot must show the thing.)
+- THE POWERUP SPAWN BUG: next_pick_idx was born 0 and the old
+  `next_idx > 4` guard skipped the branch at idx 0..4 — the counter froze
+  at 0 and NO powerup could ever spawn in ANY run, ever. The owner's new
+  law: one RANDOM powerup every 20-40 platforms counted from the last
+  SPAWNED (on-screen) one; the first waits 20-40 up.
+- THE EMPTY WIDGET: the melt chip sat between speed and coins forever
+  blank; its whole panel hides while MELTING is off, and the powerup
+  widget moved TOP-LEFT next to the score (the owner's spot).
+- THE BANNER LAW REVERSED: the tower wears the banner like every game
+  (the owner's call); the fall-death line insets above the strip.
+- THE BREAK: jagged deterministic cracks that lengthen + widen with the
+  grace clock, chips popping off while it cracks, then the platform
+  SHATTERS into 4-6+ physical chunks (gravity, spin, fade, sized by the
+  platform's own width, colored by the equipped skin). tower_break.wav.
+- BLINK SNOW: the cap STASHES when the platform goes invisible and comes
+  back with it — snow appears and disappears WITH the platform (the
+  owner's own fix; no more shed-while-ghost drift).
+- THE SHARD MATH FIX: the old settle target (+-1.094 rad) laid a SIDE ON
+  TOP — the triangle balanced on one corner ("not landing on its sides").
+  The true edge-down stance is +-(pi - phi) = +-2.0474022 rad; the pivot
+  radius is now the ACTUAL lowest-vertex distance; the probe proves two
+  verts share the lowest height at the settle stance (a side rests).
+- TWO NEW KINDS: SIZE platforms (30+) breathe wide<->small smoothly
+  (0.55..1.30 of base width, de-phased clocks, wall-clamped, reliable);
+  DROPPER platforms (50+) drop away under you when you land (accelerating
+  to x920), wait below the screen, then rise home — the rider rides the
+  dy (jump off in time); unreliable (the next platform is always safe).
+  Both wear a small carved mark so the player can plan.
+- THE RAMP (owner: "after 25 platforms start making jumps wider"): the
+  vertical gap lerps toward min(205, 82% of the char's real jump ceiling)
+  over the next 90 platforms, and the horizontal spread widens under the
+  DESCENDING-branch reach law t = (v + sqrt(v^2 - 2gh)) / g — wide jumps
+  demand a full-speed run + a late leap. Every jump stays possible.
+- tests: tower_probe grew the v0.2.7 laws (pickup spacing, painter +
+  coin texture, banner, size breathing band, dropper drop/wait/return,
+  the ramp bounds, the shard geometry, the snow stash, the shatter);
+  flow_test's banner law reversed (EVERY game carries one). ALL PASS.
+  Xvfb QA (qa_v027) eyeballed before shipping: visible coins, top-left
+  widget, mid-air chunks, breathing width, chevron drop, the true side.

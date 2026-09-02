@@ -109,10 +109,11 @@ func _run() -> void:
                 _check(first_c >= H.COIN_GAP_MIN and first_c <= H.COIN_GAP_MAX,
                                 "the first coin waits 5-25 platforms up (idx %d)" % first_c)
 
-        # ---- generation laws ----
+        # ---- generation laws (v0.2.7: ramp-aware) ----
         var gen_ok := true
         var rel_ok := true
-        var UNRELIABLE := ["blinking", "vanish", "mb"]
+        var UNRELIABLE := ["blinking", "vanish", "mb", "dropper"]
+        var ramp_seen := 0.0
         for i in range(1, g.platforms.size()):
                 var p: Dictionary = g.platforms[i]
                 var lo: float = float(p["x"]) - float(p["w"]) / 2.0
@@ -120,18 +121,31 @@ func _run() -> void:
                 if lo < H.WALL_W * g.U - 0.5 or hi > vp.x - H.WALL_W * g.U + 0.5:
                         gen_ok = false
                 var gapv: float = absf(float(g.platforms[i - 1]["y"]) - float(p["y"]))
-                if gapv < H.GAP_MIN * g.U - 1.0 or gapv > H.GAP_MAX * g.U + 1.0:
+                # THE RAMP: the first DIFF_AT platforms keep the gentle band;
+                # past that the ceiling rises toward the char's real jump cap
+                var ramp: float = clampf(float(i - H.DIFF_AT) / float(H.DIFF_RAMP), 0.0, 1.0)
+                ramp_seen = maxf(ramp_seen, ramp)
+                var gap_cap: float = minf(H.GAP_HARD_MAX,
+                                0.82 * pow(absf(H.JUMP_V * g.U), 2.0) / (2.0 * H.GRAV * g.U) / g.U)
+                var gap_hi: float = lerpf(H.GAP_MAX, gap_cap, ramp)
+                if gapv < H.GAP_MIN * g.U - 1.0 or gapv > gap_hi * g.U + 1.0:
                         gen_ok = false
                 if UNRELIABLE.has(String(g.platforms[i - 1]["type"])) and UNRELIABLE.has(String(p["type"])):
                         rel_ok = false
-        _check(gen_ok, "every platform sits between the walls at a legal gap")
+        _check(gen_ok, "every platform sits between the walls at a ramp-legal gap")
         _check(rel_ok, "THE RELIABILITY LAW: an unreliable platform is always followed by a reliable one")
+        # the reach law = the generator's DESCENDING-branch crossing time
         var reach_ok := true
         for i in range(1, g.platforms.size()):
                 var dx: float = absf(float(g.platforms[i]["x"]) - float(g.platforms[i - 1]["x"]))
-                if dx > H.WALK_MAX * g.U * (absf(H.JUMP_V * g.U) / (H.GRAV * g.U)) * 1.2:
+                var gapv2: float = absf(float(g.platforms[i - 1]["y"]) - float(g.platforms[i]["y"]))
+                var jump_v := absf(H.JUMP_V * g.U)
+                var disc: float = maxf(0.0, jump_v * jump_v - 2.0 * H.GRAV * g.U * gapv2)
+                var t_cross: float = (jump_v + sqrt(disc)) / (H.GRAV * g.U)
+                var ramp2: float = clampf(float(i - H.DIFF_AT) / float(H.DIFF_RAMP), 0.0, 1.0)
+                if dx > H.WALK_MAX * g.U * t_cross * lerpf(0.72, 1.12, ramp2) * 1.02:
                         reach_ok = false
-        _check(reach_ok, "every next platform stays inside the jump arc's reach")
+        _check(reach_ok, "every next platform stays inside the DESCENDING-branch reach")
 
         # ---- start via tap (the owner: TAP ANYWHERE) ----
         var t := InputEventScreenTouch.new()
@@ -500,8 +514,13 @@ func _run() -> void:
         mv2["type"] = "moving"
         mv2["visible"] = true
         mv2["snow"] = 0.6
-        _ticks(g, 60)
-        _check(float(mv2["snow"]) < 0.6, "a MOVING platform shakes its snow off (%.3f)" % float(mv2["snow"]))
+        # driven DIRECTLY (no _ticks): the shed lives in _update_platforms
+        # and this keeps the live snowfall out of the measurement (flakes
+        # landing mid-law made it flaky - 1 run in 3 caught a flurry)
+        for i in 60:
+                g._update_platforms(1.0 / 60.0)
+        _check(absf(float(mv2["snow"]) - 0.48) < 0.01,
+                        "a MOVING platform shakes its snow off (%.3f)" % float(mv2["snow"]))
 
         # ---- v0.2.6 MELTING (the owner's upgrade) ----
         Box.dev_set_cheat("all_owned", 1)
@@ -604,6 +623,156 @@ func _run() -> void:
         _ticks(g2, 10)
         _check(g2.phase == "over", "MELTED away to nothing = the run ends (the owner's law)")
         Box.dev_set_cheat("all_owned", 0)
+
+        # ================= v0.2.7 THE VISIBILITY + CHALLENGE ROUND ==========
+        # (a third, fresh tower - the previous two lives are spent)
+        var g3: GogaGame = H.new()
+        g3.game_id = "hopper"
+        add_child(g3)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        g3.paused = true
+
+        # ---- THE PICKUPS ARE PAINTED (the owner collected ghosts) ----
+        _check(is_instance_valid(g3.pick_layer), "the pickup PAINTER exists")
+        _check(g3._coin_tex != null, "the REAL GOGACoin texture is loaded")
+
+        # ---- THE BANNER (the v0.2.6 law reversed by the owner) ----
+        _check(bool(GameReg.get_game("hopper").get("banner", false)),
+                "the tower wears the banner now (v0.2.7 owner law)")
+        var bb: float = g3.banner_bottom()
+        _check(bb > 0.0, "the tower reserves real banner space (%.0f logical px)" % bb)
+
+        # ---- THE POWERUP SPAWN LAW: 20-40 from the last SPAWNED ----
+        Box.dev_set_cheat("all_owned", 1)
+        for i in 130:
+                g3._gen_platform()
+        var pick_idxs: Array = []
+        for k in g3.pickups:
+                pick_idxs.append(int(k["idx"]))
+        pick_idxs.sort()
+        _check(pick_idxs.size() >= 3, "powerups actually SPAWN now (%d in 130 platforms)" % pick_idxs.size())
+        var pick_ok: bool = pick_idxs.size() >= 2 and int(pick_idxs[0]) >= H.PICKUP_GAP_MIN
+        for i in range(1, pick_idxs.size()):
+                var pg: int = int(pick_idxs[i]) - int(pick_idxs[i - 1])
+                if pg < H.PICKUP_GAP_MIN or pg > H.PICKUP_GAP_MAX:
+                        pick_ok = false
+        _check(pick_ok, "powerups wait 20-40 platforms, first one 20-40 up (%s)" % str(pick_idxs))
+        Box.dev_set_cheat("all_owned", 0)
+
+        # ---- THE RAMP: deep jumps are WIDER (owner: 25+) - measured over the
+        # GENERATED tower only, before the force-spawned test platforms ----
+        var early_max := 0.0
+        var deep_max := 0.0
+        var gen_n: int = g3.platforms.size()
+        for i in range(1, gen_n):
+                var gv: float = absf(float(g3.platforms[i - 1]["y"]) - float(g3.platforms[i]["y"])) / g3.U
+                if i <= H.DIFF_AT:
+                        early_max = maxf(early_max, gv)
+                if i >= H.DIFF_AT + H.DIFF_RAMP and i < gen_n - 3:
+                        deep_max = maxf(deep_max, gv)
+        _check(deep_max > H.GAP_MAX and deep_max > early_max,
+                "past the ramp the jumps are WIDER (deep max %.0f > early max %.0f)" % [deep_max, early_max])
+        var ball_ceiling: float = pow(absf(H.JUMP_V), 2.0) / (2.0 * H.GRAV)
+        _check(deep_max < 0.84 * ball_ceiling,
+                "the wide jumps stay inside the REAL jump ceiling (%.0f < %.0f)" % [deep_max, 0.84 * ball_ceiling])
+
+        # ---- THE SIZE PLATFORM (30+): it BREATHES ----
+        g3._spawn_platform(g3.get_viewport_rect().size.x * 0.5,
+                        g3._last_top() - 150.0 * g3.U, 200.0 * g3.U, "size")
+        var sz: Dictionary = g3.platforms[g3.platforms.size() - 1]
+        var sz_base: float = float(sz["base_w"])
+        var wmin := 1e12
+        var wmax := -1.0
+        for i in 260:
+                g3._update_platforms(1.0 / 60.0)
+                wmin = minf(wmin, float(sz["w"]))
+                wmax = maxf(wmax, float(sz["w"]))
+        _check(wmax - wmin > sz_base * 0.4, "the size platform BREATHES (w %.0f..%.0f of base %.0f)" % [wmin / g3.U, wmax / g3.U, sz_base / g3.U])
+        _check(wmax <= sz_base * H.SIZE_MAX_F + 0.5 and wmin >= sz_base * H.SIZE_MIN_F - 0.5,
+                "the breathing stays inside the 0.55..1.30 band")
+
+        # ---- THE DROPPER (50+): land -> drop -> wait -> return ----
+        # spawned NEAR the camera so the return trip is drivable in-test
+        g3._spawn_platform(g3.get_viewport_rect().size.x * 0.5,
+                        g3.cam_y - 420.0 * g3.U, 200.0 * g3.U, "dropper")
+        var dr: Dictionary = g3.platforms[g3.platforms.size() - 1]
+        var dr_y0: float = float(dr["y"])
+        _check(String(dr["drop_state"]) == "idle", "the dropper idles until landed")
+        g3._land(dr)
+        _check(String(dr["drop_state"]) == "down", "landing TRIGGERS the drop")
+        for i in 40:
+                g3._update_platforms(1.0 / 60.0)
+        _check(float(dr["y"]) > dr_y0 + 60.0 * g3.U, "the dropper is FALLING under the rider")
+        var vp3: Vector2 = g3.get_viewport_rect().size
+        dr["y"] = g3.cam_y + vp3.y + 140.0 * g3.U
+        g3._update_platforms(1.0 / 60.0)
+        _check(String(dr["drop_state"]) == "wait", "below the screen it waits")
+        for i in int(2.6 * 60.0):
+                g3._update_platforms(1.0 / 60.0)
+        _check(String(dr["drop_state"]) != "wait", "the wait ends (%s)" % String(dr["drop_state"]))
+        for i in int(8.0 * 60.0):
+                g3._update_platforms(1.0 / 60.0)
+        _check(absf(float(dr["y"]) - dr_y0) < 2.0 * g3.U,
+                "the dropper RETURNS home (off %.2f)" % (absf(float(dr["y"]) - dr_y0) / g3.U))
+
+        # ---- THE RAMP SANITY: even the deep gaps respect the ceiling (the
+        # force-spawned test platforms are excluded by the law above) ----
+
+        # ---- THE SHARD MATH: the TRUE edge-down stance ----
+        _check(absf(H.SHARD_SETTLE_ANG - 2.0474022) < 0.0001,
+                "the shard settle target is the TRUE edge-down stance (2.0474022)")
+        # the drawn support at that stance puts the SIDE (not a corner) on
+        # the platform: at rot = 2.0471 the two lowest verts share one height
+        var R: float = float(H.PLAYER_R)
+        var verts: Array = [(Vector2(0, -R * 1.06)), (Vector2(R * 0.95, R * 0.78)), (Vector2(-R * 0.95, R * 0.78))]
+        var st: float = float(H.SHARD_SETTLE_ANG)
+        var heights: Array = []
+        for v0: Vector2 in verts:
+                heights.append(snappedf(v0.x * sin(st) + v0.y * cos(st), 0.001))
+        heights.sort()   # ascending: the LARGEST value = the LOWEST vertex (y grows down)
+        _check(absf(float(heights[2]) - float(heights[1])) < 0.01,
+                "at the settle stance TWO verts share the lowest height (a side rests)")
+        _check(float(heights[0]) < float(heights[2]) - 0.5,
+                "the third vert points UP (off %.2f)" % (float(heights[2]) - float(heights[0])))
+        _check(absf(float(heights[2]) - R * 0.486) < 0.02,
+                "the resting side sits at the geometric contact height (%.3f R)" % (float(heights[2]) / R))
+
+        # ---- THE SNOW STASH: blink takes the cap and brings it back ----
+        g3._spawn_platform(g3.get_viewport_rect().size.x * 0.5,
+                        g3._last_top() - 150.0 * g3.U, 200.0 * g3.U, "blinking")
+        var blink_p: Dictionary = g3.platforms[g3.platforms.size() - 1]
+        blink_p["snow"] = 0.8
+        blink_p["visible"] = true
+        blink_p["clock"] = H.BLINK_PERIOD - 0.01
+        g3._update_platforms(0.02)
+        _check(not bool(blink_p["visible"]) and float(blink_p["snow"]) == 0.0 and float(blink_p["snow_stash"]) == 0.8,
+                "blinking OFF stashes the snow cap (it goes WITH the platform)")
+        blink_p["clock"] = H.BLINK_PERIOD - 0.01
+        g3._update_platforms(0.02)
+        _check(bool(blink_p["visible"]) and absf(float(blink_p["snow"]) - 0.8) < 0.001 and not blink_p.has("snow_stash"),
+                "blinking ON restores the snow cap EXACTLY")
+
+        # ---- THE REAL BREAK: the shatter spawns physical chunks ----
+        g3._spawn_platform(g3.get_viewport_rect().size.x * 0.5,
+                        g3._last_top() - 150.0 * g3.U, 260.0 * g3.U, "vanish")
+        var vanish_p: Dictionary = g3.platforms[g3.platforms.size() - 1]
+        vanish_p["ghost"] = true
+        vanish_p["visible"] = true
+        vanish_p["clock"] = 0.0
+        g3.parts = []
+        for i in 40:
+                g3._update_platforms(1.0 / 60.0)
+        var chunk_n := 0
+        for pt in g3.parts:
+                if String(pt["kind"]) == "chunk":
+                        chunk_n += 1
+        _check(chunk_n >= 4, "the vanish platform SHATTERS into chunks (%d)" % chunk_n)
+        var chunks_moved := false
+        for pt in g3.parts:
+                if String(pt["kind"]) == "chunk" and absf(float(pt["vy"])) > 1.0:
+                        chunks_moved = true
+        _check(chunks_moved, "the chunks have velocity (gravity + spin live in the tick)")
 
         print("== tower_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(fails)

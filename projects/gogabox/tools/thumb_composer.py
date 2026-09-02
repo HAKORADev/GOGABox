@@ -549,7 +549,9 @@ def scene_hopper(spec=HOPPER_SPEC):
 
 # ------------------------------------------------------------------- merge
 
-# A satisfying late-game snake pattern; None = empty cell. Classic palette.
+# The v0.2.7 REBUILD look: the big centered board on the DEEP COOL SLATE
+# (the owner: "background cool color matches the grid one"), a real
+# GOGACoin grown in an empty cell, the +1 fusion pop. None = empty cell.
 MERGE_SPEC = dict(
     grid=[
         ["1024", "512", "256", "128"],
@@ -557,35 +559,47 @@ MERGE_SPEC = dict(
         ["4", "2", None, "8"],
         ["2", None, None, "4"],
     ],
+    coin_cell=(1, 3),             # the empty cell wearing the GOGACoin
+    plus_at=(2, 2),               # the +1 pop floats over the empty hole
     colors={"2": "efe6d8", "4": "edd9b0", "8": "f2b179", "16": "f59563",
             "32": "f67c5f", "64": "f65e3b", "128": "edcf72", "256": "edcc61",
             "512": "edc22e", "1024": "edc850"},
     light_ink={"efe6d8", "edd9b0", "edcf72", "edcc61", "edc850", "edc22e"},
-    tile=132, gap=10,
+    tile=138, gap=12,
     hero="1024",                  # the tile that gets the glow
+    bg_top=(43, 51, 80), bg_bottom=(33, 40, 62),
 )
 
 
 def scene_merge(spec=MERGE_SPEC):
     sc = Scene()
-    sc.solid((187, 173, 160))
+    sc.backdrop(spec["bg_top"], spec["bg_bottom"])
     t, g = spec["tile"], spec["gap"]
     grid = spec["grid"]
-    bw = 4 * t + 5 * g
-    bx, by = (W - bw) // 2, (H - bw) // 2
-    sc.rect([bx - 8, by - 8, bx + bw + 8, by + bw + 8], r=18,
-            fill=(160, 145, 132))
+    rows, cols = len(grid), len(grid[0])
+    bw = cols * t + (cols + 1) * g
+    bh = rows * t + (rows + 1) * g
+    bx, by = (W - bw) // 2, (H - bh) // 2 + 10
+    # the frame (warm gray, reads against the cool slate)
+    sc.rect([bx - 10, by - 10, bx + bw + 10, by + bh + 10], r=22,
+            fill=(150, 136, 122))
     for r_i, row in enumerate(grid):
         for c_i, label in enumerate(row):
             x = bx + g + c_i * (t + g)
             y = by + g + r_i * (t + g)
             if label is None:
-                sc.rect([x, y, x + t, y + t], r=12, fill=(171, 157, 144))
+                sc.rect([x, y, x + t, y + t], r=14, fill=(205, 193, 180))
+                if (c_i, r_i) == spec["coin_cell"]:
+                    # the GOGACoin grown in the empty cell (the real asset,
+                    # with its warm halo so it reads TAKE ME)
+                    sc.glow(x + t / 2, y + t / 2, int(t * 0.62), (255, 210, 70), 90)
+                    coin = load_sprite("ui/coin.png", int(t * 0.62))
+                    sc.stamp(coin, x + t / 2, y + t / 2)
                 continue
             color = spec["colors"][label]
-            sc.rect([x, y, x + t, y + t], r=12, fill="#" + color)
+            sc.rect([x, y, x + t, y + t], r=14, fill="#" + color)
             if label == spec.get("hero"):
-                sc.glow(x + t / 2, y + t / 2, int(t * 0.9), (255, 220, 90), 80)
+                sc.glow(x + t / 2, y + t / 2, int(t * 0.95), (255, 220, 90), 95)
             # fit the label inside the tile by MEASUREMENT (the game scales
             # fonts too; Kenney Rocket runs wide)
             size = int(t * 0.44)
@@ -600,7 +614,13 @@ def scene_merge(spec=MERGE_SPEC):
             ink = INK if color in spec["light_ink"] else (255, 255, 255)
             fd.text((x + (t - bb[2] + bb[0]) / 2, y + (t - bb[3] + bb[1]) / 2),
                     label, font=f, fill=ink)
-    sc.vignette(70)
+    # the +1 fusion pop (the v0.2.7 scoring law made visible) - it floats
+    # over the empty hole like it JUST merged there
+    px, py = spec["plus_at"]
+    fx = bx + g + px * (t + g) + t / 2
+    fy = by + g + py * (t + g) + t / 2
+    sc.text("+1", int(t * 0.30), int(fx), int(fy - t * 0.10), fill=(255, 255, 255))
+    sc.vignette(84)
     return sc.render()
 
 

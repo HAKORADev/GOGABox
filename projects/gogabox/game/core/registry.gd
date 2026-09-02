@@ -187,10 +187,10 @@ const GAMES := [
                 "coin_div": 10, "price": 300, "fee": 12, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
-                # NO banner here (v0.2.6 owner law: the tower's controls live
-                # at the bottom - every OTHER game carries the banner)
+                "banner": true,   # v0.2.7: the owner REVERSED the v0.2.6 law -
+                                  # the tower wears the banner like every game
                 "hours": {"from": 16, "to": 22},
-                "desc": "Climb an endless tower of icy platforms while real snow falls, lands and piles up. Eat the snow with MELTING to grow - or shrink away where it's bare. Five platform kinds, two walls, a scroll that never waits.",
+                "desc": "Climb an endless tower of icy platforms while real snow falls, lands and piles up. Eat the snow with MELTING to grow - or shrink away where it's bare. Seven platform kinds, two walls, a scroll that never waits, and jumps that widen the higher you get.",
                 "controls": [
                         "touch the LEFT half of the screen and SLIDE your finger: that is the movement - the further from where you touched, the faster and harder, back to your touch point = stop (left-right only)",
                         "tap the RIGHT half of the screen to JUMP - one tap, one jump",
@@ -199,7 +199,10 @@ const GAMES := [
                         "snow falls for REAL: platforms start bare and catch it flake by flake (moving platforms shake it off), and flakes that reach YOU make you slow and heavy - roll to shed it",
                         "MELTING (shop, toggle): ON, you eat the snow under you and GROW (max x1.5); moving fast eats slower; where there is no snow you SHRINK until the run ends - a real risk",
                         "powerups bought in the shop spawn on platforms: x2 double jump, up arrow big jump, >> speed, -50% slow slide - each 10s, shown in the widget on top with its timer",
-                        "GOGACoins hang between platforms - one every 5-25 platforms, counted from the last coin on screen; never on the start platform",
+                        "GOGACoins hang between platforms (real, visible, fading in) - one every 5-25 platforms from the last coin on screen; powerups now wait 20-40 platforms apart",
+                        "after platform 25 the jumps WIDEN toward your real jump ceiling - build speed, time the leap",
+                        "past 30 a new kind joins: SIZE platforms that breathe wide and small; past 50: DROPPERS that drop away when you land on them, wait, then rise back - jump off in time",
+                        "vanish platforms crack (jagged, growing cracks) and SHATTER into chunks; blinking platforms take their snow with them when they blink",
                         "the shop sells characters (ball/square/triangle/egg, each its own physics and its own real tumbling), platform skins (sand/rock/metal/grass), the night place, the powerups and MELTING"],
                 "genres": {"main": ["arcade", "adventure"], "sub": ["platformer", "singleplayer"]},
                 "age": "everyone",
@@ -215,13 +218,20 @@ const GAMES := [
                 "script": "res://game/games/merge/merge2048.gd",
                 "thumb": "res://assets/thumbs/merge.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 150, "price": 400, "fee": 15, "shop": false,
+                "coin_div": 20, "price": 400, "fee": 15, "shop": true,
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "daily_rounds": 8,   # v0.1.4: 8 rounds a day
-                "desc": "Swipe to slide the tiles. Equal numbers merge and double. Reach 2048 before the board fills up - the classic brain cooker.",
-                "controls": ["swipe to slide all tiles", "equal tiles merge and double", "the run ends when no move is left"],
+                "desc": "The classic brain cooker, rebuilt: a big centered board on a cool slate, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. Three themes: Classic, Minecraft and a Deep Sea whose tiles hold real water.",
+                "controls": [
+                        "swipe the finger in ANY direction - every tile slides that way, equal tiles merge and double",
+                        "each successful fusion is worth exactly +1 score",
+                        "after every 15 fusions a GOGACoin grows in an empty cell - slide any tile INTO it to collect (a tile that lands there takes it, even mid-merge)",
+                        "the SHOP sells themes: Minecraft (block tiles, lava-glow numbers, stone + lava sounds) and Deep Sea (glass cells with real sloshing water - the higher the tile, the more water it holds)",
+                        "big tiles pulse the board gold; reach 2048 and the run keeps going",
+                        "the run ends when no move is left - plan the corners",
+                ],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "turnbased", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
