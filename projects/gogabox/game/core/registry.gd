@@ -136,21 +136,33 @@ const GAMES := [
                 ],
         },
         {
+                # v0.2.9 THE REWORK (the owner: "currently it's too bad"):
+                # the position ask (each position = different physics), the
+                # real slicing (the fruit splits along YOUR cut), the hearts,
+                # the +N/-N reader, the vegetable shop, /15.
                 "id": "slasher", "title": "Fruit Slasher", "tag": "swipe everything",
                 "script": "res://game/games/slasher/slasher.gd",
                 "thumb": "res://assets/thumbs/slasher.png",
-                "orientation": "landscape", "dim": "2d",
-                "coin_div": 20, "price": 250, "fee": 15, "shop": false,
+                "orientation": "auto", "dim": "2d",
+                "coin_div": 15, "price": 250, "fee": 15, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
-                "desc": "Fruits fly, your finger is the blade. Slash combos for juice, avoid the bombs - one wrong swipe slices the run short.",
-                "controls": ["swipe across fruits to slice them", "multi-slices in one swipe = combo", "never touch the bombs"],
+                "desc": "Fruit fly, your finger is the blade - for real: the fruit splits along YOUR cut and the halves tumble. Choose your position first - portrait tosses from below, landscape lobs across. Every fruit +1, every fall -2, three hearts, and a slashed bomb takes one. A GOGACoin rides by every 20 seconds. The shop sells the vegetable basket.",
+                "controls": [
+                        "pick a position - portrait and landscape throw differently",
+                        "swipe THROUGH a fruit to cut it where your finger crossed: +1",
+                        "a fruit that falls unsliced costs -2 - the score never goes below 0",
+                        "three hearts; slash a bomb and one bursts - lose all three and the run ends",
+                        "cut several fruits in one fast swipe and the top reads +1 +2 +3; falls flush as one -N",
+                        "a GOGACoin flies by every 20 seconds - slash it like a fruit",
+                        "the shop's vegetable basket (1500) adds a fruits/vegetables toggle in the options",
+                ],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
-                        {"id": "combo_5", "title": "Fruit Ninja Moves", "desc": "Slash 5 fruits in one swipe"},
+                        {"id": "hearts_full", "title": "Untouchable", "desc": "End a run with all three hearts"},
                         {"id": "score_300", "title": "Sharp Blade", "desc": "Score 300 in one run"},
                         {"id": "slash_100", "title": "Juice Bar", "desc": "Slash 100 fruits total"},
                 ],

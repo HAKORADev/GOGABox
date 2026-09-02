@@ -151,6 +151,8 @@ func check_achievements() -> int:
                         "wins_10": ok = Box.counter(game_id, "wins") >= 10
                         "wins_40": ok = Box.counter(game_id, "wins") >= 40
                         "streak_5": ok = Box.counter(game_id, "streak") >= 5
+                        # v0.2.9 - fruit slasher (the hearts law)
+                        "hearts_full": ok = Box.counter(game_id, "hearts_kept") >= 3
                         # v0.2.4 - space dash (kills + the max power rung)
                         "kills_100": ok = Box.counter(game_id, "kills") >= 100
                         "kills_300": ok = Box.counter(game_id, "kills") >= 300

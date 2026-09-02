@@ -86,3 +86,30 @@ blue O, hard offset shadows, a YOU/DRAWS/O score-board).
 - Xvfb QA (qa_v028): the fresh page, the marks mid-game, the coin round,
   the winning strike, the verdict + the round rollover — eyeballed
   BEFORE shipping.
+
+## v0.2.9 — THE OWNER PATCH ROUND
+
+The first real playtest came back with one big bug and a pile of taste:
+
+- THE BIG ONE: after the player's move the CPU played round after round
+  ("when i do a move, the CPU plays like for 3 rounds") — the refactor
+  had dropped the `state = "play"` branch when the turn came back, so
+  the ai_wait tick kept firing `_ai_move()` and the machine drew O after
+  O. The probe never caught it: every probe path either ended the round
+  on the player's move or drove `_place` directly. The One-Move Law is
+  now pinned (3 seconds of ticks after the CPU's move = zero new marks).
+- the loser OPENS the next round; a draw flips the opener
+- the score FLOORS at 0 ("-1 on 0 should be 0, not -1 -2 -3")
+- REAL sketch marks: the v0.2.8 strokes "feel like polygons" — they are
+  now smooth layered-sine noise painted as tapered circle stamps (thin
+  ends, full middle, the ink breathing) over dark under-strokes; the O
+  overlaps its close like a real hand-drawn ring
+- ONE name: the CPU. The four moods rotate invisibly.
+- the winner anim: just the yellow strike — no amber cell highlight, no
+  mark zoom, and the strike draws ONCE (the old one pulsed forever)
+- the "next GOGACoin lands in N rounds" note line is gone
+- the SFX were re-voiced to match the cozy sketchbook design (warm soft
+  plucks instead of dry scratches; tools/v029_sfx.py)
+- the AI misses more from round to round (win-miss ~0.10-0.13, block-skip
+  ~0.08-0.17): vs a decent player it now drops ~9% — beatable sometimes,
+  still drawing most games (measured 400 games: 91% draws)

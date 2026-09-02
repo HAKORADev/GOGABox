@@ -60,6 +60,14 @@ func _run() -> void:
         g._after_move()
         _check(int(g.score) == 0, "a LOSS pays exactly -1 (1 - 1 = 0)")
         _check(int(g.losses) == 1, "the loss was counted")
+        # THE FLOOR LAW (owner v0.2.9: "-1 on 0 should be 0"): a loss at
+        # score 0 stays at 0 - never -1 -2 -3
+        g.set_score(0)
+        g._place(5, g.O)
+        g.board[3] = 2
+        g.board[4] = 2
+        g._after_move()
+        _check(int(g.score) == 0, "a loss at 0 STAYS 0 (the floor law)")
         # the DRAW pays nothing
         g.set_score(5)
         g.board = [1, 2, 1, 2, 1, 2, 2, 1, 2]
@@ -94,13 +102,6 @@ func _run() -> void:
         g.done_rounds = 7
         g._new_round()
         _check(g.coin_cell < 0, "an ordinary round carries no coin")
-        # the live note line follows the coin clock (7 done: 2 rounds to go)
-        _check(String(g.note_lbl.text).contains("2 rounds"),
-                "the note counts the rounds down (2 left after 7)")
-        g.done_rounds = 8
-        g._new_round()
-        _check(String(g.note_lbl.text).contains("1 round"),
-                "the note says the coin lands NEXT round (8 done)")
 
         # ---- THE ADAPTIVE CORE: the burned reply never repeats ----
         var mem: Array = []
@@ -125,6 +126,75 @@ func _run() -> void:
                         free_hits += 1
         _check(free_hits > 0,
                 "without the memory the reply is free again (%d/200 picked cell 0)" % free_hits)
+
+        # ---- THE ONE-MOVE LAW (the owner's biggest catch: the CPU played
+        # round after round because the state stayed "ai_wait") ----
+        var g5: GogaGame = XO.new()
+        g5.game_id = "xo"
+        add_child(g5)
+        await get_tree().process_frame
+        g5._place(4, g5.X)          # the player opens center
+        g5._after_move()
+        _check(String(g5.state) == "ai_wait" and g5.turn == g5.O,
+                "after the player's move the CPU thinks once")
+        g5.clock = 9.9              # skip the think beat
+        g5._goga_tick(1.0 / 60.0)   # the CPU moves NOW
+        _check(String(g5.state) == "play" and g5.turn == g5.X,
+                "after the CPU's move the state is REALLY play/turn X")
+        var o_marks := 0
+        var x_marks := 0
+        for v in g5.board:
+                if int(v) == g5.O:
+                        o_marks += 1
+                elif int(v) == g5.X:
+                        x_marks += 1
+        _check(o_marks == 1 and x_marks == 1,
+                "one player mark, ONE cpu mark (no 3-round CPU spree)")
+        g5.clock = 0.0
+        for f in 180:               # 3 seconds of ticking
+                g5._goga_tick(1.0 / 60.0)
+                if String(g5.state) == "play":
+                        g5.clock = 0.0
+        o_marks = 0
+        for v in g5.board:
+                if int(v) == g5.O:
+                        o_marks += 1
+        _check(o_marks == 1, "3 seconds of ticks: the CPU did NOT move again")
+
+        # ---- THE OPENER LAW (owner v0.2.9: the loser starts next) ----
+        var g6: GogaGame = XO.new()
+        g6.game_id = "xo"
+        add_child(g6)
+        await get_tree().process_frame
+        _check(g6.turn == g6.X, "round 1: the player opens")
+        g6.board = [1, 1, 0, 2, 2, 0, 0, 0, 0]
+        g6._tap_cell(2)             # X wins -> O (the loser) opens next
+        _check(g6.next_opener == g6.O, "the loser (CPU) won the next opener")
+        g6.board = [2, 2, 0, 1, 1, 0, 0, 0, 0]
+        g6._place(2, g6.O)
+        g6._after_move()            # O wins -> X (the loser) opens next
+        _check(g6.next_opener == g6.X, "after a CPU win the player opens")
+        g6.board = [1, 2, 1, 2, 1, 2, 2, 1, 2]
+        g6._after_move()            # the draw flips
+        _check(g6.next_opener == g6.O, "a draw flips the opener")
+
+        # ---- the strike: drawn once, no pulse ----
+        var g7: GogaGame = XO.new()
+        g7.game_id = "xo"
+        add_child(g7)
+        await get_tree().process_frame
+        g7.board = [1, 1, 0, 2, 2, 0, 0, 0, 0]
+        g7._tap_cell(2)
+        _check(g7.last_win_line.size() == 3 and g7.strike_t == 0.0,
+                "the win arms the one-shot strike")
+        for f in 40:
+                g7._goga_tick(1.0 / 60.0)
+        _check(absf(g7.strike_t - 1.0) < 0.001, "the strike grew ONCE to full")
+        var stable: float = float(g7.strike_t)
+        for f in 120:
+                g7._goga_tick(1.0 / 60.0)
+        _check(absf(g7.strike_t - stable) < 0.001,
+                "the strike STAYS full (no oscillation)")
 
         # ---- the live fork spy + the memory flag ----
         var g2: GogaGame = XO.new()
@@ -190,10 +260,10 @@ func _run() -> void:
                         cdraws += 1
         var wr := float(cwins) / float(games)
         var lr := float(closses) / float(games)
-        _check(wr > 0.4 and wr < 0.95,
-                "600 games: the CPU wins most but NOT always (%.0f%%)" % [wr * 100.0])
-        _check(lr < 0.15,
-                "600 games: the CPU rarely loses (%.0f%% - good enough to not lose)" % [lr * 100.0])
+        _check(wr > 0.5 and wr < 0.92,
+                "600 games: the CPU wins most but misses real chances now (%.0f%%)" % [wr * 100.0])
+        _check(lr > 0.0 and lr < 0.3,
+                "600 games: the user CAN win sometimes (%.0f%% losses - owner v0.2.9)" % [lr * 100.0])
 
         # ---- vs a DECENT player (greedy: takes wins, blocks, prefers
         # center/corners) the CPU must NOT keep winning - decent play draws
@@ -242,10 +312,10 @@ func _run() -> void:
                         dloss += 1
         var dr := float(ddraws) / float(dgames)
         var dlr := float(dloss) / float(dgames)
-        _check(dr > 0.4,
-                "vs a DECENT player the CPU draws most (%.0f%% - it cannot bully good play)" % [dr * 100.0])
-        _check(dlr < 0.35,
-                "vs a DECENT player the CPU still holds (%.0f%% losses max)" % [dlr * 100.0])
+        _check(dr > 0.25,
+                "vs a DECENT player the CPU still draws most (%.0f%%)" % [dr * 100.0])
+        _check(dlr < 0.45,
+                "vs a DECENT player the CPU is beatable but holds (%.0f%% losses)" % [dlr * 100.0])
 
         # ---- the 3-round rhythm on a LIVE run ----
         var g3: GogaGame = XO.new()

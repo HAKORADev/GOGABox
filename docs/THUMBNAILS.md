@@ -110,7 +110,7 @@ What exists if it ever comes back:
 | snake | 960x640 COMPOSED | the owner's literal pose spec (9-long L, apple 3 ahead) + staged coin |
 | rally | 960x640 COMPOSED | court spec: paddles, net, ball just smashed off the player |
 | lanes | 960x640 COMPOSED | near-miss spec: block nose-down above the ship |
-| slasher | 960x640 COMPOSED | fruit arc + blade trail + bomb spec |
+| slasher | 960x640 COMPOSED | v0.2.9 rework: the dusk minimal bg, the painted fruits, the split watermelon (masked flesh faces) + juice, the blade ribbon, the coin, the glowing bomb |
 | hopper | 960x640 COMPOSED | climb spec: zigzag platforms, player mid-air |
 | merge | 960x640 COMPOSED | v0.2.8 warm-paper board: real 4x4 grid + coin cell + hero glow (the +1 pop is gone - its Kenney 1 read as 41) |
 | dario | 960x640 COMPOSED | leap spec: hero over the pit, coins, walker, flag |

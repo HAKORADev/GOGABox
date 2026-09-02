@@ -28,7 +28,7 @@ import math
 import os
 import sys
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from derive_assets import font, INK, CARD, ACCENT, HOT, GOOD, COIN, BAD  # noqa: E402
@@ -436,38 +436,98 @@ def scene_lanes(spec=LANES_SPEC):
 
 # ----------------------------------------------------------------- slasher
 
+# The v0.2.9 REWORK look: the dusk minimal background, the painted fruits,
+# a sliced watermelon mid-burst (the halves + the juice), the glowing
+# blade ribbon, the coin riding by.
 SLASHER_SPEC = dict(
-    fruits=((0, 0.30, 0.30, 1.05), (1, 0.52, 0.22, 0.92),
-            (2, 0.70, 0.42, 1.0)),      # (kind, fx, fy, scale)
-    bomb=(0.87, 0.66, 0.95),
-    slash=((0.08, 0.86), (0.36, 0.60), (0.62, 0.70), (0.92, 0.24)),
-    gold=(0.16, 0.44, 0.8),
+    fruits=((0, 0.28, 0.28, 0.60), (1, 0.74, 0.30, 0.56),
+            (2, 0.56, 0.18, 0.54)),      # (kind, fx, fy, scale)
+    bomb=(0.88, 0.74, 0.78),
+    slash=((0.05, 0.90), (0.28, 0.64), (0.54, 0.74), (0.90, 0.18)),
+    juice=((0.40, 0.52), (0.48, 0.62), (0.36, 0.66), (0.52, 0.46)),
+    coin=(0.13, 0.38, 0.40),
 )
 
 
 def scene_slasher(spec=SLASHER_SPEC):
     sc = Scene()
-    sc.solid((74, 47, 24))
-    sc.rect([0, H * 0.62, W, H], fill=(94, 62, 32))    # the board planks
-    for i in range(5):                                 # plank seams
-        y = H * 0.62 + i * H * 0.078
-        sc.line([(0, y), (W, y)], (74, 47, 24, 120), width=3)
-    sc.vignette(100)
+    sc.backdrop((23, 50, 63), (29, 26, 38))
+    dr = ImageDraw.Draw(sc.work)
+    for r_i in range(3):                       # the slow light rays
+        sw = W * (0.14 + 0.05 * r_i)
+        x = W * (0.16 + 0.36 * r_i) - sw
+        dr.polygon([(x, -10), (x + sw, -10), (x + sw * 1.9 + W * 0.1, H + 10),
+                    (x + sw * 0.7 + W * 0.1, H + 10)],
+                   fill=(255, 255, 255, 9))
+    rr = __import__("random").Random(77)       # the drifting bokeh
+    for i in range(12):
+        bx, by = rr.uniform(0, W), rr.uniform(0, H)
+        sc.ellipse([bx - 7, by - 7, bx + 7, by + 7], fill=(255, 255, 240, 14))
     for kind, fx, fy, s in spec["fruits"]:
         x, y = fx * W, fy * H
-        sc.glow(x, y, 80, (255, 220, 150), 45)
-        sc.stamp("games/slasher/fruit_%d.png" % kind, x, y, scale=s)
-    if spec.get("gold"):
-        fx, fy, s = spec["gold"]
-        sc.glow(fx * W, fy * H, 86, (255, 210, 80), 90)
-        sc.stamp("games/slasher/fruit_gold.png", fx * W, fy * H, scale=s)
+        sc.glow(x, y, 90, (255, 220, 150), 42)
+        sc.stamp("games/slasher/f_%s.png"
+                 % ["watermelon", "orange", "apple"][kind], x, y, scale=s)
+    # the SLICED watermelon: two halves split apart, the pale flesh masked
+    # to the fruit's silhouette, the juice drops flying
+    juice = (255, 92, 109)
+    for half_img, side in _watermelon_halves():
+        rot = -22 * side
+        hx = 0.42 * W - 30 * side
+        hy = 0.56 * H + (8 if side < 0 else -6)
+        half_img = half_img.rotate(rot, expand=True, resample=Image.BICUBIC)
+        sc.work.alpha_composite(half_img, (int(hx - half_img.width / 2),
+                                           int(hy - half_img.height / 2)))
+    for jx, jy in spec["juice"]:
+        sc.ellipse([jx * W - 9, jy * H - 9, jx * W + 9, jy * H + 9],
+                   fill=juice + (235,))
+        sc.ellipse([jx * W - 4, jy * H - 4, jx * W + 4, jy * H + 4],
+                   fill=(255, 255, 255, 60))
     if spec.get("bomb"):
         fx, fy, s = spec["bomb"]
+        sc.glow(fx * W, fy * H, 70, (255, 120, 60), 60)
         sc.stamp("games/slasher/bomb.png", fx * W, fy * H, scale=s)
-    # the blade trail (the player's finger)
+    if spec.get("coin"):
+        fx, fy, s = spec["coin"]
+        sc.glow(fx * W, fy * H, 80, (255, 210, 80), 95)
+        sc.stamp("ui/coin.png", fx * W, fy * H, scale=s)
     pts = [(fx * W, fy * H) for fx, fy in spec["slash"]]
-    sc.line(pts, (255, 255, 255, 235), width=9)
+    sc.line(pts, (140, 220, 255, 90), width=22)
+    sc.line(pts, (255, 255, 255, 240), width=8)
+    sc.vignette(78)
     return sc.render()
+
+
+def _watermelon_halves():
+    """the two cut halves: the pale flesh face is MASKED to the fruit's
+    alpha so nothing pokes out of the silhouette"""
+    out = []
+    img = Image.open(game_asset("games/slasher/f_watermelon.png")).convert("RGBA")
+    w, h = img.size
+    for side in (-1, 1):
+        if side < 0:
+            half = img.crop((0, 0, w // 2, h))
+            fx = w // 2 - 3               # the cut edge is the RIGHT side
+        else:
+            half = img.crop((w // 2, 0, w, h))
+            fx = 3
+        hw, hh = half.size
+        flesh = Image.new("RGBA", (hw, hh), (0, 0, 0, 0))
+        fd = ImageDraw.Draw(flesh)
+        fd.rectangle([fx - 16 if side < 0 else fx - 2, int(hh * 0.04),
+                      fx + (2 if side < 0 else 16), int(hh * 0.96)],
+                     fill=(255, 96, 110, 255))
+        fd.rectangle([fx - 7 if side < 0 else fx - 1, int(hh * 0.10),
+                      fx + (1 if side < 0 else 7), int(hh * 0.90)],
+                     fill=(255, 214, 170, 255))
+        fd.rectangle([fx - 3 if side < 0 else fx - 1, int(hh * 0.16),
+                      fx + (1 if side < 0 else 3), int(hh * 0.84)],
+                     fill=(255, 244, 214, 255))
+        alpha = half.getchannel("A")
+        flesh.putalpha(ImageChops.multiply(flesh.getchannel("A"), alpha))
+        half.alpha_composite(flesh)
+        out.append((half, side))
+    return out
 
 
 # ------------------------------------------------------------------ hopper

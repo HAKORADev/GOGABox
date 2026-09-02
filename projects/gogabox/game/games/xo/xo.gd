@@ -41,25 +41,28 @@ const MEM_ROUNDS := 2        # owner: "short memory only for 2 rounds"
 ## round the machine wears another one - the same hand, four moods. The
 ## knobs keep the owner's balance law: strong blocks (rarely loses), small
 ## miss chances (not smart enough to always win).
+## v0.2.9 TUNING (owner: "tweak the AI to miss a little from round to
+## round so the user could win sometimes") - the miss chances grew. The
+## four moods rotate INVISIBLY (the owner: "just keep it one name: CPU").
 const PROFILES := {
         "wall": {
-                "title": "THE WALL", "miss_win": 0.05, "skip_block": 0.02,
-                "fork_watch": 0.85, "noise": 0.22,
+                "miss_win": 0.13, "skip_block": 0.08,
+                "fork_watch": 0.80, "noise": 0.26,
                 "w_build": 1.5, "w_block": 2.7, "w_pos": 1.5,
         },
         "trick": {
-                "title": "THE TRICKSTER", "miss_win": 0.03, "skip_block": 0.03,
-                "fork_watch": 0.95, "noise": 0.30,
+                "miss_win": 0.11, "skip_block": 0.10,
+                "fork_watch": 0.92, "noise": 0.34,
                 "w_build": 2.6, "w_block": 1.9, "w_pos": 1.2,
         },
         "rusher": {
-                "title": "THE RUSHER", "miss_win": 0.02, "skip_block": 0.08,
-                "fork_watch": 0.55, "noise": 0.34,
+                "miss_win": 0.10, "skip_block": 0.17,
+                "fork_watch": 0.50, "noise": 0.38,
                 "w_build": 3.0, "w_block": 1.6, "w_pos": 1.1,
         },
         "sage": {
-                "title": "THE SAGE", "miss_win": 0.04, "skip_block": 0.04,
-                "fork_watch": 0.75, "noise": 0.26,
+                "miss_win": 0.12, "skip_block": 0.12,
+                "fork_watch": 0.70, "noise": 0.30,
                 "w_build": 2.2, "w_block": 2.2, "w_pos": 1.3,
         },
 }
@@ -91,6 +94,14 @@ var streak := 0
 var mem: Array = []           # FIFO, MEM_ROUNDS long
 var cur: Dictionary = {}      # this round's record {open, reply, fork}
 
+# THE OPENER LAW (owner v0.2.9: "the loser starts first next round") -
+# a draw flips the opener; round 1 belongs to the player
+var next_opener := X
+var last_opener := X
+# the one-shot strike (owner: "just the yellow line" - no highlight, no
+# zoom; it draws ONCE and stays)
+var strike_t := 1.0
+
 # the round's profile (rotates; the owner: "different profiles")
 var profile_order: Array = ["wall", "trick", "rusher", "sage"]
 var profile_i := 0
@@ -114,7 +125,6 @@ var you_t: Label
 var draw_t: Label
 var cpu_t: Label
 var turn_lbl: Label
-var note_lbl: Label
 var cell := 190.0
 var board_origin := Vector2.ZERO
 var _dust: Array = []         # pencil dust particles
@@ -381,31 +391,20 @@ func _build_board(vp: Vector2) -> void:
                 t.pressed.connect(func(): _tap_cell(i))
                 world.add_child(t)
                 cells_ui.append(t)
-        # the amber winners glow + the strike line live here
+        # THE STRIKE (owner v0.2.9: "just the yellow line with no yellow
+        # highlight and no zoom in/out effect") - one amber marker swipe,
+        # drawn once, then it simply STAYS
         win_holder = Node2D.new()
         win_holder.z_index = 3
         win_holder.draw.connect(func():
                 var wl: Array = last_win_line
-                if wl.is_empty():
+                if wl.is_empty() or strike_t <= 0.0:
                         return
-                var a := 0.5 + 0.5 * sin(_time * 6.0)
-                for i in wl:
-                        var ii: int = int(i)
-                        var cx: int = ii % 3
-                        var cy: int = ii / 3
-                        win_holder.draw_rect(Rect2(board_origin + Vector2(cx * cell + 6, cy * cell + 6),
-                                        Vector2(cell - 12, cell - 12)),
-                                        Color(AMBER, 0.14 + 0.10 * a))
                 var p0 := _cell_mid(wl[0])
                 var p1 := _cell_mid(wl[2])
-                var dir := (p1 - p0).normalized()
-                var perp := Vector2(-dir.y, dir.x)
-                # the strike grows with the pulse (a marker swipe)
-                var grow := 0.5 + 0.5 * a
-                var mid := p0.lerp(p1, grow)
-                var pts := _wobble_line(p0, mid, 6, 2.2)
-                win_holder.draw_polyline(pts, Color(AMBER, 0.9), 12.0, true)
-                win_holder.draw_circle(mid + perp * 0.0, 4.0, Color(AMBER, 0.9)))
+                var pts := _wobble_line(p0, p0.lerp(p1, clampf(strike_t, 0.0, 1.0)),
+                                8, 2.0)
+                win_holder.draw_polyline(pts, Color(AMBER, 0.95), 11.0, true))
         world.add_child(win_holder)
         # the turn line + the coin note (the thinking dots live IN the turn
         # text - no floating widgets to collide with)
@@ -414,11 +413,6 @@ func _build_board(vp: Vector2) -> void:
         turn_lbl.custom_minimum_size = Vector2(vp.x, 40)
         turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         world.add_child(turn_lbl)
-        note_lbl = Arc.label("", 19, Color(0.45, 0.42, 0.38))
-        note_lbl.position = Vector2(0, board_origin.y - 52.0)
-        note_lbl.custom_minimum_size = Vector2(vp.x, 28)
-        note_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        world.add_child(note_lbl)
 
 var last_win_line: Array = []
 
@@ -502,7 +496,9 @@ func _new_round() -> void:
         last_win_line = []
         win_holder.queue_redraw()
         rounds += 1
-        turn = X if rounds % 2 == 1 else O   # the opener alternates
+        # THE OPENER LAW: the loser of the last round starts; a draw flips
+        last_opener = next_opener
+        turn = next_opener
         clock = 0.0
         # the state resumes WITH the round (the round_over beat must never
         # swallow the next round)
@@ -522,18 +518,7 @@ func _new_round() -> void:
         coin_t = 0.0
         if done_rounds > 0 and done_rounds % COIN_EVERY == 0:
                 coin_cell = _rng.randi() % 9
-        _note_refresh()
         _banner()
-
-func _note_refresh() -> void:
-        if coin_cell >= 0:
-                note_lbl.text = "- a GOGACoin is on the board - mark its cell to take it -"
-                note_lbl.add_theme_color_override("font_color", Color("8a6a14"))
-        else:
-                var left := COIN_EVERY - (done_rounds % COIN_EVERY)
-                note_lbl.text = "the next GOGACoin lands in %d round%s" % [left,
-                                "" if left == 1 else "s"]
-                note_lbl.add_theme_color_override("font_color", Color(0.45, 0.42, 0.38))
 
 func _tap_cell(i: int) -> void:
         if state != "play" or turn != X or int(board[i]) != 0:
@@ -564,9 +549,14 @@ func _after_move() -> void:
                 return
         turn = O if turn == X else X
         clock = 0.0
+        # THE ONE-MOVE LAW (v0.2.9: the CPU played round after round because
+        # the state stayed "ai_wait" when the turn came back to the player -
+        # the tick kept firing _ai_move and the machine drew O after O)
         if turn == O:
                 state = "ai_wait"
                 think_beat = _rng.randf_range(0.5, 0.95)
+        else:
+                state = "play"
         _banner()
 
 func _banner() -> void:
@@ -576,10 +566,10 @@ func _banner() -> void:
                 turn_lbl.text = "YOUR MOVE"
                 turn_lbl.add_theme_color_override("font_color", X_RED)
         else:
-                # the thinking dots live in the text (three pencil dots cycle)
+                # ONE NAME (owner v0.2.9: "just keep it one name which is
+                # CPU") - the profiles rotate invisibly underneath
                 var n := int(_time * 2.5) % 3 + 1
-                turn_lbl.text = "%s IS THINKING%s" % [PROFILES[profile]["title"],
-                                " .".repeat(n)]
+                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(n)
                 turn_lbl.add_theme_color_override("font_color", O_BLUE)
 
 func _place(i: int, who: int) -> void:
@@ -595,12 +585,11 @@ func _place(i: int, who: int) -> void:
         holder.rotation = -0.5 if who == X else 0.4
         world.add_child(holder)
         marks[i] = holder
-        var lw := 20.0
         var seed_n := i * 31 + who * 7 + rounds * 13
         if who == X:
-                _draw_x(holder, seed_n, lw)
+                _draw_x(holder, seed_n)
         else:
-                _draw_o(holder, seed_n, lw)
+                _draw_o(holder, seed_n)
         var tw := holder.create_tween().set_parallel(true)
         tw.tween_property(holder, "scale", Vector2.ONE, 0.26) \
                 .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -613,66 +602,102 @@ func _place(i: int, who: int) -> void:
         if who == X and _winning_cells(board, X).size() >= 2:
                 cur["fork"] = true
 
-func _draw_x(holder: Node2D, seed_n: int, lw: float) -> void:
-        var r := cell * 0.28
-        for flips in 2:
-                var sign_y := 1.0 if flips == 0 else -1.0
-                var a := Vector2(-r, -r * sign_y)
-                var b := Vector2(r, r * sign_y)
-                # the dark under-stroke (the sketch depth)
-                var under := Line2D.new()
-                under.width = lw
-                under.default_color = X_DARK
-                under.points = _wobble_pts(a + Vector2(4, 4), b + Vector2(4, 4), seed_n + flips * 91)
-                under.end_cap_mode = Line2D.LINE_CAP_ROUND
-                holder.add_child(under)
-                var main := Line2D.new()
-                main.width = lw
-                main.default_color = X_RED
-                main.points = _wobble_pts(a, b, seed_n + flips * 37)
-                main.end_cap_mode = Line2D.LINE_CAP_ROUND
-                holder.add_child(main)
+# ---------------------------------------------------------------- THE MARKS
+# v0.2.9 THE REAL SKETCH (owner: "they are not real sketchy, they feels
+# like polygons") - no more Line2D segments: every stroke is SMOOTH NOISE
+# (two layered sines, never corners) painted as circle stamps with a
+# TAPERED width (thin at the ends, full in the middle, the ink breathing
+# along the way) over a dark under-stroke. It reads as a felt-tip marker
+# drawn by a human hand.
 
-func _draw_o(holder: Node2D, seed_n: int, lw: float) -> void:
-        var r := cell * 0.28
-        var under := Line2D.new()
-        under.width = lw
-        under.default_color = O_DARK
-        under.points = _wobble_ring(r + 3.0, seed_n + 55)
-        under.end_cap_mode = Line2D.LINE_CAP_ROUND
-        holder.add_child(under)
-        var ring := Line2D.new()
-        ring.width = lw
-        ring.default_color = O_BLUE
-        ring.points = _wobble_ring(r, seed_n)
-        ring.end_cap_mode = Line2D.LINE_CAP_ROUND
-        holder.add_child(ring)
+func _draw_x(holder: Node2D, seed_n: int) -> void:
+        var r := cell * 0.26
+        var painter := Node2D.new()
+        painter.z_index = 1
+        painter.draw.connect(func():
+                _paint_stroke(painter, Vector2(-r, -r), Vector2(r, r),
+                                seed_n, X_RED, X_DARK, cell * 0.075)
+                _paint_stroke(painter, Vector2(-r, r), Vector2(r, -r),
+                                seed_n + 7, X_RED, X_DARK, cell * 0.075))
+        holder.add_child(painter)
 
-## the wobble lives in GAME space (fixed per mark) - a rotated holder does
-## not re-wobble the stroke
-func _wobble_pts(a: Vector2, b: Vector2, seed_n: int) -> PackedVector2Array:
-        var pts := PackedVector2Array()
+func _draw_o(holder: Node2D, seed_n: int) -> void:
+        var r := cell * 0.26
+        var painter := Node2D.new()
+        painter.z_index = 1
+        painter.draw.connect(func():
+                var pts := _ring_path(seed_n, r)
+                var under: PackedVector2Array = pts.duplicate()
+                for k in under.size():
+                        under[k] = under[k] + Vector2(3, 3)
+                _stamp_path(painter, under, O_DARK, Color(O_DARK, 0.55),
+                                cell * 0.066, true)
+                _stamp_path(painter, pts, O_BLUE, Color(O_BLUE, 0.97),
+                                cell * 0.066, true))
+        holder.add_child(painter)
+
+## the smooth noisy centerline of a stroke (smooth sines - zero corners)
+func _stroke_path(a: Vector2, b: Vector2, sd: int) -> PackedVector2Array:
         var rng := RandomNumberGenerator.new()
-        rng.seed = seed_n
+        rng.seed = sd
+        var p1 := rng.randf_range(0.0, TAU)
+        var p2 := rng.randf_range(0.0, TAU)
+        var f1 := rng.randf_range(1.5, 2.3)
+        var f2 := rng.randf_range(3.2, 4.4)
+        var amp := cell * 0.022
         var dir := (b - a).normalized()
         var perp := Vector2(-dir.y, dir.x)
-        for k in 7:
-                var f := float(k) / 6.0
-                var p := a.lerp(b, f)
-                pts.append(p + perp * rng.randf_range(-2.6, 2.6))
+        var pts := PackedVector2Array()
+        var n := 30
+        for k in n + 1:
+                var f := float(k) / float(n)
+                var nz := sin(f * f1 * TAU + p1) * 0.62 \
+                                + sin(f * f2 * TAU + p2) * 0.38
+                pts.append(a.lerp(b, f) + perp * (nz * amp))
         return pts
 
-func _wobble_ring(r: float, seed_n: int) -> PackedVector2Array:
-        var pts := PackedVector2Array()
+## the ring the hand really draws: the radius drifts, the close-overlaps
+func _ring_path(sd: int, r: float) -> PackedVector2Array:
         var rng := RandomNumberGenerator.new()
-        rng.seed = seed_n
+        rng.seed = sd
+        var p1 := rng.randf_range(0.0, TAU)
+        var p2 := rng.randf_range(0.0, TAU)
         var a0 := rng.randf_range(0.0, TAU)
-        for k in 25:
-                var ang := a0 + TAU * float(k) / 24.0
-                var rr := r + rng.randf_range(-2.4, 2.4)
-                pts.append(Vector2(cos(ang), sin(ang)) * rr)
-        pts.append(pts[0])
+        var pts := PackedVector2Array()
+        var n := 42
+        for k in n + 1:
+                var f := float(k) / float(n)
+                var ang := a0 + TAU * f * 1.1          # the close overlaps
+                var wob := sin(ang * 2.0 + p1) * r * 0.05 \
+                                + sin(ang * 3.0 + p2) * r * 0.035
+                pts.append(Vector2(cos(ang), sin(ang))
+                                * (r * (1.0 + 0.06 * f) + wob))
         return pts
+
+## circle stamps along a path - the tapered, breathing marker ink
+func _stamp_path(cv: CanvasItem, pts: PackedVector2Array, col_a: Color,
+                col_b: Color, w: float, taper := true) -> void:
+        var n := pts.size()
+        for k in n:
+                var f := 0.5
+                if n > 1:
+                        f = float(k) / float(n - 1)
+                var tw := w * 0.5
+                if taper:
+                        var mid := 0.5 - 0.5 * cos(f * TAU)
+                        tw = w * (0.16 + 0.84 * pow(mid, 0.7))
+                var c := col_a.lerp(col_b, 0.5 + 0.5 * sin(f * 9.0))
+                cv.draw_circle(pts[k], tw, c)
+
+## a full stroke: the dark under-copy then the tapered ink
+func _paint_stroke(cv: CanvasItem, a: Vector2, b: Vector2, sd: int,
+                col: Color, dark: Color, w: float) -> void:
+        var pts := _stroke_path(a, b, sd)
+        var under: PackedVector2Array = pts.duplicate()
+        for k in under.size():
+                under[k] = under[k] + Vector2(3, 3)
+        _stamp_path(cv, under, dark, Color(dark, 0.55), w * 0.92, true)
+        _stamp_path(cv, pts, col, Color(col, 0.94), w, true)
 
 func _coin_taken(who: int) -> void:
         coin_cell = -1
@@ -686,7 +711,6 @@ func _coin_taken(who: int) -> void:
                 _toast_show("THE CPU GRABBED THE COIN")
         if is_instance_valid(_coin_layer):
                 _coin_layer.queue_redraw()   # the coin is GONE the same frame
-        _note_refresh()
 
 var _last_placed := 0
 
@@ -714,16 +738,28 @@ func _resolve(w: int) -> void:
         elif w == O:
                 losses += 1
                 streak = 0
-                add_score(-1)                    # THE OWNER'S LAW: loss = -1
-                turn_lbl.text = "%s WINS  -1" % PROFILES[profile]["title"]
+                # THE OWNER'S LAWS: loss = -1, but the score NEVER goes
+                # negative (v0.2.9: "-1 on 0 should be 0, not -1 -2 -3")
+                if score > 0:
+                        add_score(-1)
+                turn_lbl.text = "CPU WINS  -1"
                 turn_lbl.add_theme_color_override("font_color", O_BLUE)
                 Jukebox.sfx("xo_lose", -3.0)
         else:
                 draws += 1
                 add_score(0)                     # a draw pays nothing
-                turn_lbl.text = "DRAW  -  THE WALL HOLDS"
+                turn_lbl.text = "DRAW"
                 turn_lbl.add_theme_color_override("font_color", Color("4b5563"))
                 Jukebox.sfx("xo_draw", -4.0)
+        # THE OPENER LAW: the loser starts next; a draw flips the opener
+        if w == X:
+                next_opener = O
+        elif w == O:
+                next_opener = X
+        else:
+                next_opener = O if last_opener == X else X
+        if last_win_line.size() == 3:
+                strike_t = 0.0                   # the strike draws ONCE
         achievement_max("max_score", score)
         mem = remember(mem, cur)                 # THE 2-ROUND MEMORY
         _refresh_widget()
@@ -743,11 +779,9 @@ func _goga_tick(delta: float) -> void:
                         _ai_move()
         elif state == "round_over":
                 clock += delta
-                # the winners pulse (marks breathe on the strike)
-                var pulse := 1.0 + 0.07 * sin(_time * 6.0)
-                for i in last_win_line:
-                        if is_instance_valid(marks[i]):
-                                marks[i].scale = Vector2.ONE * pulse
+                # the strike grows once and stays (no zoom, no pulse)
+                if strike_t < 1.0:
+                        strike_t = minf(1.0, strike_t + delta * 3.4)
                 if clock >= 1.7:
                         _new_round()
         coin_t += delta
