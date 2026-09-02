@@ -11,7 +11,9 @@ extends RefCounted
 ##   age      "everyone" | "kids" | "teens"
 ##   charges  {"per_round": n, "capacity": n, "regen_minutes": m}  GOGABatteries (omit = free play)
 ##   banner   true -> this game's own view carries the ad banner (opt-in;
-##            turn-based/slow games only - never fast action)
+##            v0.2.6 THE OWNER LAW: every game wears one except the snowy
+##            tower - its controls live at the bottom; games reserve the
+##            strip with the shared banner_safe_px helper)
 ##   hours    {"from": h, "to": h}  playable only inside the window (local time)
 ##   blocked_hours {"from": h, "to": h}     NOT playable inside the window
 ##   reveal   {"kind": "chain"|"orders"|"inbox"|"real"|"direct", ...}
@@ -70,6 +72,7 @@ const GAMES := [
                 "coin_div": 4, "price": 150, "fee": 8, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "banner": true,   # v0.2.6: the court insets above the banner
                 "daily_rounds": 6,   # v0.1.4: 6 rounds a day, resets 12AM 00:00
                 "desc": "Real pong now: goals pay points, every hit heats the ball x1.1 until it burns red, coins and powerups ride the court, and the extra walls hunt YOU. The pause menu's END banks the run.",
                 "controls": ["hold anywhere - your platform follows the finger along its axis", "a goal for you +1, a goal on you -1", "every hit heats the ball x1.1 until the next serve", "END in the pause menu banks the earnings"],
@@ -108,6 +111,7 @@ const GAMES := [
                 "coin_div": 50, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "blocked_hours": {"from": 1, "to": 8},
                 "daily_rounds": 6, "daily_minutes": 15,
                 "desc": "Five lanes, a sky FULL of enemy ships, four weapons. Kills are score, wrecks drop loot, and the war only gets harder the more you kill. Buy ships, weapons and spaces in the shop.",
@@ -139,6 +143,7 @@ const GAMES := [
                 "coin_div": 20, "price": 250, "fee": 15, "shop": false,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
                 "desc": "Fruits fly, your finger is the blade. Slash combos for juice, avoid the bombs - one wrong swipe slices the run short.",
                 "controls": ["swipe across fruits to slice them", "multi-slices in one swipe = combo", "never touch the bombs"],
@@ -182,17 +187,20 @@ const GAMES := [
                 "coin_div": 10, "price": 300, "fee": 12, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
+                # NO banner here (v0.2.6 owner law: the tower's controls live
+                # at the bottom - every OTHER game carries the banner)
                 "hours": {"from": 16, "to": 22},
-                "desc": "Climb an endless tower of icy platforms while real snow falls, lands and loads you down. Five platform kinds, two walls, a scroll that never waits - and the run bonus is yours at the bottom.",
+                "desc": "Climb an endless tower of icy platforms while real snow falls, lands and piles up. Eat the snow with MELTING to grow - or shrink away where it's bare. Five platform kinds, two walls, a scroll that never waits.",
                 "controls": [
-                        "hold the LEFT / RIGHT arrows to walk - the ball rolls as it moves",
-                        "tap the JUMP circle to hop - one press, one jump",
-                        "score is platforms climbed: land higher than ever for +1, skipping platforms still pays 1, landing lower pays nothing",
+                        "touch the LEFT half of the screen and SLIDE your finger: that is the movement - the further from where you touched, the faster and harder, back to your touch point = stop (left-right only)",
+                        "tap the RIGHT half of the screen to JUMP - one tap, one jump",
+                        "score is platforms climbed: land higher than ever for +1, skipping platforms still pays 1, landing lower pays nothing - the start platform pays nothing",
                         "the scroll starts after 2 platforms and climbs x1.1 every 10 - falling below the screen ends the run",
-                        "real snow lands on platforms and piles on YOU: loaded down you accelerate slower and jump weaker - roll to shed it",
-                        "powerups bought in the shop spawn on platforms: x2 double jump, up arrow big jump, >> speed, -50% slow slide - each 10s, the ring inside the jump button drains as time runs out",
-                        "GOGACoins hang between platforms - one every 5-25 platforms, counted from the last coin on screen",
-                        "the shop sells characters (ball/square/triangle/egg, each with its own physics), platform skins (sand/rock/metal/grass), the night place and the powerups"],
+                        "snow falls for REAL: platforms start bare and catch it flake by flake (moving platforms shake it off), and flakes that reach YOU make you slow and heavy - roll to shed it",
+                        "MELTING (shop, toggle): ON, you eat the snow under you and GROW (max x1.5); moving fast eats slower; where there is no snow you SHRINK until the run ends - a real risk",
+                        "powerups bought in the shop spawn on platforms: x2 double jump, up arrow big jump, >> speed, -50% slow slide - each 10s, shown in the widget on top with its timer",
+                        "GOGACoins hang between platforms - one every 5-25 platforms, counted from the last coin on screen; never on the start platform",
+                        "the shop sells characters (ball/square/triangle/egg, each its own physics and its own real tumbling), platform skins (sand/rock/metal/grass), the night place, the powerups and MELTING"],
                 "genres": {"main": ["arcade", "adventure"], "sub": ["platformer", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -229,6 +237,7 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 60, "price": 350, "fee": 12, "shop": false,
                 "reveal": {"kind": "chain"},
+                "banner": true,   # v0.2.6: the JUMP button lifts above the strip
                 "desc": "A proper little platformer - run, jump, stomp. Three levels of pits, walkers and coins, and a flag at the end of each.",
                 "controls": ["hold the left / right half to walk", "JUMP button (or swipe up) to jump", "land on walkers to squash them (+5)", "touch a walker sideways or fall into a pit and the run ends", "reach the flag to clear the level"],
                 "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "retro", "singleplayer"]},

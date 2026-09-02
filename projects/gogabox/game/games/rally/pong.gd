@@ -545,9 +545,12 @@ func _add_pad(id: String, is_user: bool, edge: String, axis: int,
 func _build_world() -> void:
         var vp := get_viewport_rect().size
         var top := 108.0
+        # v0.2.6: the banner strip is reserved at the bottom (BOTH courts -
+        # the user's pad sits at the bottom in both)
+        var bottom := 24.0 + banner_bottom()
         field = Rect2(Vector2(24.0, top),
                         Vector2(maxf(200.0, vp.x - 48.0),
-                                        maxf(200.0, vp.y - top - 24.0)))
+                                        maxf(200.0, vp.y - top - bottom)))
         pads.clear()
         pads_by_id.clear()
         # v0.2.3 patch THE TWO COURTS REALLY DIFFER (owner: "change the user

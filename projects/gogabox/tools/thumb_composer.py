@@ -472,36 +472,78 @@ def scene_slasher(spec=SLASHER_SPEC):
 
 # ------------------------------------------------------------------ hopper
 
+# v0.2.6: the thumb wears the CLEAN sky law (no mountains/trees), the
+# lumpy REAL snow caps, the small corner sun and the eye-ful characters.
 HOPPER_SPEC = dict(
-    platforms=((0.24, 0.78, 1.0), (0.62, 0.58, 1.0), (0.40, 0.34, 1.0)),
-    player=(0.46, 0.20, 1.0),     # mid-air between plat 2 and 3
-    snow=26,
+    platforms=((0.24, 0.80, 0.92), (0.64, 0.60, 0.80), (0.42, 0.36, 0.70)),
+    player=(0.47, 0.20),          # mid-air between plat 2 and 3
+    snow=30,
+    coin=(0.76, 0.42),
 )
 
 
 def scene_hopper(spec=HOPPER_SPEC):
     sc = Scene()
-    sc.backdrop((140, 200, 235), (214, 238, 252))
-    # soft clouds
-    for cx, cy, s in ((0.18, 0.16, 1.0), (0.78, 0.30, 0.8), (0.55, 0.72, 0.9)):
+    sc.backdrop((140, 200, 235), (219, 240, 252))
+    # the SMALL sun (the snake law: tiny core, tight halo)
+    sx, sy = int(W * 0.86), int(H * 0.14)
+    sc.glow(sx, sy, 64, (255, 244, 200), 90)
+    sc.ellipse([sx - 30, sy - 30, sx + 30, sy + 30], fill=(255, 246, 214, 235))
+    sc.ellipse([sx - 20, sy - 20, sx + 20, sy + 20], fill=(255, 252, 236, 255))
+    # soft clean clouds
+    for cx, cy, s in ((0.20, 0.15, 1.0), (0.72, 0.30, 0.75), (0.50, 0.62, 0.85)):
         x, y = cx * W, cy * H
-        sc.ellipse([x - 90 * s, y - 26 * s, x + 90 * s, y + 26 * s],
-                   fill=(255, 255, 255, 160))
-        sc.ellipse([x - 46 * s, y - 44 * s, x + 40 * s, y + 8 * s],
-                   fill=(255, 255, 255, 170))
-    plat = load_sprite("games/hopper/platform.png")
-    player = load_sprite("games/hopper/player.png")
+        sc.ellipse([x - 95 * s, y - 24 * s, x + 95 * s, y + 24 * s],
+                   fill=(255, 255, 255, 175))
+        sc.ellipse([x - 48 * s, y - 44 * s, x + 42 * s, y + 6 * s],
+                   fill=(255, 255, 255, 185))
+    # platforms: sandy ledges with LUMPY snow caps that grew flake by flake
     for fx, fy, s in spec["platforms"]:
-        sc.stamp(plat, fx * W, fy * H, scale=s)
-    px, py, s = spec["player"]
-    sc.glow(px * W, py * H, 84, (255, 255, 255), 60)
-    sc.stamp(player, px * W, py * H, scale=s)
-    # snow (deterministic sprinkle)
+        px_, py_ = fx * W, fy * H
+        pw_, ph_ = 210 * s, 34 * s
+        sc.rect([px_ - pw_ / 2, py_ - ph_ / 2, px_ + pw_ / 2, py_ + ph_ / 2],
+                r=10, fill=(201, 168, 106))
+        sc.rect([px_ - pw_ / 2, py_ - ph_ / 2, px_ + pw_ / 2, py_ - ph_ / 2 + 10],
+                r=6, fill=(227, 201, 141))
+        # the lumps: overlapping half-ellipses riding the top edge
+        import random
+        rng = random.Random(int(fx * 1000))
+        n = 5
+        for i in range(n):
+            lx = px_ - pw_ / 2 + (i + 0.5) * pw_ / n
+            lr = (pw_ / n) * (0.62 + 0.22 * rng.random())
+            sc.ellipse([lx - lr, py_ - ph_ / 2 - lr * 0.9,
+                        lx + lr, py_ - ph_ / 2 + lr * 0.5],
+                       fill=(255, 255, 255, 244))
+    # a GOGACoin between the ledges
+    if spec.get("coin"):
+        kx, ky = spec["coin"][0] * W, spec["coin"][1] * H
+        sc.glow(kx, ky, 40, (255, 216, 110), 120)
+        sc.ellipse([kx - 20, ky - 20, kx + 20, ky + 20], fill=(246, 200, 80))
+        sc.ellipse([kx - 13, ky - 13, kx + 13, ky + 13],
+                   outline=(255, 232, 160), width=3)
+    # the SNOWBALL with its eyes (mouthless, the owner rule)
+    bx, by = spec["player"][0] * W, spec["player"][1] * H
+    R = 52
+    sc.glow(bx, by, 96, (255, 255, 255), 70)
+    sc.ellipse([bx - R, by - R, bx + R, by + R], fill=(143, 169, 189))
+    sc.ellipse([bx - R + 5, by - R + 5, bx + R - 5, by + R - 5],
+               fill=(223, 233, 242))
+    sc.ellipse([bx - R + 8, by - R + 12, bx + R - 8, by + R - 4],
+               fill=(255, 255, 255, 250))
+    sc.ellipse([bx - 30, by - 34, bx + 2, by - 2], fill=(255, 255, 255, 140))
+    for ex in (-14, 16):
+        sc.ellipse([bx + ex - 11, by - 16, bx + ex + 11, by + 8],
+                   fill=(255, 255, 255, 255))
+        sc.ellipse([bx + ex - 4, by - 8, bx + ex + 6, by + 3],
+                   fill=(26, 36, 48, 255))
+    # the falling snow (deterministic sprinkle)
     for i in range(spec.get("snow", 0)):
         x = (i * 367) % W
         y = (i * 211 + 40) % H
         r = 3 + (i % 3)
-        sc.ellipse([x, y, x + r, y + r], fill=(255, 255, 255, 220))
+        sc.ellipse([x, y, x + r, y + r], fill=(255, 255, 255, 215))
+    sc.vignette(80)
     return sc.render()
 
 

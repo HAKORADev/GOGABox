@@ -108,3 +108,70 @@ there. the current game is little good".
 - a probe-only lesson written down for the future: a seated test harness
   dies silently the moment its platform type can blink — force the seat
   solid and re-seat every tick
+
+## THE v0.2.6 VERDICT ROUND (the owner playtested v0.2.5)
+
+The owner came back with a list — and the list was right. Every line,
+root-caused and fixed:
+
+- THE DEAD JUMP BUTTON: the jump circle's `_gui_input` subtracted
+  `global_position` from a touch position that is ALREADY local — every
+  press landed far outside the circle. The probe had driven `_do_jump()`
+  directly, so the real input path was never tested. The buttons died
+  anyway (below); the probe now drives the REAL input path.
+- THE OWNER'S OWN CONTROLS replaced them: LEFT half = an analog move
+  zone (the first touch anchors; the finger's X offset from the anchor is
+  the FORCE — a dead point back at the anchor, full force at ~110px,
+  left-right only, Y ignored, tracked by touch index). RIGHT half = tap
+  to jump. Multi-touch safe.
+- THE BACKGROUNDS: the mountains + tree lines + aurora are GONE. Day is
+  a calm gradient + a SMALL round corner sun (the snake game's size law,
+  radii computed from the real viewport — the old UV orb stretched weird
+  on portrait) + drifting clouds. Night is a deep gradient + a small
+  crescent moon + ROUND star lights (dust + breathing glints — the first
+  draft drew square blocks: a `step` fills the whole grid cell, the fix
+  is a point distance inside the cell) + drifting night sparks.
+- THE NIGHT LEAK: day → night → day came back DARKER. `_day_night()`
+  re-added a CanvasModulate and freed the old one by NAME; on the second
+  switch Godot @-renamed the new node (same-frame name collision with
+  the not-yet-freed old one), so the third switch's lookup MISSED and
+  the night tint survived forever under its renamed handle. ONE
+  CanvasModulate in a member var now; only its color swaps. Probed +
+  shot (day after night is exactly day).
+- REAL TUMBLING: the cube rotated in instant 90° snaps ("just updating
+  its look this weird way" — the owner). Now the cube and the shard
+  pivot CONTINUOUSLY over their leading corner/edge (θ = v / r), a
+  support-height law lifts the drawn body so the falling side RIDES the
+  platform, and stopping eases the body onto its nearest flat face with
+  a soft SLAP (new tower_slap.wav). Inertia decays in the air.
+- THE START PLATFORM paid +1 and a PHANTOM COIN spawned right on it
+  (`next_coin_idx` started at 0 — the coin sat exactly where the ball
+  spawns and was collected at run start). Start platform pays NOTHING
+  (`highest_idx` starts AT it), the first coin waits 5-25 platforms up.
+- THE FAKE SNOW: the caps filled so fast every platform looked
+  pre-snowed. Platforms are BORN BARE now, fill flake by flake (retuned
+  rate), the cap draws as flat wide domes that grow (the eyeball rounds:
+  circles read as balls; squares are wrong; flat ellipses read as snow),
+  moving platforms shake their snow off, blink-off platforms drop theirs.
+- MELTING (the owner's v0.2.6 upgrade): a shop item (500), toggled ON/OFF.
+  ON: the character eats the snow UNDER it and grows toward x1.5 (hard
+  cap — "not too much"); moving fast eats at a lower rate (down to ~30%
+  — "the faster the move the higher the consumption time and lower the
+  consumption rate"); no snow under it and it SHRINKS until the run ends
+  at x0.42 (tower_melt.wav drips, tower_puff.wav death, a live MELT
+  chip in the HUD). Its own risk loop against the slow-filling caps.
+- THE POWERUP WIDGET ON TOP: glyph + name + seconds + a draining bar
+  (the life ring inside the jump button died with the button).
+- BANNERS: every game wears the ad banner now EXCEPT the tower (the
+  owner: its controls live at the bottom) — pong insets its court in
+  both orientations, dario lifts its JUMP button, the shared
+  `banner_safe_px()` helper moved into the game base.
+- SFX: tower_melt / tower_slap / tower_puff join (tools/v026_sfx.py).
+- tests: tower_probe grew the v0.2.6 laws (start silence, first-coin
+  distance, the REAL input path — right-half tap jumps, the analog zone
+  anchors/dead-point/Y-ignoring, melt grow/eat/speed-floor/shrink/death,
+  born-bare + moving-sheds, tumble continuity + settle, the one-modulate
+  leak law, the widget); flow_test grew the banner law + melt constants.
+  ALL PASS. Xvfb QA re-shot 16 and eyeballed BEFORE shipping (the
+  owner's rule) — it caught the square stars, the ball-snow and the
+  stretched orb, none of which any headless law would catch.

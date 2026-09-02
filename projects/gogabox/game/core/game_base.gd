@@ -217,6 +217,28 @@ func _build_hud() -> void:
 func set_hud_score_prefix(prefix: String) -> void:
         _score_label.text = prefix + " " + str(score)
 
+## v0.2.6 THE SHARED BANNER STRIP: the 52dp Unity banner is a NATIVE view
+## in REAL px (the menu.gd math) - every game that wears one (registry
+## "banner": true) reserves this much LOGICAL space at its bottom so the
+## strip has a real place to appear. Snake carried its own copy; this is
+## the one-true-helper now.
+func banner_safe_px() -> float:
+        var dpi := DisplayServer.screen_get_dpi()
+        var win := DisplayServer.window_get_size()
+        var vp := get_viewport_rect().size
+        if win.x <= 0 or win.y <= 0 or vp.x <= 0.0 or vp.y <= 0.0:
+                return 64.0
+        var px_per_logical := minf(float(win.x) / vp.x, float(win.y) / vp.y)
+        var phys := 52.0 * dpi / 160.0 + 12.0
+        return maxf(64.0, ceilf(phys / maxf(0.05, px_per_logical)))
+
+## convenience: the reserved bottom inset for THIS game (0 when it does
+## not wear a banner)
+func banner_bottom() -> float:
+        if not bool(GameReg.get_game(game_id).get("banner", false)):
+                return 0.0
+        return banner_safe_px()
+
 ## Games with shops call this during _goga_setup() to get a HUD button.
 ## BUTTON SAFETY SYSTEM v0.0.8: buttons join the top bar BETWEEN the back
 ## button and the spacer - they stack side by side in normal flow, can never

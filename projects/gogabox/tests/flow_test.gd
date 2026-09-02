@@ -359,6 +359,15 @@ func _t_registry() -> int:
                 hop_floor = mini(hop_floor, int(HO.POWERUPS[pc_id]["price"]))
         ok += _check(hop_floor >= 250,
                 "the tower shop keeps a real price floor (cheapest = %d)" % hop_floor)
+        # v0.2.6: the banner law + MELTING (the owner's upgrade)
+        var banner_ok := true
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo"]:
+                banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
+        ok += _check(banner_ok, "every game but the tower carries the ad banner")
+        ok += _check(not bool(hop.get("banner", false)),
+                "the snowy tower stays banner-free (controls at the bottom)")
+        ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
+                "MELTING: a real price and the x1.5 growth cap")
         var geo: Dictionary = GameReg.get_game("geometry")
         ok += _check(bool(geo.get("coming_soon", false)) \
                         and int(geo["reveal"]["appear_after"]) == 0,

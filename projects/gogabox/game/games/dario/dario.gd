@@ -193,7 +193,8 @@ func _build_jump_button() -> void:
         var vp := get_viewport_rect().size
         var b := Arc.button("JUMP", Vector2(200, 96), 34, Arc.HOT, func():
                 _try_jump())
-        b.position = Vector2(vp.x - 224, vp.y - 120)
+        # v0.2.6: lifted above the banner strip (dario wears the banner now)
+        b.position = Vector2(vp.x - 224, vp.y - 120 - banner_bottom())
         _hud.add_child(b)
 
 func _try_jump() -> void:
