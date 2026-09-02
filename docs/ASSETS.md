@@ -111,3 +111,34 @@ Proven add-ons for future games (MIT/CC0 unless noted): *Phantom Camera*
 - `wood_portrait.png` / `wood_landscape.png` — composed from that
   background.jpg (mirrored tiling + vignette), tools inline in the
   session log.
+
+## v0.3.1 patch II — the Cursed Dario overhaul (provenance)
+
+The owner judged the v0.3.1 painted set "trash" and ordered a hard hunt
+("try hard because this is the most critical step in this whole game").
+Hunted via GitHub mirror search (the itch.io / kenney.nl storefronts stay
+JS-gated to bots), reviewed with contact sheets, and vendored:
+
+- `assets/games/dario/` — **Pixel Adventure** by Pixel Frog
+  (pixelfrog-assets.itch.io/pixel-adventure-1). The itch page licenses it
+  free for commercial and non-commercial use; vendored from the public
+  mirror `github.com/marpor/PixelAdventure` (its README calls the set
+  public domain). In the game: Pink Man (idle/run/jump/fall/hit), Snail,
+  Bat, Plant (+bullet), Rino, the spiky Turtle (REAL spikes-in /
+  spikes-out frames), Ghost (the Witcher's base), terrain tiles (grass /
+  dirt / bricks + the studded mover deck), crates (the ? overlay is
+  painted on), spikes, fire, falling platforms, the End trophy, the
+  trunk bullet (recolored purple = the curse bolt).
+- `assets/games/dario/bg_far.png` / `bg_mid.png` — **Sunny Land** by
+  Ansimuz (ansimuz.itch.io/sunny-land-pixel-art), licensed free for
+  commercial and non-commercial use; vendored from the public mirror
+  `github.com/Kevin1321/DA_Module_12_SunnyLand` (the forest background +
+  middleground parallax layers).
+- The Witcher = the PA Ghost recolored cursed-lavender with a pixel
+  witch hat baked on (`tools/v031b_dario_art.py` — the whole compose is
+  reproducible from that script).
+- The GOGACoin keeps its own `item_coin.png` (the Box-wide currency
+  identity). All sliced/pre-scaled nearest-neighbor only; the hunt
+  review sheets live in the session log (`hunt/r1..r8`).
+- The synthesized dario voices (v031_sfx) are unchanged; the slasher
+  whoosh family was REMOVED by owner law (silence is the slash).

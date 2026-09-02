@@ -732,9 +732,10 @@ func _on_drag(from: Vector2, to: Vector2) -> void:
                         _cut_item(p, from, to)
         # v0.3.1: no more glint sprite (the owner: "we do not need it
         # since we have our own finger-slasher thing") - the blade ribbon
-        # IS the effect. The swipe voice is DYNAMIC now: the speed picks
-        # the variant (see _swipe_voice)
-        _swipe_voice(seg.length() / maxf(0.0001, get_process_delta_time()))
+        # IS the effect. v0.3.1 PATCH II: the swipe sound is GONE entirely
+        # (the owner: "remove the slash sound completely, the rest of the
+        # SFXs are good") - slicing is a SILENT act now; the cuts, bombs
+        # and combos keep their voices.
 
 # ============================================================ the cut
 
@@ -943,40 +944,9 @@ func _flush_loss() -> void:
 
 # ============================================================ misc
 
-## THE DYNAMIC SWIPE VOICE (the owner: "reuse some parts in it and via
-## code you make it go like wheeeph or whoph based on slash movement
-## speed instead of repeating same audio in a weird way"). The whoosh
-## ships in FOUR speed cuts (sl_whoosh_lo/med/hi/fast - same body,
-## different lengths and brightness); the swipe's speed picks one, the
-## pitch shaves a little more character in, and a voice never restarts
-## while it can still be heard.
-var _voice_until := 0.0
-
-func _swipe_voice(speed_px_s: float) -> void:
-        var now := _time
-        if now < _voice_until:
-                return
-        var name_ := "sl_whoosh_med"
-        var pitch := 1.0
-        var dur := 0.16
-        if speed_px_s < 900.0:
-                name_ = "sl_whoosh_lo"
-                pitch = _rng.randf_range(0.92, 1.0)
-                dur = 0.22
-        elif speed_px_s < 1600.0:
-                name_ = "sl_whoosh_med"
-                pitch = _rng.randf_range(0.95, 1.06)
-                dur = 0.16
-        elif speed_px_s < 2600.0:
-                name_ = "sl_whoosh_hi"
-                pitch = _rng.randf_range(1.0, 1.12)
-                dur = 0.13
-        else:
-                name_ = "sl_whoosh_fast"
-                pitch = _rng.randf_range(1.06, 1.2)
-                dur = 0.10
-        _voice_until = now + dur * 0.8
-        Jukebox.sfx(name_, -10.0, pitch)
+## v0.3.1 PATCH II: the dynamic swipe voice block was REMOVED by owner law
+## ("remove the slash sound completely"). The four sl_whoosh_* cuts and
+## this function are gone from the game - silence IS the slash.
 
 func _point_segment_dist(pt: Vector2, a: Vector2, b: Vector2) -> float:
         var ab := b - a

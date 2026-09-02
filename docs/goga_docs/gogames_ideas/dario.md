@@ -84,3 +84,40 @@ the lore out. THE LORE CAME FIRST:
 - the art: the CC0 Kenney Platformer Art Deluxe (OGA) vendored (the
   license is in the pack) + the painted pieces in the same flat style
   (tools/v031_dario_art.py) + 12 voices (tools/v031_sfx.py)
+
+## v0.3.1 PATCH II - the owner playtest round (this is the law now)
+
+- the shop overlay BUG: closing freed only the sheet's center - the DIM
+  (mouse_filter STOP) stayed and ate every tap. THE PAIR LAW (merge2048's
+  _shop_pair) is now dario law: capture dim+center at open, drop BOTH at
+  close, and a buy rebuilds the sheet EXACTLY ONCE (the old tail stacked
+  copies of the sheet).
+- the movement BUG: TouchKit tracks ONE press - holding LEFT + tapping
+  RIGHT replaced the press and walking died on the first jump. Dario now
+  reads raw ScreenTouch BY INDEX: the first left-half touch owns the
+  analog walk anchor, any right-half press edge jumps. Two real thumbs.
+- the theme toggle: an owned night sky wears a WEAR THE NIGHT / WEAR THE
+  DAY switch (Box.unequip_item added for it).
+- the score table rebalanced: snail 5, fly 10, spitter 15, blocker 20,
+  spiky 25, the Witcher 100 (the owner: "why did the weakest give me
+  10?").
+- the dialogue: the game OPENS with the scrollable story square (THE
+  CURSE) + DONE; replays get the deja-vu variant. Story pop-ups are now
+  WHITE bubbles with BLACK text riding OVER DARIO'S HEAD.
+- the coins live INSIDE the ? crates (max 5 a level) and POP OUT on the
+  bump - no free-floating coins anywhere.
+- THE WORLD: continuous ground (no gaps, no floating grass), every
+  shelf/mover/ghost a 2-tile jump, every crate bump-reachable, the goal
+  trophy snaps onto the ground. Level 10 = the compact arena with the
+  GHOST PLATFORM LADDER (2.1s on / 1.5s off, offset phases, blink
+  warning) - the owner's own timed-climb design to her head.
+- the boss: she haunts her summoning ground (swing around her base, not
+  a hardcoded x), appear->idle frames, mercy iframes after every stomp
+  (no bounce-into-hurt chain).
+- THE ART: Pixel Adventure by Pixel Frog + Sunny Land parallax forest
+  (both free for commercial + non-commercial; mirrors + provenance in
+  docs/ASSETS.md). The Witcher is the Ghost recolored + a baked pixel
+  witch hat; the spikes are REAL frames now (spikes-out = deadly).
+- the sky is screen-space (the old world-space sky scrolled away with
+  the camera) and samples its color from the forest art; below the
+  ground is dark soil.

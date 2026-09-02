@@ -797,6 +797,14 @@ func equip_item(game_id: String, cat: String, item: String) -> void:
                 _items(game_id, cat)["on"] = item
                 save()
 
+## v0.3.1 PATCH II: clear a category's "on" (wear NOTHING). The dario
+## theme toggle needs it - an owned night sky must be able to go back to
+## the plain day without owning a fake "day" item. item_on(cat) reads ""
+## as "nothing equipped".
+func unequip_item(game_id: String, cat: String) -> void:
+        _items(game_id, cat)["on"] = ""
+        save()
+
 # ------------------------------------------------------------- skins (per game)
 
 func skin_owned(game_id: String, skin_id: String) -> bool:
