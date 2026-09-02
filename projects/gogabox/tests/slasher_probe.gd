@@ -69,33 +69,30 @@ func _run() -> void:
         g._flush_loss()
         _check(int(g.score) == 7, "-2 lands on a live score too (9 -> 7)")
 
-        # ---- the visualizer: merged, never spam ----
-        g.viz = []
-        g.set_score(5)
-        g._push_viz("+3", Color(0.45, 0.95, 0.55), 0)
-        g._push_viz("+7", Color(0.45, 0.95, 0.55), 0)
-        var gain_zone := 0
-        var young := 0
-        for v in g.viz:
-                if int(v["zone"]) == 0:
-                        gain_zone += 1
-                        if float(v["life"]) > float(v["max"]) * 0.55:
-                                young += 1
-        _check(gain_zone == 1 and young == 1,
-                "a young +N in the same zone MERGES (no + spam)")
-        g._push_viz("-2", Color(0.98, 0.42, 0.36), 1)
-        var zones := {}
-        for v in g.viz:
-                zones[int(v["zone"])] = true
-        _check(zones.size() == 2, "the gains and the losses live in TWO zones")
+        # ---- THE READER LAW v0.3.0 (the owner: "+1 next to the cut and
+        # -2 for each one fails") - one floater PER EVENT, no zones ----
+        g.floats = []
+        g._push_float("+1", Vector2(100, 100), Color(0.55, 1.0, 0.6), 34.0)
+        _check(g.floats.size() == 1 and String(g.floats[0]["txt"]) == "+1",
+                "a cut floats its own +1")
+        g._push_float("+1", Vector2(140, 160), Color(0.55, 1.0, 0.6), 34.0)
+        _check(g.floats.size() == 2, "two cuts = two floaters (NO merging)")
+        _check(String(g.floats[0]["txt"]) != String(g.floats[1]["txt"]) \
+                        or g.floats[0]["x"] != g.floats[1]["x"],
+                "the floaters live at their own spots")
 
-        # ---- the real slice: two halves fly apart ----
+        # ---- the real slice: the TWO REAL HALVES fly apart ----
         g.set_score(0)
+        g.floats = []
         var before_halves: int = int(g.halves.size())
-        g._cut_item(_make_item(g, "watermelon"), Vector2(60, 60),
+        g._cut_item(_make_item(g, "sandia"), Vector2(60, 60),
                         Vector2(180, 120))
         _check(g.halves.size() >= before_halves + 2,
-                "the fruit SPLIT into two textured halves")
+                "the fruit SPLIT into its two real art halves")
+        _check(g.floats.size() == 1 and String(g.floats[0]["txt"]) == "+1",
+                "the cut floats +1 next to the fruit")
+        _check(g.splats.size() >= 1 and g.drops.size() >= 10,
+                "REAL juice: a splat on the wood + droplets in the air")
         var moved := false
         if g.halves.size() > 0:
                 var h0: Dictionary = g.halves[0]
@@ -112,10 +109,14 @@ func _run() -> void:
         g._goga_tick(1.0 / 60.0)
         _check(g.halves.size() == hcount, "the halves live through a tick")
 
-        # ---- the hearts law ----
+        # ---- the hearts law + the REAL explosion ----
         g.hearts = 3
+        var rings_before: int = int(g.rings.size())
+        var smokes_before: int = int(g.smokes.size())
         g._bomb_slashed(Vector2(100, 100))
         _check(g.hearts == 2, "a slashed bomb takes ONE heart (not the run)")
+        _check(g.rings.size() >= rings_before + 2 and g.smokes.size() >= smokes_before + 8,
+                "the explosion is REAL: flash + shockwave + smoke")
         g.hearts = 1
         g._bomb_slashed(Vector2(100, 100))
         _check(g.hearts == 0 and bool(g._over),

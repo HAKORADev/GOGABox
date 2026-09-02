@@ -44,3 +44,34 @@ sheet, his spec.
   a split melon whose flesh face is masked to the silhouette.
 - ACHIEVEMENTS: Untouchable (bank a run with all three hearts), Sharp
   Blade (300 in a run), Juice Bar (100 slashed total).
+
+## v0.3.0 — THE VERDICT (the real face)
+
+The owner played the rework and sent a list headed "work harder on it so
+it gets even better than the real fruit ninja bruh!". What changed:
+
+- THE SLICE WAS INVISIBLE — root cause: the v0.2.9 halves were polygons
+  in a UNIT square scaled by the item scale (~0.5) = sub-pixel sprites;
+  all he saw was the splat ring and a fade. The fruit now swaps for its
+  two REAL pre-drawn halves (the classic art set ships them), aligned so
+  the flat faces sit on YOUR cut line, thrown apart with flips.
+- THE CLASSIC ART SET landed (the hunt: Kenney is a JS shell now, OGA's
+  fruit packs are pixel art or CC-BY-SA samples, the GitHub crayon pack
+  was reviewed and skipped) — apple, banana, basaha, peach, sandia, each
+  whole + two halves, the boom, the flash glint, the smoke, and the WOOD
+  BOARD (composed into portrait/landscape plates with mirrored tiling).
+  Source: github.com/ChineseDron/fruit-ninja (the classic html5 clone
+  set), documented in ASSETS.md. The painted fruits retired from the
+  spawner; they remain the vegetables stand-in behind the shop.
+- THE GLITCH LINE: the v0.2.9 cut-flash drew the entire swipe segment —
+  it looked like a glitch streak. Now the classic flash.png glint appears
+  only along real cuts, quick and small.
+- THE JUICE: bigger stretched droplets + splatter decals stuck to the
+  wood (merged blobs + a drip), fading slow — the board remembers.
+- THE BOMB: classic art + a real explosion (flash, shockwave, smoke,
+  sparks, shake, red pulse) and its own "-1 HEART" floater.
+- THE FEEDBACK: the zone reader died — "+1" floats at the cut, "-2"
+  floats at each fall. Simple, honest, per event.
+- THE ASK: just the two phone cards.
+- THE SFX: the wet cuts became squelches (soft slide + snap + plips).
+- The sparkles are 4 tiny slow dots now ("small cool things").

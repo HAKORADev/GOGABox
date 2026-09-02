@@ -113,3 +113,13 @@ The first real playtest came back with one big bug and a pile of taste:
 - the AI misses more from round to round (win-miss ~0.10-0.13, block-skip
   ~0.08-0.17): vs a decent player it now drops ~9% — beatable sometimes,
   still drawing most games (measured 400 games: 91% draws)
+
+## v0.3.0 — the marks, pre-rendered
+
+The runtime stamp-painter still read "weird" to the owner. The marks are
+now painted OFFLINE (tools/v030_xomarks.py): each stroke is a smooth
+noisy path rendered as a DENSE ribbon of discs with the width tapering
+to a point (the first render's ends were blobs — the taper curve peaked
+at the wrong t; the classic (1-cos t·2pi)/2 fixed it), an under-shadow
+copy, 3 variants per kind, 4x supersampled then downscaled. The game
+just places the right texture with the pop-in animation.

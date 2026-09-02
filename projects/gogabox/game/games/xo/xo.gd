@@ -585,11 +585,13 @@ func _place(i: int, who: int) -> void:
         holder.rotation = -0.5 if who == X else 0.4
         world.add_child(holder)
         marks[i] = holder
-        var seed_n := i * 31 + who * 7 + rounds * 13
-        if who == X:
-                _draw_x(holder, seed_n)
-        else:
-                _draw_o(holder, seed_n)
+        # v0.3.0: the marks are PRE-RENDERED brush sketches (3 variants
+        # per kind, deterministic per cell+round - tools/v030_xomarks.py)
+        var variant := (i * 31 + who * 7 + rounds * 13) % 3
+        var spr := Sprite2D.new()
+        spr.texture = _mark_tex(who, variant)
+        spr.scale = Vector2.ONE * cell * 1.55 / 256.0
+        holder.add_child(spr)
         var tw := holder.create_tween().set_parallel(true)
         tw.tween_property(holder, "scale", Vector2.ONE, 0.26) \
                 .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -602,102 +604,18 @@ func _place(i: int, who: int) -> void:
         if who == X and _winning_cells(board, X).size() >= 2:
                 cur["fork"] = true
 
-# ---------------------------------------------------------------- THE MARKS
-# v0.2.9 THE REAL SKETCH (owner: "they are not real sketchy, they feels
-# like polygons") - no more Line2D segments: every stroke is SMOOTH NOISE
-# (two layered sines, never corners) painted as circle stamps with a
-# TAPERED width (thin at the ends, full in the middle, the ink breathing
-# along the way) over a dark under-stroke. It reads as a felt-tip marker
-# drawn by a human hand.
+var _mark_cache := {}
 
-func _draw_x(holder: Node2D, seed_n: int) -> void:
-        var r := cell * 0.26
-        var painter := Node2D.new()
-        painter.z_index = 1
-        painter.draw.connect(func():
-                _paint_stroke(painter, Vector2(-r, -r), Vector2(r, r),
-                                seed_n, X_RED, X_DARK, cell * 0.075)
-                _paint_stroke(painter, Vector2(-r, r), Vector2(r, -r),
-                                seed_n + 7, X_RED, X_DARK, cell * 0.075))
-        holder.add_child(painter)
+func _mark_tex(who: int, variant: int) -> Texture2D:
+        var key := "%d_%d" % [who, variant]
+        if not _mark_cache.has(key):
+                _mark_cache[key] = load("res://assets/games/xo/mark_%s_%d.png"
+                                % ["x" if who == X else "o", variant])
+        return _mark_cache[key]
 
-func _draw_o(holder: Node2D, seed_n: int) -> void:
-        var r := cell * 0.26
-        var painter := Node2D.new()
-        painter.z_index = 1
-        painter.draw.connect(func():
-                var pts := _ring_path(seed_n, r)
-                var under: PackedVector2Array = pts.duplicate()
-                for k in under.size():
-                        under[k] = under[k] + Vector2(3, 3)
-                _stamp_path(painter, under, O_DARK, Color(O_DARK, 0.55),
-                                cell * 0.066, true)
-                _stamp_path(painter, pts, O_BLUE, Color(O_BLUE, 0.97),
-                                cell * 0.066, true))
-        holder.add_child(painter)
-
-## the smooth noisy centerline of a stroke (smooth sines - zero corners)
-func _stroke_path(a: Vector2, b: Vector2, sd: int) -> PackedVector2Array:
-        var rng := RandomNumberGenerator.new()
-        rng.seed = sd
-        var p1 := rng.randf_range(0.0, TAU)
-        var p2 := rng.randf_range(0.0, TAU)
-        var f1 := rng.randf_range(1.5, 2.3)
-        var f2 := rng.randf_range(3.2, 4.4)
-        var amp := cell * 0.022
-        var dir := (b - a).normalized()
-        var perp := Vector2(-dir.y, dir.x)
-        var pts := PackedVector2Array()
-        var n := 30
-        for k in n + 1:
-                var f := float(k) / float(n)
-                var nz := sin(f * f1 * TAU + p1) * 0.62 \
-                                + sin(f * f2 * TAU + p2) * 0.38
-                pts.append(a.lerp(b, f) + perp * (nz * amp))
-        return pts
-
-## the ring the hand really draws: the radius drifts, the close-overlaps
-func _ring_path(sd: int, r: float) -> PackedVector2Array:
-        var rng := RandomNumberGenerator.new()
-        rng.seed = sd
-        var p1 := rng.randf_range(0.0, TAU)
-        var p2 := rng.randf_range(0.0, TAU)
-        var a0 := rng.randf_range(0.0, TAU)
-        var pts := PackedVector2Array()
-        var n := 42
-        for k in n + 1:
-                var f := float(k) / float(n)
-                var ang := a0 + TAU * f * 1.1          # the close overlaps
-                var wob := sin(ang * 2.0 + p1) * r * 0.05 \
-                                + sin(ang * 3.0 + p2) * r * 0.035
-                pts.append(Vector2(cos(ang), sin(ang))
-                                * (r * (1.0 + 0.06 * f) + wob))
-        return pts
-
-## circle stamps along a path - the tapered, breathing marker ink
-func _stamp_path(cv: CanvasItem, pts: PackedVector2Array, col_a: Color,
-                col_b: Color, w: float, taper := true) -> void:
-        var n := pts.size()
-        for k in n:
-                var f := 0.5
-                if n > 1:
-                        f = float(k) / float(n - 1)
-                var tw := w * 0.5
-                if taper:
-                        var mid := 0.5 - 0.5 * cos(f * TAU)
-                        tw = w * (0.16 + 0.84 * pow(mid, 0.7))
-                var c := col_a.lerp(col_b, 0.5 + 0.5 * sin(f * 9.0))
-                cv.draw_circle(pts[k], tw, c)
-
-## a full stroke: the dark under-copy then the tapered ink
-func _paint_stroke(cv: CanvasItem, a: Vector2, b: Vector2, sd: int,
-                col: Color, dark: Color, w: float) -> void:
-        var pts := _stroke_path(a, b, sd)
-        var under: PackedVector2Array = pts.duplicate()
-        for k in under.size():
-                under[k] = under[k] + Vector2(3, 3)
-        _stamp_path(cv, under, dark, Color(dark, 0.55), w * 0.92, true)
-        _stamp_path(cv, pts, col, Color(col, 0.94), w, true)
+# the marks' art is drawn at 256px; the board cell wants ~0.62 of itself
+func _mark_scale() -> float:
+        return cell * 0.98 / 256.0 * 1.55
 
 func _coin_taken(who: int) -> void:
         coin_cell = -1

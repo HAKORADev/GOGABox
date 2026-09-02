@@ -94,3 +94,20 @@ Proven add-ons for future games (MIT/CC0 unless noted): *Phantom Camera*
 - Icons: `icon.svg` is the master; a per-project `tools/rasterize_icons.gd`
   renders the launcher PNGs referenced by the export presets (needs one
   `godot --headless --import` first).
+
+## v0.3.0 — the Fruit Slasher classic set (provenance)
+
+- `assets/games/slasher/classic/` — the classic fruit-ninja clone art
+  (apple/banana/basaha/peach/sandia whole + two cut halves each, boom,
+  flash glint, smoke) and `background.jpg` (the wood board): downloaded
+  from github.com/ChineseDron/fruit-ninja (`release/images/`, the
+  classic html5 clone set, 427 stars). The repo carries NO license file;
+  the set is the widely-mirrored clone art used by countless tutorial
+  ports. GOGABox is a personal non-commercial project — if this ever
+  goes commercial, replace the set (the hunt log: Kenney = JS-gated,
+  OGA 2d-fruits = pixel art CC0, OGA fruit-and-vegetables = CC-BY-SA
+  sample, jaredly/fruit-ninja-assets = crayon style no-license,
+  WayToSucceed pack = flat style with halves, reviewed).
+- `wood_portrait.png` / `wood_landscape.png` — composed from that
+  background.jpg (mirrored tiling + vignette), tools inline in the
+  session log.

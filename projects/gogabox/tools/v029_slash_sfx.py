@@ -98,19 +98,30 @@ def sl_whoosh():
 
 
 def _wet_cut(drop_f0, drop_f1, noise_lp, splash=0.5, dur=0.22):
+    """v0.3.0: a REAL juicy cut - a soft squelch (the body slides down),
+    a short wet snap at the start, and tiny juice plips. The noise is
+    HEAVY low-passed and quiet (the old dry burst read like an explosion)"""
     n = int(SR * dur)
     t = _t(dur)
-    body = _sweep(dur, drop_f0, drop_f1) * np.exp(-t * 16.0)
-    splash_n = _lowpass(_noise(dur), noise_lp) * _env(n, a=0.001, r=dur * 0.6)
-    # the wet drops: 2-3 tiny pitch blips after the cut
+    # the squelch body: the pitch slides down with a wobble (the flesh)
+    wob = 1.0 + 0.12 * np.sin(2 * math.pi * 34.0 * t)
+    body = _sweep(dur, drop_f0, drop_f1) * wob * np.exp(-t * 13.0)
+    # the wet snap: one quick attack transient (very short)
+    snap_n = _lowpass(_noise(0.03), 0.5) * _env(int(SR * 0.03), a=0.001, r=0.02)
+    # the juice: quiet, heavy-lowpassed splash (a whisper, not a burst)
+    splash_n = _lowpass(_noise(dur), min(0.2, noise_lp)) \
+            * _env(n, a=0.004, r=dur * 0.7) * 0.35
+    # the plips: 2 little drops falling after the cut
     drops = np.zeros(n)
-    for k, at in enumerate([0.05, 0.09, 0.14][:2 + (k := 0) or 2]):
+    for k, at in enumerate([0.06, 0.11]):
         i0 = int(SR * at)
         if i0 + int(SR * 0.05) < n:
-            blip = _sweep(0.05, 700 - k * 160, 300 - k * 60) \
-                    * np.exp(-_t(0.05) * 40.0)
-            drops[i0:i0 + blip.size] += blip * 0.2
-    return body * 0.8 + splash_n * splash + drops
+            blip = _sweep(0.05, 620 - k * 180, 260 - k * 60) \
+                    * np.exp(-_t(0.05) * 46.0)
+            drops[i0:i0 + blip.size] += blip * 0.16
+    out = np.zeros(n)
+    out[:snap_n.size] += snap_n * 0.7
+    return out + body * 0.75 + splash_n * splash + drops
 
 
 def sl_cut_a():
