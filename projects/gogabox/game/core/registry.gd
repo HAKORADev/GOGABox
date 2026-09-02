@@ -254,21 +254,32 @@ const GAMES := [
                 ],
         },
         {
-                "id": "dario", "title": "Dario", "tag": "run, jump, stomp",
+                # v0.3.1 CURSED DARIO - the rebuild with lore (dario.md):
+                # ten levels, the Witcher finale, the shot from behind.
+                "id": "dario", "title": "Cursed Dario", "tag": "escape the curse",
                 "script": "res://game/games/dario/dario.gd",
                 "thumb": "res://assets/thumbs/dario.png",
                 "orientation": "landscape", "dim": "2d",
-                "coin_div": 60, "price": 350, "fee": 12, "shop": false,
+                "coin_div": 10, "price": 350, "fee": 100, "shop": true,
                 "reveal": {"kind": "chain"},
-                "banner": true,   # v0.2.6: the JUMP button lifts above the strip
-                "desc": "A proper little platformer - run, jump, stomp. Three levels of pits, walkers and coins, and a flag at the end of each.",
-                "controls": ["hold the left / right half to walk", "JUMP button (or swipe up) to jump", "land on walkers to squash them (+5)", "touch a walker sideways or fall into a pit and the run ends", "reach the flag to clear the level"],
-                "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "retro", "singleplayer"]},
+                "banner": true,   # the ground rises above the strip
+                "desc": "Dario fell into this world through a Witcher's curse. Ten levels of stomp, dodge and deja vu to the end line - where SHE waits. Crush the Witcher (20 stomps, dodge her curses) and escape... probably. A mario-like with ? blocks, a shop (the night sky, three powerups), 3 lives and a story that remembers you.",
+                "controls": [
+                        "hold the LEFT half of the screen and slide to walk left/right",
+                        "tap the RIGHT side to jump - land on enemies to stomp them",
+                        "every enemy kind pays its own points; blockers take 3 stomps; spiky ones only when their spikes are DOWN",
+                        "bump ? blocks: a GOGACoin (5 a level), a powerup - or nothing at all",
+                        "burning platforms hurt the lingerer; moving platforms carry; spitters and the Witcher shoot",
+                        "3 lives - a death restarts the level at -200 score",
+                        "the shop sells the night sky and the powerups: STRONG FOOT, THE SHIELD, POWER JUMP",
+                        "reach the door. Beat the Witcher. Escape. (You won't.)",
+                ],
+                "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "story", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
-                        {"id": "stomp_25", "title": "Big Boot", "desc": "Squash 25 walkers total"},
-                        {"id": "clear_all", "title": "Flag Bearer", "desc": "Clear all three levels in one run"},
-                        {"id": "score_100", "title": "Coin Mountain", "desc": "Score 100 in one run"},
+                        {"id": "stomp_100", "title": "Heel of the Hero", "desc": "Stomp 100 enemies total"},
+                        {"id": "witcher_slain", "title": "Witcher Slayer", "desc": "Crush the Witcher"},
+                        {"id": "clear_10", "title": "The Escape That Wasn't", "desc": "Clear all ten levels in one run"},
                 ],
         },
         {

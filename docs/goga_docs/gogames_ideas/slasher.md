@@ -75,3 +75,17 @@ it gets even better than the real fruit ninja bruh!". What changed:
 - THE ASK: just the two phone cards.
 - THE SFX: the wet cuts became squelches (soft slide + snap + plips).
 - The sparkles are 4 tiny slow dots now ("small cool things").
+
+## v0.3.1 — the patch round
+
+- the vegs grew (150px target — the painted art sits smaller in its
+  canvas than the classic fruits do in theirs)
+- BOTH positions now toss from the bottom; the landscape spreads around
+  the CENTER ("it throws from the left to the bottom" is dead) — the row
+  pattern is a wide bottom row there too
+- the slice glint is gone ("we have our own finger-slasher thing")
+- THE DYNAMIC SWIPE VOICE: the whoosh was measured (0.16s, peak at
+  ~55-75%, ~12k zc/s) and rebuilt as four speed cuts — the swipe speed
+  picks lo/med/hi/fast + a pitch nudge, and a voice never overlaps
+  itself; "wheeeph or whoph based on slash movement speed"
+- the thumbnail recomposed to the current wood look

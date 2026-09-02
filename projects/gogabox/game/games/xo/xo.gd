@@ -590,7 +590,9 @@ func _place(i: int, who: int) -> void:
         var variant := (i * 31 + who * 7 + rounds * 13) % 3
         var spr := Sprite2D.new()
         spr.texture = _mark_tex(who, variant)
-        spr.scale = Vector2.ONE * cell * 1.55 / 256.0
+        # v0.3.1: the owner - "make the X and O more smaller, they are
+        # too big" (was 1.55 cell widths - over half a cell too wide)
+        spr.scale = Vector2.ONE * cell * 0.74 / 256.0
         holder.add_child(spr)
         var tw := holder.create_tween().set_parallel(true)
         tw.tween_property(holder, "scale", Vector2.ONE, 0.26) \

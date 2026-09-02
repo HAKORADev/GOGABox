@@ -34,12 +34,17 @@ const MODES := {
                 "vy": [-1580.0, -1200.0],
                 "spin": [-3.2, 3.2],
         },
+        # v0.3.1: the owner - "the horizontal mode... it throws from the
+        # left to the bottom, while it is supposed to be from the center
+        # from bottom". BOTH positions now toss from the bottom; the
+        # landscape spreads wider from the CENTER with lighter gravity.
         "horizontal": {
-                "gravity": 1180.0,
-                "from_bottom": false,
-                "vx": [640.0, 1020.0],
-                "vy": [-540.0, -120.0],
-                "spin": [-4.6, 4.6],
+                "gravity": 1240.0,
+                "from_bottom": true,
+                "center_spread": 0.42,
+                "vx": [-320.0, 320.0],
+                "vy": [-1420.0, -1080.0],
+                "spin": [-4.2, 4.2],
         },
 }
 const MISS_COST := 2
@@ -472,7 +477,10 @@ func _item_scale(kind: String, tex: Texture2D) -> float:
                 return 84.0 / float(tex.get_width())
         if kind == "bomb":
                 return 106.0 / float(tex.get_width())
-        var target := 122.0 if mode_id == "fruits" else 96.0
+        # v0.3.1: the vegs were "weirdly too small compared to the
+        # correct size of the fruit" - their painted art sits smaller in
+        # its canvas, so the target grows past the fruit's
+        var target := 122.0 if mode_id == "fruits" else 150.0
         return target / float(tex.get_width())
 
 func _launch(kind: String, at: Vector2 = Vector2.INF,
@@ -487,7 +495,12 @@ func _launch(kind: String, at: Vector2 = Vector2.INF,
         var v := Vector2.ZERO
         if bool(m["from_bottom"]):
                 if pos == Vector2.INF:
-                        pos = Vector2(_rng.randf_range(vp.x * 0.14, vp.x * 0.86),
+                        var spread := 0.36
+                        if m.has("center_spread"):
+                                # the landscape law: around the CENTER
+                                spread = float(m["center_spread"])
+                        pos = Vector2(vp.x * 0.5
+                                        + _rng.randf_range(-spread, spread) * vp.x,
                                         vp.y + 70.0)
                 v = Vector2(_rng.randf_range(m["vx"][0], m["vx"][1]),
                                 _rng.randf_range(m["vy"][0], m["vy"][1]) * speed)
@@ -521,10 +534,9 @@ func _spawn_pattern() -> void:
         elif roll < 0.78:
                 var vp := get_viewport_rect().size
                 var m: Dictionary = MODES[orient]
-                var at := Vector2(_rng.randf_range(vp.x * 0.25, vp.x * 0.75),
-                                vp.y + 60.0) if bool(m["from_bottom"]) \
-                                else Vector2(-60.0, _rng.randf_range(
-                                vp.y * 0.2, vp.y * 0.7))
+                var spread := float(m.get("center_spread", 0.36))
+                var at := Vector2(vp.x * 0.5 + _rng.randf_range(-spread, spread)
+                                * vp.x * 0.6, vp.y + 60.0)
                 for i in 3:
                         _launch(_roll_kind(0.0), at, speed * (1.0 - 0.09 * i))
         else:
@@ -545,18 +557,20 @@ func _spawn_pattern() -> void:
                                 _launch_at(kind, at, Vector2(base_vx,
                                                 base_vy * _rng.randf_range(0.92, 1.08)))
                 else:
-                        var base_y := _rng.randf_range(vp.y * 0.2, vp.y * 0.66)
-                        var base_vx2 := _rng.randf_range(m["vx"][0], m["vx"][1]) * 0.9
-                        var base_vy2 := _rng.randf_range(m["vy"][0], m["vy"][1])
+                        # v0.3.1: the landscape row = a WIDE row from the
+                        # bottom center (the old left curtain is dead)
+                        var base_x := _rng.randf_range(vp.x * 0.3, vp.x * 0.7)
+                        var base_vy := _rng.randf_range(m["vy"][0], m["vy"][1]) * 0.92
+                        var base_vx := _rng.randf_range(m["vx"][0], m["vx"][1])
                         for i in n:
                                 var kind := _roll_kind(0.0)
                                 if i == bomb_i:
                                         kind = "bomb"
-                                var at := Vector2(-60.0, base_y + (i - n / 2.0)
-                                                * (vp.y * 0.12))
+                                var at := Vector2(base_x + (i - n / 2.0)
+                                                * (vp.x * 0.12), vp.y + 60.0)
                                 _launch_at(kind, at, Vector2(
-                                                base_vx2 * _rng.randf_range(0.92, 1.08),
-                                                base_vy2))
+                                                base_vx * _rng.randf_range(0.9, 1.1),
+                                                base_vy * _rng.randf_range(0.92, 1.08)))
         Jukebox.sfx("sl_launch", -14.0, _rng.randf_range(0.9, 1.15))
 
 func _launch_at(kind: String, at: Vector2, v: Vector2) -> void:
@@ -716,17 +730,11 @@ func _on_drag(from: Vector2, to: Vector2) -> void:
                 var hit_r := 50.0 * float(p["scale"]) / 0.5
                 if d < hit_r:
                         _cut_item(p, from, to)
-                        # the classic FLASH GLINT along the cut (small,
-                        # quick - the real game's glint)
-                        var gl := Sprite2D.new()
-                        gl.texture = _flash_tex
-                        gl.position = (from + to) / 2.0
-                        gl.rotation = (to - from).angle()
-                        gl.scale = Vector2.ONE * _rng.randf_range(0.8, 1.25)
-                        gl.z_index = 31
-                        world.add_child(gl)
-                        glints.append({"node": gl, "life": 0.13, "max": 0.13})
-        Jukebox.sfx("sl_whoosh", -12.0, _rng.randf_range(0.95, 1.1))
+        # v0.3.1: no more glint sprite (the owner: "we do not need it
+        # since we have our own finger-slasher thing") - the blade ribbon
+        # IS the effect. The swipe voice is DYNAMIC now: the speed picks
+        # the variant (see _swipe_voice)
+        _swipe_voice(seg.length() / maxf(0.0001, get_process_delta_time()))
 
 # ============================================================ the cut
 
@@ -934,6 +942,41 @@ func _flush_loss() -> void:
         loss_flush = 0.0
 
 # ============================================================ misc
+
+## THE DYNAMIC SWIPE VOICE (the owner: "reuse some parts in it and via
+## code you make it go like wheeeph or whoph based on slash movement
+## speed instead of repeating same audio in a weird way"). The whoosh
+## ships in FOUR speed cuts (sl_whoosh_lo/med/hi/fast - same body,
+## different lengths and brightness); the swipe's speed picks one, the
+## pitch shaves a little more character in, and a voice never restarts
+## while it can still be heard.
+var _voice_until := 0.0
+
+func _swipe_voice(speed_px_s: float) -> void:
+        var now := _time
+        if now < _voice_until:
+                return
+        var name_ := "sl_whoosh_med"
+        var pitch := 1.0
+        var dur := 0.16
+        if speed_px_s < 900.0:
+                name_ = "sl_whoosh_lo"
+                pitch = _rng.randf_range(0.92, 1.0)
+                dur = 0.22
+        elif speed_px_s < 1600.0:
+                name_ = "sl_whoosh_med"
+                pitch = _rng.randf_range(0.95, 1.06)
+                dur = 0.16
+        elif speed_px_s < 2600.0:
+                name_ = "sl_whoosh_hi"
+                pitch = _rng.randf_range(1.0, 1.12)
+                dur = 0.13
+        else:
+                name_ = "sl_whoosh_fast"
+                pitch = _rng.randf_range(1.06, 1.2)
+                dur = 0.10
+        _voice_until = now + dur * 0.8
+        Jukebox.sfx(name_, -10.0, pitch)
 
 func _point_segment_dist(pt: Vector2, a: Vector2, b: Vector2) -> float:
         var ab := b - a

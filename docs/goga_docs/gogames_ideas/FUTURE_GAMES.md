@@ -149,11 +149,53 @@ Dash, keeps thinking, and will name the next game when ready.
   release, and bring the whole tower down on the pigs - each bird its own
   trick, wood/glass/stone each breaking its own way.
 
+## The v0.3.1 dump (the owner's list, kept verbatim-ish)
+
+- **ben10-alien-runner-like** — Ben 10 Alien Evolution energy: a
+  HORIZONTAL endless runner (alien forms as the twist hook).
+- **dan-the-man-like** — Halfbrick's Dan the Man: a HORIZONTAL adventure
+  with shooting/melee beats (the owner's "shooter horizontal adventure").
+- **crossy-road-like** — 2D or 3D hop-across-traffic-and-rivers, grid
+  hops, one tap per hop.
+- **STUDY: "Offline Games - No Wifi Games"** — the app itself: mine its
+  game list, see which minis GOGABox is missing and which of ours are
+  weaker than theirs.
+- **STUDY: "Cooking Mama: Let's Cook"** — the cooking minigame loop:
+  step-by-step touch recipes, timing, the satisfaction curve.
+- **STUDY: BabyBus games** — the kids' shelf: what tiny-player UX looks
+  like (big targets, voice guidance, zero fail states) — feeds the age
+  question in THE_APP_STORE_QUESTION.md.
+- **STUDY: Good Pizza Great Pizza + idle games** — the order-fulfilment
+  loop and the idle-number loop; both could wear GOGABox skins.
+- **where-water-like** — Where's My Water energy: dig paths so something
+  needs water gets it, moving pipes, avoid the bad stuff. (Owner: "in
+  the concept of something needs water and moving pipes and avoiding bad
+  things".)
+- **goods-sort-like** — Goods Puzzle: Sort Challenge: sort goods on
+  shelves by color/type.
+- **stack-sort-like** — Stack Sort: Color Puzzle: unsorted colors into
+  structured sorted lines (the braid/bottle-sort family).
+- **happy-glass-like** — draw lines, route water, fill the glass.
+- **state-io-like** — State.io energy: a virtual horizontal map of ~100
+  countries with IMPERFECT outlines (roughly right, stylized), conquer
+  tick-by-tick. (Owner: "virtual horizontal map with 100 countries with
+  imperfect country outlines ofc to match real life geography".)
+- **fire-ball-3d-like** — Voodoo's Fire Ball 3D energy: shoot/hurl balls
+  that split and cascade into towers of blocks.
+- **minesweeper-like** — the classic, untouched. (Owner: "a game like
+  minesweeper".)
+
 ## Platformers & rage climbs
 - **party-dash-like** — Cartoon Network's Party Dash energy: an endless
   VERTICAL action platformer, cool and fast. Up the towers, over the
   hazards, never stop moving. (Owner: "platformer endless vertical action
   cool game".)
+- **horizontal-action-like** — THE COMPANION PIECE (owner, v0.3.1: "put
+  another game under it where it is horizontal action game so i do not
+  forget about this idea"): an endless/run HORIZONTAL action platformer
+  under the same energy — the owner has "many ideas" for it and several
+  of the games below (the Ben 10 runner, the Dan the Man adventure) feed
+  this shelf.
 - **memory-cards-like** — the classic: a grid of face-down cards, flip two,
   remember what hides behind each one, match every pair. Pairs, themes and
   grid sizes scale up; fewer flips = better. (Owner: "remember the thing

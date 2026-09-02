@@ -87,14 +87,30 @@ def _pluck(f0, f1, dur, vol=1.0, warm=0.3):
 
 # ---------------------------------------------------------------- voices
 
-def sl_whoosh():
-    dur = 0.16
+def _whoosh_cut(dur, lp, tone_f0, tone_f1, tone_amt, peak_at=0.55):
+    """one speed cut of the blade voice: the body swells to a peak at
+    peak_at of its length (the measured sl_whoosh shape), the tone rides
+    f0->f1 (brightness = speed)"""
     n = int(SR * dur)
-    body = _lowpass(_noise(dur), 0.35)
-    # the brightness swells then fades (the blade passing)
-    swell = np.sin(np.pi * _t(dur) / dur) ** 1.6
-    tone = _sweep(dur, 300, 900) * 0.12
-    _save("sl_whoosh", (body * swell + tone * swell) * _env(n, a=0.004, r=0.06), 0.5)
+    t = _t(dur)
+    body = _lowpass(_noise(dur), lp)
+    swell = np.sin(np.pi * np.clip(t / peak_at, 0, 2) / 2.0) ** 1.6
+    swell = np.where(t < peak_at,
+                     np.sin((t / peak_at) * math.pi / 2) ** 1.6,
+                     np.sin((1 - (t - peak_at) / (1 - peak_at)) * math.pi / 2) ** 1.2)
+    tone = _sweep(dur, tone_f0, tone_f1) * tone_amt
+    return (body * swell + tone * swell) * _env(n, a=0.004, r=0.05)
+
+
+def sl_whoosh():
+    # v0.3.1 THE DYNAMIC SWIPE VOICE: the owner asked to analyze the file
+    # and build speed cuts ("wheeeph or whoph based on slash movement
+    # speed instead of repeating same audio"). The measured body: 0.16s,
+    # the swell peaks at ~55-75%, brightness ~12k zc/s. Four cuts ship:
+    _save("sl_whoosh_lo", _whoosh_cut(0.24, 0.18, 180, 420, 0.10, 0.6), 0.46)
+    _save("sl_whoosh_med", _whoosh_cut(0.16, 0.35, 300, 900, 0.12, 0.55), 0.5)
+    _save("sl_whoosh_hi", _whoosh_cut(0.12, 0.5, 420, 1400, 0.16, 0.5), 0.52)
+    _save("sl_whoosh_fast", _whoosh_cut(0.09, 0.62, 600, 2000, 0.2, 0.45), 0.54)
 
 
 def _wet_cut(drop_f0, drop_f1, noise_lp, splash=0.5, dur=0.22):

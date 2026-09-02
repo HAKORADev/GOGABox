@@ -143,9 +143,11 @@ func check_achievements() -> int:
                         "tile_256": ok = Box.counter(game_id, "max_tile") >= 256
                         "tile_512": ok = Box.counter(game_id, "max_tile") >= 512
                         "tile_2048": ok = Box.counter(game_id, "max_tile") >= 2048
-                        # v0.1.7 - dario
+                        # v0.3.1 - cursed dario
                         "stomp_25": ok = Box.counter(game_id, "stomped") >= 25
-                        "clear_all": ok = Box.counter(game_id, "levels_done") >= 3
+                        "stomp_100": ok = Box.counter(game_id, "stomped") >= 100
+                        "witcher_slain": ok = Box.counter(game_id, "witcher") >= 1
+                        "clear_10": ok = Box.counter(game_id, "levels_done") >= 10
                         # v0.2.8 - xo (the sketch remake: wins + streaks,
                         # the ladder rungs are gone)
                         "wins_10": ok = Box.counter(game_id, "wins") >= 10

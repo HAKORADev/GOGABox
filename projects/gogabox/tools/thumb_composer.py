@@ -28,7 +28,7 @@ import math
 import os
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from derive_assets import font, INK, CARD, ACCENT, HOT, GOOD, COIN, BAD  # noqa: E402
@@ -439,94 +439,77 @@ def scene_lanes(spec=LANES_SPEC):
 # The v0.2.9 REWORK look: the dusk minimal background, the painted fruits,
 # a sliced watermelon mid-burst (the halves + the juice), the glowing
 # blade ribbon, the coin riding by.
+# The v0.3.1 look = the CURRENT game: the classic wood board, the classic
+# fruits, a sliced apple mid-burst (its two real art halves), the juice,
+# the blade ribbon, the coin, the boom.
 SLASHER_SPEC = dict(
-    fruits=((0, 0.28, 0.28, 0.60), (1, 0.74, 0.30, 0.56),
-            (2, 0.56, 0.18, 0.54)),      # (kind, fx, fy, scale)
-    bomb=(0.88, 0.74, 0.78),
-    slash=((0.05, 0.90), (0.28, 0.64), (0.54, 0.74), (0.90, 0.18)),
-    juice=((0.40, 0.52), (0.48, 0.62), (0.36, 0.66), (0.52, 0.46)),
-    coin=(0.13, 0.38, 0.40),
+    fruits=((0, 0.26, 0.26, 0.42), (1, 0.76, 0.28, 0.40),
+            (2, 0.58, 0.16, 0.40)),      # (kind, fx, fy, scale)
+    bomb=(0.88, 0.72, 0.42),
+    slash=((0.06, 0.90), (0.28, 0.64), (0.54, 0.74), (0.90, 0.18)),
+    juice=((0.42, 0.52), (0.50, 0.62), (0.38, 0.66), (0.52, 0.46)),
+    coin=(0.12, 0.36, 0.34),
 )
 
 
 def scene_slasher(spec=SLASHER_SPEC):
     sc = Scene()
-    sc.backdrop((23, 50, 63), (29, 26, 38))
+    # the WOOD: the classic board tiled with mirrored seams
+    wood = Image.open(game_asset("games/slasher/classic/background.jpg")).convert("RGB")
+    wtile = Image.new("RGB", (W, H))
+    for row in range(2):
+        for col in range(2):
+            t = wood
+            if col % 2 == 1:
+                t = ImageOps.mirror(t)
+            if row % 2 == 1:
+                t = ImageOps.flip(t)
+            wtile.paste(t, (col * wood.width - (wood.width * 2 - W) // 2,
+                            row * wood.height - (wood.height * 2 - H) // 2))
+    sc.work.alpha_composite(wtile.convert("RGBA"))
     dr = ImageDraw.Draw(sc.work)
-    for r_i in range(3):                       # the slow light rays
-        sw = W * (0.14 + 0.05 * r_i)
-        x = W * (0.16 + 0.36 * r_i) - sw
-        dr.polygon([(x, -10), (x + sw, -10), (x + sw * 1.9 + W * 0.1, H + 10),
-                    (x + sw * 0.7 + W * 0.1, H + 10)],
-                   fill=(255, 255, 255, 9))
-    rr = __import__("random").Random(77)       # the drifting bokeh
-    for i in range(12):
+    for i in range(10):                        # the tiny sparkles
+        rr = __import__("random").Random(900 + i)
         bx, by = rr.uniform(0, W), rr.uniform(0, H)
-        sc.ellipse([bx - 7, by - 7, bx + 7, by + 7], fill=(255, 255, 240, 14))
+        sc.ellipse([bx - 2, by - 2, bx + 2, by + 2], fill=(255, 250, 230, 60))
     for kind, fx, fy, s in spec["fruits"]:
         x, y = fx * W, fy * H
-        sc.glow(x, y, 90, (255, 220, 150), 42)
-        sc.stamp("games/slasher/f_%s.png"
-                 % ["watermelon", "orange", "apple"][kind], x, y, scale=s)
-    # the SLICED watermelon: two halves split apart, the pale flesh masked
-    # to the fruit's silhouette, the juice drops flying
-    juice = (255, 92, 109)
-    for half_img, side in _watermelon_halves():
-        rot = -22 * side
+        sc.glow(x, y, 80, (255, 230, 170), 34)
+        sc.stamp("games/slasher/classic/c_%s.png"
+                 % ["apple", "banana", "peach"][kind], x, y, scale=s)
+    # the SLICED apple: its two real art halves, thrown apart
+    for half, side in _apple_halves():
         hx = 0.42 * W - 30 * side
-        hy = 0.56 * H + (8 if side < 0 else -6)
-        half_img = half_img.rotate(rot, expand=True, resample=Image.BICUBIC)
-        sc.work.alpha_composite(half_img, (int(hx - half_img.width / 2),
-                                           int(hy - half_img.height / 2)))
+        hy = 0.55 * H + (8 if side < 0 else -6)
+        half = half.rotate(-24 * side, expand=True, resample=Image.BICUBIC)
+        sc.work.alpha_composite(half, (int(hx - half.width / 2),
+                                       int(hy - half.height / 2)))
     for jx, jy in spec["juice"]:
         sc.ellipse([jx * W - 9, jy * H - 9, jx * W + 9, jy * H + 9],
-                   fill=juice + (235,))
+                   fill=(205, 233, 126, 235))
         sc.ellipse([jx * W - 4, jy * H - 4, jx * W + 4, jy * H + 4],
                    fill=(255, 255, 255, 60))
     if spec.get("bomb"):
         fx, fy, s = spec["bomb"]
-        sc.glow(fx * W, fy * H, 70, (255, 120, 60), 60)
-        sc.stamp("games/slasher/bomb.png", fx * W, fy * H, scale=s)
+        sc.glow(fx * W, fy * H, 60, (255, 120, 60), 60)
+        sc.stamp("games/slasher/classic/c_bomb.png", fx * W, fy * H, scale=s)
     if spec.get("coin"):
         fx, fy, s = spec["coin"]
-        sc.glow(fx * W, fy * H, 80, (255, 210, 80), 95)
+        sc.glow(fx * W, fy * H, 70, (255, 210, 80), 95)
         sc.stamp("ui/coin.png", fx * W, fy * H, scale=s)
     pts = [(fx * W, fy * H) for fx, fy in spec["slash"]]
-    sc.line(pts, (140, 220, 255, 90), width=22)
-    sc.line(pts, (255, 255, 255, 240), width=8)
-    sc.vignette(78)
+    sc.line(pts, (255, 240, 210, 80), width=20)
+    sc.line(pts, (255, 255, 255, 230), width=7)
+    sc.vignette(70)
     return sc.render()
 
 
-def _watermelon_halves():
-    """the two cut halves: the pale flesh face is MASKED to the fruit's
-    alpha so nothing pokes out of the silhouette"""
+def _apple_halves():
+    """the two REAL art halves of the classic apple"""
     out = []
-    img = Image.open(game_asset("games/slasher/f_watermelon.png")).convert("RGBA")
-    w, h = img.size
-    for side in (-1, 1):
-        if side < 0:
-            half = img.crop((0, 0, w // 2, h))
-            fx = w // 2 - 3               # the cut edge is the RIGHT side
-        else:
-            half = img.crop((w // 2, 0, w, h))
-            fx = 3
-        hw, hh = half.size
-        flesh = Image.new("RGBA", (hw, hh), (0, 0, 0, 0))
-        fd = ImageDraw.Draw(flesh)
-        fd.rectangle([fx - 16 if side < 0 else fx - 2, int(hh * 0.04),
-                      fx + (2 if side < 0 else 16), int(hh * 0.96)],
-                     fill=(255, 96, 110, 255))
-        fd.rectangle([fx - 7 if side < 0 else fx - 1, int(hh * 0.10),
-                      fx + (1 if side < 0 else 7), int(hh * 0.90)],
-                     fill=(255, 214, 170, 255))
-        fd.rectangle([fx - 3 if side < 0 else fx - 1, int(hh * 0.16),
-                      fx + (1 if side < 0 else 3), int(hh * 0.84)],
-                     fill=(255, 244, 214, 255))
-        alpha = half.getchannel("A")
-        flesh.putalpha(ImageChops.multiply(flesh.getchannel("A"), alpha))
-        half.alpha_composite(flesh)
-        out.append((half, side))
+    for name, side in [("c_apple_h1.png", -1), ("c_apple_h2.png", 1)]:
+        out.append((Image.open(game_asset("games/slasher/classic/" + name))
+                    .convert("RGBA"), side))
     return out
 
 
@@ -684,65 +667,89 @@ def scene_merge(spec=MERGE_SPEC):
 
 # ------------------------------------------------------------------- dario
 
+# The v0.3.1 CURSED DARIO look: the Kenney day sky, the grass/dirt ground,
+# the ? box, the snail, the purple Witcher silhouette looming, the hero
+# mid-jump with the blade of... no - just the classic stomp arc.
 DARIO_SPEC = dict(
-    ground_y=0.80,                # ground top as H fraction
-    gap=(0.40, 0.60),             # pit x-range (fractions) - the jump story
-    platform=(0.57, 2.4),         # floating brick ledge (fx, rows above ground)
-    hero=(0.38, 0.42, -10),       # hero mid-air over the pit (fx, fy, tilt)
-    hero_scale=1.5,
-    coins=((0.46, 0.27), (0.53, 0.21), (0.60, 0.27)),
-    walker=(0.75, 1.3),           # enemy on the far ground (fx, scale)
-    flag=(0.93, 1.12),
-    brick_scale=1.0,
+    ground_y=0.78,
+    gap=(0.42, 0.62),
+    ledge=(0.55, 1.9),            # the grass ledge with the ? box
+    hero=(0.40, 0.46, -8),        # mid-jump over the pit
+    coins=((0.47, 0.30), (0.53, 0.24), (0.59, 0.30)),
+    snail=(0.76, 0.95),
+    witcher=(0.86, 0.30),
+    box=(0.60, 0.50),
 )
 
 
 def scene_dario(spec=DARIO_SPEC):
     sc = Scene()
-    sc.backdrop((110, 190, 235), (196, 232, 250))
-    gy = spec["ground_y"] * H
-    # distant hills peeking over the ground line
-    sc.ellipse([-220, gy - 150, W * 0.34, gy + 260], fill=(96, 168, 92, 255))
-    sc.ellipse([W * 0.58, gy - 110, W + 260, gy + 300],
-               fill=(88, 158, 84, 255))
-    gx0, gx1 = spec["gap"][0] * W, spec["gap"][1] * W
-    sc.rect([gx0, gy, gx1, H], fill=(44, 28, 16))      # the pit is DARK
-    brick = load_sprite("games/dario/brick.png")
-    ground = load_sprite("games/dario/ground.png")
-    ts = int(brick.width * spec["brick_scale"])
-    # ground rows (brick rim + dirt) split by THE pit
+    # the day sky (the Kenney bg, mirrored-tiled across the whole canvas)
+    bg = Image.open(game_asset("games/dario/bg_day.png")).convert("RGBA")
+    ncols = W // bg.width + 2
+    nrows = H // bg.height + 2
+    x0 = -(bg.width * ncols - W) // 2
+    y0 = -(bg.height * nrows - H) // 2
+    for row in range(nrows):
+        for col in range(ncols):
+            t = bg
+            if col % 2 == 1:
+                t = ImageOps.mirror(t)
+            if row % 2 == 1:
+                t = ImageOps.flip(t)
+            sc.work.alpha_composite(t, (x0 + col * bg.width,
+                            y0 + row * bg.height))
+    gy = int(spec["ground_y"] * H)
+    # the Witcher LOOMS in the sky (the curse)
+    wimg = Image.open(game_asset("games/dario/witcher.png")).convert("RGBA")
+    wimg = wimg.resize((200, 240), Image.BICUBIC)
+    wfx, wfy = spec["witcher"]
+    glow = Image.new("RGBA", (260, 300), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([30, 30, 230, 270], fill=(150, 80, 200, 70))
+    glow = glow.filter(ImageFilter.GaussianBlur(20))
+    sc.work.alpha_composite(glow, (int(wfx * W) - 130, int(wfy * H) - 150))
+    sc.work.alpha_composite(wimg, (int(wfx * W) - 100, int(wfy * H) - 120))
+    # the ground: grass lips + dirt bodies, split by THE pit
+    grass = load_sprite("games/dario/tile_grass.png")
+    dirt = load_sprite("image_cache_fix", ) if False else load_sprite(
+            "games/dario/tile_dirt.png")
+    ts = grass.width
     x = 0
+    gx0, gx1 = spec["gap"][0] * W, spec["gap"][1] * W
     while x < W:
         cx = x + ts / 2
-        if gx0 - 4 <= cx <= gx1 + 4:
+        if gx0 - 6 <= cx <= gx1 + 6:
             x += ts
             continue
-        sc.stamp(brick, cx, gy + ts / 2, scale=spec["brick_scale"])
-        sc.stamp(ground, cx, gy + ts * 1.5, scale=spec["brick_scale"])
+        sc.stamp(grass, cx, gy + ts / 2)
+        sc.stamp(dirt, cx, gy + ts * 1.5)
         x += ts
-    # floating brick ledge over the pit (the brave route)
-    pfx, prow = spec["platform"]
-    px, py = pfx * W, gy - prow * ts
-    sc.stamp(brick, px - ts / 2, py, scale=spec["brick_scale"])
-    sc.stamp(brick, px + ts / 2, py, scale=spec["brick_scale"])
-    # coins arcing over the pit
-    coin = load_sprite("ui/coin.png")
+    # the ledge with the ? box
+    lfx, lrows = spec["ledge"]
+    lx = int(lfx * W)
+    ly = gy - int(lrows * ts)
+    for k in range(3):
+        sc.stamp(grass, lx - ts + k * ts, ly + ts / 2)
+        sc.stamp(dirt, lx - ts + k * ts, ly + ts * 1.5)
+    bfx, bfy = spec["box"]
+    boximg = load_sprite("games/dario/tile_box_coin.png")
+    sc.stamp(boximg, bfx * W, ly - boximg.height / 2 + 4)
+    # the coins
+    coin = load_sprite("games/dario/item_coin.png", 56)
     for fx, fy in spec["coins"]:
-        sc.glow(fx * W, fy * H, 52, (255, 201, 60), 85)
-        sc.stamp(coin, fx * W, fy * H, scale=0.62)
-    # the enemy waiting on the far side + the goal flag
-    wfx, ws = spec["walker"]
-    walker = load_sprite("games/dario/walker.png")
-    sc.stamp(walker, wfx * W, gy - walker.height * ws / 2, scale=ws)
-    ffx, fs = spec["flag"]
-    flag = load_sprite("games/dario/flag.png")
-    sc.stamp(flag, ffx * W, gy - flag.height * fs / 2, scale=fs)
-    # THE HERO - mid-leap from the left ledge, tilted into the jump
+        sc.glow(fx * W, fy * H, 40, (255, 210, 80), 80)
+        sc.stamp(coin, fx * W, fy * H)
+    # the snail
+    sfx, ss = spec["snail"]
+    snail = load_sprite("games/dario/enemy_snail1.png")
+    sc.stamp(snail, sfx * W, gy - snail.height * ss / 2, scale=ss)
+    # THE HERO mid-jump
     hero = load_sprite("games/dario/hero_jump.png")
-    hx, hy, tilt = spec["hero"]
-    sc.glow(hx * W, hy * H, 110, (255, 255, 255), 60)
-    sc.stamp(hero, hx * W, hy * H, scale=spec["hero_scale"], rot=tilt)
-    sc.vignette(70)
+    hfx, hfy, tilt = spec["hero"]
+    sc.glow(hfx * W, hfy * H, 90, (255, 255, 255), 55)
+    sc.stamp(hero, hfx * W, hfy * H, scale=1.35, rot=tilt)
+    sc.vignette(58)
     return sc.render()
 
 

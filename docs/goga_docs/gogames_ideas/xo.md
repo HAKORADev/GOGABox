@@ -123,3 +123,9 @@ to a point (the first render's ends were blobs — the taper curve peaked
 at the wrong t; the classic (1-cos t·2pi)/2 fixed it), an under-shadow
 copy, 3 variants per kind, 4x supersampled then downscaled. The game
 just places the right texture with the pop-in animation.
+
+## v0.3.1 — the marks sized down
+
+"make the X and O more smaller, they are too big" — the scale dropped
+from 155% of a cell to ~74%; the before/after QA shots confirm the marks
+sit inside their cells now.

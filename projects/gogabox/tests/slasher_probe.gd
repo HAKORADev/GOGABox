@@ -36,8 +36,10 @@ func _run() -> void:
                         != float(SL.MODES["horizontal"]["gravity"]),
                 "the positions carry DIFFERENT gravity")
         _check(bool(SL.MODES["vertical"]["from_bottom"]) \
-                        and not bool(SL.MODES["horizontal"]["from_bottom"]),
-                "portrait tosses from below; landscape lobs across")
+                        and bool(SL.MODES["horizontal"]["from_bottom"]),
+                "BOTH positions toss from the bottom (v0.3.1 owner law)")
+        _check(SL.MODES["horizontal"].has("center_spread"),
+                "the landscape spawns spread from the CENTER")
 
         # ---- boot: the ask -> options -> run ----
         var g: GogaGame = SL.new()
@@ -148,13 +150,16 @@ func _run() -> void:
         g2._register_miss(Vector2(1, 1))   # a fruit fall
         _check(int(g2.run_coins) == rc2, "the coin is never confused with fruit falls")
 
-        # ---- the landscape physics on the live game ----
+        # ---- the landscape physics on the live game (v0.3.1: from the
+        # bottom CENTER, wide spread, lighter gravity) ----
         g2.orient = "horizontal"
-        var n_before: int = int(g2.items.size())
         g2._launch("apple")
         var it2: Dictionary = g2.items[g2.items.size() - 1]
-        _check(float(it2["v"].x) > 0.0 and float(it2["g"]) == 1180.0,
-                "a landscape launch lobs ACROSS with the landscape gravity")
+        var vp3: Vector2 = g2.get_viewport_rect().size
+        _check(float(it2["v"].y) < 0.0 and float(it2["g"]) == 1240.0,
+                "a landscape launch rises from below with ITS gravity")
+        _check(absf(float(it2["node"].position.x) - vp3.x * 0.5) < vp3.x * 0.45,
+                "the landscape spawn sits around the CENTER")
 
         # ---- the vegetables gate ----
         var kind0 := String(g2._item_kind())
