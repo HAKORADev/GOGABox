@@ -46,7 +46,14 @@ func music(track: String, restart := false) -> void:
         elif stream is AudioStreamOggVorbis:
                 (stream as AudioStreamOggVorbis).loop = true
         elif stream is AudioStreamWAV:
-                (stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+                var w := stream as AudioStreamWAV
+                w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+                # THE LOOP REGION LAW (v0.3.2 PATCH III): LOOP_FORWARD with the
+                # default loop_end = 0 can loop a ZERO-length region - the track
+                # plays once then reads silence forever. Name the whole stream
+                # as the region so every wav theme loops for real.
+                w.loop_begin = 0
+                w.loop_end = int(w.get_length() * float(w.mix_rate))
         _music.stream = stream
         _music.volume_db = -38.0
         _music.play()

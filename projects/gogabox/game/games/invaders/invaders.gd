@@ -27,10 +27,19 @@ const LVL_PTS := [0, 2, 5, 9, 14, 20]  # cumulative points needed to BE level i+
 const DEATH_POWER_RUNGS := 3
 
 # ---------------------------------------------------------------- loot rhythms
-const COIN_WAVES_MIN := 2          # owner: "a GOGACoin after 2-10 waves"
-const COIN_WAVES_MAX := 10
-const POWER_WAVES_MIN := 1         # owner: "weapon points... 1 per 1-2 waves"
-const POWER_WAVES_MAX := 2
+## v0.3.2 PATCH III - THE WRECK LAW (the owner: "it is supposed to drop items
+## from the killed ships... i am not sure if you ported the power point and
+## the universal weapons to spawn"): the wave-anchored airdrops are DEAD -
+## Space Dash's exact kill-rolled economy now runs here. Coins: 1 per 5-10
+## kills counting from the last coin COLLECTED. Power points: 16% per kill,
+## +50% extra on a big body. Universal weapons (thunder/bomb): 5% per kill,
+## only once bought. The ship's own icon: 5% (feeds the ladder / comes home).
+const COIN_KILLS_MIN := 5
+const COIN_KILLS_MAX := 10
+const POWER_CHANCE := 0.16
+const BIG_POWER_CHANCE := 0.5
+const OWN_ICON_CHANCE := 0.05
+const SHOP_WEAPON_CHANCE := 0.05
 
 const LANES := "res://assets/games/lanes/"
 
@@ -88,29 +97,45 @@ const BURN_BASE := 2.0             # hornet burn seconds at L1
 ## owner score law: +1/+2/+3 only. hp grows 18% per stage ("at the start,
 ## enemies will not go down, but later they will go down and down" - the
 ## weapon ladder outgrows them).
+## THE TYPE INFRA LAW (v0.3.2 PATCH III, the owner: "enemies are sorted in
+## types, specific types share same infra"): the roster is FAMILIES -
+##   shooters "aim"  : aimer, magma            (a bolt aimed at the protector)
+##   shooters "fan"  : spitter                 (3-bolt fan)
+##   shooters "shotgun": brute                 (5-bolt blast)
+##   shooters "ring" : void                    (8-bolt ring + blink)
+##   shielded        : tank(4), brute(6), void(4) - a shield pool eats the
+##                     first hits (cyan while it holds, then the body pays)
+##   divers          : diver (detaches, dives, THE breach pressure)
+##   big bodies      : tank, brute, void ("big": true - the extra power roll)
+##   extras          : swift/weaver weave, splitter splits, magma trails
 const ETYPES := {
-                "grunt": {"tex": "en_grunt.png", "hp": 6, "score": 1, "r": 50.0, "scale": 1.0},
-                "swift": {"tex": "en_swift.png", "hp": 4, "score": 1, "r": 46.0, "scale": 1.0,
+                "grunt": {"tex": "en_grunt.png", "hp": 6, "score": 1, "r": 50.0},
+                "swift": {"tex": "en_swift.png", "hp": 4, "score": 1, "r": 46.0,
                                 "weave": 1.0},
-                "aimer": {"tex": "en_aimer.png", "hp": 8, "score": 2, "r": 52.0, "scale": 1.0,
+                "aimer": {"tex": "en_aimer.png", "hp": 8, "score": 2, "r": 52.0,
                                 "fires": "aim", "fire_cd": [2.6, 4.2]},
-                "diver": {"tex": "en_diver.png", "hp": 5, "score": 1, "r": 44.0, "scale": 1.0,
+                "diver": {"tex": "en_diver.png", "hp": 5, "score": 1, "r": 44.0,
                                 "dives": true},
-                "tank": {"tex": "en_tank.png", "hp": 22, "score": 2, "r": 64.0, "scale": 1.0},
-                "splitter": {"tex": "en_split.png", "hp": 7, "score": 1, "r": 48.0, "scale": 1.0,
+                "tank": {"tex": "en_tank.png", "hp": 22, "score": 2, "r": 64.0,
+                                "shield": 4, "big": true},
+                "splitter": {"tex": "en_split.png", "hp": 7, "score": 1, "r": 48.0,
                                 "splits": true},
-                "weaver": {"tex": "en_weaver.png", "hp": 10, "score": 2, "r": 54.0, "scale": 1.0,
+                "weaver": {"tex": "en_weaver.png", "hp": 10, "score": 2, "r": 54.0,
                                 "weave": 2.2},
-                "spitter": {"tex": "en_spit.png", "hp": 12, "score": 2, "r": 54.0, "scale": 1.0,
+                "spitter": {"tex": "en_spit.png", "hp": 12, "score": 2, "r": 54.0,
                                 "fires": "fan", "fire_cd": [3.2, 4.4]},
-                "brute": {"tex": "en_brute.png", "hp": 30, "score": 3, "r": 66.0, "scale": 1.0,
-                                "fires": "shotgun", "fire_cd": [3.6, 5.0]},
-                "magma": {"tex": "en_magma.png", "hp": 18, "score": 3, "r": 52.0, "scale": 1.0,
+                "brute": {"tex": "en_brute.png", "hp": 30, "score": 3, "r": 66.0,
+                                "fires": "shotgun", "fire_cd": [3.6, 5.0], "shield": 6, "big": true},
+                "magma": {"tex": "en_magma.png", "hp": 18, "score": 3, "r": 52.0,
                                 "fires": "aim", "fire_cd": [2.8, 4.0], "trails": true},
-                "void": {"tex": "en_void.png", "hp": 26, "score": 3, "r": 58.0, "scale": 1.0,
-                                "fires": "ring", "fire_cd": [3.4, 4.6], "blink": true},
+                "void": {"tex": "en_void.png", "hp": 26, "score": 3, "r": 58.0,
+                                "fires": "ring", "fire_cd": [3.4, 4.6], "blink": true,
+                                "shield": 4, "big": true},
 }
 const DIVE_CD := [5.5, 9.0]        # a diver detaches inside this window
+const ENEMY_SCALE := 0.62          # THE FIXED SCALE LAW (PATCH III): one size
+                                   # on every screen - no viewport-proportional
+                                   # clumps (the owner: "the game scale is corrupted")
 
 ## ---------------------------------------------------------------- the tour
 ## v0.3.2 PATCH: the facts are GONE from the screen (the owner: "weird facts
@@ -126,45 +151,51 @@ const DIVE_CD := [5.5, 9.0]        # a diver detaches inside this window
 ## own Deep Blue. deep/neb1/neb2/star, exactly the shader's four uniforms.
 const SKY_NEUTRAL := {"deep": Color("060a1c"), "neb1": Color("1a2f6e"),
                 "neb2": Color("3d1f66"), "star": Color(0.82, 0.90, 1.0)}
+## THE POOLS ARE UNLOCK ORDER (PATCH III, the owner: "in chicken invaders as
+## example, the progression be visible, like, seeing new enemies after new
+## stage or after some waves"): wave w may draw from pool[0..min(w, size)] -
+## wave 1 = the base body only, a NEW type marches in as the waves climb.
+## Stage 1 stays peaceful for three waves; the first SHOOTER (the aimer)
+## arrives in wave 4 - then the tour escalates.
 const STAGES := [
                 {"name": "NEPTUNE", "sub": "THE OUTPOST",
-                                "pool": ["grunt", "swift", "diver"],
+                                "pool": ["grunt", "swift", "diver", "aimer"],
                                 "sky": {"deep": Color("050a26"), "neb1": Color("1a3a8a"),
                                                 "neb2": Color("2a1a5e"), "star": Color(0.66, 0.77, 1.0)}},
                 {"name": "URANUS", "sub": "THE TILT",
-                                "pool": ["grunt", "swift", "diver", "aimer"],
+                                "pool": ["grunt", "swift", "aimer", "diver", "tank"],
                                 "sky": {"deep": Color("04121a"), "neb1": Color("0f5c66"),
                                                 "neb2": Color("1a4d6e"), "star": Color(0.75, 0.94, 1.0)}},
                 {"name": "SATURN", "sub": "THE RINGS",
-                                "pool": ["grunt", "swift", "aimer", "tank"],
+                                "pool": ["swift", "aimer", "tank", "splitter"],
                                 "sky": {"deep": Color("140f06"), "neb1": Color("6e5214"),
                                                 "neb2": Color("663a1a"), "star": Color(1.0, 0.91, 0.75)}},
                 {"name": "JUPITER", "sub": "THE GIANT",
-                                "pool": ["grunt", "swift", "aimer", "tank", "splitter"],
+                                "pool": ["aimer", "tank", "splitter", "weaver"],
                                 "sky": {"deep": Color("160d06"), "neb1": Color("8a5214"),
                                                 "neb2": Color("5e2a14"), "star": Color(1.0, 0.87, 0.75)}},
                 {"name": "MARS", "sub": "THE RED DUST",
-                                "pool": ["grunt", "diver", "aimer", "splitter", "weaver"],
+                                "pool": ["aimer", "splitter", "weaver", "diver", "spitter"],
                                 "sky": {"deep": Color("140806"), "neb1": Color("7a2e14"),
                                                 "neb2": Color("66321a"), "star": Color(1.0, 0.79, 0.69)}},
                 {"name": "EARTH", "sub": "HOME",
-                                "pool": ["grunt", "diver", "tank", "weaver", "spitter"],
+                                "pool": ["tank", "weaver", "spitter", "brute"],
                                 "sky": {"deep": Color("040a1a"), "neb1": Color("14416e"),
                                                 "neb2": Color("1a5c4a"), "star": Color(0.87, 0.95, 1.0)}},
                 {"name": "VENUS", "sub": "THE FURNACE",
-                                "pool": ["swift", "diver", "weaver", "spitter", "brute"],
+                                "pool": ["weaver", "spitter", "brute", "magma"],
                                 "sky": {"deep": Color("161004"), "neb1": Color("8a6e14"),
                                                 "neb2": Color("6e4a14"), "star": Color(1.0, 0.95, 0.75)}},
                 {"name": "MERCURY", "sub": "THE CRATERS",
-                                "pool": ["swift", "tank", "weaver", "spitter", "brute"],
+                                "pool": ["spitter", "brute", "magma", "tank"],
                                 "sky": {"deep": Color("100e0c"), "neb1": Color("5c5148"),
                                                 "neb2": Color("3d3a36"), "star": Color(0.95, 0.93, 0.89)}},
                 {"name": "THE SUN", "sub": "THE WALL",
-                                "pool": ["tank", "weaver", "spitter", "brute", "magma"],
+                                "pool": ["brute", "magma", "void", "spitter"],
                                 "sky": {"deep": Color("1c0802"), "neb1": Color("8a2e08"),
                                                 "neb2": Color("661a08"), "star": Color(1.0, 0.81, 0.62)}},
                 {"name": "THE HIDEOUT", "sub": "THE FRONT DOOR",
-                                "pool": ["weaver", "spitter", "brute", "magma", "void"],
+                                "pool": ["magma", "void", "brute", "weaver"],
                                 "sky": {"deep": Color("0c0518"), "neb1": Color("3d1466"),
                                                 "neb2": Color("24105e"), "star": Color(0.88, 0.78, 1.0)}},
 ]
@@ -217,6 +248,12 @@ const DEFENDERS := {
 ## alpha pop-ups, white text (the owner's law: translucent enough to see the
 ## war behind, solid enough to read). Up to 3 variants per situation, rotating.
 const LINES := {
+                # THE OPENING STORY (PATCH III - the owner: "where it is the story
+                # and lore i crafted in my old message?"). The whole crafted lore,
+                # in one scrollable card: the same universe as Space Dash, the
+                # crew holding the line out there, the tour from the last planet
+                # to the sun, and the hideout waiting behind it.
+                "intro_story": "They came from the dark beyond the sun - the invaders, hunting our solar system.\n\nSPACE DASH met them first, out at the rim, and held. This box is one war fought on two fronts: while that dash runs, the crew of the SSDS - azure, ember, verdant, veteran, phantom, hornet, titan - is still out there fighting them in the black.\n\nI am the PROTECTOR. My line is the last one: from Neptune, the farthest outpost, inward world by world - Uranus, Saturn, Jupiter, Mars, home over Earth, then the furnace of Venus, the craters of Mercury, the burning wall of the Sun itself.\n\nBehind the sun, radar says, there is a tenth place. Their hideout. Whatever waits there called this invasion.\n\nI will not let them reach it. Not one of them.",
                 "intro": [
                                 "SPACE DASH held them off at the rim of the system. This is where they turn. This is where I hold.",
                                 "I have chased these raiders since the dash wars. They will not touch our sun while I fly.",
@@ -359,10 +396,8 @@ var snake_clock := 0.0
 var missile_cd := 0.0
 var last_shot_ms := 0
 
-var waves_since_coin := 0
-var coin_target := 3
-var waves_since_power := 0
-var power_target := 1
+var kills_since_coin := 0             # the dash law: counted from the last coin COLLECTED
+var coin_target := 7
 
 var enemies: Array = []               # wave enemies (dicts)
 var bolts: Array = []                 # player bullets/orbs/beams/bullets/fire
@@ -479,6 +514,15 @@ func _goga_setup() -> void:
 
                 themes_on = Box.item_owned(game_id, "theme", "pack")
                 _sky_snap(stage)
+                # THE SKIN FIRST LAW (v0.3.2 PATCH III, the owner: "when i start
+                # playing, it shows the azure skin as the default while letting
+                # the weapon the same as the perspective ship"): the equipped
+                # hull is read BEFORE the ship is built - the old order built
+                # the sprite while skin was still the azure default.
+                skin = Box.skin_on(game_id)
+                if not SHIPS.has(skin):
+                                skin = "azure"
+                weapon = String(SHIPS[skin]["weapon"])
 
                 ship = Sprite2D.new()
                 world.add_child(ship)
@@ -497,10 +541,6 @@ func _goga_setup() -> void:
                                                 "thunder", "bomb"]:
                                 wpower[wid] = 1
                                 wpts[wid] = 0
-                skin = Box.skin_on(game_id)
-                if not SHIPS.has(skin):
-                                skin = "azure"
-                weapon = String(SHIPS[skin]["weapon"])
                 Jukebox.music("res://assets/audio/music/inv_tour.wav")
                 # THE FLOW LAW (v0.3.2 PATCH, the owner: "the game supposed to show
                 # optionals screen first then the tap to play"): the crew picker
@@ -619,6 +659,22 @@ func _boss_chip_update() -> void:
 
 func _bottom_safe() -> float:
                 return 84.0 + banner_bottom()
+
+## THE 22-ROW LAW (v0.3.2 PATCH III, the owner: "it should be like 22 lines
+## of rows, up to 10 rows used with 10 rows empty space in-between and a row
+## under user ship and a row on the top nothing in it, tweak the scale"):
+## the playfield is a FIXED 22-row grid - row 0 stays EMPTY, the enemy block
+## lives in rows 1..10 (up to ten used), rows 11..20 are the open battle
+## sky, row 21 is the protector's row, and the bottom safe band is the empty
+## row under it. FIXED scale everywhere - no viewport-proportional clumps.
+const GRID_ROWS := 22
+const GRID_TOP := 44.0
+
+func _grid_row_h() -> float:
+                return (get_viewport_rect().size.y - GRID_TOP - _bottom_safe()) / float(GRID_ROWS)
+
+func _grid_row_y(row: float) -> float:
+                return GRID_TOP + _grid_row_h() * (row + 0.5)
 
 # ================================================================ ready card
 
@@ -750,9 +806,11 @@ func _ship_tick(delta: float) -> void:
                 var target := move_axis * 900.0
                 ship_v.x = lerpf(ship_v.x, target, minf(1.0, delta * 7.5))
                 ship.position.x = clampf(ship.position.x + ship_v.x * delta, 70.0, vp.x - 70.0)
-                var home := vp.y - _bottom_safe() - 84.0
+                # row 21 = the protector's row (the 22-row law); the sine breath
+                # stays inside its row
+                var home := _grid_row_y(21.0)
                 ship.position.y = lerpf(ship.position.y,
-                                                home + sin(Time.get_ticks_msec() * 0.0013) * 10.0,
+                                                home + sin(Time.get_ticks_msec() * 0.0013) * 8.0,
                                                 minf(1.0, delta * 3.0))
                 ship_v.y = 0.0
                 ship.rotation = clampf(ship_v.x * 0.00055, -0.32, 0.32)
@@ -882,7 +940,7 @@ func _fire_orb() -> void:
                                 bolts.append({"node": b, "dmg": dmg, "vel": Vector2.from_angle(ang) * 980.0,
                                                                 "kind": "orb", "hit": {}})
                 fire_cd = ORB_CD
-                Jukebox.sfx("inv_shoot_azure", -8.0, 1.0 + 0.03 * float(lvl))
+                Jukebox.sfx("inv_shoot_azure", -5.0, 1.0 + 0.03 * float(lvl))
 
 ## ---- ember: red beams. more beams, wider range (owner) ----
 func _fire_beam() -> void:
@@ -901,7 +959,7 @@ func _fire_beam() -> void:
                                 bolts.append({"node": b, "dmg": dmg, "vel": Vector2.from_angle(ang) * 1150.0,
                                                                 "kind": "beam", "hit": {}})
                 fire_cd = BEAM_CD
-                Jukebox.sfx("inv_shoot_ember", -8.0)
+                Jukebox.sfx("inv_shoot_ember", -5.0)
 
 ## ---- phantom: machine gun, rapid, small (owner) ----
 func _fire_mg() -> void:
@@ -917,7 +975,7 @@ func _fire_mg() -> void:
                                                                 "vel": Vector2(rng.randf_range(-40.0, 40.0), -1500.0),
                                                                 "kind": "mg", "hit": {}})
                 fire_cd = MG_CD
-                Jukebox.sfx("inv_shoot_phantom", -12.0, 1.0 + rng.randf_range(-0.05, 0.05))
+                Jukebox.sfx("inv_shoot_phantom", -8.0, 1.0 + rng.randf_range(-0.05, 0.05))
 
 ## ---- verdant: green snakes - slow weaving, PIERCE, damage is hits/sec ----
 func _fire_snakes() -> void:
@@ -938,98 +996,125 @@ func _fire_snakes() -> void:
 func _snakes_tick(delta: float) -> void:
                 if snakes.is_empty():
                                 return
-                if not firing or weapon != "snake":
+                # THE RELEASE LAW (v0.3.2 PATCH III, the owner: "when i stop
+                # holding, it vanish in nowhere? it's supposed to still shoot one
+                # by one"): letting go never deletes the beams mid-air - every
+                # fired snake finishes its flight and exits the sky. Only a real
+                # weapon SWITCH clears them outright.
+                if weapon != "snake":
                                 for s in snakes:
                                                 s["node"].queue_free()
                                 snakes.clear()
                                 return
-                var lvl := weapon_level()
+                if not firing:
+                                for s in snakes:
+                                                s["orphan"] = true
                 snake_clock += delta
                 var emit := false
                 if snake_clock >= 0.05:
                                 snake_clock = 0.0
                                 emit = true
-                for s in snakes:
+                for s in snakes.duplicate():
                                 s["t"] += delta * 5.0
                                 var n: Sprite2D = s["node"]
-                                n.position.x = ship.position.x + sin(s["t"]) * 90.0   # the snake weave
+                                # an orphan stops riding the protector's weave - it owns
+                                # the x it had and just climbs on (one by one, owner)
+                                if not bool(s.get("orphan", false)):
+                                                n.position.x = ship.position.x + sin(s["t"]) * 90.0
                                 n.position.y -= 300.0 * float(s["tall"]) * delta
                                 n.rotation = cos(s["t"]) * 0.5
                                 if emit and n.position.y > 0.0:
                                                 trails.append({"pos": n.position, "vel": Vector2(0, 60), "life": 0.22,
                                                                                 "max": 0.22, "r": 9.0, "col": Color(0.35, 0.95, 0.45, 0.6)})
                                 if n.position.y < -80.0:
-                                                n.position.y = ship.position.y - 40.0
-                                                n.position.x = ship.position.x
-                                # the DPS law: every SNAKE_TICK the snake re-damages everything its
-                                # swept path crossed since the last tick (it is slow ON PURPOSE - the
-                                # owner: "slow enough to deal high damage by time"); the FURTHER the
-                                # body along the path, the lower the damage, floor 1, never 0
+                                                if bool(s.get("orphan", false)):
+                                                                n.queue_free()
+                                                                snakes.erase(s)
+                                                else:
+                                                                n.position.y = ship.position.y - 40.0
+                                                                n.position.x = ship.position.x
+                                                                s["last_y"] = n.position.y
+                                                                s["path_x"] = n.position.x
+                                                continue
+                                # THE DPS LAW + THE ACCURACY LAW (PATCH III, the owner:
+                                # "the green beams do not make damage accurately, it should
+                                # make a damage on the one it collided with correctly"):
+                                # every SNAKE_TICK the beam re-damages what its swept
+                                # SEGMENT really crossed - true point-to-line distance,
+                                # not the old fat band around the current x (bodies the
+                                # beam never touched were dying). The FURTHER along the
+                                # path, the lower the damage, floor 1, never 0.
                                 s["tick"] -= delta
                                 if s["tick"] <= 0.0:
-                                        s["tick"] = SNAKE_TICK
-                                        var dmg0: int = int(s["lvl"])
-                                        var sn: Sprite2D = s["node"]
-                                        var last_y: float = float(s.get("last_y", sn.position.y))
-                                        var ny: float = sn.position.y
-                                        var y_lo: float = minf(last_y, ny) - 48.0
-                                        var y_hi: float = maxf(last_y, ny) + 48.0
-                                        var victims: Array = []
-                                        for e in enemies:
-                                                if not is_instance_valid(e["node"]):
-                                                        continue
-                                                var ep: Vector2 = e["node"].position
-                                                if absf(ep.x - sn.position.x) < float(e["r"]) * 0.6 + 44.0 and ep.y >= y_lo and ep.y <= y_hi:
-                                                        victims.append(e)
-                                        victims.sort_custom(func(a, b):
-                                                return float(a["node"].position.y) > float(b["node"].position.y))
-                                        for i in victims.size():
-                                                _hit_enemy(victims[i], maxi(1, dmg0 - i))
-                                        s["last_y"] = ny
+                                                s["tick"] = SNAKE_TICK
+                                                var dmg0: int = int(s["lvl"])
+                                                var sn: Sprite2D = s["node"]
+                                                var a2 := Vector2(float(s.get("path_x", sn.position.x)),
+                                                                float(s.get("last_y", sn.position.y)))
+                                                var b2: Vector2 = sn.position
+                                                var victims: Array = []
+                                                for e in enemies:
+                                                                if not is_instance_valid(e["node"]):
+                                                                                continue
+                                                                var ep: Vector2 = e["node"].position
+                                                                if _seg_dist(ep, a2, b2) < float(e["r"]) * 0.55 + 16.0:
+                                                                                victims.append(e)
+                                                victims.sort_custom(func(a, b):
+                                                                return float(a["node"].position.y) > float(b["node"].position.y))
+                                                for i in victims.size():
+                                                                _hit_enemy(victims[i], maxi(1, dmg0 - i))
+                                                s["last_y"] = b2.y
+                                                s["path_x"] = b2.x
 
-## ---- veteran: sound arcs - open circles, bigger + stronger (owner) ----
+## true distance from a point to a segment - the accuracy law's ruler
+func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
+                var seg := b - a
+                var t := 0.5
+                if seg.length_squared() > 0.0001:
+                                t = clampf((p - a).dot(seg) / seg.length_squared(), 0.0, 1.0)
+                return p.distance_to(a + seg * t)
+
+## ---- veteran: sound arcs (v0.3.2 PATCH III, the owner: "the arch supposed
+## to be white + an effect, a VFX, currently it feels like low-res png") ----
+## NO sprite anymore - the arc is PAINTED every frame by the fx painter:
+## a white core arch + a cool additive glow + a trailing echo ring, crisp at
+## any radius. The dict carries its own position (it rides the shooter).
 func _fire_arc() -> void:
                 var lvl := weapon_level()
-                var a := Sprite2D.new()
-                a.texture = _tex["w_veteran"]
-                a.material = _add_mat()
-                a.position = ship.position
-                world.add_child(a)
-                arcs.append({"node": a, "r": 30.0, "grow": 300.0 + 55.0 * float(lvl),
-                                                "dmg": lvl, "hit": {}, "live": 1.5})
+                arcs.append({"pos": ship.position, "follow": "ship", "r": 34.0,
+                                                "grow": 300.0 + 55.0 * float(lvl), "dmg": lvl, "hit": {},
+                                                "live": 1.5})
                 fire_cd = ARC_CD
-                Jukebox.sfx("inv_shoot_veteran", -7.0)
+                _fx_spark(ship.position + Vector2(0, -40), 5, Color(1, 1, 1, 0.9), 220.0)
+                Jukebox.sfx("inv_shoot_veteran", -4.0)
 
 func _arcs_tick(delta: float) -> void:
                 for a in arcs.duplicate():
                                 a["r"] += a["grow"] * delta
                                 a["live"] -= delta
-                                var n: Sprite2D = a["node"]
                                 # the ring rides its SHOOTER (the protector's arcs follow the
                                 # protector; a rented Veteran's arcs follow the Veteran)
                                 if String(a.get("follow", "ship")) == "defender" and defender != null \
                                                 and is_instance_valid(defender):
-                                                n.position = defender.position
+                                                a["pos"] = defender.position
                                 else:
-                                                n.position = ship.position
-                                n.scale = Vector2.ONE * (a["r"] / 22.0)
-                                n.modulate.a = clampf(a["live"], 0.0, 1.0)
+                                                a["pos"] = ship.position
+                                var npos: Vector2 = a["pos"]
                                 for e in enemies.duplicate():   # the copy law: kills erase mid-loop
                                                 if not is_instance_valid(e["node"]):
                                                                 continue
                                                 var id: int = e["node"].get_instance_id()
                                                 if a["hit"].has(id):
                                                                 continue
-                                                if absf(e["node"].position.distance_to(n.position) - a["r"]) < float(e["r"]) * 0.5 + 20.0:
+                                                if absf(e["node"].position.distance_to(npos) - float(a["r"])) < float(e["r"]) * 0.5 + 20.0:
                                                                 a["hit"][id] = true
-                                                                _hit_enemy(e, a["dmg"])
+                                                                _hit_enemy(e, int(a["dmg"]))
                                 if boss.has("node"):
                                                 var id2: int = boss["node"].get_instance_id()
-                                                if not a["hit"].has(id2) and absf(boss["node"].position.distance_to(n.position) - a["r"]) < float(boss["r"]) * 0.4 + 20.0:
+                                                if not a["hit"].has(id2) and absf(boss["node"].position.distance_to(npos) - float(a["r"])) < float(boss["r"]) * 0.4 + 20.0:
                                                                 a["hit"][id2] = true
-                                                                _hit_boss(a["dmg"], n.position)
-                                if a["live"] <= 0.0 or a["r"] > 1500.0:
-                                                n.queue_free()
+                                                                _hit_boss(int(a["dmg"]), npos)
+                                if float(a["live"]) <= 0.0 or float(a["r"]) > 1500.0:
                                                 arcs.erase(a)
 
 ## ---- hornet: fire that SPREADS (owner) ----
@@ -1044,7 +1129,7 @@ func _fire_hornet() -> void:
                                                 "vel": Vector2(rng.randf_range(-60, 60), -760.0), "kind": "fire",
                                                 "hit": {}})
                 fire_cd = FIRE_CD
-                Jukebox.sfx("inv_shoot_hornet", -9.0)
+                Jukebox.sfx("inv_shoot_hornet", -6.0)
 
 func _ignite(at: Vector2, lvl: int, chain_left: int) -> void:
                 # the burn: spreads to nearby enemies, longer + hotter per level (owner)
@@ -1091,7 +1176,7 @@ func _fire_missile() -> void:
                 world.add_child(b)
                 missiles.append({"node": b, "t": 0.0})
                 fire_cd = MISSILE_CD
-                Jukebox.sfx("inv_shoot_titan", -5.0)
+                Jukebox.sfx("inv_shoot_titan", -2.0)
 
 func _missiles_tick(delta: float) -> void:
                 for m in missiles.duplicate():
@@ -1173,7 +1258,7 @@ func _cast_thunder() -> void:
                                 _hit_enemy(e, maxi(1, dmg0 - 1 - hop))
                                 _fx_spark(e["node"].position, 5, Color(0.7, 0.9, 1.0), 200.0)
                                 hop += 1
-                Jukebox.sfx("inv_thunder", -5.0)
+                Jukebox.sfx("inv_thunder", -2.0)
                 shake = maxf(shake, 6.0)
                 fire_cd = THUNDER_CD
 
@@ -1228,7 +1313,7 @@ func _bomb_blast(at: Vector2) -> void:
                                                 var rings2 := int(floorf(d2 / 60.0))
                                                 _hit_boss(maxi(1, center - rings2), at)
                 _fx_explosion(at, 2.2, Color(1.0, 0.75, 0.4))
-                Jukebox.sfx("inv_bomb_boom", -3.0)
+                Jukebox.sfx("inv_bomb_boom", 0.0)
                 shake = maxf(shake, 14.0)
 
 ## ---- player bolts: travel + hit ----
@@ -1354,21 +1439,26 @@ func _begin_stage(idx: int, first := false) -> void:
                                 _apply_stage_sky(idx)
                 phase = "gap"
                 var st: Dictionary = STAGES[idx]
-                # THE STORY SHEET: the big arrival moment - a scrollable CARD that
-                # pauses the war (the cursed dario law). Lore only - the planet's
-                # real-world data lives in the sky's palette, not in text.
-                var intro: String = _line_pick("intro") if (first and idx == 0) \
-                                else _fmt(_line_pick("stage"), [String(st["name"])])
-                _story_show("%s - %s" % [String(st["name"]), String(st["sub"])], intro,
-                                func(): _next_wave())
+                # THE STORY LAW (PATCH III): the FIRST card is THE PROTECTOR - the
+                # full crafted lore (the Space Dash universe, the crew out there,
+                # the tour, the hideout) on a START button. The old flow pasted
+                # "NEPTUNE - THE OUTPOST" over the opening story - the wave popup's
+                # title wearing the lore's face. Stage arrivals keep their own
+                # lore line under a plain STAGE title, also START.
+                if first:
+                                _story_show("THE PROTECTOR", String(LINES["intro_story"]),
+                                                func(): _next_wave(), false, "START")
+                else:
+                                var intro: String = _fmt(_line_pick("stage"), [String(st["name"])])
+                                _story_show("STAGE %d: %s" % [idx + 1, String(st["name"])], intro,
+                                                func(): _next_wave(), false, "START")
                 achievement_max("max_stage", idx + 1)
 
 func _next_wave() -> void:
                 if over:
                                 return
                 wave += 1
-                waves_since_coin += 1
-                waves_since_power += 1
+                # loot no longer rides the wave counter - the wrecks pay (PATCH III)
                 if wave >= 10:
                                 _start_boss_wave()
                                 return
@@ -1378,7 +1468,8 @@ func _next_wave() -> void:
                 var tw := create_tween()
                 tw.tween_interval(1.1)
                 tw.tween_callback(func():
-                                if over:
+                                # THE GAP GUARD (the death-hang law): only a live gap spawns
+                                if over or phase != "gap":
                                                 return
                                 _spawn_wave())
 
@@ -1391,48 +1482,61 @@ func _wave_title(big: String, small := "") -> void:
                 tw.tween_interval(1.15)
                 tw.tween_property(wave_lbl, "modulate:a", 0.0, 0.35)
 
-## the formation slots (local box, centered)
+## the formation slots (v0.3.2 PATCH III - FIXED PIXELS, the scale law):
+## up to 11 columns at 78px, rows at the grid's 2.1-row pitch, anchored so
+## the block's first line sits on grid row 1 (grid row 0 stays empty).
 func _pattern_slots(pattern: String, count: int) -> Array:
                 var slots: Array = []
-                var cols := mini(6, maxi(3, int(ceilf(count / 2.5))))
+                var cols := mini(11, maxi(4, int(ceilf(count / 2.2))))
+                var cp := 78.0                          # the column pitch (fixed)
+                var rp := maxf(58.0, _grid_row_h() * 2.1)   # the row pitch (fixed)
                 match pattern:
                                 "line":
-                                                for r in 2:
+                                                var rows := mini(4, int(ceilf(count / float(cols))))
+                                                for r in rows:
                                                                 for c in cols:
-                                                                                slots.append(Vector2((float(c) - float(cols - 1) / 2.0) * 150.0,
-                                                                                                                120.0 + r * 130.0))
+                                                                                slots.append(Vector2((float(c) - float(cols - 1) / 2.0) * cp,
+                                                                                                                                float(r) * rp))
                                 "vee":
                                                 for i in count:
                                                                 var k := i - (count - 1) / 2.0
-                                                                slots.append(Vector2(k * 140.0, 120.0 + absf(k) * 90.0))
+                                                                slots.append(Vector2(k * 130.0, float(absf(k)) * rp * 0.75))
                                 "arc":
                                                 for i in count:
                                                                 var a := PI * (0.15 + 0.7 * float(i) / maxf(1.0, float(count - 1)))
-                                                                slots.append(Vector2(-cos(a) * 430.0, 240.0 - sin(a) * 150.0))
+                                                                slots.append(Vector2(-cos(a) * 430.0, rp * 1.6 - sin(a) * rp * 1.4))
                                 "diamond":
                                                 var mid := count / 2
                                                 for i in count:
                                                                 var k := absf(float(i - mid))
-                                                                slots.append(Vector2((float(i) - float(count - 1) / 2.0) * 140.0,
-                                                                                                130.0 + (mid - k) * 70.0))
+                                                                slots.append(Vector2((float(i) - float(count - 1) / 2.0) * cp,
+                                                                                                float(mid - k) * rp * 0.6))
                                 "columns":
                                                 for c in 3:
                                                                 for r in int(ceilf(float(count) / 3.0)):
-                                                                                slots.append(Vector2((float(c) - 1.0) * 210.0, 100.0 + r * 130.0))
+                                                                                slots.append(Vector2((float(c) - 1.0) * 200.0, float(r) * rp))
                                 "ring":
                                                 for i in count:
                                                                 var a := TAU * float(i) / float(count)
-                                                                slots.append(Vector2(cos(a) * 400.0, 240.0 + sin(a) * 150.0))
+                                                                slots.append(Vector2(cos(a) * 400.0, rp * 1.5 + sin(a) * rp * 1.3))
                                 _:
                                                 # lattice
-                                                for r in 3:
+                                                var lrows := mini(4, int(ceilf(count / float(cols))))
+                                                for r in lrows:
                                                                 for c in cols:
-                                                                                slots.append(Vector2((float(c) - float(cols - 1) / 2.0) * 160.0,
-                                                                                                                110.0 + r * 140.0 + (30.0 if c % 2 == 1 else 0.0)))
+                                                                                slots.append(Vector2((float(c) - float(cols - 1) / 2.0) * cp,
+                                                                                                                float(r) * rp + (22.0 if c % 2 == 1 else 0.0)))
                 while slots.size() > count:
                                 slots.pop_back()
                 while slots.size() < count:
-                                slots.append(Vector2(rng.randf_range(-420, 420), rng.randf_range(110, 420)))
+                                var r2 := mini(3, slots.size() / cols)
+                                slots.append(Vector2((float(slots.size() % cols) - float(cols - 1) / 2.0) * cp,
+                                                                float(r2) * rp))
+                # every slot stays reachable on THIS screen (a slot outside the
+                # sky would hover forever, unwinnable)
+                var hw := get_viewport_rect().size.x * 0.5 - 90.0
+                for s in slots:
+                                s.x = clampf(s.x, -hw, hw)
                 return slots
 
 func _spawn_wave() -> void:
@@ -1441,38 +1545,51 @@ func _spawn_wave() -> void:
                 var pool: Array = st["pool"]
                 var pattern: String = PATTERNS[(stage * 3 + wave) % PATTERNS.size()]
                 var count := 8 + stage + wave
-                form_origin = Vector2(get_viewport_rect().size.x * 0.5, 0.0)
+                # THE 22-ROW LAW: the block anchors on grid row 1 - the top grid
+                # row (row 0) stays empty, the battle sky (rows 11..20) stays open
+                form_origin = Vector2(get_viewport_rect().size.x * 0.5, _grid_row_y(1.0))
                 form_v = Vector2(rng.randf_range(40.0, 80.0) * (1.0 if rng.randf() > 0.5 else -1.0), 0.0)
                 form_t = 0.0
                 var slots := _pattern_slots(pattern, count)
                 var hp_mul := 1.0 + STAGE_HP_GROWTH * float(stage)
+                # THE PROGRESSION LAW (PATCH III): wave w draws from the pool's
+                # first min(w, size) kinds - new types march in as waves climb
+                var avail: int = mini(wave, pool.size())
                 for i in count:
-                                var kind: String = pool[0] if i % 3 == 0 else pool[rng.randi_range(0, pool.size() - 1)]
+                                var kind: String = pool[0] if i % 3 == 0 else pool[rng.randi_range(0, avail - 1)]
+                                if rng.randf() < 0.22:
+                                                kind = pool[avail - 1]        # the newest arrival shows itself
                                 var d: Dictionary = ETYPES[kind]
                                 var n := Sprite2D.new()
                                 n.texture = _tx(d["tex"])
-                                n.scale = Vector2.ONE * float(d["scale"])
-                                var from := Vector2(rng.randf_range(60, get_viewport_rect().size.x - 60), -90.0 - rng.randf_range(0, 240))
+                                n.scale = Vector2.ONE * ENEMY_SCALE      # the fixed scale
+                                var from := Vector2(rng.randf_range(60, get_viewport_rect().size.x - 60), -70.0 - rng.randf_range(0, 180))
                                 n.position = from
                                 world.add_child(n)
                                 enemies.append({"kind": kind, "node": n, "hp": int(ceilf(float(d["hp"]) * hp_mul)),
-                                                                "hp_base": int(d["hp"]), "r": float(d["r"]), "score": int(d["score"]),
+                                                                "hp_base": int(d["hp"]), "r": float(d["r"]) * ENEMY_SCALE,
+                                                                "score": int(d["score"]),
+                                                                "shield": int(d.get("shield", 0)),
                                                                 "slot": slots[i], "state": "in", "t": rng.randf() * TAU,
                                                                 "fire_cd": rng.randf_range(float(d["fire_cd"][0]) if d.has("fire_cd") else 9.0,
                                                                                                 float(d["fire_cd"][1]) if d.has("fire_cd") else 12.0),
                                                                 "dive_cd": rng.randf_range(DIVE_CD[0], DIVE_CD[1]) if d.has("dives") else -1.0,
                                                                 "data": d})
+                                if int(d.get("shield", 0)) > 0:
+                                                n.modulate = Color(0.75, 0.95, 1.15, 1.0)   # shielded reads cyan
                                 var tw := n.create_tween()
                                 tw.tween_interval(0.05 * float(i))
-                Jukebox.sfx("inv_wave", -6.0)
+                Jukebox.sfx("inv_wave", -5.0)
 
 func _form_tick(delta: float) -> void:
                 var vp := get_viewport_rect().size
                 form_t += delta
-                var target_y := 130.0 + 30.0 * sin(form_t * 0.5)
+                # the block breathes INSIDE the enemy zone (rows 1..10) - it never
+                # sinks into the battle sky (the 22-row law)
+                var target_y := _grid_row_y(1.0) + 8.0 * sin(form_t * 0.5)
                 form_origin.x += form_v.x * delta
                 form_origin.y = lerpf(form_origin.y, target_y, minf(1.0, delta * 1.4))
-                var margin := vp.x * 0.22
+                var margin := mini(200.0, vp.x * 0.22)
                 if form_origin.x < margin:
                                 form_v.x = absf(form_v.x)
                 elif form_origin.x > vp.x - margin:
@@ -1570,7 +1687,7 @@ func _enemy_fire(e: Dictionary) -> void:
                                                 for k in 8:
                                                                 var ang3 := TAU * float(k) / 8.0
                                                                 _ebolt(from, Vector2.from_angle(ang3) * 340.0)
-                Jukebox.sfx("inv_hit", -18.0, 0.6)
+                Jukebox.sfx("inv_hit", -12.0, 0.7)
 
 func _ebolt(from: Vector2, vel: Vector2) -> void:
                 var b := Sprite2D.new()
@@ -1605,6 +1722,24 @@ func _ebolts_tick(delta: float) -> void:
 func _hit_enemy(e: Dictionary, dmg: int) -> void:
                 if not is_instance_valid(e["node"]):
                                 return
+                # THE SHIELD LAW (PATCH III, the owner: "they have a shield"):
+                # a shielded family eats the hit whole - the pool drains first,
+                # the body never feels it while any shield remains. The cyan tint
+                # tells the truth; the break rings and the body pays from then on.
+                if int(e.get("shield", 0)) > 0:
+                                var left := int(e["shield"]) - dmg
+                                _fx_spark(e["node"].position, 3, Color(0.6, 0.95, 1.0), 180.0)
+                                if left > 0:
+                                                e["shield"] = left
+                                                _fx_popup(e["node"].position + Vector2(0, -20), "SHIELD",
+                                                                                Color(0.65, 0.9, 1.0), 20)
+                                                return
+                                e["shield"] = 0
+                                e["node"].modulate = Color(1, 1, 1, 1)
+                                _fx_ring(e["node"].position, 64.0, Color(0.65, 0.9, 1.0), 0.3)
+                                _fx_popup(e["node"].position + Vector2(0, -20), "BREAK",
+                                                                Color(0.8, 0.95, 1.0), 22)
+                                return
                 e["hp"] = int(e["hp"]) - dmg
                 _fx_popup(e["node"].position + Vector2(0, -20), "-%d" % dmg, Color(1, 0.95, 0.8), 24)
                 if int(e["hp"]) <= 0:
@@ -1615,7 +1750,7 @@ func _kill_enemy(e: Dictionary, scored: bool) -> void:
                                 return
                 var d: Dictionary = e["data"]
                 _fx_explosion(e["node"].position, 0.9, Color(0.8, 0.85, 1.0))
-                Jukebox.sfx("inv_boom_small", -10.0, rng.randf_range(0.9, 1.2))
+                Jukebox.sfx("inv_boom_small", -7.0, rng.randf_range(0.9, 1.2))
                 var at: Vector2 = e["node"].position
                 e["node"].queue_free()
                 enemies.erase(e)
@@ -1624,16 +1759,21 @@ func _kill_enemy(e: Dictionary, scored: bool) -> void:
                                 achievement_count("kills", 1)
                                 _score_gain(int(e["score"]))
                                 _fx_popup(at + Vector2(0, -46), "+%d" % int(e["score"]), Color(1, 0.92, 0.55), 30)
+                                # THE WRECK LAW (PATCH III): the loot rolls HERE, at the
+                                # wreck - the dash economy, not wave airdrops
+                                _roll_drop(at, e)
                                 if bool(d.get("splits", false)):
                                                 for k in 2:
                                                                 var dd: Dictionary = ETYPES["grunt"]
                                                                 var n := Sprite2D.new()
                                                                 n.texture = _tex["en_grunt"]
+                                                                n.scale = Vector2.ONE * ENEMY_SCALE
                                                                 n.position = at + Vector2(-40.0 + 80.0 * float(k), 0.0)
                                                                 world.add_child(n)
                                                                 enemies.append({"kind": "grunt", "node": n, "hp": int(ceilf(float(dd["hp"]) *
                                                                                                 (1.0 + STAGE_HP_GROWTH * float(stage)))), "hp_base": int(dd["hp"]),
-                                                                                                "r": float(dd["r"]), "score": int(dd["score"]),
+                                                                                                "r": float(dd["r"]) * ENEMY_SCALE, "score": int(dd["score"]),
+                                                                                                "shield": 0,
                                                                                                 "slot": e["slot"] + Vector2(-40.0 + 80.0 * float(k), 40.0),
                                                                                                 "state": "hover", "t": rng.randf() * TAU, "fire_cd": 9.0,
                                                                                                 "dive_cd": -1.0, "data": dd})
@@ -1666,58 +1806,62 @@ func _wave_end() -> void:
                                 defender_waves_left -= 1
                                 if defender_waves_left <= 0:
                                                 _defender_depart()
-                # loot: the wave-anchored rolls (owner laws, not kill-counted)
-                var vp := get_viewport_rect().size
-                if waves_since_coin >= coin_target:
-                                waves_since_coin = 0
-                                coin_target = rng.randi_range(COIN_WAVES_MIN, COIN_WAVES_MAX)
-                                _spawn_loot("coin", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
-                if waves_since_power >= power_target:
-                                waves_since_power = 0
-                                power_target = rng.randi_range(POWER_WAVES_MIN, POWER_WAVES_MAX)
-                                _spawn_loot("power", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
-                _roll_weapon_drop()
+                # NO wave airdrops here anymore (PATCH III): everything drops from
+                # the wrecks, exactly the Space Dash economy. The gap is just a gap.
                 var tw := create_tween()
                 tw.tween_interval(0.9)
                 tw.tween_callback(func():
-                                if over:
+                                # THE GAP GUARD: a stale wave callback must never fire
+                                # into a dying/ended flow (the death-hang law)
+                                if over or phase != "gap":
                                                 return
                                 if wave >= 10:
                                                 return
                                 _next_wave())
 
+## THE DASH SIZES (PATCH III, the owner: "WHY THE FUCK THE GOGACOIN IS THAT
+## BIG... and weapon items are weirdly small"): the coin renders at the dash
+## 74px (the ui coin is 192 - the old code stamped it RAW), the items ride
+## the dash 2.0-2.2x stamps so an item reads as an ITEM.
 func _spawn_loot(kind: String, at: Vector2) -> void:
                 var n := Sprite2D.new()
                 match kind:
                                 "coin":
                                                 n.texture = _tex["coin"]
+                                                n.scale = Vector2.ONE * (74.0 / 192.0)
                                 "power":
                                                 n.texture = _tex["item_power"]
+                                                n.scale = Vector2.ONE * 2.0
                                 "heart":
                                                 n.texture = _tex["heart"]
+                                                n.scale = Vector2.ONE * 0.55
                                 "wswitch":
                                                 n.texture = _tex["item_w_" + skin]
+                                                n.scale = Vector2.ONE * 1.8
                                 "thunder":
                                                 n.texture = _tex["item_thunder"]
+                                                n.scale = Vector2.ONE * 2.0
                                 "bomb":
                                                 n.texture = _tex["item_bomb"]
+                                                n.scale = Vector2.ONE * 2.2
                 n.position = at
                 world.add_child(n)
-                loots.append({"kind": kind, "node": n, "vel": Vector2(rng.randf_range(-30, 30), 150.0)})
+                loots.append({"kind": kind, "node": n, "vel": Vector2(0, 230.0)})
 
 func _loot_tick(delta: float) -> void:
                 var vp := get_viewport_rect().size
                 for l in loots.duplicate():
                                 var n: Sprite2D = l["node"]
+                                # the dash fall: straight down, only the coin spins
                                 n.position += l["vel"] * delta
-                                n.position.x = clampf(n.position.x, 40.0, vp.x - 40.0)
-                                n.rotation += delta * 1.6
-                                if n.position.y > vp.y - _bottom_safe() + 40.0:
+                                if String(l["kind"]) == "coin":
+                                                n.rotation += delta * 3.0
+                                if n.position.y > vp.y + 70.0:
                                                 n.queue_free()
                                                 loots.erase(l)
                                                 continue
                                 # THE DEFENDER IS INVISIBLE TO ITEMS: only the protector collects
-                                if n.position.distance_to(ship.position) < 64.0:
+                                if n.position.distance_to(ship.position) < 74.0:
                                                 _collect(String(l["kind"]))
                                                 n.queue_free()
                                                 loots.erase(l)
@@ -1728,6 +1872,9 @@ func _collect(kind: String) -> void:
                                                 add_run_coins(1)
                                                 Jukebox.sfx("inv_coin", -6.0)
                                                 _fx_popup(ship.position + Vector2(0, -60), "+1", Arc.COIN, 28)
+                                                # the dash law: the kill counter runs from the last coin COLLECTED
+                                                kills_since_coin = 0
+                                                coin_target = rng.randi_range(COIN_KILLS_MIN, COIN_KILLS_MAX)
                                 "power":
                                                 _apply_power(weapon, 1)
                                 "heart":
@@ -1751,15 +1898,30 @@ func _collect(kind: String) -> void:
                                                 pass
                 _refresh_hud2()
 
-## the weapon-drop rolls happen on top of the wave loot: the owner's law -
-## a weapon icon only spawns if the CURRENT ship is the one the weapon needs,
-## and thunder/bomb only if bought (the space dash pattern)
-func _roll_weapon_drop() -> void:
-                if rng.randf() < 0.05:
-                                _spawn_loot("wswitch", Vector2(rng.randf_range(160, get_viewport_rect().size.x - 160), -60.0))
+## THE WRECK ROLL (PATCH III - the dash _roll_drop, invaders taste): every
+## scored kill rolls. A weapon icon only spawns if the CURRENT ship is the
+## one the weapon needs; thunder/bomb only once bought (the dash pattern);
+## big bodies (tanks/brutes/voids) pay the extra power chance.
+func _roll_drop(at: Vector2, e: Dictionary) -> void:
+                kills_since_coin += 1
+                if kills_since_coin >= coin_target:
+                                kills_since_coin = 0
+                                coin_target = rng.randi_range(COIN_KILLS_MIN, COIN_KILLS_MAX)
+                                _spawn_loot("coin", at)
+                                return
+                if rng.randf() < POWER_CHANCE:
+                                _spawn_loot("power", at)
+                                return
+                if rng.randf() < OWN_ICON_CHANCE:
+                                _spawn_loot("wswitch", at)
+                                return
                 for wid in SHOP_WEAPONS:
-                                if Box.item_owned(game_id, "weapons", wid) and rng.randf() < 0.05:
-                                                _spawn_loot(wid, Vector2(rng.randf_range(160, get_viewport_rect().size.x - 160), -60.0))
+                                if Box.item_owned(game_id, "weapons", wid) and rng.randf() < SHOP_WEAPON_CHANCE:
+                                                _spawn_loot(wid, at)
+                                                return
+                var d: Dictionary = e.get("data", {})
+                if bool(d.get("big", false)) and rng.randf() < BIG_POWER_CHANCE:
+                                _spawn_loot("power", at)
 
 # ================================================================ bosses
 
@@ -1800,7 +1962,7 @@ func _spawn_boss(bid: String, final: bool, hp_mul := 1.0) -> void:
                                 var tw := n.create_tween()
                                 tw.tween_property(n, "position:y", 220.0, 1.2).set_trans(Tween.TRANS_CUBIC) \
                                                                 .set_ease(Tween.EASE_OUT)
-                                Jukebox.sfx("inv_boss_in", -3.0))
+                                Jukebox.sfx("inv_boss_in", 0.0), false, "FIGHT")
                 _refresh_hud2()
 
 func _boss_tick(delta: float) -> void:
@@ -2034,13 +2196,17 @@ func _summon_kind(kind: String, at: Vector2) -> void:
                 var d: Dictionary = ETYPES[kind]
                 var n := Sprite2D.new()
                 n.texture = _tx(d["tex"])
+                n.scale = Vector2.ONE * ENEMY_SCALE
                 n.position = at
                 world.add_child(n)
                 enemies.append({"kind": kind, "node": n, "hp": int(ceilf(float(d["hp"]) *
                                                 (1.0 + STAGE_HP_GROWTH * float(stage)))), "hp_base": int(d["hp"]),
-                                                "r": float(d["r"]), "score": int(d["score"]), "slot": at,
+                                                "r": float(d["r"]) * ENEMY_SCALE, "score": int(d["score"]), "slot": at,
+                                                "shield": int(d.get("shield", 0)),
                                                 "state": "dive", "dive_v": Vector2(rng.randf_range(-80, 80), 200.0),
                                                 "t": rng.randf() * TAU, "fire_cd": 3.0, "dive_cd": -1.0, "data": d})
+                if int(d.get("shield", 0)) > 0:
+                                n.modulate = Color(0.75, 0.95, 1.15, 1.0)
 
 func _hit_boss(dmg: int, at: Vector2) -> void:
                 if boss.is_empty() or not is_instance_valid(boss["node"]):
@@ -2081,12 +2247,11 @@ func _shard_blocked(at: Vector2) -> bool:
                 return false
 
 func _boss_escape() -> void:
-                String(boss["id"])
+                var bid: String = boss["id"]
                 Jukebox.sfx("inv_boss_out", -2.0)
                 _fx_spark(boss["node"].position, 14, Color(0.7, 0.5, 1.0), 380.0)
                 boss["state"] = "flee"
-                var bid: String = boss["id"]
-                _story_show("IT RUNS", String(LINES["escape"][bid]), Callable())
+                _story_show("IT RUNS", String(LINES["escape"][bid]), Callable(), false, "CONTINUE")
                 achievement_count("bosses_met", 1)
 
 func _boss_gone() -> void:
@@ -2098,7 +2263,7 @@ func _boss_gone() -> void:
                                 _after_boss(true)
 
 func _boss_killed() -> void:
-                Jukebox.sfx("inv_boom_big", -2.0)
+                Jukebox.sfx("inv_boom_big", 1.0)
                 _fx_explosion(boss["node"].position, 3.0, Color(1.0, 0.7, 0.4))
                 shake = 20.0
                 var bid: String = boss["id"]
@@ -2116,7 +2281,7 @@ func _boss_killed() -> void:
                                 return
                 _story_show("%s DOWN" % bname,
                                 _fmt(_line_pick("boss_end"), [bname, String(STAGES[stage]["name"])]),
-                                func(): _after_boss(false))
+                                func(): _after_boss(false), false, "CONTINUE")
 
 ## helper: are we inside the stage-10 finale?
 func stage_boss_or_gauntlet() -> String:
@@ -2217,7 +2382,7 @@ func _gauntlet_wave(hp_mul: float, title: String) -> void:
                                                 return
                                 phase = "wave_in"
                                 var vp := get_viewport_rect().size
-                                form_origin = Vector2(vp.x * 0.5, 60.0)
+                                form_origin = Vector2(vp.x * 0.5, _grid_row_y(1.0))
                                 form_v = Vector2(70.0, 0.0)
                                 form_t = 0.0
                                 var pool: Array = STAGES[9]["pool"]
@@ -2228,14 +2393,18 @@ func _gauntlet_wave(hp_mul: float, title: String) -> void:
                                                 var d: Dictionary = ETYPES[kind]
                                                 var n := Sprite2D.new()
                                                 n.texture = _tx(d["tex"])
+                                                n.scale = Vector2.ONE * ENEMY_SCALE
                                                 n.position = Vector2(rng.randf_range(80, vp.x - 80), -90.0 - float(i) * 50.0)
                                                 world.add_child(n)
                                                 enemies.append({"kind": kind, "node": n,
                                                                                 "hp": int(ceilf(float(d["hp"]) * hp_mul)), "hp_base": int(d["hp"]),
-                                                                                "r": float(d["r"]), "score": int(d["score"]), "slot": slots[i],
+                                                                                "r": float(d["r"]) * ENEMY_SCALE, "score": int(d["score"]), "slot": slots[i],
+                                                                                "shield": int(d.get("shield", 0)),
                                                                                 "state": "in", "t": rng.randf() * TAU, "fire_cd": rng.randf_range(2.0, 4.0),
                                                                                 "dive_cd": rng.randf_range(4.0, 8.0) if d.has("dives") else -1.0,
                                                                                 "data": d})
+                                                if int(d.get("shield", 0)) > 0:
+                                                                n.modulate = Color(0.75, 0.95, 1.15, 1.0)
                                 Jukebox.sfx("inv_wave", -5.0))
 
 func _gauntlet_boss_down(bid: String, was_final: bool) -> void:
@@ -2250,7 +2419,7 @@ func _gauntlet_boss_down(bid: String, was_final: bool) -> void:
                                                 func():
                                                                 if over:
                                                                                 return
-                                                                _gauntlet_next())
+                                                                _gauntlet_next(), false, "ONWARD")
 
 # ================================================================ defender
 ## the DEFEND button: rent a crew ship for 10 waves. One at a time, once per
@@ -2351,7 +2520,12 @@ func _defend_box(id: String, active: bool) -> Button:
                 b.pressed.connect(func():
                         if Box.spend(pr):
                                 _defender_call(id)
-                                _sheet_down()
+                                # THE CLOSE LAW (v0.3.2 PATCH III, the owner: "when
+                                # i call a ship, the whole app stop responding"):
+                                # _sheet_down() freed the sheet but never unpaused
+                                # the tree - the sky shader kept flying while every
+                                # input died. _sheet_close() frees AND unpauses.
+                                _sheet_close()
                         else:
                                 _toast_show("not enough GOGACoins"))
         return b
@@ -2434,13 +2608,8 @@ func _defender_tick(delta: float) -> void:
                 return
         if wid == "arc":
                 defender_fire_cd = ARC_CD
-                var a := Sprite2D.new()
-                a.texture = _tex["w_veteran"]
-                a.material = _add_mat()
-                a.position = defender.position
-                world.add_child(a)
-                arcs.append({"node": a, "r": 30.0, "grow": 430.0, "dmg": 3, "hit": {},
-                                "live": 1.5, "follow": "defender"})
+                arcs.append({"pos": defender.position, "follow": "defender",
+                                "r": 34.0, "grow": 430.0, "dmg": 3, "hit": {}, "live": 1.5})
                 Jukebox.sfx("inv_shoot_veteran", -12.0)
                 return
         # THE AIM LAW (the owner: "a defender shoots with aims"): every bolt is
@@ -2507,7 +2676,8 @@ func _nearest_target_pos(at: Vector2, max_d: float) -> Dictionary:
 ##  riding ABOVE whoever speaks (dario's bubble follow law, invaders colors).
 ##  It never blocks the war; taps fire straight through it.
 
-func _story_show(title: String, msg: String, after := Callable(), bad := false) -> void:
+func _story_show(title: String, msg: String, after := Callable(), bad := false,
+                btn := "END") -> void:
         _bubble_down()
         _story_down()
         paused = true
@@ -2532,7 +2702,10 @@ func _story_show(title: String, msg: String, after := Callable(), bad := false) 
         story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(story)
         sheet.add_child(sc)
-        var done := Arc.button("END", Vector2(560, 78), 28, Arc.BAD if bad else Arc.GOOD,
+        # THE BUTTON LAW (PATCH III, the owner: "the start dialogue comes with
+        # button says end, let it say start"): every moment names its own
+        # button - the opening says START, the breach and the chase say END.
+        var done := Arc.button(btn, Vector2(560, 78), 28, Arc.BAD if bad else Arc.GOOD,
                         func(): _story_end())
         sheet.add_child(done)
         for b in Arc._buttons_in(sc):
@@ -2579,7 +2752,13 @@ func _bubble_next() -> void:
         if _bubble_queue.is_empty():
                 return
         var d: Dictionary = _bubble_queue.pop_front()
-        _bubble_down()
+        # THE QUEUE LAW (v0.3.2 PATCH III): retire the CURRENT bubble only -
+        # the old call to _bubble_down() wiped the whole waiting queue, so the
+        # defender radio's second voice (the reply) never played.
+        if _bubble != null and is_instance_valid(_bubble):
+                _bubble.queue_free()
+        _bubble = null
+        _bubble_anchor = Callable()
         _bubble = PanelContainer.new()
         # THE ALPHA LAW: visible, never solid - the war stays readable behind it
         var sb := Arc.panel_style(Color(0.02, 0.03, 0.08, 0.60), 14)
@@ -2926,11 +3105,15 @@ func _wreck() -> void:
 ## THE BREACH: one enemy past the bottom = the STORY (scrollable, paused,
 ## the dario law) + END -> the death menu (the owner: "we are in big danger")
 func _breach() -> void:
-        if over or phase == "breach":
+        # the breach only fires from a LIVE fight - never over a dying run (a
+        # stale wave callback re-spawning during the death tween re-breached
+        # and re-paused the tree: the death menu never opened - the probe's
+        # END -> death law caught it)
+        if over or phase == "breach" or phase == "over" or phase == "ending":
                 return
         phase = "breach"
         firing = false
-        Jukebox.sfx("inv_breach", -2.0)
+        Jukebox.sfx("inv_breach", 1.0)
         shake = 14.0
         _clear_ebolts()
         var lines: Array = LINES["breach"]
@@ -3019,6 +3202,15 @@ func _fx_explosion(at: Vector2, s: float, col: Color) -> void:
 
 func _draw_fx() -> void:
         var font := Arc.font_big()
+        # THE VETERAN'S VOICE (PATCH III): the sound arch is painted, not a
+        # stretched png - white core, cool glow, a trailing echo ring behind it
+        for a in arcs:
+                var k4: float = clampf(float(a["live"]), 0.0, 1.0)
+                var c: Vector2 = a["pos"]
+                var r4: float = float(a["r"])
+                fx.draw_arc(c, r4, PI + 0.45, TAU - 0.45, 44, Color(0.62, 0.84, 1.0, 0.34 * k4), 26.0, true)
+                fx.draw_arc(c, r4, PI + 0.45, TAU - 0.45, 44, Color(1, 1, 1, 0.95 * k4), 8.0, true)
+                fx.draw_arc(c, r4 * 0.86, PI + 0.62, TAU - 0.62, 40, Color(1, 1, 1, 0.38 * k4), 4.0, true)
         for r in fx_rings:
                 var k: float = 1.0 - float(r["life"]) / float(r["max"])
                 fx.draw_circle(r["pos"], lerpf(float(r["r"]), float(r["r1"]), k), Color(r["col"], 0.35 * (1.0 - k)))

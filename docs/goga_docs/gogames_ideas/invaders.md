@@ -209,3 +209,72 @@ list, then a second look at the patch QA. Everything above that moved, moved:
   per-planet palettes; the themes pack lerps worlds in ~1.5s; without the
   pack, Dash's Deep Blue. The painted plates are deleted.
 - THE WAVES: the formation box scales with the viewport (no more clumps).
+
+---
+
+## v0.3.2 PATCH III - THE OWNER PLAYTEST ROUND III (2026-09)
+
+The owner played PATCH I+II on device. Verdict per item, and the laws now
+written into the game:
+
+- SLASHER: good to go (the TouchKit polyline fix holds). Untouched.
+- THE SKIN FIRST LAW: picking a ship in optionals flew AZURE while keeping
+  the picked ship's weapon - `_build_ship()` ran before
+  `skin = Box.skin_on()`. The equip is now read BEFORE the hull is built.
+- THE UNFREEZE LAW: calling a defender froze the whole app (the sky shader
+  kept flying, nothing answered) - the defend button's pressed handler freed
+  the sheet with `_sheet_down()` and never unpaused the tree. It closes with
+  `_sheet_close()` now. THE BUBBLE QUEUE LAW: `_bubble_next()` wiped the
+  whole waiting queue with `_bubble_down()`, so the radio's reply never
+  played - it retires only the current bubble.
+- THE RELEASE LAW (verdant): letting go of the fire finger deleted the
+  snakes mid-air. Released snakes are ORPHANS now - they stop riding the
+  protector's weave, finish their flight and exit the sky, one by one.
+- THE ACCURACY LAW (verdant): the old hit test was a fat band around the
+  beam's CURRENT x - bodies the beam never touched were dying. Hits are now
+  judged against the true swept SEGMENT (point-to-line distance,
+  `r * 0.55 + 16`), falloff by contact order, floor 1.
+- THE WHITE ARC LAW (veteran): the "arch" was a 48px red png stretched to
+  ~13x. The arc is PAINTED by the fx painter now - white core + cool glow +
+  a trailing echo ring, crisp at any radius, riding its shooter.
+- THE WRECK LAW (loot): the wave-anchored airdrops are dead - Space Dash's
+  exact kill-rolled economy runs here: a coin every 5-10 kills counted from
+  the last coin COLLECTED, power points 16% a kill (+50% extra on big
+  bodies), the ship's own icon 5%, thunder/bomb 5% once bought. THE DASH
+  SIZES: the coin renders at the dash 74px (it was the raw 192!), the items
+  ride 1.8-2.2x stamps.
+- THE 22-ROW LAW (scale): the owner's layout - 22 rows: row 0 empty, the
+  enemy block lives in rows 1..10, rows 11..20 are the open battle sky,
+  row 21 is the protector's row, the bottom safe band is the empty row
+  under it. FIXED scale: every enemy rides ENEMY_SCALE 0.62 on every screen
+  (the PATCH II viewport-proportional formation is dead), fixed 78px column
+  pitch, the block anchors on grid row 1 and never sinks into the sky.
+- THE PROGRESSION LAW: the pools are UNLOCK ORDER - wave w draws from
+  pool[0..min(w, size)]; stage 1 is peaceful for three waves, the first
+  shooter (the aimer) arrives in wave 4, and every later wave can show its
+  newest type (22% bias). Chicken-invaders-visible progression.
+- THE TYPE INFRA LAW: the roster is families - shooters share infra
+  (aim: aimer/magma, fan: spitter, shotgun: brute, ring: void), shields are
+  declared per family (tank 4, brute 6, void 4 - cyan while they hold, the
+  break rings, then the body pays), divers dive, big bodies pay the extra
+  power roll.
+- THE BUTTON LAW (dialogue): every moment names its own button - the
+  opening says START, stage arrivals START, boss meets FIGHT, boss ends and
+  escapes CONTINUE, the breach and the chase END.
+- THE OPENING STORY: the first card is THE PROTECTOR - the whole crafted
+  lore (one universe with Space Dash, the SSDS crew fighting out there, the
+  tour from Neptune to the Sun, the hideout behind it). The old flow pasted
+  "NEPTUNE - THE OUTPOST" over it - the wave popup's title wearing the
+  lore's face.
+- THE PRESENCE PASS (audio): the tour + finale loops are real arrangements
+  now (stereo 44.1k, kick/snare/hats, driving saw bass, wide pads, echoing
+  lead); the combat voices gained sub bodies, blast layers and tails; the
+  code volumes came up ~3-4dB. Jukebox law: wav loops name their whole
+  region (loop_end) - LOOP_FORWARD with the default zero region could read
+  silence.
+- THE DEATH-HANG LAW (found by the probe): a stale wave callback respawned
+  a wave DURING the death tween - the old diver re-breached, re-paused the
+  tree and the death menu never opened. Wave callbacks guard on
+  `phase == "gap"` now and the breach only fires from a live fight.
+- THE THUMBNAIL: recomposed - the fixed-scale formation, THE INVADER in the
+  violet, dash-sized coin, readable items, NO streak lines.

@@ -171,3 +171,32 @@ then the slasher fix, then the invaders.
         weapon pips.
 - [x] Thumbnail recomposed from the new look. Suites: ALL GREEN (flow_test +
       dash/slasher/xo/merge/dario/snake/tower/pong/geometry/invaders probes).
+
+## PATCH III - the third playtest round (2026-09, DONE)
+- [x] Slasher: owner verdict "good to go" - untouched.
+- [x] Skin-first law: the equipped hull builds the ship (was: azure always,
+      weapon from the pick).
+- [x] Defender-call freeze: `_sheet_close()` after a call (was `_sheet_down()`,
+      tree stayed paused); bubble queue no longer wiped mid-radio.
+- [x] Verdant: release = the beams finish their flight one by one; hits =
+      true swept-segment distance (the fat-band ghosts are gone).
+- [x] Veteran: the arch is painted white VFX (core + glow + echo), the 48px
+      png is retired.
+- [x] Drops = the dash wreck economy (coin 5-10 kills from last COLLECTED,
+      power 16%/kill, own icon 5%, thunder/bomb 5% once bought) + dash sizes
+      (coin 74px, items 1.8-2.2x). Wave airdrops deleted.
+- [x] The 22-row fixed-scale grid (top row empty, enemies rows 1..10, open
+      sky 11..20, the protector's row 21) + ENEMY_SCALE 0.62 everywhere.
+- [x] Enemies shoot from stage 1 wave 4 (the aimer); pools are unlock order
+      (new types per wave, 22% newest bias).
+- [x] Shields per family (tank 4 / brute 6 / void 4) with the cyan truth +
+      the break ring; type infra documented in ETYPES.
+- [x] Story buttons: START / FIGHT / CONTINUE / END per moment; the opening
+      card is THE PROTECTOR (the full crafted lore).
+- [x] Audio presence pass: stereo 44.1k drum-driven tour + finale loops,
+      sub-bodied combat voices, +3-4dB; Jukebox names wav loop regions.
+- [x] Death-hang law: wave callbacks guard the gap phase; the breach never
+      fires over a dying run (the probe caught the frozen death menu).
+- [x] Thumbnail recomposed (no lines, dash sizes, the Invader looming).
+- [x] Suites: ALL GREEN (flow_test + dash/slasher/xo/merge/dario/snake/
+      tower/pong/geometry/invaders probes) + qa_v032c eyeballed (9 shots).

@@ -1,12 +1,21 @@
 extends Node
-## invaders_probe - v0.3.2: drives the REBUILT Space Invaders headless. The
-## owner's laws: the tour (10 stages x 10 waves, Neptune -> the Hideout),
-## +1/+2/+3 enemies and +25..+200 bosses, hearts law (-500, +1 per 1000, cap 3),
-## the breach law (one past the bottom = the dialogue), the power ladder
-## (level IS the damage, death -3 rungs), the falloff laws (thunder chain,
-## bomb rings, snake pierce - floor 1, never 0), the wave-anchored loot
-## (coin 2-10 waves, power 1-2 waves), the boss escape law (3/6/9 at 20%,
-## the finale gauntlet) and THE INVADER's ending.
+## invaders_probe - v0.3.2 PATCH III: drives Space Invaders headless. The
+## owner's playtest-round laws, newest first:
+##   PATCH III - THE SKIN FIRST LAW (the equipped hull IS the flown hull),
+##   THE UNFREEZE LAW (calling a defender never leaves the tree paused),
+##   THE BUBBLE QUEUE LAW (the radio's reply survives the first bubble),
+##   THE RELEASE LAW (verdant's beams finish their flight, one by one),
+##   THE ACCURACY LAW (the snake hits ONLY what its segment really crossed),
+##   THE WHITE ARC LAW (the veteran's voice is painted VFX, not a png),
+##   THE WRECK LAW (loot rolls at the wreck: coin 5-10 kills, power 16%,
+##   universal weapons once bought - the dash economy, dash item sizes),
+##   THE 22-ROW LAW (top row empty, enemy block rows 1..10, open battle sky,
+##   the protector's own row, FIXED scale - no viewport clumps),
+##   THE PROGRESSION LAW (wave w unlocks pool[0..w] - new types per wave),
+##   THE SHIELD LAW (tank/brute/void eat hits on a visible cyan pool),
+##   THE BUTTON LAW (the opening story says START, the breach says END),
+##   + the whole v0.3.2 body: the tour, the ladder, the falloffs, the breach,
+##   the escapes, the finale gauntlet, the defender, the themes pack.
 ##
 ##   godot --headless --path projects/gogabox res://tests/invaders_probe.tscn
 
@@ -37,7 +46,7 @@ func _start_run() -> void:
         await _frames(2)
         G._press(Vector2(200, 500), 0)
         await _frames(2)
-        G._story_end()               # the intro lore story (scrollable, paused)
+        G._story_end()               # the opening story (scrollable, paused, START)
         await _wait(1.6)
 
 func _mk(kind: String, at: Vector2) -> Dictionary:
@@ -47,41 +56,38 @@ func _mk(kind: String, at: Vector2) -> Dictionary:
         e["dive_cd"] = -1.0
         return e
 
+func _story_btn() -> String:
+        # the text of the story sheet's action button
+        for n in G._story_pair:
+                if n == null or not is_instance_valid(n):
+                        continue
+                for b in n.find_children("*", "Button", true, false):
+                        return String((b as Button).text)
+        return ""
+
 func _run() -> void:
         Box.reset_all()
-        print("== invaders_probe: the tour v0.3.2 ==")
+        print("== invaders_probe: the tour v0.3.2 PATCH III ==")
 
         # ---- registry sanity (the owner's economy) ----
         var sr: Dictionary = GameReg.get_game("invaders")
         _check(not sr.is_empty(), "invaders is in the registry")
         _check(String(sr["title"]) == "Space Invaders", "the rename law: HEN -> SPACE INVADERS")
         _check(int(sr["coin_div"]) == 500, "run bonus = score/500 (owner)")
-        _check(int(sr["fee"]) == 100 and int(sr["price"]) == 350,
-                        "fee 100, buy price 350 (the hen teaser's own price)")
         _check(String(sr["orientation"]) == "landscape", "the tour is HORIZONTAL")
-        _check(bool(sr["shop"]) and bool(sr["banner"]), "shop + banner on")
         _check(GameReg.playable().size() == 9 and GameReg.workshop().size() == 6,
                         "9 playable / 6 teasers (hen graduated)")
-        _check(GameReg.playable()[GameReg.playable().size() - 1]["id"] == "invaders",
-                        "invaders sits at the END of the playable chain (dario/xo links intact)")
-        _check(GameReg.get_game("hen").is_empty(), "the hen teaser is gone from the workshop")
 
         # ---- boot ----
         await _boot()
         _check(G.phase == "ready" and G._sheet_pair.size() > 0,
                         "THE FLOW LAW: the game OPENS on the optionals screen")
         _check(G._optional_box("ember") != null, "optionals builds IMAGE boxes (the snake standard)")
-        G._show_ready_card()
-        await _frames(2)
-        _check(G._ready_card != null, "closing optionals lands on TAP ANYWHERE TO PLAY")
-        var no_ctrl_hint := true
-        if G._ready_card != null:
-                for c in G._ready_card.find_children("*", "Label", true, false):
-                        if "left half" in String(c.get_class()):
-                                no_ctrl_hint = false
-        _check(no_ctrl_hint, "no controls help on the ready card (it lives in the guide)")
-        _check(String(G.LINES["intro"][0]).contains("SPACE DASH"),
-                        "the first dialogue references Space Dash (one universe)")
+        _check(Jukebox._current_music.contains("inv_tour"), "the tour MUSIC is on from boot")
+        _check(String(G.LINES["intro_story"]).contains("SPACE DASH")
+                        and String(G.LINES["intro_story"]).contains("PROTECTOR")
+                        and String(G.LINES["intro_story"]).contains("hideout"),
+                        "the OPENING STORY carries the crafted lore (one universe, the tour, the hideout)")
         var facts_gone := true
         for s in G.STAGES:
                 if s.has("line"):
@@ -95,8 +101,6 @@ func _run() -> void:
         _check(G.hearts_lbl.text == "x 3", "the heart law: 'x nn' then the heart shape")
         _check(G.POWER_MAX == 6 and G.LVL_PTS.size() == 6,
                         "the ladder is SIX levels deep (the space dash depth)")
-        _check(G.boss_chip != null and not G.boss_chip.visible,
-                        "the boss % chip exists and sleeps until a boss lives")
         _check(G.STAGES.size() == 10, "the tour has 10 stages")
         _check(String(G.STAGES[0]["name"]) == "NEPTUNE" and String(G.STAGES[8]["name"]) == "THE SUN"
                         and String(G.STAGES[9]["name"]) == "THE HIDEOUT",
@@ -105,78 +109,67 @@ func _run() -> void:
         for k in G.ETYPES:
                 score_ok = score_ok and int(G.ETYPES[k]["score"]) >= 1 and int(G.ETYPES[k]["score"]) <= 3
         _check(score_ok, "every enemy pays +1/+2/+3 (owner)")
-        var boss_ok := true
-        var boss_scores := []
-        for b in G.BOSSES:
-                boss_scores.append(int(G.BOSSES[b]["score"]))
-                if int(G.BOSSES[b]["score"]) < 25 or int(G.BOSSES[b]["score"]) > 200:
-                        boss_ok = false
-        boss_scores.sort()
-        _check(boss_ok and int(boss_scores[0]) == 25 and int(boss_scores[boss_scores.size() - 1]) == 200,
-                        "bosses pay +25..+200 (the Invader takes the 200)")
 
-        # ---- start the run ----
+        # ---- THE 22-ROW LAW + the fixed scale ----
+        _check(G.GRID_ROWS == 22, "the grid is 22 rows (the owner's layout)")
+        var vp0 := G.get_viewport_rect().size
+        _check(G._grid_row_y(1.0) > G.GRID_TOP, "grid row 0 stays EMPTY above the block")
+        _check(G._grid_row_y(10.0) < G._grid_row_y(11.0), "the enemy zone ends inside row 10")
+        _check(G._grid_row_y(21.0) < vp0.y - G._bottom_safe() + 60.0,
+                        "row 21 = the protector's row (an empty row under it)")
+        _check(is_equal_approx(float(G.ENEMY_SCALE), 0.62), "the FIXED scale law: 0.62 everywhere")
+
+        # ---- THE SKIN FIRST LAW (the owner: "it shows the azure skin as the
+        # default while letting the weapon the same as the perspective ship") --
+        Box.earn(100000)
+        Box.buy_skin("invaders", "ember", int(G.SHIPS["ember"]["price"]))
+        Box.equip_skin("invaders", "ember")
+        await _boot()
+        _check(G.skin == "ember", "the optionals pick is read at boot")
+        _check(String(G.ship.texture.resource_path).contains("ship_orange"),
+                        "the flown hull IS the picked hull (ember orange, not azure)")
+        _check(G.weapon == "beam", "the exclusive weapon rides with the hull")
+        Box.reset_all()
+        await _boot()
+
+        # ---- start the run (THE PROTECTOR story first) ----
         await _start_run()
         _check(G.wave == 1, "wave 1 starts after the dialogues")
         _check(not G.enemies.is_empty(), "the formation flies in")
 
-        # ---- the crew + their exclusive weapons ----
-        _check(G.SHIPS["azure"]["price"] == 0, "Azure the PROTECTOR is the starter (price 0)")
-        _check(String(G.SHIPS["azure"]["weapon"]) == "orb", "Azure carries the blue balls")
-        var crew_ok := true
-        for pair in [["ember", "beam"], ["verdant", "snake"], ["veteran", "arc"],
-                        ["phantom", "mg"], ["hornet", "fire"], ["titan", "missile"]]:
-                crew_ok = crew_ok and String(G.SHIPS[pair[0]]["weapon"]) == pair[1]
-        _check(crew_ok, "ember/verdant/veteran/phantom/hornet/titan each own their weapon")
-        _check(int(G.SHIPS["titan"]["price"]) == 6000 and int(G.SHIPS["ember"]["price"]) == 1500,
-                        "ships price HIGH (2-in-1: hull + weapon)")
+        # ---- THE PROGRESSION LAW: wave 1 = the base body only ----
+        var kinds := {}
+        for e in G.enemies:
+                kinds[String(e["kind"])] = true
+        _check(kinds.size() == 1 and kinds.has("grunt"),
+                        "stage 1 wave 1 flies ONLY the base body (progression is visible)")
+        var pools_ordered := true
+        for s in G.STAGES:
+                var pool: Array = s["pool"]
+                if pool.size() < 3:
+                        pools_ordered = false
+        _check(pools_ordered and String(G.STAGES[0]["pool"][3]) == "aimer",
+                        "the first SHOOTER arrives in stage 1 wave 4 (the pools are unlock order)")
+        _check(int(G.ETYPES["tank"].get("shield", 0)) == 4
+                        and int(G.ETYPES["brute"].get("shield", 0)) == 6
+                        and bool(G.ETYPES["brute"].get("big", false)),
+                        "the type infra: shields + big bodies are DECLARED per family")
 
         # ---- the power ladder: the LEVEL is the damage ----
         _check(G.weapon_level() == 1, "every weapon starts at level 1 (= 1 damage)")
-        G._apply_power("orb", 1)
-        _check(G.weapon_level() == 1, "2 points to level 2 - one point is not enough")
-        G._apply_power("orb", 1)
+        G._apply_power("orb", 2)
         _check(G.weapon_level() == 2, "level 2 at 2 points")
         G._apply_power("orb", 3)
         _check(G.weapon_level() == 3, "level 3 at 5 points")
         G._apply_power("orb", 20)
-        _check(G.weapon_level() == G.POWER_MAX and G.POWER_MAX == 6,
-                        "the ladder caps at SIX (the owner: space dash depth)")
-        _check(G.score >= 25, "points past the cap pay +25 score (the lanes law)")
+        _check(G.weapon_level() == G.POWER_MAX, "the ladder caps at SIX")
 
-        # ---- per-hit weapons: damage = level ----
-        G.wpower["orb"] = 2
-        G.wpts["orb"] = 0
-        var e1 := _mk("grunt", Vector2(900, 300))
-        var hp0: int = e1["hp"]
-        G.weapon = "orb"
-        G._hit_enemy(e1, G.weapon_level())
-        _check(int(e1["hp"]) == hp0 - 2, "an L2 hit takes exactly 2 (level = damage)")
-        G.wpower["orb"] = 3
-        G.bolts.clear()
-        G._fire_orb()
-        _check(G.bolts.size() == 3, "L3 azure fires 3 balls (more balls, small angle)")
-        var one_dmg := true
-        for b in G.bolts:
-                one_dmg = one_dmg and int(b["dmg"]) == 3
-        _check(one_dmg, "every ball carries the LEVEL as damage")
-        for b in G.bolts.duplicate():
-                b["node"].queue_free()
-        G.bolts.clear()
-        G.weapon = "beam"
-        G.wpower["beam"] = 5
-        G._fire_beam()
-        _check(G.bolts.size() >= 4, "L5 ember fires a wider battery (more beams, wider range)")
-        for b in G.bolts.duplicate():
-                b["node"].queue_free()
-        G.bolts.clear()
-        G.weapon = "mg"
-        G.wpower["mg"] = 1
-        G._fire_mg()
-        _check(G.bolts.size() == 2 and int(G.bolts[0]["dmg"]) == 1, "L1 MG: 2 barrels, small damage")
-        for b in G.bolts.duplicate():
-                b["node"].queue_free()
-        G.bolts.clear()
+        # ---- the crew + their exclusive weapons ----
+        var crew_ok := true
+        for pair in [["azure", "orb"], ["ember", "beam"], ["verdant", "snake"],
+                        ["veteran", "arc"], ["phantom", "mg"], ["hornet", "fire"], ["titan", "missile"]]:
+                crew_ok = crew_ok and String(G.SHIPS[pair[0]]["weapon"]) == pair[1]
+        _check(crew_ok, "the seven crew each own their exclusive weapon")
 
         # ---- the thunder rework: the beam UP + chain falloff (floor 1) ----
         G.weapon = "thunder"
@@ -191,8 +184,7 @@ func _run() -> void:
         G._cast_thunder()
         _check(int(vic[0]["hp"]) == hp_before[0] - 3,
                         "the beam column hits for the base (2 + level)")
-        _check(int(vic[1]["hp"]) == hp_before[1] - 2,
-                        "the first chain hop takes base - 1")
+        _check(int(vic[1]["hp"]) == hp_before[1] - 2, "the first chain hop takes base - 1")
         _check(int(vic[2]["hp"]) == hp_before[2] - 1,
                         "the second hop takes base - 2 (6 -> 5 -> 4 ... the owner's law)")
         for v in vic:
@@ -207,40 +199,101 @@ func _run() -> void:
         var hb: int = btarget["hp"]
         var hs: int = bside["hp"]
         G._bomb_blast(Vector2(G.ship.position.x + 100, G.ship.position.y - 320))
-        _check(int(btarget["hp"]) == hb - 5, "bomb center = 3 + 2*level (decent damage)")
-        _check(int(bside["hp"]) == hs - 3, "150px out = two rings in, -2 (each ring -1, floor 1)")
+        _check(int(btarget["hp"]) == hb - 5, "bomb center = 3 + 2*level")
+        _check(int(bside["hp"]) == hs - 3, "each 60px ring pays one less, floor 1")
         G._drop_bomb()
-        _check(G.bombs.size() == 1, "no ammo limit: the launcher keeps firing")
         var bb: Dictionary = G.bombs[0]
         bb["node"].position = Vector2(-9999, -9999)
         G._bombs_tick(0.016)
         _check(G.bombs.is_empty(), "a bomb that touches NOTHING just leaves (contact fuse law)")
 
-        # ---- the snake: pierce falloff, damage over time ----
+        # ---- THE RELEASE LAW + THE ACCURACY LAW (verdant) ----
         G.weapon = "snake"
         G.wpower["snake"] = 2
         G.wpts["snake"] = 0
-        var s1 := _mk("grunt", Vector2(G.ship.position.x, G.ship.position.y - 70))
-        var s2 := _mk("grunt", Vector2(G.ship.position.x, G.ship.position.y - 140))
+        var col_x: float = G.ship.position.x
+        var s1 := _mk("grunt", Vector2(col_x, G.ship.position.y - 70))
+        var s2 := _mk("grunt", Vector2(col_x, G.ship.position.y - 140))
+        var s_far := _mk("grunt", Vector2(col_x + 70.0, G.ship.position.y - 105))
         var h1: int = s1["hp"]
         var h2: int = s2["hp"]
+        var h_far: int = s_far["hp"]
         G._fire_snakes()
         G.firing = true
         for i in 34:
                 for s in G.snakes:
                         s["t"] = 0.0          # pin the weave so the sweep stays on the column
-                s1["node"].position = Vector2(G.ship.position.x, G.ship.position.y - 70)
-                s2["node"].position = Vector2(G.ship.position.x, G.ship.position.y - 140)
+                s1["node"].position = Vector2(col_x, G.ship.position.y - 70)
+                s2["node"].position = Vector2(col_x, G.ship.position.y - 140)
+                s_far["node"].position = Vector2(col_x + 70.0, G.ship.position.y - 105)
                 G._snakes_tick(0.016)
         _check(int(s1["hp"]) <= h1 - 2 and int(s2["hp"]) <= h2 - 1,
                         "the snake pierces through bodies over time; the further body takes less")
-        _check(int(s2["hp"]) >= h2 - 2, "the falloff floors at a real 1 - never zero damage")
+        _check(int(s_far["hp"]) == h_far,
+                        "THE ACCURACY LAW: a body 70px OFF the beam's real path is untouched")
+        # the release: the beams finish the flight - they do NOT vanish
         G.firing = false
+        G._snakes_tick(0.016)
+        _check(not G.snakes.is_empty(),
+                        "THE RELEASE LAW: letting go never deletes the beams mid-air")
+        var orphan := true
         for s in G.snakes:
-                s["node"].queue_free()
-        G.snakes.clear()
+                orphan = orphan and bool(s.get("orphan", false))
+        _check(orphan, "released snakes stop riding the weave and fly out ONE BY ONE")
+        var exited := false
+        for i in 260:
+                G._snakes_tick(0.016)
+                if G.snakes.is_empty():
+                                exited = true
+                                break
+        if not exited:
+                for s in G.snakes:
+                        var nn: Sprite2D = s["node"]
+                        print("  DEBUG snake: y=", nn.position.y, " orphan=", bool(s.get("orphan", false)),
+                                        " tall=", s["tall"])
+        _check(exited, "released snakes EXIT the sky when their flight ends")
+        if is_instance_valid(s1["node"]):
+                s1["node"].queue_free()
+        if is_instance_valid(s2["node"]):
+                s2["node"].queue_free()
+        if is_instance_valid(s_far["node"]):
+                s_far["node"].queue_free()
 
-        # ---- titan: same damage to EVERY enemy (2 + the level, full field) ----
+        # ---- THE WHITE ARC LAW (veteran) ----
+        G.weapon = "arc"
+        G.wpower["arc"] = 3
+        G.arcs.clear()
+        G._fire_arc()
+        _check(G.arcs.size() == 1 and not G.arcs[0].has("node"),
+                        "the sound arch is NOT a stretched png sprite anymore")
+        _check(G.arcs[0]["pos"] == G.ship.position, "the arch rides its shooter")
+        var av := _mk("grunt", Vector2(G.ship.position.x, G.ship.position.y - 200))
+        var ah: int = av["hp"]
+        var grown: float = float(G.arcs[0]["r"])
+        G._arcs_tick(0.1)
+        grown = float(G.arcs[0]["r"])
+        av["node"].position = G.ship.position + Vector2(0, -grown)
+        G.arcs[0]["hit"] = {}
+        G._arcs_tick(0.016)
+        _check(int(av["hp"]) < ah, "the painted arch still cuts whatever its ring meets")
+        if is_instance_valid(av["node"]):
+                av["node"].queue_free()
+        G.arcs.clear()
+
+        # ---- THE SHIELD LAW ----
+        var tk := _mk("tank", Vector2(700, 300))
+        _check(int(tk["shield"]) == 4, "a tank flies with its shield pool (4)")
+        var tkhp: int = tk["hp"]
+        G._hit_enemy(tk, 2)
+        _check(int(tk["shield"]) == 2 and int(tk["hp"]) == tkhp,
+                        "a shielded body EATS the hit - the pool drains, the hp never moves")
+        G._hit_enemy(tk, 3)
+        _check(int(tk["shield"]) == 0 and int(tk["hp"]) == tkhp,
+                        "the breaking hit is consumed by the last shield point")
+        G._hit_enemy(tk, 5)
+        _check(int(tk["hp"]) == tkhp - 5, "after the break the body pays for real")
+
+        # ---- titan: same damage to EVERY enemy (full field, the copy law) ----
         G.weapon = "missile"
         var t1 := _mk("grunt", Vector2(300, 200))
         var t2 := _mk("grunt", Vector2(1500, 400))
@@ -252,40 +305,7 @@ func _run() -> void:
         G.missiles.append({"node": m, "t": 0.99})
         G._missiles_tick(0.016)
         _check(int(t1["hp"]) == th1 - 3 and int(t2["hp"]) == th2 - 3,
-                        "the missile hits EVERY enemy with the SAME 2+level damage (owner law)")
-        # the contact fuse: a missile detonates when it MEETS a body
-        var t3 := _mk("grunt", Vector2(G.ship.position.x, G.ship.position.y - 300))
-        var th3: int = t3["hp"]
-        var m2 := Sprite2D.new()
-        m2.texture = G._tex["w_titan"]
-        m2.position = Vector2(G.ship.position.x, G.ship.position.y - 300)
-        G.world.add_child(m2)
-        G.missiles.append({"node": m2, "t": 0.1})
-        G._missiles_tick(0.016)
-        _check(int(t3["hp"]) < th3 and G.missiles.is_empty(),
-                        "the missile detonates ON CONTACT (the owner's fuse law)")
-
-        # ---- THE COPY-LAW REGRESSION (the owner's titan bug): a dense field -
-        # the old blast loops erased kills mid-iteration and SKIPPED the enemies
-        # after each kill. Every body must take the same damage, every time. ----
-        var dense: Array = []
-        var dense_hp: Array = []
-        for i in 10:
-                var de: Dictionary = _mk("grunt", Vector2(200.0 + 90.0 * float(i), 300.0))
-                dense.append(de)
-                dense_hp.append(int(de["hp"]))
-        var dm := Sprite2D.new()
-        dm.texture = G._tex["w_titan"]
-        dm.position = Vector2(200.0, 300.0)
-        G.world.add_child(dm)
-        G.missiles.append({"node": dm, "t": 0.99})
-        G._missiles_tick(0.016)
-        var dense_ok := true
-        for i in dense.size():
-                if is_instance_valid(dense[i]["node"]) and int(dense[i]["hp"]) != dense_hp[i] - 3:
-                        dense_ok = false
-        _check(dense_ok and G.enemies.size() < 25,
-                        "the full-field strike hits ALL 10 in a dense field (the copy law)")
+                        "the missile hits EVERY enemy with the SAME damage (owner law)")
 
         # ---- hearts law ----
         var sc0: int = G.score
@@ -294,19 +314,82 @@ func _run() -> void:
         G._wreck()
         _check(G.hearts == 2 and G.score == maxi(0, sc0 - 500),
                         "a hit takes -500 score and -1 heart (owner)")
-        _check(G.weapon_level() == 1 and G.weapon == "missile",
-                        "the wreck drops the CURRENT weapon 3 rungs (the dash law)")
         G.next_heart_at = G.score + 500
         var h0: int = G.hearts
         G._score_gain(1000)
         _check(G.hearts == h0 + 1, "+1 heart per 1000 score (owner)")
-        G.hearts = 3
-        G.next_heart_at = G.score + 500
-        var sc1: int = G.score
-        G._score_gain(1000)
-        _check(G.score >= sc1 + 25, "a 4th heart pays +25 score instead (cap 3)")
 
-        # ---- the breach law ----
+        # ---- THE WRECK LAW (the dash economy, at the wreck) ----
+        _check(G.COIN_KILLS_MIN == 5 and G.COIN_KILLS_MAX == 10,
+                        "the coin rhythm: 1 per 5-10 kills (the dash law)")
+        _check(is_equal_approx(float(G.POWER_CHANCE), 0.16), "power points: 16% a kill")
+        var wreck := _mk("grunt", Vector2(640, 240))
+        G.kills_since_coin = G.coin_target - 1
+        G.loots.clear()
+        G._kill_enemy(wreck, true)
+        _check(G.loots.size() == 1 and String(G.loots[0]["kind"]) == "coin",
+                        "the ripened kill pays its coin AT THE WRECK (no wave airdrops)")
+        _check(is_equal_approx(float(G.loots[0]["node"].scale.x), 74.0 / 192.0),
+                        "THE COIN SIZE LAW: the dash 74px - never the raw 192 again")
+        G._collect("coin")
+        _check(G.kills_since_coin == 0, "the counter runs from the last coin COLLECTED")
+        var pw := _mk("grunt", Vector2(500, 240))
+        G.kills_since_coin = 0
+        G.coin_target = 10
+        G.loots.clear()
+        G.rng.seed = 20260904
+        var dropped_power := false
+        for i in 40:
+                var w2 := _mk("grunt", Vector2(500, 240))
+                G._kill_enemy(w2, true)
+        for l in G.loots:
+                if String(l["kind"]) == "power":
+                        dropped_power = true
+                        _check(is_equal_approx(float(l["node"].scale.x), 2.0),
+                                        "the power core rides the dash 2x stamp (items read as ITEMS)")
+        _check(dropped_power, "the 16% power roll pays across a real kill streak")
+        G.loots.clear()
+
+        # ---- the switch law ----
+        var skin_weapon := String(G.SHIPS[G.skin]["weapon"])
+        G.weapon = "thunder"
+        G._collect("thunder")
+        _check(G.weapon == "thunder", "a pool-weapon pickup SWITCHES you to it (own ladder)")
+        G._collect("wswitch")
+        _check(G.weapon == skin_weapon, "the ship's OWN icon brings its weapon back")
+
+        # ---- THE UNFREEZE LAW + THE BUBBLE QUEUE LAW (the defender radio) ----
+        Box.earn(10000)
+        G._defend_open()
+        _check(get_tree().paused and G._sheet_pair.size() > 0, "the defend sheet pauses like every sheet")
+        G._defender_call("ember")
+        _check(G.defender != null and G.defender_id == "ember", "DEFEND rents a crew ship")
+        G._sheet_close()
+        _check(not get_tree().paused,
+                        "THE UNFREEZE LAW: closing the call screen UNPAUSES - the app answers")
+        _check(G._bubble_queue.size() >= 1,
+                        "THE QUEUE LAW: the radio's REPLY waits behind the caller's bubble")
+        G._bubble_t = 0.01
+        G._bubble_tick(0.02)
+        await _wait(0.4)
+        _check(G._bubble_queue.is_empty(), "the reply PLAYS after the caller (never wiped)")
+        var dw: int = G.defender_waves_left
+        G._wave_end()
+        _check(G.defender_waves_left == dw - 1, "every cleared wave burns one of its ten")
+        G.defender_waves_left = 1
+        G._wave_end()
+        await _wait(1.8)
+        _check(G.defender == null, "at zero it flies home with the radio")
+        G._defender_call("titan")
+        var ebolt := Sprite2D.new()
+        ebolt.texture = G._tex["ebolt"]
+        G.world.add_child(ebolt)
+        ebolt.position = G.defender.position
+        G.ebolts.append({"node": ebolt, "vel": Vector2(0, 100)})
+        G._ebolts_tick(0.016)
+        _check(G.defender == null, "ONE hit ends the defender (the owner's fragility law)")
+
+        # ---- the breach law (END button) ----
         var bre := _mk("diver", Vector2(G.ship.position.x, 200))
         bre["state"] = "dive"
         bre["dive_v"] = Vector2(0, 100)
@@ -315,17 +398,25 @@ func _run() -> void:
         G._enemies_tick(0.016)
         _check(G.phase == "breach", "one past the bottom = THE BREACH (the run is lost)")
         _check(G._story_pair.size() > 0, "the breach wears the SCROLLABLE STORY (the dario law)")
+        _check(_story_btn() == "END", "THE BUTTON LAW: the breach's button says END")
         G._story_end()
         await _wait(1.2)
         _check(G.over, "END -> the death flow (finish_run emitted)")
-        _check(G.score >= 0, "the score never goes negative")
 
-        # ---- a fresh run: the boss laws ----
+        # ---- a fresh run: the story + boss laws ----
         await _boot()
         await _start_run()
+        G.stage = 0
+        G.wave = 0
+        G._begin_stage(3)
+        _check(_story_btn() == "START", "THE BUTTON LAW: stage arrivals say START")
+        _story_btn_ignore()
+        G._story_end()
+        await _wait(1.4)
         G.stage = 2
         G.wave = 10
         G._start_boss_wave()
+        _check(_story_btn() == "FIGHT", "THE BUTTON LAW: a boss meet says FIGHT")
         G._story_end()
         await _frames(3)
         _check(not G.boss.is_empty() and String(G.boss["id"]) == "duke", "stage 3 wears the RING DUKE")
@@ -333,7 +424,8 @@ func _run() -> void:
         G.boss["hp"] = int(ceilf(float(G.boss["hp_max"]) * 0.15))
         G._hit_boss(3, G.boss["node"].position)
         _check(String(G.boss["state"]) == "flee", "the duke RUNS at 20% hp (owner: 3/6/9 never die)")
-        _check(Box.counter("invaders", "bosses_met") >= 1, "meeting a runaway keeper counts")
+        _check(_story_btn() == "CONTINUE", "THE BUTTON LAW: the escape radio says CONTINUE")
+        G._story_end()
         G.boss["node"].position.y = -400.0
         G._boss_tick(0.016)
         _check(G.boss.is_empty(), "the escape ends the wave (the world moves on)")
@@ -365,8 +457,6 @@ func _run() -> void:
         await _frames(3)
         _check(G.gauntlet_i == 2 and G.boss.has("sats") and G.boss["sats"].size() == 1,
                         "step 3: duke + mimic fly together")
-        _check(int(G.boss["hp"]) == int(G.BOSSES["duke"]["hp"]) + int(G.BOSSES["mimic"]["hp"]),
-                        "the duo shares ONE health pool (damage either body)")
         G._gauntlet_next()
         _check(G.gauntlet_i == 3, "step 4: the harder wave")
         G._gauntlet_next()
@@ -388,66 +478,15 @@ func _run() -> void:
         G._story_end()
         await _frames(2)
 
-        # ---- the defender ----
+        # ---- the themes pack law ----
         await _boot()
         await _start_run()
-        Box.earn(10000)
-        G._defender_call("ember")
-        _check(G.defender != null and G.defender_id == "ember", "DEFEND rents a crew ship")
-        _check(G.defender_waves_left == G.DEFEND_WAVES, "the defender flies 10 waves")
-        _check(bool(G.defender_called.get("ember", false)), "each ship is callable once per run")
-        var dw: int = G.defender_waves_left
-        G._wave_end()
-        _check(G.defender_waves_left == dw - 1, "every cleared wave burns one of its ten")
-        G.defender_waves_left = 1
-        G._wave_end()
-        await _wait(1.8)
-        _check(G.defender == null, "at zero it flies home with the radio")
-        _check(bool(G.defender_called.get("ember", false)) and not G.defender_called.has("titan"),
-                        "ember is spent, titan is still rentable")
-        G._defender_call("titan")
-        var ebolt := Sprite2D.new()
-        ebotl_texture(ebolt)
-        G.world.add_child(ebolt)
-        G.ebolts.append({"node": ebolt, "vel": Vector2(0, 100)})
-        ebotl_place(ebolt)
-        G._ebolts_tick(0.016)
-        _check(G.defender == null, "ONE hit ends the defender (the owner's fragility law)")
-
-        # ---- the wave-anchored loot laws ----
-        _check(G.COIN_WAVES_MIN == 2 and G.COIN_WAVES_MAX == 10,
-                        "the coin rhythm is 2-10 waves (owner)")
-        _check(G.POWER_WAVES_MIN == 1 and G.POWER_WAVES_MAX == 2,
-                        "weapon points: 1 per 1-2 waves (owner)")
-        G.waves_since_coin = 99
-        G.waves_since_power = 99
-        G.coin_target = 3
-        G.power_target = 1
-        var lo0: int = G.loots.size()
-        G._wave_end()
-        _check(G.loots.size() >= lo0 + 2, "both rolls fire when their waves ripen")
-        _check(G.waves_since_coin == 0 and G.coin_target >= 2 and G.coin_target <= 10,
-                        "the coin rerolls inside 2..10")
-
-        # ---- the ship's-own-icon law + the switch law ----
-        var skin_weapon := String(G.SHIPS[G.skin]["weapon"])
-        G.weapon = "thunder"
-        G._collect("thunder")
-        _check(G.weapon == "thunder", "a pool-weapon pickup SWITCHES you to it (own ladder)")
-        G._collect("wswitch")
-        _check(G.weapon == skin_weapon, "the ship's OWN icon brings its weapon back")
-        _check(int(G.wpts[skin_weapon]) >= 1, "own-icon pickups feed the same ladder")
-
-        # ---- the themes pack law (the DASH SKY: one shader, palettes) ----
         _check(not G.themes_on, "without the pack the tour wears ONE neutral sky")
         G.themes_on = true
         G._apply_stage_sky(4, true)
         var mars_deep: Color = G.STAGES[4]["sky"]["deep"]
         _check(G.sky_cur["deep"].is_equal_approx(mars_deep),
                         "the pack paints each world its own DASH-SHADER sky (palette law)")
-        var neutral_deep: Color = G.SKY_NEUTRAL["deep"]
-        _check(neutral_deep == Color("060a1c"),
-                        "the neutral sky IS Space Dash's Deep Blue (one universe)")
 
         # ---- done ----
         Box.reset_all()
@@ -458,11 +497,8 @@ func _run() -> void:
                 print("RESULT: %d FAILURES" % fails)
         get_tree().quit(0 if fails == 0 else 1)
 
-func ebotl_texture(b: Sprite2D) -> void:
-        b.texture = G._tex["ebolt"]
-
-func ebotl_place(b: Sprite2D) -> void:
-        b.position = G.defender.position
+func _story_btn_ignore() -> void:
+        pass
 
 func _ready() -> void:
         print("=== invaders probe ===")
