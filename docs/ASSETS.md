@@ -142,3 +142,26 @@ JS-gated to bots), reviewed with contact sheets, and vendored:
   review sheets live in the session log (`hunt/r1..r8`).
 - The synthesized dario voices (v031_sfx) are unchanged; the slasher
   whoosh family was REMOVED by owner law (silence is the slash).
+
+## v0.3.2 — Space Invaders (provenance)
+
+- `assets/games/invaders/ship_*.png` (the 7 SSDS hulls) — **derived from the
+  same Kenney Space Shooter Redux + Extension hulls the box already vendored
+  for Space Dash** (CC0; see the `kenney-space-shooter-redux` /
+  `kenney-space-shooter-extension` sources in
+  `projects/gogabox/assets.manifest.json`). The owner's own call: "edit some
+  ships and change their size and colors" — hue-shift, recolor, cockpit glow
+  and gun-pod mounts are applied by `tools/v032_invaders_art.py`.
+- Everything else under `assets/games/invaders/` (11 enemy kinds, 10 bosses,
+  11 planet plates, all projectiles/VFX/items) is **painted from scratch** by
+  `tools/v032_invaders_art.py` (PIL, deterministic, 4x supersample) in the
+  box's own flat-alien style — CC0-clean, no third-party source.
+- The planet plates carry REAL-WORLD data in their design (the owner's law):
+  Neptune's 2,100 km/h wind streaks + dark storm, Uranus's 98°-tilt vertical
+  ring, Saturn's ring band, Jupiter's bands + Great Red Spot, Mars's dust
+  veils + two moons, Earth's cloud swirls + the Moon, Venus's 465° sulfur
+  deck, Mercury's 430°/-180° day-night split, the Sun's 5,500° flare loops,
+  and the Hideout's reactor-veined megastructure.
+- All `inv_*` voices + the two music loops (`inv_tour`, `inv_finale`) are
+  synthesized by `tools/v032_invaders_sfx.py` (numpy, deterministic) — no
+  samples, no licenses to carry.

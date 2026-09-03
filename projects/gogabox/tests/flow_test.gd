@@ -305,10 +305,14 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 8, "8 playable games")
-        # v0.2.3 patch: 7 teasers - the REAL Geometry Flash joined the
-        # workshop as a SOON tile when the lane-dodger became Space Dash
-        ok += _check(GameReg.workshop().size() == 7, "7 workshop teasers")
+        var ok := _check(GameReg.playable().size() == 9, "9 playable games")
+        # v0.3.2: 6 teasers - HEN graduated into SPACE INVADERS (the rename law)
+        ok += _check(GameReg.workshop().size() == 6, "6 workshop teasers")
+        ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
+                "the hen teaser ships as SPACE INVADERS (rename law)")
+        ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
+                and int(GameReg.get_game("invaders")["fee"]) == 100,
+                "invaders wears the owner's economy (bonus /500, fee 100)")
         ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dash",
                 "the lane-dodger ships as SPACE DASH (rename law)")
         # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
@@ -362,7 +366,7 @@ func _t_registry() -> int:
         # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
         # the banner now, the tower included; MELTING stays
         var banner_ok := true
-        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper"]:
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders"]:
                 banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
@@ -545,7 +549,7 @@ func _t_roadmap() -> int:
         Box.dev_set_cheat("all_owned", 0)
         # v0.0.7 two-level badges: mystery teaser wears NEW!
         Roadmap.tick()
-        ok += _check(Box.badge("hen") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("hen"))
+        ok += _check(Box.badge("spud") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("spud"))
         # playing snake reveals rally (chain) but it stays hidden until Roadmap.tick stamps it
         Box.record_started("snake")
         ok += _check(Roadmap.state("rally") == "LOCKED", "rally revealed after snake played")
@@ -589,7 +593,8 @@ func _t_roadmap() -> int:
                 "mystery teasers keep NEW! semantics")
         # timed mystery
         ok += _check(Roadmap.time_left("spud") > 23.0 * 3600.0, "spud ~24h left")
-        ok += _check(Roadmap.inbox_left("hen") > 19.0 * 60.0, "hen ~20min box time left")
+        ok += _check(Roadmap.state("invaders") == "HIDDEN",
+                "invaders still hidden (xo owned, unplayed - the chain grew a link)")
         Box.reset_all()
         return ok
 
@@ -597,35 +602,31 @@ func _t_roadmap() -> int:
 
 ## THE MYSTERY QUEUE (owner brainstorm): at most 4 mysteries exist at once;
 ## the rest are INEXISTENT (HIDDEN, untracked) until a queue slot frees.
-## v0.1.7: dario/xo left the workshop, so the queue is hen/spud/maze/poptd
-## - exactly 4 mystery-able teasers = the cap is full, never overflowed.
+## v0.3.2: hen graduated into SPACE INVADERS, so the queue is spud/maze/poptd
+## - 3 mystery-able teasers under the 4 cap, never overflowed.
 func _t_mystery_queue() -> int:
         Box.reset_all()
-        var ok := _check(Roadmap.state("hen") == "MYSTERY", "queue: hen slot 1")
-        ok += _check(Roadmap.state("spud") == "MYSTERY", "queue: spud slot 2")
+        var ok := _check(Roadmap.state("spud") == "MYSTERY", "queue: spud slot 1")
         ok += _check(Roadmap.state("maze") == "HIDDEN", "maze waits (appear_after 2 at 1 owned)")
         ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd waits (appear_after 4)")
         ok += _check(Roadmap.state("matcher") == "CHARGING",
                 "matcher is NO mystery (direct): visible CHARGING tile")
-        ok += _check(Roadmap.state("dario") == "HIDDEN" and Roadmap.state("xo") == "HIDDEN",
-                "dario/xo are chain games, never queue members")
+        ok += _check(Roadmap.state("dario") == "HIDDEN" and Roadmap.state("xo") == "HIDDEN"
+                and Roadmap.state("invaders") == "HIDDEN",
+                "dario/xo/invaders are chain games, never queue members")
         # own 2 -> maze joins (and keys' direct meter shows up CHARGING)
         Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 3 at 2 owned")
+        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 2 at 2 owned")
         ok += _check(Roadmap.state("keys") == "CHARGING",
                 "keys CHARGING at 2 owned (direct + 200-charge meter)")
         # own 3 -> nothing new (poptd needs 4)
         Box.unlock_game("lanes", 0)
         ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd still waiting at 3 owned")
-        # own 4 -> poptd joins: the queue is FULL at MYSTERY_CAP
+        # own 4 -> poptd joins: the queue stays under MYSTERY_CAP
         Box.unlock_game("slasher", 0)
-        ok += _check(Roadmap.state("poptd") == "MYSTERY", "poptd takes slot 4 at 4 owned")
-        # resolve hen (20 inbox minutes of box time) -> its slot frees
-        Box.add_time("snake", 21 * 60)
-        ok += _check(Roadmap.state("hen") == "SOON", "hen resolved after 20 box minutes")
+        ok += _check(Roadmap.state("poptd") == "MYSTERY", "poptd takes slot 3 at 4 owned")
         ok += _check(Roadmap.state("spud") == "MYSTERY" \
-                and Roadmap.state("maze") == "MYSTERY" \
-                and Roadmap.state("poptd") == "MYSTERY", "rest of the queue intact")
+                and Roadmap.state("maze") == "MYSTERY", "rest of the queue intact")
         Box.reset_all()
         return ok
 
@@ -1511,7 +1512,7 @@ func _t_dev_cheats() -> int:
         Box.dev_set_cheat("all_owned", 0)
         ok += _check(not Box.owns_game("merge"), "all_owned 0 -> nothing owned")
         Box.dev_set_cheat("all_owned", 1)
-        ok += _check(Box.owns_game("merge") and Box.owns_game("hen"),
+        ok += _check(Box.owns_game("merge") and Box.owns_game("invaders"),
                 "all_owned 1 -> everything owned (games AND teasers)")
         # v0.2.5 THE ALWAYS-PLAYABLE CHEAT (owner: "ignores all limits and
         # make the games always playable even if there is no enough

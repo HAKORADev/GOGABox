@@ -311,6 +311,39 @@ const GAMES := [
                 ],
         },
 
+        {
+                # v0.3.2 SPACE INVADERS - the hen workshop teaser, renamed and
+                # graduated (the owner's tour: Neptune -> ... -> the Sun, then
+                # the Hideout; one war with Space Dash, nobody ever dies).
+                "id": "invaders", "title": "Space Invaders", "tag": "hold the solar system",
+                "script": "res://game/games/invaders/invaders.gd",
+                "thumb": "res://assets/thumbs/invaders.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 500, "price": 350, "fee": 100, "shop": true,
+                "banner": true,
+                "reveal": {"kind": "chain"},
+                "desc": "The aliens reached our solar system. Fly the Protector from Neptune inward to the Sun and into their Hideout: ten worlds, ten waves each, a named boss over every one - and three of them will run and come back for the finale. Rent the SSDS crew with DEFEND, buy Thunder or the Bomb Launcher, chase THE INVADER down. Small scores, a big war, and a line that never breaks while you hold it.",
+                "controls": [
+                        "left half of the screen: slide to fly - the ship steers with you",
+                        "right half: tap or HOLD to fire (every crew ship fires something of its own)",
+                        "enemies pay +1/+2/+3, bosses +25 to +200; a heart loss costs -500 score",
+                        "one enemy past the bottom reaches the solar system - the run is lost. Intercept the divers",
+                        "a GOGACoin drifts in every 2-10 waves, a weapon point every 1-2 waves; your ship's own icon feeds its weapon ladder (5 levels, damage = the level)",
+                        "DEFEND rents a crew ship for 10 waves - one hit ends its shift, and it never touches your loot",
+                        "the shop sells Thunder (an electric beam that chains around itself) and the Bomb Launcher (no ammo, contact fuse only) - the Stage Themes pack paints every world",
+                        "bosses 3, 6 and 9 escape at low health and return for the Hideout gauntlet; THE INVADER never truly dies - and neither does the war",
+                ],
+                "genres": {"main": ["shooter", "arcade"], "sub": ["retro", "singleplayer"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "score_2000", "title": "Solar Shield", "desc": "Score 2000 in one run"},
+                        {"id": "kill_500", "title": "Star Sweep", "desc": "Destroy 500 enemies total"},
+                        {"id": "clear_tour", "title": "The Long War", "desc": "Finish the full tour"},
+                        {"id": "boss_all", "title": "Duke Hunter", "desc": "Meet all three runaway keepers"},
+                        {"id": "defend_3", "title": "Crew Trust", "desc": "Call 3 defenders total"},
+                ],
+        },
+
         # ---- the workshop (not built yet, but ALREADY in the feed as teasers so
         # the box keeps growing. Kinds:
         #   orders - quest lines to reveal          (black box ?????)
@@ -327,13 +360,6 @@ const GAMES := [
         # v0.1.4 THE MYSTERY QUEUE: only the first 4 mystery-able teasers
         # (catalog order) exist at once - the rest stay inexistent until a
         # queue slot frees (Roadmap.MYSTERY_CAP).
-        {"id": "hen", "title": "Hen Invaders", "tag": "1P shooter port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/hen.png",
-                "desc": "The sky is full of angry hens. Shoot them down, wave after wave.",
-                "genres": {"main": ["shooter", "arcade"], "sub": ["retro", "singleplayer"]},
-                "age": "everyone",
-                "reveal": {"kind": "inbox", "appear_after": 1, "price": 350, "needs_games": 0,
-                        "minutes": 20}},
         {"id": "spud", "title": "Cosmic Spud", "tag": "wave shooter port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/spud.png",
                 "desc": "One potato against the galaxy. Hold the line, spud.",

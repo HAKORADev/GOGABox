@@ -163,6 +163,12 @@ func check_achievements() -> int:
                         "tower_30": ok = Box.counter(game_id, "max_tower") >= 30
                         "tower_80": ok = Box.counter(game_id, "max_tower") >= 80
                         "tower_150": ok = Box.counter(game_id, "max_tower") >= 150
+                        # v0.3.2 - space invaders (the tour)
+                        "score_2000": ok = score >= 2000
+                        "kill_500": ok = Box.counter(game_id, "kills") >= 500
+                        "clear_tour": ok = Box.counter(game_id, "tour_done") >= 1
+                        "boss_all": ok = Box.counter(game_id, "bosses_met") >= 3
+                        "defend_3": ok = Box.counter(game_id, "defenders_called") >= 3
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://gogaboxinvpb"]
+
+[ext_resource type="Script" path="res://tests/invaders_probe.gd" id="1"]
+
+[node name="InvadersProbe" type="Node"]
+script = ExtResource("1")

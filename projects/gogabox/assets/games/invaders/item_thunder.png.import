@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dajx5tldvcl3"
-path="res://.godot/imported/hen.png-959717dee778b65ecc9bddf3441c75a0.ctex"
+uid="uid://bcb037mv3gl44"
+path="res://.godot/imported/item_thunder.png-10c208e159dfc00db87dd0f4d96d7b4e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/thumbs/hen.png"
-dest_files=["res://.godot/imported/hen.png-959717dee778b65ecc9bddf3441c75a0.ctex"]
+source_file="res://assets/games/invaders/item_thunder.png"
+dest_files=["res://.godot/imported/item_thunder.png-10c208e159dfc00db87dd0f4d96d7b4e.ctex"]
 
 [params]
 

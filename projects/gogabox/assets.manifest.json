@@ -59,6 +59,15 @@
       "url": "https://kenney.nl/assets/particle-pack",
       "license": "CC0 1.0 Universal",
       "used_for": "assets/games/lanes/fx_{flare,spark,smoke,star}.png - the tintable glow workhorses behind Space Dash's code VFX"
+    },
+    {
+      "id": "invaders-ships",
+      "name": "Space Invaders crew hulls (derived from the vendored Kenney sets)",
+      "url": "https://kenney.nl/assets/space-shooter-redux",
+      "zip": null,
+      "license": "CC0 1.0 Universal",
+      "used_for": "assets/games/invaders/ship_*.png - the 7 SSDS hulls are hue/recolor/glow/mount edits of the SAME Kenney hulls vendored for lanes (kenney-space-shooter-redux + extension), applied by tools/v032_invaders_art.py per the owner's 'edit some ships and change their size and colors' call. Everything else in assets/games/invaders/ is painted from scratch by that tool (CC0-clean).",
+      "origin": "local:derived"
     }
   ],
   "audit": {
