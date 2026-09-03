@@ -56,6 +56,10 @@ const LOSS_WINDOW := 0.9
 
 const FRUITS := ["apple", "banana", "basaha", "peach", "sandia"]
 const VEGGIES := ["carrot", "tomato", "eggplant", "broccoli", "corn", "pepper"]
+## v0.3.1 PATCH III - THE SHAPED COLLISION (the owner: "each object should
+## have a collision that shaped like it"): the long produce wears a
+## CAPSULE along its own body, everything round wears an honest CIRCLE.
+const ELONG := ["banana", "carrot", "eggplant", "corn"]
 ## the juice tints per fruit (the real flesh colors)
 const JUICE := {
         "apple": Color("cde97e"), "banana": Color("ffe98a"),
@@ -722,20 +726,78 @@ func _on_drag(from: Vector2, to: Vector2) -> void:
         var seg := to - from
         if seg.length() < 14.0:
                 return
+        # v0.3.1 PATCH III - THE SHAPE LAW: the old code cut anything in a
+        # ~200px swath around the swipe (a drawn CIRCLE around a fruit
+        # clipped it - the owner's bug). Now every object owns its real
+        # shape and the slash must CROSS it. Bombs are the exception: a
+        # graze on their side detonates, no pass-through needed.
         for p in items.duplicate():
                 var n: Sprite2D = p["node"]
                 if bool(p["sliced"]):
                         continue
-                var d := _point_segment_dist(n.position, from, to)
-                var hit_r := 50.0 * float(p["scale"]) / 0.5
-                if d < hit_r:
+                var shp: Dictionary = _shape_of(p)
+                if String(p["kind"]) == "bomb":
+                        if _point_segment_dist(n.position, from, to) \
+                                        < float(shp["r"]) + 14.0:
+                                _cut_item(p, from, to)
+                        continue
+                if String(shp["type"]) == "capsule":
+                        var axis: Vector2 = Vector2(0, -1).rotated(n.rotation) \
+                                        * float(shp["half"])
+                        if _seg_seg_dist(from, to, n.position + axis,
+                                        n.position - axis) <= float(shp["r"]):
+                                _cut_item(p, from, to)
+                elif _seg_circle_hit(from, to, n.position, float(shp["r"])):
                         _cut_item(p, from, to)
-        # v0.3.1: no more glint sprite (the owner: "we do not need it
-        # since we have our own finger-slasher thing") - the blade ribbon
-        # IS the effect. v0.3.1 PATCH II: the swipe sound is GONE entirely
-        # (the owner: "remove the slash sound completely, the rest of the
-        # SFXs are good") - slicing is a SILENT act now; the cuts, bombs
-        # and combos keep their voices.
+
+## the item's own collision shape, sized from the DRAWN pixels (the blade
+## ribbon is ~26px wide - the hit zone is the body, never a 200px swath)
+func _shape_of(p: Dictionary) -> Dictionary:
+        var shp: Dictionary = p.get("shape", {})
+        if not shp.is_empty():
+                return shp
+        var n: Sprite2D = p["node"]
+        var sc: float = float(p["scale"])
+        var dw := float(n.texture.get_width()) * sc
+        var dh := float(n.texture.get_height()) * sc
+        if ELONG.has(String(p["kind"])):
+                shp = {"type": "capsule", "half": dh * 0.34, "r": dw * 0.30}
+        else:
+                shp = {"type": "circle", "r": dw * 0.42}
+        p["shape"] = shp
+        return shp
+
+## true when the segment REALLY crosses the disc (the owner: "the slash
+## should only slash when the slash visual line really collides with the
+## thing from side to side") - a line beside the disc, or a loop AROUND
+## it that never enters, is not a cut
+func _seg_circle_hit(a: Vector2, b: Vector2, c: Vector2, r: float) -> bool:
+        return _point_segment_dist(c, a, b) < r
+
+## the shortest distance between two segments (capsule vs slash line)
+func _seg_seg_dist(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vector2) -> float:
+        if _segs_cross(p1, p2, p3, p4):
+                return 0.0
+        return minf(_point_segment_dist(p1, p3, p4), \
+                minf(_point_segment_dist(p2, p3, p4), \
+                minf(_point_segment_dist(p3, p1, p2), _point_segment_dist(p4, p1, p2))))
+
+func _segs_cross(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vector2) -> bool:
+        var d1 := _cross(p3, p4, p1)
+        var d2 := _cross(p3, p4, p2)
+        var d3 := _cross(p1, p2, p3)
+        var d4 := _cross(p1, p2, p4)
+        return ((d1 > 0.0) != (d2 > 0.0)) and ((d3 > 0.0) != (d4 > 0.0))
+
+func _cross(a: Vector2, b: Vector2, p: Vector2) -> float:
+        return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+
+# v0.3.1: no more glint sprite (the owner: "we do not need it
+# since we have our own finger-slasher thing") - the blade ribbon
+# IS the effect. v0.3.1 PATCH II: the swipe sound is GONE entirely
+# (the owner: "remove the slash sound completely, the rest of the
+# SFXs are good") - slicing is a SILENT act now; the cuts, bombs
+# and combos keep their voices.
 
 # ============================================================ the cut
 

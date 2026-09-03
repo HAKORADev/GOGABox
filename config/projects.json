@@ -10,7 +10,7 @@
       "apk_name": "GOGABox",
       "package": "hakora.dev.gogabox",
       "version_name": "0.3.1",
-      "version_code_base": 30400,
+      "version_code_base": 30402,
       "aab": false,
       "abi_presets": {
         "arm64-v8a": "Android arm64",

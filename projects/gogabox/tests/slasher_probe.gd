@@ -185,8 +185,81 @@ func _run() -> void:
         _check(bombs >= 12,
                 "the spawner keeps birthing bombs (rows hide them: %d in 160 patterns)" % bombs)
 
+        # ---- THE SHAPED COLLISION (v0.3.1 patch III, the owner: "if i
+        # made a circle with the slash, if a fruit get into the circle
+        # thing, it will be cut! THIS IS WRONG!") ----
+        var g4: GogaGame = SL.new()
+        g4.game_id = "slasher"
+        add_child(g4)
+        await get_tree().process_frame
+        g4._orient_choice("vertical")
+        g4._start_run()
+        g4.set_score(0)
+        # the shape law: every item owns a shape sized from its DRAWN pixels
+        var ap: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        var shp: Dictionary = g4._shape_of(ap)
+        _check(String(shp["type"]) == "circle" and float(shp["r"]) > 10.0,
+                "a round fruit wears an honest CIRCLE shape")
+        var bn: Dictionary = _make_live(g4, "banana", Vector2(400, 300))
+        var bshp: Dictionary = g4._shape_of(bn)
+        _check(String(bshp["type"]) == "capsule",
+                "a long fruit wears a CAPSULE along its body")
+        # THE CROSSING LAW: a line THROUGH the fruit cuts it
+        g4.items.append(ap)
+        ap["sliced"] = false
+        var score0 := int(g4.score)
+        g4._on_drag(Vector2(400, 380), Vector2(400, 220))
+        _check(int(g4.score) == score0 + 1,
+                "a real crossing (side to side) CUTS the fruit")
+        # a line BESIDE the fruit (outside its shape) never cuts
+        var ap2: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        g4.items.append(ap2)
+        g4._on_drag(Vector2(400 + float(shp["r"]) + 40.0, 380),
+                        Vector2(400 + float(shp["r"]) + 40.0, 220))
+        _check(g4.items.has(ap2),
+                "a near-miss line BESIDE the fruit does NOT cut it")
+        # THE OWNER'S EXACT CASE: a drawn CIRCLE (loop) AROUND the fruit
+        # never cuts it - the old code clipped anything in a 200px swath
+        var ap3: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        g4.items.append(ap3)
+        var off := float(shp["r"]) + 30.0
+        g4._on_drag(Vector2(400 - off, 300 - off), Vector2(400 + off, 300 - off))
+        g4._on_drag(Vector2(400 + off, 300 - off), Vector2(400 + off, 300 + off))
+        g4._on_drag(Vector2(400 + off, 300 + off), Vector2(400 - off, 300 + off))
+        g4._on_drag(Vector2(400 - off, 300 + off), Vector2(400 - off, 300 - off))
+        _check(g4.items.has(ap3),
+                "a drawn circle AROUND the fruit does NOT cut it (the owner's bug)")
+        # the CAPSULE cuts through its own body only
+        var bn2: Dictionary = _make_live(g4, "banana", Vector2(400, 300))
+        g4.items.append(bn2)
+        var bs: Dictionary = g4._shape_of(bn2)
+        g4._on_drag(Vector2(400 - float(bs["r"]) - 30.0, 300),
+                        Vector2(400 - float(bs["r"]) - 30.0, 300))
+        # (a zero-length segment is skipped) - the real cut:
+        g4._on_drag(Vector2(340, 300), Vector2(340 + float(bs["r"]) * 2.0, 300))
+        _check(not g4.items.has(bn2),
+                "a line through the banana's BODY cuts the capsule")
+        # THE BOMB LAW: a GRAZE on its side detonates - no pass-through
+        g4.hearts = 3
+        var bm: Dictionary = _make_live(g4, "bomb", Vector2(400, 300))
+        g4.items.append(bm)
+        var bsh: Dictionary = g4._shape_of(bm)
+        g4._on_drag(Vector2(400 - float(bsh["r"]) - 8.0, 300),
+                        Vector2(400 - float(bsh["r"]) + 2.0, 360))
+        _check(g4.hearts == 2,
+                "a graze on the bomb's SIDE detonates it (no pass-through needed)")
+
         print("== slasher_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(1 if fails > 0 else 0)
+
+func _make_live(g: GogaGame, kind: String, pos: Vector2) -> Dictionary:
+        var s := Sprite2D.new()
+        s.texture = g._bomb_tex if kind == "bomb" else g._texs[kind]
+        s.position = pos
+        s.scale = Vector2.ONE * 0.5
+        g.world.add_child(s)
+        return {"node": s, "kind": kind, "v": Vector2.ZERO,
+                "spin": 0.0, "sliced": false, "scale": 0.5, "g": 1560.0}
 
 func _make_item(g: GogaGame, kind: String) -> Dictionary:
         var s := Sprite2D.new()

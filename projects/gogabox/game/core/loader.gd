@@ -56,13 +56,20 @@ func _run(g: Dictionary) -> void:
         center.add_child(v)
 
         # ---- thumb frame with scan bar
+        # v0.3.1 PATCH III (the owner: "the game thumbnail when appears, it
+        # looks like a box instead of the rectangle-like shape and with
+        # clipped side edges"): the frame was SQUARE (side x side) with a
+        # COVERED stretch - every 3:2 thumbnail rendered as a clipped box.
+        # The frame now wears the thumbnail's real aspect: the WHOLE art
+        # shows, complete, exactly like everywhere else in the box.
         var frame := Panel.new()
         var sb := Arc.panel_style(Color(0, 0, 0, 0.35), 26)
         sb.border_color = Arc.ACCENT
         sb.set_border_width_all(3)
         frame.add_theme_stylebox_override("panel", sb)
-        var side := minf(300.0, W * 0.42)
-        frame.custom_minimum_size = Vector2(side, side)
+        var fw := minf(380.0, W * 0.66)
+        var fh := fw / 1.5          # the thumbs are 960x640 - keep them so
+        frame.custom_minimum_size = Vector2(fw, fh)
         frame.clip_contents = true
         frame.size_flags_horizontal = BoxContainer.SIZE_SHRINK_CENTER
         v.add_child(frame)
@@ -83,11 +90,11 @@ func _run(g: Dictionary) -> void:
         var scan := ColorRect.new()
         scan.color = Color(1.0, 0.72, 0.15, 0.55)
         scan.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        scan.size = Vector2(side, 6)
+        scan.size = Vector2(fw, 6)
         scan.position = Vector2(0, 10)
         frame.add_child(scan)
         var stw := scan.create_tween().set_loops()
-        stw.tween_property(scan, "position:y", side - 16.0, 0.8) \
+        stw.tween_property(scan, "position:y", fh - 16.0, 0.8) \
                         .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
         stw.tween_property(scan, "position:y", 10.0, 0.8) \
                         .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
