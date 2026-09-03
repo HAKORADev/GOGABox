@@ -402,6 +402,7 @@ var last_shot_ms := 0
 
 var waves_since_coin := 0             # THE AIRDROP LAW: counted in WAVES
 var coin_target := 3
+var last_kill_pos := Vector2(-1, -1)  # where the last enemy ship DIED - the loot's birthplace
 var waves_since_power := 0
 var power_target := 1
 
@@ -824,8 +825,9 @@ func _ship_tick(delta: float) -> void:
                 # steering their bodies while normal user ship can not do that"):
                 # the protector STEERS its body now - it banks hard into its
                 # motion AND leans toward the nearest threat, exactly like the
-                # rented defenders lean into their aims. The nose carries the
-                # fire (every aimed weapon below rides _nose()).
+                # rented defenders lean into their aims. The bank is a POSE
+                # only - the fire leaves the nose area straight up; the body
+                # never tilts for a shot (the fire law, below).
                 steer_scan -= delta
                 if steer_scan <= 0.0:
                                 steer_scan = 0.12
@@ -838,10 +840,12 @@ func _ship_tick(delta: float) -> void:
                 var want_rot := clampf(ship_v.x * 0.00075 + steer_lean, -0.55, 0.55)
                 ship.rotation = lerpf(ship.rotation, want_rot, minf(1.0, delta * 10.0))
 
-## the ship's nose - the direction its steered body is pointing; the aimed
-## weapons fire along it so steering steers the FIRE too
+## THE FIRE LAW (the owner: "the fire goes out from the nose-like area
+## without ship body tilting"): _nose() is the POINT every shot is born at
+## - the steered body's nose tip - and every weapon fires STRAIGHT UP from
+## it. The bank steers the body, never the bullets.
 func _nose() -> Vector2:
-                return Vector2.UP.rotated(ship.rotation)
+                return ship.position + Vector2(0, -48).rotated(ship.rotation)
 
 func _tail_tick(delta: float) -> void:
                 # THE DYNAMIC TAIL (owner: the space dash tail was "buggy and static"):
@@ -958,13 +962,13 @@ func _fire_orb() -> void:
                 var n := lvl                                   # L1:1 .. L5:5 balls
                 var dmg := lvl                                 # damage = the level
                 var spread := deg_to_rad(7.0)
-                var base := _nose().angle()
+                var base := Vector2.UP.angle()
                 for k in n:
                                 var ang := base + (float(k) - float(n - 1) / 2.0) * spread
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_azure"]
                                 b.material = _add_mat()
-                                b.position = ship.position + Vector2(0, -48)
+                                b.position = _nose()
                                 b.rotation = ang + PI / 2.0
                                 world.add_child(b)
                                 bolts.append({"node": b, "dmg": dmg, "vel": Vector2.from_angle(ang) * 980.0,
@@ -978,13 +982,13 @@ func _fire_beam() -> void:
                 var n := mini(1 + (lvl - 1) / 2 + (1 if lvl >= 4 else 0), 6)
                 var dmg := lvl
                 var spread := deg_to_rad(4.0 + 2.0 * float(lvl))   # wider per level
-                var base2 := _nose().angle()
+                var base2 := Vector2.UP.angle()
                 for k in n:
                                 var ang := base2 + (float(k) - float(n - 1) / 2.0) * spread
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_ember"]
                                 b.material = _add_mat()
-                                b.position = ship.position + Vector2(0, -52)
+                                b.position = ship.position + Vector2(0, -52).rotated(ship.rotation)
                                 b.rotation = ang + PI / 2.0
                                 world.add_child(b)
                                 bolts.append({"node": b, "dmg": dmg, "vel": Vector2.from_angle(ang) * 1150.0,
@@ -996,12 +1000,12 @@ func _fire_beam() -> void:
 func _fire_mg() -> void:
                 var lvl := weapon_level()
                 var dmg := int(ceilf(float(lvl) / 2.0))        # 1,1,2,2,3 - small damage
-                var nb := _nose() * 1500.0
+                var nb := Vector2.UP * 1500.0
                 for sx in [-1.0, 1.0]:
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_phantom"]
                                 b.material = _add_mat()
-                                b.position = ship.position + Vector2(sx * 22.0, -42)
+                                b.position = ship.position + Vector2(sx * 22.0, -42).rotated(ship.rotation)
                                 b.rotation = nb.angle() + PI / 2.0
                                 world.add_child(b)
                                 bolts.append({"node": b, "dmg": dmg,
@@ -1019,7 +1023,8 @@ func _fire_snakes() -> void:
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_verdant"]
                                 b.material = _add_mat()
-                                b.position = ship.position + Vector2((float(k) - float(n - 1) / 2.0) * 60.0, -40)
+                                b.position = ship.position + Vector2(
+                                                                (float(k) - float(n - 1) / 2.0) * 60.0, -40).rotated(ship.rotation)
                                 world.add_child(b)
                                 snakes.append({"node": b, "lvl": lvl, "t": rng.randf() * TAU,
                                                                 "tall": tall, "tick": SNAKE_TICK, "hit": {},
@@ -1183,11 +1188,11 @@ func _fire_hornet() -> void:
                 var b := Sprite2D.new()
                 b.texture = _tex["w_hornet"]
                 b.material = _add_mat()
-                b.position = ship.position + Vector2(0, -46)
-                b.rotation = _nose().angle() + PI / 2.0
+                b.position = ship.position + Vector2(0, -46).rotated(ship.rotation)
+                b.rotation = Vector2.UP.angle() + PI / 2.0
                 world.add_child(b)
                 bolts.append({"node": b, "dmg": lvl,
-                                                "vel": _nose() * 760.0 + Vector2(rng.randf_range(-60, 60), 0.0),
+                                                "vel": Vector2.UP * 760.0 + Vector2(rng.randf_range(-60, 60), 0.0),
                                                 "kind": "fire", "hit": {}})
                 fire_cd = FIRE_CD
                 Jukebox.sfx("inv_shoot_hornet", -6.0)
@@ -1233,7 +1238,7 @@ func _burns_tick(delta: float) -> void:
 func _fire_missile() -> void:
                 var b := Sprite2D.new()
                 b.texture = _tex["w_titan"]
-                b.position = ship.position + Vector2(0, -50)
+                b.position = ship.position + Vector2(0, -50).rotated(ship.rotation)
                 world.add_child(b)
                 missiles.append({"node": b, "t": 0.0})
                 fire_cd = MISSILE_CD
@@ -1327,7 +1332,7 @@ func _cast_thunder() -> void:
 func _drop_bomb() -> void:
                 var b := Sprite2D.new()
                 b.texture = _tex["bomb"]
-                b.position = ship.position + Vector2(0, -50)
+                b.position = ship.position + Vector2(0, -50).rotated(ship.rotation)
                 world.add_child(b)
                 bombs.append({"node": b, "vel": Vector2(rng.randf_range(-30, 30), -680.0)})
                 fire_cd = BOMB_CD
@@ -1867,6 +1872,7 @@ func _kill_enemy(e: Dictionary, scored: bool) -> void:
                 _fx_explosion(e["node"].position, 0.9, Color(0.8, 0.85, 1.0))
                 Jukebox.sfx("inv_boom_small", -7.0, rng.randf_range(0.9, 1.2))
                 var at: Vector2 = e["node"].position
+                last_kill_pos = at                   # the loot birth law: remember the wreck
                 e["node"].queue_free()
                 enemies.erase(e)
                 if scored:
@@ -1920,16 +1926,18 @@ func _wave_end() -> void:
                                                 _defender_depart()
                 # THE AIRDROP LAW (PATCH IV): the wave-anchored rolls live HERE,
                 # at the wave end - the owner's own rhythms (coin 2-10 waves,
-                # power 1-2, weapon icons 5%). The gap breathes, the sky pays.
-                var vp := get_viewport_rect().size
+                # power 1-2, weapon icons 5%). The loot is born at the last
+                # WRECK - the sky airdrops nothing on its own (the loot birth
+                # law: "items drop from a killed enemy ship area and not
+                # floating from no where").
                 if waves_since_coin >= coin_target:
                                 waves_since_coin = 0
                                 coin_target = rng.randi_range(COIN_WAVES_MIN, COIN_WAVES_MAX)
-                                _spawn_loot("coin", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                                _spawn_loot("coin", _drop_origin())
                 if waves_since_power >= power_target:
                                 waves_since_power = 0
                                 power_target = rng.randi_range(POWER_WAVES_MIN, POWER_WAVES_MAX)
-                                _spawn_loot("power", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                                _spawn_loot("power", _drop_origin())
                 _roll_weapon_drop()
                 var tw := create_tween()
                 tw.tween_interval(0.9)
@@ -1941,6 +1949,18 @@ func _wave_end() -> void:
                                 if wave >= 10:
                                                 return
                                 _next_wave())
+
+## THE LOOT BIRTH LAW (the owner: "items drop from a killed enemy ship area
+## and not floating from no where"): every wave-anchored drop is born where
+## the last enemy ship DIED - a small scatter around that wreck, clamped
+## inside the sky. The RHYTHM is untouched (coin 2-10 waves, power 1-2, 5%
+## weapon rolls at the wave end, kills roll nothing).
+func _drop_origin() -> Vector2:
+                var vp := get_viewport_rect().size
+                if last_kill_pos.x < 0.0:
+                                return Vector2(rng.randf_range(160, vp.x - 160), -60.0)
+                return Vector2(clampf(last_kill_pos.x + rng.randf_range(-30.0, 30.0), 90.0, vp.x - 90.0),
+                                                clampf(last_kill_pos.y + rng.randf_range(-20.0, 20.0), 90.0, vp.y * 0.75))
 
 ## THE DASH SIZES (the owner: "WHY THE FUCK THE GOGACOIN IS THAT BIG... and
 ## weapon items are weirdly small"): the coin renders at the dash 74px (the
@@ -2022,14 +2042,13 @@ func _collect(kind: String) -> void:
 
 ## THE WEAPON ROLL (the owner's law, verbatim from the GDD): "weapon icons 5%
 ## rolls (own icon always allowed, thunder/bomb only if bought)" - rolled at
-## every wave end, from the top, like every airdrop of this war.
+## every wave end, born at the last wreck (the loot birth law).
 func _roll_weapon_drop() -> void:
-                var vp := get_viewport_rect().size
                 if rng.randf() < WEAPON_ROLL:
-                                _spawn_loot("wswitch", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                                _spawn_loot("wswitch", _drop_origin())
                 for wid in SHOP_WEAPONS:
                                 if Box.item_owned(game_id, "weapons", wid) and rng.randf() < WEAPON_ROLL:
-                                                _spawn_loot(wid, Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                                                _spawn_loot(wid, _drop_origin())
 
 # ================================================================ bosses
 
@@ -2468,6 +2487,7 @@ func _boss_gone() -> void:
 
 func _boss_killed() -> void:
                 Jukebox.sfx("inv_boom_big", 1.0)
+                last_kill_pos = boss["node"].position  # a boss wreck births loot too
                 _fx_explosion(boss["node"].position, 3.0, Color(1.0, 0.7, 0.4))
                 shake = 20.0
                 var bid: String = boss["id"]
@@ -2815,7 +2835,7 @@ func _defender_tick(delta: float) -> void:
                 defender_fire_cd = MISSILE_CD
                 var mb := Sprite2D.new()
                 mb.texture = _tex["w_titan"]
-                mb.position = defender.position + Vector2(0, -50)
+                mb.position = defender.position + Vector2(0, -50).rotated(defender.rotation)
                 world.add_child(mb)
                 missiles.append({"node": mb, "t": 0.0, "dmg": 4})
                 Jukebox.sfx("inv_shoot_titan", -8.0)
@@ -2833,7 +2853,8 @@ func _defender_tick(delta: float) -> void:
                 return
         var at: Vector2 = target["node"].position
         var dir: Vector2 = (at - defender.position).normalized()
-        defender.rotation = dir.angle() + PI / 2.0     # the turret leans into the shot
+        # THE FIRE LAW: the body never tilts for a shot - the aim steers the
+        # BOLT (it leaves the nose area and flies to the threat), not the body
         # THE DEFENDER WEAPON LAW (PATCH IV, the owner: "they do not know how
         # to use the holding weapons, they shoot simply"): a rented crew ship
         # wields the REAL weapon it carries - its own behavior, at level 3.
@@ -2871,7 +2892,8 @@ func _defender_tick(delta: float) -> void:
                                 var sb := Sprite2D.new()
                                 sb.texture = _tex["w_verdant"]
                                 sb.material = _add_mat()
-                                sb.position = defender.position + dir * 40.0 \
+                                sb.position = defender.position \
+                                                                + Vector2(0, -40).rotated(defender.rotation) \
                                                                 + dir.orthogonal() * (26.0 if k == 0 else -26.0)
                                 world.add_child(sb)
                                 snakes.append({"node": sb, "lvl": 3, "t": rng.randf() * TAU,
@@ -2888,7 +2910,7 @@ func _defender_bolt(dir: Vector2, dmg: int, kind := "orb", fire_lvl := 0) -> voi
         var b := Sprite2D.new()
         b.texture = _tx(WEAPON_SPRITE[String(SHIPS[defender_id]["weapon"])])
         b.material = _add_mat()
-        b.position = defender.position + dir * 40.0
+        b.position = defender.position + Vector2(0, -40).rotated(defender.rotation)
         b.rotation = dir.angle() + PI / 2.0
         world.add_child(b)
         var shot := {"node": b, "dmg": dmg, "vel": dir * 900.0, "kind": kind, "hit": {}}

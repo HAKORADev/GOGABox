@@ -1,8 +1,14 @@
 extends Node
-## invaders_probe - v0.3.2 PATCH IV: drives Space Invaders headless. The
-## owner's playtest-round laws, newest first:
+## invaders_probe - v0.3.2 PATCH IV (hotfix): drives Space Invaders headless.
+## The owner's playtest-round laws, newest first:
+##   THE FIRE LAW (hotfix: all user ships AND defenders - the fire leaves the
+##   NOSE area and flies STRAIGHT; the bank is a steering pose only, the body
+##   never tilts for a shot),
+##   THE LOOT BIRTH LAW (hotfix: the wave-end drops are born at the last
+##   killed ship's WRECK - nothing floats in from the top; the rhythm itself
+##   stays coin 2-10 / power 1-2 / 5% weapon rolls, kills roll nothing),
 ##   PATCH IV - THE STEERING LAW (the protector steers its BODY like the
-##   defenders; the aimed fire rides the steered nose),
+##   defenders),
 ##   THE DEFENDER WEAPON LAW (a rented ship wields its REAL held weapon at
 ##   level 3 - orb volleys, beam pairs, igniting fire, free weaving snakes),
 ##   THE BOSS AWAKENING (the keeper was parked on "enter" FOREVER - it wakes
@@ -217,8 +223,12 @@ func _run() -> void:
         G.wpower["orb"] = 1
         G.bolts.clear()
         G._fire_orb()
-        _check(G.bolts.size() == 1 and absf((G.bolts[0]["vel"] as Vector2).angle() - (-PI / 2.0 + 0.3)) < 0.02,
-                        "the aimed fire rides the STEERED NOSE (steering steers the fire)")
+        _check(G.bolts.size() == 1 and absf((G.bolts[0]["vel"] as Vector2).angle() - (-PI / 2.0)) < 0.001,
+                        "THE FIRE LAW: the banked body's fire flies STRAIGHT UP (the bank never steers bullets)")
+        _check(((G.bolts[0]["node"] as Sprite2D).position as Vector2).distance_to(G._nose()) < 1.0,
+                        "the shot is born AT the steered NOSE point (the nose-like area)")
+        _check(absf(G.ship.rotation - 0.3) < 0.001,
+                        "the body holds its bank POSE - firing never tilts the ship")
         G.ship.rotation = 0.0
         G.bolts.clear()
 
@@ -377,6 +387,10 @@ func _run() -> void:
                         "the power rhythm: a point every 1-2 waves (owner)")
         G.waves_since_coin = G.coin_target
         G.waves_since_power = G.power_target + 1
+        var wreck := _mk("grunt", Vector2(430.0, 210.0))
+        G._kill_enemy(wreck, true)
+        _check(G.last_kill_pos.distance_to(Vector2(430.0, 210.0)) < 1.0,
+                        "every kill remembers its WRECK (the loot's birthplace)")
         G.loots.clear()
         G.phase = "gap"
         G._wave_end()
@@ -385,9 +399,13 @@ func _run() -> void:
                 dropped[String(l["kind"])] = l
         _check(dropped.has("coin") and dropped.has("power"),
                         "the ripe rhythms pay BOTH airdrops at the wave end")
-        _check((dropped["coin"]["node"] as Sprite2D).position.y < 0.0
-                        and (dropped["power"]["node"] as Sprite2D).position.y < 0.0,
-                        "the airdrops enter from the TOP like every wave's payment")
+        var coin_pos: Vector2 = (dropped["coin"]["node"] as Sprite2D).position
+        var power_pos: Vector2 = (dropped["power"]["node"] as Sprite2D).position
+        _check(coin_pos.distance_to(Vector2(430.0, 210.0)) < 90.0
+                        and power_pos.distance_to(Vector2(430.0, 210.0)) < 90.0,
+                        "THE LOOT BIRTH LAW: coin + power are born AT the killed ship's area")
+        _check(coin_pos.y > 0.0 and power_pos.y > 0.0,
+                        "nothing floats in from the top anymore")
         _check(is_equal_approx(float(dropped["coin"]["node"].scale.x), 74.0 / 192.0),
                         "THE COIN SIZE LAW: the dash 74px - never the raw 192 again")
         _check(is_equal_approx(float(dropped["power"]["node"].scale.x), 2.4)
@@ -446,6 +464,14 @@ func _run() -> void:
         G._defender_tick(0.016)
         _check(G.bolts.size() >= db0 + 2,
                         "the rented EMBER fires a real BEAM PAIR (no more plain bolts)")
+        _check(absf(G.defender.rotation) < 0.02,
+                        "THE FIRE LAW: the rented body NEVER tilts for its shot (it stays level)")
+        var dmuzzle_ok := true
+        for i in range(db0, G.bolts.size()):
+                dmuzzle_ok = dmuzzle_ok and ((G.bolts[i]["node"] as Sprite2D).position as Vector2) \
+                                                .distance_to(G.defender.position \
+                                                + Vector2(0, -40).rotated(G.defender.rotation)) < 1.0
+        _check(dmuzzle_ok, "the defender's bolts leave its NOSE area, not its body center")
         var beams_aimed := true
         for i in range(db0, G.bolts.size()):
                 var sh: Dictionary = G.bolts[i]

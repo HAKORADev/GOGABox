@@ -348,3 +348,36 @@ nothing, i just shoot them". Everything above that moved, moved:
   the radio, the airdrops with the coin + the pill).
 - version 0.3.2 PATCH IV (base 30424: arm32 30425, arm64 30426), cert
   unchanged == all previous builds.
+- PATCH IV HOTFIX (the owner, same patch - same name: "wait, patch same
+  patch with same name, ensure these two points"). Two laws of the PATCH
+  IV round were re-read and re-landed EXACTLY as the owner meant them:
+- THE FIRE LAW (the owner: "i will assume you meant all user ships and
+  defenders when fire, the fire goes out from the nose-like area without
+  ship body tilting"): _nose() is a POINT now, not a direction - the
+  steered body's nose tip. EVERY weapon of the protector (azure volley,
+  ember beams, phantom twin muzzles, verdant snakes, hornet fire, titan
+  missile, the bomb drop) is born at the nose-like area and flies
+  STRAIGHT UP - the steering bank is a POSE only, the bank never steers
+  the bullets, and firing never tilts the body. The defenders obey the
+  same law: the turret-lean snap (rotation = aim angle) is DELETED - a
+  rented ship stays LEVEL, its aimed bolt leaves the nose area and flies
+  to the threat on its own (thunder keeps its sky beam, bombs their
+  drop). Steering parity (round IV) is untouched: every hull still banks
+  into its motion and leans toward threats - it just never tilts FOR a
+  shot.
+- THE LOOT BIRTH LAW (the owner: "i will assume you mean the spawn rates
+  are correct, but items drop from a killed enemy ship area and not
+  floating from no where"): the wave-anchored RHYTHM is untouched (coin
+  every 2-10 waves, power point every 1-2 waves, weapon icons 5% rolls
+  at the wave end, kills roll nothing) - but the drops are no longer
+  airdropped from the top of an empty sky. Every kill remembers its
+  WRECK (last_kill_pos - grunts, divers, splits and boss kills alike)
+  and every wave-end drop is BORN there: a small scatter around the
+  wreck, clamped inside the sky, falling the dash fall from the death
+  spot. The sky pays at the wave end, but it pays where the last ship
+  died.
+- tests: invaders_probe re-landed the two laws (the banked fire flies
+  straight up + born at the nose point + the pose holds; the wreck is
+  remembered + coin/power born AT the killed ship's area + nothing
+  floats in from the top; the rented body stays level and its bolts
+  leave its nose area) - ALL PASS.
