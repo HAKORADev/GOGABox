@@ -27,19 +27,19 @@ const LVL_PTS := [0, 2, 5, 9, 14, 20]  # cumulative points needed to BE level i+
 const DEATH_POWER_RUNGS := 3
 
 # ---------------------------------------------------------------- loot rhythms
-## v0.3.2 PATCH III - THE WRECK LAW (the owner: "it is supposed to drop items
-## from the killed ships... i am not sure if you ported the power point and
-## the universal weapons to spawn"): the wave-anchored airdrops are DEAD -
-## Space Dash's exact kill-rolled economy now runs here. Coins: 1 per 5-10
-## kills counting from the last coin COLLECTED. Power points: 16% per kill,
-## +50% extra on a big body. Universal weapons (thunder/bomb): 5% per kill,
-## only once bought. The ship's own icon: 5% (feeds the ladder / comes home).
-const COIN_KILLS_MIN := 5
-const COIN_KILLS_MAX := 10
-const POWER_CHANCE := 0.16
-const BIG_POWER_CHANCE := 0.5
-const OWN_ICON_CHANCE := 0.05
-const SHOP_WEAPON_CHANCE := 0.05
+## THE AIRDROP LAW (PATCH IV - the owner: "when i said do the drop to be like
+## space dash, i did not mean to overwrite the design of this game, i told
+## you the limits of each weapon and each thing"): Space Dash lent this war
+## its SIZES and its pill, never its economy. The loot rhythm is wave-anchored
+## exactly as the GDD wrote it - a GOGACoin every 2-10 waves, a power point
+## every 1-2 waves (both airdrop from the top at the wave end), and weapon
+## icons 5% rolls at the wave end (own icon always, bought thunder/bomb too).
+## Kill rolls are Space Dash's design and STAY in Space Dash.
+const COIN_WAVES_MIN := 2          # owner: "a GOGACoin after 2-10 waves"
+const COIN_WAVES_MAX := 10
+const POWER_WAVES_MIN := 1         # owner: "weapon points... 1 per 1-2 waves"
+const POWER_WAVES_MAX := 2
+const WEAPON_ROLL := 0.05          # owner: "weapon icons 5% rolls"
 
 const LANES := "res://assets/games/lanes/"
 
@@ -202,7 +202,9 @@ const STAGES := [
 const STAGE_HP_GROWTH := 0.18      # +18% hp per stage
 
 ## wave formation patterns (slot layouts, in a 1000x520 local box)
-const PATTERNS := ["line", "vee", "arc", "diamond", "columns", "ring", "lattice"]
+## PATCH IV: + "wings" - two mirrored wedges hugging the sides (the
+## chicken-invaders structure law)
+const PATTERNS := ["line", "vee", "arc", "diamond", "columns", "ring", "lattice", "wings"]
 
 ## ---------------------------------------------------------------- bosses
 ## every boss: own specials, own voices. "escapes": 3/6/9 leave at 20% hp
@@ -380,6 +382,8 @@ var move_axis := 0.0                  # the tower law: the drag's analog -1..1
 var fire_idx := -1
 var firing := false
 var ship_v := Vector2.ZERO            # for the tail + bank
+var steer_scan := 0.0                 # THE STEERING LAW: cached aim scan
+var steer_lean := 0.0                 # the lean toward the nearest threat
 
 var hearts := START_HEARTS
 var next_heart_at := HEART_EVERY
@@ -396,8 +400,10 @@ var snake_clock := 0.0
 var missile_cd := 0.0
 var last_shot_ms := 0
 
-var kills_since_coin := 0             # the dash law: counted from the last coin COLLECTED
-var coin_target := 7
+var waves_since_coin := 0             # THE AIRDROP LAW: counted in WAVES
+var coin_target := 3
+var waves_since_power := 0
+var power_target := 1
 
 var enemies: Array = []               # wave enemies (dicts)
 var bolts: Array = []                 # player bullets/orbs/beams/bullets/fire
@@ -418,6 +424,7 @@ var gauntlet_i := -1
 var form_origin := Vector2.ZERO       # the wave formation anchor
 var form_v := Vector2.ZERO
 var form_t := 0.0
+var form_margin := 240.0              # THE MARGIN LAW: the drift keeps every slot on-screen
 var wave_clock := 0.0
 
 var _tex: Dictionary = {}
@@ -813,7 +820,28 @@ func _ship_tick(delta: float) -> void:
                                                 home + sin(Time.get_ticks_msec() * 0.0013) * 8.0,
                                                 minf(1.0, delta * 3.0))
                 ship_v.y = 0.0
-                ship.rotation = clampf(ship_v.x * 0.00055, -0.32, 0.32)
+                # THE STEERING LAW (PATCH IV, the owner: "the defenders still
+                # steering their bodies while normal user ship can not do that"):
+                # the protector STEERS its body now - it banks hard into its
+                # motion AND leans toward the nearest threat, exactly like the
+                # rented defenders lean into their aims. The nose carries the
+                # fire (every aimed weapon below rides _nose()).
+                steer_scan -= delta
+                if steer_scan <= 0.0:
+                                steer_scan = 0.12
+                                var near: Dictionary = _nearest_enemy_pos(ship.position, 1400.0)
+                                if not near.is_empty() and is_instance_valid(near["node"]):
+                                                var nd: Vector2 = near["node"].position - ship.position
+                                                steer_lean = clampf(nd.angle() + PI / 2.0, -0.85, 0.85) * 0.28
+                                else:
+                                                steer_lean = 0.0
+                var want_rot := clampf(ship_v.x * 0.00075 + steer_lean, -0.55, 0.55)
+                ship.rotation = lerpf(ship.rotation, want_rot, minf(1.0, delta * 10.0))
+
+## the ship's nose - the direction its steered body is pointing; the aimed
+## weapons fire along it so steering steers the FIRE too
+func _nose() -> Vector2:
+                return Vector2.UP.rotated(ship.rotation)
 
 func _tail_tick(delta: float) -> void:
                 # THE DYNAMIC TAIL (owner: the space dash tail was "buggy and static"):
@@ -924,13 +952,15 @@ func _weapon_tick(delta: float) -> void:
                 _burns_tick(delta)
 
 ## ---- azure: blue small balls. more balls, small angle (owner) ----
+## PATCH IV: the volley rides the STEERED NOSE - steering steers the fire
 func _fire_orb() -> void:
                 var lvl := weapon_level()
                 var n := lvl                                   # L1:1 .. L5:5 balls
                 var dmg := lvl                                 # damage = the level
                 var spread := deg_to_rad(7.0)
+                var base := _nose().angle()
                 for k in n:
-                                var ang := -PI / 2.0 + (float(k) - float(n - 1) / 2.0) * spread
+                                var ang := base + (float(k) - float(n - 1) / 2.0) * spread
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_azure"]
                                 b.material = _add_mat()
@@ -948,8 +978,9 @@ func _fire_beam() -> void:
                 var n := mini(1 + (lvl - 1) / 2 + (1 if lvl >= 4 else 0), 6)
                 var dmg := lvl
                 var spread := deg_to_rad(4.0 + 2.0 * float(lvl))   # wider per level
+                var base2 := _nose().angle()
                 for k in n:
-                                var ang := -PI / 2.0 + (float(k) - float(n - 1) / 2.0) * spread
+                                var ang := base2 + (float(k) - float(n - 1) / 2.0) * spread
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_ember"]
                                 b.material = _add_mat()
@@ -965,14 +996,16 @@ func _fire_beam() -> void:
 func _fire_mg() -> void:
                 var lvl := weapon_level()
                 var dmg := int(ceilf(float(lvl) / 2.0))        # 1,1,2,2,3 - small damage
+                var nb := _nose() * 1500.0
                 for sx in [-1.0, 1.0]:
                                 var b := Sprite2D.new()
                                 b.texture = _tex["w_phantom"]
                                 b.material = _add_mat()
                                 b.position = ship.position + Vector2(sx * 22.0, -42)
+                                b.rotation = nb.angle() + PI / 2.0
                                 world.add_child(b)
                                 bolts.append({"node": b, "dmg": dmg,
-                                                                "vel": Vector2(rng.randf_range(-40.0, 40.0), -1500.0),
+                                                                "vel": nb + Vector2(rng.randf_range(-40.0, 40.0), 0.0),
                                                                 "kind": "mg", "hit": {}})
                 fire_cd = MG_CD
                 Jukebox.sfx("inv_shoot_phantom", -8.0, 1.0 + rng.randf_range(-0.05, 0.05))
@@ -990,7 +1023,7 @@ func _fire_snakes() -> void:
                                 world.add_child(b)
                                 snakes.append({"node": b, "lvl": lvl, "t": rng.randf() * TAU,
                                                                 "tall": tall, "tick": SNAKE_TICK, "hit": {},
-                                                                "last_y": b.position.y})   # the sweep owns the whole muzzle path
+                                                                "last": b.position})   # the sweep owns the whole muzzle path
                 snake_clock = 0.0
 
 func _snakes_tick(delta: float) -> void:
@@ -1000,15 +1033,19 @@ func _snakes_tick(delta: float) -> void:
                 # holding, it vanish in nowhere? it's supposed to still shoot one
                 # by one"): letting go never deletes the beams mid-air - every
                 # fired snake finishes its flight and exits the sky. Only a real
-                # weapon SWITCH clears them outright.
-                if weapon != "snake":
-                                for s in snakes:
+                # weapon SWITCH clears the RIDING snakes outright; a FREE snake
+                # (PATCH IV: a rented Verdant's) never rode anything, so a switch
+                # never even looks at it.
+                for s in snakes.duplicate():
+                                if not bool(s.get("free", false)) and weapon != "snake":
                                                 s["node"].queue_free()
-                                snakes.clear()
+                                                snakes.erase(s)
+                if snakes.is_empty():
                                 return
-                if not firing:
+                if weapon == "snake" and not firing:
                                 for s in snakes:
-                                                s["orphan"] = true
+                                                if not bool(s.get("free", false)):
+                                                                s["orphan"] = true
                 snake_clock += delta
                 var emit := false
                 if snake_clock >= 0.05:
@@ -1017,25 +1054,45 @@ func _snakes_tick(delta: float) -> void:
                 for s in snakes.duplicate():
                                 s["t"] += delta * 5.0
                                 var n: Sprite2D = s["node"]
-                                # an orphan stops riding the protector's weave - it owns
-                                # the x it had and just climbs on (one by one, owner)
-                                if not bool(s.get("orphan", false)):
-                                                n.position.x = ship.position.x + sin(s["t"]) * 90.0
-                                n.position.y -= 300.0 * float(s["tall"]) * delta
-                                n.rotation = cos(s["t"]) * 0.5
-                                if emit and n.position.y > 0.0:
-                                                trails.append({"pos": n.position, "vel": Vector2(0, 60), "life": 0.22,
-                                                                                "max": 0.22, "r": 9.0, "col": Color(0.35, 0.95, 0.45, 0.6)})
-                                if n.position.y < -80.0:
-                                                if bool(s.get("orphan", false)):
+                                var prev: Vector2 = n.position
+                                if bool(s.get("free", false)):
+                                                # THE FREE SNAKE (PATCH IV, the owner: defenders "do not
+                                                # know how to use the holding weapons, they shoot
+                                                # simply"): a rented Verdant flies the REAL thing - the
+                                                # aimed line, weaving around it, piercing everything it
+                                                # crosses, finishing its flight on its own.
+                                                s["age"] = float(s.get("age", 0.0)) + delta
+                                                var fdist: float = 300.0 * float(s["tall"]) * float(s["age"])
+                                                n.position = (s["w0"] as Vector2) + (s["dir"] as Vector2) * fdist \
+                                                                                + (s["dir"] as Vector2).orthogonal() * sin(s["t"]) * 46.0
+                                                n.rotation = (s["dir"] as Vector2).angle() + PI / 2.0 + cos(s["t"]) * 0.5
+                                                if emit and n.position.y > 0.0:
+                                                                trails.append({"pos": n.position, "vel": Vector2(0, 60), "life": 0.22,
+                                                                                                "max": 0.22, "r": 9.0, "col": Color(0.35, 0.95, 0.45, 0.6)})
+                                                if n.position.y < -80.0 or n.position.y > get_viewport_rect().size.y + 80.0 \
+                                                                                or n.position.x < -80.0 or n.position.x > get_viewport_rect().size.x + 80.0:
                                                                 n.queue_free()
                                                                 snakes.erase(s)
-                                                else:
-                                                                n.position.y = ship.position.y - 40.0
-                                                                n.position.x = ship.position.x
-                                                                s["last_y"] = n.position.y
-                                                                s["path_x"] = n.position.x
-                                                continue
+                                                                continue
+                                else:
+                                                # an orphan stops riding the protector's weave - it owns
+                                                # the x it had and just climbs on (one by one, owner)
+                                                if not bool(s.get("orphan", false)):
+                                                                n.position.x = ship.position.x + sin(s["t"]) * 90.0
+                                                n.position.y -= 300.0 * float(s["tall"]) * delta
+                                                n.rotation = cos(s["t"]) * 0.5
+                                                if emit and n.position.y > 0.0:
+                                                                trails.append({"pos": n.position, "vel": Vector2(0, 60), "life": 0.22,
+                                                                                                "max": 0.22, "r": 9.0, "col": Color(0.35, 0.95, 0.45, 0.6)})
+                                                if n.position.y < -80.0:
+                                                                if bool(s.get("orphan", false)):
+                                                                                n.queue_free()
+                                                                                snakes.erase(s)
+                                                                else:
+                                                                                n.position.y = ship.position.y - 40.0
+                                                                                n.position.x = ship.position.x
+                                                                                s["last"] = n.position
+                                                                continue
                                 # THE DPS LAW + THE ACCURACY LAW (PATCH III, the owner:
                                 # "the green beams do not make damage accurately, it should
                                 # make a damage on the one it collided with correctly"):
@@ -1049,8 +1106,7 @@ func _snakes_tick(delta: float) -> void:
                                                 s["tick"] = SNAKE_TICK
                                                 var dmg0: int = int(s["lvl"])
                                                 var sn: Sprite2D = s["node"]
-                                                var a2 := Vector2(float(s.get("path_x", sn.position.x)),
-                                                                float(s.get("last_y", sn.position.y)))
+                                                var a2: Vector2 = s.get("last", prev)
                                                 var b2: Vector2 = sn.position
                                                 var victims: Array = []
                                                 for e in enemies:
@@ -1059,12 +1115,16 @@ func _snakes_tick(delta: float) -> void:
                                                                 var ep: Vector2 = e["node"].position
                                                                 if _seg_dist(ep, a2, b2) < float(e["r"]) * 0.55 + 16.0:
                                                                                 victims.append(e)
+                                                var dseg: Vector2 = b2 - a2
+                                                # the FIRST body the beam crosses pays the full hit,
+                                                # each later body one less (contact order = ascending
+                                                # distance along the swept segment)
                                                 victims.sort_custom(func(a, b):
-                                                                return float(a["node"].position.y) > float(b["node"].position.y))
+                                                                return float((a["node"].position - a2).dot(dseg)) \
+                                                                                                < float((b["node"].position - a2).dot(dseg)))
                                                 for i in victims.size():
                                                                 _hit_enemy(victims[i], maxi(1, dmg0 - i))
-                                                s["last_y"] = b2.y
-                                                s["path_x"] = b2.x
+                                                s["last"] = b2
 
 ## true distance from a point to a segment - the accuracy law's ruler
 func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
@@ -1124,10 +1184,11 @@ func _fire_hornet() -> void:
                 b.texture = _tex["w_hornet"]
                 b.material = _add_mat()
                 b.position = ship.position + Vector2(0, -46)
+                b.rotation = _nose().angle() + PI / 2.0
                 world.add_child(b)
                 bolts.append({"node": b, "dmg": lvl,
-                                                "vel": Vector2(rng.randf_range(-60, 60), -760.0), "kind": "fire",
-                                                "hit": {}})
+                                                "vel": _nose() * 760.0 + Vector2(rng.randf_range(-60, 60), 0.0),
+                                                "kind": "fire", "hit": {}})
                 fire_cd = FIRE_CD
                 Jukebox.sfx("inv_shoot_hornet", -6.0)
 
@@ -1339,7 +1400,8 @@ func _bolts_tick(delta: float) -> void:
                                                                 b["hit"][id] = true
                                                                 _hit_enemy(e, b["dmg"])
                                                                 if b["kind"] == "fire":
-                                                                                _ignite(e["node"].position, weapon_level_of("fire"), 2)
+                                                                                _ignite(e["node"].position,
+                                                                                                                int(b.get("fire_lvl", weapon_level_of("fire"))), 2)
                                                                 # every bolt dies on its first victim (swarm weapons refire fast)
                                                                 ate = true
                                                                 break
@@ -1348,7 +1410,7 @@ func _bolts_tick(delta: float) -> void:
                                                                 b["hit"]["boss"] = true
                                                                 _hit_boss(b["dmg"], n.position)
                                                                 if b["kind"] == "fire":
-                                                                                _boss_burn(weapon_level_of("fire"))
+                                                                                _boss_burn(int(b.get("fire_lvl", weapon_level_of("fire"))))
                                                                 ate = true
                                 if ate:
                                                 _fx_spark(n.position, 4, Color(1.0, 0.9, 0.7), 160.0)
@@ -1458,7 +1520,9 @@ func _next_wave() -> void:
                 if over:
                                 return
                 wave += 1
-                # loot no longer rides the wave counter - the wrecks pay (PATCH III)
+                # THE AIRDROP LAW: the loot clocks count WAVES (coin 2-10, power 1-2)
+                waves_since_coin += 1
+                waves_since_power += 1
                 if wave >= 10:
                                 _start_boss_wave()
                                 return
@@ -1487,9 +1551,17 @@ func _wave_title(big: String, small := "") -> void:
 ## the block's first line sits on grid row 1 (grid row 0 stays empty).
 func _pattern_slots(pattern: String, count: int) -> Array:
                 var slots: Array = []
-                var cols := mini(11, maxi(4, int(ceilf(count / 2.2))))
-                var cp := 78.0                          # the column pitch (fixed)
-                var rp := maxf(58.0, _grid_row_h() * 2.1)   # the row pitch (fixed)
+                var vp := get_viewport_rect().size
+                # THE SLOT LAW (PATCH IV, the owner: waves "are glitchy here and
+                # overlaps on each other" - make them structured like chicken
+                # invaders): the column pitch is WIDER than a body plus its FULL
+                # weave (96px columns vs the weave capped at ~30px) - neighbors
+                # can never kiss, whatever the pattern. The grid never reaches
+                # past the playable sky.
+                var cp := 96.0
+                var rp := maxf(64.0, _grid_row_h() * 2.1)
+                var cols_max := clampi(int((vp.x - 220.0) / cp), 4, 16)
+                var cols := mini(cols_max, maxi(4, int(ceilf(count / 2.2))))
                 match pattern:
                                 "line":
                                                 var rows := mini(4, int(ceilf(count / float(cols))))
@@ -1516,16 +1588,27 @@ func _pattern_slots(pattern: String, count: int) -> Array:
                                                                 for r in int(ceilf(float(count) / 3.0)):
                                                                                 slots.append(Vector2((float(c) - 1.0) * 200.0, float(r) * rp))
                                 "ring":
+                                                # two concentric rings keep the arc spacing honest
+                                                # (a single dense ring made neighbors kiss)
+                                                var half := maxi(1, int(ceilf(count / 2.0)))
                                                 for i in count:
-                                                                var a := TAU * float(i) / float(count)
-                                                                slots.append(Vector2(cos(a) * 400.0, rp * 1.5 + sin(a) * rp * 1.3))
+                                                                var rr := 400.0 if i % 2 == 0 else 292.0
+                                                                var a := TAU * float(i / 2) / float(half)
+                                                                slots.append(Vector2(cos(a) * rr, rp * 1.5 + sin(a) * rr * 0.8))
+                                "wings":
+                                                # two mirrored wedges hugging the sides, row under row
+                                                for i in count:
+                                                                var k := i / 2
+                                                                var side := 1.0 if i % 2 == 1 else -1.0
+                                                                slots.append(Vector2(side * (130.0 + float(k) * cp),
+                                                                                                                                float(k) * rp * 0.85))
                                 _:
                                                 # lattice
                                                 var lrows := mini(4, int(ceilf(count / float(cols))))
                                                 for r in lrows:
                                                                 for c in cols:
                                                                                 slots.append(Vector2((float(c) - float(cols - 1) / 2.0) * cp,
-                                                                                                                float(r) * rp + (22.0 if c % 2 == 1 else 0.0)))
+                                                                                                                                float(r) * rp + (22.0 if c % 2 == 1 else 0.0)))
                 while slots.size() > count:
                                 slots.pop_back()
                 while slots.size() < count:
@@ -1534,7 +1617,7 @@ func _pattern_slots(pattern: String, count: int) -> Array:
                                                                 float(r2) * rp))
                 # every slot stays reachable on THIS screen (a slot outside the
                 # sky would hover forever, unwinnable)
-                var hw := get_viewport_rect().size.x * 0.5 - 90.0
+                var hw := vp.x * 0.5 - 110.0
                 for s in slots:
                                 s.x = clampf(s.x, -hw, hw)
                 return slots
@@ -1551,10 +1634,23 @@ func _spawn_wave() -> void:
                 form_v = Vector2(rng.randf_range(40.0, 80.0) * (1.0 if rng.randf() > 0.5 else -1.0), 0.0)
                 form_t = 0.0
                 var slots := _pattern_slots(pattern, count)
+                # THE MARGIN LAW: the drift bounce keeps every slot ON-SCREEN -
+                # the margin is the formation's own half-width + a wall (wide
+                # grids sway gently in place, narrow ones sweep the sky)
+                var max_sx := 0.0
+                for s in slots:
+                                max_sx = maxf(max_sx, absf((s as Vector2).x))
+                form_margin = clampf(max_sx + 90.0, 200.0, get_viewport_rect().size.x * 0.5 - 120.0)
                 var hp_mul := 1.0 + STAGE_HP_GROWTH * float(stage)
                 # THE PROGRESSION LAW (PATCH III): wave w draws from the pool's
                 # first min(w, size) kinds - new types march in as waves climb
                 var avail: int = mini(wave, pool.size())
+                # THE FLY-IN (PATCH IV, chicken-invaders structure): the wave
+                # enters from ONE side (alternating per wave) as a staggered
+                # train - every body sweeps a curved arc into its slot. No more
+                # teleport-clumps from the top.
+                var vp := get_viewport_rect().size
+                var side := -1.0 if (stage + wave) % 2 == 0 else 1.0
                 for i in count:
                                 var kind: String = pool[0] if i % 3 == 0 else pool[rng.randi_range(0, avail - 1)]
                                 if rng.randf() < 0.22:
@@ -1563,22 +1659,25 @@ func _spawn_wave() -> void:
                                 var n := Sprite2D.new()
                                 n.texture = _tx(d["tex"])
                                 n.scale = Vector2.ONE * ENEMY_SCALE      # the fixed scale
-                                var from := Vector2(rng.randf_range(60, get_viewport_rect().size.x - 60), -70.0 - rng.randf_range(0, 180))
+                                var from := Vector2(-120.0 if side < 0.0 else vp.x + 120.0,
+                                                                rng.randf_range(120.0, 340.0) + float(i) * 4.0)
                                 n.position = from
                                 world.add_child(n)
+                                var want: Vector2 = form_origin + (slots[i] as Vector2)
                                 enemies.append({"kind": kind, "node": n, "hp": int(ceilf(float(d["hp"]) * hp_mul)),
                                                                 "hp_base": int(d["hp"]), "r": float(d["r"]) * ENEMY_SCALE,
                                                                 "score": int(d["score"]),
                                                                 "shield": int(d.get("shield", 0)),
                                                                 "slot": slots[i], "state": "in", "t": rng.randf() * TAU,
+                                                                "in_d": 0.055 * float(i), "u": 0.0, "p0": from,
+                                                                "ctl": Vector2((from.x + want.x) * 0.5,
+                                                                                                minf(from.y, want.y) - 240.0),
                                                                 "fire_cd": rng.randf_range(float(d["fire_cd"][0]) if d.has("fire_cd") else 9.0,
                                                                                                 float(d["fire_cd"][1]) if d.has("fire_cd") else 12.0),
                                                                 "dive_cd": rng.randf_range(DIVE_CD[0], DIVE_CD[1]) if d.has("dives") else -1.0,
                                                                 "data": d})
                                 if int(d.get("shield", 0)) > 0:
                                                 n.modulate = Color(0.75, 0.95, 1.15, 1.0)   # shielded reads cyan
-                                var tw := n.create_tween()
-                                tw.tween_interval(0.05 * float(i))
                 Jukebox.sfx("inv_wave", -5.0)
 
 func _form_tick(delta: float) -> void:
@@ -1589,10 +1688,9 @@ func _form_tick(delta: float) -> void:
                 var target_y := _grid_row_y(1.0) + 8.0 * sin(form_t * 0.5)
                 form_origin.x += form_v.x * delta
                 form_origin.y = lerpf(form_origin.y, target_y, minf(1.0, delta * 1.4))
-                var margin := mini(200.0, vp.x * 0.22)
-                if form_origin.x < margin:
+                if form_origin.x < form_margin:
                                 form_v.x = absf(form_v.x)
-                elif form_origin.x > vp.x - margin:
+                elif form_origin.x > vp.x - form_margin:
                                 form_v.x = -absf(form_v.x)
 
 func _enemies_tick(delta: float) -> void:
@@ -1606,21 +1704,37 @@ func _enemies_tick(delta: float) -> void:
                                 e["t"] += delta
                                 match String(e["state"]):
                                                 "in":
-                                                                # steer into the slot - drift, not snap (the owner's "feel real")
-                                                                var want: Vector2 = form_origin + e["slot"]
-                                                                var to := want - n.position
-                                                                n.position += to.limit_length(560.0) * delta * 2.4
-                                                                n.rotation = clampf(to.x * 0.001, -0.4, 0.4)
-                                                                if to.length() < 26.0:
-                                                                                e["state"] = "hover"
-                                                                                if phase == "wave_in":
-                                                                                                phase = "fight"
+                                                                # THE FLY-IN (PATCH IV, chicken-invaders structure): a staggered
+                                                                # train - each body sweeps a CURVED ARC from the entry side into
+                                                                # its slot, beat by beat. No more teleport-clumps.
+                                                                if float(e.get("in_d", 0.0)) > 0.0:
+                                                                                e["in_d"] = float(e["in_d"]) - delta
+                                                                else:
+                                                                                e["u"] = minf(float(e.get("u", 0.0)) + delta * 0.9, 1.0)
+                                                                                var want: Vector2 = form_origin + (e["slot"] as Vector2)
+                                                                                var u: float = float(e["u"])
+                                                                                var q0: Vector2 = (e["p0"] as Vector2).lerp(e["ctl"], u)
+                                                                                var q1: Vector2 = (e["ctl"] as Vector2).lerp(want, u)
+                                                                                var prev2: Vector2 = n.position
+                                                                                n.position = q0.lerp(q1, u)
+                                                                                var trav: Vector2 = n.position - prev2
+                                                                                if trav.length_squared() > 1.0:
+                                                                                                n.rotation = clampf(trav.angle() + PI / 2.0, -0.6, 0.6)
+                                                                                if u >= 1.0:
+                                                                                                e["state"] = "hover"
+                                                                                                if phase == "wave_in":
+                                                                                                                phase = "fight"
                                                 "hover":
+                                                                # THE SLOT LAW (PATCH IV): everyone weaves INSIDE its own cell -
+                                                                # the x amplitude is capped under half the column pitch and the
+                                                                # bob ripples row by row (neighbors can never overlap again), and
+                                                                # the walls always hold the body on-screen
                                                                 var weave: float = float(d.get("weave", 0.0))
-                                                                var off := Vector2(0.0, sin(e["t"] * 1.6) * 14.0)
+                                                                var off := Vector2(0.0, sin(e["t"] * 1.6 + float((e["slot"] as Vector2).y) * 0.02) * 13.0)
                                                                 if weave > 0.0:
-                                                                                off.x = sin(e["t"] * (1.1 + weave)) * (24.0 + 26.0 * weave)
+                                                                                off.x = sin(e["t"] * (1.1 + weave)) * (10.0 + 9.0 * weave)
                                                                 n.position = form_origin + e["slot"] + off
+                                                                n.position.x = clampf(n.position.x, 70.0, vp.x - 70.0)
                                                                 n.rotation = sin(e["t"] * 2.0) * 0.06
                                                                 # the breach pressure: divers detach and dive the protector
                                                                 if float(e["dive_cd"]) > 0.0:
@@ -1629,7 +1743,7 @@ func _enemies_tick(delta: float) -> void:
                                                                                                 e["state"] = "dive"
                                                                                                 e["dive_v"] = Vector2(0.0, 240.0)
                                                                                                 Jukebox.sfx("inv_bomb_drop", -14.0, 1.4)
-                                                "dive":
+
                                                                 # steer at the ship, accelerate down - they must be intercepted
                                                                 var dv: Vector2 = e.get("dive_v", Vector2(0, 240))
                                                                 var steer := (ship.position - n.position)
@@ -1689,12 +1803,13 @@ func _enemy_fire(e: Dictionary) -> void:
                                                                 _ebolt(from, Vector2.from_angle(ang3) * 340.0)
                 Jukebox.sfx("inv_hit", -12.0, 0.7)
 
-func _ebolt(from: Vector2, vel: Vector2) -> void:
+func _ebolt(from: Vector2, vel: Vector2, scl := 1.0) -> void:
                 var b := Sprite2D.new()
                 b.texture = _tex["ebolt"]
                 b.material = _add_mat()
                 b.position = from
                 b.rotation = vel.angle() + PI / 2.0
+                b.scale = Vector2.ONE * scl
                 world.add_child(b)
                 ebolts.append({"node": b, "vel": vel})
 
@@ -1759,9 +1874,6 @@ func _kill_enemy(e: Dictionary, scored: bool) -> void:
                                 achievement_count("kills", 1)
                                 _score_gain(int(e["score"]))
                                 _fx_popup(at + Vector2(0, -46), "+%d" % int(e["score"]), Color(1, 0.92, 0.55), 30)
-                                # THE WRECK LAW (PATCH III): the loot rolls HERE, at the
-                                # wreck - the dash economy, not wave airdrops
-                                _roll_drop(at, e)
                                 if bool(d.get("splits", false)):
                                                 for k in 2:
                                                                 var dd: Dictionary = ETYPES["grunt"]
@@ -1806,8 +1918,19 @@ func _wave_end() -> void:
                                 defender_waves_left -= 1
                                 if defender_waves_left <= 0:
                                                 _defender_depart()
-                # NO wave airdrops here anymore (PATCH III): everything drops from
-                # the wrecks, exactly the Space Dash economy. The gap is just a gap.
+                # THE AIRDROP LAW (PATCH IV): the wave-anchored rolls live HERE,
+                # at the wave end - the owner's own rhythms (coin 2-10 waves,
+                # power 1-2, weapon icons 5%). The gap breathes, the sky pays.
+                var vp := get_viewport_rect().size
+                if waves_since_coin >= coin_target:
+                                waves_since_coin = 0
+                                coin_target = rng.randi_range(COIN_WAVES_MIN, COIN_WAVES_MAX)
+                                _spawn_loot("coin", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                if waves_since_power >= power_target:
+                                waves_since_power = 0
+                                power_target = rng.randi_range(POWER_WAVES_MIN, POWER_WAVES_MAX)
+                                _spawn_loot("power", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
+                _roll_weapon_drop()
                 var tw := create_tween()
                 tw.tween_interval(0.9)
                 tw.tween_callback(func():
@@ -1819,10 +1942,12 @@ func _wave_end() -> void:
                                                 return
                                 _next_wave())
 
-## THE DASH SIZES (PATCH III, the owner: "WHY THE FUCK THE GOGACOIN IS THAT
-## BIG... and weapon items are weirdly small"): the coin renders at the dash
-## 74px (the ui coin is 192 - the old code stamped it RAW), the items ride
-## the dash 2.0-2.2x stamps so an item reads as an ITEM.
+## THE DASH SIZES (the owner: "WHY THE FUCK THE GOGACOIN IS THAT BIG... and
+## weapon items are weirdly small"): the coin renders at the dash 74px (the
+## ui coin is 192 - the old code stamped it RAW), the items ride the dash
+## 2.0-2.4x stamps so an item reads as an ITEM. The power point wears Space
+## Dash's own PILL now (PATCH IV, the owner: "update the power point to use
+## same pill design as the space dash game too") at the dash 2.4x stamp.
 func _spawn_loot(kind: String, at: Vector2) -> void:
                 var n := Sprite2D.new()
                 match kind:
@@ -1831,7 +1956,7 @@ func _spawn_loot(kind: String, at: Vector2) -> void:
                                                 n.scale = Vector2.ONE * (74.0 / 192.0)
                                 "power":
                                                 n.texture = _tex["item_power"]
-                                                n.scale = Vector2.ONE * 2.0
+                                                n.scale = Vector2.ONE * 2.4
                                 "heart":
                                                 n.texture = _tex["heart"]
                                                 n.scale = Vector2.ONE * 0.55
@@ -1872,9 +1997,6 @@ func _collect(kind: String) -> void:
                                                 add_run_coins(1)
                                                 Jukebox.sfx("inv_coin", -6.0)
                                                 _fx_popup(ship.position + Vector2(0, -60), "+1", Arc.COIN, 28)
-                                                # the dash law: the kill counter runs from the last coin COLLECTED
-                                                kills_since_coin = 0
-                                                coin_target = rng.randi_range(COIN_KILLS_MIN, COIN_KILLS_MAX)
                                 "power":
                                                 _apply_power(weapon, 1)
                                 "heart":
@@ -1898,30 +2020,16 @@ func _collect(kind: String) -> void:
                                                 pass
                 _refresh_hud2()
 
-## THE WRECK ROLL (PATCH III - the dash _roll_drop, invaders taste): every
-## scored kill rolls. A weapon icon only spawns if the CURRENT ship is the
-## one the weapon needs; thunder/bomb only once bought (the dash pattern);
-## big bodies (tanks/brutes/voids) pay the extra power chance.
-func _roll_drop(at: Vector2, e: Dictionary) -> void:
-                kills_since_coin += 1
-                if kills_since_coin >= coin_target:
-                                kills_since_coin = 0
-                                coin_target = rng.randi_range(COIN_KILLS_MIN, COIN_KILLS_MAX)
-                                _spawn_loot("coin", at)
-                                return
-                if rng.randf() < POWER_CHANCE:
-                                _spawn_loot("power", at)
-                                return
-                if rng.randf() < OWN_ICON_CHANCE:
-                                _spawn_loot("wswitch", at)
-                                return
+## THE WEAPON ROLL (the owner's law, verbatim from the GDD): "weapon icons 5%
+## rolls (own icon always allowed, thunder/bomb only if bought)" - rolled at
+## every wave end, from the top, like every airdrop of this war.
+func _roll_weapon_drop() -> void:
+                var vp := get_viewport_rect().size
+                if rng.randf() < WEAPON_ROLL:
+                                _spawn_loot("wswitch", Vector2(rng.randf_range(160, vp.x - 160), -60.0))
                 for wid in SHOP_WEAPONS:
-                                if Box.item_owned(game_id, "weapons", wid) and rng.randf() < SHOP_WEAPON_CHANCE:
-                                                _spawn_loot(wid, at)
-                                                return
-                var d: Dictionary = e.get("data", {})
-                if bool(d.get("big", false)) and rng.randf() < BIG_POWER_CHANCE:
-                                _spawn_loot("power", at)
+                                if Box.item_owned(game_id, "weapons", wid) and rng.randf() < WEAPON_ROLL:
+                                                _spawn_loot(wid, Vector2(rng.randf_range(160, vp.x - 160), -60.0))
 
 # ================================================================ bosses
 
@@ -1948,7 +2056,8 @@ func _spawn_boss(bid: String, final: bool, hp_mul := 1.0) -> void:
                 boss = {"id": bid, "node": n, "def": d, "hp": int(ceilf(float(d["hp"]) * hp_mul)),
                                                 "hp_max": int(ceilf(float(d["hp"]) * hp_mul)), "r": float(d["r"]),
                                                 "t": 0.0, "move_t": 2.2, "move_i": 0, "final": final,
-                                                "state": "enter", "angle": 0.0, "phase2": false}
+                                                "state": "enter", "angle": 0.0, "phase2": false,
+                                                "atk_t": 1.4, "act": {}, "tel": false}
                 var line: String
                 if gauntlet_i >= 0:
                                 line = _line_pick("gauntlet")
@@ -1973,6 +2082,14 @@ func _boss_tick(delta: float) -> void:
                 var vp := get_viewport_rect().size
                 b["t"] = float(b["t"]) + delta
                 if String(b["state"]) == "enter":
+                                # THE AWAKENING (PATCH IV, the owner: "i reached the second
+                                # boss and the first two literally do nothing, i just shoot
+                                # them"): the state was parked on "enter" FOREVER - no hover,
+                                # no moves, no attacks, a punching bag at y=220. The glide-in
+                                # is 1.2s; then the keeper WAKES UP.
+                                if float(b["t"]) >= 1.25:
+                                                b["state"] = "hover"
+                                                b["atk_t"] = 1.1
                                 return
                 if String(b["state"]) == "flee":
                                 n.position.y -= 900.0 * delta
@@ -1982,9 +2099,20 @@ func _boss_tick(delta: float) -> void:
                                 return
                 if String(b["state"]) == "dead":
                                 return
-                # the hover: slow sine drift (never static, the owner's feel-real law)
-                n.position.x = vp.x * 0.5 + sin(float(b["t"]) * 0.55) * (vp.x * 0.24)
-                n.position.y = 220.0 + sin(float(b["t"]) * 0.9) * 26.0
+                # THE ACT: a cinematic special (the side roll, the dust dash, the
+                # spiral) owns the body while it runs - the hover waits its turn.
+                # (PATCH IV: the old tweens were stomped by the hover every frame
+                # and never showed.)
+                if b.has("act") and not (b["act"] as Dictionary).is_empty():
+                                _boss_act(delta)
+                                _boss_extras(delta)
+                                return
+                # the hover: slow sine drift, LERPED - a special can hand the body
+                # back anywhere and the drift glides it home (never a snap)
+                var hx := vp.x * 0.5 + sin(float(b["t"]) * 0.55) * (vp.x * 0.24)
+                var hy := 220.0 + sin(float(b["t"]) * 0.9) * 26.0
+                n.position.x = lerpf(n.position.x, hx, minf(1.0, delta * 2.2))
+                n.position.y = lerpf(n.position.y, hy, minf(1.0, delta * 2.2))
                 n.rotation = sin(float(b["t"]) * 0.8) * 0.05
                 # THE INVADER phase 2: rage under 40% (faster, meaner) - the radio
                 # pops ABOVE the beast, it does not stop the war
@@ -1995,6 +2123,28 @@ func _boss_tick(delta: float) -> void:
                                 _bubble_say("THE INVADER is done watching. Everything it has - NOW.",
                                                                 _boss_anchor, 3.0)
                                 shake = 16.0
+                # THE WAR CLOCK (PATCH IV): between its named specials the keeper
+                # still FIGHTS - aimed bolts on its own clock (rage = faster).
+                b["atk_t"] = float(b.get("atk_t", 1.4)) - delta * (1.35 if bool(b["phase2"]) else 1.0)
+                if float(b["atk_t"]) <= 0.0:
+                                b["atk_t"] = rng.randf_range(1.15, 1.75)
+                                var spd := 480.0 + 22.0 * float(stage)
+                                var aim: Vector2 = (ship.position - n.position).normalized()
+                                _ebolt(n.position, aim * spd, 1.2)
+                                if stage >= 3:
+                                                _ebolt(n.position, aim.rotated(0.16) * spd, 1.2)
+                                                _ebolt(n.position, aim.rotated(-0.16) * spd, 1.2)
+                                Jukebox.sfx("inv_hit", -13.0, 0.85)
+                # THE TELEGRAPH (PATCH IV): half a second before a special the
+                # keeper flares - read it, dodge it
+                if not bool(b.get("tel", false)) and float(b["move_t"]) <= 0.5 \
+                                                and float(b["move_t"]) > 0.0:
+                                b["tel"] = true
+                                _fx_ring(n.position, float(b["r"]) * 1.15, Color(1.0, 0.85, 0.4), 0.35)
+                                var tw3 := n.create_tween()
+                                tw3.tween_property(n, "modulate", Color(1.55, 1.45, 1.25), 0.12)
+                                tw3.tween_property(n, "modulate", Color(1, 1, 1), 0.3)
+                                Jukebox.sfx("inv_wswitch", -14.0, 0.7)
                 # the move clock
                 if float(b["move_t"]) > 0.0:
                                 b["move_t"] = float(b["move_t"]) - delta * (1.55 if bool(b["phase2"]) else 1.0)
@@ -2003,8 +2153,67 @@ func _boss_tick(delta: float) -> void:
                                                 var mv: String = moves[int(b["move_i"]) % moves.size()]
                                                 b["move_i"] = int(b["move_i"]) + 1
                                                 b["move_t"] = rng.randf_range(2.6, 3.8)
+                                                b["tel"] = false
                                                 _boss_move(mv)
                 _boss_extras(delta)
+                # THE BODY IS REAL (PATCH IV): a charging keeper mows the protector
+                if n.position.distance_to(ship.position) < float(b["r"]) * 0.55 + 42.0:
+                                _wreck()
+
+## THE ACT SYSTEM (PATCH IV): movement specials are SCRIPTED ACTS the tick
+## obeys - the old code launched tweens the hover stomped every frame, so
+## the side roll and the dust dash never showed. An act owns the body until
+## its final beat, then hands it back to the drift.
+func _boss_act(delta: float) -> void:
+                var b := boss
+                var n: Sprite2D = b["node"]
+                var vp := get_viewport_rect().size
+                var act: Dictionary = b["act"]
+                act["t"] = float(act["t"]) + delta
+                var t: float = float(act["t"])
+                match String(act["name"]):
+                                "roll":
+                                                # THE TILTED MONARCH: one full side-roll sweep across the
+                                                # frame and back, shaking bolts loose the whole way
+                                                var x0: float = float(act["x0"])
+                                                if t < 0.8:
+                                                                n.position.x = lerpf(x0, vp.x - 260.0, minf(1.0, t / 0.8))
+                                                elif t < 1.6:
+                                                                n.position.x = lerpf(vp.x - 260.0, 260.0, minf(1.0, (t - 0.8) / 0.8))
+                                                elif t < 2.4:
+                                                                n.position.x = lerpf(260.0, x0, minf(1.0, (t - 1.6) / 0.8))
+                                                n.rotation = sin(t * 9.0) * 0.16
+                                                act["drop"] = float(act.get("drop", 0.0)) - delta
+                                                if float(act["drop"]) <= 0.0 and t < 2.3:
+                                                                act["drop"] = 0.16
+                                                                _ebolt(n.position, Vector2(0, 470.0), 1.4)
+                                                if t >= 2.4:
+                                                                n.rotation = 0.0
+                                                                b["act"] = {}
+                                "dash":
+                                                # THE DUST REAVER: the charge at the protector's column
+                                                if t < 0.55:
+                                                                var k: float = t / 0.55
+                                                                n.position = (act["p0"] as Vector2).lerp(
+                                                                                                Vector2(ship.position.x, 470.0), k * k)
+                                                elif t < 0.75:
+                                                                shake = maxf(shake, 7.0)
+                                                elif t < 1.7:
+                                                                n.position.y = lerpf(470.0, 220.0, minf(1.0, (t - 0.75) / 0.95))
+                                                if t >= 1.7:
+                                                                b["act"] = {}
+                                "spiral":
+                                                # THE STORM TYRANT: two rotating arms, 1.6s of storm
+                                                act["emit"] = float(act.get("emit", 0.0)) - delta
+                                                if float(act["emit"]) <= 0.0:
+                                                                act["emit"] = 0.085
+                                                                var a: float = t * 5.2
+                                                                _ebolt(n.position, Vector2.from_angle(a) * 340.0, 1.4)
+                                                                _ebolt(n.position, Vector2.from_angle(a + PI) * 340.0, 1.4)
+                                                if t >= 1.6:
+                                                                b["act"] = {}
+                                _:
+                                                b["act"] = {}
 
 ## the named specials - every boss owns its voices (sfx + vfx)
 func _boss_move(mv: String) -> void:
@@ -2012,24 +2221,24 @@ func _boss_move(mv: String) -> void:
                 var at: Vector2 = n.position
                 var rage := 1.35 if bool(boss["phase2"]) else 1.0
                 match mv:
-                                "volley":            # triton: three aimed spear lines
-                                                for k in 3:
-                                                                _ebolt(at, (ship.position - at).normalized().rotated((float(k) - 1.0) * 0.2) * 560.0)
+                                "volley":            # triton: FIVE aimed spears, the wide volley
+                                                for k in 5:
+                                                                _ebolt(at, (ship.position - at).normalized().rotated((float(k) - 2.0) * 0.17) * 560.0, 1.7)
                                                 Jukebox.sfx("inv_shoot_ember", -6.0, 0.7)
                                 "divecall":          # triton: summons divers
                                                 for k in 3:
                                                                 _summon_diver(at + Vector2((float(k) - 1.0) * 120.0, 60.0))
                                                 Jukebox.sfx("inv_bomb_drop", -6.0, 0.9)
-                                "rolleroll":         # monarch: sweeps sideways through the frame
-                                                var tw := n.create_tween()
-                                                tw.tween_property(n, "position:x", 260.0, 0.8).set_trans(Tween.TRANS_SINE)
-                                                tw.tween_property(n, "position:x", get_viewport_rect().size.x - 260.0, 1.4) \
-                                                                                .set_trans(Tween.TRANS_SINE)
+                                "rolleroll":         # monarch: the REAL side roll - a scripted act
+                                                boss["act"] = {"name": "roll", "t": 0.0, "x0": n.position.x, "drop": 0.35}
                                                 Jukebox.sfx("inv_boss_out", -12.0, 0.7)
-                                "ringtilt":          # monarch: a tilted ring of bolts
-                                                for k in 10:
-                                                                var a := TAU * float(k) / 10.0 + 0.3
-                                                                _ebolt(at, Vector2.from_angle(a) * 380.0)
+                                "ringtilt":          # monarch: TWO tilted rings, the second spun
+                                                for k in 12:
+                                                                var a := TAU * float(k) / 12.0 + 0.3
+                                                                _ebolt(at, Vector2.from_angle(a) * 380.0, 1.5)
+                                                for k in 12:
+                                                                var a2 := TAU * float(k) / 12.0 + 0.3 + 0.26
+                                                                _ebolt(at, Vector2.from_angle(a2) * 300.0, 1.5)
                                                 Jukebox.sfx("inv_hit", -6.0, 0.8)
                                 "shardring":         # duke: orbiting shards (they BLOCK shots - the seam law)
                                                 boss_shards.clear()
@@ -2042,7 +2251,7 @@ func _boss_move(mv: String) -> void:
                                                                 var x: float = 120.0 + float(k) * (get_viewport_rect().size.x - 240.0) / 11.0
                                                                 if absf(x - ship.position.x) < 170.0:
                                                                                 continue                     # the fair gap above the protector
-                                                                _ebolt(Vector2(x, -40.0), Vector2(0, 460.0))
+                                                                _ebolt(Vector2(x, -40.0), Vector2(0, 460.0), 1.4)
                                                 Jukebox.sfx("inv_thunder", -10.0, 1.3)
                                 "redspot":           # storm: one slow fat orb that floats at the ship
                                                 var o := Sprite2D.new()
@@ -2054,22 +2263,17 @@ func _boss_move(mv: String) -> void:
                                                 ebolts.append({"node": o, "vel": (ship.position - at).normalized() * 240.0,
                                                                                 "big": true})
                                                 Jukebox.sfx("inv_bomb_drop", -4.0, 0.6)
-                                "spiral":            # storm: rotating bolt spiral
-                                                for k in 14:
-                                                                var a2 := TAU * float(k) / 14.0 + float(boss["t"])
-                                                                _ebolt(at, Vector2.from_angle(a2) * 330.0)
+                                "spiral":            # storm: the REAL rotating storm - a scripted act
+                                                boss["act"] = {"name": "spiral", "t": 0.0, "emit": 0.0}
                                                 Jukebox.sfx("inv_hit", -6.0, 0.55)
-                                "dustdash":          # reaver: charges the ship's column
-                                                var tw2 := n.create_tween()
-                                                tw2.tween_property(n, "position", Vector2(ship.position.x, 430.0), 0.55) \
-                                                                                .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-                                                tw2.tween_property(n, "position:y", 220.0, 0.9).set_trans(Tween.TRANS_SINE)
+                                "dustdash":          # reaver: the REAL charge - a scripted act
+                                                boss["act"] = {"name": "dash", "t": 0.0, "p0": n.position}
                                                 Jukebox.sfx("inv_boss_in", -8.0, 1.3)
                                                 shake = maxf(shake, 10.0)
                                 "sandspread":        # reaver: a 5-fan
                                                 for k in 5:
                                                                 var a3 := PI / 2.0 + (float(k) - 2.0) * 0.24
-                                                                _ebolt(at, Vector2.from_angle(a3) * 480.0)
+                                                                _ebolt(at, Vector2.from_angle(a3) * 480.0, 1.5)
                                                 Jukebox.sfx("inv_shoot_phantom", -6.0, 0.6)
                                 "mimicbeam":         # mimic: a beam that wears OUR blue before it hurts
                                                 _boss_beam(at, Color(0.45, 0.75, 1.0), 0.9, 1.1)
@@ -2081,7 +2285,7 @@ func _boss_move(mv: String) -> void:
                                                                 var x2: float = 90.0 + float(k) * (get_viewport_rect().size.x - 180.0) / 15.0
                                                                 if absf(x2 - ship.position.x) < 210.0:
                                                                                 continue
-                                                                _ebolt(Vector2(x2, -40.0), Vector2(0, 430.0))
+                                                                _ebolt(Vector2(x2, -40.0), Vector2(0, 430.0), 1.4)
                                                 Jukebox.sfx("inv_thunder", -8.0, 1.15)
                                 "craters":           # eater: orbs that burst into rings
                                                 for k in 3:
@@ -2101,7 +2305,7 @@ func _boss_move(mv: String) -> void:
                                                 for side: Vector2 in [Vector2(60, get_viewport_rect().size.y - 120), Vector2(get_viewport_rect().size.x - 60, get_viewport_rect().size.y - 120)]:
                                                                 for k in 5:
                                                                                 var a4: float = (ship.position - (side as Vector2)).angle() + (float(k) - 2.0) * 0.16
-                                                                                _ebolt(side, Vector2.from_angle(a4) * 470.0)
+                                                                                _ebolt(side, Vector2.from_angle(a4) * 470.0, 1.5)
                                                 Jukebox.sfx("inv_shoot_hornet", -6.0, 0.8)
                                 "heatwave":          # herald: the pushback (a shove, felt then recovered)
                                                 ship.position.y = minf(ship.position.y + 90.0,
@@ -2113,7 +2317,7 @@ func _boss_move(mv: String) -> void:
                                                 var petals := 8 if not bool(boss["phase2"]) else 12
                                                 for k in petals:
                                                                 var a5 := TAU * float(k) / float(petals) + float(boss["t"]) * 1.7
-                                                                _ebolt(at, Vector2.from_angle(a5) * 360.0)
+                                                                _ebolt(at, Vector2.from_angle(a5) * 360.0, 1.5)
                                                 Jukebox.sfx("inv_hit", -4.0, 0.5)
                                 "blink":             # the invader: teleport
                                                 _fx_spark(at, 10, Color(0.7, 0.45, 1.0), 300.0)
@@ -2388,19 +2592,29 @@ func _gauntlet_wave(hp_mul: float, title: String) -> void:
                                 var pool: Array = STAGES[9]["pool"]
                                 var count := 14 + 4 * gauntlet_i
                                 var slots := _pattern_slots("lattice", count)
+                                var max_sx := 0.0
+                                for s in slots:
+                                                max_sx = maxf(max_sx, absf((s as Vector2).x))
+                                form_margin = clampf(max_sx + 90.0, 200.0, vp.x * 0.5 - 120.0)
+                                var side_g := -1.0 if (stage + wave) % 2 == 0 else 1.0
                                 for i in count:
                                                 var kind: String = pool[rng.randi_range(0, pool.size() - 1)]
                                                 var d: Dictionary = ETYPES[kind]
                                                 var n := Sprite2D.new()
                                                 n.texture = _tx(d["tex"])
                                                 n.scale = Vector2.ONE * ENEMY_SCALE
-                                                n.position = Vector2(rng.randf_range(80, vp.x - 80), -90.0 - float(i) * 50.0)
+                                                n.position = Vector2(-120.0 if side_g < 0.0 else vp.x + 120.0,
+                                                                                                rng.randf_range(120.0, 340.0) + float(i) * 4.0)
                                                 world.add_child(n)
+                                                var want_g: Vector2 = form_origin + (slots[i] as Vector2)
                                                 enemies.append({"kind": kind, "node": n,
                                                                                 "hp": int(ceilf(float(d["hp"]) * hp_mul)), "hp_base": int(d["hp"]),
                                                                                 "r": float(d["r"]) * ENEMY_SCALE, "score": int(d["score"]), "slot": slots[i],
                                                                                 "shield": int(d.get("shield", 0)),
                                                                                 "state": "in", "t": rng.randf() * TAU, "fire_cd": rng.randf_range(2.0, 4.0),
+                                                                                "in_d": 0.055 * float(i), "u": 0.0, "p0": n.position,
+                                                                                "ctl": Vector2((n.position.x + want_g.x) * 0.5,
+                                                                                                                minf(n.position.y, want_g.y) - 240.0),
                                                                                 "dive_cd": rng.randf_range(4.0, 8.0) if d.has("dives") else -1.0,
                                                                                 "data": d})
                                                 if int(d.get("shield", 0)) > 0:
@@ -2612,41 +2826,75 @@ func _defender_tick(delta: float) -> void:
                                 "r": 34.0, "grow": 430.0, "dmg": 3, "hit": {}, "live": 1.5})
                 Jukebox.sfx("inv_shoot_veteran", -12.0)
                 return
-        # THE AIM LAW (the owner: "a defender shoots with aims"): every bolt is
-        # fired AT the nearest threat - enemies AND the boss both count
+        # THE AIM LAW (the owner: "a defender shoots with aims"): every shot
+        # is fired AT the nearest threat - enemies AND the boss both count
         var target: Dictionary = _nearest_target_pos(defender.position, 1500.0)
         if target.is_empty() or not is_instance_valid(target["node"]):
                 return
         var at: Vector2 = target["node"].position
         var dir: Vector2 = (at - defender.position).normalized()
         defender.rotation = dir.angle() + PI / 2.0     # the turret leans into the shot
+        # THE DEFENDER WEAPON LAW (PATCH IV, the owner: "they do not know how
+        # to use the holding weapons, they shoot simply"): a rented crew ship
+        # wields the REAL weapon it carries - its own behavior, at level 3.
+        # No more plain bolts wearing a weapon's texture.
         match wid:
+                "orb":
+                        # azure's volley: three blue balls, the small spread
+                        defender_fire_cd = ORB_CD * 2.0
+                        for k in 3:
+                                var oa: Vector2 = dir.rotated((float(k) - 1.0) * deg_to_rad(7.0))
+                                _defender_bolt(oa, 3)
+                        Jukebox.sfx("inv_shoot_azure", -13.0)
+                "beam":
+                        # ember's batteries: two red beams, the wider spread
+                        defender_fire_cd = BEAM_CD * 2.0
+                        for k in 2:
+                                var ba: Vector2 = dir.rotated((float(k) - 0.5) * deg_to_rad(10.0))
+                                _defender_bolt(ba, 3)
+                        Jukebox.sfx("inv_shoot_ember", -12.0)
                 "mg":
-                        defender_fire_cd = 0.24
+                        # phantom's gun: rapid, small, both muzzles
+                        defender_fire_cd = 0.13
                         for sx in [-1.0, 1.0]:
-                                _defender_bolt(dir.rotated(sx * 0.06), 3)
+                                _defender_bolt(dir.rotated(sx * 0.05), 2)
                         Jukebox.sfx("inv_shoot_phantom", -14.0, 0.9)
                 "fire":
-                        defender_fire_cd = 0.7
-                        _defender_bolt(dir, 3, "fire")
+                        # hornet's lob: it SPREADS - a real ignite rides the hit
+                        defender_fire_cd = FIRE_CD
+                        _defender_bolt(dir, 3, "fire", 3)
                         Jukebox.sfx("inv_shoot_hornet", -12.0)
                 "snake":
-                        defender_fire_cd = 0.5
-                        _defender_bolt(dir, 3)
+                        # verdant's beams: the REAL weaving pierce, on its own line
+                        defender_fire_cd = 1.6
+                        for k in 2:
+                                var sb := Sprite2D.new()
+                                sb.texture = _tex["w_verdant"]
+                                sb.material = _add_mat()
+                                sb.position = defender.position + dir * 40.0 \
+                                                                + dir.orthogonal() * (26.0 if k == 0 else -26.0)
+                                world.add_child(sb)
+                                snakes.append({"node": sb, "lvl": 3, "t": rng.randf() * TAU,
+                                                                "tall": 1.75, "tick": rng.randf_range(0.0, SNAKE_TICK),
+                                                                "hit": {}, "free": true, "w0": sb.position,
+                                                                "dir": dir, "age": 0.0, "last": sb.position})
                         Jukebox.sfx("inv_shoot_azure", -13.0, 0.7)
                 _:
                         defender_fire_cd = 0.5
                         _defender_bolt(dir, 3)
                         Jukebox.sfx("inv_shoot_azure", -14.0, 0.8)
 
-func _defender_bolt(dir: Vector2, dmg: int, kind := "orb") -> void:
+func _defender_bolt(dir: Vector2, dmg: int, kind := "orb", fire_lvl := 0) -> void:
         var b := Sprite2D.new()
         b.texture = _tx(WEAPON_SPRITE[String(SHIPS[defender_id]["weapon"])])
         b.material = _add_mat()
         b.position = defender.position + dir * 40.0
         b.rotation = dir.angle() + PI / 2.0
         world.add_child(b)
-        bolts.append({"node": b, "dmg": dmg, "vel": dir * 900.0, "kind": kind, "hit": {}})
+        var shot := {"node": b, "dmg": dmg, "vel": dir * 900.0, "kind": kind, "hit": {}}
+        if fire_lvl > 0:
+                shot["fire_lvl"] = fire_lvl
+        bolts.append(shot)
 
 ## the defender's targeting sees the BOSS too (the old code ignored it and
 ## the wingman just idled through every boss fight)

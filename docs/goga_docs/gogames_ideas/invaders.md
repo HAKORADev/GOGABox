@@ -278,3 +278,73 @@ written into the game:
   `phase == "gap"` now and the breach only fires from a live fight.
 - THE THUMBNAIL: recomposed - the fixed-scale formation, THE INVADER in the
   violet, dash-sized coin, readable items, NO streak lines.
+
+---
+
+## v0.3.2 PATCH IV — the owner playtest round IV (journal)
+
+The owner's fourth list ("make this as a patch for same v032"): the
+defenders out-steer the player, the defenders shoot plain bolts while
+holding real weapons, the drops overwrote this game's design with Space
+Dash's economy, the waves are glitchy and overlap ("make them more
+structured like chicken invaders"), and the first two bosses "literally do
+nothing, i just shoot them". Everything above that moved, moved:
+
+- THE STEERING LAW: the defenders turned their whole hulls to aim while the
+  protector only had a whisper of motion bank - the owner: "the defenders
+  still steering their bodies while normal user ship can not do that". The
+  protector STEERS now: it banks hard into its motion AND leans toward the
+  nearest threat (capped, lerped), and the aimed weapons (orb/beam/mg/fire)
+  ride the steered nose - steering steers the FIRE. Thunder keeps its
+  vertical beam, bombs keep their drop.
+- THE DEFENDER WEAPON LAW: "they do not know how to use the holding
+  weapons, they shoot simply" - a rented crew ship wields the REAL weapon
+  it carries, at level 3: azure's three-ball volley, ember's aimed beam
+  pair, phantom's rapid twin muzzles, hornet's fire that really IGNITES
+  (the burn level rides the bolt), and verdant's REAL snakes - the FREE
+  snake mode: a beam on its own aimed line, weaving around it, piercing
+  everything it crosses (the swept-segment DPS law rides along), gone when
+  the sky ends. Veteran arcs + titan missiles were already real.
+- THE BOSS AWAKENING (the root of "the first two literally do nothing"):
+  the boss state was parked on "enter" FOREVER - no hover, no moves, no
+  attacks, a punching bag at y=220 (the probe masked it by setting the
+  state by hand). The glide-in is 1.25s; then the keeper WAKES. On top:
+  THE WAR CLOCK (aimed bolts between specials, faster in rage), THE
+  TELEGRAPH (the keeper flares half a second before every special), THE
+  BODY IS REAL (a charging keeper mows the protector), and the ACT SYSTEM:
+  the monarch's side roll, the reaver's dust dash and the storm's spiral
+  are scripted ACTS the tick obeys (the old tweens were stomped by the
+  hover every frame - the roll never showed). Triton's volley is a
+  five-spear fan, the monarch spins TWO tilted rings, and every boss bolt
+  rides a 1.2-1.7x stamp so a keeper's attack reads like one.
+- THE SLOT LAW (chicken-invaders structure): 96px columns - wider than a
+  body plus its FULL weave (the x weave is capped at ~30px inside its own
+  cell), the bob ripples row by row, the walls always hold a body
+  on-screen, and the block's drift bounce is the formation's own
+  half-width (no more slots sweeping half the crew off-screen). The FLY-IN:
+  each wave enters from ONE side (alternating) as a staggered train -
+  every body sweeps a curved arc into its slot (the finale gauntlet waves
+  ride the same train). + "wings" (two mirrored side wedges) joined the
+  pattern book, and the ring pattern is two concentric rings so neighbors
+  stop kissing.
+- THE AIRDROP LAW (the owner: "i did not mean to overwrite the design of
+  this game, i told you the limits of each weapon and each thing"): Space
+  Dash lent this war its SIZES and its pill, never its economy. The
+  wave-anchored rhythm is RESTORED exactly as the GDD wrote it - a
+  GOGACoin every 2-10 waves, a power point every 1-2 waves (both airdrop
+  from the top at the wave end), weapon icons 5% rolls at the wave end
+  (own icon always, bought thunder/bomb too), kills roll NOTHING (the
+  wreck economy stayed in Space Dash), death still drops 3 levels. THE
+  PILL LAW: the power point wears Space Dash's own item_power PILL at the
+  dash 2.4x stamp.
+- tests: invaders_probe grown for PATCH IV (the fly-in train, the slot
+  law, the steering law + the steered nose, the airdrop law + the pill,
+  the defender weapon law with the free snakes, the boss awakening, the
+  war clock, the five-spear volley, the roll act sweeping the frame, the
+  spiral) - ALL PASS; full battery green (flow_test + dash/slasher/xo/
+  merge/dario/snake/tower/pong/geometry); qa_v032d 6 shots (the fly-in,
+  the structured grid + steered ship, the awake triton fanning five
+  spears, the monarch mid-roll, the rented verdant flying its snakes with
+  the radio, the airdrops with the coin + the pill).
+- version 0.3.2 PATCH IV (base 30424: arm32 30425, arm64 30426), cert
+  unchanged == all previous builds.

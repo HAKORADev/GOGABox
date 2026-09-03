@@ -1,19 +1,23 @@
 extends Node
-## invaders_probe - v0.3.2 PATCH III: drives Space Invaders headless. The
+## invaders_probe - v0.3.2 PATCH IV: drives Space Invaders headless. The
 ## owner's playtest-round laws, newest first:
-##   PATCH III - THE SKIN FIRST LAW (the equipped hull IS the flown hull),
-##   THE UNFREEZE LAW (calling a defender never leaves the tree paused),
-##   THE BUBBLE QUEUE LAW (the radio's reply survives the first bubble),
-##   THE RELEASE LAW (verdant's beams finish their flight, one by one),
-##   THE ACCURACY LAW (the snake hits ONLY what its segment really crossed),
-##   THE WHITE ARC LAW (the veteran's voice is painted VFX, not a png),
-##   THE WRECK LAW (loot rolls at the wreck: coin 5-10 kills, power 16%,
-##   universal weapons once bought - the dash economy, dash item sizes),
-##   THE 22-ROW LAW (top row empty, enemy block rows 1..10, open battle sky,
-##   the protector's own row, FIXED scale - no viewport clumps),
-##   THE PROGRESSION LAW (wave w unlocks pool[0..w] - new types per wave),
-##   THE SHIELD LAW (tank/brute/void eat hits on a visible cyan pool),
-##   THE BUTTON LAW (the opening story says START, the breach says END),
+##   PATCH IV - THE STEERING LAW (the protector steers its BODY like the
+##   defenders; the aimed fire rides the steered nose),
+##   THE DEFENDER WEAPON LAW (a rented ship wields its REAL held weapon at
+##   level 3 - orb volleys, beam pairs, igniting fire, free weaving snakes),
+##   THE BOSS AWAKENING (the keeper was parked on "enter" FOREVER - it wakes
+##   after the glide), THE WAR CLOCK (keepers fire between specials),
+##   THE ACT LAW (the side roll / dust dash / spiral are scripted acts the
+##   tick obeys - tweens the hover stomped are dead),
+##   THE SLOT LAW (96px columns, capped weave - waves are structured like
+##   chicken invaders, no overlaps, no off-screen bodies, the fly-in is a
+##   staggered curved train from one side),
+##   THE AIRDROP LAW (the game's OWN loot rhythm restored: coin 2-10 waves,
+##   power 1-2 waves, weapon icons 5% at wave end; the power point wears
+##   Space Dash's PILL; kills roll NOTHING),
+##   PATCH III - THE SKIN FIRST LAW, THE UNFREEZE LAW, THE BUBBLE QUEUE LAW,
+##   THE RELEASE LAW, THE ACCURACY LAW, THE WHITE ARC LAW, THE 22-ROW LAW,
+##   THE PROGRESSION LAW, THE SHIELD LAW, THE BUTTON LAW,
 ##   + the whole v0.3.2 body: the tour, the ladder, the falloffs, the breach,
 ##   the escapes, the finale gauntlet, the defender, the themes pack.
 ##
@@ -136,6 +140,32 @@ func _run() -> void:
         await _start_run()
         _check(G.wave == 1, "wave 1 starts after the dialogues")
         _check(not G.enemies.is_empty(), "the formation flies in")
+        # ---- THE FLY-IN LAW (PATCH IV: a staggered curved train, one side) ----
+        var trains := true
+        var side0 := 0.0
+        for e in G.enemies:
+                if not e.has("p0") or not e.has("in_d") or not e.has("ctl"):
+                        trains = false
+                else:
+                        side0 = signf((e["p0"] as Vector2).x)
+        _check(trains, "THE FLY-IN LAW: every body rides a staggered curved train")
+        _check(side0 != 0.0, "the train enters from ONE side (alternating per wave)")
+        # ---- THE SLOT LAW (structured like chicken invaders) ----
+        var slots_line: Array = G._pattern_slots("line", 22)
+        var overlap_free := true
+        for a in slots_line.size():
+                for b2 in range(a + 1, slots_line.size()):
+                        var dx: float = absf((slots_line[a] as Vector2).x - (slots_line[b2] as Vector2).x)
+                        var dy: float = absf((slots_line[a] as Vector2).y - (slots_line[b2] as Vector2).y)
+                        if dx < 84.0 and dy < 48.0:
+                                overlap_free = false
+        _check(overlap_free, "THE SLOT LAW: no two slots of the book can ever overlap (96px pitch)")
+        var slots_on := true
+        for s in slots_line:
+                if absf((s as Vector2).x) > G.get_viewport_rect().size.x * 0.5 - 100.0:
+                        slots_on = false
+        _check(slots_on, "every slot stays inside the playable sky (no off-screen bodies)")
+        _check(G.PATTERNS.has("wings"), "the wings pattern joined the formation book")
 
         # ---- THE PROGRESSION LAW: wave 1 = the base body only ----
         var kinds := {}
@@ -170,6 +200,27 @@ func _run() -> void:
                         ["veteran", "arc"], ["phantom", "mg"], ["hornet", "fire"], ["titan", "missile"]]:
                 crew_ok = crew_ok and String(G.SHIPS[pair[0]]["weapon"]) == pair[1]
         _check(crew_ok, "the seven crew each own their exclusive weapon")
+
+        # ---- THE STEERING LAW (the owner: "the defenders still steering their
+        # bodies while normal user ship can not do that") ----
+        G.move_axis = 1.0
+        G.ship_v.x = 900.0
+        for i in 40:
+                G.steer_scan = 0.0
+                G._ship_tick(0.016)
+        _check(absf(G.ship.rotation) > 0.2,
+                        "THE STEERING LAW: the protector banks its BODY into the run (like the defenders)")
+        _check(absf(G.ship.rotation) <= 0.56, "the steer is capped (the sky stays honest)")
+        G.move_axis = 0.0
+        G.ship_v.x = 0.0
+        G.ship.rotation = 0.3
+        G.wpower["orb"] = 1
+        G.bolts.clear()
+        G._fire_orb()
+        _check(G.bolts.size() == 1 and absf((G.bolts[0]["vel"] as Vector2).angle() - (-PI / 2.0 + 0.3)) < 0.02,
+                        "the aimed fire rides the STEERED NOSE (steering steers the fire)")
+        G.ship.rotation = 0.0
+        G.bolts.clear()
 
         # ---- the thunder rework: the beam UP + chain falloff (floor 1) ----
         G.weapon = "thunder"
@@ -319,35 +370,46 @@ func _run() -> void:
         G._score_gain(1000)
         _check(G.hearts == h0 + 1, "+1 heart per 1000 score (owner)")
 
-        # ---- THE WRECK LAW (the dash economy, at the wreck) ----
-        _check(G.COIN_KILLS_MIN == 5 and G.COIN_KILLS_MAX == 10,
-                        "the coin rhythm: 1 per 5-10 kills (the dash law)")
-        _check(is_equal_approx(float(G.POWER_CHANCE), 0.16), "power points: 16% a kill")
-        var wreck := _mk("grunt", Vector2(640, 240))
-        G.kills_since_coin = G.coin_target - 1
+        # ---- THE AIRDROP LAW (PATCH IV: this war's OWN loot rhythm) ----
+        _check(G.COIN_WAVES_MIN == 2 and G.COIN_WAVES_MAX == 10,
+                        "the coin rhythm: one airdrop every 2-10 WAVES (owner)")
+        _check(G.POWER_WAVES_MIN == 1 and G.POWER_WAVES_MAX == 2,
+                        "the power rhythm: a point every 1-2 waves (owner)")
+        G.waves_since_coin = G.coin_target
+        G.waves_since_power = G.power_target + 1
         G.loots.clear()
-        G._kill_enemy(wreck, true)
-        _check(G.loots.size() == 1 and String(G.loots[0]["kind"]) == "coin",
-                        "the ripened kill pays its coin AT THE WRECK (no wave airdrops)")
-        _check(is_equal_approx(float(G.loots[0]["node"].scale.x), 74.0 / 192.0),
-                        "THE COIN SIZE LAW: the dash 74px - never the raw 192 again")
-        G._collect("coin")
-        _check(G.kills_since_coin == 0, "the counter runs from the last coin COLLECTED")
-        var pw := _mk("grunt", Vector2(500, 240))
-        G.kills_since_coin = 0
-        G.coin_target = 10
-        G.loots.clear()
-        G.rng.seed = 20260904
-        var dropped_power := false
-        for i in 40:
-                var w2 := _mk("grunt", Vector2(500, 240))
-                G._kill_enemy(w2, true)
+        G.phase = "gap"
+        G._wave_end()
+        var dropped := {}
         for l in G.loots:
-                if String(l["kind"]) == "power":
-                        dropped_power = true
-                        _check(is_equal_approx(float(l["node"].scale.x), 2.0),
-                                        "the power core rides the dash 2x stamp (items read as ITEMS)")
-        _check(dropped_power, "the 16% power roll pays across a real kill streak")
+                dropped[String(l["kind"])] = l
+        _check(dropped.has("coin") and dropped.has("power"),
+                        "the ripe rhythms pay BOTH airdrops at the wave end")
+        _check((dropped["coin"]["node"] as Sprite2D).position.y < 0.0
+                        and (dropped["power"]["node"] as Sprite2D).position.y < 0.0,
+                        "the airdrops enter from the TOP like every wave's payment")
+        _check(is_equal_approx(float(dropped["coin"]["node"].scale.x), 74.0 / 192.0),
+                        "THE COIN SIZE LAW: the dash 74px - never the raw 192 again")
+        _check(is_equal_approx(float(dropped["power"]["node"].scale.x), 2.4)
+                        and (dropped["power"]["node"].texture as Texture2D).get_width() == 22,
+                        "THE PILL LAW: the power point wears Space Dash's PILL at the 2.4x stamp")
+        # kills roll NOTHING - the wreck economy stays in Space Dash
+        G.loots.clear()
+        for i in 30:
+                var nk := _mk("grunt", Vector2(500, 240))
+                G._kill_enemy(nk, true)
+        _check(G.loots.is_empty(), "kills roll NOTHING - the wreck economy stayed in Space Dash")
+        # the weapon roll: 5% at wave end, thunder/bomb only once bought
+        Box.earn(100000)
+        Box.buy_item(G.game_id, "weapons", "thunder", 2500)
+        G.rng.seed = 7
+        for i in 300:
+                G._roll_weapon_drop()
+        var thunder_paid := false
+        for l in G.loots:
+                if String(l["kind"]) == "thunder":
+                        thunder_paid = true
+        _check(thunder_paid, "the 5% weapon roll pays the bought thunder across 300 waves")
         G.loots.clear()
 
         # ---- the switch law ----
@@ -373,6 +435,43 @@ func _run() -> void:
         G._bubble_tick(0.02)
         await _wait(0.4)
         _check(G._bubble_queue.is_empty(), "the reply PLAYS after the caller (never wiped)")
+
+        # ---- THE DEFENDER WEAPON LAW (PATCH IV: the REAL held weapons) ----
+        var dt := _mk("grunt", Vector2(G.defender.position.x + 180, G.defender.position.y - 160))
+        var saved_enemies: Array = G.enemies.duplicate()
+        G.enemies = [dt]                       # the tests aim at ONE honest target
+        var ddir: Vector2 = (dt["node"].position - G.defender.position).normalized()
+        G.defender_fire_cd = 0.0
+        var db0: int = G.bolts.size()
+        G._defender_tick(0.016)
+        _check(G.bolts.size() >= db0 + 2,
+                        "the rented EMBER fires a real BEAM PAIR (no more plain bolts)")
+        var beams_aimed := true
+        for i in range(db0, G.bolts.size()):
+                var sh: Dictionary = G.bolts[i]
+                beams_aimed = beams_aimed and absf((sh["vel"] as Vector2).normalized().angle()
+                                                - ddir.angle()) < 0.35 \
+                                and (sh["node"] as Sprite2D).texture == G._tex["w_ember"]
+        _check(beams_aimed, "the beam pair is AIMED at the nearest threat, wearing ember's sprite")
+        # the rented VERDANT flies the real weaving pierce - FREE snakes
+        G.defender_id = "verdant"
+        G.defender_fire_cd = 0.0
+        var sn0: int = G.snakes.size()
+        G._defender_tick(0.016)
+        _check(G.snakes.size() >= sn0 + 2, "the rented VERDANT flies the REAL snakes")
+        var free_true := true
+        for s in G.snakes:
+                free_true = free_true and bool(s.get("free", false)) \
+                                and absf(((s["dir"] as Vector2).normalized().angle() - ddir.angle())) < 0.1
+        _check(free_true, "the defender snakes are FREE beams aimed down their own line")
+        var fs_hp: int = dt["hp"]
+        for i in 90:
+                G._snakes_tick(0.016)
+        _check(int(dt["hp"]) < fs_hp, "the free snakes PIERCE for real (the DPS law rides along)")
+        if is_instance_valid(dt["node"]):
+                dt["node"].queue_free()
+        G.snakes.clear()
+        G.enemies = saved_enemies
         var dw: int = G.defender_waves_left
         G._wave_end()
         _check(G.defender_waves_left == dw - 1, "every cleared wave burns one of its ten")
@@ -413,6 +512,48 @@ func _run() -> void:
         _story_btn_ignore()
         G._story_end()
         await _wait(1.4)
+
+        # ---- THE BOSS LAWS (PATCH IV: the keepers WAKE UP) ----
+        await _boot()
+        await _start_run()
+        G.stage = 0
+        G.wave = 10
+        G._start_boss_wave()
+        G._story_end()
+        await _frames(3)
+        _check(not G.boss.is_empty() and String(G.boss["id"]) == "triton",
+                        "stage 1 wears the TRITON WARDEN")
+        _check(String(G.boss["state"]) == "enter", "the keeper glides in on enter")
+        for i in 90:
+                G._boss_tick(0.016)
+        _check(String(G.boss["state"]) == "hover",
+                        "THE AWAKENING LAW: the keeper WAKES after the glide (never a punching bag again)")
+        G.boss["atk_t"] = 0.01
+        var eb0: int = G.ebolts.size()
+        G._boss_tick(0.016)
+        _check(G.ebolts.size() > eb0, "THE WAR CLOCK: the keeper fires between its specials")
+        var eb1: int = G.ebolts.size()
+        G._boss_move("volley")
+        _check(G.ebolts.size() >= eb1 + 5, "the triton volley is a real FIVE-spear fan")
+        G._boss_move("rolleroll")
+        _check(not (G.boss["act"] as Dictionary).is_empty() and String(G.boss["act"]["name"]) == "roll",
+                        "THE ACT LAW: the side roll is a scripted ACT (the stomped tween is dead)")
+        var min_x: float = G.boss["node"].position.x
+        var max_x: float = min_x
+        for i in 165:
+                G._boss_tick(0.016)
+                min_x = minf(min_x, G.boss["node"].position.x)
+                max_x = maxf(max_x, G.boss["node"].position.x)
+        _check(max_x - min_x > G.get_viewport_rect().size.x * 0.4,
+                        "the roll SWEEPS the frame (the owner finally sees it)")
+        _check((G.boss["act"] as Dictionary).is_empty(), "the act hands the body back to the drift")
+        G._boss_move("spiral")
+        var sp0: int = G.ebolts.size()
+        for i in 60:
+                G._boss_tick(0.016)
+        _check(G.ebolts.size() > sp0 + 16, "the storm spiral pours a real rotating storm")
+
+        # ---- a fresh run: the story + boss laws ----
         G.stage = 2
         G.wave = 10
         G._start_boss_wave()
