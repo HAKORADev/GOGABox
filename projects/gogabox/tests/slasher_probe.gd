@@ -249,6 +249,59 @@ func _run() -> void:
         _check(g4.hearts == 2,
                 "a graze on the bomb's SIDE detonates it (no pass-through needed)")
 
+        # ---- THE ANCHOR-CHORD REGRESSION (v0.3.2 patch, the owner AGAIN:
+        # "i move my finger in an arch shape... then i close the arch, BOM,
+        # it's slashed, how? why?") - the v0.3.1 probe called _on_drag
+        # directly with honest segments, so it never saw the REAL bug:
+        # TouchKit emitted anchor->current chords that swept the loop's
+        # interior. This time the loop goes through the REAL kit. ----
+        var tk := TouchKit.new()
+        g4.add_child(tk)
+        tk.dragged.connect(g4._on_drag)
+        var off3 := float(shp["r"]) + 30.0
+        var ap4: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        g4.items.append(ap4)
+        var et := InputEventScreenTouch.new()
+        et.position = Vector2(400 - off3, 300 - off3)
+        et.pressed = true
+        tk.feed(et)
+        for c in [Vector2(400 + off3, 300 - off3), Vector2(400 + off3, 300 + off3),
+                        Vector2(400 - off3, 300 + off3), Vector2(400 - off3, 300 - off3)]:
+                var ed := InputEventScreenDrag.new()
+                ed.position = c
+                tk.feed(ed)
+        _check(g4.items.has(ap4),
+                "a closed loop fed through the REAL TouchKit does NOT cut the fruit inside")
+        # ...and a slow finger walking THROUGH the fruit (many tiny true
+        # segments, each under the old 14px floor) must still cut it
+        var ap5: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        g4.items.append(ap5)
+        var et2 := InputEventScreenTouch.new()
+        et2.position = Vector2(400, 300 + float(shp["r"]) + 60.0)
+        et2.pressed = true
+        tk.feed(et2)
+        var steps := 14
+        for i in range(1, steps + 1):
+                var y: float = 300.0 + float(shp["r"]) + 60.0 \
+                                - (2.0 * (float(shp["r"]) + 60.0)) * float(i) / float(steps)
+                var ed2 := InputEventScreenDrag.new()
+                ed2.position = Vector2(400, y)
+                tk.feed(ed2)
+        _check(not g4.items.has(ap5),
+                "a SLOW finger crossing the fruit in tiny steps still CUTS it")
+        # a straight fast slash through the same kit still cuts
+        var ap6: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        g4.items.append(ap6)
+        var et3 := InputEventScreenTouch.new()
+        et3.position = Vector2(400, 380)
+        et3.pressed = true
+        tk.feed(et3)
+        var ed3 := InputEventScreenDrag.new()
+        ed3.position = Vector2(400, 220)
+        tk.feed(ed3)
+        _check(not g4.items.has(ap6),
+                "a real crossing fed through the REAL TouchKit still CUTS")
+
         print("== slasher_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(1 if fails > 0 else 0)
 

@@ -440,46 +440,47 @@ def scene_lanes(spec=LANES_SPEC):
 # weaving above, the blue balls mid-flight, the boss looming in the sky,
 # the coin + the power core drifting down.
 INVADERS_SPEC = dict(
-    ship=(0.22, 0.80, 1.6),            # the protector, nose-up
-    enemies=(
-        ("en_grunt", 0.44, 0.24, 1.5, False),
-        ("en_swift", 0.62, 0.36, 1.4, False),
-        ("en_diver", 0.30, 0.40, 1.3, False),
-        ("en_brute", 0.80, 0.24, 1.5, False),
-        ("en_weaver", 0.16, 0.18, 1.3, False),
+    ship=(0.20, 0.80, 1.5),            # the protector, nose-up
+    enemies=(                          # the dash-family formation, weaving in
+        ("en_diver", 0.16, 0.16, 0.72, False),
+        ("en_swift", 0.34, 0.24, 0.80, False),
+        ("en_grunt", 0.52, 0.16, 0.85, False),
+        ("en_brute", 0.70, 0.30, 0.92, False),
+        ("en_weaver", 0.44, 0.42, 0.72, False),
     ),
     boss="boss_invader",               # the master watching from the dark
-    boss_pos=(0.86, 0.52, 1.15),
-    bolts=((0.255, 0.70), (0.27, 0.60), (0.29, 0.50), (0.31, 0.41)),
-    impact=(0.33, 0.33),
-    coin=(0.06, 0.86, 0.9),
-    power=(0.12, 0.92, 0.9),
+    boss_pos=(0.85, 0.60, 0.78),
+    bolts=((0.235, 0.66), (0.25, 0.56), (0.265, 0.47), (0.28, 0.39)),
+    impact=(0.30, 0.30),
+    coin=(0.06, 0.88, 0.9),
+    power=(0.115, 0.93, 0.9),
 )
 
 
 def scene_invaders(spec=INVADERS_SPEC):
+    # the v0.3.2 PATCH look: the ATMOSPHERE ONLY (no planet objects - the
+    # owner's law), the Space Dash hulls, the layered Invader looming.
     sc = Scene()
-    sc.backdrop((8, 12, 34), (3, 4, 14))
-    sc.glow(W * 0.70, H * 0.18, 200, (48, 40, 120), 56)
-    sc.glow(W * 0.16, H * 0.30, 150, (30, 70, 140), 46)
-    for i in range(40):
+    sc.backdrop((10, 16, 46), (4, 6, 20))
+    sc.glow(W * 0.70, H * 0.16, 210, (40, 70, 170), 60)
+    sc.glow(W * 0.14, H * 0.30, 160, (26, 52, 130), 50)
+    for i in range(52):
         sx = (i * 233) % W
-        sy = (i * 149 + 31) % int(H * 0.72)
+        sy = (i * 149 + 31) % int(H * 0.92)
         a = 110 + (i * 59) % 120
         r = 1 + (i % 3)
         sc.ellipse([sx - r, sy - r, sx + r, sy + r], fill=(215, 228, 255, a))
-    # the alien world's surface arc at the bottom (the tour's law)
-    sc.ellipse([int(-W * 0.25), int(H * 0.82), int(W * 1.25), int(H * 1.9)],
-               fill=(22, 30, 66))
-    sc.ellipse([int(-W * 0.25), int(H * 0.84), int(W * 1.25), int(H * 1.86)],
-               fill=(36, 52, 108))
-    sc.glow(W * 0.5, H * 0.86, 260, (60, 90, 190), 60)
+    # Neptune's wind streaks (the palette IS the planet data)
+    for i in range(7):
+        sy = int(H * (0.10 + 0.11 * i))
+        sx = int(W * ((i * 0.37) % 0.5))
+        sc.line([sx, sy, sx + int(W * 0.22), sy], fill=(150, 180, 235, 40), width=2)
     # the boss hanging in the sky
     boss = load_sprite("games/invaders/%s.png" % spec["boss"])
     bx, by, bs = spec["boss_pos"]
-    sc.glow(bx * W, by * H, 170, (120, 70, 220), 60)
+    sc.glow(bx * W, by * H, 180, (120, 70, 220), 64)
     sc.stamp(boss, bx * W, by * H, scale=bs)
-    # the formation (real sprites)
+    # the formation (the SAME Kenney hulls Space Dash flies)
     for rel, fx, fy, s, flip in spec["enemies"]:
         img = load_sprite("games/invaders/%s.png" % rel)
         sc.stamp(img, fx * W, fy * H, scale=s)
@@ -494,14 +495,14 @@ def scene_invaders(spec=INVADERS_SPEC):
     sc.stamp(coin, spec["coin"][0] * W, spec["coin"][1] * H, scale=spec["coin"][2])
     power = load_sprite("games/invaders/item_power.png")
     sc.stamp(power, spec["power"][0] * W, spec["power"][1] * H, scale=spec["power"][2])
-    # the protector + its dynamic blue tail (real sprite)
+    # the protector + its dynamic blue tail (the DASH hull, one universe)
     sx, sy, ss = spec["ship"]
     tail_col = (80, 150, 255)
     for k in range(5):
         sc.glow(sx * W, sy * H + 66 + k * 26, 34 - k * 5, tail_col, 110 - k * 16)
     sc.glow(sx * W, sy * H, 110, tail_col, 66)
-    ship = load_sprite("games/invaders/ship_azure.png")
-    sc.stamp(ship, sx * W, sy * H, scale=ss * 1.7)
+    ship = load_sprite("games/lanes/ship_blue.png")
+    sc.stamp(ship, sx * W, sy * H, scale=ss * 1.8)
     sc.vignette(95)
     return sc.render()
 

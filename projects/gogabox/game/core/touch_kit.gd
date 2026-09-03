@@ -19,6 +19,7 @@ var _press_pos := Vector2.ZERO
 var _press_time := 0
 var _moved := false
 var _down := false
+var _drag_prev := Vector2.ZERO
 
 func feed(event: InputEvent) -> void:
         # NOTE: only ScreenTouch/ScreenDrag. project.godot emulates touch from
@@ -29,6 +30,7 @@ func feed(event: InputEvent) -> void:
                         _down = true
                         _moved = false
                         _press_pos = t.position
+                        _drag_prev = t.position
                         _press_time = Time.get_ticks_msec()
                         press_started.emit(t.position)
                 else:
@@ -52,7 +54,19 @@ func feed(event: InputEvent) -> void:
                                         else:
                                                 dir = Vector2i(0, 1 if total.y > 0 else -1)
                                         swiped.emit(dir, d.position)
-                                dragged.emit(_press_pos, d.position)
+                                        # the FIRST segment covers the silent
+                                        # pre-threshold walk (anchor -> here)
+                                        dragged.emit(_press_pos, d.position)
+                                else:
+                                        # v0.3.2 PATCH: the TRUE polyline segment
+                                        # (prev sample -> this one). The old code
+                                        # re-emitted anchor -> current chords, so a
+                                        # closed loop drawn AROUND a fruit swept its
+                                        # interior with invisible diagonals and the
+                                        # fruit got cut without the visible slash
+                                        # ever touching it (the owner's slasher bug).
+                                        dragged.emit(_drag_prev, d.position)
+                                _drag_prev = d.position
 
 func is_down() -> bool:
         return _down

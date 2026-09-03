@@ -105,3 +105,69 @@
 - Thumb 960×640, no baked text. SFX naming prefix: `inv_*`.
 - Landscape design 1920×1080 (ScaleRule.DESIGN_LANDSCAPE); read get_viewport_rect() live.
 - Every push = ONE push at the end (owner law). Local commits per pass are fine.
+
+# v0.3.2 PATCH I — THE OWNER PLAYTEST ROUND (every snapshot complaint)
+
+The owner tested build 666a3f7 on device and posted 11 snapshots + a fix list.
+This patch answers every line of it. Work order per the owner: snapshots first,
+then the slasher fix, then the invaders.
+
+- [x] THE SLASHER FIX, FOR REAL: the bug was never the geometry - TouchKit
+      emitted anchor->current CHORDS, so a drawn loop swept its own interior.
+      touch_kit.gd now emits true polyline segments (prev sample -> current);
+      slasher's stale 14px floor dropped to 2px (slow fingers still cut).
+      The probe NOW FEEDS THE REAL TOUCHKIT (the old probe called _on_drag
+      directly and never saw the bug). Loop-around: no cut. Slow crossing: cut.
+- [x] The blue circle / planet object: GONE - backgrounds repainted as pure
+      atmosphere (gradient + mood + stars). No objects, no text on the sky.
+- [x] The Neptune FACTS popups: GONE - "real world data" lives in the sky
+      palette only; the player reads lore.
+- [x] The SHIPS button in-game: the stale APK had it; the flow is now
+      OPTIONALS-FIRST (the game opens on the crew picker), and the in-game
+      HUD carries only SHOP + DEFEND.
+- [x] Optionals follows the snake standard: image boxes (the real hull PNG),
+      name, state, price chip, green border on the ship on duty.
+- [x] The ships ARE the Space Dash ships (the Lanes PNGs, loaded live) -
+      player, crew, and the enemies (dash enemy hulls, tinted, 1.6x).
+- [x] Dialogues follow Cursed Dario: big moments = scrollable CARD sheet that
+      PAUSES the war (stage arrivals, boss meet/kill, escapes, breach, the
+      ending); quick radio = alpha white-text bubbles riding ABOVE the
+      speaker (dario's follow law, flip-below when cramped).
+- [x] Titan: one missile per 5s, contact fuse, SAME 2+level damage to EVERY
+      enemy - plus THE REAL BUG: the blast loops iterated `enemies` while
+      kills erased from it, SKIPPING everyone after the first kill (the
+      owner's "titan does not follow the description"). Every blast loop now
+      walks a COPY (missiles, bombs, thunder, arcs, burns). Dense-field
+      regression added to the probe.
+- [x] Controls: the left half is an ANALOG AXIS now (snowy-tower law: dead
+      zone + full at 110px, drift + bank), the right half fires/holds - the
+      ship no longer chases the finger around the sky.
+- [x] The defender AIMS at the nearest threat (enemies AND the boss - the old
+      code idled through boss fights), leans into the shot, and rents its OWN
+      weapon flavor (Titan rents the 5s missile, Veteran the arcs).
+- [x] Defend menu: image boxes; YOUR SHIP pinned gray; FLEW THIS RUN gray;
+      while a defender flies, EVERY hull grays with the waves-left header.
+      Rows expand to the sheet width - no more clipped wide buttons.
+- [x] SIX power levels (the space dash depth), 6 HUD pips.
+- [x] Hearts read "x 3" then the heart shape (the owner's law).
+- [x] Boss health = a small alpha % chip riding UNDER the body (z-above,
+      anchored to the sprite's real bottom) - the full-width bar is dead.
+- [x] Flow: optionals screen FIRST, then TAP ANYWHERE (no controls help -
+      it lives in the guide).
+- [x] The shop sells the crew as 2-in-1 (hull + weapon, flies NEXT run -
+      never mid-run) + weapons + the themes pack; dash-style sections.
+- [x] Bosses repainted big (340..560px layered originals); the Mimic is the
+      Azure hull's evil twin.
+- [x] PATCH II (the owner's second look at the QA shots):
+      * THE SKY = the bg_space.gdshader Space Dash literally flies, wearing
+        per-planet palettes (themes pack lerps them ~1.5s; without it, Dash's
+        own Deep Blue). The painted plates are deleted. No snowball stars,
+        no scratch lines - the hashed twinkle starfields + nebulae + the near
+        drifting star sprites, exactly the dash design.
+      * THE WAVE STRUCTURE: the formation box scales with the viewport now
+        (x 0.9-1.55x, y 0.9-1.3x) - no more clumped stacks on wide screens;
+        the drift margins scale too.
+      * THE "S nn W nn" TOUR WIDGET is back, riding the HUD next to the
+        weapon pips.
+- [x] Thumbnail recomposed from the new look. Suites: ALL GREEN (flow_test +
+      dash/slasher/xo/merge/dario/snake/tower/pong/geometry/invaders probes).

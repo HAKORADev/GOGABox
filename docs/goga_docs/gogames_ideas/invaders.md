@@ -168,3 +168,44 @@ formations (line/V/arc/circle/diamond/columns/ring/lattice) from per-stage pools
 waves complete when cleared, wave titles center-pop, bosses script their own moves.
 Finale gauntlet wired in stage 10 between waves. `finish_run(score)` on death/breach/
 end dialogue; `pause_end_run` true (bank from pause).
+
+---
+
+## v0.3.2 PATCH I + II — the owner playtest rounds (journal)
+
+The owner play-tested the first pushed build and posted 11 snapshots + a fix
+list, then a second look at the patch QA. Everything above that moved, moved:
+
+- THE SLASHER (box-wide): TouchKit `dragged` now emits TRUE polyline segments
+  (prev sample -> current; the first covers the silent pre-threshold walk).
+  The old anchor chords let a drawn loop cut fruits its visible line never
+  touched. Slasher's 14px segment floor is 2px. The probe feeds the REAL kit.
+- THE FLOW: the game OPENS on the optionals (the snake standard - image boxes
+  with the real hull, state, price chip); closing it lands on the clean
+  TAP ANYWHERE card (no controls help - it lives in the guide). In-game HUD:
+  SHOP + DEFEND only.
+- THE SHIPS ARE THE DASH SHIPS: the Lanes hull PNGs loaded live; enemies are
+  the dash enemy hulls tinted 1.6x; the Mimic is Azure's evil twin.
+- THE DIALOGUES (dario law): big moments = scrollable CARD sheet that PAUSES
+  the war (stage arrivals, boss meet/kill, escapes, breach, THE CHASE);
+  quick radio = alpha white-text bubbles riding ABOVE the speaker.
+- THE CREW LAWS: optionals picks the starter; the shop sells the crew 2-in-1
+  (hull + weapon, flies NEXT run, never mid-run); defend menu image boxes
+  with the honest grays (YOUR SHIP / FLEW THIS RUN / ON COVER + waves left).
+- THE LADDER: SIX levels (the dash depth); hearts read "x 3" + the shape;
+  the tour widget "S nn W nn" rides the HUD again.
+- THE BOSS LAW: no full-width bar - a small alpha % chip rides UNDER the
+  body (z-above, anchored to the sprite's real bottom edge).
+- THE CONTROLS: the left half is an analog AXIS (tower law: dead zone, full
+  at 110px, drift + bank); the right half fires/holds.
+- THE DEFENDER: aims at the nearest threat (boss included), leans into the
+  shot, rents its own weapon flavor (Titan = the 5s missile, Veteran = arcs).
+- THE TITAN TRUTH: one missile / 5s, contact fuse, SAME 2+level damage to
+  EVERY enemy - and the REAL bug the playtest exposed: blast loops iterated
+  the live enemies array while kills erased from it, SKIPPING every body
+  after the first kill. The copy law now governs every blast loop
+  (missiles, bombs, thunder, arcs, burns) + a dense-field probe regression.
+- THE SKY (patch II): the bg_space.gdshader Space Dash flies, wearing
+  per-planet palettes; the themes pack lerps worlds in ~1.5s; without the
+  pack, Dash's Deep Blue. The painted plates are deleted.
+- THE WAVES: the formation box scales with the viewport (no more clumps).

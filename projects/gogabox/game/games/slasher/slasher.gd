@@ -724,7 +724,12 @@ func _on_drag(from: Vector2, to: Vector2) -> void:
         if trail.size() > 26:
                 trail.pop_front()
         var seg := to - from
-        if seg.length() < 14.0:
+        # v0.3.2 PATCH: TouchKit now emits the TRUE polyline segments
+        # (prev sample -> this one, never anchor chords), so this floor is
+        # 2px - a slow finger's per-frame steps must still cut. The old
+        # 14px floor only made sense against the long anchor chords that
+        # caused the owner's loop-around bug.
+        if seg.length() < 2.0:
                 return
         # v0.3.1 PATCH III - THE SHAPE LAW: the old code cut anything in a
         # ~200px swath around the swipe (a drawn CIRCLE around a fruit

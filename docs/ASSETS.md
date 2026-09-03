@@ -165,3 +165,28 @@ JS-gated to bots), reviewed with contact sheets, and vendored:
 - All `inv_*` voices + the two music loops (`inv_tour`, `inv_finale`) are
   synthesized by `tools/v032_invaders_sfx.py` (numpy, deterministic) — no
   samples, no licenses to carry.
+
+## v0.3.2 PATCH I — the owner playtest round (provenance updates)
+
+- **THE SHIPS ARE THE DASH SHIPS, LITERALLY**: the divergent
+  `assets/games/invaders/ship_*.png` copies were DELETED; the engine now
+  loads the Space Dash hulls straight from `assets/games/lanes/`
+  (ship_blue/orange/green/veteran/phantom/horn/titan — the same Kenney CC0
+  files Space Dash flies). One universe, one fleet. The Mimic boss is the
+  Azure hull's recolored evil twin by design (lore).
+- `assets/games/invaders/en_*.png` (11 kinds) — **derived from the Space Dash
+  enemy hulls** (`enemy_grunt/grunt2/runner/shooter/splitter/tank/shielded/
+  shatter/ufo_red/ufo_green/ufo_yellow`), gentle per-kind hue tints + 1.6x
+  upscale, by `tools/v032b_patch_art.py`. The family stays obvious on purpose.
+- `assets/games/invaders/boss_*.png` (10) — **big layered originals** (340..560
+  px, nose-down, armor plates + glowing cores + per-boss signature structures)
+  repainted by `tools/v032b_patch_art.py` + `tools/v032b_boss_fix.py`.
+- **THE SKY IS SPACE DASH'S SKY, LITERALLY** (patch II): the painted bg
+  plates were DELETED. The tour wears the same `bg_space.gdshader` Space Dash
+  flies (deep base + additive nebulae + two twinkling parallax starfields +
+  the near drifting star sprites), tinted PER PLANET through the shader's four
+  palette uniforms - the real-world data lives in the PALETTE (Neptune's storm
+  blues, the Sun's burn, the Hideout's void violet). Without the Stage Themes
+  pack the tour wears Space Dash's own Deep Blue; buying the pack lerps each
+  world's palette in over ~1.5s. The owner: the sky must be "the space dash
+  BGs designs" - now it is, byte for byte.
