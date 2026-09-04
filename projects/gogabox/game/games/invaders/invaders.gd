@@ -382,8 +382,7 @@ var move_axis := 0.0                  # the tower law: the drag's analog -1..1
 var fire_idx := -1
 var firing := false
 var ship_v := Vector2.ZERO            # for the tail + bank
-var steer_scan := 0.0                 # THE STEERING LAW: cached aim scan
-var steer_lean := 0.0                 # the lean toward the nearest threat
+var dodge_side := 0.0                 # THE DODGE LAW: the committed sidestep side
 
 var hearts := START_HEARTS
 var next_heart_at := HEART_EVERY
@@ -821,24 +820,16 @@ func _ship_tick(delta: float) -> void:
                                                 home + sin(Time.get_ticks_msec() * 0.0013) * 8.0,
                                                 minf(1.0, delta * 3.0))
                 ship_v.y = 0.0
-                # THE STEERING LAW (PATCH IV, the owner: "the defenders still
-                # steering their bodies while normal user ship can not do that"):
-                # the protector STEERS its body now - it banks hard into its
-                # motion AND leans toward the nearest threat, exactly like the
-                # rented defenders lean into their aims. The bank is a POSE
-                # only - the fire leaves the nose area straight up; the body
-                # never tilts for a shot (the fire law, below).
-                steer_scan -= delta
-                if steer_scan <= 0.0:
-                                steer_scan = 0.12
-                                var near: Dictionary = _nearest_enemy_pos(ship.position, 1400.0)
-                                if not near.is_empty() and is_instance_valid(near["node"]):
-                                                var nd: Vector2 = near["node"].position - ship.position
-                                                steer_lean = clampf(nd.angle() + PI / 2.0, -0.85, 0.85) * 0.28
-                                else:
-                                                steer_lean = 0.0
-                var want_rot := clampf(ship_v.x * 0.00075 + steer_lean, -0.55, 0.55)
-                ship.rotation = lerpf(ship.rotation, want_rot, minf(1.0, delta * 10.0))
+                # THE LEVEL HULL LAW (v0.3.3-p1, the owner: "why the user and
+                # defender ships steer/tilt their bodies to face an enemy ship,
+                # I said to not be like that"): the threat lean is DEAD. No hull
+                # ever turns toward an enemy - not the protector, not a rented
+                # defender. The only pose left is the soft bank INTO ITS OWN
+                # horizontal motion (a strafe lean, it faces the direction the
+                # ship is moving, never an enemy) - and even that is capped
+                # tight. The fire always leaves the nose area straight up.
+                var want_rot := clampf(ship_v.x * 0.00042, -0.26, 0.26)
+                ship.rotation = lerpf(ship.rotation, want_rot, minf(1.0, delta * 9.0))
 
 ## THE FIRE LAW (the owner: "the fire goes out from the nose-like area
 ## without ship body tilting"): _nose() is the POINT every shot is born at
@@ -1748,19 +1739,36 @@ func _enemies_tick(delta: float) -> void:
                                                                                                 e["state"] = "dive"
                                                                                                 e["dive_v"] = Vector2(0.0, 240.0)
                                                                                                 Jukebox.sfx("inv_bomb_drop", -14.0, 1.4)
-
-                                                                # steer at the ship, accelerate down - they must be intercepted
-                                                                var dv: Vector2 = e.get("dive_v", Vector2(0, 240))
-                                                                var steer := (ship.position - n.position)
-                                                                dv.x += clampf(steer.x, -320.0, 320.0) * delta * 1.6
-                                                                dv.y += 420.0 * delta
-                                                                e["dive_v"] = dv
-                                                                n.position += dv * delta
+                                                "dive":
+                                                                # THE DIVE BRANCH (v0.3.3-p1, THE FROZEN DIVER LAW - the
+                                                                # owner: "whenever an enemy ship collides with another, it
+                                                                # weirdly gets teleported a little away and becomes frozen
+                                                                # and does nothing" + "on first boss the spawned enemies
+                                                                # are frozen"): the dive physics used to live INSIDE the
+                                                                # hover branch and the match had NO dive case at all - a
+                                                                # diver froze mid-air after one hop, the boss's summons
+                                                                # (born straight into "dive") froze at birth, and every
+                                                                # hover body carried an ever-growing one-frame offset that
+                                                                # read as teleports and wall kicks. The branch is REAL
+                                                                # now: steer at the ship, accelerate down, and the walls
+                                                                # are a DEAD END - touch one and the sideways velocity
+                                                                # dies, the body keeps falling straight down.
+                                                                var dv2: Vector2 = e.get("dive_v", Vector2(0.0, 240.0))
+                                                                var steer2 := (ship.position - n.position)
+                                                                dv2.x += clampf(steer2.x, -320.0, 320.0) * delta * 1.6
+                                                                dv2.y += 420.0 * delta
+                                                                var nx := n.position.x + dv2.x * delta
+                                                                if nx < 70.0 or nx > vp.x - 70.0:
+                                                                                dv2.x = 0.0                # the dead end - fall, do not kick
+                                                                n.position.x = clampf(nx, 70.0, vp.x - 70.0)
+                                                                n.position.y += dv2.y * delta
+                                                                e["dive_v"] = dv2
                                                                 n.rotation = sin(e["t"] * 9.0) * 0.14
                                                 _:
                                                                 pass
                                 if String(e["state"]) == "in" or String(e["state"]) == "hover":
-                                                # fired kinds shoot on their cadence (some aim, some fan, some ring)
+                                                # fired kinds shoot on their cadence (some aim, some fan,
+                                                # some ring) - divers keep falling silent, they ARE the shot
                                                 if d.has("fires") and not over:
                                                                 e["fire_cd"] = float(e["fire_cd"]) - delta
                                                                 if e["fire_cd"] <= 0.0:
@@ -2820,13 +2828,67 @@ func _defender_down() -> void:
 func _defender_tick(delta: float) -> void:
         if defender == null or not is_instance_valid(defender):
                 return
-        # the wingman law: hover beside the protector, mirror its height softly
-        var want := ship.position + Vector2(-240.0, 30.0 + sin(Time.get_ticks_msec() * 0.001) * 18.0)
-        defender.position = defender.position.lerp(want, minf(1.0, delta * 3.0))
-        defender.rotation = lerpf(defender.rotation, 0.0, minf(1.0, delta * 2.0))
-        # it fights with its OWN weapon at level 3
+        var vpx := get_viewport_rect().size.x
+        # THE WINGMAN LAW: hover beside the protector, mirror its height softly
+        var want_x := ship.position.x - 240.0
+        # THE DODGE LAW (v0.3.3-p1, the owner: "the defenders must dodge
+        # getting shotted"): every falling enemy bolt with its x inside the
+        # wingman's lane is a threat - the defender SIDESTEPS and STANDS
+        # BESIDE the lane on one committed side (dead overhead = the side
+        # with more room wins, and the side STAYS while the threat lives -
+        # a flip-flopping wingman dodges nothing). One hit still ends the
+        # shift, so the dodge is its survival.
+        var threat := false
+        var threat_x := 0.0
+        for b in ebolts:
+                if not is_instance_valid(b["node"]):
+                        continue
+                var bn: Sprite2D = b["node"]
+                var bv: Vector2 = b.get("vel", Vector2(0, 300))
+                if bv.y <= 0.0:
+                        continue
+                var dy: float = defender.position.y - bn.position.y
+                if dy < 0.0 or dy > 640.0:
+                        continue
+                var dx: float = defender.position.x - bn.position.x
+                if absf(dx) < 74.0:
+                        threat = true
+                        threat_x = bn.position.x
+                        if absf(dx) > 6.0:
+                                dodge_side = signf(dx)
+                        elif dodge_side == 0.0:
+                                dodge_side = 1.0 if defender.position.x < vpx * 0.5 else -1.0
+                        break
+        # THE STRAFE LAW (v0.3.3-p1, the owner: "their shots come out from
+        # their nose area and NOT aiming - they move the ship left-right to
+        # target an enemy ship"): the wingman does not aim its gun - it DRIVES
+        # its gun. It slides left-right until its lane lines up under the
+        # nearest threat, then fires STRAIGHT UP from its nose, exactly like
+        # the protector. Nothing angular ever leaves the body. Dodging
+        # outranks shooting - a wingman holds fire while it evades.
+        var aligned := false
+        if threat:
+                want_x = threat_x + dodge_side * 96.0
+        else:
+                dodge_side = 0.0
+                var tgt: Dictionary = _nearest_target_pos(defender.position, 1500.0)
+                if not tgt.is_empty() and is_instance_valid(tgt["node"]):
+                        var tx: float = (tgt["node"] as Sprite2D).position.x
+                        want_x = tx
+                        aligned = absf(tx - defender.position.x) < 52.0
+        # ONE exponential chase from the CURRENT position (the probe killed
+        # the two-lerp version: pos -> want -> target composed into a crawl)
+        var want_y := ship.position.y + 30.0 + sin(Time.get_ticks_msec() * 0.001) * 18.0
+        defender.position.x = lerpf(defender.position.x, want_x, minf(1.0, delta * 3.0))
+        defender.position.y = lerpf(defender.position.y, want_y, minf(1.0, delta * 3.0))
+        defender.position.x = clampf(defender.position.x, 80.0, vpx - 80.0)
+        # THE LEVEL HULL LAW: a rented hull never tilts - not for threats,
+        # not for shots. Level body, vertical fire.
+        defender.rotation = lerpf(defender.rotation, 0.0, minf(1.0, delta * 4.0))
+        # it fights with its OWN weapon at level 3 - straight up, only when
+        # its lane is on the threat (a wingman never sprays an empty sky)
         defender_fire_cd -= delta
-        if defender_fire_cd > 0.0 or phase == "ready" or over:
+        if defender_fire_cd > 0.0 or phase == "ready" or over or not aligned:
                 return
         var wid := String(SHIPS[defender_id]["weapon"])
         if wid == "missile":
@@ -2835,7 +2897,7 @@ func _defender_tick(delta: float) -> void:
                 defender_fire_cd = MISSILE_CD
                 var mb := Sprite2D.new()
                 mb.texture = _tex["w_titan"]
-                mb.position = defender.position + Vector2(0, -50).rotated(defender.rotation)
+                mb.position = defender.position + Vector2(0, -50)
                 world.add_child(mb)
                 missiles.append({"node": mb, "t": 0.0, "dmg": 4})
                 Jukebox.sfx("inv_shoot_titan", -8.0)
@@ -2846,44 +2908,32 @@ func _defender_tick(delta: float) -> void:
                                 "r": 34.0, "grow": 430.0, "dmg": 3, "hit": {}, "live": 1.5})
                 Jukebox.sfx("inv_shoot_veteran", -12.0)
                 return
-        # THE AIM LAW (the owner: "a defender shoots with aims"): every shot
-        # is fired AT the nearest threat - enemies AND the boss both count
-        var target: Dictionary = _nearest_target_pos(defender.position, 1500.0)
-        if target.is_empty() or not is_instance_valid(target["node"]):
-                return
-        var at: Vector2 = target["node"].position
-        var dir: Vector2 = (at - defender.position).normalized()
-        # THE FIRE LAW: the body never tilts for a shot - the aim steers the
-        # BOLT (it leaves the nose area and flies to the threat), not the body
-        # THE DEFENDER WEAPON LAW (PATCH IV, the owner: "they do not know how
-        # to use the holding weapons, they shoot simply"): a rented crew ship
-        # wields the REAL weapon it carries - its own behavior, at level 3.
-        # No more plain bolts wearing a weapon's texture.
+        # THE WEAPON LAW: the real held weapon, level 3 - but every voice
+        # fires VERTICAL now (spreads fan around STRAIGHT UP, never aimed)
+        var up := Vector2.UP
         match wid:
                 "orb":
                         # azure's volley: three blue balls, the small spread
                         defender_fire_cd = ORB_CD * 2.0
                         for k in 3:
-                                var oa: Vector2 = dir.rotated((float(k) - 1.0) * deg_to_rad(7.0))
-                                _defender_bolt(oa, 3)
+                                _defender_bolt(up.rotated((float(k) - 1.0) * deg_to_rad(7.0)), 3)
                         Jukebox.sfx("inv_shoot_azure", -13.0)
                 "beam":
-                        # ember's batteries: two red beams, the wider spread
+                        # ember's batteries: two red beams, the narrow pair
                         defender_fire_cd = BEAM_CD * 2.0
                         for k in 2:
-                                var ba: Vector2 = dir.rotated((float(k) - 0.5) * deg_to_rad(10.0))
-                                _defender_bolt(ba, 3)
+                                _defender_bolt(up.rotated((float(k) - 0.5) * deg_to_rad(5.0)), 3)
                         Jukebox.sfx("inv_shoot_ember", -12.0)
                 "mg":
                         # phantom's gun: rapid, small, both muzzles
                         defender_fire_cd = 0.13
                         for sx in [-1.0, 1.0]:
-                                _defender_bolt(dir.rotated(sx * 0.05), 2)
+                                _defender_bolt(up.rotated(sx * 0.03), 2)
                         Jukebox.sfx("inv_shoot_phantom", -14.0, 0.9)
                 "fire":
-                        # hornet's lob: it SPREADS - a real ignite rides the hit
+                        # hornet's lob: straight up - a real ignite rides the hit
                         defender_fire_cd = FIRE_CD
-                        _defender_bolt(dir, 3, "fire", 3)
+                        _defender_bolt(up, 3, "fire", 3)
                         Jukebox.sfx("inv_shoot_hornet", -12.0)
                 "snake":
                         # verdant's beams: the REAL weaving pierce, on its own line
@@ -2892,25 +2942,24 @@ func _defender_tick(delta: float) -> void:
                                 var sb := Sprite2D.new()
                                 sb.texture = _tex["w_verdant"]
                                 sb.material = _add_mat()
-                                sb.position = defender.position \
-                                                                + Vector2(0, -40).rotated(defender.rotation) \
-                                                                + dir.orthogonal() * (26.0 if k == 0 else -26.0)
+                                sb.position = defender.position + Vector2(0, -40) \
+                                                                + up.orthogonal() * (26.0 if k == 0 else -26.0)
                                 world.add_child(sb)
                                 snakes.append({"node": sb, "lvl": 3, "t": rng.randf() * TAU,
                                                                 "tall": 1.75, "tick": rng.randf_range(0.0, SNAKE_TICK),
                                                                 "hit": {}, "free": true, "w0": sb.position,
-                                                                "dir": dir, "age": 0.0, "last": sb.position})
+                                                                "dir": up, "age": 0.0, "last": sb.position})
                         Jukebox.sfx("inv_shoot_azure", -13.0, 0.7)
                 _:
                         defender_fire_cd = 0.5
-                        _defender_bolt(dir, 3)
+                        _defender_bolt(up, 3)
                         Jukebox.sfx("inv_shoot_azure", -14.0, 0.8)
 
 func _defender_bolt(dir: Vector2, dmg: int, kind := "orb", fire_lvl := 0) -> void:
         var b := Sprite2D.new()
         b.texture = _tx(WEAPON_SPRITE[String(SHIPS[defender_id]["weapon"])])
         b.material = _add_mat()
-        b.position = defender.position + Vector2(0, -40).rotated(defender.rotation)
+        b.position = defender.position + Vector2(0, -40)
         b.rotation = dir.angle() + PI / 2.0
         world.add_child(b)
         var shot := {"node": b, "dmg": dmg, "vel": dir * 900.0, "kind": kind, "hit": {}}

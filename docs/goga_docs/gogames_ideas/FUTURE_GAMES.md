@@ -55,6 +55,12 @@ Eighth dump - minutes after the seventh, same review round, same rule (no
 game code touched): +1, the angry-birds-like. The owner keeps testing Space
 Dash, keeps thinking, and will name the next game when ready.
 
+Ninth dump - the v0.3.3 patch-1 round (2026-09-04): +1, the good-stuff
+catcher. (Owner: "a game with concept of collecting good falling things and
+not collect the bad things" - the catch-the-falling-items classic: good
+things rain down to grab, bad things rain down to dodge, miss the good or
+catch the bad and it costs you.)
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -107,6 +113,9 @@ Dash, keeps thinking, and will name the next game when ready.
   path, swoop the collectibles, thread the hazards.
 - **crazy fishing-like** — We Bare Bears Crazy Fishing: cast the hook, snag
   the fish, dodge the stingers, haul the catch up.
+- **good-stuff-catcher** — the falling-things collector: good things fall,
+  catch them; bad things fall, dodge them. (Owner: "a game with concept of
+  collecting good falling things and not collect the bad things".)
 - **fish-eats-fish-like** - the food-chain swimmer: start tiny, eat anything
   smaller, GROW, and everything bigger eats you back. Feeding-Frenzy eating
   but MORE OPEN - Hungry Shark energy: free-swim a whole map, hunt, keep the

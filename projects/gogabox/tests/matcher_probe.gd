@@ -22,6 +22,15 @@ func ck(cond: bool, label: String) -> void:
                 print("[FAIL] ", label)
 
 
+func _labels_in(n: Node) -> Array:
+        var out: Array = []
+        for c in n.get_children():
+                if c is Label:
+                        out.append(c)
+                out.append_array(_labels_in(c))
+        return out
+
+
 func _boot(mode: String) -> void:
         if G != null and is_instance_valid(G):
                 G.queue_free()
@@ -394,6 +403,127 @@ func _run() -> void:
         ck(ok_density, "fuzz: the board stayed dense (no vanished cells)")
         ck(ok_colors, "fuzz: every cell stayed legal (colors + specials + coins)")
         ck(not G._find_matches().is_empty() == false, "fuzz: the board ended quiet")
+
+        # ------------------------------------------------ the optionals laws
+        # (v0.3.3-p1: the owner's first-screen round)
+        G._pick_close()
+        await get_tree().create_timer(0.2).timeout
+        G._pick_open(true)
+        await get_tree().create_timer(0.4).timeout
+        ck(G.pick_open, "THE OPTIONALS LAW: the optionals sheet greets first")
+        var osc: BoxScroll = G.pick_sheet[2]
+        var tap_ok := true
+        var live := 0
+        for b in Arc._buttons_in(osc):
+                if b.disabled:
+                        continue
+                live += 1
+                var found := false
+                for t in osc._tappables:
+                        if t["ctrl"] == b:
+                                found = true
+                                break
+                tap_ok = tap_ok and found
+        ck(tap_ok and live > 0, "THE TAPPABLE LAW: every live button in the scroll is registered (%d)" % live)
+        # THE START LAW: an owned mood card starts the game on tap
+        var cards: Array = Arc._buttons_in(osc)
+        var live_buttons: Array = []
+        for b in cards:
+                if not b.disabled:
+                        live_buttons.append(b)
+        # the mood cards are the scroll's first live buttons (the grid runs first)
+        # the CHALLENGE card is the grid's first child (Arc._buttons_in
+        # walks a LIFO stack - its order is reversed, so never trust [0])
+        var mood_grid: GridContainer = null
+        var stack2: Array = [osc]
+        while not stack2.is_empty() and mood_grid == null:
+                var cur: Node = stack2.pop_back()
+                if cur is GridContainer:
+                        mood_grid = cur
+                        break
+                for c in cur.get_children():
+                        stack2.append(c)
+        ck(mood_grid != null and mood_grid.get_child(0) is Button,
+                        "the optionals grid wears the mood cards")
+        ((mood_grid.get_child(0) as Button)).pressed.emit()
+        await get_tree().create_timer(0.4).timeout
+        ck(G.phase == "play" and G.mode == "challenge" and not G.pick_open,
+                        "THE START LAW: tapping an owned mood STARTS it (the old dead taps are dead)")
+        # THE EMPTY-BOARD LAW: a skin refresh on an unborn grid never crashes
+        var saved_grid: Array = G.grid
+        G.grid = []
+        G._refresh_board_skin()
+        G.grid = saved_grid
+        ck(true, "THE EMPTY-BOARD LAW: the skin refresh survives an unborn grid (the freeze is dead)")
+        # THE SHOP LAW: the optionals wears a real SHOP button; the shop
+        # opens its own sheet and CLOSE walks back to the optionals
+        # (pre-run - a mid-run close would walk back to the live run)
+        G.phase = "hold"
+        G._pick_open(false)
+        await get_tree().create_timer(0.3).timeout
+        var shop_btn: Button = null
+        for b in Arc._buttons_in(G.pick_sheet[2]):
+                if b.text == "SHOP":
+                        shop_btn = b
+        ck(shop_btn != null, "THE SHOP BUTTON LAW: the optionals wears a real SHOP button")
+        shop_btn.pressed.emit()
+        await get_tree().create_timer(0.3).timeout
+        ck(G.shop_open and not G.pick_open, "the shop opens its own sheet")
+        var close_btn: Button = null
+        for b in Arc._buttons_in(G.shop_sheet[2]):
+                if b.text == "CLOSE":
+                        close_btn = b
+        close_btn.pressed.emit()
+        await get_tree().create_timer(0.3).timeout
+        ck(G.pick_open and not G.shop_open, "the shop CLOSE walks back to the optionals")
+        G._pick_close()
+        await get_tree().create_timer(0.2).timeout
+
+        # ------------------------------------------------ the power popup laws
+        G.phase = "play"
+        Box.dev_set_cheat("all_owned", 1)
+        G.run_coins = 500
+        G.charges["line"] = 0
+        G.power_used["line"] = 1
+        G._rail_tap("line")
+        await get_tree().create_timer(0.3).timeout
+        ck(not G.refill_sheet.is_empty(), "THE BUY POPUP LAW: an empty power opens the buying menu")
+        var pbtns: Array = Arc._buttons_in(G.refill_sheet[1])
+        var plus_b: Button = null
+        var minus_b: Button = null
+        for b in pbtns:
+                if b.text == "+":
+                        plus_b = b
+                elif b.text == "-":
+                        minus_b = b
+        ck(plus_b != null and minus_b != null, "the popup wears the - / + arrows")
+        ck(minus_b.disabled, "the arrows START at 1 (minus is dead at one)")
+        plus_b.pressed.emit()
+        plus_b.pressed.emit()
+        await get_tree().create_timer(0.1).timeout
+        ck(plus_b.disabled, "THE DYNAMIC CAP LAW: 1 used -> the arrows stop at 2")
+        var total_txt := ""
+        for l in _labels_in(G.refill_sheet[1]):
+                if String(l.text).begins_with("BUY "):
+                        total_txt = String(l.text)
+        ck(total_txt.begins_with("BUY 2"), "the total rides the qty (%s)" % total_txt.replace("\n", " "))
+        for b in pbtns:
+                if b.text == "BUY":
+                        b.pressed.emit()
+        await get_tree().create_timer(0.3).timeout
+        ck(int(G.charges["line"]) == 2 and int(G.run_coins) == 500 - 90,
+                        "the BUY pays the ROUND balance (2 x 45), the wallet is untouched")
+        ck(Box.coins() >= 9000, "the box wallet never moved mid-run")
+        # THE GRAY-OUT LAW: all 3 spent -> the rail slot goes dead
+        G.charges["line"] = 0
+        G.power_used["line"] = 3
+        G._refresh_rail()
+        ck(G.rail_slots["line"]["btn"].disabled, "THE GRAY-OUT LAW: 3 spent -> the slot grays out")
+        G._rail_tap("line")
+        await get_tree().create_timer(0.2).timeout
+        ck(G.refill_sheet.is_empty(), "a spent power opens nothing")
+        G.power_used["line"] = 0
+        G.phase = "hold"
 
         # ------------------------------------------------ the banner + the registry
         var reg := GameReg.get_game("matcher")

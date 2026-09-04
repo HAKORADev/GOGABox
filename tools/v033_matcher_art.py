@@ -477,32 +477,50 @@ def mode_cards():
 
 
 def thumbnail():
-    """960x640 box thumbnail - the happy gem wall."""
+    """960x640 box thumbnail - the happy gem wall, EVERYTHING inside the
+    frame (v0.3.3-p1: the old comp drew its left gem column at x=-50, half
+    the wall clipped off-canvas - the owner: "the thumbnail contains
+    out-of-resolution stuff"). A tidy plate, a centered 3x6 wall, the three
+    specials riding real gems, the coin tucked in the corner."""
     W, H = 960, 640
-    bg = Image.open(os.path.join(OUT, "bg", "bg_day.png")).convert("RGBA").resize((W, H))
-    im = bg
+    im = Image.open(os.path.join(OUT, "bg", "bg_day.png")).convert("RGBA").resize((W, H))
     d = ImageDraw.Draw(im)
-    # gem wall rows
+    # the board plate - a soft card the wall sits on, fully inside
+    d.rounded_rectangle([96, 92, 864, 486], radius=36, fill=(255, 250, 238, 210),
+                        outline=(214, 138, 48, 200), width=5)
     gs = [Image.open(os.path.join(OUT, "gems", "gem_%d.png" % i)).convert("RGBA").resize((104, 104))
           for i in range(5)]
-    for r in range(3):
-        for c in range(9):
-            g = gs[(r * 3 + c) % 5]
-            jx = (r % 2) * 52
-            im.alpha_composite(g, (c * 104 - 10 + jx - 40, 200 + r * 110 - 40))
-    # hypercube hero + flame
-    hyper = Image.open(os.path.join(OUT, "specials", "ov_hyper.png")).convert("RGBA").resize((170, 170))
-    im.alpha_composite(hyper, (730, 40))
-    flame = Image.open(os.path.join(OUT, "specials", "ov_flame.png")).convert("RGBA").resize((150, 150))
-    im.alpha_composite(flame, (80, 30))
-    # title band
-    d.rounded_rectangle([120, 520, 840, 620], radius=40, fill=(255, 252, 240, 225),
+    wall = [[0, 2, 4, 1, 3, 0],
+            [3, 1, 4, 2, 0, 4],
+            [1, 4, 0, 3, 2, 1]]
+    gw, gh, gap = 104, 104, 12
+    x0 = 96 + (768 - (6 * gw + 5 * gap)) // 2
+    y0 = 92 + (394 - (3 * gh + 2 * gap)) // 2
+    for r, row in enumerate(wall):
+        for c, k in enumerate(row):
+            if r == 0 and c == 5:
+                continue          # the hypercube hero stands alone
+            x = x0 + c * (gw + gap)
+            y = y0 + r * (gh + gap)
+            im.alpha_composite(gs[k], (x, y))
+    # the specials ride real gems (the overlay law, on display)
+    ov_flame = Image.open(os.path.join(OUT, "specials", "ov_flame.png")).convert("RGBA").resize((116, 116))
+    ov_star = Image.open(os.path.join(OUT, "specials", "ov_star.png")).convert("RGBA").resize((116, 116))
+    ov_hyper = Image.open(os.path.join(OUT, "specials", "ov_hyper.png")).convert("RGBA").resize((126, 126))
+    im.alpha_composite(ov_flame, (x0 + 2 * (gw + gap) - 6, y0 - 6))
+    im.alpha_composite(ov_star, (x0 + 3 * (gw + gap) - 6, y0 + (gh + gap) - 6))
+    im.alpha_composite(ov_hyper, (x0 + 5 * (gw + gap) - 11, y0 - 11))
+    # the GOGACoin peeks over the plate's corner
+    coin = Image.open(os.path.join(ROOT, "projects/gogabox/assets/ui/coin.png")).convert("RGBA").resize((88, 88))
+    im.alpha_composite(coin, (796, 58))
+    # the title band
+    d.rounded_rectangle([120, 520, 840, 616], radius=40, fill=(255, 252, 240, 235),
                         outline=(214, 138, 48, 255), width=6)
     try:
         f = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 64)
     except Exception:
         f = ImageFont.load_default()
-    d.text((480, 568), "MATCHER", font=f, fill=(196, 96, 40), anchor="mm")
+    d.text((480, 566), "MATCHER", font=f, fill=(196, 96, 40), anchor="mm")
     im.convert("RGB").save(os.path.join(THUMB_OUT, "matcher.png"))
     print("thumb ok")
 

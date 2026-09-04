@@ -125,6 +125,7 @@ var coin_cell := Vector2i(-1, -1)
 
 ## powers
 var charges := {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
+var power_used := {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
 var armed := ""
 
 ## fx pools
@@ -143,7 +144,10 @@ var chip_mode: Label
 var chip_info: Label
 var chip_info2: Label
 var pick_open := false
-var pick_sheet := []            # the picker trio
+var pick_sheet := []            # the optionals trio
+var shop_sheet := []            # the shop trio
+var shop_open := false
+var first_moment := true        # the boot optionals owns the first tap
 var refill_sheet := []          # open refill sheet trio
 var armed_cursor: Sprite2D
 
@@ -274,30 +278,14 @@ func _build_board_plate() -> void:
 
 
 func _build_hud_extras() -> void:
-        var vp := get_viewport_rect().size
         chip_mode = add_hud_chip(String(MODES[mode]["name"]))
         chip_info = add_hud_chip("")
         chip_info2 = add_hud_chip("")
-        var tip := Arc.fit_label(_mode_tip(), 22, Color(0.24, 0.32, 0.5), vp.x - 40)
-        tip.position = Vector2(20, 88)
-        tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        _overlay_root_ref().add_child(tip)
+        # THE QUIET HUD LAW (v0.3.3-p1, the owner: "I saw a help message on
+        # the top, which we usually do not do that in the games, this can be
+        # in the guide"): the on-board tip line is GONE - every mode's
+        # wisdom already lives in the ? guide sheet
         _refresh_hud()
-
-
-func _mode_tip() -> String:
-        match mode:
-                "challenge":
-                        return "reach the round goal before its clock - a lost round costs 500 score"
-                "peace":
-                        return "no fail, no coins, no power-ups - just match and breathe"
-                "butterflies":
-                        return "match the butterflies before one flutters into the spider"
-                "ice":
-                        return "match on the ice columns to melt them - never let one reach the top"
-                "mine":
-                        return "dig the earth away - gold, diamonds and artifacts sleep inside"
-        return ""
 
 
 func _build_spider() -> void:
@@ -311,10 +299,17 @@ func _build_spider() -> void:
         world.add_child(sp)
 
 
-# ================================================================ the mode picker
-## THE FIRST MOMENT (the invaders flow law): the mode picker greets you.
-## One happy card per mode - tap an owned mode to play, tap a locked one to
-## buy it straight there (the wallet handles it, no separate shop trip).
+# ================================================================ the optionals
+## THE OPTIONALS SCREEN (v0.3.3-p1, the owner: "I saw the first screen as
+## matcher and not an optionals menu like the rest of the optionals screen,
+## also the shop here is not a button"): the snake/invaders standard now
+## greets first - one scrollable sheet, one IMAGE box per mood, the skins
+## row, and a REAL SHOP BUTTON. Tapping an owned mood STARTS it (always -
+## even the picked one; the old picker disabled the current mode's card and
+## left its buttons unregistered, so taps died inside the scroll). A locked
+## box's tap opens the SHOP (the snake law). No help line rides the HUD -
+## the mode wisdom lives in the guide (the owner: "this can be in the guide").
+
 func _pick_open(first := false) -> void:
         if pick_open:
                 return
@@ -326,13 +321,9 @@ func _pick_open(first := false) -> void:
         sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
         var kids := root.get_children()
         pick_sheet = [kids[kids.size() - 2], kids[kids.size() - 1]]
-        var title := Arc.fit_label("MATCHER", 46, Arc.HOT, 560)
+        var title := Arc.fit_label("OPTIONALS - THE MOOD SHELF", 34, Arc.HOT, 560)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(title)
-        var sub := Arc.fit_label("pick your mood - the board never ends", 20,
-                        Color(0.5, 0.42, 0.3), 560)
-        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sheet.add_child(sub)
         var wallet := Arc.coin_chip()
         wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         sheet.add_child(wallet)
@@ -340,22 +331,53 @@ func _pick_open(first := false) -> void:
         sc.game_safe = true
         sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         var vp := get_viewport_rect().size
-        sc.custom_minimum_size = Vector2(640, clampf(vp.y * 0.52, 360.0, 760.0))
+        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.5, 340.0, 700.0))
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 10)
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
         pick_sheet.append(sc)
+        var grid := GridContainer.new()
+        grid.columns = 2
+        grid.add_theme_constant_override("h_separation", 12)
+        grid.add_theme_constant_override("v_separation", 12)
+        grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(grid)
         for id in MODE_ORDER:
-                box.add_child(_pick_card(id))
+                grid.add_child(_pick_card(id))
+        var st := Arc.fit_label("THE SKINS - THE GEMS YOU MATCH WITH", 20, Arc.HOT, 560)
+        st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(st)
         var skinrow := HBoxContainer.new()
         skinrow.alignment = BoxContainer.ALIGNMENT_CENTER
         skinrow.add_theme_constant_override("separation", 10)
-        sheet.add_child(skinrow)
+        skinrow.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(skinrow)
         for sid in SKIN_ORDER:
                 skinrow.add_child(_skin_chip(sid))
-        Arc.fit_sheet(sheet, 0)
+        var shopb := Arc.button("SHOP", Vector2(0, 78), 28, Arc.COIN, func(): _shop_open())
+        shopb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        box.add_child(shopb)
+        var cb := Arc.button("TO THE BOARD" if first_moment else "CLOSE",
+                        Vector2(0, 78), 26, Arc.GOOD, func():
+                        var go := first_moment and phase != "play"
+                        _pick_close()
+                        if go:
+                                _start_mode(mode))
+        cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        box.add_child(cb)
+        _pick_finish(sc)
+
+
+func _pick_finish(sc: BoxScroll) -> void:
+        # THE TAPPABLE LAW: BoxScroll owns taps inside scrolls - an
+        # unregistered button never fires (the old picker's dead taps)
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
 
 
 func _pick_card(id: String) -> Button:
@@ -363,10 +385,70 @@ func _pick_card(id: String) -> Button:
         var owned: bool = int(m["price"]) == 0 or Box.item_owned(game_id, "modes", id)
         var on: bool = mode == id and owned
         var b := Button.new()
-        b.custom_minimum_size = Vector2(620, 128)
-        var sb := Arc.panel_style(Arc.CARD if owned else Color(0.86, 0.82, 0.74, 0.96), 24, 8)
+        b.custom_minimum_size = Vector2(292, 214)
+        var sb := Arc.panel_style(Arc.CARD if owned else Color(0.86, 0.82, 0.74, 0.96), 20, 6)
         if on:
                 sb.set_border_width_all(4)
+                sb.border_color = Arc.GOOD
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.05)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var v := VBoxContainer.new()
+        v.set_anchors_preset(Control.PRESET_FULL_RECT)
+        v.offset_left = 10
+        v.offset_right = -10
+        v.offset_top = 10
+        v.offset_bottom = -8
+        v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        v.add_theme_constant_override("separation", 4)
+        b.add_child(v)
+        var art := TextureRect.new()
+        art.texture = load(String(m["card"]))
+        art.custom_minimum_size = Vector2(260, 112)
+        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        if not owned:
+                art.modulate = Color(1, 1, 1, 0.5)
+        v.add_child(art)
+        var l := Arc.fit_label(String(m["name"]), 24, Arc.INK, 272)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        v.add_child(l)
+        if owned:
+                var st := Arc.fit_label("PICKED - TAP TO PLAY" if on else "TAP TO PLAY",
+                                16, Color("2c8a44"), 272)
+                st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                v.add_child(st)
+                # THE START LAW (the owner: "whenever I select something, the
+                # game does not start"): an owned mood ALWAYS starts on tap -
+                # the picked card included
+                b.pressed.connect(func():
+                                Jukebox.sfx("confirm", -4.0)
+                                _pick_close()
+                                _start_mode(id))
+        else:
+                var chip := Arc.chip(str(int(m["price"])), "res://assets/ui/coin.png",
+                                Color(0, 0, 0, 0.5), 16, Arc.COIN)
+                chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+                chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                v.add_child(chip)
+                # THE SNAKE LAW: a locked box's tap opens the shop
+                b.pressed.connect(func(): _shop_open())
+        return b
+
+
+func _skin_chip(sid: String) -> Button:
+        var s: Dictionary = SKINS[sid]
+        var owned: bool = int(s["price"]) == 0 or Box.skin_owned(game_id, sid)
+        var on := skin == sid and owned
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(290, 84)
+        var sb := Arc.panel_style(Arc.CARD_2 if owned else Color(0.85, 0.8, 0.72, 0.95), 16, 4)
+        if on:
+                sb.set_border_width_all(3)
                 sb.border_color = Arc.GOOD
         b.add_theme_stylebox_override("normal", sb)
         var sbp := sb.duplicate() as StyleBoxFlat
@@ -377,135 +459,214 @@ func _pick_card(id: String) -> Button:
         h.offset_left = 12
         h.offset_right = -12
         h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        h.add_theme_constant_override("separation", 14)
+        h.add_theme_constant_override("separation", 10)
         b.add_child(h)
-        var art := TextureRect.new()
-        art.texture = load(String(m["card"]))
-        art.custom_minimum_size = Vector2(150, 84)
-        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        if not owned:
-                art.modulate = Color(1, 1, 1, 0.5)
-        h.add_child(art)
-        var v := VBoxContainer.new()
-        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_theme_constant_override("separation", 2)
-        h.add_child(v)
-        var l := Arc.fit_label(String(m["name"]), 30, Arc.INK, 380)
-        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_child(l)
-        var line := Arc.fit_label(String(m["line"]), 18, Color(0.45, 0.38, 0.28), 380)
-        line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_child(line)
+        var ic := TextureRect.new()
+        ic.texture = load(String(s["tex"][0]))
+        ic.custom_minimum_size = Vector2(52, 52)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        h.add_child(ic)
+        var txt := String(s["name"]).to_upper()
         if on:
-                var st := Arc.fit_label("PICKED - TAP TO PLAY", 18, Color("2c8a44"), 170)
-                st.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                h.add_child(st)
-                b.disabled = true
+                txt += "  - ON"
         elif owned:
-                var st2 := Arc.fit_label("PLAY", 20, Color("2c8a44"), 120)
-                st2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                h.add_child(st2)
-                b.pressed.connect(func():
-                                mode = id
-                                Jukebox.sfx("confirm", -4.0)
-                                _pick_close()
-                                _start_mode(id))
+                txt += "  - TAP TO WEAR"
         else:
-                var chip := Arc.chip(str(int(m["price"])), "res://assets/ui/coin.png",
-                                Color(0, 0, 0, 0.5), 18, Arc.COIN)
-                chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                h.add_child(chip)
-                b.pressed.connect(func(): _buy_mode(id))
-        return b
-
-
-func _buy_mode(id: String) -> void:
-        var m: Dictionary = MODES[id]
-        var price := int(m["price"])
-        if Box.spend(price):
-                Box.buy_item(game_id, "modes", id, 0)   # record the ownership
-                mode = id
-                Jukebox.sfx("m_goal", -4.0)
-                Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 40)
-                _pick_close()
-                _start_mode(id)
-        else:
-                Jukebox.sfx("error", -6.0)
-                _toast_show("need %d more coins for %s" % [price - Box.coins(), m["name"]])
-
-
-func _skin_chip(sid: String) -> Button:
-        var s: Dictionary = SKINS[sid]
-        var owned: bool = int(s["price"]) == 0 or Box.skin_owned(game_id, sid)
-        var on := skin == sid
-        var b := Button.new()
-        b.custom_minimum_size = Vector2(160, 56)
-        var sb := Arc.panel_style(Arc.CARD_2 if owned else Color(0.85, 0.8, 0.72, 0.95), 16, 4)
-        if on:
-                sb.set_border_width_all(3)
-                sb.border_color = Arc.GOOD
-        b.add_theme_stylebox_override("normal", sb)
-        var txt := ("ON - " if on else "") + String(s["name"]).to_upper()
-        if not owned:
-                txt = "%s  (%d)" % [String(s["name"]).to_upper(), int(s["price"])]
-        var l := Arc.fit_label(txt, 16, Arc.INK, 148)
+                txt += "  %d" % int(s["price"])
+        var l := Arc.fit_label(txt, 17, Arc.INK, 210)
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        b.add_child(l)
+        h.add_child(l)
         if on:
                 b.disabled = true
         elif owned:
                 b.pressed.connect(func(): _pick_equip_skin(sid))
         else:
-                b.pressed.connect(func(): _pick_buy_skin(sid))
+                b.pressed.connect(func(): _shop_open())
         return b
 
 
 func _pick_equip_skin(sid: String) -> void:
         Box.equip_skin(game_id, sid)
         skin = sid
-        tex_gem = _skin_textures()
         _refresh_board_skin()
         Jukebox.sfx("confirm", -3.0)
         _pick_close()
-        _pick_open()
-
-
-func _pick_buy_skin(sid: String) -> void:
-        var s: Dictionary = SKINS[sid]
-        if Box.buy_skin(game_id, sid, int(s["price"])):
-                skin = sid
-                tex_gem = _skin_textures()
-                _refresh_board_skin()
-                Jukebox.sfx("m_goal", -4.0)
-                _pick_close()
-                _pick_open()
-        else:
-                Jukebox.sfx("error", -6.0)
-                _toast_show("need %d more coins for the %s" %
-                                [int(s["price"]) - Box.coins(), s["name"]])
+        _pick_open(false)
 
 
 func _pick_close() -> void:
-        if pick_sheet.is_empty():
-                return
+        _pick_down()
+        get_tree().paused = false
+        paused = false
+
+
+func _pick_down() -> void:
         pick_open = false
         for k in pick_sheet:
                 if is_instance_valid(k):
                         k.queue_free()
         pick_sheet = []
+
+
+# ================================================================ the shop
+## THE SHOP IS A BUTTON'S GUEST (v0.3.3-p1, the owner: "a proper shop"):
+## one scrollable sheet in the invaders store style - the moods, the skin,
+## the power unlocks - every price paid from the FULL GOGABox wallet.
+
+func _shop_open() -> void:
+        if shop_open:
+                return
+        _pick_down()
+        shop_open = true
+        paused = true
+        get_tree().paused = true
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
+        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        var kids := root.get_children()
+        shop_sheet = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var title := Arc.fit_label("MATCHER SHOP", 34, Arc.INK, 560)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(title)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.5, 340.0, 700.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        sheet.add_child(sc)
+        shop_sheet.append(sc)
+        var sec := Arc.fit_label("THE MOODS - BUY ONE, PICK IT IN OPTIONALS", 20, Arc.HOT, 560)
+        sec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(sec)
+        for id in MODE_ORDER:
+                box.add_child(_shop_mode_row(id))
+        var sec2 := Arc.fit_label("THE SKIN", 20, Arc.HOT, 560)
+        sec2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(sec2)
+        box.add_child(_shop_skin_row())
+        var sec3 := Arc.fit_label("THE POWERS - UNLOCK ONCE, REFILL IN PLAY", 20, Arc.HOT, 560)
+        sec3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(sec3)
+        for pid in POWER_ORDER:
+                box.add_child(_shop_power_row(pid))
+        var cb := Arc.button("CLOSE", Vector2(0, 74), 24, Arc.GOOD, func(): _shop_close())
+        cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        box.add_child(cb)
+        _pick_finish(sc)
+
+
+func _shop_mode_row(id: String) -> Control:
+        var m: Dictionary = MODES[id]
+        if int(m["price"]) == 0 or Box.item_owned(game_id, "modes", id):
+                var l := Arc.fit_label("%s  -  OWNED" % String(m["name"]).to_upper(),
+                                20, Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        var b := Arc.coin_button("%s  -  %d" % [String(m["name"]).to_upper(), int(m["price"])],
+                        Vector2(0, 64), 22, Color("8a4ab8"), func():
+                        if Box.buy_item(game_id, "modes", id, int(m["price"])):
+                                Jukebox.sfx("m_goal", -4.0)
+                                Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+                        else:
+                                Jukebox.sfx("error", -6.0)
+                                _toast_show("need %d more coins" %
+                                                (int(m["price"]) - Box.coins()))
+                        _shop_down()
+                        _shop_open())
+        b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        if Box.coins() < int(m["price"]):
+                b.disabled = true
+        return b
+
+
+func _shop_skin_row() -> Control:
+        var s: Dictionary = SKINS["candy"]
+        if Box.skin_owned(game_id, "candy"):
+                var l := Arc.fit_label("CANDY SHOP  -  OWNED (WEAR IT IN OPTIONALS)",
+                                20, Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        var b := Arc.coin_button("CANDY SHOP  -  %d" % int(s["price"]),
+                        Vector2(0, 64), 22, Color("c45a9a"), func():
+                        if Box.buy_skin(game_id, "candy", int(s["price"])):
+                                skin = "candy"
+                                _refresh_board_skin()
+                                Jukebox.sfx("m_goal", -4.0)
+                                Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+                        else:
+                                Jukebox.sfx("error", -6.0)
+                                _toast_show("need %d more coins" %
+                                                (int(s["price"]) - Box.coins()))
+                        _shop_down()
+                        _shop_open())
+        b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        if Box.coins() < int(s["price"]):
+                b.disabled = true
+        return b
+
+
+func _shop_power_row(pid: String) -> Control:
+        var p: Dictionary = POWERS[pid]
+        if Box.item_owned(game_id, "power", pid):
+                var l := Arc.fit_label("%s  -  OWNED" % String(p["name"]).to_upper(),
+                                20, Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        var b := Arc.coin_button("%s  -  %d" % [String(p["name"]).to_upper(), int(p["price"])],
+                        Vector2(0, 64), 22, Color("4a7ab8"), func():
+                        if Box.buy_item(game_id, "power", pid, int(p["price"])):
+                                Jukebox.sfx("m_goal", -4.0)
+                                Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+                        else:
+                                Jukebox.sfx("error", -6.0)
+                                _toast_show("need %d more coins" %
+                                                (int(p["price"]) - Box.coins()))
+                        _shop_down()
+                        _shop_open())
+        b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        if Box.coins() < int(p["price"]):
+                b.disabled = true
+        return b
+
+
+func _shop_close() -> void:
+        _shop_down()
         get_tree().paused = false
         paused = false
+        # the shop only opens from the optionals (pre-run) - walk back there
+        if phase != "play" and not over:
+                _pick_open(false)
+
+
+func _shop_down() -> void:
+        shop_open = false
+        for k in shop_sheet:
+                if is_instance_valid(k):
+                        k.queue_free()
+        shop_sheet = []
 
 
 func _refresh_board_skin() -> void:
         tex_gem = _skin_textures()
+        # THE EMPTY-BOARD LAW (v0.3.3-p1): the optionals lives BEFORE the
+        # first deal - a skin bought there must not index an unborn grid
+        # (the old index error killed the callback mid-sheet and the paused
+        # tree froze the app = the owner's "the app crashed")
         for r in ROWS:
+                if grid.size() <= r:
+                        return
                 for c in COLS:
+                        if grid[r].size() <= c:
+                                continue
                         if _in_earth(r):
                                 continue
                         var cell: Dictionary = grid[r][c]
@@ -518,6 +679,7 @@ func _refresh_board_skin() -> void:
 # ================================================================ mode start
 func _start_mode(id: String) -> void:
         mode = id
+        first_moment = false
         phase = "play"
         chip_mode.text = String(MODES[id]["name"])
         run_clock = RUN_CLOCK
@@ -533,6 +695,7 @@ func _start_mode(id: String) -> void:
         coin_clock = COIN_EVERY
         coin_cell = Vector2i(-1, -1)
         charges = {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
+        power_used = {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
         armed = ""
         if mode == "peace":
                 score_bonus_enabled = false
@@ -1883,28 +2046,43 @@ func _refresh_rail() -> void:
                 var owned: bool = Box.item_owned(game_id, "power", pid)
                 var dots: Label = slot["dots"]
                 var price: Label = slot["price"]
-                if not owned:
-                        dots.text = "LOCKED"
-                        dots.add_theme_color_override("font_color", Color(0.55, 0.42, 0.3))
-                        price.text = "%d wallet" % int(POWERS[pid]["price"])
-                elif n > 0:
-                        dots.text = "%d/3" % n
-                        dots.add_theme_color_override("font_color", Color("2c8a44"))
-                        price.text = String(POWERS[pid]["name"]).to_upper()
-                else:
-                        dots.text = "EMPTY"
-                        dots.add_theme_color_override("font_color", Color(0.62, 0.5, 0.36))
-                        price.text = "%d round" % int(POWERS[pid]["refill"])
                 var btn: Button = slot["btn"]
-                var sb := btn.get_theme_stylebox("normal") as StyleBoxFlat
-                if armed == pid:
-                        sb.set_border_width_all(4)
-                        sb.border_color = Arc.ACCENT
-                elif n > 0 and owned:
-                        sb.set_border_width_all(2)
-                        sb.border_color = Arc.GOOD
+                var spent_out: bool = owned and n <= 0 and int(power_used[pid]) >= POWER_MAX
+                if spent_out:
+                        # THE GRAY-OUT LAW (the owner): all 3 used this run ->
+                        # the slot goes gray and dead until the next run
+                        dots.text = "SPENT"
+                        dots.add_theme_color_override("font_color", Color(0.55, 0.5, 0.45))
+                        price.text = "next run"
+                        btn.disabled = true
                 else:
+                        btn.disabled = false
+                        if not owned:
+                                dots.text = "LOCKED"
+                                dots.add_theme_color_override("font_color", Color(0.55, 0.42, 0.3))
+                                price.text = "%d wallet" % int(POWERS[pid]["price"])
+                        elif n > 0:
+                                dots.text = "%d/3" % n
+                                dots.add_theme_color_override("font_color", Color("2c8a44"))
+                                price.text = String(POWERS[pid]["name"]).to_upper()
+                        else:
+                                dots.text = "EMPTY"
+                                dots.add_theme_color_override("font_color", Color(0.62, 0.5, 0.36))
+                                price.text = "%d round" % int(POWERS[pid]["refill"])
+                var sb := btn.get_theme_stylebox("normal") as StyleBoxFlat
+                if spent_out:
                         sb.set_border_width_all(0)
+                        btn.modulate = Color(1, 1, 1, 0.45)
+                else:
+                        btn.modulate = Color(1, 1, 1, 1)
+                        if armed == pid:
+                                sb.set_border_width_all(4)
+                                sb.border_color = Arc.ACCENT
+                        elif n > 0 and owned:
+                                sb.set_border_width_all(2)
+                                sb.border_color = Arc.GOOD
+                        else:
+                                sb.set_border_width_all(0)
 
 
 func _rail_tap(pid: String) -> void:
@@ -1921,10 +2099,15 @@ func _rail_tap(pid: String) -> void:
                 _refresh_rail()
                 return
         if n <= 0:
+                # THE BUY POPUP: empty -> the quantity arrows ask how many
+                # (max 3 - used), the full balance is shown, the round pays
+                if int(power_used[pid]) >= POWER_MAX:
+                        return              # grayed on the rail anyway
                 _power_sheet(pid)
                 return
         if pid == "shuffle":
                 charges[pid] = n - 1
+                power_used[pid] = int(power_used[pid]) + 1
                 _refresh_rail()
                 await _shuffle_board(false)
                 await _resolve_after_power()
@@ -1965,6 +2148,7 @@ func _fire_power(cellp: Vector2i) -> void:
                 _refresh_rail()
                 return
         charges[pid] = n - 1
+        power_used[pid] = int(power_used[pid]) + 1
         armed = ""
         _set_armed_cursor(false)
         _refresh_rail()
@@ -2061,6 +2245,15 @@ func _resolve_after_power() -> void:
 
 
 # ------------------------------------------------ the power sheets
+## THE BUY POPUP (v0.3.3-p1, the owner: "when the power is empty, user will
+## click and it will show the buying menu for it and will ask for number
+## with arrows start from 1 to 3 with dynamic updates like only 2 if
+## already 1 used, and gray out the power if the user used all 3 already,
+## make it in that buying pop-up shows the GOGABox full balance"):
+##  - not owned  -> the wallet UNLOCK button (the full balance pays once)
+##  - empty      -> the quantity arrows 1..(3 - used), the total updates
+##                  live, the ROUND balance pays, BOTH balances are shown
+##  - 3 spent    -> the rail slot itself grays out; the popup never opens
 func _power_sheet(pid: String) -> void:
         if not refill_sheet.is_empty():
                 return
@@ -2078,14 +2271,19 @@ func _power_sheet(pid: String) -> void:
         var d := Arc.fit_label(String(p["desc"]), 22, Color(0.45, 0.38, 0.28), 560)
         d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(d)
-        var owned: bool = Box.item_owned(game_id, "power", pid)
+        # THE BALANCES LAW: the popup shows the FULL GOGABox balance (the
+        # owner asked for it by name) AND the round balance it spends
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
         var roundbal := Arc.chip("round balance: %d" % run_coins, "res://assets/ui/coin.png",
-                        Color(0, 0, 0, 0.35), 22, Arc.COIN)
+                        Color(0, 0, 0, 0.35), 20, Arc.COIN)
         roundbal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         sheet.add_child(roundbal)
+        var owned: bool = Box.item_owned(game_id, "power", pid)
         if not owned:
-                var buy := Arc.button("UNLOCK  -  %d" % int(p["price"]),
-                                Vector2(460, 84), 28, Arc.GOOD, func():
+                var buy := Arc.button("UNLOCK  -  %d FROM THE WALLET" % int(p["price"]),
+                                Vector2(560, 84), 24, Arc.GOOD, func():
                                 if Box.spend(int(p["price"])):
                                         Box.buy_item(game_id, "power", pid, 0)
                                         Jukebox.sfx("m_goal", -4.0)
@@ -2098,27 +2296,66 @@ func _power_sheet(pid: String) -> void:
                 sheet.add_child(buy)
         else:
                 var n := int(charges[pid])
-                var info := Arc.fit_label("stocked %d/3" % n, 24, Color("2c8a44"), 560)
-                info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                sheet.add_child(info)
-                if n < POWER_MAX:
-                        var refill_price := int(p["refill"])
-                        var rb := Arc.button("REFILL +1  -  %d ROUND COINS" % refill_price,
-                                        Vector2(520, 84), 24, Arc.ACCENT, func():
-                                        if run_coins >= refill_price:
-                                                add_run_coins(-refill_price)
-                                                charges[pid] = int(charges[pid]) + 1
-                                                Jukebox.sfx("m_refill", -4.0)
-                                                _power_sheet_close()
-                                                _refresh_rail()
-                                        else:
-                                                Jukebox.sfx("error", -6.0)
-                                                _toast_show("the round balance is thin - collect the board coin!"))
-                        sheet.add_child(rb)
-                var note := Arc.fit_label("refills spend the ROUND balance only -\nthe box wallet is never touched mid-run",
-                                18, Color(0.55, 0.45, 0.3), 560, false)
-                note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                sheet.add_child(note)
+                var used := int(power_used[pid])
+                var max_buy: int = POWER_MAX - used - n
+                if max_buy <= 0:
+                        var done := Arc.fit_label("all %d spent this run - the next run restocks"
+                                        % POWER_MAX, 24, Color("2c8a44"), 560)
+                        done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        sheet.add_child(done)
+                else:
+                        # THE ARROWS: - / qty / + , the total rides the qty
+                        # (a Dictionary box: GDScript lambdas capture by
+                        # VALUE - a plain int would mutate only the
+                        # handler's own copy and the arrows would never move)
+                        var qty_box := {"n": 1}
+                        var row := HBoxContainer.new()
+                        row.alignment = BoxContainer.ALIGNMENT_CENTER
+                        row.add_theme_constant_override("separation", 14)
+                        sheet.add_child(row)
+                        var minus := Arc.button("-", Vector2(96, 84), 40, Arc.CARD_2, func(): pass)
+                        var qlabel := Arc.fit_label("1", 40, Arc.INK, 90)
+                        qlabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        var plus := Arc.button("+", Vector2(96, 84), 40, Arc.CARD_2, func(): pass)
+                        row.add_child(minus)
+                        row.add_child(qlabel)
+                        row.add_child(plus)
+                        var total := Arc.fit_label("", 26, Arc.HOT, 560)
+                        total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        sheet.add_child(total)
+                        var stock := Arc.fit_label("", 20, Color(0.55, 0.45, 0.3), 560)
+                        stock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        sheet.add_child(stock)
+                        var repaint := func():
+                                var q: int = int(qty_box["n"])
+                                qlabel.text = str(q)
+                                total.text = "BUY %d  -  %d ROUND COINS" % [q, q * int(p["refill"])]
+                                stock.text = "stocked %d/3  -  %d used this run" % [n + used, used]
+                                minus.disabled = q <= 1
+                                plus.disabled = q >= max_buy
+                        minus.pressed.connect(func():
+                                qty_box["n"] = maxi(1, int(qty_box["n"]) - 1)
+                                repaint.call())
+                        plus.pressed.connect(func():
+                                qty_box["n"] = mini(max_buy, int(qty_box["n"]) + 1)
+                                repaint.call())
+                        repaint.call()
+                        var buyb := Arc.button("BUY", Vector2(560, 84), 28, Arc.ACCENT, func():
+                                var cost: int = int(qty_box["n"]) * int(p["refill"])
+                                if run_coins >= cost:
+                                        add_run_coins(-cost)
+                                        charges[pid] = int(charges[pid]) + int(qty_box["n"])
+                                        Jukebox.sfx("m_refill", -4.0)
+                                        _power_sheet_close()
+                                        _refresh_rail()
+                                else:
+                                        Jukebox.sfx("error", -6.0)
+                                        _toast_show("the round balance is thin - collect the board coin!"))
+                        sheet.add_child(buyb)
+                        var note := Arc.fit_label("refills spend the ROUND balance only -\nthe box wallet is never touched mid-run",
+                                        18, Color(0.55, 0.45, 0.3), 560, false)
+                        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        sheet.add_child(note)
         var close := Arc.button("CLOSE", Vector2(460, 74), 26, Arc.CARD_2, func(): _power_sheet_close())
         sheet.add_child(close)
         Arc.fit_sheet(sheet, 1)

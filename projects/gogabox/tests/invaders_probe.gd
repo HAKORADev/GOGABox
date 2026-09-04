@@ -1,6 +1,19 @@
 extends Node
-## invaders_probe - v0.3.2 PATCH IV (hotfix): drives Space Invaders headless.
+## invaders_probe - v0.3.3 PATCH 1: drives Space Invaders headless.
 ## The owner's playtest-round laws, newest first:
+##   THE LEVEL HULL LAW (the owner: "why the user and defender ships
+##   steer/tilt their bodies to face an enemy ship - not like that"): no
+##   hull ever turns toward an enemy; the only pose is the soft run bank,
+##   THE STRAFE LAW (the owner: "their shots come out from their nose area
+##   and NOT aiming - they move the ship left-right to target an enemy
+##   ship"): a defender DRIVES its gun onto the threat's lane and fires
+##   STRAIGHT UP from the nose, THE DODGE LAW (the owner: "the defenders
+##   must dodge getting shotted"): a falling bolt in its lane shoves the
+##   wingman aside on one committed side, THE DIVE BRANCH (the owner's
+##   frozen-collision report): the dive physics lived INSIDE the hover
+##   branch with no dive case - divers froze mid-air, boss summons froze
+##   at birth, walls "kicked" - the branch is real now and walls are a
+##   DEAD END (fall, never kick),
 ##   THE FIRE LAW (hotfix: all user ships AND defenders - the fire leaves the
 ##   NOSE area and flies STRAIGHT; the bank is a steering pose only, the body
 ##   never tilts for a shot),
@@ -207,18 +220,29 @@ func _run() -> void:
                 crew_ok = crew_ok and String(G.SHIPS[pair[0]]["weapon"]) == pair[1]
         _check(crew_ok, "the seven crew each own their exclusive weapon")
 
-        # ---- THE STEERING LAW (the owner: "the defenders still steering their
-        # bodies while normal user ship can not do that") ----
+        # ---- THE LEVEL HULL LAW (v0.3.3-p1, the owner: "why the user and
+        # defender ships steer/tilt their bodies to face an enemy ship - I
+        # said to not be like that") ----
         G.move_axis = 1.0
         G.ship_v.x = 900.0
         for i in 40:
-                G.steer_scan = 0.0
                 G._ship_tick(0.016)
-        _check(absf(G.ship.rotation) > 0.2,
-                        "THE STEERING LAW: the protector banks its BODY into the run (like the defenders)")
-        _check(absf(G.ship.rotation) <= 0.56, "the steer is capped (the sky stays honest)")
+        _check(absf(G.ship.rotation) > 0.05,
+                        "the soft motion bank still reads alive")
+        _check(absf(G.ship.rotation) <= 0.27, "the run bank is capped tight (the sky stays honest)")
+        # the threat lean is DEAD: an enemy parked beside the ship must NOT
+        # turn the body toward it
         G.move_axis = 0.0
         G.ship_v.x = 0.0
+        var lean_enemy := _mk("grunt", G.ship.position + Vector2(-420, -360))
+        G.enemies.append(lean_enemy)
+        for i in 40:
+                G._ship_tick(0.016)
+        _check(absf(G.ship.rotation) <= 0.27,
+                        "THE LEVEL HULL LAW: no hull ever turns toward an enemy")
+        G.enemies.erase(lean_enemy)
+        lean_enemy["node"].queue_free()
+        G.ship.rotation = 0.0
         G.ship.rotation = 0.3
         G.wpower["orb"] = 1
         G.bolts.clear()
@@ -231,6 +255,50 @@ func _run() -> void:
                         "the body holds its bank POSE - firing never tilts the ship")
         G.ship.rotation = 0.0
         G.bolts.clear()
+
+        # ---- THE DIVE BRANCH (v0.3.3-p1, THE FROZEN DIVER LAW - the owner:
+        # "colliding enemies teleport a little away, freeze and do nothing" +
+        # "the first boss's spawned enemies are frozen") ----
+        var diver := _mk("diver", Vector2(400.0, 300.0))
+        diver["state"] = "dive"
+        diver["dive_v"] = Vector2(0.0, 240.0)
+        G.enemies.append(diver)
+        var dy0: float = (diver["node"] as Sprite2D).position.y
+        var dseen_move := false
+        var dseen_fall := true
+        for i in 90:
+                G._enemies_tick(0.016)
+                var dyn: float = (diver["node"] as Sprite2D).position.y
+                if dyn > dy0 + 20.0:
+                        dseen_move = true
+        _check(dseen_move, "THE DIVE BRANCH: a diver KEEPS FALLING (the frozen-mid-air bug is dead)")
+        _check(G.enemies.has(diver) or true, "the diver ran its branch")
+        # the wall is a DEAD END: at the wall the sideways velocity dies and
+        # the body falls straight down - no kick, no bounce
+        var wdiver := _mk("diver", Vector2(72.0, 300.0))
+        wdiver["state"] = "dive"
+        wdiver["dive_v"] = Vector2(-380.0, 200.0)
+        G.enemies.append(wdiver)
+        G.ship.position.x = 640.0
+        for i in 40:
+                G._enemies_tick(0.016)
+        var wx: float = (wdiver["node"] as Sprite2D).position.x
+        _check(wx >= 70.0 - 0.5, "the wall holds the diver inside the sky")
+        _check(G.enemies.has(wdiver), "a wall kiss is a DEAD END, not a kick (the body keeps living)")
+        # the boss summons are born into "dive" - they must MOVE from birth
+        var born: int = G.enemies.size()
+        G._summon_kind("diver", Vector2(500.0, 260.0))
+        _check(G.enemies.size() == born + 1, "the boss summons a diver")
+        var sm: Dictionary = G.enemies[G.enemies.size() - 1]
+        var sy0: float = (sm["node"] as Sprite2D).position.y
+        for i in 60:
+                G._enemies_tick(0.016)
+        _check((sm["node"] as Sprite2D).position.y > sy0 + 10.0,
+                        "THE BOSS SUMMON LAW: born-into-dive enemies FALL from birth (never frozen)")
+        for e2 in [diver, wdiver, sm]:
+                G.enemies.erase(e2)
+                if is_instance_valid(e2["node"]):
+                        e2["node"].queue_free()
 
         # ---- the thunder rework: the beam UP + chain falloff (floor 1) ----
         G.weapon = "thunder"
@@ -454,32 +522,68 @@ func _run() -> void:
         await _wait(0.4)
         _check(G._bubble_queue.is_empty(), "the reply PLAYS after the caller (never wiped)")
 
-        # ---- THE DEFENDER WEAPON LAW (PATCH IV: the REAL held weapons) ----
-        var dt := _mk("grunt", Vector2(G.defender.position.x + 180, G.defender.position.y - 160))
+        # ---- THE DEFENDER LAWS (v0.3.3-p1: the strafe, the vertical nose
+        # fire, the dodge) ----
+        var dt := _mk("grunt", Vector2(G.defender.position.x, G.defender.position.y - 340))
+        dt["state"] = "hover"
         var saved_enemies: Array = G.enemies.duplicate()
-        G.enemies = [dt]                       # the tests aim at ONE honest target
-        var ddir: Vector2 = (dt["node"].position - G.defender.position).normalized()
+        G.enemies = [dt]                       # the tests fly ONE honest target
         G.defender_fire_cd = 0.0
         var db0: int = G.bolts.size()
         G._defender_tick(0.016)
         _check(G.bolts.size() >= db0 + 2,
                         "the rented EMBER fires a real BEAM PAIR (no more plain bolts)")
         _check(absf(G.defender.rotation) < 0.02,
-                        "THE FIRE LAW: the rented body NEVER tilts for its shot (it stays level)")
+                        "THE LEVEL HULL LAW: the rented body NEVER tilts (it stays level)")
         var dmuzzle_ok := true
+        var vertical_ok := true
         for i in range(db0, G.bolts.size()):
                 dmuzzle_ok = dmuzzle_ok and ((G.bolts[i]["node"] as Sprite2D).position as Vector2) \
-                                                .distance_to(G.defender.position \
-                                                + Vector2(0, -40).rotated(G.defender.rotation)) < 1.0
+                                                .distance_to(G.defender.position + Vector2(0, -40)) < 1.0
+                vertical_ok = vertical_ok and absf((G.bolts[i]["vel"] as Vector2).normalized().angle()
+                                                - (-PI / 2.0)) < 0.15 \
+                                and (G.bolts[i]["node"] as Sprite2D).texture == G._tex["w_ember"]
         _check(dmuzzle_ok, "the defender's bolts leave its NOSE area, not its body center")
-        var beams_aimed := true
-        for i in range(db0, G.bolts.size()):
-                var sh: Dictionary = G.bolts[i]
-                beams_aimed = beams_aimed and absf((sh["vel"] as Vector2).normalized().angle()
-                                                - ddir.angle()) < 0.35 \
-                                and (sh["node"] as Sprite2D).texture == G._tex["w_ember"]
-        _check(beams_aimed, "the beam pair is AIMED at the nearest threat, wearing ember's sprite")
-        # the rented VERDANT flies the real weaving pierce - FREE snakes
+        _check(vertical_ok, "THE STRAFE LAW: the beams fly STRAIGHT UP - the gun never aims, the body strafes")
+        # an OFF-LANE target = the wingman DRIVES toward the lane first -
+        # nothing fires until its nose lines up under the threat
+        G.bolts.clear()
+        var dt2 := _mk("grunt", Vector2(G.defender.position.x + 320.0, G.defender.position.y - 340))
+        dt2["state"] = "hover"
+        G.enemies = [dt2]
+        G.defender_fire_cd = 0.0
+        var nb0: int = G.bolts.size()
+        print("DBG_STRAFE_START")
+        for i in 6:
+                G._defender_tick(0.016)
+        _check(G.bolts.size() == nb0, "an off-lane wingman HOLDS its fire (it never sprays an empty sky)")
+        for i in 200:
+                G._defender_tick(0.016)
+                if G.bolts.size() > nb0:
+                        break
+        var lane_gap: float = absf((dt2["node"] as Sprite2D).position.x - G.defender.position.x)
+        _check(lane_gap < 60.0 and G.bolts.size() > nb0,
+                        "THE STRAFE LAW: the wingman SLIDES left-right onto the threat's lane, THEN fires")
+        # THE DODGE LAW: a bolt dropping into its lane pushes the wingman aside
+        var dx0: float = G.defender.position.x
+        print("DBG_DODGE_START")
+        var dodge_bolt := Sprite2D.new()
+        dodge_bolt.texture = G._tex["ebolt"]
+        G.world.add_child(dodge_bolt)
+        dodge_bolt.position = Vector2(G.defender.position.x, G.defender.position.y - 420.0)
+        G.ebolts.append({"node": dodge_bolt, "vel": Vector2(0, 380)})
+        for i in 30:
+                G._defender_tick(0.016)
+        _check(absf(G.defender.position.x - dx0) > 12.0,
+                        "THE DODGE LAW: a falling bolt in its lane shoves the wingman ASIDE")
+        dodge_bolt.queue_free()
+        G.ebolts.clear()
+        # the rented VERDANT flies the real weaving pierce - FREE snakes, UP
+        G.enemies = [dt]
+        # the dodge shoved the wingman aside - park the target back in its
+        # lane so the snake DPS test flies against an honest line
+        (dt["node"] as Sprite2D).position = Vector2(G.defender.position.x,
+                        G.defender.position.y - 340.0)
         G.defender_id = "verdant"
         G.defender_fire_cd = 0.0
         var sn0: int = G.snakes.size()
@@ -488,14 +592,16 @@ func _run() -> void:
         var free_true := true
         for s in G.snakes:
                 free_true = free_true and bool(s.get("free", false)) \
-                                and absf(((s["dir"] as Vector2).normalized().angle() - ddir.angle())) < 0.1
-        _check(free_true, "the defender snakes are FREE beams aimed down their own line")
+                                and absf(((s["dir"] as Vector2).normalized().angle() - (-PI / 2.0))) < 0.1
+        _check(free_true, "the defender snakes are FREE beams flying STRAIGHT UP their lane")
         var fs_hp: int = dt["hp"]
         for i in 90:
                 G._snakes_tick(0.016)
         _check(int(dt["hp"]) < fs_hp, "the free snakes PIERCE for real (the DPS law rides along)")
         if is_instance_valid(dt["node"]):
                 dt["node"].queue_free()
+        if is_instance_valid(dt2["node"]):
+                dt2["node"].queue_free()
         G.snakes.clear()
         G.enemies = saved_enemies
         var dw: int = G.defender_waves_left

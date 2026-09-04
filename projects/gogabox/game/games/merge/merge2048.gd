@@ -127,6 +127,7 @@ var _sea_time := 0.0
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
 var _shop_pair: Array = []
+var _confirm_pair: Array = []        # the are-you-sure pair (the size law)
 var _options_pair: Array = []        # the OPTIONS sheet owns its pair too
 
 # the water physics constants (v0.2.8 THE REAL MOTION LAW). The surface is
@@ -1173,23 +1174,60 @@ func _size_row(id: String) -> Control:
         if on:
                 return v
         if owned:
+                # THE ARE-YOU-SURE LAW (v0.3.3-p1, the owner): changing the
+                # grid size wipes the run - it asks first now
                 v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
-                                Color("4a5ab8"), func():
-                                                Box.equip_item(game_id, "size", id)
-                                                Jukebox.sfx("confirm", -4.0)
-                                                _apply_size(id)
-                                                _options_open()))
+                                Color("4a5ab8"), func(): _size_confirm(id, false)))
                 return v
         var b := Arc.coin_button("BUY  %d" % int(sz["price"]),
                         Vector2(560, 56), 22, Color("4a5ab8"), func():
                                         if Box.buy_item(game_id, "size", id, int(sz["price"])):
                                                 Jukebox.sfx("buy")
-                                                _apply_size(id)
-                                        _options_open())
+                                                _size_confirm(id, true)
+                                        else:
+                                                _options_open())
         if Box.coins() < int(sz["price"]):
                 b.disabled = true
         v.add_child(b)
         return v
+
+## THE ARE-YOU-SURE SHEET (v0.3.3-p1): YES applies the new board (the run
+## starts fresh), NO walks back - a bought size that is refused re-equips
+## the old one so the store and the board always tell the same truth.
+func _size_confirm(id: String, bought: bool) -> void:
+        _confirm_pair_down()
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
+        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        var kids := root.get_children()
+        _confirm_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sz: Dictionary = SIZES[id]
+        var t := Arc.label("SWITCH TO %s?" % String(sz["name"]).to_upper(), 32, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var w := Arc.fit_label("switching starts a fresh board -\nthe current run is wiped",
+                        22, Arc.HOT, 560)
+        w.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(w)
+        sheet.add_child(Arc.button("YES - SWITCH", Vector2(560, 84), 28, Arc.GOOD, func():
+                        _confirm_pair_down()
+                        Box.equip_item(game_id, "size", id)
+                        Jukebox.sfx("confirm", -4.0)
+                        _apply_size(id)
+                        _options_open()))
+        sheet.add_child(Arc.button("NO", Vector2(560, 74), 26, Arc.BAD, func():
+                        _confirm_pair_down()
+                        if bought:
+                                Box.equip_item(game_id, "size", size_id)
+                        _options_open()))
+
+
+func _confirm_pair_down() -> void:
+        for n in _confirm_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _confirm_pair = []
+
 
 func _options_pair_down() -> void:
         for n in _options_pair:
