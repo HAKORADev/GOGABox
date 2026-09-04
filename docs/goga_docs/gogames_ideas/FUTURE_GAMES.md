@@ -61,6 +61,10 @@ not collect the bad things" - the catch-the-falling-items classic: good
 things rain down to grab, bad things rain down to dodge, miss the good or
 catch the bad and it costs you.)
 
+Tenth dump - the v0.3.3 patch-2 round (2026-09-05): +2, the
+absorb-and-grow family (a slime.io-like in 3D and a hole.io-like in 2D,
+one concept two flavors) and the beyblade battling arena.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine.
@@ -121,6 +125,20 @@ catch the bad and it costs you.)
   but MORE OPEN - Hungry Shark energy: free-swim a whole map, hunt, keep the
   hunger fed, learn which waters belong to whom. (Owner: "big fish eats small
   fish like feeding-frenzy but more open like hungry shark".)
+- **absorb-and-grow (slime.io 3D + hole.io 2D)** - one concept, two
+  flavors, parked together the way the owner said them: start TINY, absorb
+  whatever is smaller than you, GROW, and the things that scared you a
+  minute ago are food now. The hole.io flavor is 2D - you ARE the hole,
+  roaming the streets swallowing cars, poles, trees, then whole buildings
+  as your rim widens. The slime.io flavor is 3D - you ARE the blob,
+  gulping smaller slimes, dodging bigger ones, mass is the scoreboard.
+  (Owner: "a game like slime.io 3D and a game like hole.io 2D with
+  absorb-and-grow concept".)
+- **beyblade-like** - the spinning-top battle arena: build your top (tip,
+  disk, blade each bending the behavior), launch it into the ring, and
+  outspin / outsmash / ring-out / burst the rival top. Clashes, sparks,
+  stamina drains, a stadium that fights back. (Owner: "a game with beyblade
+  battling concept".)
 
 ## Puzzle
 - **klickety-like** - KDE Klickety (SameGame/Clickomania energy): a board
@@ -231,6 +249,8 @@ catch the bad and it costs you.)
 - **plants-vs-zombies-like** - PopCap PvZ: lane defense - plant your
   fighters on the grid, harvest the sun economy, stop the wave before it
   crosses the lawn.
+- (the beyblade-like above also leans here - parts loadout before the
+  match is a strategy layer on top of an arcade battle.)
 
 ## Ports & redesigns
 - **the rest of the python game box games** — carried over with proper
