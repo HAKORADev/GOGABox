@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://gogaboxx11flow"]
+
+[ext_resource type="Script" path="res://tests/x11_flow_probe.gd" id="1"]
+
+[node name="X11FlowProbe" type="Node"]
+script = ExtResource("1")

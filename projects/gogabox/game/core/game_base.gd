@@ -61,6 +61,15 @@ var _toast: Dictionary
 var _ach_clock := 0.0
 var _hud_row: HBoxContainer   # the top bar (v0.0.8: game buttons live IN it)
 var _flow_btns := 0           # game buttons inserted after the back button
+# v0.3.3-p2 THE SHEET STACK + BACK LAW: every game-owned modal sheet goes
+# through sheet_push/sheet_pop - exact dim+center pairs, the newest on top.
+# The HUD back button AND the Android back button both walk this stack:
+# a sheet open -> close the top sheet; nothing open -> the pause sheet.
+# This is the cure for the whole "back does nothing / the game hangs" family
+# (the old per-game pair juggling removed the WRONG dim+center pair and left
+# invisible dims eating every tap).
+var _sheet_stack: Array = []  # [{dim: Control, cc: Control}]
+var _pause_pair: Array = []   # [dim, cc] of the live pause sheet
 # v0.1.0 owner rule: the score-bonus ratio lives in the DEAD MENU only -
 # the in-game HUD line from v0.0.9 is gone (Arc.bonus_ratio_text stays,
 # host_node.gd still prints "pickups = N - score bonus = S/D = B").
@@ -107,6 +116,58 @@ func finish_run(final_score: int, final_coins := -1) -> void:
 
 func quit_to_box() -> void:
         request_quit.emit()
+
+# --------------------------------------------------- the sheet stack (v0.3.3-p2)
+
+## THE one way a game opens a modal sheet. Returns the inner VBox to fill.
+## The exact dim+center pair is captured and tracked (with the caller's id);
+## the sheet chain gets PROCESS_MODE_ALWAYS so it stays alive even while the
+## tree is paused, and BoxScroll's topmost law hands every tap above it to
+## THIS sheet.
+func sheet_push(sheet_height := 0.0, id := "") -> VBoxContainer:
+        var root := _overlay_root_ref()
+        var vb := Arc.sheet(root, sheet_height)
+        var kids := root.get_children()
+        var dim: Control = kids[kids.size() - 2]
+        var cc: Control = kids[kids.size() - 1]
+        dim.process_mode = Node.PROCESS_MODE_ALWAYS
+        cc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _sheet_stack.append({"dim": dim, "cc": cc, "id": id})
+        return vb
+
+## Close the top sheet - its EXACT pair dies (never a neighbor, never a
+## sheet that opened after it). The game hears WHICH sheet died through
+## _goga_sheet_popped so its own state flags never desync.
+func sheet_pop() -> void:
+        if _sheet_stack.is_empty():
+                return
+        var s: Dictionary = _sheet_stack.pop_back()
+        for k in [s["dim"], s["cc"]]:
+                if k != null and is_instance_valid(k):
+                        k.queue_free()
+        _goga_sheet_popped(String(s.get("id", "")))
+
+## the game's state sync when the BASE closed a sheet for it (the back
+## button path) - match the id, flip the matching flag
+func _goga_sheet_popped(_id: String) -> void:
+        pass
+
+func sheet_open_count() -> int:
+        return _sheet_stack.size()
+
+## THE BACK LAW - the HUD "<" button and the Android back button both land
+## here. Top sheet open -> close it. Pause sheet open -> resume. Nothing
+## open -> the pause sheet. One behavior in every game, every screen.
+func _back_pressed() -> void:
+        if over:
+                return
+        if not _pause_pair.is_empty():
+                _pause_close()
+                return
+        if not _sheet_stack.is_empty():
+                sheet_pop()
+                return
+        _pause_open()
 
 # --------------------------------------------------- achievements / counters
 
@@ -216,7 +277,7 @@ func _build_hud() -> void:
         _hud_row = top
 
         var back := Arc.button("<", Vector2(64, 64), 30, Color(0.16, 0.10, 0.05, 0.85),
-                func(): _pause_open())
+                func(): _back_pressed())
         top.add_child(back)
 
         var mid := Control.new()
@@ -306,12 +367,20 @@ func _toast_ref() -> Dictionary:
         return _toast
 
 func _pause_open() -> void:
-        if over or paused:
+        if over or paused or not _pause_pair.is_empty():
                 return
         paused = true
         get_tree().paused = true
         var sheet := Arc.sheet(_overlay_root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        # v0.3.3-p2: ALWAYS rides the DIM (the sheet's true root) - the whole
+        # branch processes while the tree is paused, and the dim itself can
+        # still eat the taps that miss the panel
+        var kids := _overlay_root.get_children()
+        var dim: Control = kids[kids.size() - 2]
+        var cc: Control = kids[kids.size() - 1]
+        dim.process_mode = Node.PROCESS_MODE_ALWAYS
+        cc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _pause_pair = [dim, cc]
         var g := GameReg.get_game(game_id)
         var title := Arc.label(String(g.get("title", game_id)), 44, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -324,17 +393,20 @@ func _pause_open() -> void:
                         _pause_close()
                         finish_run(score)))
         sheet.add_child(Arc.button("QUIT TO BOX", Vector2(460, 84), 26, Arc.BAD, func():
-                get_tree().paused = false
+                _pause_close()
                 quit_to_box()))
         Arc.fit_sheet(sheet, 3 if end_ok else 2)     # pinned rows, content clamped
 
 func _pause_close() -> void:
         get_tree().paused = false
         paused = false
-        # remove the sheet (last 2 children added: dim + center container)
-        var kids := _overlay_root.get_children()
-        for i in range(maxi(0, kids.size() - 2), kids.size()):
-                kids[i].queue_free()
+        # v0.3.3-p2: the EXACT tracked pair dies (the old "last 2 children"
+        # removal freed a LATER sheet's pair instead and left invisible dims
+        # eating every tap - the hang family)
+        for k in _pause_pair:
+                if k != null and is_instance_valid(k):
+                        k.queue_free()
+        _pause_pair = []
 
 # --------------------------------------------------- unified input plumbing
 

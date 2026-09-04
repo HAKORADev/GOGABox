@@ -562,7 +562,9 @@ func _run() -> void:
                 if G.bolts.size() > nb0:
                         break
         var lane_gap: float = absf((dt2["node"] as Sprite2D).position.x - G.defender.position.x)
-        _check(lane_gap < 60.0 and G.bolts.size() > nb0,
+        # v0.3.3-p2: the lane window grew 52 -> 66 (the wingman feels alive -
+        # it fires the moment its lane is honestly ON the threat)
+        _check(lane_gap < 70.0 and G.bolts.size() > nb0,
                         "THE STRAFE LAW: the wingman SLIDES left-right onto the threat's lane, THEN fires")
         # THE DODGE LAW: a bolt dropping into its lane pushes the wingman aside
         var dx0: float = G.defender.position.x

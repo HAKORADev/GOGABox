@@ -1,27 +1,34 @@
 extends GogaGame
-## MATCHER - v0.3.3, the happy one. Bejeweled-Classic energy (PopCap's
-## endless jewel), NOT a level machine: one endless board, five MODES, the
-## specials earned by matching (flame / star / hypercube - VFX OVERLAYS on
-## top of any skin, the owner's skin-safe law), the Candy-Crush-style bought
-## power-ups refilled with the ROUND balance, and the GOGACoin that takes a
-## real grid place and must be escorted to the bottom row.
-## The PGB python matcher (v1.3.8) lives again as the CHALLENGE mode.
+## MATCHER - v0.3.3 PATCH 2, the smooth one. Every motion tweens (the owner:
+## "the game is not smooth and has weird instant animations that is totally
+## uncanny"), the specials are a SHADER ON THE GEM ITSELF (the owner: "i want
+## it to be like a shader on the asset, not a weird VFX that is even not
+## synced with the thing movement"), the coin drops like any normal gem and
+## auto-collects at the bottom, the powers buy with the GLOBAL GOGACoins, and
+## the three Bejeweled-Classic modes follow the owner's specs: Diamond Mine
+## rows push up from the bottom every 25s (+25s per cleared row, 60s start),
+## Ice Storm grows vertical ice columns (3-segment horizontal melts, full
+## vertical destroys, more lines with progression, top = lost), Butterflies
+## rise with real animations and the SPIDER hunts the nearest one.
 ##
 ## THE OWNER LAWS this file obeys:
 ##  - "every single thing will be 1 score point, and the bonus will be /300"
-##  - the coin: "make it appear and takes a grid real place, then the user
-##    has to make it reach the bottom and it will drop and be earned, make
-##    the 30s timer be based on last collected one not last appeared one"
+##  - "make powerups be based on global GOGACoins and not round-balance"
+##  - the shop: "CLEARLY A BUTTON AT THE TOP CALLED SHOP IN EVERY SINGLE GAME"
+##    (never a row inside the optionals)
+##  - "make it drop down like any normal thing ... when it is in the bottom,
+##    it should be auto collected"
 ##  - "make a lose here takes -500 score points ... only in challenge mode"
 ##  - PEACE = the snake peace: 0 bonus, 0 coins, no power-ups, END in pause
-##  - "the 4-match special thing will be a VFX drawn on-top of whatever"
 ##  - happy + welcoming atmosphere, vertical-only view, banner strip seated
 
 const COLS := 8
 const ROWS := 8
 const COLORS := 5
 
-## skins: base gem art per skin (the specials are overlays - skin-safe)
+## skins: base gem art per skin. The SPECIALS are a shader on the gem sprite
+## (skin-safe by construction - the shader works on any texture). The donut
+## skin wears the owner's Match_3_Template donuts + checker cells + backdrop.
 const SKINS := {
         "gem": {"name": "Gem Vault", "price": 0,
                 "tex": ["res://assets/games/matcher/gems/gem_0.png",
@@ -35,8 +42,17 @@ const SKINS := {
                         "res://assets/games/matcher/gems/candy_2.png",
                         "res://assets/games/matcher/gems/candy_3.png",
                         "res://assets/games/matcher/gems/candy_4.png"]},
+        "donut": {"name": "Donut Den", "price": 280,
+                "tex": ["res://assets/games/matcher/gems/donut_0.png",
+                        "res://assets/games/matcher/gems/donut_1.png",
+                        "res://assets/games/matcher/gems/donut_2.png",
+                        "res://assets/games/matcher/gems/donut_3.png",
+                        "res://assets/games/matcher/gems/donut_4.png"],
+                "bg": "res://assets/games/matcher/bg/bg_donut.png",
+                "cell": ["res://assets/games/matcher/bg/cell_donut_light.png",
+                        "res://assets/games/matcher/bg/cell_donut_dark.png"]},
 }
-const SKIN_ORDER := ["gem", "candy"]
+const SKIN_ORDER := ["gem", "candy", "donut"]
 
 ## the five modes (Bejeweled Classic shelf, renamed per the owner)
 const MODES := {
@@ -58,8 +74,9 @@ const MODES := {
 }
 const MODE_ORDER := ["challenge", "peace", "butterflies", "ice", "mine"]
 
-## the bought power-ups (unlock once with the wallet; refill in-play up to
-## 3 charges with the ROUND balance - never the box wallet)
+## the bought power-ups (unlock once with the wallet; in-play stock pays the
+## GLOBAL GOGACoins - the owner: "make powerups be based on global GOGACoins
+## and not round-balance"). Cap 3 per run, the gray-out law stays.
 const POWERS := {
         "shuffle": {"name": "Shuffle", "price": 100, "refill": 30,
                 "icon": "res://assets/games/matcher/power/p_shuffle.png",
@@ -79,9 +96,13 @@ const POWER_MAX := 3
 
 const COIN_EVERY := 30.0        # the owner's rhythm - from last COLLECTED
 const RUN_CLOCK := 300.0        # challenge: the real life of a run
-const MINE_CLOCK := 90.0        # diamond mine start clock
-const MINE_DESCEND := 30.0      # +30s per layer dug through
-const EARTH_ROWS := 3           # the mine's buried band
+# DIAMOND MINE - the owner's Bejeweled-Classic spec: "each specific like 25
+# seconds it makes another row and clearing a row gives extra 25 seconds and
+# the round starts with 60 seconds and some times it make two rows"
+const MINE_CLOCK := 60.0        # the dig clock starts at 60s
+const MINE_ROW_TIME := 25.0     # a new earth row every 25s...
+const MINE_ROW_BONUS := 25.0    # ...and a cleared row pays +25s
+const MINE_DOUBLE := 0.25       # ...sometimes two rows at once
 
 # ------------------------------------------------------------ state
 var skin := "gem"
@@ -109,19 +130,23 @@ var drought_color := -1
 var rush_left := 0.0
 var pace := 1                   # butterflies: rows per move
 var pace_clock := 45.0
-var frost := [0, 0, 0, 0, 0, 0, 0, 0]  # ice: layers per column
-var frost_clock := 7.0
-var frost_gap := 7.0
+var frost := [0, 0, 0, 0, 0, 0, 0, 0]  # ice: segments per column (bottom-up)
+var frost_clock := 8.0
+var frost_gap := 8.0
+var frost_ticks := 0            # progression: every 4th spawn joins a 2nd line
 var temp := 0.0                 # the temperature gauge (0..1)
 var melt_chain := 0.0           # consecutive melts within 3s
+var melt_plan := {}             # col -> "3" | "all" (built from the wave groups)
 var dig_clock := MINE_CLOCK
-var depth := 0                  # meters descended
-var earth := []                 # mine: EARTH_ROWS x COLS of {tr: ""}
-var earth_left := 0
+var mine_rise_clock := MINE_ROW_TIME   # the 25s earth-row clock
+var depth := 0                  # earth rows cleared (meters descended)
+var earth_top := ROWS           # mine: the first earth row (ROWS = no earth)
+var earth := []                 # earth rows: earth[r] = [{tr, node, tr_spr}]
 
 ## the coin
 var coin_clock := COIN_EVERY
 var coin_cell := Vector2i(-1, -1)
+var _coin_refill_pending := false
 
 ## powers
 var charges := {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
@@ -144,12 +169,11 @@ var chip_mode: Label
 var chip_info: Label
 var chip_info2: Label
 var pick_open := false
-var pick_sheet := []            # the optionals trio
-var shop_sheet := []            # the shop trio
-var shop_open := false
 var first_moment := true        # the boot optionals owns the first tap
-var refill_sheet := []          # open refill sheet trio
 var armed_cursor: Sprite2D
+var spider: Sprite2D            # butterflies: the hunter on the top rail
+var spider_tw: Tween
+var wallet_chip: PanelContainer # the buy popup's live full-balance chip
 
 var tex_gem: Array = []
 var _tex := {}                  # lazily loaded aux textures
@@ -167,10 +191,10 @@ func _t(key: String) -> Texture2D:
                 var paths := {
                         "coin": "res://assets/ui/coin.png",
                         "cell": "res://assets/games/matcher/bg/cell.png",
+                        "cell_donut0": "res://assets/games/matcher/bg/cell_donut_light.png",
+                        "cell_donut1": "res://assets/games/matcher/bg/cell_donut_dark.png",
                         "plate": "res://assets/games/matcher/bg/plate.png",
-                        "flame": "res://assets/games/matcher/specials/ov_flame.png",
-                        "star": "res://assets/games/matcher/specials/ov_star.png",
-                        "hyper": "res://assets/games/matcher/specials/ov_hyper.png",
+                        "banner": "res://assets/games/matcher/fx/banner.png",
                         "wing": "res://assets/games/matcher/modes/butterfly.png",
                         "spider": "res://assets/games/matcher/modes/spider.png",
                         "ice1": "res://assets/games/matcher/modes/ice_1.png",
@@ -191,6 +215,111 @@ func _t(key: String) -> Texture2D:
                 }
                 _tex[key] = load(paths[key])
         return _tex[key]
+
+## the specials shader - one material per cell, ON the gem sprite (the owner:
+## "like a shader on the asset")
+var _special_shader: Shader
+
+func _special_mat(kind: String) -> ShaderMaterial:
+        if _special_shader == null:
+                _special_shader = load("res://assets/games/matcher/specials/special.gdshader")
+        var m := ShaderMaterial.new()
+        m.shader = _special_shader
+        m.set_shader_parameter("special",
+                        1 if kind == "flame" else (2 if kind == "star" else 3))
+        return m
+
+
+## v0.3.3-p2 THE WING BAKE: a butterfly's wings are COMPOSED INTO its own
+## texture (gem art + the monarch sheet) - the sprite moves as one thing,
+## so nothing can ever desync or overlap again (the owner's "flies corrupt
+## the line and overlap things" bug died with the separate overlay node).
+var _wing_bake := {}     # (skin|color) -> ImageTexture
+
+func _cell_texture(color: int, wing: bool) -> Texture2D:
+        var base: Texture2D = tex_gem[color % tex_gem.size()]
+        if not wing:
+                return base
+        var key := "%s|%d" % [skin, color]
+        if _wing_bake.has(key):
+                return _wing_bake[key]
+        var img: Image = base.get_image()
+        if img == null:
+                return base
+        if img.is_compressed():
+                img.decompress()
+        img.convert(Image.FORMAT_RGBA8)
+        var wing_img: Image = (_t("wing") as Texture2D).get_image()
+        if wing_img != null:
+                if wing_img.is_compressed():
+                        wing_img.decompress()
+                wing_img.convert(Image.FORMAT_RGBA8)
+                # scale the wing sheet onto the gem square, centered
+                var size := img.get_width()
+                var wimg := Image.create(size, size, false, Image.FORMAT_RGBA8)
+                wimg.fill(Color(0, 0, 0, 0))
+                var scale_f := float(size) / float(wing_img.get_width()) * 1.15
+                var dw := int(wing_img.get_width() * scale_f)
+                var dh := int(wing_img.get_height() * scale_f)
+                wing_img.resize(dw, dh, Image.INTERPOLATE_LANCZOS)
+                var ox := (size - dw) / 2
+                var oy := (size - dh) / 2
+                wimg.blend_rect(wing_img, Rect2i(0, 0, dw, dh), Vector2i(ox, oy))
+                img.blend_rect(wimg, Rect2i(0, 0, size, size), Vector2i(0, 0))
+        var tex := ImageTexture.create_from_image(img)
+        _wing_bake[key] = tex
+        return tex
+
+
+func _retexture_cell(r: int, c: int) -> void:
+        var cell: Dictionary = grid[r][c]
+        if cell.is_empty() or not is_instance_valid(cell.get("node")):
+                return
+        var n: Sprite2D = cell["node"]
+        if _is_coin(cell):
+                n.texture = _t("coin")
+                return
+        n.texture = _cell_texture(int(cell["color"]), bool(cell.get("wing", false)))
+        _dress_special(r, c)
+
+
+## THE TOP BANNER (v0.3.3-p2, the owner: a lose/round message "appears inside
+## the grid and not somewhere at the top as example"): the template's ribbon
+## rides just under the HUD, slides in, fades out. Every mode event speaks
+## here - never inside the grid again.
+func _banner(txt: String, good := true) -> void:
+        var root := _overlay_root_ref()
+        var holder := Control.new()
+        holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        holder.set_anchors_preset(Control.PRESET_TOP_WIDE)
+        holder.offset_top = 186.0
+        holder.offset_bottom = 306.0
+        root.add_child(holder)
+        var ribbon := TextureRect.new()
+        ribbon.texture = _t("banner")
+        ribbon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ribbon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ribbon.set_anchors_preset(Control.PRESET_FULL_RECT)
+        ribbon.offset_left = 190.0
+        ribbon.offset_right = -190.0
+        ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        ribbon.modulate = Color(1, 1, 1, 0.0)
+        holder.add_child(ribbon)
+        var l := Arc.fit_label(txt, 30, Arc.INK, 620)
+        l.set_anchors_preset(Control.PRESET_FULL_RECT)
+        l.offset_bottom = -18.0
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        l.modulate.a = 0.0
+        holder.add_child(l)
+        var tw := holder.create_tween()
+        tw.set_parallel(true)
+        tw.tween_property(ribbon, "modulate:a", 1.0, 0.22)
+        tw.tween_property(l, "modulate:a", 1.0, 0.22)
+        tw.chain().tween_interval(1.15)
+        tw.chain().tween_property(holder, "modulate:a", 0.0, 0.3)
+        tw.chain().tween_callback(holder.queue_free)
 
 
 # ================================================================ setup
@@ -221,6 +350,10 @@ func _goga_setup() -> void:
         _build_spider()
         _build_rail()
         _ready_input()
+        # THE UNIVERSAL SHOP BUTTON (the owner: "the shop IS CLEARLY A BUTTON
+        # AT THE TOP CALLED SHOP IN EVERY SINGLE GAME") - the optionals sheet
+        # never sells again
+        add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/matcher_happy.mp3")
         _pick_open(true)
 
@@ -229,6 +362,9 @@ func _build_background(vp: Vector2) -> void:
         var path := "res://assets/games/matcher/bg/bg_day.png"
         if mode == "peace":
                 path = "res://assets/games/matcher/bg/bg_peace.png"
+        # the donut skin wears its own template backdrop
+        if skin == "donut" and mode != "peace" and SKINS[skin].has("bg"):
+                path = String(SKINS[skin]["bg"])
         bg_spr = Sprite2D.new()
         bg_spr.texture = load(path)
         var ts := Vector2(vp.x / bg_spr.texture.get_width(), vp.y / bg_spr.texture.get_height())
@@ -258,7 +394,7 @@ func _pos_to_cell(p: Vector2) -> Vector2i:
 func _build_board_plate() -> void:
         var vp := get_viewport_rect().size
         var bp := _board_pixel()
-        board_o = Vector2((vp.x - bp.x) * 0.5, clampf(vp.y * 0.26, 280.0, vp.y - bp.y - banner_bottom() - 300.0))
+        board_o = Vector2((vp.x - bp.x) * 0.5, clampf(vp.y * 0.30, 330.0, vp.y - bp.y - banner_bottom() - 300.0))
         var plate := Sprite2D.new()
         plate.texture = _t("plate")
         plate.centered = false
@@ -266,10 +402,15 @@ func _build_board_plate() -> void:
         plate.scale = Vector2.ONE * cell_px / 120.0
         plate.z_index = -10
         world.add_child(plate)
+        var checker: Array = []
+        if SKINS[skin].has("cell"):
+                checker.append(load(String(SKINS[skin]["cell"][0])))
+                checker.append(load(String(SKINS[skin]["cell"][1])))
         for r in ROWS:
                 for c in COLS:
                         var cell := Sprite2D.new()
-                        cell.texture = _t("cell")
+                        cell.texture = _t("cell") if checker.is_empty() \
+                                        else checker[(r + c) % 2]
                         cell.centered = false
                         cell.position = board_o + Vector2(c, r) * cell_px
                         cell.scale = Vector2.ONE * cell_px / 120.0
@@ -278,17 +419,39 @@ func _build_board_plate() -> void:
 
 
 func _build_hud_extras() -> void:
-        chip_mode = add_hud_chip(String(MODES[mode]["name"]))
-        chip_info = add_hud_chip("")
-        chip_info2 = add_hud_chip("")
-        # THE QUIET HUD LAW (v0.3.3-p1, the owner: "I saw a help message on
-        # the top, which we usually do not do that in the games, this can be
-        # in the guide"): the on-board tip line is GONE - every mode's
-        # wisdom already lives in the ? guide sheet
+        # v0.3.3-p2 THE NOTCH LAW (the owner: "move the widgets under the
+        # GOGACoins row ... they behind the physical front camera, make it go
+        # down"): the top bar sits LOWER (clears the camera cutout) and the
+        # mode chips get their OWN second row under it
+        if _hud_row != null and is_instance_valid(_hud_row):
+                _hud_row.offset_top = 44.0
+                _hud_row.offset_bottom = 108.0
+        var row2 := HBoxContainer.new()
+        row2.set_anchors_preset(Control.PRESET_TOP_WIDE)
+        row2.offset_left = 14
+        row2.offset_right = -14
+        row2.offset_top = 116.0
+        row2.offset_bottom = 170.0
+        row2.alignment = BoxContainer.ALIGNMENT_CENTER
+        row2.add_theme_constant_override("separation", 10)
+        row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _hud.add_child(row2)
+        var cm := Arc.chip("", "", Color(0, 0, 0, 0.4), 22, Arc.CARD)
+        var ci := Arc.chip("", "", Color(0, 0, 0, 0.4), 22, Arc.CARD)
+        var ci2 := Arc.chip("", "", Color(0, 0, 0, 0.4), 22, Arc.CARD)
+        row2.add_child(cm)
+        row2.add_child(ci)
+        row2.add_child(ci2)
+        chip_mode = cm.get_child(0).get_child(cm.get_child(0).get_child_count() - 1)
+        chip_info = ci.get_child(0).get_child(ci.get_child(0).get_child_count() - 1)
+        chip_info2 = ci2.get_child(0).get_child(ci2.get_child(0).get_child_count() - 1)
         _refresh_hud()
 
 
 func _build_spider() -> void:
+        if spider != null and is_instance_valid(spider):
+                spider.queue_free()
+        spider = null
         if mode != "butterflies":
                 return
         var sp := Sprite2D.new()
@@ -297,30 +460,22 @@ func _build_spider() -> void:
         sp.scale = Vector2.ONE * (cell_px / 160.0) * 1.3
         sp.z_index = 12
         world.add_child(sp)
+        spider = sp
 
 
 # ================================================================ the optionals
-## THE OPTIONALS SCREEN (v0.3.3-p1, the owner: "I saw the first screen as
-## matcher and not an optionals menu like the rest of the optionals screen,
-## also the shop here is not a button"): the snake/invaders standard now
-## greets first - one scrollable sheet, one IMAGE box per mood, the skins
-## row, and a REAL SHOP BUTTON. Tapping an owned mood STARTS it (always -
-## even the picked one; the old picker disabled the current mode's card and
-## left its buttons unregistered, so taps died inside the scroll). A locked
-## box's tap opens the SHOP (the snake law). No help line rides the HUD -
-## the mode wisdom lives in the guide (the owner: "this can be in the guide").
+## THE OPTIONALS SCREEN (v0.3.3-p2 THE UNIVERSAL SHAPE): one scrollable
+## sheet, one IMAGE box per mood, the skins row - and NO SHOP ROW (the
+## owner: "it should not has the shop there, the shop IS CLEARLY A BUTTON AT
+## THE TOP CALLED SHOP IN EVERY SINGLE GAME"). It rides the base sheet
+## stack, never pauses the tree (the phase gates the play), so the HUD back
+## button and the Android back CLOSE it - the owner's dead-back report.
 
 func _pick_open(first := false) -> void:
         if pick_open:
                 return
         pick_open = true
-        paused = true
-        get_tree().paused = true
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        pick_sheet = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sheet := sheet_push(0.0, "pick")
         var title := Arc.fit_label("OPTIONALS - THE MOOD SHELF", 34, Arc.HOT, 560)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(title)
@@ -337,7 +492,6 @@ func _pick_open(first := false) -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        pick_sheet.append(sc)
         var grid := GridContainer.new()
         grid.columns = 2
         grid.add_theme_constant_override("h_separation", 12)
@@ -356,9 +510,6 @@ func _pick_open(first := false) -> void:
         box.add_child(skinrow)
         for sid in SKIN_ORDER:
                 skinrow.add_child(_skin_chip(sid))
-        var shopb := Arc.button("SHOP", Vector2(0, 78), 28, Arc.COIN, func(): _shop_open())
-        shopb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        box.add_child(shopb)
         var cb := Arc.button("TO THE BOARD" if first_moment else "CLOSE",
                         Vector2(0, 78), 26, Arc.GOOD, func():
                         var go := first_moment and phase != "play"
@@ -492,41 +643,44 @@ func _pick_equip_skin(sid: String) -> void:
         skin = sid
         _refresh_board_skin()
         Jukebox.sfx("confirm", -3.0)
-        _pick_close()
+        _pick_rebuild()
+
+
+## the stack-safe rebuild: the live optionals pops, a fresh one pushes
+func _pick_rebuild() -> void:
+        _pick_down()
         _pick_open(false)
 
 
 func _pick_close() -> void:
         _pick_down()
-        get_tree().paused = false
-        paused = false
 
 
 func _pick_down() -> void:
+        if not pick_open:
+                return
         pick_open = false
-        for k in pick_sheet:
-                if is_instance_valid(k):
-                        k.queue_free()
-        pick_sheet = []
+        sheet_pop()
+
+
+## the base closed a sheet for us (the back button) - keep the flags honest
+func _goga_sheet_popped(id: String) -> void:
+        match id:
+                "pick":
+                        pick_open = false
+                "power":
+                        wallet_chip = null
 
 
 # ================================================================ the shop
-## THE SHOP IS A BUTTON'S GUEST (v0.3.3-p1, the owner: "a proper shop"):
-## one scrollable sheet in the invaders store style - the moods, the skin,
-## the power unlocks - every price paid from the FULL GOGABox wallet.
+## THE SHOP (v0.3.3-p2): the HUD's top SHOP button is its only door. It
+## pushes ON TOP of whatever is live (the optionals stays beneath it and
+## comes back on close - the stack owns the layering), never pauses the
+## tree, and every rebuild is pop-then-push (no orphan dims). Every price
+## is paid from the FULL GOGABox wallet.
 
 func _shop_open() -> void:
-        if shop_open:
-                return
-        _pick_down()
-        shop_open = true
-        paused = true
-        get_tree().paused = true
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        shop_sheet = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sheet := sheet_push(0.0, "shop")
         var title := Arc.fit_label("MATCHER SHOP", 34, Arc.INK, 560)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(title)
@@ -543,17 +697,17 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        shop_sheet.append(sc)
         var sec := Arc.fit_label("THE MOODS - BUY ONE, PICK IT IN OPTIONALS", 20, Arc.HOT, 560)
         sec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(sec)
         for id in MODE_ORDER:
                 box.add_child(_shop_mode_row(id))
-        var sec2 := Arc.fit_label("THE SKIN", 20, Arc.HOT, 560)
+        var sec2 := Arc.fit_label("THE SKINS", 20, Arc.HOT, 560)
         sec2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(sec2)
-        box.add_child(_shop_skin_row())
-        var sec3 := Arc.fit_label("THE POWERS - UNLOCK ONCE, REFILL IN PLAY", 20, Arc.HOT, 560)
+        box.add_child(_shop_skin_row("candy"))
+        box.add_child(_shop_skin_row("donut"))
+        var sec3 := Arc.fit_label("THE POWERS - UNLOCK ONCE, STOCK IN PLAY", 20, Arc.HOT, 560)
         sec3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(sec3)
         for pid in POWER_ORDER:
@@ -562,6 +716,12 @@ func _shop_open() -> void:
         cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         box.add_child(cb)
         _pick_finish(sc)
+
+
+## the stack-safe rebuild: the live shop pops, a fresh one pushes
+func _shop_rebuild() -> void:
+        _shop_down()
+        _shop_open()
 
 
 func _shop_mode_row(id: String) -> Control:
@@ -580,25 +740,24 @@ func _shop_mode_row(id: String) -> Control:
                                 Jukebox.sfx("error", -6.0)
                                 _toast_show("need %d more coins" %
                                                 (int(m["price"]) - Box.coins()))
-                        _shop_down()
-                        _shop_open())
+                        _shop_rebuild())
         b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         if Box.coins() < int(m["price"]):
                 b.disabled = true
         return b
 
 
-func _shop_skin_row() -> Control:
-        var s: Dictionary = SKINS["candy"]
-        if Box.skin_owned(game_id, "candy"):
-                var l := Arc.fit_label("CANDY SHOP  -  OWNED (WEAR IT IN OPTIONALS)",
+func _shop_skin_row(sid: String) -> Control:
+        var s: Dictionary = SKINS[sid]
+        if Box.skin_owned(game_id, sid) or int(s["price"]) == 0:
+                var l := Arc.fit_label("%s  -  OWNED (WEAR IT IN OPTIONALS)" % String(s["name"]).to_upper(),
                                 20, Color("58c470"), 560)
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 return l
-        var b := Arc.coin_button("CANDY SHOP  -  %d" % int(s["price"]),
+        var b := Arc.coin_button("%s  -  %d" % [String(s["name"]).to_upper(), int(s["price"])],
                         Vector2(0, 64), 22, Color("c45a9a"), func():
-                        if Box.buy_skin(game_id, "candy", int(s["price"])):
-                                skin = "candy"
+                        if Box.buy_skin(game_id, sid, int(s["price"])):
+                                skin = sid
                                 _refresh_board_skin()
                                 Jukebox.sfx("m_goal", -4.0)
                                 Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
@@ -606,8 +765,7 @@ func _shop_skin_row() -> Control:
                                 Jukebox.sfx("error", -6.0)
                                 _toast_show("need %d more coins" %
                                                 (int(s["price"]) - Box.coins()))
-                        _shop_down()
-                        _shop_open())
+                        _shop_rebuild())
         b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         if Box.coins() < int(s["price"]):
                 b.disabled = true
@@ -626,12 +784,12 @@ func _shop_power_row(pid: String) -> Control:
                         if Box.buy_item(game_id, "power", pid, int(p["price"])):
                                 Jukebox.sfx("m_goal", -4.0)
                                 Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+                                _refresh_rail()
                         else:
                                 Jukebox.sfx("error", -6.0)
                                 _toast_show("need %d more coins" %
                                                 (int(p["price"]) - Box.coins()))
-                        _shop_down()
-                        _shop_open())
+                        _shop_rebuild())
         b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         if Box.coins() < int(p["price"]):
                 b.disabled = true
@@ -640,19 +798,10 @@ func _shop_power_row(pid: String) -> Control:
 
 func _shop_close() -> void:
         _shop_down()
-        get_tree().paused = false
-        paused = false
-        # the shop only opens from the optionals (pre-run) - walk back there
-        if phase != "play" and not over:
-                _pick_open(false)
 
 
 func _shop_down() -> void:
-        shop_open = false
-        for k in shop_sheet:
-                if is_instance_valid(k):
-                        k.queue_free()
-        shop_sheet = []
+        sheet_pop()
 
 
 func _refresh_board_skin() -> void:
@@ -673,7 +822,7 @@ func _refresh_board_skin() -> void:
                         if cell.is_empty() or int(cell.get("color", -1)) < 0:
                                 continue
                         var n: Sprite2D = cell["node"]
-                        n.texture = tex_gem[int(cell["color"]) % tex_gem.size()]
+                        n.texture = _cell_texture(int(cell["color"]), bool(cell.get("wing", false)))
 
 
 # ================================================================ mode start
@@ -690,8 +839,12 @@ func _start_mode(id: String) -> void:
         frost_clock = 7.0
         frost_gap = 7.0
         temp = 0.0
+        frost_ticks = 0
+        melt_plan = {}
         dig_clock = MINE_CLOCK
+        mine_rise_clock = MINE_ROW_TIME
         depth = 0
+        earth_top = ROWS
         coin_clock = COIN_EVERY
         coin_cell = Vector2i(-1, -1)
         charges = {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
@@ -711,6 +864,10 @@ func _start_mode(id: String) -> void:
                 # deal started round_clock at 0 and every run ate an instant -500 gong
                 round_no = 1
                 _roll_round()
+        # v0.3.3-p2: the spider only ever lived on the boot screen's mode - a
+        # butterflies run started from the picker had NONE (the owner's "there
+        # is no spider?")
+        _build_spider()
         _refresh_rail()
         _refresh_hud()
 
@@ -748,8 +905,7 @@ func _new_cell(r: int, c: int, from_y := -1.0) -> Dictionary:
         n.scale = Vector2.ONE * cell_px / 100.0
         n.z_index = 2
         world.add_child(n)
-        return {"color": col, "special": "", "wing": false, "node": n,
-                        "ov": null, "wing_ov": null}
+        return {"color": col, "special": "", "wing": false, "node": n}
 
 
 func _deal_board() -> void:
@@ -768,12 +924,9 @@ func _deal_board() -> void:
                 grid.append(row)
         earth = []
         if mode == "mine":
-                for r in EARTH_ROWS:
-                        var er := []
-                        for c in COLS:
-                                er.append({"tr": ""})
-                        earth.append(er)
-                _lay_earth(1.0)
+                earth_top = ROWS - 1          # ONE earth row waits at the bottom
+                earth.resize(ROWS)
+                _lay_earth_row(earth_top, 1.0)
         for r in ROWS:
                 if _in_earth(r):
                         continue
@@ -820,7 +973,10 @@ func _deal_animate() -> void:
 
 
 func _in_earth(r: int) -> bool:
-        return mode == "mine" and r < EARTH_ROWS
+        # v0.3.3-p2 THE MINE PUSHES FROM THE BOTTOM (the owner's Bejeweled
+        # Classic spec): the earth band grows UPWARD from the bottom row -
+        # earth_top = the first earth row, ROWS = no earth at all
+        return mode == "mine" and r >= earth_top
 
 
 # ================================================================ the model
@@ -998,7 +1154,8 @@ func _ready_input() -> void:
 
 
 func _tap(p: Vector2) -> void:
-        if phase != "play" or busy or over or paused or pick_open:
+        if phase != "play" or busy or over or paused or pick_open \
+                        or sheet_open_count() > 0:
                 return
         idle_clock = 0.0
         var cellp := _pos_to_cell(p)
@@ -1014,7 +1171,8 @@ func _tap(p: Vector2) -> void:
 
 
 func _drag(from: Vector2, to: Vector2) -> void:
-        if phase != "play" or busy or over or paused or pick_open:
+        if phase != "play" or busy or over or paused or pick_open \
+                        or sheet_open_count() > 0:
                 return
         if armed != "":
                 return
@@ -1117,9 +1275,12 @@ func _bump(cellp: Vector2i) -> void:
         if cell.is_empty() or not is_instance_valid(cell.get("node")):
                 return
         var n: Sprite2D = cell["node"]
+        # v0.3.3-p2 (the owner's "it weirdly got too huge"): the bump rides
+        # the sprite's OWN scale - a coin no longer inflates to gem size
+        var base: Vector2 = n.scale
         var tw := n.create_tween()
-        tw.tween_property(n, "scale", Vector2.ONE * cell_px / 100.0 * 1.12, 0.07)
-        tw.tween_property(n, "scale", Vector2.ONE * cell_px / 100.0, 0.1)
+        tw.tween_property(n, "scale", base * 1.12, 0.07)
+        tw.tween_property(n, "scale", base, 0.1)
 
 
 func _animate_swap(a: Vector2i, b: Vector2i) -> void:
@@ -1187,6 +1348,8 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                 cascade += 1
                 # 1 - the specials this wave births (the swap cell wins the crown)
                 var born := _birth_kinds(groups, swap_a, swap_b)   # [{r, c, kind, color}]
+                if mode == "ice":
+                        _plan_melt(groups)      # the horizontal-3 / vertical-all law
                 var pop := {}
                 for g in groups:
                         for key in g["cells"]:
@@ -1231,7 +1394,7 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
         # quiet board: the after-care
         _collect_bottom_coins()
         if mode == "mine":
-                _mine_layer_check()
+                _mine_row_check()
         if not _has_valid_move():
                 await _shuffle_board(true)
         idle_clock = 0.0
@@ -1287,19 +1450,23 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
                                 Jukebox.sfx("m_flutter", -6.0, randf_range(0.9, 1.15))
                 if rush:
                         add_score(1)        # the gold rush twist: pops pay double
-                if is_instance_valid(cell.get("ov")):
-                        cell["ov"].queue_free()
-                if is_instance_valid(cell.get("wing_ov")):
-                        cell["wing_ov"].queue_free()
+                # v0.3.3-p2 THE POP LAW: the model frees the seat INSTANTLY,
+                # the sprite shrinks away for a beat - no teleporting vanish
                 if is_instance_valid(cell.get("node")):
-                        cell["node"].queue_free()
+                        var n: Sprite2D = cell["node"]
+                        var tw := n.create_tween()
+                        tw.set_parallel(true)
+                        tw.tween_property(n, "scale", Vector2.ONE * 0.02, 0.09) \
+                                        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+                        tw.tween_property(n, "modulate:a", 0.0, 0.09)
+                        tw.chain().tween_callback(n.queue_free)
                 grid[r][c] = {}
         if count > 0:
                 add_score(count)
                 achievement_count("matched", count)
                 # the pitch-laddered pop chorus (cascade climbs the scale)
                 var base_pop: String = ["pop_1", "pop_2", "pop_3", "pop_4"][randi() % 4]
-                Jukebox.sfx(base_pop, -7.0, 1.0 + 0.09 * float(mini(cascade, 8)))
+                Jukebox.sfx(base_pop, -8.0)
                 # the ice law: a match over iced columns melts them
                 if mode == "ice":
                         _melt_under(pop)
@@ -1315,8 +1482,15 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
                 if cell.is_empty() or _is_coin(cell):
                         continue
                 cell["special"] = String(b["kind"])
-                _attach_special_overlay(int(b["r"]), int(b["c"]))
-                Jukebox.sfx("m_special", -5.0, 1.0 + 0.06 * born.find(b))
+                _dress_special(int(b["r"]), int(b["c"]))
+                Jukebox.sfx("m_special", -6.0, 1.0 + 0.05 * born.find(b))
+                # the gem wears it with a little arrival pop
+                if is_instance_valid(cell.get("node")):
+                        var bn: Sprite2D = cell["node"]
+                        var btw := bn.create_tween()
+                        btw.tween_property(bn, "scale", Vector2.ONE * cell_px / 100.0 * 1.22, 0.1) \
+                                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                        btw.tween_property(bn, "scale", Vector2.ONE * cell_px / 100.0, 0.12)
                 if String(b["kind"]) == "hyper":
                         achievement_count("hypers", 1)
                 var p := _cell_pos(int(b["r"]), int(b["c"]))
@@ -1326,28 +1500,19 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
         await get_tree().create_timer(0.16, false).timeout
 
 
-func _attach_special_overlay(r: int, c: int) -> void:
+func _dress_special(r: int, c: int) -> void:
+        # v0.3.3-p2 THE SHADER-ON-THE-ASSET LAW (the owner): the special is
+        # the gem's own material - it rides every swap, fall and cascade in
+        # perfect sync, on ANY skin's texture. No overlay to desync.
         var cell: Dictionary = grid[r][c]
-        if cell.is_empty():
+        if cell.is_empty() or not is_instance_valid(cell.get("node")):
                 return
-        if is_instance_valid(cell.get("ov")):
-                cell["ov"].queue_free()
-                cell["ov"] = null
         var kind := String(cell.get("special", ""))
+        var n: Sprite2D = cell["node"]
         if kind == "":
+                n.material = null
                 return
-        var ov := Sprite2D.new()
-        ov.texture = _t("flame" if kind == "flame" else ("star" if kind == "star" else "hyper"))
-        ov.position = _cell_pos(r, c)
-        ov.scale = Vector2.ONE * cell_px / 128.0 * 1.05
-        ov.z_index = 4
-        world.add_child(ov)
-        cell["ov"] = ov
-        if kind == "hyper":
-                # the prism breathes
-                var tw := ov.create_tween().set_loops()
-                tw.tween_property(ov, "rotation", 0.16, 0.5).set_trans(Tween.TRANS_SINE)
-                tw.tween_property(ov, "rotation", -0.16, 0.5).set_trans(Tween.TRANS_SINE)
+        n.material = _special_mat(kind)
 
 
 func _gem_pop_fx(p: Vector2, col: int) -> void:
@@ -1369,7 +1534,10 @@ func _combo_banner(n: int) -> void:
         var w: String = words[mini(n, words.size() - 1)]
         var vp := get_viewport_rect().size
         _float_text(Vector2(vp.x / 2.0, board_o.y - 60.0), w, Color(1, 0.85, 0.35), 40 + 4 * n)
-        Jukebox.sfx("m_special", -9.0, 0.8 + 0.1 * float(mini(n, 6)))
+        # v0.3.3-p2: the pentatonic marimba ladder (the owner: "the combo SFXs
+        # are the most weirdest ones")
+        var step := clampi(n, 2, 7)
+        Jukebox.sfx("m_combo_%d" % step, -6.0)
 
 
 # ================================================================ hypercube
@@ -1452,15 +1620,6 @@ func _gravity() -> void:
                                 .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
         if not movers.is_empty():
                 await get_tree().create_timer(max_dur + 0.02, false).timeout
-        # overlays ride their cells
-        for r in ROWS:
-                for c in COLS:
-                        var cell: Dictionary = grid[r][c]
-                        if cell.is_empty():
-                                continue
-                        for k in ["ov", "wing_ov"]:
-                                if is_instance_valid(cell.get(k)):
-                                        (cell[k] as Sprite2D).position = _cell_pos(r, c)
         await get_tree().create_timer(0.05, false).timeout
 
 
@@ -1471,62 +1630,88 @@ func _gravity() -> void:
 ## in the bottom row it drops out of the board and is earned.
 func _spawn_coin() -> void:
         var candidates := []
-        for r in ROWS:
+        for r in ROWS - 1:
                 for c in COLS:
                         if not _playable(r, c) or grid[r][c].is_empty():
                                 continue
                         var cell: Dictionary = grid[r][c]
                         if _is_coin(cell) or String(cell.get("special", "")) == "hyper":
                                 continue
-                        if r == ROWS - 1:
-                                continue        # a coin born on the bottom row is a free coin
                         candidates.append(Vector2i(r, c))
         if candidates.is_empty():
                 return
         var at: Vector2i = candidates[randi() % candidates.size()]
         var cell: Dictionary = grid[at.x][at.y]
-        if is_instance_valid(cell.get("ov")):
-                cell["ov"].queue_free()
-        if is_instance_valid(cell.get("wing_ov")):
-                cell["wing_ov"].queue_free()
+        # the gem that lived here poofs away (a real seat changes hands)
         if is_instance_valid(cell.get("node")):
-                cell["node"].queue_free()
+                var old_n: Sprite2D = cell["node"]
+                var tw0 := old_n.create_tween()
+                tw0.set_parallel(true)
+                tw0.tween_property(old_n, "scale", Vector2.ONE * 0.02, 0.12)
+                tw0.tween_property(old_n, "modulate:a", 0.0, 0.12)
+                tw0.chain().tween_callback(old_n.queue_free)
+        # the coin DROPS IN from above the board - a normal falling thing
         var n := Sprite2D.new()
         n.texture = _t("coin")
-        n.scale = Vector2.ONE * cell_px * 0.62 / 192.0
-        n.position = _cell_pos(at.x, at.y)
+        n.scale = Vector2.ONE * cell_px * 0.8 / 192.0
+        var target := _cell_pos(at.x, at.y)
+        n.position = Vector2(target.x, board_o.y - cell_px * 0.8)
         n.z_index = 3
         world.add_child(n)
-        grid[at.x][at.y] = {"color": -1, "coin": true, "node": n, "ov": null, "wing_ov": null}
+        var tw := n.create_tween()
+        tw.tween_property(n, "position", target, 0.32) \
+                        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+        grid[at.x][at.y] = {"color": -1, "coin": true, "node": n}
         coin_cell = at
         coin_clock = -1.0        # ticking stops while a coin lives on the board
-        Jukebox.sfx("m_special", -8.0, 1.3)
-        _ring_fx(_cell_pos(at.x, at.y), Color(1, 0.9, 0.4))
-        _float_text(_cell_pos(at.x, at.y), "GOGACOIN!", Color(1, 0.85, 0.3), 26)
+        Jukebox.sfx("m_special", -10.0, 1.35)
+        _float_text(Vector2(target.x, target.y - cell_px * 0.7), "GOGACOIN!", Color(1, 0.85, 0.3), 26)
 
 
 func _collect_bottom_coins() -> void:
         if coin_cell.x < 0:
                 return
         # THE MUTATION LAW: collect from a duplicate pass
-        for r in [ROWS - 1]:
-                for c in COLS:
-                        var cell: Dictionary = grid[r][c]
-                        if cell.is_empty() or not _is_coin(cell):
-                                continue
-                        # it reached the bottom: it drops out and is EARNED
-                        add_run_coins(1)
-                        achievement_count("coins_taken", 1)
-                        Jukebox.sfx("m_coin", -4.0)
-                        _ring_fx(_cell_pos(r, c), Color(1, 0.85, 0.3))
-                        _float_text(_cell_pos(r, c), "+1", Color(1, 0.85, 0.3), 32)
-                        _coin_fly_to_hud(_cell_pos(r, c))
-                        if is_instance_valid(cell.get("node")):
-                                cell["node"].queue_free()
-                        grid[r][c] = {}
-                        coin_cell = Vector2i(-1, -1)
-                        coin_clock = COIN_EVERY    # the owner: from the last COLLECTED
-                        return
+        for c in COLS:
+                var cell: Dictionary = grid[ROWS - 1][c]
+                if cell.is_empty() or not _is_coin(cell):
+                        continue
+                _collect_coin_at(Vector2i(ROWS - 1, c))
+                return
+
+
+## one coin earned: +1 run coin, the fly-to-HUD theatre, the seat refills
+func _collect_coin_at(at: Vector2i) -> void:
+        var cell: Dictionary = grid[at.x][at.y]
+        if cell.is_empty() or not _is_coin(cell):
+                return
+        add_run_coins(1)
+        achievement_count("coins_taken", 1)
+        Jukebox.sfx("m_coin", -4.0)
+        _ring_fx(_cell_pos(at.x, at.y), Color(1, 0.85, 0.3))
+        _float_text(_cell_pos(at.x, at.y), "+1", Color(1, 0.85, 0.3), 32)
+        _coin_fly_to_hud(_cell_pos(at.x, at.y))
+        if is_instance_valid(cell.get("node")):
+                (cell["node"] as Sprite2D).queue_free()
+        grid[at.x][at.y] = {}
+        coin_cell = Vector2i(-1, -1)
+        coin_clock = COIN_EVERY    # the owner: from the last COLLECTED
+        # THE REFILL LAW (the owner's "the place of it stayed empty" bug):
+        # the emptied seat is filled by the very next gravity wave
+        _auto_refill()
+
+
+## the auto-collect tick (the owner: "when it is in the bottom, it should be
+## auto collected and not waiting for me to tap it")
+func _auto_coin_watch() -> void:
+        if coin_cell.x != ROWS - 1 or busy or over or phase != "play":
+                return
+        _collect_coin_at(coin_cell)
+
+
+## a gravity wave with no resolve loop attached (the coin's seat refill)
+func _auto_refill() -> void:
+        _coin_refill_pending = true
 
 
 func _coin_fly_to_hud(from: Vector2) -> void:
@@ -1589,16 +1774,16 @@ func _shuffle_board(silent := false) -> void:
                 var cell: Dictionary = grid[cellp.x][cellp.y]
                 if is_instance_valid(cell.get("node")):
                         (cell["node"] as Sprite2D).texture = tex_gem[int(cell["color"]) % tex_gem.size()]
-        # the wing overlays never move with a shuffle (butterflies are pinned to
-        # their cells, not their colors)
+        # v0.3.3-p2: butterflies retexture after a shuffle (their wings ride
+        # their own texture now, so a new color just gets a new bake)
         if mode == "butterflies":
                 for r in ROWS:
                         for c in COLS:
                                 var cell: Dictionary = grid[r][c]
                                 if cell.is_empty():
                                         continue
-                                if bool(cell.get("wing", false)) and is_instance_valid(cell.get("wing_ov")):
-                                        (cell["wing_ov"] as Sprite2D).position = _cell_pos(r, c)
+                                if bool(cell.get("wing", false)):
+                                        _retexture_cell(r, c)
         # re-dress specials: an overlay whose host changed color stays (specials
         # keep their own identity), flame/star keep working on any color
 
@@ -1616,8 +1801,12 @@ func _goga_tick(delta: float) -> void:
         # the mode clocks (the base gates pause before this runs)
         if mode != "peace":
                 _tick_coin(delta)
+                _auto_coin_watch()          # the bottom-row coin earns itself
         else:
                 peace_secs += delta
+        if _coin_refill_pending and not busy:
+                _coin_refill_pending = false
+                _gravity()                  # fire-and-forget: the seat refills
         match mode:
                 "challenge":
                         _tick_challenge(delta)
@@ -1670,15 +1859,13 @@ func _tick_challenge(delta: float) -> void:
                 set_score(maxi(0, score - 500))
                 round_no += 1
                 Jukebox.sfx("m_gong", -4.0)
-                _float_text(Vector2(get_viewport_rect().size.x / 2.0, board_o.y - 90.0),
-                                "ROUND LOST  -500", Color(0.95, 0.4, 0.35), 40)
+                _banner("ROUND LOST  -500", false)
                 _roll_round()
         elif round_bank >= round_goal:
                 round_no += 1
                 Jukebox.sfx("m_goal", -4.0)
                 Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 34)
-                _float_text(Vector2(get_viewport_rect().size.x / 2.0, board_o.y - 90.0),
-                                "ROUND %d CLEAR!" % (round_no - 1), Color(0.4, 0.9, 0.5), 42)
+                _banner("ROUND %d CLEAR!" % (round_no - 1), true)
                 _roll_round()
         if run_clock <= 0.0:
                 _finish_run("time up - the run banks")
@@ -1707,21 +1894,25 @@ func _tick_butterflies(delta: float) -> void:
         if pace_clock <= 0.0:
                 pace_clock = 45.0
                 pace += 1
-                _float_text(Vector2(get_viewport_rect().size.x / 2.0, board_o.y - 60.0),
-                                "THEY HURRY!", Color(1, 0.6, 0.8), 34)
+                _banner("THEY HURRY!", false)
 
 
 func _rise_butterflies() -> void:
-        # every player move: all butterflies fly UP `pace` rows. One crossing the
-        # top feeds the spider - the run ends (the butterflies' fatal law).
+        # v0.3.3-p2 THE RISE ANIMATION LAW (the owner: "flies are corrupting
+        # the line and it's instant with no animations and makes huge
+        # glitches like overlapping things"): the MODEL swaps first, then
+        # EVERY displaced node tweens to its new home together - nothing
+        # teleports, nothing overlaps. A butterfly reaching the top row is
+        # caught by the spider after the wave lands.
         for step in pace:
+                var movers := []          # [{node, to}]
                 var wings := []
                 for r in ROWS:
                         for c in COLS:
                                 var cell: Dictionary = grid[r][c]
                                 if not cell.is_empty() and bool(cell.get("wing", false)):
                                         wings.append(Vector2i(r, c))
-                wings.sort()            # top rows first - the flyer closest to the spider moves first
+                wings.sort()            # top rows first - the topmost flies first
                 for wcell in wings:
                         var r: int = wcell.x
                         var c: int = wcell.y
@@ -1729,24 +1920,100 @@ func _rise_butterflies() -> void:
                         if cell.is_empty() or not bool(cell.get("wing", false)):
                                 continue        # it was swept up by an earlier mover
                         if r == 0:
-                                _spider_feeds(c)
-                                return
-                        # swap with whatever sits above (a coin holds the butterfly back)
+                                continue        # it waits at the top - the spider watches
+                        # swap with whatever sits above (a coin holds it back)
                         _swap_model(r, c, r - 1, c)
                         var above: Dictionary = grid[r - 1][c]
                         if is_instance_valid(above.get("node")):
-                                (above["node"] as Sprite2D).position = _cell_pos(r - 1, c)
-                        if is_instance_valid(above.get("wing_ov")):
-                                (above["wing_ov"] as Sprite2D).position = _cell_pos(r - 1, c)
-                        if is_instance_valid(above.get("ov")):
-                                (above["ov"] as Sprite2D).position = _cell_pos(r - 1, c)
+                                movers.append({"node": above["node"],
+                                                "to": _cell_pos(r - 1, c)})
+                        var below: Dictionary = grid[r][c]
+                        if not below.is_empty() and is_instance_valid(below.get("node")):
+                                movers.append({"node": below["node"],
+                                                "to": _cell_pos(r, c)})
+                # one wave, one duration - every mover lands together
+                var max_dur := 0.0
+                for m in movers:
+                        var n: Sprite2D = m["node"]
+                        var dist: float = absf(n.position.y - (m["to"] as Vector2).y)
+                        var dur: float = clampf(dist / 2200.0, 0.12, 0.22)
+                        max_dur = maxf(max_dur, dur)
+                        var tw: Tween
+                        if n.get_meta("rise_tw", 0):
+                                var prev: Tween = n.get_meta("rise_tw")
+                                if prev != null and prev.is_valid():
+                                        prev.kill()
+                        tw = n.create_tween()
+                        n.set_meta("rise_tw", tw)
+                        tw.tween_property(n, "position", m["to"], dur) \
+                                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+                if not movers.is_empty():
+                        await get_tree().create_timer(max_dur + 0.02, false).timeout
+        # the spider checks the sky: any butterfly ON the top row gets grabbed
+        for c in COLS:
+                var cell: Dictionary = grid[0][c]
+                if not cell.is_empty() and bool(cell.get("wing", false)):
+                        await _spider_grabs(Vector2i(0, c))
+                        return
+        _spider_hunt()
 
 
-func _spider_feeds(c: int) -> void:
+## THE SPIDER (the owner: "it should exist and looks toward the nearest
+## butterfly to grab it then the game ends"): it glides along the top rail
+## toward the highest butterfly, and when one lands on the top row it sweeps
+## over, shrinks it away, and the run ends.
+func _spider_hunt() -> void:
+        if spider == null or not is_instance_valid(spider):
+                return
+        var best := Vector2i(-1, -1)
+        for r in ROWS:
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if not cell.is_empty() and bool(cell.get("wing", false)):
+                                best = Vector2i(r, c)
+                                break
+                if best.x >= 0:
+                        break
+        if best.x < 0:
+                return
+        var want_x := _cell_pos(0, best.y).x
+        if spider_tw != null and spider_tw.is_valid():
+                spider_tw.kill()
+        spider_tw = spider.create_tween()
+        spider_tw.tween_property(spider, "position:x", want_x, 0.45) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _spider_grabs(at: Vector2i) -> void:
+        if spider == null or not is_instance_valid(spider):
+                _finish_run("the spider dined")
+                return
+        var cell: Dictionary = grid[at.x][at.y]
+        var target := _cell_pos(at.x, at.y)
+        if spider_tw != null and spider_tw.is_valid():
+                spider_tw.kill()
+        var tw := spider.create_tween()
+        tw.tween_property(spider, "position", target + Vector2(0, -cell_px * 0.5), 0.4) \
+                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+        await tw.finished
+        # the grab: the butterfly shrinks INTO the spider
+        if is_instance_valid(cell.get("node")):
+                var n: Sprite2D = cell["node"]
+                var gt := n.create_tween()
+                gt.set_parallel(true)
+                gt.tween_property(n, "position", spider.position, 0.22) \
+                                .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+                gt.tween_property(n, "scale", Vector2.ONE * 0.02, 0.22)
+                gt.chain().tween_callback(n.queue_free)
+        grid[at.x][at.y] = {}
+        var pulse := spider.create_tween()
+        pulse.tween_property(spider, "scale", spider.scale * 1.25, 0.12)
+        pulse.tween_property(spider, "scale", spider.scale, 0.14)
         Jukebox.sfx("m_gulp", -2.0)
         Jukebox.sfx("m_spider", -4.0)
-        _ring_fx(Vector2(board_o.x + (float(c) + 0.5) * cell_px, board_o.y - 80.0),
-                        Color(0.7, 0.5, 0.9))
+        _ring_fx(spider.position, Color(0.7, 0.5, 0.9))
+        _banner("THE SPIDER DINED!", false)
+        await get_tree().create_timer(0.35, false).timeout
         _finish_run("the spider dined")
 
 
@@ -1757,15 +2024,16 @@ func _hatch_butterfly(r: int, c: int) -> void:
         if _is_coin(cell):
                 return
         cell["wing"] = true
-        if is_instance_valid(cell.get("wing_ov")):
-                cell["wing_ov"].queue_free()
-        var w := Sprite2D.new()
-        w.texture = _t("wing")
-        w.scale = Vector2.ONE * cell_px * 0.58 / 128.0
-        w.position = _cell_pos(r, c)
-        w.z_index = 5
-        world.add_child(w)
-        cell["wing_ov"] = w
+        # v0.3.3-p2: the wings are BAKED into the gem's own texture - they
+        # move with the sprite forever, nothing can desync or overlap
+        _retexture_cell(r, c)
+        var n: Sprite2D = cell["node"]
+        if is_instance_valid(n):
+                var base: Vector2 = n.scale
+                n.scale = base * 0.2
+                var tw := n.create_tween()
+                tw.tween_property(n, "scale", base, 0.3) \
+                                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
         Jukebox.sfx("m_flutter", -8.0)
 
 
@@ -1795,12 +2063,21 @@ func _tick_butterfly_hatch() -> void:
 
 
 func _tick_ice(delta: float) -> void:
+        # v0.3.3-p2 THE ICE STORM LAW (the owner's Bejeweled Classic spec):
+        # vertical ice columns grow from the bottom; a column reaching the
+        # top is LOST; progression keeps spawning more iced lines
         frost_clock -= delta
         if frost_clock <= 0.0:
                 frost_clock = frost_gap
-                frost_gap = maxf(3.0, frost_gap - 0.12)
+                frost_gap = maxf(4.0, frost_gap - 0.1)
+                frost_ticks += 1
                 var col := randi() % COLS
-                frost[col] = mini(8, int(frost[col]) + 1)
+                _ice_grow(col)
+                if frost_ticks % 4 == 0:
+                        # the progression: a second line joins in
+                        var c2 := randi() % COLS
+                        if c2 != col:
+                                _ice_grow(c2)
                 _refresh_ice()
                 Jukebox.sfx("m_freeze", -10.0)
                 _check_ice_over()
@@ -1809,90 +2086,183 @@ func _tick_ice(delta: float) -> void:
                 temp = maxf(0.0, temp - delta * 0.4)
 
 
+func _ice_grow(c: int) -> void:
+        if int(frost[c]) < ROWS:
+                frost[c] = int(frost[c]) + 1
+
+
+## v0.3.3-p2 THE MELT PLAN (the owner: "hitting that line with horizontal
+## moves takes only like 3 areas of it and hitting it completely vertical
+## destroys it completely"): built from the wave's real groups - a horizontal
+## group touching an iced column eats 3 segments of it, a vertical group in
+## the column wipes the whole line. Vertical wins when both touch.
+func _plan_melt(groups: Array) -> void:
+        melt_plan = {}
+        for g in groups:
+                var cells: Dictionary = g["cells"]
+                var is_v: bool = String(g["dir"]) == "v"
+                var cols := {}
+                for key in cells.keys():
+                        cols[int(key) % COLS] = true
+                if is_v:
+                        for c in cols.keys():
+                                melt_plan[int(c)] = "all"
+                else:
+                        for c in cols.keys():
+                                if int(frost[int(c)]) > 0 and not melt_plan.has(int(c)):
+                                        melt_plan[int(c)] = "3"
+
+
 func _melt_under(pop: Dictionary) -> void:
-        var cols := {}
-        for key in pop.keys():
-                var r := int(key) / COLS
-                var c := int(key) % COLS
-                if int(frost[c]) > 0:
-                        cols[c] = true
-        for c in cols.keys():
+        for c in melt_plan.keys():
                 var ci := int(c)
-                if int(frost[ci]) > 0:
-                        frost[ci] = int(frost[ci]) - 1
-                        add_score(5)       # the melt bonus
-                        Jukebox.sfx("m_melt", -6.0, randf_range(0.9, 1.2))
-                        _ring_fx(_cell_pos(ROWS - 1, ci), Color(0.75, 0.9, 1.0))
-                        achievement_count("melted", 1)
-                        melt_chain = 3.0
-                        temp = minf(1.0, temp + 0.34)
-                        if temp >= 1.0:
-                                temp = 0.0
-                                add_score(10)
-                                _float_text(_cell_pos(ROWS - 1, ci), "HOT HANDS! +10", Color(1, 0.6, 0.3), 30)
+                var lvl := int(frost[ci])
+                if lvl <= 0:
+                        continue
+                var took: int = lvl if String(melt_plan[c]) == "all" else mini(3, lvl)
+                frost[ci] = maxi(0, lvl - took)
+                add_score(5 * took)       # the melt bonus, per segment
+                achievement_count("melted", took)
+                Jukebox.sfx("m_melt", -6.0, randf_range(0.9, 1.2))
+                _ring_fx(_cell_pos(ROWS - 1 - (lvl - 1), ci), Color(0.75, 0.9, 1.0))
+                melt_chain = 3.0
+                temp = minf(1.0, temp + 0.20 * float(took))
+                if temp >= 1.0:
+                        temp = 0.0
+                        add_score(10)
+                        _float_text(_cell_pos(ROWS - 1, ci), "HOT HANDS! +10", Color(1, 0.6, 0.3), 30)
+        melt_plan = {}
         _refresh_ice()
         _check_ice_over()
 
 
 func _refresh_ice() -> void:
-        # ice lives as overlay stacks on the bottom cells of each column
+        # the ice visuals: each segment = one iced cell sprite on the column's
+        # bottom cells; new segments slide in, melted ones fade out (no more
+        # instant pops - the owner's smoothness law)
         for c in COLS:
                 var lvl := int(frost[c])
                 for r in ROWS:
                         var cell: Dictionary = grid[r][c]
-                        var ice_row := r - (ROWS - 8)     # not used; clarity below
-                        var depth_from_bottom := (ROWS - 1) - r
-                        var want := clampi(lvl - depth_from_bottom, 0, 3)  # 0..3 visible layers per cell
-                        var key := "ice_ov%d" % depth_from_bottom
                         if cell.is_empty():
                                 continue
+                        var depth_from_bottom := (ROWS - 1) - r
+                        var want := clampi(lvl - depth_from_bottom, 0, 3)
+                        var key := "ice_ov%d" % depth_from_bottom
                         var have: Sprite2D = cell.get(key) if cell.get(key) != null else null
                         if want > 0 and have == null:
                                 var ov := Sprite2D.new()
                                 ov.texture = _t("ice%d" % want)
-                                ov.position = _cell_pos(r, c)
+                                ov.position = _cell_pos(r, c) + Vector2(0, -26.0)
                                 ov.scale = Vector2.ONE * cell_px / 120.0
+                                ov.modulate.a = 0.0
                                 ov.z_index = 6
                                 world.add_child(ov)
                                 cell[key] = ov
+                                var tw := ov.create_tween().set_parallel(true)
+                                tw.tween_property(ov, "position", _cell_pos(r, c), 0.22) \
+                                                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                                tw.tween_property(ov, "modulate:a", 1.0, 0.18)
                         elif want == 0 and have != null:
-                                have.queue_free()
                                 cell[key] = null
+                                var tw2 := have.create_tween()
+                                tw2.tween_property(have, "modulate:a", 0.0, 0.16)
+                                tw2.tween_callback(have.queue_free)
                         elif want > 0 and have != null:
                                 have.texture = _t("ice%d" % want)
-        # one cell may only wear its own layer sprite; deeper columns stack via
-        # the cells above them (each iced cell shows ice_1..3 by remaining depth)
 
 
 func _check_ice_over() -> void:
         for c in COLS:
-                if int(frost[c]) >= 8:
+                if int(frost[c]) >= ROWS:
                         Jukebox.sfx("m_gong", -4.0)
-                        _finish_run("the frost reached the water")
+                        _banner("THE ICE REACHED THE TOP!", false)
+                        _finish_run("the ice reached the top")
 
+
+# ================================================================ the mine
+## v0.3.3-p2 THE DIAMOND MINE, the owner's Bejeweled Classic spec:
+##   - the round starts with 60 seconds
+##   - every 25 seconds a NEW EARTH ROW rises from the bottom (sometimes two)
+##   - clearing a full earth row (digging all 8 of its cells) gives +25s
+##   - matches in the row sitting ON the earth dig the earth below them
+##   - the earth reaching the top buries the run
 
 func _tick_mine(delta: float) -> void:
         dig_clock -= delta
         if dig_clock <= 0.0:
+                _banner("TIME UP!", false)
                 _finish_run("the dig clock ran dry")
+                return
+        mine_rise_clock -= delta
+        if mine_rise_clock <= 0.0:
+                mine_rise_clock = MINE_ROW_TIME
+                var rows := 1
+                if randf() < MINE_DOUBLE:
+                        rows = 2         # "some times it make two rows"
+                for i in rows:
+                        _mine_rise()
 
 
-func _lay_earth(density: float) -> void:
-        earth_left = 0
-        for r in EARTH_ROWS:
-                for c in COLS:
-                        var cell: Dictionary = earth[r][c]
-                        var tr := ""
-                        var roll := randf()
-                        if roll < 0.10 * density:
-                                tr = "artifact"
-                        elif roll < 0.26 * density:
-                                tr = "diamond"
-                        elif roll < 0.52 * density:
-                                tr = "gold"
-                        cell["tr"] = tr
-                        cell["node"] = _earth_sprite(r, c, tr)
-                        earth_left += 1
+## one earth row rises from the bottom: the band's top moves UP one row and
+## the new cells slide in from under the board (never an instant appear)
+func _mine_rise() -> void:
+        if earth_top <= 0:
+                return
+        earth_top -= 1
+        earth.resize(ROWS)
+        _lay_earth_row(earth_top, 1.0)
+        # a coin buried by the rise is LOST (the clock restarts - never a
+        # free earn)
+        if coin_cell.x >= 0 and coin_cell.x >= earth_top:
+                coin_cell = Vector2i(-1, -1)
+                coin_clock = COIN_EVERY
+        # the gems that were in that row are gone (buried under the new dirt)
+        for c in COLS:
+                var old: Dictionary = grid[earth_top][c]
+                if not old.is_empty() and is_instance_valid(old.get("node")):
+                        (old["node"] as Sprite2D).queue_free()
+                grid[earth_top][c] = {}
+                var row: Array = earth[earth_top]
+                var e: Dictionary = row[c]
+                if e.has("node") and is_instance_valid(e["node"]):
+                        var n: Sprite2D = e["node"]
+                        n.position.y += cell_px      # start one row BELOW home
+                        var tw := n.create_tween()
+                        tw.tween_property(n, "position:y",
+                                        _cell_pos(earth_top, c).y, 0.3) \
+                                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                        if n.has_meta("tr_spr"):
+                                var sp: Sprite2D = n.get_meta("tr_spr")
+                                if is_instance_valid(sp):
+                                        sp.position.y += cell_px
+                                        var tw2 := sp.create_tween()
+                                        tw2.tween_property(sp, "position:y",
+                                                        _cell_pos(earth_top, c).y, 0.3) \
+                                                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        Jukebox.sfx("m_freeze", -8.0, 0.7)
+        _banner("THE EARTH RISES!", false)
+        _refresh_hud()
+        if earth_top <= 0:
+                _banner("BURIED!", false)
+                _finish_run("buried by the earth")
+
+
+## fills one earth row with treasure cells (density grows with depth)
+func _lay_earth_row(r: int, density: float) -> void:
+        earth[r] = []
+        for c in COLS:
+                var tr := ""
+                var roll := randf()
+                if roll < 0.10 * density:
+                        tr = "artifact"
+                elif roll < 0.26 * density:
+                        tr = "diamond"
+                elif roll < 0.52 * density:
+                        tr = "gold"
+                var e := {"tr": tr}
+                e["node"] = _earth_sprite(r, c, tr)
+                earth[r].append(e)
 
 
 func _earth_sprite(r: int, c: int, tr: String) -> Sprite2D:
@@ -1914,56 +2284,95 @@ func _earth_sprite(r: int, c: int, tr: String) -> Sprite2D:
         return n
 
 
-## a match wave drills the columns it touched: the LOWEST earth cell in each
-## matched column breaks (the owner's dig fantasy - match under the dirt).
+## a match wave drills the columns whose MATCHED CELLS sit directly on the
+## earth: the TOP earth cell of each such column breaks (match against the
+## dirt to dig - the Bejeweled Classic feel)
 func _mine_dig(pop: Dictionary) -> void:
+        if earth_top >= ROWS:
+                return
         var cols := {}
         for key in pop.keys():
-                cols[int(key) % COLS] = true
+                var r := int(key) / COLS
+                var c := int(key) % COLS
+                if r == earth_top - 1:
+                        cols[c] = true
         for ci in cols.keys():
                 var c := int(ci)
-                for r in range(EARTH_ROWS - 1, -1, -1):
-                        var e: Dictionary = earth[r][c]
-                        if e.is_empty() or not e.has("node"):
-                                continue
-                        # break this earth cell
-                        var n: Sprite2D = e["node"]
-                        _gem_pop_fx(n.position, 2)
-                        if n.has_meta("tr_spr"):
-                                var s: Sprite2D = n.get_meta("tr_spr")
-                                if is_instance_valid(s):
-                                        var tr := String(earth[r][c].get("tr", ""))
-                                        var pay: int = int({"gold": 10, "diamond": 25, "artifact": 60}.get(tr, 0))
-                                        add_score(int(pay))
-                                        _float_text(n.position, "+%d" % int(pay), Color(1, 0.85, 0.35), 30)
-                                        Jukebox.sfx("m_" + tr, -4.0)
-                                        _coin_fly_to_hud(s.position)
-                                        s.queue_free()
-                        n.queue_free()
-                        earth[r][c] = {}
-                        earth_left -= 1
-                        Jukebox.sfx("m_dig", -5.0, randf_range(0.9, 1.15))
-                        break    # one cell per column per wave
+                var row: Array = earth[earth_top]
+                if row.size() <= c:
+                        continue
+                var e: Dictionary = row[c]
+                if e.is_empty() or not e.has("node") \
+                                or not is_instance_valid(e["node"]):
+                        continue
+                var n: Sprite2D = e["node"]
+                _gem_pop_fx(n.position, 2)
+                if n.has_meta("tr_spr"):
+                        var s: Sprite2D = n.get_meta("tr_spr")
+                        if is_instance_valid(s):
+                                var tr := String(e.get("tr", ""))
+                                var pay: int = int({"gold": 10, "diamond": 25, "artifact": 60}.get(tr, 0))
+                                add_score(int(pay))
+                                _float_text(s.position, "+%d" % int(pay), Color(1, 0.85, 0.35), 30)
+                                Jukebox.sfx("m_" + tr, -4.0)
+                                _coin_fly_to_hud(s.position)
+                                s.queue_free()
+                var tw := n.create_tween()
+                tw.tween_property(n, "scale", Vector2.ONE * 0.02, 0.12)
+                tw.tween_callback(n.queue_free)
+                row[c] = {}
+                Jukebox.sfx("m_dig", -5.0, randf_range(0.9, 1.15))
+        _mine_row_check()
 
 
-func _mine_layer_check() -> void:
-        if earth_left > 0:
+## the top earth row fully dug -> the whole band SINKS one row (+25s, the
+## owner: "clearing a row gives extra 25 seconds") and the board breathes
+func _mine_row_check() -> void:
+        if earth_top >= ROWS:
                 return
-        # THE DESCEND: the layer breaks, +30s, a richer band slides in
-        depth += 4
-        dig_clock += MINE_DESCEND
+        var row: Array = earth[earth_top]
+        for c in COLS:
+                var e: Dictionary = row[c] if c < row.size() else {}
+                if not e.is_empty() and e.has("node") \
+                                and is_instance_valid(e["node"]):
+                        return          # cells still standing
+        # the row is clear: the band sinks with a smooth drop
+        depth += 1
+        dig_clock += MINE_ROW_BONUS
         Jukebox.sfx("m_descend", -3.0)
         achievement_max("depth", depth)
-        var vp := get_viewport_rect().size
-        _float_text(Vector2(vp.x / 2.0, board_o.y - 70.0), "DEPTH %dm  +30s" % depth,
-                        Color(1, 0.9, 0.5), 40)
-        _lay_earth(1.0 + 0.25 * float(depth / 4))
+        _banner("ROW CLEARED!  +%ds" % int(MINE_ROW_BONUS), true)
+        var cleared := earth_top
+        earth_top += 1
+        for r in range(cleared, ROWS):
+                if earth[r] == null:
+                        continue
+                for c in COLS:
+                        if c >= earth[r].size():
+                                continue
+                        var e2: Dictionary = earth[r][c]
+                        if e2.is_empty() or not e2.has("node") \
+                                        or not is_instance_valid(e2["node"]):
+                                continue
+                        var n: Sprite2D = e2["node"]
+                        var target := _cell_pos(r, c).y
+                        var tw := n.create_tween()
+                        tw.tween_property(n, "position:y", target, 0.26) \
+                                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                        if n.has_meta("tr_spr"):
+                                var sp: Sprite2D = n.get_meta("tr_spr")
+                                if is_instance_valid(sp):
+                                        var tw2 := sp.create_tween()
+                                        tw2.tween_property(sp, "position:y", target, 0.26) \
+                                                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        _refresh_hud()
 
 
 # ================================================================ finish
 func _finish_run(reason: String) -> void:
         if over:
                 return
+        _banner(reason, false)
         if mode == "challenge":
                 achievement_max("challenge_best", score)
         if mode == "peace":
@@ -2060,7 +2469,7 @@ func _refresh_rail() -> void:
                         if not owned:
                                 dots.text = "LOCKED"
                                 dots.add_theme_color_override("font_color", Color(0.55, 0.42, 0.3))
-                                price.text = "%d wallet" % int(POWERS[pid]["price"])
+                                price.text = "%d GOGACoins" % int(POWERS[pid]["price"])
                         elif n > 0:
                                 dots.text = "%d/3" % n
                                 dots.add_theme_color_override("font_color", Color("2c8a44"))
@@ -2068,7 +2477,7 @@ func _refresh_rail() -> void:
                         else:
                                 dots.text = "EMPTY"
                                 dots.add_theme_color_override("font_color", Color(0.62, 0.5, 0.36))
-                                price.text = "%d round" % int(POWERS[pid]["refill"])
+                                price.text = "%d GOGACoins" % int(POWERS[pid]["refill"])
                 var sb := btn.get_theme_stylebox("normal") as StyleBoxFlat
                 if spent_out:
                         sb.set_border_width_all(0)
@@ -2086,7 +2495,8 @@ func _refresh_rail() -> void:
 
 
 func _rail_tap(pid: String) -> void:
-        if phase != "play" or over or pick_open or mode == "peace":
+        if phase != "play" or over or pick_open or mode == "peace" \
+                        or sheet_open_count() > 0:
                 return
         var owned: bool = Box.item_owned(game_id, "power", pid)
         var n := int(charges[pid])
@@ -2147,6 +2557,15 @@ func _fire_power(cellp: Vector2i) -> void:
                 _set_armed_cursor(false)
                 _refresh_rail()
                 return
+        # THE VAPOR LAW (v0.3.3-p2, the owner's "sound only, no effect" bug):
+        # vapor aims at a COLOR - an empty seat or the coin is a rejected aim,
+        # the charge STAYS, the cursor stays armed
+        if pid == "vapor":
+                var vc := _color_at(cellp.x, cellp.y)
+                if vc < 0:
+                        Jukebox.sfx("error", -10.0)
+                        _toast_show("tap a gem - the vapor needs a color")
+                        return
         charges[pid] = n - 1
         power_used[pid] = int(power_used[pid]) + 1
         armed = ""
@@ -2179,6 +2598,14 @@ func _fire_power(cellp: Vector2i) -> void:
                                         if _playable(r, c) and not grid[r][c].is_empty() \
                                                         and not _is_coin(grid[r][c]) and _color_at(r, c) == col:
                                                 pop[r * COLS + c] = true
+                                                # the vapour wave is VISIBLE: every
+                                                # doomed gem flashes before it pops
+                                                var vn: Sprite2D = grid[r][c].get("node")
+                                                if is_instance_valid(vn):
+                                                        var vt := vn.create_tween()
+                                                        vt.tween_property(vn, "modulate",
+                                                                        Color(1.6, 0.6, 1.8), 0.16)
+                        pop[cellp.y * COLS + cellp.x] = true
                         Jukebox.sfx("m_hyper", -5.0)
         achievement_count("powers_used", 1)
         await _resolve_from_pop(pop)
@@ -2216,6 +2643,19 @@ func _resolve_from_pop(pop: Dictionary) -> void:
                                         var sp2 := String(grid[r][c].get("special", ""))
                                         if sp2 != "" and not detonated.has(key):
                                                 queue.append({"r": r, "c": c, "kind": sp2})
+        if mode == "ice":
+                # the power blasts melt like horizontal matches (3 per column)
+                var pcols := {}
+                for key in pop.keys():
+                        pcols[int(key) % COLS] = true
+                var pg: Array = []
+                for c in pcols.keys():
+                        var cc := {}
+                        for r in ROWS:
+                                cc[r * COLS + int(c)] = true
+                        pg.append({"cells": cc, "dir": "h", "color": 0,
+                                        "cross": Vector2i(-1, -1)})
+                _plan_melt(pg)
         await _pop_cells(pop, [])
         while true:
                 if over:
@@ -2235,7 +2675,7 @@ func _resolve_from_pop(pop: Dictionary) -> void:
         await _gravity()
         _collect_bottom_coins()
         if mode == "mine":
-                _mine_layer_check()
+                _mine_row_check()
         if not _has_valid_move():
                 await _shuffle_board(true)
 
@@ -2255,15 +2695,7 @@ func _resolve_after_power() -> void:
 ##                  live, the ROUND balance pays, BOTH balances are shown
 ##  - 3 spent    -> the rail slot itself grays out; the popup never opens
 func _power_sheet(pid: String) -> void:
-        if not refill_sheet.is_empty():
-                return
-        paused = true
-        get_tree().paused = true
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        refill_sheet = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sheet := sheet_push(0.0, "power")
         var p: Dictionary = POWERS[pid]
         var t := Arc.fit_label(String(p["name"]).to_upper(), 36, Arc.INK, 560)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2271,18 +2703,16 @@ func _power_sheet(pid: String) -> void:
         var d := Arc.fit_label(String(p["desc"]), 22, Color(0.45, 0.38, 0.28), 560)
         d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(d)
-        # THE BALANCES LAW: the popup shows the FULL GOGABox balance (the
-        # owner asked for it by name) AND the round balance it spends
-        var wallet := Arc.coin_chip()
-        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        sheet.add_child(wallet)
-        var roundbal := Arc.chip("round balance: %d" % run_coins, "res://assets/ui/coin.png",
-                        Color(0, 0, 0, 0.35), 20, Arc.COIN)
-        roundbal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        sheet.add_child(roundbal)
+        # THE GLOBAL WALLET LAW (v0.3.3-p2, the owner: "make powerups be based
+        # on global GOGACoins and not round-balance"): the popup shows the
+        # FULL GOGABox balance and the buy pays it. The round balance is a
+        # scoreboard, never a wallet.
+        wallet_chip = Arc.coin_chip()
+        wallet_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet_chip)
         var owned: bool = Box.item_owned(game_id, "power", pid)
         if not owned:
-                var buy := Arc.button("UNLOCK  -  %d FROM THE WALLET" % int(p["price"]),
+                var buy := Arc.button("UNLOCK  -  %d GOGACoins" % int(p["price"]),
                                 Vector2(560, 84), 24, Arc.GOOD, func():
                                 if Box.spend(int(p["price"])):
                                         Box.buy_item(game_id, "power", pid, 0)
@@ -2292,7 +2722,7 @@ func _power_sheet(pid: String) -> void:
                                         _refresh_rail()
                                 else:
                                         Jukebox.sfx("error", -6.0)
-                                        _toast_show("need %d more coins" % (int(p["price"]) - Box.coins())))
+                                        _toast_show("need %d more GOGACoins" % (int(p["price"]) - Box.coins())))
                 sheet.add_child(buy)
         else:
                 var n := int(charges[pid])
@@ -2304,10 +2734,11 @@ func _power_sheet(pid: String) -> void:
                         done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                         sheet.add_child(done)
                 else:
-                        # THE ARROWS: - / qty / + , the total rides the qty
-                        # (a Dictionary box: GDScript lambdas capture by
-                        # VALUE - a plain int would mutate only the
-                        # handler's own copy and the arrows would never move)
+                        # THE ARROWS: - / qty / + , the total rides the qty and
+                        # the cap is dynamic (the owner: "arrows start from 1 to
+                        # 3 with dynamic updates like only 2 if already 1 used")
+                        # (a Dictionary box: GDScript lambdas capture by VALUE -
+                        # a plain int would mutate only the handler's own copy)
                         var qty_box := {"n": 1}
                         var row := HBoxContainer.new()
                         row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2329,8 +2760,12 @@ func _power_sheet(pid: String) -> void:
                         var repaint := func():
                                 var q: int = int(qty_box["n"])
                                 qlabel.text = str(q)
-                                total.text = "BUY %d  -  %d ROUND COINS" % [q, q * int(p["refill"])]
+                                total.text = "BUY %d  -  %d GOGACoins" % [q, q * int(p["refill"])]
                                 stock.text = "stocked %d/3  -  %d used this run" % [n + used, used]
+                                if wallet_chip != null and is_instance_valid(wallet_chip):
+                                        (wallet_chip.get_child(0).get_child(
+                                                wallet_chip.get_child(0).get_child_count() - 1)
+                                                as Label).text = Box.coins_display()
                                 minus.disabled = q <= 1
                                 plus.disabled = q >= max_buy
                         minus.pressed.connect(func():
@@ -2342,34 +2777,23 @@ func _power_sheet(pid: String) -> void:
                         repaint.call()
                         var buyb := Arc.button("BUY", Vector2(560, 84), 28, Arc.ACCENT, func():
                                 var cost: int = int(qty_box["n"]) * int(p["refill"])
-                                if run_coins >= cost:
-                                        add_run_coins(-cost)
+                                if Box.spend(cost):
                                         charges[pid] = int(charges[pid]) + int(qty_box["n"])
                                         Jukebox.sfx("m_refill", -4.0)
                                         _power_sheet_close()
                                         _refresh_rail()
                                 else:
                                         Jukebox.sfx("error", -6.0)
-                                        _toast_show("the round balance is thin - collect the board coin!"))
+                                        _toast_show("need %d more GOGACoins" % (cost - Box.coins())))
                         sheet.add_child(buyb)
-                        var note := Arc.fit_label("refills spend the ROUND balance only -\nthe box wallet is never touched mid-run",
-                                        18, Color(0.55, 0.45, 0.3), 560, false)
-                        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                        sheet.add_child(note)
         var close := Arc.button("CLOSE", Vector2(460, 74), 26, Arc.CARD_2, func(): _power_sheet_close())
         sheet.add_child(close)
         Arc.fit_sheet(sheet, 1)
 
 
 func _power_sheet_close() -> void:
-        if refill_sheet.is_empty():
-                return
-        for k in refill_sheet:
-                if is_instance_valid(k):
-                        k.queue_free()
-        refill_sheet = []
-        get_tree().paused = false
-        paused = false
+        sheet_pop()
+        wallet_chip = null
 
 
 # ================================================================ hud
@@ -2398,7 +2822,7 @@ func _refresh_hud() -> void:
                         chip_info2.add_theme_color_override("font_color",
                                 Color("1c6ea8") if worst >= 6 else Color("35210f"))
                 "mine":
-                        chip_info.text = "%dm  %d left" % [depth, earth_left]
+                        chip_info.text = "%dm  ice-line %ds" % [depth, int(ceilf(mine_rise_clock))]
                         chip_info2.text = "%ds" % int(ceilf(dig_clock))
                         chip_info2.add_theme_color_override("font_color",
                                 Color("d84a3a") if dig_clock < 15.0 else Color("35210f"))

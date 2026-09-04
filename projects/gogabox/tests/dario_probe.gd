@@ -112,10 +112,9 @@ func _run() -> void:
         _check(g.p_node != null and is_instance_valid(g.p_node),
                         "Dario was born at the start marker")
         _check(bool(g._locked), "the intro dialogue box LOCKS the game")
-        _check(g._intro_pair.size() == 2,
+        _check(g.sheet_open_count() == 1,
                         "the intro owns its dim+center PAIR (the pair law)")
-        g._pair_down(g._intro_pair)
-        g._intro_pair = []
+        g.sheet_pop()
         g._locked = false
         _check(not bool(g._locked), "DONE dismisses the intro and unlocks")
 
@@ -244,8 +243,7 @@ func _run() -> void:
         g_rh.game_id = "dario"
         add_child(g_rh)
         await get_tree().process_frame
-        g_rh._pair_down(g_rh._intro_pair)
-        g_rh._intro_pair = []
+        g_rh.sheet_pop()
         g_rh._locked = false
         g_rh._load_level(3)      # THE STONES - the rhino's debut
         g_rh._spawn_enemy("blocker", Vector2i(20, 12))
@@ -332,8 +330,7 @@ func _run() -> void:
         g_mv.game_id = "dario"
         add_child(g_mv)
         await get_tree().process_frame
-        g_mv._pair_down(g_mv._intro_pair)
-        g_mv._intro_pair = []
+        g_mv.sheet_pop()
         g_mv._locked = false
         g_mv._load_level(2)      # THE MARKS - the first mover
         _check(g_mv.movers.size() >= 1, "level 3 carries the mover")
@@ -363,8 +360,7 @@ func _run() -> void:
         g_sp.game_id = "dario"
         add_child(g_sp)
         await get_tree().process_frame
-        g_sp._pair_down(g_sp._intro_pair)
-        g_sp._intro_pair = []
+        g_sp.sheet_pop()
         g_sp._locked = false
         g_sp._load_level(1)      # THE WOODS REPEAT - the first spikes
         _check(g_sp.spikes.size() >= 2, "the spike cells are REAL entities now")
@@ -405,8 +401,7 @@ func _run() -> void:
         g_d.game_id = "dario"
         add_child(g_d)
         await get_tree().process_frame
-        g_d._pair_down(g_d._intro_pair)
-        g_d._intro_pair = []
+        g_d.sheet_pop()
         g_d._locked = false
         g_d._load_level(1)
         await get_tree().process_frame
@@ -445,8 +440,7 @@ func _run() -> void:
         g2.game_id = "dario"
         add_child(g2)
         await get_tree().process_frame
-        g2._pair_down(g2._intro_pair)
-        g2._intro_pair = []
+        g2.sheet_pop()
         g2._locked = false
         g2._load_level(9)     # the arena
         _check(g2.ghosts.size() >= 4, "the arena carries the TALL ghost ladder")
@@ -473,8 +467,7 @@ func _run() -> void:
         g3.game_id = "dario"
         add_child(g3)
         await get_tree().process_frame
-        g3._pair_down(g3._intro_pair)
-        g3._intro_pair = []
+        g3.sheet_pop()
         g3._locked = false
         g3._load_level(9)
         g3._start_boss(Vector2i(24, 4))
@@ -524,11 +517,10 @@ func _run() -> void:
 
         # ---- the shop builds and closes without orphan dims ----
         g3._shop_open()
-        _check(g3._shop_pair.size() == 2, "the shop owns its dim+center PAIR")
+        _check(g3.sheet_open_count() >= 1, "the shop rides the base sheet stack (its exact pair is tracked)")
         var root_ctrl: Control = g3._overlay_root_ref()
         var kids := root_ctrl.get_child_count()
-        g3._pair_down(g3._shop_pair)
-        g3._shop_pair = []
+        g3.sheet_pop()
         await get_tree().process_frame
         await get_tree().process_frame
         _check(root_ctrl.get_child_count() < kids,

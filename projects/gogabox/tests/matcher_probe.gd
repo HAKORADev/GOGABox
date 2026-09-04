@@ -22,6 +22,27 @@ func ck(cond: bool, label: String) -> void:
                 print("[FAIL] ", label)
 
 
+## walks the game's overlay root for the scroll of the top sheet
+func _scroll_in_overlay(g: GogaGame) -> BoxScroll:
+        var found: BoxScroll = null
+        var stack: Array = [g._overlay_root_ref()]
+        while not stack.is_empty() and found == null:
+                var cur: Node = stack.pop_back()
+                if cur is BoxScroll:
+                        found = cur
+                        break
+                for c in cur.get_children():
+                        stack.append(c)
+        return found
+
+## the VBox of the top sheet (the last CenterContainer child's panel child)
+func _top_sheet(g: GogaGame) -> VBoxContainer:
+        var root: Control = g._overlay_root_ref()
+        var cc: Control = root.get_child(root.get_child_count() - 1) as Control
+        var panel: Control = cc.get_child(0) as Control
+        return panel.get_child(0) as VBoxContainer
+
+
 func _labels_in(n: Node) -> Array:
         var out: Array = []
         for c in n.get_children():
@@ -291,15 +312,24 @@ func _run() -> void:
                 if top_wing.x >= 0:
                         break
         if top_wing.x >= 0:
-                # walk it to the top row, then one more move feeds the spider
+                # walk it to the top row: the spider grabs it after the rise lands
                 G.grid[0][top_wing.y] = G.grid[top_wing.x][top_wing.y]
                 G.grid[top_wing.x][top_wing.y] = {}
-                if is_instance_valid(G.grid[0][top_wing.y].get("wing_ov")):
-                        G.grid[0][top_wing.y]["wing_ov"].position = G._cell_pos(0, top_wing.y)
                 G.over = false
                 G.phase = "play"
-                G._rise_butterflies()
+                await G._rise_butterflies()
                 ck(G.over, "a butterfly at the top row feeds the spider - the run ends")
+        # THE WING BAKE LAW: a butterfly's wings live IN its texture now
+        var bake_ok := true
+        for r in 8:
+                for c2 in 8:
+                        var wc: Dictionary = G.grid[r][c2]
+                        if wc.is_empty() or not bool(wc.get("wing", false)):
+                                continue
+                        var wn: Sprite2D = wc["node"]
+                        if wn.texture == G.tex_gem[int(wc["color"]) % G.tex_gem.size()]:
+                                bake_ok = false
+        ck(bake_ok, "THE WING BAKE LAW: butterfly wings are baked into the sprite texture")
 
         # ------------------------------------------------ the ice law
         await _boot("ice")
@@ -308,31 +338,51 @@ func _run() -> void:
                 if int(f) > 0:
                         any_ice = true
         ck(any_ice, "ice columns started rising")
-        G.frost[2] = 3
+        for f in 8:
+                G.frost[f] = 0          # a clean sky: only column 2 is iced
+        G.frost[2] = 5
         G._refresh_ice()
-        var popset := {}
-        for r in 8:
-                popset[r * 8 + 2] = true
+        var hcells := {}
+        for c2 in 8:
+                hcells[3 * 8 + c2] = true
         var sc0 := int(G.score)
-        G._melt_under(popset)
-        ck(int(G.frost[2]) == 2, "a match on an iced column melts one layer")
-        ck(int(G.score) - sc0 == 5, "a melt pays its +5 bonus")
+        # THE HORIZONTAL LAW: a horizontal match touching the line eats 3
+        G._plan_melt([{"cells": hcells, "dir": "h", "color": 0, "cross": Vector2i(-1, -1)}])
+        G._melt_under({})
+        ck(int(G.frost[2]) == 2, "a HORIZONTAL match melts exactly 3 segments (5 -> 2)")
+        ck(int(G.score) - sc0 == 15, "the melt pays +5 per segment")
+        # THE VERTICAL LAW: a vertical match in the column destroys it ALL
+        var vcells := {}
+        for r in 8:
+                vcells[r * 8 + 2] = true
+        G._plan_melt([{"cells": vcells, "dir": "v", "color": 0, "cross": Vector2i(-1, -1)}])
+        G._melt_under({})
+        ck(int(G.frost[2]) == 0, "a VERTICAL match destroys the whole line")
 
         # ------------------------------------------------ the mine law
         await _boot("mine")
-        ck(G.earth.size() == 3 and G.earth[0].size() == 8, "the earth band is 3 rows wide")
-        ck(G.earth_left == 24, "a fresh layer holds 24 earth cells")
-        var el0 := int(G.earth_left)
-        var popmine := {}
-        for r in 8:
-                popmine[r * 8 + 4] = true
-        G._mine_dig(popmine)
-        ck(int(G.earth_left) == el0 - 1, "a match in a column drills the lowest earth cell")
-        G.earth_left = 0
+        ck(G.earth_top == 7, "THE MINE LAW: the run starts with ONE bottom row (rows rise from the bottom)")
+        ck(G.earth[7].size() == 8, "the earth row holds 8 cells")
+        ck(absf(float(G.MINE_CLOCK) - 60.0) < 0.01, "the round starts with 60 seconds")
+        ck(float(G.mine_rise_clock) > 24.0 and float(G.mine_rise_clock) <= 25.0,
+                "the earth rises every 25 seconds")
+        # a match in the row SITTING ON the earth digs the earth below it -
+        # and a fully dug row pays its +25s and sinks the band in one move
         var dc0 := float(G.dig_clock)
-        G._mine_layer_check()
-        ck(float(G.dig_clock) >= dc0 + G.MINE_DESCEND - 0.01, "breaking the layer pays +30s")
-        ck(int(G.depth) == 4, "the depth meter descended")
+        var dp0 := int(G.depth)
+        var popmine := {}
+        for c2 in 8:
+                popmine[6 * 8 + c2] = true     # row 6 = directly above earth_top 7
+        G._mine_dig(popmine)
+        var alive := 0
+        for c2 in 8:
+                var e: Dictionary = G.earth[7][c2]
+                if not e.is_empty() and e.has("node") and is_instance_valid(e["node"]):
+                        alive += 1
+        ck(alive == 0, "a full wave on the dirt row dug the whole earth row")
+        ck(float(G.dig_clock) >= dc0 + G.MINE_ROW_BONUS - 0.01, "clearing a row pays +25s")
+        ck(int(G.depth) == dp0 + 1, "the depth meter descended")
+        ck(int(G.earth_top) == 8, "the cleared band sank away (the board breathes)")
 
         # ------------------------------------------------ the power economy
         await _boot("challenge")
@@ -411,7 +461,8 @@ func _run() -> void:
         G._pick_open(true)
         await get_tree().create_timer(0.4).timeout
         ck(G.pick_open, "THE OPTIONALS LAW: the optionals sheet greets first")
-        var osc: BoxScroll = G.pick_sheet[2]
+        var osc: BoxScroll = _scroll_in_overlay(G)
+        ck(osc != null, "the optionals rides the base sheet stack (a scroll lives)")
         var tap_ok := true
         var live := 0
         for b in Arc._buttons_in(osc):
@@ -455,28 +506,50 @@ func _run() -> void:
         G._refresh_board_skin()
         G.grid = saved_grid
         ck(true, "THE EMPTY-BOARD LAW: the skin refresh survives an unborn grid (the freeze is dead)")
-        # THE SHOP LAW: the optionals wears a real SHOP button; the shop
-        # opens its own sheet and CLOSE walks back to the optionals
-        # (pre-run - a mid-run close would walk back to the live run)
+        # THE SHOP LAW v0.3.3-p2 (the owner: "the shop IS CLEARLY A BUTTON AT
+        # THE TOP CALLED SHOP IN EVERY SINGLE GAME" + "it should not has the
+        # shop there"): the optionals has NO shop row; the HUD top bar wears
+        # the button; the shop opens ON TOP of the optionals and its CLOSE
+        # walks back (the stack keeps the pick alive beneath)
         G.phase = "hold"
+        G._pick_close()
+        await get_tree().create_timer(0.2).timeout
         G._pick_open(false)
         await get_tree().create_timer(0.3).timeout
-        var shop_btn: Button = null
-        for b in Arc._buttons_in(G.pick_sheet[2]):
+        var osc2: BoxScroll = _scroll_in_overlay(G)
+        var shop_in_optionals := false
+        for b in Arc._buttons_in(osc2):
                 if b.text == "SHOP":
-                        shop_btn = b
-        ck(shop_btn != null, "THE SHOP BUTTON LAW: the optionals wears a real SHOP button")
-        shop_btn.pressed.emit()
+                        shop_in_optionals = true
+        ck(not shop_in_optionals, "THE SHOP LAW: the optionals has NO shop row")
+        var hud_shop: Button = null
+        for b in Arc._buttons_in(G._hud_row):
+                if b.text == "SHOP":
+                        hud_shop = b
+        ck(hud_shop != null, "THE SHOP LAW: the HUD top bar wears the SHOP button")
+        hud_shop.pressed.emit()
         await get_tree().create_timer(0.3).timeout
-        ck(G.shop_open and not G.pick_open, "the shop opens its own sheet")
+        ck(G.pick_open and G.sheet_open_count() == 2,
+                "the shop opens ON TOP of the optionals (the stack holds both)")
+        var ssc: BoxScroll = _scroll_in_overlay(G)
         var close_btn: Button = null
-        for b in Arc._buttons_in(G.shop_sheet[2]):
+        for b in Arc._buttons_in(ssc):
                 if b.text == "CLOSE":
                         close_btn = b
         close_btn.pressed.emit()
         await get_tree().create_timer(0.3).timeout
-        ck(G.pick_open and not G.shop_open, "the shop CLOSE walks back to the optionals")
-        G._pick_close()
+        ck(G.pick_open and G.sheet_open_count() == 1,
+                "the shop CLOSE walks back to the optionals (nothing rebuilt, nothing hung)")
+        # THE BACK LAW: the HUD back closes the top sheet, again -> the board
+        G._back_pressed()
+        await get_tree().create_timer(0.2).timeout
+        ck(not G.pick_open and G.sheet_open_count() == 0,
+                "THE BACK LAW: back closes the optionals (the owner's dead back is alive)")
+        G._back_pressed()
+        await get_tree().create_timer(0.2).timeout
+        ck(G.paused and not G.sheet_open_count() > 0,
+                "THE BACK LAW: with nothing open, back opens the pause sheet")
+        G._pause_close()
         await get_tree().create_timer(0.2).timeout
 
         # ------------------------------------------------ the power popup laws
@@ -487,8 +560,9 @@ func _run() -> void:
         G.power_used["line"] = 1
         G._rail_tap("line")
         await get_tree().create_timer(0.3).timeout
-        ck(not G.refill_sheet.is_empty(), "THE BUY POPUP LAW: an empty power opens the buying menu")
-        var pbtns: Array = Arc._buttons_in(G.refill_sheet[1])
+        ck(G.sheet_open_count() == 1, "THE BUY POPUP LAW: an empty power opens the buying menu")
+        var psheet: VBoxContainer = _top_sheet(G)
+        var pbtns: Array = Arc._buttons_in(psheet)
         var plus_b: Button = null
         var minus_b: Button = null
         for b in pbtns:
@@ -503,17 +577,20 @@ func _run() -> void:
         await get_tree().create_timer(0.1).timeout
         ck(plus_b.disabled, "THE DYNAMIC CAP LAW: 1 used -> the arrows stop at 2")
         var total_txt := ""
-        for l in _labels_in(G.refill_sheet[1]):
+        for l in _labels_in(psheet):
                 if String(l.text).begins_with("BUY "):
                         total_txt = String(l.text)
-        ck(total_txt.begins_with("BUY 2"), "the total rides the qty (%s)" % total_txt.replace("\n", " "))
+        ck(total_txt.begins_with("BUY 2") and total_txt.contains("GOGACoins"),
+                        "the total rides the qty and names GOGACoins (%s)" % total_txt.replace("\n", " "))
+        var wallet_before := Box.coins()
         for b in pbtns:
                 if b.text == "BUY":
                         b.pressed.emit()
         await get_tree().create_timer(0.3).timeout
-        ck(int(G.charges["line"]) == 2 and int(G.run_coins) == 500 - 90,
-                        "the BUY pays the ROUND balance (2 x 45), the wallet is untouched")
-        ck(Box.coins() >= 9000, "the box wallet never moved mid-run")
+        ck(int(G.charges["line"]) == 2,
+                        "the BUY stocks 2 charges")
+        ck(Box.coins() == wallet_before - 90 and int(G.run_coins) == 500,
+                        "THE GLOBAL WALLET LAW: the BUY pays the FULL wallet (2 x 45), the round balance is untouched")
         # THE GRAY-OUT LAW: all 3 spent -> the rail slot goes dead
         G.charges["line"] = 0
         G.power_used["line"] = 3
@@ -521,9 +598,20 @@ func _run() -> void:
         ck(G.rail_slots["line"]["btn"].disabled, "THE GRAY-OUT LAW: 3 spent -> the slot grays out")
         G._rail_tap("line")
         await get_tree().create_timer(0.2).timeout
-        ck(G.refill_sheet.is_empty(), "a spent power opens nothing")
+        ck(G.sheet_open_count() == 0, "a spent power opens nothing")
         G.power_used["line"] = 0
         G.phase = "hold"
+        # THE SPECIALS SHADER LAW: a born flame dresses its gem's MATERIAL
+        G.phase = "play"
+        G.grid[3][3]["special"] = "flame"
+        G._dress_special(3, 3)
+        var fn: Sprite2D = G.grid[3][3]["node"]
+        ck(fn.material != null and fn.material is ShaderMaterial,
+                "THE SHADER LAW: the special is the gem's own shader (moves with it)")
+        # THE DONUT SKIN LAW: the template skin exists and is priced
+        ck(G.SKINS.has("donut") and int(G.SKINS["donut"]["price"]) == 280
+                        and G.SKIN_ORDER.has("donut"),
+                "THE DONUT SKIN LAW: the template's Donut Den waits in the shop")
 
         # ------------------------------------------------ the banner + the registry
         var reg := GameReg.get_game("matcher")

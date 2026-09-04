@@ -185,10 +185,12 @@ func _quit_to_menu() -> void:
         if router != null and is_instance_valid(router) and router.has_method("on_game_closed"):
                 router.call("on_game_closed")
 
-## Android back button while playing -> pause (never instant-quit).
+## Android back button while playing -> THE BACK LAW (v0.3.3-p2): a game
+## sheet open -> close it; the pause sheet open -> resume; nothing open ->
+## pause. The same behavior as the HUD "<" button (game_base._back_pressed).
 func request_pause() -> void:
-        if game != null and is_instance_valid(game) and not game.over and not game.paused:
-                game._pause_open()
+        if game != null and is_instance_valid(game) and not game.over:
+                game._back_pressed()
 
 func _exit_tree() -> void:
         if _session_open:

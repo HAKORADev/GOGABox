@@ -100,6 +100,10 @@ const BURN_BASE := 2.0             # hornet burn seconds at L1
 ## THE TYPE INFRA LAW (v0.3.2 PATCH III, the owner: "enemies are sorted in
 ## types, specific types share same infra"): the roster is FAMILIES -
 ##   shooters "aim"  : aimer, magma            (a bolt aimed at the protector)
+##   shooters "nose" : grunt, swift            (v0.3.3-p2, the owner: "some of
+##                     them should be able to aim, like currently, but some
+##                     of them shoot from their nose area without targeting"
+##                     - a straight drop from the nose, zero tracking)
 ##   shooters "fan"  : spitter                 (3-bolt fan)
 ##   shooters "shotgun": brute                 (5-bolt blast)
 ##   shooters "ring" : void                    (8-bolt ring + blink)
@@ -109,9 +113,10 @@ const BURN_BASE := 2.0             # hornet burn seconds at L1
 ##   big bodies      : tank, brute, void ("big": true - the extra power roll)
 ##   extras          : swift/weaver weave, splitter splits, magma trails
 const ETYPES := {
-                "grunt": {"tex": "en_grunt.png", "hp": 6, "score": 1, "r": 50.0},
+                "grunt": {"tex": "en_grunt.png", "hp": 6, "score": 1, "r": 50.0,
+                                "fires": "nose", "fire_cd": [3.0, 5.0]},
                 "swift": {"tex": "en_swift.png", "hp": 4, "score": 1, "r": 46.0,
-                                "weave": 1.0},
+                                "weave": 1.0, "fires": "nose", "fire_cd": [3.4, 5.4]},
                 "aimer": {"tex": "en_aimer.png", "hp": 8, "score": 2, "r": 52.0,
                                 "fires": "aim", "fire_cd": [2.6, 4.2]},
                 "diver": {"tex": "en_diver.png", "hp": 5, "score": 1, "r": 44.0,
@@ -1768,8 +1773,9 @@ func _enemies_tick(delta: float) -> void:
                                                                 pass
                                 if String(e["state"]) == "in" or String(e["state"]) == "hover":
                                                 # fired kinds shoot on their cadence (some aim, some fan,
-                                                # some ring) - divers keep falling silent, they ARE the shot
-                                                if d.has("fires") and not over:
+                                                # some ring, some drop straight nose shots) - divers keep
+                                                # falling silent, they ARE the shot
+                                                if d.has("fires") and not over and _fire_war_ok():
                                                                 e["fire_cd"] = float(e["fire_cd"]) - delta
                                                                 if e["fire_cd"] <= 0.0:
                                                                                 e["fire_cd"] = rng.randf_range(float(d["fire_cd"][0]), float(d["fire_cd"][1]))
@@ -1796,12 +1802,23 @@ func _enemies_tick(delta: float) -> void:
                                                                 _hit_enemy(e, 999)
                                                                 _wreck()
 
+## v0.3.3-p2: the nose shooters (grunt/swift) keep the PATCH III peace law -
+## Neptune's first three waves stay silent; from wave 4 (the aimer's arrival)
+## the straight nose shots join, and every later stage fires from wave 1.
+func _fire_war_ok() -> bool:
+        return stage > 0 or wave >= 4
+
 func _enemy_fire(e: Dictionary) -> void:
                 var d: Dictionary = e["data"]
                 var from: Vector2 = e["node"].position
                 match String(d["fires"]):
                                 "aim":
                                                 _ebolt(from, (ship.position - from).normalized() * 460.0)
+                                "nose":
+                                                # v0.3.3-p2 THE NOSE SHOT (the owner): straight
+                                                # down from the nose area, never a tracking shot
+                                                _ebolt(from + Vector2(0, float(e["r"]) * 0.55),
+                                                                Vector2(0, 1) * 430.0)
                                 "fan":
                                                 for k in 3:
                                                                 var ang := PI / 2.0 + (float(k) - 1.0) * 0.38
@@ -2859,6 +2876,25 @@ func _defender_tick(delta: float) -> void:
                         elif dodge_side == 0.0:
                                 dodge_side = 1.0 if defender.position.x < vpx * 0.5 else -1.0
                         break
+        # v0.3.3-p2 THE BODY AVOID LAW: a diver bearing down on the wingman is
+        # a threat like a bolt - the hull sidesteps instead of trading itself
+        # for a body it cannot dent (the "defenders still stupid" report: it
+        # used to hover INTO a diver's face and die for nothing)
+        if not threat:
+                for e2 in enemies:
+                        if not is_instance_valid(e2.get("node")):
+                                continue
+                        var en: Sprite2D = e2["node"]
+                        if String(e2.get("state", "")) != "dive":
+                                continue
+                        var ddx: float = defender.position.x - en.position.x
+                        var ddy: float = defender.position.y - en.position.y
+                        if ddy > -40.0 and ddy < 300.0 and absf(ddx) < 130.0:
+                                threat = true
+                                threat_x = en.position.x
+                                dodge_side = signf(ddx) if absf(ddx) > 6.0 \
+                                                else (1.0 if defender.position.x < vpx * 0.5 else -1.0)
+                                break
         # THE STRAFE LAW (v0.3.3-p1, the owner: "their shots come out from
         # their nose area and NOT aiming - they move the ship left-right to
         # target an enemy ship"): the wingman does not aim its gun - it DRIVES
@@ -2875,12 +2911,20 @@ func _defender_tick(delta: float) -> void:
                 if not tgt.is_empty() and is_instance_valid(tgt["node"]):
                         var tx: float = (tgt["node"] as Sprite2D).position.x
                         want_x = tx
-                        aligned = absf(tx - defender.position.x) < 52.0
+                        # v0.3.3-p2: the lane window grows (52 -> 66) - the old
+                        # narrow window + slow chase read as a wingman that
+                        # "never shoots"
+                        aligned = absf(tx - defender.position.x) < 66.0
+                else:
+                        # the idle patrol: a slow sentry sweep around the escort
+                        # point - a wingman never hangs like a statue
+                        want_x = ship.position.x - 240.0 \
+                                        + sin(Time.get_ticks_msec() * 0.0006) * 90.0
         # ONE exponential chase from the CURRENT position (the probe killed
         # the two-lerp version: pos -> want -> target composed into a crawl)
         var want_y := ship.position.y + 30.0 + sin(Time.get_ticks_msec() * 0.001) * 18.0
-        defender.position.x = lerpf(defender.position.x, want_x, minf(1.0, delta * 3.0))
-        defender.position.y = lerpf(defender.position.y, want_y, minf(1.0, delta * 3.0))
+        defender.position.x = lerpf(defender.position.x, want_x, minf(1.0, delta * 4.2))
+        defender.position.y = lerpf(defender.position.y, want_y, minf(1.0, delta * 3.4))
         defender.position.x = clampf(defender.position.x, 80.0, vpx - 80.0)
         # THE LEVEL HULL LAW: a rented hull never tilts - not for threats,
         # not for shots. Level body, vertical fire.
@@ -3003,9 +3047,13 @@ func _story_show(title: String, msg: String, after := Callable(), bad := false,
         get_tree().paused = true
         var root := _overlay_root_ref()
         var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        # v0.3.3-p2: the story sheet runs ALWAYS (tappable under the pause)
         var kids := root.get_children()
-        _story_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sdim: Control = kids[kids.size() - 2]
+        var scc: Control = kids[kids.size() - 1]
+        sdim.process_mode = Node.PROCESS_MODE_ALWAYS
+        scc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _story_pair = [sdim, scc]
         _story_after = after
         var t := Arc.label(title, 34, Arc.BAD if bad else Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3154,9 +3202,17 @@ func _sheet_open(title: String) -> void:
                 get_tree().paused = true
         var root := _overlay_root_ref()
         var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
+        # v0.3.3-p2 THE BACK LAW support: the sheet branch runs ALWAYS so it
+        # stays tappable under the paused tree, and _back_pressed (the HUD
+        # "<" + the Android back) closes the top sheet instead of stacking a
+        # dead pause over a live menu (the owner's "back to box hangs in the
+        # game menus")
         var kids := root.get_children()
-        _sheet_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var dim: Control = kids[kids.size() - 2]
+        var cc: Control = kids[kids.size() - 1]
+        dim.process_mode = Node.PROCESS_MODE_ALWAYS
+        cc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _sheet_pair = [dim, cc]
         var t := Arc.fit_label(title, 34, Arc.INK, 560)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -3202,6 +3258,18 @@ func _sheet_close() -> void:
         _sheet_down()
         get_tree().paused = false
         paused = false
+
+## v0.3.3-p2 THE BACK LAW, invaders shape: a live menu (or the story sheet)
+## closes FIRST - the pause never stacks on top of it again. Then the base
+## behavior (nothing open -> the pause sheet; pause open -> resume).
+func _back_pressed() -> void:
+        if not _sheet_pair.is_empty() or not _story_pair.is_empty():
+                _sheet_down()
+                _story_down()
+                get_tree().paused = false
+                paused = false
+                return
+        super._back_pressed()
 
 # ================================================================ shop / optionals
 
@@ -3307,11 +3375,14 @@ func _optionals_open(first := false) -> void:
                         18, Color(0.6, 0.65, 0.75), 560, false)
         hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(hint)
-        var fb := Arc.button("TO THE LINE" if first else "CLOSE", Vector2(0, 74), 24,
+        # v0.3.3-p2 (the owner: "it first says to the line, but when changing
+        # the ship it shows close, it should remain to the line"): the button
+        # ALWAYS says TO THE LINE and ALWAYS walks to the ready card - the
+        # label never flips to CLOSE, the flow never dead-ends in a menu
+        var fb := Arc.button("TO THE LINE", Vector2(0, 74), 24,
                         Arc.GOOD, func():
                                 _sheet_close()
-                                if first:
-                                        _show_ready_card())
+                                _show_ready_card())
         fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         box.add_child(fb)
         _sheet_finish(_sheet_pair[2] as BoxScroll)

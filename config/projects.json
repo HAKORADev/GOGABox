@@ -9,7 +9,7 @@
       "ci_auto": true,
       "apk_name": "GOGABox",
       "package": "hakora.dev.gogabox",
-      "version_name": "0.3.3 PATCH 1",
+      "version_name": "0.3.3 PATCH 2",
       "version_code_base": 30430,
       "aab": false,
       "abi_presets": {

@@ -126,9 +126,8 @@ var _mc_blocks := {}                 # value -> Texture2D
 var _sea_time := 0.0
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
-var _shop_pair: Array = []
-var _confirm_pair: Array = []        # the are-you-sure pair (the size law)
-var _options_pair: Array = []        # the OPTIONS sheet owns its pair too
+var _confirm_open_id := ""   # the size id the live are-you-sure asks about
+var _confirm_bought := false
 
 # the water physics constants (v0.2.8 THE REAL MOTION LAW). The surface is
 # a damped spring per tile; the container acceleration comes from the
@@ -561,12 +560,15 @@ func _slide(dirv: Vector2i) -> bool:
                                         cx = nx
                                         cy = ny
                                         continue
-                                if nv == v and not merged.has(Vector2i(nx, ny)):
+                                # v0.3.3-p2 THE 2048 CAP (the owner): a 2048 tile
+                                # never fuses - the grid fills, the run ends the
+                                # honest way. No 4096s, no weird super-game.
+                                if nv == v and v < 2048 and not merged.has(Vector2i(nx, ny)):
                                         cx = nx
                                         cy = ny
                                 break
                         var dest := Vector2i(cx, cy)
-                        if int(nb[cx][cy]) == v and not merged.has(dest):
+                        if int(nb[cx][cy]) == v and v < 2048 and not merged.has(dest):
                                 nb[cx][cy] = v * 2
                                 merged[dest] = true
                                 merges.append({"at": dest, "value": v * 2})
@@ -980,7 +982,7 @@ func _goga_input(_event: InputEvent) -> void:
 ## swipe ANY direction moves the board (the owner's control law). A board
 ## nudge sells the hit; a deny wobble sells the wall.
 func _on_swipe(dirv: Vector2i, _pos: Vector2) -> void:
-        if over or paused or animating or over_board:
+        if over or paused or animating or over_board or sheet_open_count() > 0:
                 return
         var moved := _slide(dirv)
         if not moved:
@@ -1019,16 +1021,13 @@ func _merge_sfx(v: int) -> String:
         return "m_pop"
 
 # ============================================================ the shop
-## Same bones as the tower shop (THE PAIR LAW - the sheet owns its exact
-## dim+center pair). One shelf: THEMES.
+## v0.3.3-p2 THE SHEET STACK: the shop rides game_base.sheet_push/sheet_pop -
+## the exact dim+center pair is tracked by the base, the topmost law hands
+## every tap to the live sheet, and the back button closes it. One shelf:
+## THEMES + THE SIZES (the options sheet no longer sells - the shop does).
 
 func _shop_open() -> void:
-        _shop_pair_down()
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        _shop_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sheet := sheet_push(0.0)
         var t := Arc.label("2048 SHOP", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -1048,8 +1047,11 @@ func _shop_open() -> void:
         box.add_child(_shop_label("THEMES - a whole new feel, sounds included"))
         for id in THEMES:
                 box.add_child(_theme_row(id))
+        box.add_child(_shop_label("BOARD SIZES - bigger boards, bigger bonus"))
+        for id in SIZES:
+                box.add_child(_size_row(id, true))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
-                        func(): _shop_close()))
+                        func(): sheet_pop()))
         for b in Arc._buttons_in(sc):
                 if b.disabled:
                         continue
@@ -1083,27 +1085,24 @@ func _theme_row(id: String) -> Control:
                                                 Box.equip_item(game_id, "theme", id)
                                                 Jukebox.sfx("confirm", -4.0)
                                                 _apply_theme()
-                                                _shop_open()))
+                                                _shop_rebuild()))
                 return v
         var b := Arc.coin_button("BUY  %d" % _theme_price(id),
                         Vector2(560, 56), 22, Color("4a5ab8"), func():
                                         if Box.buy_item(game_id, "theme", id, _theme_price(id)):
                                                 Jukebox.sfx("buy")
                                                 _apply_theme()
-                                        _shop_open())
+                                        _shop_rebuild())
         if Box.coins() < _theme_price(id):
                 b.disabled = true
         v.add_child(b)
         return v
 
-func _shop_pair_down() -> void:
-        for n in _shop_pair:
-                if n != null and is_instance_valid(n):
-                        n.queue_free()
-        _shop_pair = []
-
-func _shop_close() -> void:
-        _shop_pair_down()
+## the stack-safe rebuild: the live shop sheet pops, a fresh one pushes
+func _shop_rebuild() -> void:
+        if sheet_open_count() > 0:
+                sheet_pop()
+        _shop_open()
 
 ## a theme change repaints EVERYTHING: the backdrop, the frame, the holes
 ## and every living tile (water materials in, pixel blocks out, and back)
@@ -1117,19 +1116,14 @@ func _apply_theme() -> void:
         coin_layer.queue_redraw()
 
 # ============================================================ the options
-## THE BOARD SIZES (owner v0.2.8): "add an options menu shows 4x4 normal
-## and 6x6 and 8x8, make the others be bought first for high prices, make
-## 6x6 score bonus be /80 and 8x8 /160". Same sheet bones as the shop
-## (THE PAIR LAW - its own exact dim+center pair). Equipping a different
-## size starts a FRESH board with that size.
+## THE BOARD SIZES (owner v0.2.8). v0.3.3-p2 THE UNIVERSAL SHAPE: the options
+## sheet is a PICKER, not a shop - owned sizes show SWITCH (with the
+## are-you-sure), locked sizes are labeled LOCKED and their tap walks to the
+## SHOP (the snake law - the shop button is the HUD's, the sheet sells).
+## Rides the sheet stack (the exact-pair + topmost-tap laws).
 
 func _options_open() -> void:
-        _options_pair_down()
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        _options_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var sheet := sheet_push(0.0)
         var t := Arc.label("2048 OPTIONS", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -1151,14 +1145,16 @@ func _options_open() -> void:
         for id in SIZES:
                 box.add_child(_size_row(id))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
-                        func(): _options_close()))
+                        func(): sheet_pop()))
         for b in Arc._buttons_in(sc):
                 if b.disabled:
                         continue
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
 
-func _size_row(id: String) -> Control:
+## the row: in the SHOP a locked size SELLS (buy -> are-you-sure -> fresh
+## board); in the OPTIONS a locked size walks to the shop (the snake law)
+func _size_row(id: String, in_shop := false) -> Control:
         var sz: Dictionary = SIZES[id]
         var owned := Box.item_owned(game_id, "size", id) or int(sz["price"]) == 0
         var on := size_id == id
@@ -1179,28 +1175,40 @@ func _size_row(id: String) -> Control:
                 v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
                                 Color("4a5ab8"), func(): _size_confirm(id, false)))
                 return v
+        if not in_shop:
+                var lk := Arc.button("LOCKED - %d IN THE SHOP" % int(sz["price"]),
+                                Vector2(560, 56), 20, Color(0.55, 0.48, 0.38), func():
+                                        sheet_pop()      # the options step aside...
+                                        _shop_open())    # ...the shop answers
+                v.add_child(lk)
+                return v
         var b := Arc.coin_button("BUY  %d" % int(sz["price"]),
                         Vector2(560, 56), 22, Color("4a5ab8"), func():
                                         if Box.buy_item(game_id, "size", id, int(sz["price"])):
                                                 Jukebox.sfx("buy")
                                                 _size_confirm(id, true)
                                         else:
-                                                _options_open())
+                                                Jukebox.sfx("error", -6.0)
+                                                _toast_show("need %d more GOGACoins" %
+                                                                (int(sz["price"]) - Box.coins()))
+                                                _shop_rebuild())
         if Box.coins() < int(sz["price"]):
                 b.disabled = true
         v.add_child(b)
         return v
 
-## THE ARE-YOU-SURE SHEET (v0.3.3-p1): YES applies the new board (the run
-## starts fresh), NO walks back - a bought size that is refused re-equips
-## the old one so the store and the board always tell the same truth.
+## THE ARE-YOU-SURE SHEET (v0.3.3-p1, stack-borne v0.3.3-p2): the confirm
+## PUSHES on top of whatever is live. YES pops it (and the sheet under it
+## when it came from a buy) and applies the board. NO pops just the confirm -
+## the sheet under it never died, so there is nothing to rebuild and nothing
+## can hang (the old code queue_free'd its pair and rebuilt the options from
+## scratch - a race the Xvfb probe turned into a dead tap).
 func _size_confirm(id: String, bought: bool) -> void:
-        _confirm_pair_down()
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        var kids := root.get_children()
-        _confirm_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        if _confirm_open_id != "":
+                sheet_pop()          # a confirm is already up - replace it
+        _confirm_open_id = id
+        _confirm_bought = bought
+        var sheet := sheet_push(0.0)
         var sz: Dictionary = SIZES[id]
         var t := Arc.label("SWITCH TO %s?" % String(sz["name"]).to_upper(), 32, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1210,30 +1218,15 @@ func _size_confirm(id: String, bought: bool) -> void:
         w.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(w)
         sheet.add_child(Arc.button("YES - SWITCH", Vector2(560, 84), 28, Arc.GOOD, func():
-                        _confirm_pair_down()
+                        sheet_pop()                      # the confirm dies first
+                        _confirm_open_id = ""
+                        if _confirm_bought and sheet_open_count() > 0:
+                                sheet_pop()              # the shop under it too
                         Box.equip_item(game_id, "size", id)
                         Jukebox.sfx("confirm", -4.0)
-                        _apply_size(id)
-                        _options_open()))
+                        _apply_size(id)))
         sheet.add_child(Arc.button("NO", Vector2(560, 74), 26, Arc.BAD, func():
-                        _confirm_pair_down()
-                        if bought:
-                                Box.equip_item(game_id, "size", size_id)
-                        _options_open()))
-
-
-func _confirm_pair_down() -> void:
-        for n in _confirm_pair:
-                if n != null and is_instance_valid(n):
-                        n.queue_free()
-        _confirm_pair = []
-
-
-func _options_pair_down() -> void:
-        for n in _options_pair:
-                if n != null and is_instance_valid(n):
-                        n.queue_free()
-        _options_pair = []
-
-func _options_close() -> void:
-        _options_pair_down()
+                        sheet_pop()
+                        _confirm_open_id = ""
+                        if _confirm_bought:
+                                Box.equip_item(game_id, "size", size_id)))

@@ -428,12 +428,6 @@ var _stars: Array = []
 var _fade_cl: CanvasLayer
 var _fade_rect: ColorRect
 
-# the shop sheet PAIR (THE PAIR LAW - the sheet owns its dim+center pair;
-# freeing only the center left the dim eating every tap - the overlay bug)
-var _shop_pair: Array = []
-# the intro dialogue pair (same law)
-var _intro_pair: Array = []
-
 # ============================================================ setup
 
 var _jump_queued := false
@@ -481,27 +475,14 @@ func _refresh_hearts() -> void:
                                 else Color(0.16, 0.12, 0.12, 0.6)
 
 # ============================================================ the shop
-## THE PAIR LAW (stolen from merge2048, the game that never had this
-## bug): Arc.sheet adds a dim + a center to the overlay root. The pair
-## is captured at open and BOTH are dropped at close. A buy rebuilds the
-## sheet exactly ONCE. No orphan dims, no stacked sheets.
-
-func _pair_capture(root: Control) -> Array:
-        var kids := root.get_children()
-        return [kids[kids.size() - 2], kids[kids.size() - 1]]
-
-func _pair_down(pair: Array) -> void:
-        for c in pair:
-                if c != null and is_instance_valid(c):
-                        c.queue_free()
+## v0.3.3-p2 THE SHEET STACK: dario's sheets ride game_base.sheet_push/
+## sheet_pop - exact pairs tracked by the base, the topmost law hands every
+## tap to the live sheet, and the back button (HUD "<" + Android back)
+## closes the top sheet instead of stacking a pause over a live dialogue
+## scroll (the owner's "tapping resume or exit to box makes nothing").
 
 func _shop_open() -> void:
-        _pair_down(_shop_pair)
-        _shop_pair = []
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        _shop_pair = _pair_capture(root)
+        var sheet := sheet_push(0.0)
         var t := Arc.label("CURSED DARIO SHOP", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -543,9 +524,7 @@ func _shop_open() -> void:
                         "jump": "POWER JUMP"}[pid], pdesc,
                         int(POWER_PRICE[pid]), "power", pid, Callable()))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
-                        func():
-                                _pair_down(_shop_pair)
-                                _shop_pair = []))
+                        func(): sheet_pop()))
         for b in Arc._buttons_in(sc):
                 if b.disabled:
                         continue
@@ -568,7 +547,7 @@ func _theme_toggle(night_on: bool) -> Control:
                                 else:
                                         Box.equip_item(game_id, "theme", "night")
                                 _apply_theme()
-                                _shop_open())
+                                _shop_rebuild())
         v.add_child(b)
         return v
 
@@ -592,23 +571,22 @@ func _row(title: String, desc: String, price: int, cat: String,
                                         Jukebox.sfx("buy")
                                         if on_buy.is_valid():
                                                 on_buy.call()
-                                _shop_open())          # ONE rebuild - never a stack
-        if Box.coins() < price:
-                b.disabled = true
+                                _shop_rebuild())       # ONE rebuild - never a stack
         v.add_child(b)
         return v
+
+## the stack-safe rebuild: the live shop sheet pops, a fresh one pushes
+func _shop_rebuild() -> void:
+        if sheet_open_count() > 0:
+                sheet_pop()
+        _shop_open()
 
 # ============================================================ the intro
 ## the scrollable story square with the DONE button (the owner's spec)
 
 func _intro_open() -> void:
-        _pair_down(_intro_pair)
-        _intro_pair = []
         _locked = true
-        var root := _overlay_root_ref()
-        var sheet := Arc.sheet(root, 0.0)
-        sheet.get_parent().get_parent().process_mode = Node.PROCESS_MODE_ALWAYS
-        _intro_pair = _pair_capture(root)
+        var sheet := sheet_push(0.0)
         var cursed := Box.counter(game_id, "playthroughs") >= 2
         var t := Arc.label("THE CURSE", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -626,8 +604,7 @@ func _intro_open() -> void:
         sc.add_child(story)
         sheet.add_child(sc)
         var done := Arc.button("DONE", Vector2(560, 78), 28, Arc.GOOD, func():
-                _pair_down(_intro_pair)
-                _intro_pair = []
+                sheet_pop()
                 _locked = false)
         sheet.add_child(done)
         for b in Arc._buttons_in(sc):

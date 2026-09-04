@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "project": "gogabox",
-  "_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Re-derive everything: python3 projects/gogabox/tools/derive_assets.py (idempotent: re-downloads the Kenney fonts zip, re-copies CC0 audio vendored in candyrush, re-draws all PIL art, re-synthesizes sfx, regenerates thumbnails). All sources CC0; derivations inherit CC0. v0.2.4: the Space Dash set joined (Kenney space packs via OpenGameArt mirrors + the Particle Pack); recolors are deterministic tools/v024_vendor.py output (CC0 inherits).",
+  "_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Re-derive everything: python3 projects/gogabox/tools/derive_assets.py (idempotent: re-downloads the Kenney fonts zip, re-copies CC0 audio vendored in candyrush, re-draws all PIL art, re-synthesizes sfx, regenerates thumbnails). All sources CC0; derivations inherit CC0. v0.2.4: the Space Dash set joined (Kenney space packs via OpenGameArt mirrors + the Particle Pack); recolors are deterministic tools/v024_vendor.py output (CC0 inherits). v0.3.3-p2: the owner's own Match_3_Template sprites joined (the Donut Den skin + the checker cells + the backdrop + the banner ribbon).",
   "sources": [
     {
       "id": "kenney-fonts",
@@ -68,6 +68,13 @@
       "license": "CC0 1.0 Universal",
       "used_for": "assets/games/invaders/ship_*.png - the 7 SSDS hulls are hue/recolor/glow/mount edits of the SAME Kenney hulls vendored for lanes (kenney-space-shooter-redux + extension), applied by tools/v032_invaders_art.py per the owner's 'edit some ships and change their size and colors' call. Everything else in assets/games/invaders/ is painted from scratch by that tool (CC0-clean).",
       "origin": "local:derived"
+    },
+    {
+      "id": "owner-match3-template",
+      "name": "Match_3_Template.zip (owner-provided, uploaded to the session)",
+      "url": "owner upload (GameMaker sprite package: donuts, play-field tiles, background, banner ribbon)",
+      "license": "owner-provided for GOGABox use",
+      "used_for": "assets/games/matcher/gems/donut_0..4.png (the Donut Den skin gems), assets/games/matcher/bg/cell_donut_light.png + cell_donut_dark.png (the checker cells), assets/games/matcher/bg/bg_donut.png (the skin backdrop, cover-cropped 1080x1920), assets/games/matcher/fx/banner.png (the top event ribbon)"
     }
   ],
   "audit": {

@@ -38,6 +38,48 @@ var input_locked := false
 ## them, so they opt out with this flag.
 var game_safe := false
 
+## v0.3.3-p2 THE TOPMOST-CONTROL LAW (the owner's whole "back/no/hang" bug
+## family): a live BoxScroll under a LATER sheet ate every raw touch aimed
+## at the sheet's plain buttons - BoxScroll._input runs BEFORE the GUI stage,
+## so its capture + set_input_as_handled starved the buttons above (the
+## merge2048 are-you-sure NO tap that "hangs", the dario pause over the
+## intro dialogue, the invaders menu backs). Law: if a VISIBLE, PROCESSING
+## control that lives in a LATER sibling subtree covers this point, the
+## touch is NOT MINE - I never capture it, never swallow it, never fire.
+## (Verified under Xvfb: with the options scroll alive, the confirm NO click
+## died; with the law, plain buttons above scrolls receive their clicks.)
+func _covered_by_overlay(pos: Vector2) -> bool:
+        # climb to the topmost ancestor whose parent scopes us (a CanvasLayer
+        # or a non-Control) - sheets/overlays are LATER children of that scope
+        var scope: Control = self
+        var parent := scope.get_parent()
+        while parent is Control and parent.get_parent() is Control:
+                scope = parent
+                parent = scope.get_parent()
+        if parent == null:
+                return false
+        var kids := parent.get_children()
+        var idx := kids.find(scope)
+        for i in range(idx + 1, kids.size()):
+                var n := kids[i]
+                if n is Control and (n as Control).is_visible_in_tree() \
+                                and (n as Control).can_process() \
+                                and _blocks_at(n as Control, pos):
+                        return true
+        return false
+
+## any control in this subtree whose rect owns the point and that is not
+## transparent (IGNORE) - an IGNORE container can still host STOP children
+func _blocks_at(c: Control, pos: Vector2) -> bool:
+        if c.get_global_rect().has_point(pos) \
+                        and c.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+                return true
+        for ch in c.get_children():
+                if ch is Control and (ch as Control).is_visible_in_tree() \
+                                and _blocks_at(ch as Control, pos):
+                        return true
+        return false
+
 func _init() -> void:
         horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -101,11 +143,13 @@ func _input(event: InputEvent) -> void:
 func _mouse(m: InputEventMouseButton) -> void:
         if m.button_index != MOUSE_BUTTON_LEFT:
                 return
-        if get_global_rect().has_point(m.position):
+        if get_global_rect().has_point(m.position) \
+                        and not _covered_by_overlay(m.position):
                 get_viewport().set_input_as_handled()
 
 func _owns(pos: Vector2) -> bool:
-        return _idx == -1 and get_global_rect().has_point(pos)
+        return _idx == -1 and get_global_rect().has_point(pos) \
+                        and not _covered_by_overlay(pos)
 
 func _touch(t: InputEventScreenTouch) -> void:
         if t.pressed:
@@ -114,6 +158,10 @@ func _touch(t: InputEventScreenTouch) -> void:
                         # touch - I never capture it, so my index can never
                         # stick waiting for a release the inner already ate
                         if _nested_scroll_at(t.position) != null:
+                                return
+                        # the topmost law (v0.3.3-p2): a later overlay sheet
+                        # owns this touch - see _covered_by_overlay
+                        if _covered_by_overlay(t.position):
                                 return
                         _idx = t.index
                         _start = t.position

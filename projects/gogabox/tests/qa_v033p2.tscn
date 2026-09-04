@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://gogaboxqap2"]
+
+[ext_resource type="Script" path="res://tests/qa_v033p2.gd" id="1"]
+
+[node name="QaV033p2" type="Node"]
+script = ExtResource("1")

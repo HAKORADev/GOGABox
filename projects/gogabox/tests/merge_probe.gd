@@ -230,8 +230,8 @@ func _run() -> void:
         # ---- the shop opens (the pair law holds) ----
         g2._shop_open()
         await get_tree().process_frame
-        _check(g2._shop_pair.size() == 2, "the shop owns its dim+center pair")
-        g2._shop_close()
+        _check(g2.sheet_open_count() >= 1, "the shop rides the base sheet stack (its exact pair is tracked)")
+        g2.sheet_pop()
 
         # ================================================================
         # v0.2.8 THE VERDICT ROUND II
@@ -283,8 +283,8 @@ func _run() -> void:
         # the options sheet owns its exact dim+center pair (THE PAIR LAW)
         g2._options_open()
         await get_tree().process_frame
-        _check(g2._options_pair.size() == 2, "the options sheet owns its dim+center pair")
-        g2._options_close()
+        _check(g2.sheet_open_count() >= 1, "the options sheet rides the base sheet stack")
+        g2.sheet_pop()
 
         # ---- THE REAL MOTION WATER (the owner: react to REAL motion,
         # not the swipe direction; no motion = NO water motion) ----
