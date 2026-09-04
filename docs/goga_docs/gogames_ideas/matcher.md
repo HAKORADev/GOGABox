@@ -267,3 +267,126 @@ static up-up-up ladder:
   background flood-filled away; spider/ice/earth/treasures/power icons/
   skies/mode cards are PIL originals (`tools/v033_matcher_art.py`), the
   17 SFX + the peace theme are numpy synth (`tools/v033_sfx.py`).
+
+---
+
+# v0.3.3 PATCH 3 — the real-match-3 round (2026-09-05)
+
+The owner's verdict after patch 2: 2048 and invaders are GOOD, matcher gets
+the whole next patch. Everything below is his spec, quotes verbatim.
+
+## THE OWNER'S SPECIAL TABLE (replacing the Bejeweled guesses)
+- "the L or T is the bomb" -> BOMB: a 3x3 crater + the shockwave + the shake.
+- "the 4 vertical makes a horizontal line sweeper" -> ROW SWEEPER: its whole
+  row, with a glowing bar racing left-to-right and STAGED pops (distance
+  delays) so the eye sees the sweep.
+- "the 4 horizontal makes vertical one line sweeper" -> COLUMN SWEEPER:
+  its whole column, top-to-bottom staged.
+- "the +5 in a line makes color remover" -> COLOR REMOVER: "matchable with
+  whatever 3+" (swap with ANY gem) and "remove that color in a proper
+  bottom-to-up animation and removing" - the doomed color pops row by row
+  from the bottom edge upward under a rising shimmer. Caught in a blast it
+  takes a random color with it.
+- Shader v2 (`special.gdshader`): molten bomb heartbeat + orbiting embers,
+  gliding energy bands on both sweepers, an iridescent swirl + sparkle on
+  the remover. Still ON the gem, still skin-safe (the owner: "ofc first
+  they need more proper shaders for their effects btw because currently
+  they are too poor").
+- The invalid-SFX leak: blasts only speak when they actually hit.
+
+## BUTTERFLIES - the two bug laws
+- THE AFTER-MOVE LAW: "butterfly should move after the moves are done" -
+  the rise walks AFTER the full resolve (swap -> cascades -> settle), never
+  during the swap (his 2+1 example).
+- THE GRACE LAW: "the butterfly should reach the top, and then after that,
+  if it stayed at the top again, the spider will take it, not take it once
+  it is in the top" - touching row 0 is SAFE; the spider stirs (glides to
+  the column, red pulse, m_grace sting, "THE SPIDER STIRS..." banner); a
+  butterfly STILL on row 0 after the next rise gets grabbed - run over.
+
+## DIAMOND MINE - the pure-dirt rebuild
+- THE PURE DIRT LAW: "the sand/whatever that tiles are, should contain
+  nothing from the matchable jewels" - earth rows are pure dirt cells with
+  treasures, never gems.
+- THE BOARD LIFT: "when a line comes, it will raise the top line up and
+  remove it in a smooth way" - a rise glides the WHOLE board up one cell,
+  the top row sails out of the frame and fades, the freed bottom row
+  becomes fresh dirt sliding in from below. (The model lifts; one tween
+  wave moves everything together.)
+- THE PROGRESSION LAYERS: "by progression has intense layers like 3 layers
+  or 4 or a level of layers that needs only a special item to break it" -
+  dirt (1 dig) -> clay (2 digs, cracks first) -> ROCK (a plain match just
+  clanks; only special blasts shatter it).
+- The 25s rise (+ sometimes two), the 60s start and the +25s per cleared
+  row stay exactly as the owner specced in patch 2.
+
+## ICE STORM - the video's design
+The owner's Bejeweled 3 footage: frosted full-cell blocks with snow caps,
+gems standing ON the ice. The old overlay sat ABOVE the gems ("currently
+and weirdly you freeze the tiles"). Now the blocks render BEHIND the gems
+(z 1 < gem 2), the top segment wears the cap, melts still pay the
+h-3 / v-all laws.
+
+## CHALLENGE - the pre-solve rounds (the owner's math)
+"calculate the matches and the grid before even starting it and then set
+the requirements and time and allowed moves based on that" - every fresh
+board is PRE-SOLVED: all legal swaps are played on the model and their
+immediate yields measured. Target, allowed moves and time all DERIVE from
+that measurement (tightness climbs with the round; rush/drought twist it).
+Score is the requirement (the owner: "i see gem matches requirements and
+have not seen score requirements"); the old "fair random" numbers are dead.
+THE SHOWN LAW: "it does not show how many rounds won and how many lost in
+challenge and does not show how many losses until end" - the HUD wears
+R/wins/losses and a 5-life bank; a lost round costs a life + the -500;
+the last life ends the run. Rounds redeal with a fresh analyzed board.
+
+## THE THREE NEW MODES
+- JELLY (360): "like candy crush jelly ... it can spread between 3 extra
+  grids up to 8 in a connected way, it feels like a virus" - starts as full
+  lines from the bottom (sides on odd levels), a match ADJACENT dissolves
+  it, a move with zero jelly cleared SPREADS (+1..3 connected cells), the
+  spread EATS the gem it lands on, "jelly do not fall and nothing go past
+  through it" (a solid plug: gems rest ON it, nothing refills beneath),
+  limited moves, clear the grid. Levels ladder the layouts.
+- ICE CRASH (420): "like jelly but different ... things go pass through it
+  and it has layers" - 1..5 ice layers (the ladder art), hits happen INSIDE
+  the ice (a popped iced cell loses one layer), "level 6 makes it like a
+  rock and requires a special thing to crash it down to level 5", gems fall
+  straight through, a dry move spreads it, limited moves.
+- DROP DOWN (480): "items dropped from top after there is a match ... the
+  round will start with 1-5 items exists at the top line first, with a UI
+  widget tells user how many remaining, it will use both moves and timing
+  or one of them as a limit, so there is 3 possibilities ... the drop logic
+  will be like the gogacoin one here, make it down down down" - parcels
+  ride gravity AND trade one row down per move, the bottom row delivers
+  (+3), each round rolls moves / time / both.
+
+## THE LOOK + THE VOICE (the owner's zip as the defaults)
+"the zip i uploaded earlier that contained assets, it has grid assets and
+background and amazing SFXs that i guess using it as the default will be
+cooler" - the template checker cells, the template backdrop, the pop burst
+frames, the richer objective-token donuts, and most SFX are now THE
+DEFAULTS; "the game music except peace uses GOGABox main menu music" -
+verified by cross-correlation (cos-sim 1.0) and replaced with the zip's own
+81s A-major-feel track (matcher_game.mp3). Peace keeps v2.
+
+## THE OPTIONALS + THE RAIL
+- "make the skins just show the names and the highlight on the in-use one
+  and remove the text of 'on' or tap to use, these are not in my design
+  plannings at all" - names only, the green border IS the highlight.
+- "redesign the powerups to look more rich, also remove the other text ...
+  just show empty or nn or grayed out, let the name in the buy pop-up" -
+  the rail is ICON ONLY: gold-rimmed 132px icons, a count bubble, three
+  stock pips, gray when locked/empty/spent; names and prices live in the
+  buy popup.
+
+## PROBE (the owner: "run real tests so i do not have to hunt")
+matcher_probe rebuilt: 110 hard checks, 0 fails - the owner's table
+(births + blast areas + staged pops), the grace law, the after-move law,
+the pure dirt / clay / rock / board-lift laws, the pre-solve derived
+rounds + the lives math, the jelly spread/eat/plug laws, the ice-crash
+layer/rock/pass laws, the drop limits + gravity/step/delivery laws, the
+icon rail, the skin-name law, the music law, plus every p1/p2 regression
+(coin, shop stack, back law, wallet, fuzz 2000). Full battery green:
+flow_test + invaders + merge + dario + slasher + dash + snake + xo +
+tower + pong.

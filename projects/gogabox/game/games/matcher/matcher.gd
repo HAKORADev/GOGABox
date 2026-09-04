@@ -1,15 +1,24 @@
 extends GogaGame
-## MATCHER - v0.3.3 PATCH 2, the smooth one. Every motion tweens (the owner:
-## "the game is not smooth and has weird instant animations that is totally
-## uncanny"), the specials are a SHADER ON THE GEM ITSELF (the owner: "i want
-## it to be like a shader on the asset, not a weird VFX that is even not
-## synced with the thing movement"), the coin drops like any normal gem and
-## auto-collects at the bottom, the powers buy with the GLOBAL GOGACoins, and
-## the three Bejeweled-Classic modes follow the owner's specs: Diamond Mine
-## rows push up from the bottom every 25s (+25s per cleared row, 60s start),
-## Ice Storm grows vertical ice columns (3-segment horizontal melts, full
-## vertical destroys, more lines with progression, top = lost), Butterflies
-## rise with real animations and the SPIDER hunts the nearest one.
+## MATCHER - v0.3.3 PATCH 3, the real-match-3 one. THE OWNER'S SPECIAL TABLE
+## (his words): "the L or T is the bomb, the 4 vertical makes a horizontal
+## line sweeper, the 4 horizontal makes vertical one line sweeper, the +5 in
+## a line makes color remover" - the remover is swap-matched with any 3+
+## gem and wipes its color bottom-to-up. Butterflies rise AFTER the move
+## fully resolves (never during the swap) and a butterfly that touches the
+## top row gets ONE move of grace before the spider dines. Diamond Mine's
+## earth is pure dirt (zero matchable gems inside): a rise lifts the whole
+## board one cell and the top row glides out smoothly; progression stacks
+## clay (2 digs) and rock (special-only) layers. Ice Storm wears the video's
+## real design: frosted full-cell blocks with snow caps BEHIND the gems.
+## CHALLENGE derives its rounds from a PRE-SOLVE of the fresh grid (the
+## owner: "calculate the matches and the grid before even starting it and
+## then set the requirements and time and allowed moves based on that").
+## THREE NEW MODES: JELLY (the connected virus that eats gems, blocked
+## falls, clear it all on limited moves), ICE CRASH (layered ice 1-5, a
+## rock 6 only specials crack, gems pass through) and DROP DOWN (parcel
+## items ride down one row per move, three limit flavors).
+## The board cells + backdrop + most SFX now come from the owner's uploaded
+## Match_3_Template zip; the in-game music is the zip's own track.
 ##
 ## THE OWNER LAWS this file obeys:
 ##  - "every single thing will be 1 score point, and the bonus will be /300"
@@ -47,18 +56,16 @@ const SKINS := {
                         "res://assets/games/matcher/gems/donut_1.png",
                         "res://assets/games/matcher/gems/donut_2.png",
                         "res://assets/games/matcher/gems/donut_3.png",
-                        "res://assets/games/matcher/gems/donut_4.png"],
-                "bg": "res://assets/games/matcher/bg/bg_donut.png",
-                "cell": ["res://assets/games/matcher/bg/cell_donut_light.png",
-                        "res://assets/games/matcher/bg/cell_donut_dark.png"]},
+                        "res://assets/games/matcher/gems/donut_4.png"]},
 }
 const SKIN_ORDER := ["gem", "candy", "donut"]
 
-## the five modes (Bejeweled Classic shelf, renamed per the owner)
+## the eight modes (Bejeweled Classic shelf, renamed per the owner; the
+## three v0.3.3-p3 additions follow the candy-crush school the owner asked for)
 const MODES := {
         "challenge": {"name": "CHALLENGE", "price": 0,
                 "card": "res://assets/games/matcher/modes/card_challenge.png",
-                "line": "the python matcher, reborn fair"},
+                "line": "the analyzed rounds - a real exam now"},
         "peace": {"name": "PEACE", "price": 120,
                 "card": "res://assets/games/matcher/modes/card_peace.png",
                 "line": "zen - no fail, no coins, no rush"},
@@ -71,8 +78,18 @@ const MODES := {
         "mine": {"name": "DIAMOND MINE", "price": 300,
                 "card": "res://assets/games/matcher/modes/card_mine.png",
                 "line": "dig deep, beat the clock"},
+        "jelly": {"name": "JELLY", "price": 360,
+                "card": "res://assets/games/matcher/modes/card_jelly.png",
+                "line": "the sweet virus - eat it before it spreads"},
+        "icecrash": {"name": "ICE CRASH", "price": 420,
+                "card": "res://assets/games/matcher/modes/card_icecrash.png",
+                "line": "shatter the layered ice to the last flake"},
+        "drop": {"name": "DROP DOWN", "price": 480,
+                "card": "res://assets/games/matcher/modes/card_drop.png",
+                "line": "bring the parcels home, beat the limit"},
 }
-const MODE_ORDER := ["challenge", "peace", "butterflies", "ice", "mine"]
+const MODE_ORDER := ["challenge", "peace", "butterflies", "ice", "mine",
+                "jelly", "icecrash", "drop"]
 
 ## the bought power-ups (unlock once with the wallet; in-play stock pays the
 ## GLOBAL GOGACoins - the owner: "make powerups be based on global GOGACoins
@@ -95,7 +112,24 @@ const POWER_ORDER := ["shuffle", "line", "bomb", "vapor"]
 const POWER_MAX := 3
 
 const COIN_EVERY := 30.0        # the owner's rhythm - from last COLLECTED
-const RUN_CLOCK := 300.0        # challenge: the real life of a run
+# CHALLENGE - v0.3.3-p3: the PGB loss bank returns, now SHOWN (the owner:
+# "does not show how many rounds won and how many lost ... how many losses
+# until end") and every round's numbers derive from a pre-solve of the grid
+const CH_LIVES := 5
+
+## the JELLY laws (the owner: "it can spread between 3 extra grids up to 8 in
+## a connected way, it feels like a virus", "jelly do not fall and nothing go
+## past through it")
+const JELLY_SPREAD_MAX := 3     # a spread event adds up to 3 cells
+const JELLY_BLOB_CAP := 12      # the connected blob never exceeds this
+
+## the ICE CRASH laws (the owner: "up to 5 layers ... level 6 makes it like a
+## rock and requires a special thing to crash it down to level 5")
+const ICE_CRASH_ROCK := 6
+
+## the DROP laws (the owner: "the round will start with 1-5 items at the top
+## line ... it will use both moves and timing or one of them as a limit, so
+## there is 3 possibilities")
 # DIAMOND MINE - the owner's Bejeweled-Classic spec: "each specific like 25
 # seconds it makes another row and clearing a row gives extra 25 seconds and
 # the round starts with 60 seconds and some times it make two rows"
@@ -118,7 +152,7 @@ var hinted := []                # the two hint cells (pulse)
 var idle_clock := 0.0
 
 ## mode state
-var run_clock := RUN_CLOCK
+var run_clock := 300.0
 var round_no := 0
 var round_goal := 60
 var round_bank := 0             # score banked into the current round
@@ -141,7 +175,38 @@ var dig_clock := MINE_CLOCK
 var mine_rise_clock := MINE_ROW_TIME   # the 25s earth-row clock
 var depth := 0                  # earth rows cleared (meters descended)
 var earth_top := ROWS           # mine: the first earth row (ROWS = no earth)
-var earth := []                 # earth rows: earth[r] = [{tr, node, tr_spr}]
+var earth := []                 # earth rows: earth[r] = [{kind, hp, tr, node, tr_spr}]
+
+## challenge v3: the shown score + the derived rounds
+var ch_lives := CH_LIVES
+var ch_wins := 0
+var ch_losses := 0
+var round_moves := 0            # moves spent inside the current round
+var round_moves_max := 16       # derived from the pre-solve
+var goal_color := -1            # the bonus color quota (-1 = none)
+var goal_color_left := 0
+var goal_special := ""          # the bonus craft goal (""|"bomb"|"sweep"|"hyper")
+var goal_special_done := false
+
+## jelly state: jelly[key] = true; the cell itself holds NO gem (eaten)
+var jelly := {}
+var jelly_level := 1
+var jelly_moves := 24
+var jelly_cleared_move := 0     # jelly cells cleared during the current move
+
+## ice-crash state: icel[key] = level 1..6
+var icel := {}
+var icr_level := 1
+var icr_moves := 24
+var icr_hit_move := 0
+
+## drop state
+var drop_total := 5             # items to deliver this round
+var drop_left := 5              # still to deliver (spawn queue included)
+var drop_limit_kind := "moves"  # moves | time | both
+var drop_moves := 22
+var drop_time := 75.0
+var drop_items := []            # [{r, c}] live parcels (the grid holds color -2 cells)
 
 ## the coin
 var coin_clock := COIN_EVERY
@@ -159,6 +224,9 @@ var rings := []                 # shock rings {pos, r, life, max, col, w}
 var beams := []                 # star beams {a, b, life, max}
 var zaps := []                  # hypercube arcs {a, b, life, max}
 var floaters := []              # score texts {pos, txt, life, max, col, size}
+var sweeps := []                # sweeper bars {axis, idx, t, max, col}
+var shake := 0.0                # the bomb shake (decays in _tick_fx)
+var wipes := []                 # color-remover rising shimmer rows {row, t, max, col}
 
 ## ui refs
 var world: Node2D
@@ -197,13 +265,18 @@ func _t(key: String) -> Texture2D:
                         "banner": "res://assets/games/matcher/fx/banner.png",
                         "wing": "res://assets/games/matcher/modes/butterfly.png",
                         "spider": "res://assets/games/matcher/modes/spider.png",
-                        "ice1": "res://assets/games/matcher/modes/ice_1.png",
-                        "ice2": "res://assets/games/matcher/modes/ice_2.png",
-                        "ice3": "res://assets/games/matcher/modes/ice_3.png",
+                        "iceb": "res://assets/games/matcher/modes/ice_block.png",
+                        "icebt": "res://assets/games/matcher/modes/ice_block_top.png",
                         "earth": "res://assets/games/matcher/modes/earth.png",
+                        "dirt": "res://assets/games/matcher/modes/earth.png",
+                        "clay": "res://assets/games/matcher/modes/earth_clay.png",
+                        "rock": "res://assets/games/matcher/modes/earth_rock.png",
                         "gold": "res://assets/games/matcher/modes/gold.png",
                         "diamond": "res://assets/games/matcher/modes/diamond.png",
                         "artifact": "res://assets/games/matcher/modes/artifact.png",
+                        "jelly": "res://assets/games/matcher/modes/jelly.png",
+                        "parcel": "res://assets/games/matcher/modes/item_parcel.png",
+                        "popfx": "res://assets/games/matcher/fx/popfx_0.png",
                         "exp0": "res://assets/games/matcher/fx/explosion_0.png",
                         "exp1": "res://assets/games/matcher/fx/explosion_1.png",
                         "exp2": "res://assets/games/matcher/fx/explosion_2.png",
@@ -216,6 +289,20 @@ func _t(key: String) -> Texture2D:
                 _tex[key] = load(paths[key])
         return _tex[key]
 
+
+func _t_icec(lvl: int) -> Texture2D:
+        var k := "icec%d" % clampi(lvl, 1, 6)
+        if not _tex.has(k):
+                _tex[k] = load("res://assets/games/matcher/modes/icec_%d.png" % clampi(lvl, 1, 6))
+        return _tex[k]
+
+
+func _t_popfx(i: int) -> Texture2D:
+        var k := "popfx%d" % (i % 8)
+        if not _tex.has(k):
+                _tex[k] = load("res://assets/games/matcher/fx/popfx_%d.png" % (i % 8))
+        return _tex[k]
+
 ## the specials shader - one material per cell, ON the gem sprite (the owner:
 ## "like a shader on the asset")
 var _special_shader: Shader
@@ -225,8 +312,10 @@ func _special_mat(kind: String) -> ShaderMaterial:
                 _special_shader = load("res://assets/games/matcher/specials/special.gdshader")
         var m := ShaderMaterial.new()
         m.shader = _special_shader
+        # the shader kinds: 1 bomb - 2 row sweeper - 3 col sweeper - 4 remover
         m.set_shader_parameter("special",
-                        1 if kind == "flame" else (2 if kind == "star" else 3))
+                        1 if kind == "bomb" else (2 if kind == "rowh" \
+                        else (3 if kind == "colv" else 4)))
         return m
 
 
@@ -354,17 +443,17 @@ func _goga_setup() -> void:
         # AT THE TOP CALLED SHOP IN EVERY SINGLE GAME") - the optionals sheet
         # never sells again
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/matcher_happy.mp3")
+        Jukebox.music("res://assets/audio/music/matcher_game.mp3")
         _pick_open(true)
 
 
 func _build_background(vp: Vector2) -> void:
-        var path := "res://assets/games/matcher/bg/bg_day.png"
+        # v0.3.3-p3 THE TEMPLATE DEFAULT (the owner: the zip "has grid assets
+        # and background ... using it as the default will be cooler"): the
+        # template backdrop IS the default look now; peace keeps its pastel sky
+        var path := "res://assets/games/matcher/bg/bg_tpl.png"
         if mode == "peace":
                 path = "res://assets/games/matcher/bg/bg_peace.png"
-        # the donut skin wears its own template backdrop
-        if skin == "donut" and mode != "peace" and SKINS[skin].has("bg"):
-                path = String(SKINS[skin]["bg"])
         bg_spr = Sprite2D.new()
         bg_spr.texture = load(path)
         var ts := Vector2(vp.x / bg_spr.texture.get_width(), vp.y / bg_spr.texture.get_height())
@@ -402,15 +491,13 @@ func _build_board_plate() -> void:
         plate.scale = Vector2.ONE * cell_px / 120.0
         plate.z_index = -10
         world.add_child(plate)
-        var checker: Array = []
-        if SKINS[skin].has("cell"):
-                checker.append(load(String(SKINS[skin]["cell"][0])))
-                checker.append(load(String(SKINS[skin]["cell"][1])))
+        var checker: Array = [
+                load("res://assets/games/matcher/bg/cell_tpl_light.png"),
+                load("res://assets/games/matcher/bg/cell_tpl_dark.png")]
         for r in ROWS:
                 for c in COLS:
                         var cell := Sprite2D.new()
-                        cell.texture = _t("cell") if checker.is_empty() \
-                                        else checker[(r + c) % 2]
+                        cell.texture = checker[(r + c) % 2]
                         cell.centered = false
                         cell.position = board_o + Vector2(c, r) * cell_px
                         cell.scale = Vector2.ONE * cell_px / 120.0
@@ -619,14 +706,15 @@ func _skin_chip(sid: String) -> Button:
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.add_child(ic)
-        var txt := String(s["name"]).to_upper()
-        if on:
-                txt += "  - ON"
-        elif owned:
-                txt += "  - TAP TO WEAR"
-        else:
+        # v0.3.3-p3 (the owner: "make the skins just show the names and the
+        # highlight on the in-use one and remove the text of 'on' or tap to
+        # use, these are not in my design plannings at all"): the NAME ONLY -
+        # the green border IS the in-use highlight (locked skins keep the
+        # price chip so the shop walk still makes sense)
+        var txt := String(s["name"])
+        if not owned:
                 txt += "  %d" % int(s["price"])
-        var l := Arc.fit_label(txt, 17, Arc.INK, 210)
+        var l := Arc.fit_label(txt, 20, Arc.INK, 210)
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.add_child(l)
         if on:
@@ -831,8 +919,6 @@ func _start_mode(id: String) -> void:
         first_moment = false
         phase = "play"
         chip_mode.text = String(MODES[id]["name"])
-        run_clock = RUN_CLOCK
-        round_no = 0
         pace = 1
         pace_clock = 45.0
         frost = [0, 0, 0, 0, 0, 0, 0, 0]
@@ -857,7 +943,31 @@ func _start_mode(id: String) -> void:
         else:
                 score_bonus_enabled = true
                 pause_end_run = false
-                Jukebox.music("res://assets/audio/music/matcher_happy.mp3")
+                Jukebox.music("res://assets/audio/music/matcher_game.mp3")
+        ch_lives = CH_LIVES
+        ch_wins = 0
+        ch_losses = 0
+        round_moves = 0
+        round_moves_max = 16
+        goal_color = -1
+        goal_color_left = 0
+        goal_special = ""
+        goal_special_done = false
+        jelly = {}
+        jelly_level = 1
+        jelly_moves = 24
+        jelly_cleared_move = 0
+        icel = {}
+        icr_level = 1
+        icr_moves = 24
+        icr_hit_move = 0
+        drop_total = 5
+        drop_left = 5
+        drop_limit_kind = "moves"
+        drop_moves = 22
+        drop_time = 75.0
+        drop_items = []
+        drop_level = 1
         _deal_board()
         if mode == "challenge":
                 # THE FIRST ROUND LAW: round 1 rolls BEFORE the first tick - the old
@@ -954,6 +1064,12 @@ func _deal_board() -> void:
         if mode == "butterflies":
                 for c in [1, 4, 6]:
                         _hatch_butterfly(ROWS - 1, c)
+        if mode == "jelly":
+                _jelly_lay_level()
+        if mode == "icecrash":
+                _icr_lay_level()
+        if mode == "drop":
+                _drop_roll_round()
         _deal_animate()
 
 
@@ -963,7 +1079,7 @@ func _deal_animate() -> void:
                         if _in_earth(r):
                                 continue
                         var cell: Dictionary = grid[r][c]
-                        if cell.is_empty():
+                        if cell.is_empty() or not is_instance_valid(cell.get("node")):
                                 continue
                         var n: Sprite2D = cell["node"]
                         var target := _cell_pos(r, c)
@@ -981,15 +1097,35 @@ func _in_earth(r: int) -> bool:
 
 # ================================================================ the model
 ## cell kinds: every playable cell holds a gem dict. A coin cell replaces
-## the gem (color -1). The mine's earth band lives OUTSIDE the grid.
+## the gem (color -1). A drop parcel replaces the gem (color -2). A jelly
+## cell holds NO gem at all (the jelly ate it) - the jelly layer lives in
+## the `jelly` dict. Ice-crash layers ride their cells in the `icel` dict
+## (the gem stays matchable - things pass through). The mine's earth band
+## lives OUTSIDE the grid.
 
 func _is_coin(cell: Dictionary) -> bool:
         return int(cell.get("color", -1)) == -1 and cell.has("coin")
 
 
+func _is_item(cell: Dictionary) -> bool:
+        return int(cell.get("color", -1)) == -2 and cell.has("item")
+
+
+func _jelly_at(r: int, c: int) -> bool:
+        return mode == "jelly" and jelly.has(r * COLS + c)
+
+
+func _icel_at(r: int, c: int) -> int:
+        if mode != "icecrash":
+                return 0
+        return int(icel.get(r * COLS + c, 0))
+
+
 func _playable(r: int, c: int) -> bool:
         if c < 0 or c >= COLS or r < 0 or r >= ROWS:
                 return false
+        if _jelly_at(r, c):
+                return false            # a jelly cell is a solid block
         return not _in_earth(r)
 
 
@@ -1098,7 +1234,8 @@ func _has_valid_move() -> bool:
                                 var c2: int = c + d.y
                                 if not _playable(r2, c2) or grid[r2][c2].is_empty():
                                         continue
-                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]):
+                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]) \
+                                                or _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
                                         continue
                                 # hypercube swap is ALWAYS legal (it detonates on contact)
                                 if String(grid[r][c].get("special", "")) == "hyper" \
@@ -1122,7 +1259,8 @@ func _find_a_move() -> Array:
                                 var c2: int = c + d.y
                                 if not _playable(r2, c2) or grid[r2][c2].is_empty():
                                         continue
-                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]):
+                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]) \
+                                                or _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
                                         continue
                                 if String(grid[r][c].get("special", "")) == "hyper" \
                                                 or String(grid[r2][c2].get("special", "")) == "hyper":
@@ -1240,7 +1378,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
         var cb: Dictionary = grid[b.x][b.y]
         if ca.is_empty() or cb.is_empty():
                 return
-        if _is_coin(ca) or _is_coin(cb):
+        if _is_coin(ca) or _is_coin(cb) or _is_item(ca) or _is_item(cb):
                 Jukebox.sfx("error", -12.0)
                 _bump(a)
                 _bump(b)
@@ -1264,9 +1402,18 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
                 return
         Jukebox.sfx("m_swap", -8.0)
         moves_made += 1
-        if mode == "butterflies":
-                _rise_butterflies()
+        round_moves += 1
+        if mode == "jelly":
+                jelly_moves -= 1
+        if mode == "icecrash":
+                icr_moves -= 1
+        if mode == "drop":
+                drop_moves -= 1
         await _resolve_loop(a, b)
+        # v0.3.3-p3 THE AFTER-MOVE LAW (the owner's butterfly example): the
+        # butterflies rise only AFTER the whole move has resolved - never
+        # during the swap - and every other per-move law walks here too
+        await _after_move()
         busy = false
 
 
@@ -1306,10 +1453,11 @@ var moves_made := 0
 ## -> re-scan, until the board is quiet. THE MUTATION LAW: every list a pop
 ## loop walks is duplicated first (cells vanish inside their own funeral).
 
-## the crown table: which special each match group births. The SWAP CELL
-## wins the crown (the gem the player touched wears the special), an L/T
-## cross births at the cross, otherwise the run's middle. Pure - the probe
-## reads it without playing the wave.
+## the crown table v2 - THE OWNER'S WORDS ARE THE LAW:
+## "the L or T is the bomb, the 4 vertical makes a horizontal line sweeper,
+## the 4 horizontal makes vertical one line sweeper, the +5 in a line makes
+## color remover". The SWAP CELL wins the crown, an L/T cross births at the
+## cross, otherwise the run's middle. Pure - the probe reads it.
 func _birth_kinds(groups: Array, swap_a: Vector2i, swap_b: Vector2i) -> Array:
         var born := []
         for g in groups:
@@ -1326,11 +1474,11 @@ func _birth_kinds(groups: Array, swap_a: Vector2i, swap_b: Vector2i) -> Array:
                         birth = Vector2i(int(keys[keys.size() / 2]) / COLS, int(keys[keys.size() / 2]) % COLS)
                 var kind := ""
                 if g["cross"].x >= 0:
-                        kind = "star"       # the L / T / + shape
+                        kind = "bomb"       # the L / T / + shape
                 elif int(g["len"]) >= 5:
-                        kind = "hyper"      # five in a line
+                        kind = "hyper"      # five in a line = the color remover
                 elif int(g["len"]) == 4:
-                        kind = "flame"      # four in a line
+                        kind = "rowh" if String(g["dir"]) == "v" else "colv"
                 if kind != "" and birth.x >= 0:
                         born.append({"r": birth.x, "c": birth.y, "kind": kind,
                                         "color": int(g["color"])})
@@ -1358,6 +1506,8 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                         pop.erase(int(b["r"]) * COLS + int(b["c"]))   # keys are r*COLS+c
                 # 2 - the detonation queue: specials caught INSIDE a match explode
                 var queue := []
+                var blast_union := {}
+                _stagger_hint = {}
                 for key in pop.keys():
                         var r := int(key) / COLS
                         var c := int(key) % COLS
@@ -1372,8 +1522,10 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                         if detonated.has(dkey):
                                 continue
                         detonated[dkey] = true
+                        blast_union[dkey] = true
                         var extra := _blast_cells(String(it["kind"]), int(it["r"]), int(it["c"]))
                         for key in extra:
+                                blast_union[key] = true
                                 if not pop.has(key):
                                         pop[key] = true
                                         var r := int(key) / COLS
@@ -1382,8 +1534,10 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                                                 var sp2 := String(grid[r][c].get("special", ""))
                                                 if sp2 != "" and not detonated.has(key):
                                                         queue.append({"r": r, "c": c, "kind": sp2})
-                # 4 - pop the wave (fx, score, mode counters)
-                await _pop_cells(pop, born)
+                # 4 - pop the wave (fx, score, mode counters) - the blasts
+                # sweep and bomb with STAGED pops (the owner's missing effects)
+                _icr_mark_stone(blast_union)
+                await _pop_cells(pop, born, _stagger_hint.duplicate(), blast_union)
                 # 5 - the combo praise
                 if cascade >= 2 and mode != "peace":
                         _combo_banner(cascade)
@@ -1395,34 +1549,69 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
         _collect_bottom_coins()
         if mode == "mine":
                 _mine_row_check()
+        await _mode_aftercare()
         if not _has_valid_move():
                 await _shuffle_board(true)
         idle_clock = 0.0
         _paint_selection()
 
 
-## what a special detonation covers (in keys)
+## the stagger hints the blasts leave for _pop_cells (the sweeper sweeps
+## left-to-right / top-to-bottom, the bomb radiates)
+var _stagger_hint := {}
+
+## what a special detonation covers (in keys). v0.3.3-p3 THE OWNER'S TABLE:
+## bomb = the L/T birth = a 3x3 crater; a 4-vertical birth sweeps its whole
+## ROW; a 4-horizontal birth sweeps its whole COLUMN; a remover caught in a
+## blast zaps a random color (chaos law).
 func _blast_cells(kind: String, r: int, c: int) -> Array:
         var out := {}
         match kind:
-                "flame":
+                "bomb":
                         for dr in range(-1, 2):
                                 for dc in range(-1, 2):
-                                        var rr := r + dr
+                                        var rr2 := r + dr
                                         var cc := c + dc
-                                        if _playable(rr, cc):
-                                                out[rr * COLS + cc] = true
-                "star":
+                                        if _playable(rr2, cc):
+                                                out[rr2 * COLS + cc] = true
+                                                _stagger_hint[rr2 * COLS + cc] = \
+                                                                Vector2(dr, dc).length() * 0.045
+                        shake = 0.55
+                        Jukebox.sfx("m_tok_bomb", -3.0)
+                        rings.append({"pos": _cell_pos(r, c), "r": 14.0, "life": 0.42,
+                                        "max": 0.42, "col": Color(1.0, 0.55, 0.2, 0.95), "w": 9.0})
+                "rowh":
                         for cc in COLS:
                                 if _playable(r, cc):
                                         out[r * COLS + cc] = true
-                        for rr in ROWS:
-                                if _playable(rr, c):
-                                        out[rr * COLS + c] = true
+                                        _stagger_hint[r * COLS + cc] = float(cc) * 0.028
+                        sweeps.append({"axis": "h", "idx": r, "t": 0.0, "max": 0.3,
+                                        "col": Color(0.55, 0.95, 1.0)})
+                        Jukebox.sfx("m_sweep", -4.0, randf_range(0.95, 1.1))
+                "colv":
+                        for rr3 in ROWS:
+                                if _playable(rr3, c):
+                                        out[rr3 * COLS + c] = true
+                                        _stagger_hint[rr3 * COLS + c] = float(rr3) * 0.028
+                        sweeps.append({"axis": "v", "idx": c, "t": 0.0, "max": 0.3,
+                                        "col": Color(1.0, 0.55, 0.95)})
+                        Jukebox.sfx("m_sweep", -4.0, randf_range(0.7, 0.8))
+                "hyper":
+                        # caught in a blast: it takes a random color with it
+                        var pick := randi() % COLORS
+                        for rr4 in ROWS:
+                                for cc in COLS:
+                                        if _playable(rr4, cc) and not grid[rr4][cc].is_empty() \
+                                                        and not _is_coin(grid[rr4][cc]) \
+                                                        and not _is_item(grid[rr4][cc]) \
+                                                        and int(grid[rr4][cc].get("color", -9)) == pick:
+                                                out[rr4 * COLS + cc] = true
+                        _float_text(_cell_pos(r, c), "COLOR ZAP!", Color(1, 0.7, 1.0), 34)
+                        Jukebox.sfx("m_colorwipe", -4.0)
         return out.keys()
 
 
-func _pop_cells(pop: Dictionary, born: Array) -> void:
+func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -> void:
         if pop.is_empty() and born.is_empty():
                 return
         var count := 0
@@ -1435,13 +1624,19 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
                 var cell: Dictionary = grid[r][c]
                 if cell.is_empty():
                         continue
-                # the coin is NEVER destroyed by pops - it just loses its seat below
-                if _is_coin(cell):
+                # the coin and the parcels are NEVER destroyed by pops
+                if _is_coin(cell) or _is_item(cell):
                         continue
                 count += 1
                 var col := int(cell["color"])
                 var p := _cell_pos(r, c)
-                _gem_pop_fx(p, col)
+                # THE STAGED POP LAW (v0.3.3-p3, the owner's "there is no
+                # bombing or sweeping or wiping effects at all which is
+                # weird"): a blast/sweep/wave staggers its pops by distance
+                # so the eye SEES the sweeper sweep and the wipe climb
+                var delay_s := float(stagger.get(key, 0.0))
+                var stone_mark: int = int(cell.get("stone_hit", 0))
+                _gem_pop_fx(p, col, delay_s)
                 if bool(cell.get("wing", false)):
                         # a butterfly collected: +2 mode bonus on top of its gem point
                         if mode == "butterflies":
@@ -1455,31 +1650,37 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
                 if is_instance_valid(cell.get("node")):
                         var n: Sprite2D = cell["node"]
                         var tw := n.create_tween()
+                        if delay_s > 0.0:
+                                tw.tween_interval(delay_s)
                         tw.set_parallel(true)
                         tw.tween_property(n, "scale", Vector2.ONE * 0.02, 0.09) \
                                         .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
                         tw.tween_property(n, "modulate:a", 0.0, 0.09)
                         tw.chain().tween_callback(n.queue_free)
                 grid[r][c] = {}
+                # v0.3.3-p3 THE MODE-TOUCH LAWS (the stone mark was read
+                # BEFORE the seat emptied - a dict written after would be a
+                # zombie {"stone_hit": 0} cell forever)
+                _mode_touch_pop(r, c, stone_mark)
         if count > 0:
                 add_score(count)
                 achievement_count("matched", count)
-                # the pitch-laddered pop chorus (cascade climbs the scale)
-                var base_pop: String = ["pop_1", "pop_2", "pop_3", "pop_4"][randi() % 4]
-                Jukebox.sfx(base_pop, -8.0)
+                # the zip's candy pop, pitch-laddered by the cascade
+                Jukebox.sfx("m_pop_candy", -8.0, 0.94 + 0.055 * mini(cascade, 6) \
+                                + randf_range(-0.015, 0.015))
                 # the ice law: a match over iced columns melts them
                 if mode == "ice":
                         _melt_under(pop)
-                # the mine law: the wave drills the matched columns upward
+                # the mine law: the wave drills the matched columns downward
                 if mode == "mine":
-                        _mine_dig(pop)
+                        _mine_dig(pop, blast_keys)
         if cascade > 1:
                 achievement_max("best_cascade", cascade)
-        # 4-match -> flame, L/T -> star, 5-match -> hyper (the overlay law: the
-        # special is a VFX ON TOP of the base gem - skins never break it)
+        # THE OWNER'S CROWN TABLE: L/T -> bomb, 4v -> row sweeper, 4h -> column
+        # sweeper, 5+ -> color remover - all shader-on-the-asset, any skin
         for b in born:
                 var cell: Dictionary = grid[int(b["r"])][int(b["c"])]
-                if cell.is_empty() or _is_coin(cell):
+                if cell.is_empty() or _is_coin(cell) or _is_item(cell):
                         continue
                 cell["special"] = String(b["kind"])
                 _dress_special(int(b["r"]), int(b["c"]))
@@ -1493,11 +1694,60 @@ func _pop_cells(pop: Dictionary, born: Array) -> void:
                         btw.tween_property(bn, "scale", Vector2.ONE * cell_px / 100.0, 0.12)
                 if String(b["kind"]) == "hyper":
                         achievement_count("hypers", 1)
+                if goal_special != "" and String(b["kind"]) == goal_special:
+                        goal_special_done = true
                 var p := _cell_pos(int(b["r"]), int(b["c"]))
-                _float_text(p, {"flame": "FLAME!", "star": "STAR!", "hyper": "HYPERCUBE!"}[String(b["kind"])],
-                                Color(1, 0.9, 0.4))
-        # the star detonations draw beams, flames draw rings - already pooled
+                var words := {"bomb": "BOMB!", "rowh": "ROW SWEEPER!",
+                                "colv": "COLUMN SWEEPER!", "hyper": "COLOR REMOVER!"}
+                _float_text(p, String(words[String(b["kind"])]), Color(1, 0.9, 0.4))
         await get_tree().create_timer(0.16, false).timeout
+
+
+## what ONE popped cell means to the layer modes (jelly / ice crash)
+func _mode_touch_pop(r: int, c: int, stone_mark := 0) -> void:
+        # ICE CRASH: a hit INSIDE the ice cracks its layer by one (the owner:
+        # "hits should happen inside it directly btw")
+        var lvl := _icel_at(r, c)
+        if lvl > 0:
+                icr_hit_move += 1
+                if lvl >= ICE_CRASH_ROCK:
+                        # the rock only answers to SPECIALS - a plain match
+                        # just clanks (the stone mark rides the BLAST, read
+                        # before the seat emptied)
+                        if stone_mark == 1:
+                                icel[r * COLS + c] = ICE_CRASH_ROCK - 1
+                                Jukebox.sfx("m_icebreak", -4.0)
+                        else:
+                                Jukebox.sfx("m_rockhit", -4.0)
+                                _float_text(_cell_pos(r, c), "ROCK!", Color(0.8, 0.8, 0.85), 26)
+                else:
+                        icel[r * COLS + c] = lvl - 1
+                        add_score(1)
+                        if lvl - 1 <= 0:
+                                icel.erase(r * COLS + c)
+                                Jukebox.sfx("m_icebreak", -5.0, randf_range(0.9, 1.2))
+                                achievement_count("icr_layers", 1)
+                        else:
+                                Jukebox.sfx("m_icehit", -6.0, 0.9 + 0.1 * lvl)
+                        _refresh_icel_cell(r, c)
+        # JELLY: a match ADJACENT to jelly dissolves it (the jelly cell itself
+        # is solid - its neighbors' funerals are its own)
+        if mode != "jelly":
+                return
+        for dd in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+                var d: Vector2i = dd
+                var rr5: int = r + d.x
+                var cc: int = c + d.y
+                if rr5 < 0 or cc < 0 or rr5 >= ROWS or cc >= COLS:
+                        continue
+                var k: int = rr5 * COLS + cc
+                if jelly.has(k):
+                        jelly.erase(k)
+                        jelly_cleared_move += 1
+                        add_score(2)
+                        achievement_count("jelly_cells", 1)
+                        Jukebox.sfx("m_jelly_pop", -5.0, randf_range(0.9, 1.15))
+                        _jelly_pop_fx(rr5, cc)
 
 
 func _dress_special(r: int, c: int) -> void:
@@ -1515,14 +1765,34 @@ func _dress_special(r: int, c: int) -> void:
         n.material = _special_mat(kind)
 
 
-func _gem_pop_fx(p: Vector2, col: int) -> void:
+func _gem_pop_fx(p: Vector2, col: int, delay_s := 0.0) -> void:
         var cols := [Color("6ec0eb"), Color("e84c60"), Color("6ec878"), Color("f5c446"), Color("c478dc")]
         var c: Color = cols[clampi(col, 0, 4)]
         for i in 7:
                 var dir := Vector2.from_angle(randf() * TAU) * randf_range(90.0, 260.0)
-                pops.append({"pos": p, "vel": dir, "life": randf_range(0.3, 0.55),
-                                "max": 0.55, "r": randf_range(5.0, 12.0), "col": c})
-        rings.append({"pos": p, "r": 8.0, "life": 0.3, "max": 0.3, "col": Color(c, 0.8), "w": 5.0})
+                pops.append({"pos": p, "vel": dir, "life": randf_range(0.3, 0.55) + delay_s,
+                                "max": 0.55, "r": randf_range(5.0, 12.0), "col": c, "hold": delay_s})
+        rings.append({"pos": p, "r": 8.0, "life": 0.3 + delay_s, "max": 0.3,
+                        "col": Color(c, 0.8), "w": 5.0, "hold": delay_s})
+        # THE TEMPLATE POP FRAME (the owner's zip effect pieces): the popped
+        # gem wears its matching pop frame for a beat - a real candy-crush
+        # style burst
+        var fx := Sprite2D.new()
+        fx.texture = _t_popfx(col + randi() % 2)
+        fx.position = p
+        fx.scale = Vector2.ONE * cell_px / 120.0 * 0.2
+        fx.z_index = 8
+        fx.modulate.a = 0.0
+        world.add_child(fx)
+        var tw := fx.create_tween()
+        if delay_s > 0.0:
+                tw.tween_interval(delay_s)
+        tw.set_parallel(true)
+        tw.tween_property(fx, "modulate:a", 1.0, 0.05)
+        tw.tween_property(fx, "scale", Vector2.ONE * cell_px / 120.0 * 1.15, 0.16) \
+                        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        tw.chain().tween_property(fx, "modulate:a", 0.0, 0.12)
+        tw.chain().tween_callback(fx.queue_free)
 
 
 func _float_text(p: Vector2, txt: String, col: Color, size := 30) -> void:
@@ -1567,16 +1837,54 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
                                         pop[r * COLS + c] = true
                 pop[hyper_at.y * COLS + hyper_at.x] = true
         moves_made += 1
+        round_moves += 1
+        if mode == "jelly":
+                jelly_moves -= 1
+        if mode == "icecrash":
+                icr_moves -= 1
+        if mode == "drop":
+                drop_moves -= 1
         Jukebox.sfx("m_hyper", -3.0)
+        # THE BOTTOM-UP WIPE (the owner: "remove that color in a proper
+        # bottom-to-up animation and removing"): the doomed gems pop ROW BY
+        # ROW from the bottom edge upward, each wearing the shimmer
+        var delay_map := {}
+        for key in pop.keys():
+                var r := int(key) / COLS
+                delay_map[key] = float((ROWS - 1 - r)) * 0.055
+                var wn: Sprite2D = grid[r][int(key) % COLS].get("node")
+                if is_instance_valid(wn):
+                        var vt := wn.create_tween()
+                        vt.tween_property(wn, "modulate",
+                                        Color(1.6, 0.6, 1.8), 0.16)
+        for row in ROWS:
+                wipes.append({"row": row, "t": 0.0, "max": 0.3,
+                                "col": Color(1.0, 0.7, 1.0), "delay": float(ROWS - 1 - row) * 0.055})
+        Jukebox.sfx("m_colorwipe", -4.0)
         # the lightning arcs
         var hp := _cell_pos(hyper_at.x, hyper_at.y)
         for key in pop.keys():
                 var r := int(key) / COLS
                 var c := int(key) % COLS
                 zaps.append({"a": hp, "b": _cell_pos(r, c), "life": 0.3, "max": 0.3})
-        if mode == "butterflies":
-                _rise_butterflies()
-        await _resolve_loop()
+        await _pop_cells(pop, [], delay_map)
+        await _gravity()
+        while true:
+                if over:
+                        break
+                var groups := _find_matches()
+                if groups.is_empty():
+                        break
+                cascade += 1
+                var pop2 := {}
+                for g in groups:
+                        for key in g["cells"]:
+                                pop2[key] = true
+                await _pop_cells(pop2, [])
+                if cascade >= 2:
+                        _combo_banner(cascade)
+                await _gravity()
+        await _after_move()
         busy = false
 
 
@@ -1588,6 +1896,13 @@ func _gravity() -> void:
                 for r in range(ROWS - 1, -1, -1):
                         if _in_earth(r):
                                 continue
+                        if _jelly_at(r, c):
+                                # THE JELLY PLUG LAW (the owner: "jelly do not
+                                # fall and nothing go past through it"): the
+                                # segment below is sealed - gems above rest ON
+                                # the jelly, nothing refills under it
+                                write = r - 1
+                                continue
                         var cell: Dictionary = grid[r][c]
                         if cell.is_empty():
                                 continue
@@ -1596,7 +1911,8 @@ func _gravity() -> void:
                                 grid[r][c] = {}
                                 movers.append({"node": cell["node"], "to": _cell_pos(write, c)})
                         write -= 1
-                # refill the top
+                # refill the top - write is the top slot of the segment ABOVE
+                # the highest jelly plug, so the range never crosses one
                 var spawn_i := 0
                 for r in range(write, -1, -1):
                         if _in_earth(r):
@@ -1739,7 +2055,7 @@ func _shuffle_board(silent := false) -> void:
                         if not _playable(r, c) or grid[r][c].is_empty():
                                 continue
                         var cell: Dictionary = grid[r][c]
-                        if _is_coin(cell):
+                        if _is_coin(cell) or _is_item(cell):
                                 continue
                         cells.append(Vector2i(r, c))
         if cells.size() < 4:
@@ -1817,6 +2133,8 @@ func _goga_tick(delta: float) -> void:
                         _tick_ice(delta)
                 "mine":
                         _tick_mine(delta)
+                "drop":
+                        _tick_drop(delta)
         _refresh_hud()
 
 
@@ -1849,44 +2167,565 @@ func _tick_coin(delta: float) -> void:
                         coin_clock = 2.0    # no seat right now - try again soon
 
 
+## v0.3.3-p3 THE AFTER-MOVE LAW: everything that answers a COMPLETED move
+## walks here, in one order: butterflies rise (after the resolve - never
+## during the swap), the drop parcels take their step, the spread laws fire.
+func _after_move() -> void:
+        if over:
+                return
+        match mode:
+                "butterflies":
+                        await _rise_butterflies()
+                "jelly":
+                        if jelly_cleared_move == 0 and not jelly.is_empty():
+                                _jelly_spread()
+                        jelly_cleared_move = 0
+                        _jelly_win_lose()
+                "icecrash":
+                        if icr_hit_move == 0 and not icel.is_empty():
+                                _icr_spread()
+                        icr_hit_move = 0
+                        _icr_win_lose()
+                "drop":
+                        await _drop_step()
+
+
+## the quiet-board after-care for the layer modes (the win checks that must
+## also run after cascades/power blasts, not only after swaps)
+func _mode_aftercare() -> void:
+        if over:
+                return
+        match mode:
+                "jelly":
+                        _jelly_win_lose()
+                "icecrash":
+                        _icr_win_lose()
+                "drop":
+                        _drop_collect_check()
+
+
 func _tick_challenge(delta: float) -> void:
-        run_clock -= delta
         round_clock -= delta
         rush_left = maxf(0.0, rush_left - delta)
         round_bank = score - round_start
-        if round_clock <= 0.0:
-                # THE ROUND FAILED - the owner's law: -500 score, only in challenge
+        if round_clock <= 0.0 or (round_moves >= round_moves_max \
+                        and round_bank < round_goal):
+                # THE ROUND FAILED - the owner's law: -500 score, and the
+                # v0.3.3-p3 loss bank (a life) now SHOWS its math
+                ch_losses += 1
+                ch_lives -= 1
                 set_score(maxi(0, score - 500))
-                round_no += 1
-                Jukebox.sfx("m_gong", -4.0)
-                _banner("ROUND LOST  -500", false)
-                _roll_round()
+                Jukebox.sfx("m_lifelost", -4.0)
+                if ch_lives <= 0:
+                        _banner("OUT OF LIVES  -500", false)
+                        _finish_run("out of lives - %d wins / %d losses" % [ch_wins, ch_losses])
+                        return
+                _banner("ROUND LOST  -500  (%d LIVES LEFT)" % ch_lives, false)
+                _next_challenge_round()
         elif round_bank >= round_goal:
-                round_no += 1
-                Jukebox.sfx("m_goal", -4.0)
+                ch_wins += 1
+                Jukebox.sfx("m_win_fanfare", -4.0)
                 Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 34)
-                _banner("ROUND %d CLEAR!" % (round_no - 1), true)
-                _roll_round()
-        if run_clock <= 0.0:
-                _finish_run("time up - the run banks")
+                _banner("ROUND %d CLEAR!  (%d W / %d L)" % [round_no, ch_wins, ch_losses], true)
+                _next_challenge_round()
+
+
+## the pre-solve (the owner: "calculate the matches and the grid before even
+## starting it and then set the requirements and time and allowed moves based
+## on that"): every legal swap is played on the model, its immediate yield
+## measured, and the round's numbers are DERIVED from the real board.
+func _analyze_board() -> Dictionary:
+        var gains := []
+        for r in ROWS:
+                for c in COLS:
+                        if not _playable(r, c) or grid[r][c].is_empty():
+                                continue
+                        for d in [Vector2i(0, 1), Vector2i(1, 0)]:
+                                var r2: int = r + d.x
+                                var c2: int = c + d.y
+                                if not _playable(r2, c2) or grid[r2][c2].is_empty():
+                                        continue
+                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]) \
+                                                or _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
+                                        continue
+                                _swap_model(r, c, r2, c2)
+                                var groups := _find_matches()
+                                if not groups.is_empty():
+                                        var g := 0
+                                        for grp in groups:
+                                                g += int(grp["len"])
+                                                if grp["cross"].x >= 0:
+                                                        g += 6      # a bomb follows
+                                                elif int(grp["len"]) >= 5:
+                                                        g += 8      # a remover follows
+                                                elif int(grp["len"]) == 4:
+                                                        g += 4      # a sweeper follows
+                                        gains.append(float(g))
+                                _swap_model(r, c, r2, c2)
+        if gains.is_empty():
+                return {"moves": 0, "avg": 4.0, "max": 4.0}
+        var total := 0.0
+        var best := 0.0
+        for g in gains:
+                total += g
+                best = maxf(best, g)
+        return {"moves": gains.size(), "avg": total / gains.size(), "max": best}
+
+
+func _next_challenge_round() -> void:
+        round_no += 1
+        _deal_board()
+        _roll_round()
+        _refresh_hud()
 
 
 func _roll_round() -> void:
         round_no = maxi(1, round_no)
-        round_goal = 40 + round_no * 6 + randi() % 21
-        round_time = 45.0 + randf() * 25.0
+        # THE PRE-SOLVE ROUND LAW: numbers derive from THIS board (the owner:
+        # "it uses low numbers for requirements ... the time given for each
+        # round and moves are very much and it does not feel like a challenge")
+        var an := _analyze_board()
+        var cap := maxf(3.2, float(an["avg"]) * 1.28)
+        var tight := clampf(0.60 + 0.035 * float(round_no), 0.60, 0.88)
+        round_moves_max = clampi(10 + int(float(an["moves"]) / 7.0) \
+                        + (3 if round_no < 3 else 0), 9, 18)
+        var raw := cap * float(round_moves_max) * tight
+        round_goal = maxi(40 + round_no * 12, int(round(raw / 5.0) * 5.0))
+        var per_move := clampf(8.5 - 0.35 * float(round_no), 4.5, 8.5)
+        round_time = float(round_moves_max) * per_move + 3.0
         round_clock = round_time
+        round_moves = 0
         round_bank = 0
         round_start = score
+        # the bonus goals (score stays the REAL requirement - the owner: "i
+        # see gem matches requirements and have not seen score requirements")
+        goal_color = -1
+        goal_color_left = 0
+        goal_special = ""
+        goal_special_done = false
         var roll := randf()
-        if roll < 0.25:
+        if roll < 0.22:
                 twist = "drought"
                 drought_color = randi() % COLORS
-        elif roll < 0.5:
+        elif roll < 0.42:
                 twist = "rush"
                 rush_left = 10.0
         else:
                 twist = ""
+        var roll2 := randf()
+        if round_no >= 3 and roll2 < 0.22:
+                goal_special = ["bomb", "sweep", "hyper"][randi() % 3]
+        elif roll2 < 0.30:
+                goal_color = randi() % COLORS
+                goal_color_left = 4 + randi() % 5
+        _banner("ROUND %d - TARGET %d - %d MOVES - %ds" % [round_no, round_goal,
+                        round_moves_max, int(round_time)], true)
+
+
+# ================================================================ JELLY
+## v0.3.3-p3 THE JELLY MODE (the owner's candy-crush-jelly spec): a connected
+## sweet virus. It starts as full lines from the bottom (some levels wear it
+## on the sides), a match ADJACENT to jelly dissolves that cell, a move with
+## zero jelly cleared SPREADS it (+1..3 connected cells), a spread ONTO a gem
+## EATS the gem, jelly never falls and nothing falls past it, and the round
+## is limited moves with no score or clock - clear the whole grid from it.
+func _jelly_lay_level() -> void:
+        jelly = {}
+        var rows_n := mini(1 + (jelly_level - 1) / 2, 3)
+        for r in range(ROWS - rows_n, ROWS):
+                for c in COLS:
+                        jelly[r * COLS + c] = true
+        # side jelly on odd levels (the owner: "some levels may have jelly in
+        # the sides and like that")
+        if jelly_level % 2 == 1:
+                var side := COLS - 1
+                for r in range(ROWS - 2, ROWS - 2 - mini(1 + jelly_level / 3, 3), -1):
+                        jelly[r * COLS + 0] = true
+                        jelly[r * COLS + side] = true
+        jelly_moves = clampi(10 + jelly.size() * 2, 16, 36)
+        # eat the gems under the jelly + kill any matches the eating made
+        for k in jelly.keys():
+                var r := int(k) / COLS
+                var c := int(k) % COLS
+                if not grid[r][c].is_empty() and is_instance_valid(grid[r][c].get("node")):
+                        (grid[r][c]["node"] as Sprite2D).queue_free()
+                grid[r][c] = {}
+        var guard := 0
+        while not _find_matches().is_empty() and guard < 100:
+                guard += 1
+                for g in _find_matches():
+                        for key in g["cells"]:
+                                var r := int(key) / COLS
+                                var c := int(key) % COLS
+                                if not grid[r][c].is_empty():
+                                        grid[r][c]["color"] = _roll_color()
+                                        if is_instance_valid(grid[r][c].get("node")):
+                                                (grid[r][c]["node"] as Sprite2D).texture = \
+                                                                tex_gem[int(grid[r][c]["color"]) % tex_gem.size()]
+        _refresh_jelly()
+
+
+func _refresh_jelly() -> void:
+        for k in jelly.keys():
+                if grid[int(k) / COLS][int(k) % COLS].get("jelly_node") != null:
+                        continue
+                var r := int(k) / COLS
+                var c := int(k) % COLS
+                var n := Sprite2D.new()
+                n.texture = _t("jelly")
+                n.position = _cell_pos(r, c)
+                n.scale = Vector2.ONE * cell_px / 120.0
+                n.z_index = 1
+                world.add_child(n)
+                var tw := n.create_tween()
+                n.scale = Vector2.ONE * cell_px / 120.0 * 0.2
+                tw.tween_property(n, "scale", Vector2.ONE * cell_px / 120.0, 0.3) \
+                                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                # the idle wobble - the jelly breathes
+                var wob := n.create_tween().set_loops()
+                wob.tween_property(n, "scale", Vector2(cell_px / 120.0 * 1.05, cell_px / 120.0 * 0.95), 0.7) \
+                                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+                wob.tween_property(n, "scale", Vector2(cell_px / 120.0 * 0.96, cell_px / 120.0 * 1.04), 0.7) \
+                                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+                grid[r][c] = {"jelly_node": n}
+
+
+func _jelly_pop_fx(r: int, c: int) -> void:
+        var n: Sprite2D = grid[r][c].get("jelly_node")
+        if n != null and is_instance_valid(n):
+                var tw := n.create_tween()
+                tw.set_parallel(true)
+                tw.tween_property(n, "scale", Vector2.ONE * cell_px / 120.0 * 1.4, 0.16) \
+                                .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+                tw.tween_property(n, "modulate:a", 0.0, 0.16)
+                tw.chain().tween_callback(n.queue_free)
+        grid[r][c] = {}
+        _ring_fx(_cell_pos(r, c), Color(1.0, 0.55, 0.8))
+
+
+func _jelly_spread() -> void:
+        if jelly.is_empty() or jelly.size() >= JELLY_BLOB_CAP:
+                return
+        var sources := jelly.keys()
+        var added := 0
+        var want := 1 + randi() % JELLY_SPREAD_MAX
+        var tries := 0
+        while added < want and tries < 40 and jelly.size() < JELLY_BLOB_CAP:
+                tries += 1
+                var src: int = sources[randi() % sources.size()]
+                var sr := int(src) / COLS
+                var sc := int(src) % COLS
+                var d: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)][randi() % 4]
+                var nr: int = sr + d.x
+                var nc: int = sc + d.y
+                if nr < 0 or nc < 0 or nr >= ROWS or nc >= COLS:
+                        continue
+                var k := nr * COLS + nc
+                if jelly.has(k):
+                        continue
+                jelly[k] = true
+                added += 1
+                # THE EAT LAW: the jelly consumes the gem that lived there
+                var cell: Dictionary = grid[nr][nc]
+                if not cell.is_empty() and is_instance_valid(cell.get("node")):
+                        var n: Sprite2D = cell["node"]
+                        var tw := n.create_tween()
+                        tw.set_parallel(true)
+                        tw.tween_property(n, "scale", Vector2.ONE * 0.02, 0.22)
+                        tw.tween_property(n, "modulate", Color(1.0, 0.4, 0.8), 0.22)
+                        tw.chain().tween_callback(n.queue_free)
+                grid[nr][nc] = {}
+        if added > 0:
+                Jukebox.sfx("m_jelly_spread2", -4.0)
+                _refresh_jelly()
+                _banner("THE JELLY SPREADS!", false)
+
+
+func _jelly_win_lose() -> void:
+        if over:
+                return
+        if jelly.is_empty():
+                jelly_level += 1
+                Jukebox.sfx("m_levelup", -3.0)
+                Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 30)
+                _banner("LEVEL %d CLEAR!" % (jelly_level - 1), true)
+                jelly_cleared_move = 0
+                _jelly_lay_level()
+                return
+        if jelly_moves <= 0:
+                _banner("OUT OF MOVES - THE JELLY HOLDS", false)
+                _finish_run("the jelly held - level %d" % jelly_level)
+
+
+# ================================================================ ICE CRASH
+## v0.3.3-p3 (the owner: "like jelly but different, it spreads in a connected
+## way, but things go pass through it and it has layers ... up to 5 layers
+## with different levels of colors/shaders, level 6 makes it like a rock and
+## requires a special thing to crash it down to level 5"): hits happen INSIDE
+## the ice (a popped iced cell loses one layer), spread happens on a move
+## with zero damage, limited moves, clear it all.
+func _icr_lay_level() -> void:
+        icel = {}
+        var rows_n := mini(1 + (icr_level - 1) / 2, 3)
+        for r in range(ROWS - rows_n, ROWS):
+                for c in COLS:
+                        icel[r * COLS + c] = clampi(1 + (icr_level - 1) / 3, 1, 5)
+        # a ROCK core appears from level 3 (the owner's level-6 law)
+        if icr_level >= 3:
+                var rr6 := ROWS - 1 - randi() % rows_n
+                icel[rr6 * COLS + randi() % COLS] = ICE_CRASH_ROCK
+        icr_moves = clampi(10 + icel.size() * 2, 16, 36)
+        _refresh_icel()
+
+
+func _refresh_icel() -> void:
+        for r in ROWS:
+                for c in COLS:
+                        _refresh_icel_cell(r, c)
+
+
+func _refresh_icel_cell(r: int, c: int) -> void:
+        if r < 0 or c < 0 or r >= ROWS or c >= COLS:
+                return
+        var k := r * COLS + c
+        var lvl := int(icel.get(k, 0))
+        var cell: Dictionary = grid[r][c]
+        var have: Sprite2D = cell.get("icel_node") if cell.get("icel_node") != null else null
+        if lvl <= 0:
+                if have != null and is_instance_valid(have):
+                        var tw := have.create_tween()
+                        tw.tween_property(have, "modulate:a", 0.0, 0.14)
+                        tw.tween_callback(have.queue_free)
+                if cell.has("icel_node"):
+                        cell.erase("icel_node")
+                return
+        if have == null or not is_instance_valid(have):
+                have = Sprite2D.new()
+                have.position = _cell_pos(r, c)
+                have.scale = Vector2.ONE * cell_px / 120.0
+                have.z_index = 1          # BEHIND the gem - things pass through
+                have.modulate.a = 0.0
+                world.add_child(have)
+                var tw2 := have.create_tween()
+                tw2.tween_property(have, "modulate:a", 0.92, 0.2)
+                cell["icel_node"] = have
+        have.texture = _t_icec(lvl)
+
+
+func _icr_spread() -> void:
+        if icel.is_empty():
+                return
+        var sources := icel.keys()
+        var src: int = sources[randi() % sources.size()]
+        var sr := int(src) / COLS
+        var sc := int(src) % COLS
+        var d: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)][randi() % 4]
+        var nr: int = sr + d.x
+        var nc: int = sc + d.y
+        if nr < 0 or nc < 0 or nr >= ROWS or nc >= COLS:
+                return
+        var k := nr * COLS + nc
+        var cur := int(icel.get(k, 0))
+        if cur <= 0:
+                icel[k] = 1
+        elif cur < 5:
+                icel[k] = cur + 1
+        Jukebox.sfx("m_icespread", -6.0)
+        _refresh_icel_cell(nr, nc)
+
+
+func _icr_win_lose() -> void:
+        if over:
+                return
+        if icel.is_empty():
+                icr_level += 1
+                Jukebox.sfx("m_levelup", -3.0)
+                Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 30)
+                _banner("LEVEL %d SHATTERED!" % (icr_level - 1), true)
+                icr_hit_move = 0
+                _icr_lay_level()
+                return
+        if icr_moves <= 0:
+                _banner("OUT OF MOVES - THE ICE HOLDS", false)
+                _finish_run("the ice held - level %d" % icr_level)
+
+
+## the special blasts crack the ROCK (the owner: "requires a special thing to
+## crash it down to level 5") - the blast marks its cells before they pop
+func _icr_mark_stone(pop: Dictionary) -> void:
+        if mode != "icecrash":
+                return
+        for key in pop.keys():
+                var r := int(key) / COLS
+                var c := int(key) % COLS
+                if _playable(r, c) and not grid[r][c].is_empty() \
+                                and int(icel.get(key, 0)) >= ICE_CRASH_ROCK:
+                        grid[r][c]["stone_hit"] = 1
+
+
+# ================================================================ DROP DOWN
+## v0.3.3-p3 (the owner: "items dropped from top after there is a match ...
+## the round will start with 1-5 items at the top line first, with a UI
+## widget tells user how many remaining, it will use both moves and timing or
+## one of them as a limit, so there is 3 possibilities ... the drop logic will
+## be like the gogacoin one here, make it down down down, make the items be
+## simply like this, index of all gems except the selected skin")
+func _drop_roll_round() -> void:
+        drop_total = clampi(3 + drop_level * 2 + randi() % 2, 3, 9)
+        drop_left = drop_total
+        var kinds := ["moves", "time", "both"]
+        drop_limit_kind = kinds[randi() % 3]
+        drop_moves = clampi(16 + drop_total * 2 - drop_level * 2, 12, 30)
+        drop_time = clampf(50.0 + 6.0 * float(drop_total) - 4.0 * float(drop_level), 40.0, 90.0)
+        _drop_lay()
+
+
+var drop_level := 1
+
+func _drop_lay() -> void:
+        # the round opens with 1-5 parcels already sitting on the top line
+        var starting := clampi(1 + randi() % 5, 1, mini(5, drop_left))
+        var cols_free := []
+        for c in COLS:
+                cols_free.append(c)
+        cols_free.shuffle()
+        for i in starting:
+                var c: int = cols_free[i]
+                # the parcel TAKES the top seat (the gem that lived there goes)
+                var cell: Dictionary = grid[0][c]
+                if not cell.is_empty() and is_instance_valid(cell.get("node")):
+                        (cell["node"] as Sprite2D).queue_free()
+                grid[0][c] = {}
+                _drop_spawn(c)
+
+
+func _drop_spawn(c: int) -> void:
+        if drop_left <= 0 or not grid[0][c].is_empty() or _jelly_at(0, c):
+                return
+        var cell: Dictionary = grid[0][c]
+        if not cell.is_empty() and is_instance_valid(cell.get("node")):
+                (cell["node"] as Sprite2D).queue_free()
+        var n := Sprite2D.new()
+        n.texture = _t("parcel")
+        n.scale = Vector2.ONE * cell_px * 0.92 / 120.0
+        var target := _cell_pos(0, c)
+        n.position = Vector2(target.x, board_o.y - cell_px * 0.7)
+        n.z_index = 3
+        world.add_child(n)
+        var tw := n.create_tween()
+        tw.tween_property(n, "position", target, 0.28) \
+                        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+        grid[0][c] = {"color": -2, "item": true, "node": n}
+        drop_left -= 1
+        Jukebox.sfx("m_itemspawn", -6.0)
+
+
+## the down-down-down: every parcel trades places with the gem below it, one
+## row per completed move; the bottom row delivers it
+func _drop_step() -> void:
+        # collect any parcel that already rides the bottom row
+        _drop_collect_check()
+        if over:
+                return
+        var movers := []
+        # walk bottom-up so a falling chain moves one step, not four
+        for r in range(ROWS - 2, -1, -1):
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if cell.is_empty() or not _is_item(cell):
+                                continue
+                        var below: Dictionary = grid[r + 1][c]
+                        if below.is_empty() or _is_item(below) or _is_coin(below):
+                                continue        # another parcel/coin holds it
+                        # swap with whatever sits below (a gem goes up)
+                        _swap_model(r, c, r + 1, c)
+                        var dn: Sprite2D = grid[r + 1][c].get("node")
+                        var un: Sprite2D = grid[r][c].get("node")
+                        if is_instance_valid(dn):
+                                movers.append({"node": dn, "to": _cell_pos(r + 1, c)})
+                        if is_instance_valid(un):
+                                movers.append({"node": un, "to": _cell_pos(r, c)})
+        var max_dur := 0.0
+        for m in movers:
+                var n: Sprite2D = m["node"]
+                var dist: float = absf(n.position.y - (m["to"] as Vector2).y)
+                var dur: float = clampf(dist / 1800.0, 0.14, 0.24)
+                max_dur = maxf(max_dur, dur)
+                var tw := n.create_tween()
+                tw.tween_property(n, "position", m["to"], dur) \
+                                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+        if not movers.is_empty():
+                Jukebox.sfx("m_itemdrop", -8.0, randf_range(0.9, 1.2))
+                await get_tree().create_timer(max_dur + 0.02, false).timeout
+        _drop_collect_check()
+        # the match-tax: a move that popped something feeds the next parcel in
+        if drop_left > 0 and _count_items() < 3 and randf() < 0.75:
+                var free := []
+                for c in COLS:
+                        if grid[0][c].is_empty() and not _jelly_at(0, c):
+                                free.append(c)
+                if not free.is_empty():
+                        _drop_spawn(free[randi() % free.size()])
+        _drop_limits_check()
+
+
+func _count_items() -> int:
+        # THE UNBORN-BOARD LAW: the HUD refresh can fire before the first
+        # deal (the drop chip builds at setup) - an empty grid owns 0 parcels
+        if grid.size() < ROWS:
+                return 0
+        var n := 0
+        for r in ROWS:
+                for c in COLS:
+                        if not grid[r][c].is_empty() and _is_item(grid[r][c]):
+                                n += 1
+        return n
+
+
+func _drop_collect_check() -> void:
+        for c in COLS:
+                var cell: Dictionary = grid[ROWS - 1][c]
+                if cell.is_empty() or not _is_item(cell):
+                        continue
+                add_score(3)
+                achievement_count("items", 1)
+                Jukebox.sfx("m_itemget", -4.0)
+                _ring_fx(_cell_pos(ROWS - 1, c), Color(1.0, 0.9, 0.5))
+                _float_text(_cell_pos(ROWS - 1, c), "+3", Color(1.0, 0.9, 0.5), 30)
+                _coin_fly_to_hud(_cell_pos(ROWS - 1, c))
+                if is_instance_valid(cell.get("node")):
+                        (cell["node"] as Sprite2D).queue_free()
+                grid[ROWS - 1][c] = {}
+                if drop_left <= 0 and _count_items() == 0:
+                        break
+        if drop_left <= 0 and _count_items() == 0:
+                # THE ROUND CLEAR: every parcel delivered
+                drop_level += 1
+                Jukebox.sfx("m_levelup", -3.0)
+                Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 30)
+                _banner("ALL PARCELS HOME!  ROUND %d" % (drop_level - 1), true)
+                _drop_roll_round()
+
+
+func _drop_limits_check() -> void:
+        if over:
+                return
+        if drop_limit_kind == "time" or drop_limit_kind == "both":
+                if drop_time <= 0.0:
+                        _banner("TIME UP!", false)
+                        _finish_run("the parcels waited too long")
+                        return
+        if drop_limit_kind == "moves" or drop_limit_kind == "both":
+                if drop_moves <= 0:
+                        _banner("OUT OF MOVES!", false)
+                        _finish_run("the moves ran out on the parcels")
+
+
+func _tick_drop(delta: float) -> void:
+        if drop_limit_kind == "time" or drop_limit_kind == "both":
+                drop_time -= delta
+                if drop_time <= 0.0:
+                        _drop_limits_check()
 
 
 func _tick_butterflies(delta: float) -> void:
@@ -1902,8 +2741,12 @@ func _rise_butterflies() -> void:
         # the line and it's instant with no animations and makes huge
         # glitches like overlapping things"): the MODEL swaps first, then
         # EVERY displaced node tweens to its new home together - nothing
-        # teleports, nothing overlaps. A butterfly reaching the top row is
-        # caught by the spider after the wave lands.
+        # teleports, nothing overlaps.
+        # v0.3.3-p3 THE GRACE LAW (the owner: "the butterfly should reach the
+        # top, and then after that, if it stayed at the top again, the spider
+        # will take it, not take it once it is in the top"): touching row 0
+        # is SAFE - the spider stirs and watches that column; only a
+        # butterfly STILL on row 0 after another rise gets grabbed.
         for step in pace:
                 var movers := []          # [{node, to}]
                 var wings := []
@@ -1920,9 +2763,12 @@ func _rise_butterflies() -> void:
                         if cell.is_empty() or not bool(cell.get("wing", false)):
                                 continue        # it was swept up by an earlier mover
                         if r == 0:
-                                continue        # it waits at the top - the spider watches
+                                continue        # it waits at the top - the grace law
                         # swap with whatever sits above (a coin holds it back)
                         _swap_model(r, c, r - 1, c)
+                        # the arrival on row 0 clears its own flag; leaving it too
+                        if r - 1 != 0:
+                                grid[r - 1][c].erase("top_wait")
                         var above: Dictionary = grid[r - 1][c]
                         if is_instance_valid(above.get("node")):
                                 movers.append({"node": above["node"],
@@ -1949,13 +2795,38 @@ func _rise_butterflies() -> void:
                                         .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
                 if not movers.is_empty():
                         await get_tree().create_timer(max_dur + 0.02, false).timeout
-        # the spider checks the sky: any butterfly ON the top row gets grabbed
+        # THE GRACE LAW, the walk: a butterfly already waiting on row 0 is
+        # grabbed; one that just landed gets the spider's stare for a move
         for c in COLS:
                 var cell: Dictionary = grid[0][c]
                 if not cell.is_empty() and bool(cell.get("wing", false)):
-                        await _spider_grabs(Vector2i(0, c))
+                        if bool(cell.get("top_wait", false)):
+                                await _spider_grabs(Vector2i(0, c))
+                                return
+        for c in COLS:
+                var cell: Dictionary = grid[0][c]
+                if not cell.is_empty() and bool(cell.get("wing", false)):
+                        cell["top_wait"] = true
+                        _spider_alert(c)
                         return
         _spider_hunt()
+
+
+## the spider leans toward the doomed column - the ONE-move warning
+func _spider_alert(col: int) -> void:
+        if spider == null or not is_instance_valid(spider):
+                return
+        var want_x := _cell_pos(0, col).x
+        if spider_tw != null and spider_tw.is_valid():
+                spider_tw.kill()
+        spider_tw = spider.create_tween()
+        spider_tw.tween_property(spider, "position:x", want_x, 0.3) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+        var pulse := spider.create_tween()
+        pulse.tween_property(spider, "modulate", Color(1.5, 0.75, 0.75), 0.18)
+        pulse.tween_property(spider, "modulate", Color.WHITE, 0.3)
+        Jukebox.sfx("m_grace", -6.0)
+        _banner("THE SPIDER STIRS...", false)
 
 
 ## THE SPIDER (the owner: "it should exist and looks toward the nearest
@@ -2137,9 +3008,10 @@ func _melt_under(pop: Dictionary) -> void:
 
 
 func _refresh_ice() -> void:
-        # the ice visuals: each segment = one iced cell sprite on the column's
-        # bottom cells; new segments slide in, melted ones fade out (no more
-        # instant pops - the owner's smoothness law)
+        # v0.3.3-p3 THE ICE BLOCKS THE VIDEO'S WAY (the owner: "currently and
+        # weirdly you freeze the tiles"): the ice is a full-cell frosted
+        # BLOCK BEHIND the gem (z 1 < gem z 2), snow cap on the column's top
+        # segment - the gems stand ON the ice, nothing overlays them
         for c in COLS:
                 var lvl := int(frost[c])
                 for r in ROWS:
@@ -2147,29 +3019,33 @@ func _refresh_ice() -> void:
                         if cell.is_empty():
                                 continue
                         var depth_from_bottom := (ROWS - 1) - r
-                        var want := clampi(lvl - depth_from_bottom, 0, 3)
+                        var want := clampi(lvl - depth_from_bottom, 0, 2)
                         var key := "ice_ov%d" % depth_from_bottom
                         var have: Sprite2D = cell.get(key) if cell.get(key) != null else null
-                        if want > 0 and have == null:
+                        if want > 0 and (have == null or not is_instance_valid(have)):
                                 var ov := Sprite2D.new()
-                                ov.texture = _t("ice%d" % want)
-                                ov.position = _cell_pos(r, c) + Vector2(0, -26.0)
+                                # the top segment wears the snow cap
+                                ov.texture = _t("icebt") if depth_from_bottom == lvl - 1 \
+                                                else _t("iceb")
+                                ov.position = _cell_pos(r, c)
                                 ov.scale = Vector2.ONE * cell_px / 120.0
                                 ov.modulate.a = 0.0
-                                ov.z_index = 6
+                                ov.z_index = 1
                                 world.add_child(ov)
                                 cell[key] = ov
                                 var tw := ov.create_tween().set_parallel(true)
                                 tw.tween_property(ov, "position", _cell_pos(r, c), 0.22) \
                                                 .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-                                tw.tween_property(ov, "modulate:a", 1.0, 0.18)
-                        elif want == 0 and have != null:
+                                tw.tween_property(ov, "modulate:a", 0.94, 0.18)
+                        elif want == 0 and have != null and is_instance_valid(have):
                                 cell[key] = null
                                 var tw2 := have.create_tween()
                                 tw2.tween_property(have, "modulate:a", 0.0, 0.16)
                                 tw2.tween_callback(have.queue_free)
-                        elif want > 0 and have != null:
-                                have.texture = _t("ice%d" % want)
+                        elif want > 0 and have != null and is_instance_valid(have):
+                                have.texture = _t("icebt") if depth_from_bottom == lvl - 1 \
+                                                else _t("iceb")
+                                have.modulate.a = 0.94
 
 
 func _check_ice_over() -> void:
@@ -2204,42 +3080,74 @@ func _tick_mine(delta: float) -> void:
                         _mine_rise()
 
 
-## one earth row rises from the bottom: the band's top moves UP one row and
-## the new cells slide in from under the board (never an instant appear)
+## one earth row rises from the bottom - v0.3.3-p3 THE BOARD LIFT (the owner:
+## "when a line comes, it will raise the top line up and remove it in a
+## smooth way"): the WHOLE board glides up one cell, the top row glides out
+## of the frame and fades, the freed bottom row becomes pure dirt sliding in
+## from below. Nothing overlaps - the model moves first, every node tweens.
 func _mine_rise() -> void:
         if earth_top <= 0:
                 return
+        # 1 - the top row glides out (the smooth removal)
+        for c in COLS:
+                var old: Dictionary = grid[0][c]
+                if not old.is_empty() and is_instance_valid(old.get("node")):
+                        var tn: Sprite2D = old["node"]
+                        var tw0 := tn.create_tween()
+                        tw0.set_parallel(true)
+                        tw0.tween_property(tn, "position:y", tn.position.y - cell_px * 1.5, 0.32) \
+                                        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+                        tw0.tween_property(tn, "modulate:a", 0.0, 0.28)
+                        tw0.chain().tween_callback(tn.queue_free)
+                grid[0][c] = {}
+        # 2 - the model lifts: rows 1..earth_top-1 move up one row
+        for r in range(1, ROWS):
+                grid[r - 1] = grid[r]
+        # the coin rode row 0 out of the frame - lost, the clock restarts
+        coin_cell = Vector2i(-1, -1)
+        coin_clock = COIN_EVERY
+        # 3 - the earth band grows: the freed last gem row becomes fresh dirt
         earth_top -= 1
         earth.resize(ROWS)
         _lay_earth_row(earth_top, 1.0)
-        # a coin buried by the rise is LOST (the clock restarts - never a
-        # free earn)
-        if coin_cell.x >= 0 and coin_cell.x >= earth_top:
-                coin_cell = Vector2i(-1, -1)
-                coin_clock = COIN_EVERY
-        # the gems that were in that row are gone (buried under the new dirt)
+        # 4 - every surviving gem glides to its new row (one wave, together)
+        var movers := []
+        for r in range(0, earth_top):
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if cell.is_empty() or not is_instance_valid(cell.get("node")):
+                                continue
+                        movers.append({"node": cell["node"], "to": _cell_pos(r, c)})
+        var max_dur := 0.0
+        for m in movers:
+                var n: Sprite2D = m["node"]
+                var dist: float = absf(n.position.y - (m["to"] as Vector2).y)
+                var dur: float = clampf(dist / 1600.0, 0.18, 0.3)
+                max_dur = maxf(max_dur, dur)
+                var tw := n.create_tween()
+                tw.tween_property(n, "position", m["to"], dur) \
+                                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+        # 5 - the fresh dirt slides in from below the frame
+        var row: Array = earth[earth_top]
         for c in COLS:
-                var old: Dictionary = grid[earth_top][c]
-                if not old.is_empty() and is_instance_valid(old.get("node")):
-                        (old["node"] as Sprite2D).queue_free()
-                grid[earth_top][c] = {}
-                var row: Array = earth[earth_top]
                 var e: Dictionary = row[c]
                 if e.has("node") and is_instance_valid(e["node"]):
                         var n: Sprite2D = e["node"]
-                        n.position.y += cell_px      # start one row BELOW home
-                        var tw := n.create_tween()
-                        tw.tween_property(n, "position:y",
+                        n.position.y += cell_px
+                        var tw2 := n.create_tween()
+                        tw2.tween_property(n, "position:y",
                                         _cell_pos(earth_top, c).y, 0.3) \
                                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
                         if n.has_meta("tr_spr"):
                                 var sp: Sprite2D = n.get_meta("tr_spr")
                                 if is_instance_valid(sp):
                                         sp.position.y += cell_px
-                                        var tw2 := sp.create_tween()
-                                        tw2.tween_property(sp, "position:y",
+                                        var tw3 := sp.create_tween()
+                                        tw3.tween_property(sp, "position:y",
                                                         _cell_pos(earth_top, c).y, 0.3) \
                                                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        if max_dur > 0.0:
+                await get_tree().create_timer(max_dur + 0.05, false).timeout
         Jukebox.sfx("m_freeze", -8.0, 0.7)
         _banner("THE EARTH RISES!", false)
         _refresh_hud()
@@ -2248,26 +3156,42 @@ func _mine_rise() -> void:
                 _finish_run("buried by the earth")
 
 
-## fills one earth row with treasure cells (density grows with depth)
+## fills one earth row - THE PURE DIRT LAW (the owner: "the sand/whatever
+## that tiles are, should contain nothing from the matchable jewels") plus
+## THE PROGRESSION LAYERS (the owner: "by progression has intense layers like
+## 3 layers or 4 or a level of layers that needs only a special item to
+## break it"): dirt digs in 1 match, clay in 2, rock only specials crack.
 func _lay_earth_row(r: int, density: float) -> void:
         earth[r] = []
+        var deep := float(depth)
         for c in COLS:
-                var tr := ""
+                var kind := "dirt"
                 var roll := randf()
-                if roll < 0.10 * density:
+                if roll < clampf(0.04 + deep / 30.0, 0.0, 0.22):
+                        kind = "rock"
+                elif roll < clampf(0.18 + deep / 14.0, 0.0, 0.5):
+                        kind = "clay"
+                var tr := ""
+                var roll2 := randf()
+                if kind != "rock" and roll2 < 0.10 * density:
                         tr = "artifact"
-                elif roll < 0.26 * density:
+                elif kind != "rock" and roll2 < 0.26 * density:
                         tr = "diamond"
-                elif roll < 0.52 * density:
+                elif roll2 < 0.52 * density:
                         tr = "gold"
-                var e := {"tr": tr}
-                e["node"] = _earth_sprite(r, c, tr)
+                var hp := 1
+                if kind == "clay":
+                        hp = 2
+                if kind == "rock":
+                        hp = 99        # only specials answer
+                var e := {"kind": kind, "hp": hp, "tr": tr}
+                e["node"] = _earth_sprite(r, c, kind, tr)
                 earth[r].append(e)
 
 
-func _earth_sprite(r: int, c: int, tr: String) -> Sprite2D:
+func _earth_sprite(r: int, c: int, kind: String, tr: String) -> Sprite2D:
         var n := Sprite2D.new()
-        n.texture = _t("earth")
+        n.texture = _t("dirt" if kind == "dirt" else ("clay" if kind == "clay" else "rock"))
         n.position = _cell_pos(r, c)
         n.scale = Vector2.ONE * cell_px / 120.0
         n.z_index = 2
@@ -2285,9 +3209,10 @@ func _earth_sprite(r: int, c: int, tr: String) -> Sprite2D:
 
 
 ## a match wave drills the columns whose MATCHED CELLS sit directly on the
-## earth: the TOP earth cell of each such column breaks (match against the
-## dirt to dig - the Bejeweled Classic feel)
-func _mine_dig(pop: Dictionary) -> void:
+## earth (match against the dirt to dig - the Bejeweled Classic feel).
+## v0.3.3-p3 THE LAYER LAW: clay takes two digs, rock only answers to the
+## special blasts (blast_keys) - a plain match just clanks off it.
+func _mine_dig(pop: Dictionary, blast_keys := {}) -> void:
         if earth_top >= ROWS:
                 return
         var cols := {}
@@ -2305,6 +3230,23 @@ func _mine_dig(pop: Dictionary) -> void:
                 if e.is_empty() or not e.has("node") \
                                 or not is_instance_valid(e["node"]):
                         continue
+                var force: bool = blast_keys.has((earth_top - 1) * COLS + c) \
+                                or blast_keys.has(earth_top * COLS + c)
+                var kind := String(e.get("kind", "dirt"))
+                if kind == "rock" and not force:
+                        Jukebox.sfx("m_rockhit", -6.0, randf_range(0.9, 1.2))
+                        _float_text((e["node"] as Sprite2D).position, "ROCK!",
+                                        Color(0.85, 0.85, 0.9), 24)
+                        continue
+                if kind == "clay" and not force:
+                        e["hp"] = int(e.get("hp", 2)) - 1
+                        if int(e["hp"]) > 0:
+                                Jukebox.sfx("m_dig", -6.0, 1.3)
+                                var cn: Sprite2D = e["node"]
+                                var ctw := cn.create_tween()
+                                ctw.tween_property(cn, "modulate", Color(0.75, 0.6, 0.55), 0.1)
+                                ctw.tween_property(cn, "modulate", Color.WHITE, 0.2)
+                                continue
                 var n: Sprite2D = e["node"]
                 _gem_pop_fx(n.position, 2)
                 if n.has_meta("tr_spr"):
@@ -2373,6 +3315,7 @@ func _finish_run(reason: String) -> void:
         if over:
                 return
         _banner(reason, false)
+        Jukebox.sfx("m_lose_org", -4.0)
         if mode == "challenge":
                 achievement_max("challenge_best", score)
         if mode == "peace":
@@ -2410,38 +3353,48 @@ func _build_rail() -> void:
 
 
 func _rail_slot(pid: String) -> Button:
+        # v0.3.3-p3 THE RICH ICON RAIL (the owner: "redesign the powerups to
+        # look more rich, also remove the other text ... just show empty or nn
+        # or grayed out, let the name in the buy pop-up"): the slot is the
+        # ICON ONLY - a count bubble top-right, three stock pips underneath,
+        # gray when locked/empty/spent. The name and the prices live in the
+        # buy popup.
         var p: Dictionary = POWERS[pid]
         var b := Button.new()
-        b.custom_minimum_size = Vector2(120, 132)
-        var sb := Arc.panel_style(Arc.CARD, 20, 6)
+        b.custom_minimum_size = Vector2(118, 118)
+        var sb := Arc.panel_style(Arc.CARD, 26, 6)
         b.add_theme_stylebox_override("normal", sb)
         var sbp := sb.duplicate() as StyleBoxFlat
         sbp.bg_color = sbp.bg_color.darkened(0.07)
         b.add_theme_stylebox_override("pressed", sbp)
-        var v := VBoxContainer.new()
-        v.set_anchors_preset(Control.PRESET_FULL_RECT)
-        v.offset_top = 6
-        v.offset_bottom = -4
-        v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_theme_constant_override("separation", 0)
-        b.add_child(v)
         var ic := TextureRect.new()
         ic.texture = load(String(p["icon"]))
-        ic.custom_minimum_size = Vector2(58, 58)
+        ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+        ic.offset_left = 10
+        ic.offset_right = -10
+        ic.offset_top = 10
+        ic.offset_bottom = -10
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_child(ic)
-        var dots := Arc.fit_label("", 17, Color("2c8a44"), 112)
-        dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_child(dots)
-        var price := Arc.fit_label("", 15, Color(0.5, 0.4, 0.25), 112)
-        price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        price.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        v.add_child(price)
-        rail_slots[pid] = {"btn": b, "dots": dots, "price": price}
+        b.add_child(ic)
+        var bubble := Arc.fit_label("", 22, Color.WHITE, 54)
+        bubble.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+        bubble.offset_left = -46
+        bubble.offset_top = -2
+        bubble.offset_right = -4
+        bubble.offset_bottom = 32
+        bubble.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(bubble)
+        var pips := Arc.fit_label("", 15, Color("2c8a44"), 100)
+        pips.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+        pips.offset_top = -26
+        pips.offset_bottom = -6
+        pips.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(pips)
+        rail_slots[pid] = {"btn": b, "dots": pips, "price": bubble, "icon": ic}
         b.pressed.connect(func(): _rail_tap(pid))
         return b
 
@@ -2453,37 +3406,37 @@ func _refresh_rail() -> void:
                 var slot: Dictionary = rail_slots[pid]
                 var n := int(charges[pid])
                 var owned: bool = Box.item_owned(game_id, "power", pid)
-                var dots: Label = slot["dots"]
-                var price: Label = slot["price"]
+                var pips: Label = slot["dots"]
+                var bubble: Label = slot["price"]
                 var btn: Button = slot["btn"]
+                var ic: TextureRect = slot["icon"]
                 var spent_out: bool = owned and n <= 0 and int(power_used[pid]) >= POWER_MAX
+                bubble.text = str(n) if (owned and n > 0) else ""
                 if spent_out:
                         # THE GRAY-OUT LAW (the owner): all 3 used this run ->
                         # the slot goes gray and dead until the next run
-                        dots.text = "SPENT"
-                        dots.add_theme_color_override("font_color", Color(0.55, 0.5, 0.45))
-                        price.text = "next run"
+                        pips.text = "- - -"
+                        pips.add_theme_color_override("font_color", Color(0.5, 0.46, 0.42))
+                        btn.modulate = Color(1, 1, 1, 0.38)
                         btn.disabled = true
                 else:
                         btn.disabled = false
+                        btn.modulate = Color(1, 1, 1, 1) if (owned and n > 0) \
+                                        else Color(1, 1, 1, 0.55)
                         if not owned:
-                                dots.text = "LOCKED"
-                                dots.add_theme_color_override("font_color", Color(0.55, 0.42, 0.3))
-                                price.text = "%d GOGACoins" % int(POWERS[pid]["price"])
+                                pips.text = "+"
+                                pips.add_theme_color_override("font_color", Color(0.62, 0.5, 0.3))
                         elif n > 0:
-                                dots.text = "%d/3" % n
-                                dots.add_theme_color_override("font_color", Color("2c8a44"))
-                                price.text = String(POWERS[pid]["name"]).to_upper()
+                                pips.text = "*".repeat(n) + ("o".repeat(POWER_MAX - n))
+                                pips.add_theme_color_override("font_color", Color("2c8a44"))
                         else:
-                                dots.text = "EMPTY"
-                                dots.add_theme_color_override("font_color", Color(0.62, 0.5, 0.36))
-                                price.text = "%d GOGACoins" % int(POWERS[pid]["refill"])
+                                pips.text = "o".repeat(POWER_MAX)
+                                pips.add_theme_color_override("font_color", Color(0.62, 0.5, 0.36))
                 var sb := btn.get_theme_stylebox("normal") as StyleBoxFlat
                 if spent_out:
                         sb.set_border_width_all(0)
-                        btn.modulate = Color(1, 1, 1, 0.45)
                 else:
-                        btn.modulate = Color(1, 1, 1, 1)
+                        btn.modulate = Color(1, 1, 1, 1) if spent_out == false else btn.modulate
                         if armed == pid:
                                 sb.set_border_width_all(4)
                                 sb.border_color = Arc.ACCENT
@@ -2656,7 +3609,14 @@ func _resolve_from_pop(pop: Dictionary) -> void:
                         pg.append({"cells": cc, "dir": "h", "color": 0,
                                         "cross": Vector2i(-1, -1)})
                 _plan_melt(pg)
-        await _pop_cells(pop, [])
+        # the bought powers ARE specials - they crack the rock and stagger
+        _icr_mark_stone(pop)
+        var stag := {}
+        for key in pop.keys():
+                var r := int(key) / COLS
+                var c := int(key) % COLS
+                stag[key] = float(c) * 0.03
+        await _pop_cells(pop, [], stag, pop.duplicate())
         while true:
                 if over:
                         return
@@ -2803,10 +3763,12 @@ func _refresh_hud() -> void:
         match mode:
                 "challenge":
                         var secs := int(ceilf(round_clock))
-                        chip_info.text = "goal %d/%d  %ds" % [round_bank, round_goal, secs]
-                        chip_info2.text = "run %ds  r%d" % [int(ceilf(run_clock)), round_no]
+                        chip_info.text = "goal %d/%d - mv %d/%d - %ds" % [round_bank, round_goal,
+                                        round_moves, round_moves_max, secs]
+                        chip_info2.text = "R%d  W%d L%d  LIVES %d/%d" % [round_no, ch_wins,
+                                        ch_losses, ch_lives, CH_LIVES]
                         chip_info2.add_theme_color_override("font_color",
-                                Color("d84a3a") if run_clock < 30.0 else Color("35210f"))
+                                Color("d84a3a") if ch_lives <= 1 else Color("35210f"))
                 "peace":
                         chip_info.text = "breathe"
                         chip_info2.text = "%ds" % int(peace_secs)
@@ -2826,17 +3788,48 @@ func _refresh_hud() -> void:
                         chip_info2.text = "%ds" % int(ceilf(dig_clock))
                         chip_info2.add_theme_color_override("font_color",
                                 Color("d84a3a") if dig_clock < 15.0 else Color("35210f"))
+                "jelly":
+                        chip_info.text = "jelly %d  -  LEVEL %d" % [jelly.size(), jelly_level]
+                        chip_info2.text = "moves %d" % maxi(0, jelly_moves)
+                        chip_info2.add_theme_color_override("font_color",
+                                Color("d84a3a") if jelly_moves <= 5 else Color("35210f"))
+                "icecrash":
+                        chip_info.text = "ice %d  -  LEVEL %d" % [icel.size(), icr_level]
+                        chip_info2.text = "moves %d" % maxi(0, icr_moves)
+                        chip_info2.add_theme_color_override("font_color",
+                                Color("d84a3a") if icr_moves <= 5 else Color("35210f"))
+                "drop":
+                        var lim := ""
+                        match drop_limit_kind:
+                                "moves":
+                                        lim = "mv %d" % maxi(0, drop_moves)
+                                "time":
+                                        lim = "%ds" % int(ceilf(maxf(0.0, drop_time)))
+                                "both":
+                                        lim = "mv %d - %ds" % [maxi(0, drop_moves),
+                                                        int(ceilf(maxf(0.0, drop_time)))]
+                        chip_info.text = "parcels left %d" % (drop_left + _count_items())
+                        chip_info2.text = "%s  -  round %d" % [lim, drop_level]
+                        chip_info2.add_theme_color_override("font_color",
+                                Color("d84a3a") if (drop_moves <= 4 or drop_time <= 10.0) \
+                                                else Color("35210f"))
 
 
 # ================================================================ fx tick
 func _tick_fx(delta: float) -> void:
         # the queue draw - one pass over the pooled fx
         for p in pops:
+                if float(p.get("hold", 0.0)) > 0.0:
+                        p["hold"] = float(p["hold"]) - delta
+                        continue          # a staged pop waits for its sweep
                 p["life"] -= delta
                 p["pos"] += p["vel"] * delta
                 p["vel"].y += 900.0 * delta
         pops = pops.filter(func(p): return float(p["life"]) > 0.0)
         for r in rings:
+                if float(r.get("hold", 0.0)) > 0.0:
+                        r["hold"] = float(r["hold"]) - delta
+                        continue
                 r["life"] -= delta
                 r["r"] += 260.0 * delta
         rings = rings.filter(func(r): return float(r["life"]) > 0.0)
@@ -2850,12 +3843,25 @@ func _tick_fx(delta: float) -> void:
                 f["life"] -= delta
                 f["pos"].y -= 46.0 * delta
         floaters = floaters.filter(func(f): return float(f["life"]) > 0.0)
+        for s in sweeps:
+                s["t"] = float(s["t"]) + delta
+        sweeps = sweeps.filter(func(s): return float(s["t"]) < float(s["max"]))
+        for w in wipes:
+                w["t"] = float(w["t"]) + delta
+        wipes = wipes.filter(func(w): return float(w["t"]) < float(w["max"]))
+        shake = maxf(0.0, shake - delta * 2.2)
         queue_redraw()
 
 
 func _draw() -> void:
         if world == null:
                 return
+        var vp := get_viewport_rect().size
+        # THE BOMB SHAKE - the whole world rattles for a beat
+        if shake > 0.0:
+                world.position = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * 9.0
+        elif world.position != Vector2.ZERO:
+                world.position = Vector2.ZERO
         for p in pops:
                 var a: float = float(p["life"]) / float(p["max"])
                 draw_circle(p["pos"], float(p["r"]) * (0.5 + 0.5 * a), Color(p["col"], a))
@@ -2876,12 +3882,39 @@ func _draw() -> void:
                                 pt += Vector2(randf_range(-16, 16), randf_range(-16, 16))
                         draw_line(prev, pt, Color(0.8, 0.9, 1.0, a4), 5.0 * a4 + 1.5)
                         prev = pt
+        # THE SWEEPER BARS (the owner's missing sweeping effects): a glowing
+        # bar racing across the row/column, trailing sparks
+        for s in sweeps:
+                var prog: float = clampf(float(s["t"]) / float(s["max"]), 0.0, 1.0)
+                var col: Color = s["col"]
+                if String(s["axis"]) == "h":
+                        var y := _cell_pos(int(s["idx"]), 0).y
+                        var x := board_o.x + prog * _board_pixel().x
+                        draw_line(Vector2(board_o.x, y), Vector2(x, y), Color(col, 0.85), 16.0)
+                        draw_line(Vector2(board_o.x, y), Vector2(x, y), Color(1, 1, 1, 0.5), 5.0)
+                else:
+                        var x2 := _cell_pos(0, int(s["idx"])).x
+                        var y2 := board_o.y + prog * _board_pixel().y
+                        draw_line(Vector2(x2, board_o.y), Vector2(x2, y2), Color(col, 0.85), 16.0)
+                        draw_line(Vector2(x2, board_o.y), Vector2(x2, y2), Color(1, 1, 1, 0.5), 5.0)
+        # THE COLOR-REMOVER WIPE SHIMMER: a rising row of light per wave row
+        for w in wipes:
+                var del: float = float(w.get("delay", 0.0))
+                var tt: float = float(w["t"]) - del
+                if tt < 0.0 or tt > float(w["max"]):
+                        continue
+                var a5: float = 1.0 - tt / float(w["max"])
+                var y3 := _cell_pos(int(w["row"]), 0).y
+                var col2: Color = w["col"]
+                draw_line(Vector2(board_o.x, y3 - 8.0),
+                                Vector2(board_o.x + _board_pixel().x, y3 - 8.0),
+                                Color(col2, a5 * 0.65), 10.0 * a5 + 2.0)
         for f in floaters:
-                var a5: float = float(f["life"]) / float(f["max"])
+                var a6: float = float(f["life"]) / float(f["max"])
                 var font := ThemeDB.fallback_font
                 draw_string(font, f["pos"] + Vector2(2, 2), String(f["txt"]),
-                                HORIZONTAL_ALIGNMENT_CENTER, 460, int(f["size"]), Color(0, 0, 0, a5 * 0.5))
+                                HORIZONTAL_ALIGNMENT_CENTER, 460, int(f["size"]), Color(0, 0, 0, a6 * 0.5))
                 draw_string(font, f["pos"], String(f["txt"]), HORIZONTAL_ALIGNMENT_CENTER,
-                                460, int(f["size"]), Color(f["col"], a5))
+                                460, int(f["size"]), Color(f["col"], a6))
 
 

@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "project": "gogabox",
-  "_doc": "Every visual/audio asset in this project, where it came from, its license, and how to re-fetch it. Re-derive everything: python3 projects/gogabox/tools/derive_assets.py (idempotent: re-downloads the Kenney fonts zip, re-copies CC0 audio vendored in candyrush, re-draws all PIL art, re-synthesizes sfx, regenerates thumbnails). All sources CC0; derivations inherit CC0. v0.2.4: the Space Dash set joined (Kenney space packs via OpenGameArt mirrors + the Particle Pack); recolors are deterministic tools/v024_vendor.py output (CC0 inherits). v0.3.3-p2: the owner's own Match_3_Template sprites joined (the Donut Den skin + the checker cells + the backdrop + the banner ribbon).",
+  "_doc": "Every visual/audio asset the MATCHER game wears, where it came from, its license, and how to re-fetch or re-derive it. Re-derive: python3 tools/v033p3_art.py + python3 tools/v033p3_sfx.py (patch 3 re-derives the p1/p2 set too). All sources CC0 or the owner's own upload.",
   "sources": [
     {
       "id": "kenney-fonts",
@@ -75,6 +75,13 @@
       "url": "owner upload (GameMaker sprite package: donuts, play-field tiles, background, banner ribbon)",
       "license": "owner-provided for GOGABox use",
       "used_for": "assets/games/matcher/gems/donut_0..4.png (the Donut Den skin gems), assets/games/matcher/bg/cell_donut_light.png + cell_donut_dark.png (the checker cells), assets/games/matcher/bg/bg_donut.png (the skin backdrop, cover-cropped 1080x1920), assets/games/matcher/fx/banner.png (the top event ribbon)"
+    },
+    {
+      "id": "owner-match3-template-zip",
+      "name": "The owner's Match_3_Template.zip (uploaded to the sandbox, re-hosted on his gdrive)",
+      "url": "(owner upload - GameMaker template project)",
+      "license": "the owner's own asset drop - project use",
+      "used_for": "v0.3.3-p3 THE DEFAULTS: bg/cell_tpl_light+dark (the board checker), bg/bg_tpl (the default backdrop), fx/popfx_0..7 (the pop burst frames), the richer gems/donut_0..4 (objective tokens), matcher_game.mp3 (the in-game music), and most SFX: m_swap, m_land, m_pop_candy, m_match_soft/big, m_invalid, m_tok_bomb, m_tok_whoosh, m_arm, m_shuffle, m_freeze, m_jelly_spread, m_gulp, m_special, m_goal, m_win_fanfare, m_lose_org, m_ui, m_ui_close"
     }
   ],
   "audit": {
