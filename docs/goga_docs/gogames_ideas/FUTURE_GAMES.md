@@ -145,6 +145,10 @@ Dash, keeps thinking, and will name the next game when ready.
   mouse through trap mazes — plan the path, spring the hazards.
 - **match-3 fighter** — Mao Mao / Slugterra 2 type: match-3 IS the combat —
   matched gems power the attacks.
+- **suika-like** — the watermelon merge (Suika Game / watermelon game
+  energy): drop fruits into the jar, two same fruits merge into the next
+  bigger fruit, chain merges for score, never overflow the jar. (the
+  owner's v0.3.3 dump: "a suiska-like game ... i guess it called suika")
 - **angry-birds-like** - the slingshot destroyer: pull back, aim the arc,
   release, and bring the whole tower down on the pigs - each bird its own
   trick, wood/glass/stone each breaking its own way.

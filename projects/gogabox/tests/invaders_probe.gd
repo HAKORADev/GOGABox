@@ -85,8 +85,8 @@ func _run() -> void:
         _check(String(sr["title"]) == "Space Invaders", "the rename law: HEN -> SPACE INVADERS")
         _check(int(sr["coin_div"]) == 500, "run bonus = score/500 (owner)")
         _check(String(sr["orientation"]) == "landscape", "the tour is HORIZONTAL")
-        _check(GameReg.playable().size() == 9 and GameReg.workshop().size() == 6,
-                        "9 playable / 6 teasers (hen graduated)")
+        _check(GameReg.playable().size() == 10 and GameReg.workshop().size() == 5,
+                        "10 playable / 5 teasers (matcher joined the shelf)")
 
         # ---- boot ----
         await _boot()

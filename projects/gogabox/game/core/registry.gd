@@ -312,6 +312,47 @@ const GAMES := [
         },
 
         {
+                # v0.3.3 MATCHER - the happy one, GRADUATED from its v0.1.4
+                # teaser (the owner's own ritual is honored: pour 100 charges,
+                # own 3 games, 400 coins - the tile was never a mystery).
+                # Five modes, the specials earned by matching, the bought
+                # power-ups on the ROUND balance, the board-riding GOGACoin.
+                "id": "matcher", "title": "Matcher", "tag": "the happy gem wall",
+                "script": "res://game/games/matcher/matcher.gd",
+                "thumb": "res://assets/thumbs/matcher.png",
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 300, "price": 400, "fee": 10, "shop": true,
+                "banner": true,   # the rail seats itself above the strip
+                "charge_unlock": 100,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
+                "desc": "The happy one - an endless gem wall with five moods: CHALLENGE (the round-based matcher, a lost round costs 500), PEACE (zen, nothing can hurt you), BUTTERFLIES (match them before the spider dines), ICE STORM (melt the rising frost) and DIAMOND MINE (dig the earth against the clock). Match 4 for a FLAME, an L for a STAR, 5 for a HYPERCUBE; buy powers with the round balance; escort the GOGACoin to the bottom row and it is yours.",
+                "controls": [
+                        "tap two adjacent gems to swap, or drag a gem toward its neighbor - 3+ of a kind pops, everything = 1 score point",
+                        "match 4 in a line: FLAME gem (3x3 blast) - match an L/T: STAR gem (row + column) - match 5: HYPERCUBE (swap it with any color to zap them all)",
+                        "a GOGACoin materializes on the board 30s after your last one - clear beneath it so it falls to the bottom row and drops out earned",
+                        "the bottom rail holds your powers: unlock them with the wallet once, then stock up to 3 each with the ROUND balance you collected",
+                        "CHALLENGE: rounds with fair random goals - miss one and it costs 500 score; the 5-minute run clock is your real life",
+                        "PEACE: no fail, no coins, no power-ups, the END button lives in the pause menu",
+                        "BUTTERFLIES: they rise every move - let one reach the spider and the run ends",
+                        "ICE STORM: columns freeze from the bottom - matches on them melt; a full column ends the run; quick melts heat the gauge for extra melts",
+                        "DIAMOND MINE: matches drill the earth above them - dig gold, diamonds and artifacts out and break through the layer for +30s",
+                ],
+                "genres": {"main": ["puzzle", "casual"], "sub": ["match3", "singleplayer", "relax"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "match_300", "title": "Gem Fresh", "desc": "Match 300 gems total"},
+                        {"id": "match_3000", "title": "Gem Hoard", "desc": "Match 3000 gems total"},
+                        {"id": "hyper_1", "title": "Light Touch", "desc": "Create a hypercube"},
+                        {"id": "cascade_4", "title": "Sweet Tooth", "desc": "Chain a x4 cascade"},
+                        {"id": "butter_100", "title": "Moth Keeper", "desc": "Save 100 butterflies total"},
+                        {"id": "ice_25", "title": "Ice Breaker", "desc": "Melt 25 ice layers total"},
+                        {"id": "depth_20", "title": "Deep Dig", "desc": "Descend to 20m in one mine"},
+                        {"id": "peace_300", "title": "Calm Mind", "desc": "Breathe 5 minutes in one peace run"},
+                        {"id": "challenge_1500", "title": "Challenge Chest", "desc": "Finish a challenge run over 1500"},
+                ],
+        },
+
+        {
                 # v0.3.2 SPACE INVADERS - the hen workshop teaser, renamed and
                 # graduated (the owner's tour: Neptune -> ... -> the Sun, then
                 # the Hideout; one war with Space Dash, nobody ever dies).
@@ -378,17 +419,8 @@ const GAMES := [
                                 {"type": "earn_in", "game": "lanes", "amount": 150},
                                 {"type": "spend_charges", "amount": 50},   # v0.1.4 GOGACharges order
                         ]}},
-        # v0.1.4 LOCKED WITHOUT BEING A MYSTERY (owner brainstorm): matcher
-        # shows up right away as a visible tile, never a black box - pour 100
-        # GOGACharges into it (pre-play button + capacity meter) and own 3
-        # games, and its spot is fully unlocked.
-        {"id": "matcher", "title": "Matcher", "tag": "match-3 port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/matcher.png",
-                "desc": "Swap, match, cascade. The calm one you play for hours.",
-                "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "singleplayer"]},
-                "age": "everyone",
-                "charge_unlock": 100,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3}},
+        # (matcher graduated into a REAL game above - its v0.1.4 direct tile
+        # + 100-charge meter ride along with it)
         {"id": "keys", "title": "Key Singer", "tag": "rhythm rework", "coming_soon": true,
                 "thumb": "res://assets/thumbs/keys.png",
                 "desc": "Hit the keys on the beat. The better your timing, the louder the song.",

@@ -169,6 +169,16 @@ func check_achievements() -> int:
                         "clear_tour": ok = Box.counter(game_id, "tour_done") >= 1
                         "boss_all": ok = Box.counter(game_id, "bosses_met") >= 3
                         "defend_3": ok = Box.counter(game_id, "defenders_called") >= 3
+                        # v0.3.3 - matcher (the happy wall)
+                        "match_300": ok = Box.counter(game_id, "matched") >= 300
+                        "match_3000": ok = Box.counter(game_id, "matched") >= 3000
+                        "hyper_1": ok = Box.counter(game_id, "hypers") >= 1
+                        "cascade_4": ok = Box.counter(game_id, "best_cascade") >= 4
+                        "butter_100": ok = Box.counter(game_id, "butterflies") >= 100
+                        "ice_25": ok = Box.counter(game_id, "melted") >= 25
+                        "depth_20": ok = Box.counter(game_id, "depth") >= 20
+                        "peace_300": ok = Box.counter(game_id, "peace_secs") >= 300
+                        "challenge_1500": ok = Box.counter(game_id, "challenge_best") >= 1500
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)
