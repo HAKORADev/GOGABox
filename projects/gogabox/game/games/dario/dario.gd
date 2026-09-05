@@ -586,7 +586,7 @@ func _shop_rebuild() -> void:
 
 func _intro_open() -> void:
         _locked = true
-        var sheet := sheet_push(0.0)
+        var sheet := sheet_push(0.0, "intro")
         var cursed := Box.counter(game_id, "playthroughs") >= 2
         var t := Arc.label("THE CURSE", 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1096,6 +1096,14 @@ var _walk_idx := -1          # the touch index that owns walking
 var _walk_anchor := -1.0
 var _walk_pos := Vector2.ZERO
 var _walk_dir := 0.0
+
+## v0.3.3-6 THE AUDIT FIX (the owner suspected the newer games carry the
+## matcher's back-button bug - dario DID): the back button pops the intro
+## sheet like any sheet, and the old build never unlocked the run - the
+## player stared at a live dario they could not move. The pop unlocks.
+func _goga_sheet_popped(id: String) -> void:
+        if id == "intro":
+                _locked = false
 
 func _goga_input(event: InputEvent) -> void:
         if event is InputEventScreenTouch:

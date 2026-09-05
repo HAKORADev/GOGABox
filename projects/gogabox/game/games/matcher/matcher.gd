@@ -1,5 +1,50 @@
 extends GogaGame
-## MATCHER - v0.3.3 PATCH 5, the donut-purge-and-real-mechanics round.
+## MATCHER - v0.3.3-6, the one-resolve-and-real-physics round.
+## THE PATCH 6 LAWS (the owner's patch-5 test report):
+##  - THE ONE RESOLVE LAW: the swap path and the power path are THE SAME
+##    loop now - pop -> gravity -> re-scan, the detonation chain rebuilds
+##    every wave, cascades birth specials (the owner: "i bet this game core
+##    physics and animating and core logic needs remake because no way
+##    every fix keeps a hidden bug/gap behind it"). The old power resolve
+##    never re-scanned after the refill: bomb/vapor left the board with
+##    stale unresolved matches.
+##  - THE NEWBORN SHIELD: a special born in a match is untouchable during
+##    its birth wave and survives ONE later hit (the owner: "the logic
+##    currently executes the existing special ... it eats the new special").
+##  - THE EXECUTION LAW: the vapor power and the color remover EXECUTE any
+##    special they remove (its blast joins the wave).
+##  - THE MINE ALIASING FIX: the world push rebuilt its rows as DISTINCT
+##    arrays - the old `grid[r-1] = grid[r]` loop left the two bottom rows
+##    as ONE array (the owner's ghost-gem/overlap bug family).
+##  - THE COIN LAW v6: tap-to-collect is DEAD, the hop-over is DEAD - the
+##    coin is a REAL swap partner (the owner's [gem][coin][gem][gem] case)
+##    and it waits QUEUED, riding the next refill in from the top "like a
+##    gem from there". Items stay un-swappable (the owner confirmed).
+##  - THE CC SPAWN LAW: fresh gems are born BEHIND the top line, fade in
+##    RISING from its edge and drop one by one (the owner: "not just
+##    instant-spawning, they really drop one by one this way") - and the
+##    round starts TRULY empty (the owner: "how there is gems hanging?").
+##  - THE PHYSICAL GRID-FILLING: the real candy-crush law - an empty seat
+##    whose above is solid is fed DIAGONALLY from the side (the pocket
+##    pull), plus the perch slide (the owner: "it does not work like if
+##    you never did it btw").
+##  - THE ICE LAWS v6: a horizontal match (or row sweeper) touching the
+##    line DROPS the ice 3 grids; a vertical match DESTROYS the column's
+##    ice through a render REGISTRY (the cell-dict overlays leaked on every
+##    pop - "the grids still iced and never be destroyed"); and the SECOND
+##    LAYER: tier-1 freeze summons a SLOWER layer - only ITS topping out
+##    ends the run.
+##  - THE LOSS THEATRE (challenge): a failed round clears the grid BOTTOM
+##    to TOP line by line, then the pour re-fills it (the owner: "make
+##    losing more rich").
+##  - THE ROOT LAW: back on the boot optionals does NOTHING (the owner:
+##    "first it closes optionals menu then another tap shows that pause
+##    menu, this first makes matcher unable to run") - and the armed-power
+##    hint floats on its OWN label ABOVE the rail; the combo praise is
+##    centered on its anchor and capped ("only UNRE appeared while AL out of
+##    resolution"); the drop-down rose flag can never be wiped by aftercare
+##    again ("the item that been up for two moves, it does not goes out and
+##    end the game?"). dario's intro pop unlocks the run (the audit twin).
 ## THE PATCH 5 LAWS (the owner's patch-4 test report):
 ##  - THE DONUT PURGE: the pop burst sprites were the template zip's
 ##    DONUTS - every match wore a tiny donut funeral on the pure gem skin
@@ -337,6 +382,8 @@ var drop_prev := {}             # drop_id -> row at the move's start
 var coin_clock := COIN_EVERY
 var coin_cell := Vector2i(-1, -1)
 var _coin_refill_pending := false
+var coin_queued := false       # v0.3.3-6: the coin waits in the refill queue
+var coin_col := 0              # ...and rides THIS column's next refill wave
 
 ## powers
 var charges := {"shuffle": 0, "line": 0, "bomb": 0, "vapor": 0}
@@ -1076,6 +1123,9 @@ func _start_mode(id: String) -> void:
         chip_mode.text = String(MODES[id]["name"])
         pace = 1                       # THE ONE-STEP LAW - forever 1
         frost = [0, 0, 0, 0, 0, 0, 0, 0]
+        ice_tier = [1, 1, 1, 1, 1, 1, 1, 1]
+        ice_melt_cols = {}
+        ice_drop_cols = {}
         fronts = []
         front_clock = 2.5
         front_gap = ICE_GAP0
@@ -1149,6 +1199,18 @@ func _first_tick_guard() -> bool:
         return phase == "play" and not over
 
 
+## v0.3.3-6 THE ROOT LAW (the owner: "when pressing back button or android
+## back button in optionals menu in matcher, first it closes optionals menu
+## then another tap shows that pause menu, this first makes matcher unable
+## to run because it removed the menu"): the boot optionals is the game's
+## HOME - the back button cannot pop it and strand a boardless game. In
+## play the optionals closes back into the live board like any sheet.
+func _back_pressed() -> void:
+        if pick_open and first_moment:
+                return
+        super._back_pressed()
+
+
 ## the gem spawn - mode-aware weights (the challenge drought twist bends one
 ## color rare; never to zero - a starved board is the OLD static machine)
 func _roll_color() -> int:
@@ -1169,16 +1231,55 @@ func _roll_color() -> int:
         return COLORS - 1
 
 
-func _new_cell(r: int, c: int, from_y := -1.0) -> Dictionary:
+func _new_cell(r: int, c: int, hold := 0.0, k := 0) -> Dictionary:
         var col := _roll_color()
         var n := Sprite2D.new()
         n.texture = tex_gem[col % tex_gem.size()]
         var target := _cell_pos(r, c)
-        n.position = Vector2(target.x, target.y if from_y < 0.0 else from_y)
+        # v0.3.3-6 THE CC SPAWN LAW (the owner: "the things drop from a
+        # hidden place in the top line where they appear from bottom to the
+        # up, got it? not just instant-spawning, they really drop one by
+        # one this way"): the gem is born BEHIND the top line, fades in
+        # RISING from the line's edge into its queue slot, then the physics
+        # fall takes it. The queue stacks (k lifts each slot higher) so a
+        # column's gems enter ONE BY ONE, never a pre-filled sky stack.
+        var spawn_y := board_o.y - cell_px * (0.62 + 0.38 * float(k))
+        n.position = Vector2(target.x, spawn_y + cell_px * 0.34)
+        n.modulate.a = 0.0
         n.scale = Vector2.ONE * cell_px / 100.0
         n.z_index = 2
         world.add_child(n)
+        var tw := n.create_tween()
+        tw.tween_interval(maxf(hold, 0.01))
+        tw.set_parallel(true)
+        tw.tween_property(n, "modulate:a", 1.0, 0.13)
+        tw.tween_property(n, "position:y", spawn_y, 0.13) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
         return {"color": col, "special": "", "wing": false, "node": n}
+
+
+## the coin's birth - the SAME spawn choreography as a gem (the owner: "it
+## comes there normally like a gem from there")
+func _new_coin_cell(r: int, c: int, hold := 0.0, k := 0) -> Dictionary:
+        var n := Sprite2D.new()
+        n.texture = _t("coin")
+        n.scale = Vector2.ONE * cell_px * 0.8 / 192.0
+        var target := _cell_pos(r, c)
+        var spawn_y := board_o.y - cell_px * (0.62 + 0.38 * float(k))
+        n.position = Vector2(target.x, spawn_y + cell_px * 0.34)
+        n.modulate.a = 0.0
+        n.z_index = 2
+        world.add_child(n)
+        var tw := n.create_tween()
+        tw.tween_interval(maxf(hold, 0.01))
+        tw.set_parallel(true)
+        tw.tween_property(n, "modulate:a", 1.0, 0.13)
+        tw.tween_property(n, "position:y", spawn_y, 0.13) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+        Jukebox.sfx("m_special", -10.0, 1.35)
+        _float_text(target + Vector2(0, -cell_px * 0.7), "GOGACOIN!",
+                        Color(1, 0.85, 0.3), 26)
+        return {"color": -1, "coin": true, "node": n}
 
 
 func _deal_board() -> void:
@@ -1203,19 +1304,28 @@ func _deal_board() -> void:
         if mode == "jelly":
                 _jelly_lay_level()            # the jelly eats its seats BEFORE
                                               # the gems pour in (gems only law)
-        # THE FALL-IN LAW (v0.3.3-p4, the owner: "i want the game to start
-        # with empty grid-gems then the gems drops down smoothly and fill
-        # the places, notice i said gems only"): the round opens on an EMPTY
-        # board and the gems pour in from above, column by column
-        for r in ROWS:
-                if _in_earth(r):
-                        continue
-                for c in COLS:
+        # THE REAL EMPTY START + THE CC SPAWN POUR (v0.3.3-6, the owner:
+        # "the current implementation of physical-grid-start-filling is
+        # wrong, you made the top half be pre-filled and the bottom-half
+        # empty and get filled, this break the physical-based because how
+        # there is gems hanging? + it should really start empty and get
+        # filled"): the board opens TRULY EMPTY - the gems are born one by
+        # one behind the top line (the bottom seat first inside a column,
+        # the columns sweep left to right) and free-fall into their seats.
+        # Nothing ever hangs over the board.
+        for c in COLS:
+                var k := 0
+                for r in range(ROWS - 1, -1, -1):
                         if _jelly_at(r, c) or _earth_at(r, c):
                                 continue
-                        var cell := _new_cell(r, c, board_o.y - cell_px * (1.4 + float(ROWS - r)))
+                        var hold := float(c) * 0.06 + float(k) * 0.085
+                        var cell := _new_cell(r, c, hold, k)
                         grid[r][c] = cell
-        # kill the dealt-in matches quietly (reroll the offending cells)
+                        _fall_to(cell["node"], _cell_pos(r, c).y, hold + 0.12)
+                        k += 1
+        # kill the dealt-in matches quietly (reroll the offending cells) -
+        # the model is complete the moment the pour is armed, so the reroll
+        # rides exactly like before, on cells still invisible behind the line
         var guard := 0
         while not _find_matches().is_empty() and guard < 200:
                 guard += 1
@@ -1227,15 +1337,6 @@ func _deal_board() -> void:
                                 cell["color"] = _roll_color()
                                 if is_instance_valid(cell.get("node")):
                                         cell["node"].texture = tex_gem[int(cell["color"]) % tex_gem.size()]
-        # the physical pour: column-staggered free falls, the bottom rows land
-        # first inside a column, the columns sweep left to right
-        for c in COLS:
-                for r in range(ROWS - 1, -1, -1):
-                        var cell: Dictionary = grid[r][c]
-                        if cell.is_empty() or not is_instance_valid(cell.get("node")):
-                                continue
-                        _fall_to(cell["node"], _cell_pos(r, c).y,
-                                        float(c) * 0.05 + float(ROWS - 1 - r) * 0.026)
         if mode == "ice":
                 frost = [0, 0, 0, 0, 0, 0, 0, 0]
                 fronts = []
@@ -1410,7 +1511,8 @@ func _find_matches() -> Array:
 
 
 ## any legal swap on the board? (the deadlock check - brute force, 8x8 is
-## nothing for a probe fuzz to churn)
+## nothing for a probe fuzz to churn). v0.3.3-6: gem<->coin swaps COUNT -
+## a match through a coin seat is a real move (the parcels never do).
 func _has_valid_move() -> bool:
         for r in ROWS:
                 for c in COLS:
@@ -1421,8 +1523,9 @@ func _has_valid_move() -> bool:
                                 var c2: int = c + d.y
                                 if not _playable(r2, c2) or grid[r2][c2].is_empty():
                                         continue
-                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]) \
-                                                or _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
+                                if _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
+                                        continue
+                                if _is_coin(grid[r][c]) and _is_coin(grid[r2][c2]):
                                         continue
                                 # hypercube swap is ALWAYS legal (it detonates on contact)
                                 if String(grid[r][c].get("special", "")) == "hyper" \
@@ -1432,28 +1535,6 @@ func _has_valid_move() -> bool:
                                 var ok := not _find_matches().is_empty()
                                 _swap_model(r, c, r2, c2)
                                 if ok:
-                                        return true
-        # v0.3.3-p5 THE HOP MOVES COUNT TOO: a match THROUGH a coin is a
-        # real move (the deadlock check may not call a shuffle over a
-        # board the coin hop can still save)
-        for r in ROWS:
-                for c in COLS:
-                        if not _playable(r, c) or grid[r][c].is_empty():
-                                continue
-                        for d in [Vector2i(0, 1), Vector2i(1, 0)]:
-                                var r2: int = r + d.x
-                                var c2: int = c + d.y
-                                if not _playable(r2, c2) or grid[r2][c2].is_empty():
-                                        continue
-                                if not _is_coin(grid[r2][c2]):
-                                        continue
-                                var hop := _hop_target(Vector2i(r, c), Vector2i(r2, c2))
-                                if hop == Vector2i(-9, -9):
-                                        continue
-                                _swap_model(r, c, hop.x, hop.y)
-                                var ok2 := not _find_matches().is_empty()
-                                _swap_model(r, c, hop.x, hop.y)
-                                if ok2:
                                         return true
         return false
 
@@ -1468,8 +1549,9 @@ func _find_a_move() -> Array:
                                 var c2: int = c + d.y
                                 if not _playable(r2, c2) or grid[r2][c2].is_empty():
                                         continue
-                                if _is_coin(grid[r][c]) or _is_coin(grid[r2][c2]) \
-                                                or _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
+                                if _is_item(grid[r][c]) or _is_item(grid[r2][c2]):
+                                        continue
+                                if _is_coin(grid[r][c]) and _is_coin(grid[r2][c2]):
                                         continue
                                 if String(grid[r][c].get("special", "")) == "hyper" \
                                                 or String(grid[r2][c2].get("special", "")) == "hyper":
@@ -1479,26 +1561,6 @@ func _find_a_move() -> Array:
                                 _swap_model(r, c, r2, c2)
                                 if ok:
                                         return [Vector2i(r, c), Vector2i(r2, c2)]
-        # the hop moves are hint-worthy too (the coin match-through)
-        for r in ROWS:
-                for c in COLS:
-                        if not _playable(r, c) or grid[r][c].is_empty():
-                                continue
-                        for d in [Vector2i(0, 1), Vector2i(1, 0)]:
-                                var r2: int = r + d.x
-                                var c2: int = c + d.y
-                                if not _playable(r2, c2) or grid[r2][c2].is_empty():
-                                        continue
-                                if not _is_coin(grid[r2][c2]):
-                                        continue
-                                var hop := _hop_target(Vector2i(r, c), Vector2i(r2, c2))
-                                if hop == Vector2i(-9, -9):
-                                        continue
-                                _swap_model(r, c, hop.x, hop.y)
-                                var ok2 := not _find_matches().is_empty()
-                                _swap_model(r, c, hop.x, hop.y)
-                                if ok2:
-                                        return [Vector2i(r, c), hop]
         return []
 
 
@@ -1534,36 +1596,11 @@ func _tap(p: Vector2) -> void:
                 return
         if mode == "mine" and _earth_at(cellp.x, cellp.y):
                 return
-        # v0.3.3-p5 THE COIN COURTESY (the owner: "gogacoins can not be
-        # tapped ... fix that, it should accept this"): a tap ON the coin
-        # collects it - with a gem in hand, the gem HOPS THROUGH to the
-        # cell beyond (the match-through law)
-        if cellp.x >= 0 and not grid[cellp.x][cellp.y].is_empty() \
-                        and _is_coin(grid[cellp.x][cellp.y]):
-                if sel.x >= 0 and _hop_target(sel, cellp) != Vector2i(-9, -9):
-                        var a := sel
-                        sel = Vector2i(-1, -1)
-                        _paint_selection()
-                        _try_swap(a, _hop_target(a, cellp))
-                        return
-                _collect_coin_at(cellp)
-                return
+        # v0.3.3-6 THE COIN IS A REAL PIECE: a tap on the coin just SELECTS
+        # it (the tap-to-collect is dead - the owner: "i never said let them
+        # be tap-to-collect at all") - the swap with a neighbor gem is the
+        # only thing a coin answers to
         _select(cellp)
-
-
-## the hop law: dragging from a toward a coin, the gem rides THROUGH to the
-## cell beyond the coin (same direction) if that seat holds a swap-able gem
-func _hop_target(a: Vector2i, coin: Vector2i) -> Vector2i:
-        var d := coin - a
-        if absi(d.x) + absi(d.y) != 1:
-                return Vector2i(-9, -9)     # only a step lands on the coin
-        var beyond := coin + d
-        if not _playable(beyond.x, beyond.y) or grid[beyond.x][beyond.y].is_empty():
-                return Vector2i(-9, -9)
-        var cb: Dictionary = grid[beyond.x][beyond.y]
-        if _is_coin(cb) or _is_item(cb):
-                return Vector2i(-9, -9)
-        return beyond
 
 
 func _drag(from: Vector2, to: Vector2) -> void:
@@ -1585,15 +1622,10 @@ func _drag(from: Vector2, to: Vector2) -> void:
         else:
                 dir = Vector2i(1 if d.y > 0 else -1, 0)
         var b := a + dir
-        # v0.3.3-p5 THE MATCH-THROUGH LAW (the owner: "i want to move red
-        # gem through it to do a match and go down"): a drag INTO a coin
-        # carries the gem THROUGH it - the hop lands on the cell beyond
-        if b.x >= 0 and b.y >= 0 and b.x < ROWS and b.y < COLS \
-                        and not grid[b.x][b.y].is_empty() \
-                        and _is_coin(grid[b.x][b.y]):
-                var hop := _hop_target(a, b)
-                if hop != Vector2i(-9, -9):
-                        b = hop
+        # v0.3.3-6 THE COIN SWAP LAW: a drag INTO the coin is a plain swap
+        # with it (the patch-5 "hop over the coin" is dead - the owner: "the
+        # swap ignores the coin and do shit1 to shit2 ignoring the ball,
+        # this is what i meant by matchable, you messed up")
         if not _playable(b.x, b.y):
                 return
         sel = Vector2i(-1, -1)
@@ -1645,7 +1677,12 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
         var cb: Dictionary = grid[b.x][b.y]
         if ca.is_empty() or cb.is_empty():
                 return
-        if _is_coin(ca) or _is_coin(cb) or _is_item(ca) or _is_item(cb):
+        # v0.3.3-6 THE COIN SWAP LAW: a gem and the coin ARE swappable (the
+        # coin moves like any piece and the gem's new seat may match - the
+        # owner's exact case). The PARCELS stay un-swappable (the owner:
+        # "that's correct for these items, not for gogacoins"), and a
+        # coin-coin swap is pointless (it can never match).
+        if _is_item(ca) or _is_item(cb) or (_is_coin(ca) and _is_coin(cb)):
                 Jukebox.sfx("error", -12.0)
                 _bump(a)
                 _bump(b)
@@ -1754,42 +1791,93 @@ func _birth_kinds(groups: Array, swap_a: Vector2i, swap_b: Vector2i) -> Array:
         return born
 
 
-func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> void:
+func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
+                initial_pop := {}) -> void:
+        # v0.3.3-6 THE ONE RESOLVE LAW: the swap path and the power path are
+        # THE SAME LOOP now (the owner: "i bet this game core physics and
+        # animating and core logic needs remake because no way every fix
+        # keeps a hidden bug/gap behind it"). The old split left the power
+        # path scanning matches BEFORE gravity and never after - the refill's
+        # fresh matches sat unresolved on the board (the owner's "used the
+        # bomb powerup then saw a match that should happen, the gems did not
+        # match" + "vapor: once i matched one match, all other matches got
+        # matched" were this one gap). Now: pop -> gravity -> re-scan, every
+        # wave rebuilds the detonation chain, whatever started it.
         cascade = 0
+        var power_wave := not initial_pop.is_empty()
         while true:
                 if over:
                         return
-                var groups := _find_matches()
-                if groups.is_empty():
-                        break
-                cascade += 1
-                # 1 - the specials this wave births (the swap cell wins the crown)
-                var born := _birth_kinds(groups, swap_a, swap_b)   # [{r, c, kind, color}]
-                if mode == "ice":
-                        # v0.3.3-p4 THE VERTICAL-ONLY MELT: the wave's vertical
-                        # groups mark their columns - a HORIZONTAL match never
-                        # touches the ice (the owner's correction)
-                        for g in groups:
-                                if String(g["dir"]) != "v":
-                                        continue
-                                for key in (g["cells"] as Dictionary).keys():
-                                        ice_melt_cols[int(key) % COLS] = true
+                var groups := []
                 var pop := {}
-                for g in groups:
-                        for key in g["cells"]:
-                                pop[key] = true
-                for b in born:
-                        pop.erase(int(b["r"]) * COLS + int(b["c"]))   # keys are r*COLS+c
-                # 2 - the detonation queue: specials caught INSIDE a match explode
+                var born := []
+                var is_power_wave := power_wave
+                if power_wave:
+                        # THE POWER WAVE: the tapped blast is the first pop
+                        power_wave = false
+                        cascade += 1
+                        pop = initial_pop.duplicate()
+                else:
+                        groups = _find_matches()
+                        if groups.is_empty():
+                                break
+                        cascade += 1
+                        # 1 - the specials this wave births (the swap cell
+                        # wins the crown)
+                        born = _birth_kinds(groups, swap_a, swap_b)
+                        for b in born:
+                                # THE NEWBORN SHIELD (the owner: "the
+                                # new-born special should be invincible to any
+                                # damage and survives one hit so it get
+                                # there"): born this wave = untouchable by
+                                # every blast in the wave; afterwards ONE hit
+                                # is absorbed by the shield
+                                var bcell: Dictionary = grid[int(b["r"])][int(b["c"])]
+                                if not bcell.is_empty() and not _is_coin(bcell) \
+                                                and not _is_item(bcell):
+                                        bcell["shield"] = 1
+                                        bcell["born_wave"] = true
+                        if mode == "ice":
+                                # v0.3.3-6 THE ICE LAWS: the wave's VERTICAL
+                                # groups melt their whole column; the
+                                # HORIZONTAL groups touching the ice line
+                                # (a gem inside the ice or resting on its
+                                # line) DROP that column's ice by 3 grids
+                                for g in groups:
+                                        for key in (g["cells"] as Dictionary).keys():
+                                                var mr := int(key) / COLS
+                                                var mc := int(key) % COLS
+                                                var lvl := int(frost[mc])
+                                                if lvl <= 0:
+                                                        continue
+                                                var top_row: int = ROWS - lvl
+                                                if String(g["dir"]) == "v":
+                                                        ice_melt_cols[mc] = true
+                                                elif mr >= top_row \
+                                                                or mr == top_row - 1:
+                                                        ice_drop_cols[mc] = 3
+                        for g in groups:
+                                for key in g["cells"]:
+                                        pop[key] = true
+                        for b in born:
+                                pop.erase(int(b["r"]) * COLS + int(b["c"]))
+                        swap_a = Vector2i(-1, -1)
+                        swap_b = Vector2i(-1, -1)
+                # 2 - the detonation queue: specials caught INSIDE the wave
+                # execute (the owner: "the color remover and vapor should
+                # execute a special when they remove it") - executing clears
+                # the shield, the special is USED, not eaten
                 var queue := []
                 var blast_union := {}
                 _stagger_hint = {}
                 for key in pop.keys():
                         var r := int(key) / COLS
                         var c := int(key) % COLS
-                        var sp := String(grid[r][c].get("special", ""))
-                        if sp != "":
-                                queue.append({"r": r, "c": c, "kind": sp})
+                        if _playable(r, c) and not grid[r][c].is_empty():
+                                var sp := String(grid[r][c].get("special", ""))
+                                if sp != "":
+                                        grid[r][c]["shield"] = 0
+                                        queue.append({"r": r, "c": c, "kind": sp})
                 # 3 - detonate (chain: blasts can ignite more specials)
                 var detonated := {}
                 while not queue.is_empty():
@@ -1802,24 +1890,39 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                         var extra := _blast_cells(String(it["kind"]), int(it["r"]), int(it["c"]))
                         for key in extra:
                                 blast_union[key] = true
-                                if not pop.has(key):
-                                        pop[key] = true
-                                        var r := int(key) / COLS
-                                        var c := int(key) % COLS
-                                        if _playable(r, c) and not grid[r][c].is_empty():
-                                                var sp2 := String(grid[r][c].get("special", ""))
-                                                if sp2 != "" and not detonated.has(key):
-                                                        queue.append({"r": r, "c": c, "kind": sp2})
+                                if pop.has(key):
+                                        continue
+                                var rr := int(key) / COLS
+                                var cc := int(key) % COLS
+                                if not _playable(rr, cc) or grid[rr][cc].is_empty():
+                                        continue
+                                var cd: Dictionary = grid[rr][cc]
+                                # THE NEWBORN SHIELD: a shielded special is
+                                # nobody's collateral - the hit is absorbed
+                                if int(cd.get("shield", 0)) > 0:
+                                        cd["shield"] = int(cd["shield"]) - 1
+                                        _shield_flash(rr, cc)
+                                        continue
+                                if bool(cd.get("born_wave", false)):
+                                        continue
+                                pop[key] = true
+                                var sp2 := String(cd.get("special", ""))
+                                if sp2 != "" and not detonated.has(key):
+                                        cd["shield"] = 0
+                                        queue.append({"r": rr, "c": cc, "kind": sp2})
                 # 4 - pop the wave (fx, score, mode counters) - the blasts
                 # sweep and bomb with STAGED pops (the owner's missing effects)
                 _icr_mark_stone(blast_union)
-                await _pop_cells(pop, born, _stagger_hint.duplicate(), blast_union)
+                var stag: Dictionary = _power_stagger(pop) if is_power_wave \
+                                else _stagger_hint.duplicate()
+                await _pop_cells(pop, born, stag, blast_union)
+                if is_power_wave:
+                        _wave_bottomup = false      # the vapor's climb rode
+                                                    # its one wave already
                 # 5 - the combo praise
                 if cascade >= 2 and mode != "peace":
                         _combo_banner(cascade)
-                swap_a = Vector2i(-1, -1)
-                swap_b = Vector2i(-1, -1)
-                # 6 - gravity + refill + settle
+                # 6 - gravity + refill + settle, THEN the re-scan
                 await _gravity()
         # quiet board: the after-care
         _collect_bottom_coins()
@@ -1830,6 +1933,34 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1)) -> vo
                 await _shuffle_board(true)
         idle_clock = 0.0
         _paint_selection()
+
+
+## the power wave's stagger: from the tapped origin outward, or the vapor's
+## bottom-to-up climb (only the FIRST pop of a power rides this)
+func _power_stagger(pop: Dictionary) -> Dictionary:
+        var stag := {}
+        for key in pop.keys():
+                var r := int(key) / COLS
+                var c := int(key) % COLS
+                if _wave_bottomup:
+                        stag[key] = float(ROWS - 1 - r) * REMOVER_ROW_T \
+                                        + float(c) * REMOVER_CELL_T
+                else:
+                        stag[key] = Vector2(_wave_o.x - r, _wave_o.y - c).length() * BOMB_RING_T
+        return stag
+
+
+## the newborn shield flash: the special TANKED a hit and stays
+func _shield_flash(r: int, c: int) -> void:
+        if not _playable(r, c) or grid[r][c].is_empty():
+                return
+        var n: Sprite2D = grid[r][c].get("node")
+        if is_instance_valid(n):
+                var tw := n.create_tween()
+                tw.tween_property(n, "modulate", Color(1.8, 1.8, 0.6), 0.08)
+                tw.tween_property(n, "modulate", Color.WHITE, 0.24)
+        _ring_fx(_cell_pos(r, c), Color(1.0, 0.95, 0.5))
+        Jukebox.sfx("m_rockhit", -8.0, 1.3)
 
 
 ## the stagger hints the blasts leave for _pop_cells (the sweeper sweeps
@@ -1874,6 +2005,17 @@ func _blast_cells(kind: String, r: int, c: int) -> Array:
                         # THE SWEEP SPREADS FROM THE BIRTH CELL both ways
                         sweeps.append({"axis": "h", "idx": r, "from_i": c, "t": 0.0,
                                         "max": SWEEP_T, "col": Color(0.55, 0.95, 1.0)})
+                        # v0.3.3-6 THE HORIZONTAL ICE LAW: the row sweeper is
+                        # a horizontal destruction - where it touches the ice
+                        # line it DROPS the ice 3 grids like a horizontal match
+                        if mode == "ice":
+                                for cc2 in COLS:
+                                        var lvlh := int(frost[cc2])
+                                        if lvlh <= 0:
+                                                continue
+                                        var toph: int = ROWS - lvlh
+                                        if r >= toph or r == toph - 1:
+                                                ice_drop_cols[cc2] = 3
                         Jukebox.sfx("m_sweep", -4.0, randf_range(0.95, 1.1))
                         _float_text(_cell_pos(r, c), "ROW SWEEP!",
                                         Color(0.55, 0.95, 1.0), 30)
@@ -1937,6 +2079,16 @@ func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -
                 # the coin and the parcels are NEVER destroyed by pops
                 if _is_coin(cell) or _is_item(cell):
                         continue
+                # THE NEWBORN SHIELD (v0.3.3-6): a shielded special tanks ONE
+                # hit and stays - the owner: "the logic currently executes the
+                # existing special and makes it destroy the match special ...
+                # it eats the new special". Never again.
+                if int(cell.get("shield", 0)) > 0:
+                        cell["shield"] = int(cell["shield"]) - 1
+                        _shield_flash(r, c)
+                        continue
+                if bool(cell.get("born_wave", false)):
+                        continue
                 count += 1
                 move_pops += 1
                 var col := int(cell["color"])
@@ -1982,9 +2134,11 @@ func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -
                 Jukebox.sfx("m_pop_candy", -8.0, 0.94 + 0.055 * mini(cascade, 6) \
                                 + randf_range(-0.015, 0.015))
                 # the ice law v4: ONLY the wave's vertical groups (or a
-                # full-column blast) melt the ice - horizontal never does
+                # full-column blast) melt the ice - and v0.3.3-6: the
+                # horizontal law DROPS the ice 3 grids where it touches
                 if mode == "ice":
                         _ice_melt_wave()
+                        _ice_drop_wave()
                 # the mine law: the wave drills the matched columns downward
                 if mode == "mine":
                         _mine_dig(pop, blast_keys)
@@ -1997,6 +2151,8 @@ func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -
                 if cell.is_empty() or _is_coin(cell) or _is_item(cell):
                         continue
                 cell["special"] = String(b["kind"])
+                cell.erase("born_wave")     # the birth wave is over - the
+                                            # shield (1 hit) carries on
                 _dress_special(int(b["r"]), int(b["c"]))
                 Jukebox.sfx("m_special", -6.0, 1.0 + 0.05 * born.find(b))
                 # the gem wears it with a little arrival pop
@@ -2127,7 +2283,12 @@ func _combo_banner(n: int) -> void:
         var words := ["", "", "SWEET!", "SUPER!", "EXQUISITE!", "SPECTACULAR!", "UNREAL!"]
         var w: String = words[mini(n, words.size() - 1)]
         var vp := get_viewport_rect().size
-        _float_text(Vector2(vp.x / 2.0, board_o.y - 60.0), w, Color(1, 0.85, 0.35), 40 + 4 * n)
+        # v0.3.3-6: the praise size is capped so even UNREAL! fits the
+        # screen (the owner: "i saw earlier the word unreal with huge text
+        # only UNRE appeared while AL out of resolution") - and _draw
+        # centers every floater on its anchor now
+        _float_text(Vector2(vp.x / 2.0, board_o.y - 60.0), w, Color(1, 0.85, 0.35),
+                        mini(40 + 4 * n, 56))
         # v0.3.3-p2: the pentatonic marimba ladder (the owner: "the combo SFXs
         # are the most weirdest ones")
         var step := clampi(n, 2, 7)
@@ -2186,14 +2347,10 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
         Jukebox.sfx("m_hyper", -3.0)
         # THE ONE-BY-ONE BOTTOM-UP WIPE (the owner, v0.3.3-p4: "the color
         # remover should take one by one in a smooth way from bottom to up
-        # as i said"): every doomed gem climbs the wave row by row with a
-        # small per-cell ripple, each wearing the shimmer
-        var delay_map := {}
+        # as i said"): every doomed gem wears the shimmer before its wave
         for key in pop.keys():
                 var r := int(key) / COLS
                 var c := int(key) % COLS
-                delay_map[key] = float(ROWS - 1 - r) * REMOVER_ROW_T \
-                                + float(c) * REMOVER_CELL_T
                 var wn: Sprite2D = grid[r][c].get("node")
                 if is_instance_valid(wn):
                         var vt := wn.create_tween()
@@ -2213,23 +2370,16 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
                 var r := int(key) / COLS
                 var c := int(key) % COLS
                 zaps.append({"a": hp, "b": _cell_pos(r, c), "life": 0.3, "max": 0.3})
-        await _pop_cells(pop, [], delay_map)
-        await _gravity()
-        while true:
-                if over:
-                        break
-                var groups := _find_matches()
-                if groups.is_empty():
-                        break
-                cascade += 1
-                var pop2 := {}
-                for g in groups:
-                        for key in g["cells"]:
-                                pop2[key] = true
-                await _pop_cells(pop2, [])
-                if cascade >= 2:
-                        _combo_banner(cascade)
-                await _gravity()
+        # v0.3.3-6 THE ONE RESOLVE LAW: the nova rides the UNIFIED loop - its
+        # cascades detonate caught specials and birth new ones like every
+        # other wave (the old private loop never re-scanned after gravity
+        # and never chained). The hypers themselves are consumed as plain
+        # gems - their job is done, the queue must not re-zap a random color
+        _wave_bottomup = true      # the wipe climbs bottom-to-up
+        grid[hyper_at.x][hyper_at.y]["special"] = ""
+        if both:
+                grid[other_at.x][other_at.y]["special"] = ""
+        await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), pop)
         await _after_move()
         busy = false
 
@@ -2405,23 +2555,35 @@ func _gravity() -> void:
                                         write -= 1
                                 # refill only when this segment touches the sky
                                 if seg_top < 0:
+                                        var k := 0
                                         for rr in range(write, seg_top, -1):
                                                 if not grid[rr][c].is_empty():
                                                         continue
-                                                var fresh := _new_cell(rr, c, board_o.y - cell_px * 1.2)
+                                                # v0.3.3-6 THE COIN QUEUE LAW: the
+                                                # waiting coin rides the refill in
+                                                # from the top like a gem (the
+                                                # owner: "it comes there normally
+                                                # like a gem from there")
+                                                var fresh: Dictionary
+                                                if coin_queued and c == coin_col and k == 0:
+                                                        fresh = _new_coin_cell(rr, c,
+                                                                        float(k) * 0.085, k)
+                                                        coin_queued = false
+                                                        coin_cell = Vector2i(rr, c)
+                                                else:
+                                                        fresh = _new_cell(rr, c,
+                                                                        float(k) * 0.085, k)
                                                 grid[rr][c] = fresh
                                                 movers.append({"node": fresh["node"],
                                                                 "ty": _cell_pos(rr, c).y,
-                                                                "hold": randf_range(0.0, 0.06)})
+                                                                "hold": float(k) * 0.085 + 0.12})
+                                                k += 1
                                 r = seg_top
-                # v0.3.3-p5 THE FALL-AROUND LAW (the owner's candy-crush
-                # school: "the line next to the jelly line, in the empty
-                # grids, it will make the gems fell to that side in an
-                # accurate way then that side will get filled from top
-                # again"): gems resting on a jelly plug SLIDE diagonally
-                # around it into the open seats beside, keep falling, and
-                # both sides refill from the top
-                if mode == "jelly" and _jelly_slide_around(diag):
+                # v0.3.3-6 THE PHYSICAL GRID-FILLING (the candy-crush school):
+                # the slide laws run in EVERY mode - the internal checks gate
+                # them by the solids each mode owns (jelly plugs, standing
+                # dirt). Runs until quiet: settle -> slide -> settle.
+                if _jelly_slide_around(diag):
                         moved = true
                 if not moved:
                         break
@@ -2443,24 +2605,65 @@ func _gravity() -> void:
         await get_tree().create_timer(0.04, false).timeout
 
 
-## the diagonal escape: one pass of slide-around moves (the caller loops
-## until quiet). A gem slides when it cannot fall straight (the seat below
-## is a plug) and a diagonal seat beside the plug is open - cutting the
-## corner through a solid is forbidden.
+## v0.3.3-6 THE PHYSICAL GRID-FILLING, the real candy-crush school (the
+## owner: "i have tested the physical-based grid-filling in jelly mode and
+## it does not work like if you never did it btw"): TWO slide laws, both
+## corner-cut-safe, running until the board is quiet -
+##  LAW 1 - THE POCKET PULL: an empty seat whose ABOVE is a solid (a jelly
+##    plug, standing dirt) can NEVER refill from the sky - a gem slides
+##    diagonally down into it from the side, and the side it left refills
+##    from the top. (The patch-5 build only slid gems whose OWN below was
+##    the plug - with the jelly anchored to the bottom rows that condition
+##    is practically unreachable, which is exactly why the owner never saw
+##    the mechanic fire.)
+##  LAW 2 - THE PERCH SLIDE: a gem resting ON a plug with an open seat
+##    beside-below slides around the plug's edge.
+## The parcels never slide on their own (they ride the delivery law).
 func _jelly_slide_around(diag: Array) -> bool:
         var moved := false
+        # LAW 1 - the pocket pull
+        for r in range(1, ROWS):
+                for c in COLS:
+                        if not _playable(r, c) or not grid[r][c].is_empty():
+                                continue
+                        if not _jelly_at(r - 1, c) and not _earth_at(r - 1, c):
+                                continue        # the sky reaches this seat
+                        var dirs := [1, -1] if randf() < 0.5 else [-1, 1]
+                        for dc in dirs:
+                                var sc: int = c + dc
+                                if sc < 0 or sc >= COLS:
+                                        continue
+                                # the source sits diagonally ABOVE the pocket
+                                if _jelly_at(r - 1, sc) or _earth_at(r - 1, sc):
+                                        continue
+                                # no corner cut: the seat beside the pocket
+                                # must be open for the gem to squeeze through
+                                if _jelly_at(r, sc) or _earth_at(r, sc):
+                                        continue
+                                if grid[r - 1][sc].is_empty():
+                                        continue
+                                var cell: Dictionary = grid[r - 1][sc]
+                                if _is_item(cell) or _is_coin(cell):
+                                        continue
+                                grid[r][c] = cell
+                                grid[r - 1][sc] = {}
+                                diag.append({"node": cell["node"],
+                                                "to": _cell_pos(r, c)})
+                                moved = true
+                                break
+        # LAW 2 - the perch slide
         for r in range(ROWS - 2, -1, -1):
                 for c in COLS:
                         if _jelly_at(r, c) or _earth_at(r, c):
                                 continue
                         var cell: Dictionary = grid[r][c]
-                        if cell.is_empty():
+                        if cell.is_empty() or _is_item(cell) or _is_coin(cell):
                                 continue
                         var below := r + 1
-                        if not _jelly_at(below, c):
+                        if not _jelly_at(below, c) and not _earth_at(below, c):
                                 continue        # only a PLUG spawns a slide
-                        var dirs := [1, -1] if randf() < 0.5 else [-1, 1]
-                        for dc in dirs:
+                        var dirs2 := [1, -1] if randf() < 0.5 else [-1, 1]
+                        for dc in dirs2:
                                 var nc: int = c + dc
                                 if nc < 0 or nc >= COLS:
                                         continue
@@ -2480,48 +2683,17 @@ func _jelly_slide_around(diag: Array) -> bool:
 
 
 # ================================================================ the coin
-## THE COIN LAW (the owner): every 30s AFTER the last coin was COLLECTED,
-## a GOGACoin materializes in a real cell (it never matches, it never
-## breaks). Clear under it and it falls like everything else; when it lands
-## in the bottom row it drops out of the board and is earned.
-func _spawn_coin() -> void:
-        var candidates := []
-        for r in ROWS - 1:
-                for c in COLS:
-                        if not _playable(r, c) or grid[r][c].is_empty():
-                                continue
-                        var cell: Dictionary = grid[r][c]
-                        if _is_coin(cell) or String(cell.get("special", "")) == "hyper":
-                                continue
-                        candidates.append(Vector2i(r, c))
-        if candidates.is_empty():
-                return
-        var at: Vector2i = candidates[randi() % candidates.size()]
-        var cell: Dictionary = grid[at.x][at.y]
-        # the gem that lived here poofs away (a real seat changes hands)
-        if is_instance_valid(cell.get("node")):
-                var old_n: Sprite2D = cell["node"]
-                var tw0 := old_n.create_tween()
-                tw0.set_parallel(true)
-                tw0.tween_property(old_n, "scale", Vector2.ONE * 0.02, 0.12)
-                tw0.tween_property(old_n, "modulate:a", 0.0, 0.12)
-                tw0.chain().tween_callback(old_n.queue_free)
-        # the coin DROPS IN from above the board - a normal falling thing
-        var n := Sprite2D.new()
-        n.texture = _t("coin")
-        n.scale = Vector2.ONE * cell_px * 0.8 / 192.0
-        var target := _cell_pos(at.x, at.y)
-        n.position = Vector2(target.x, board_o.y - cell_px * 0.8)
-        n.z_index = 3
-        world.add_child(n)
-        var tw := n.create_tween()
-        tw.tween_property(n, "position", target, 0.32) \
-                        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-        grid[at.x][at.y] = {"color": -1, "coin": true, "node": n}
-        coin_cell = at
-        coin_clock = -1.0        # ticking stops while a coin lives on the board
-        Jukebox.sfx("m_special", -10.0, 1.35)
-        _float_text(Vector2(target.x, target.y - cell_px * 0.7), "GOGACOIN!", Color(1, 0.85, 0.3), 26)
+## THE COIN LAW v0.3.3-6 (the owner's report): "i never said let them be
+## tap-to-collect at all" - the tap-collect is DEAD. "the logic of the
+## gogacoin appears and takes a random place is wrong, it should wait in
+## queue, once a match happened and a new gems should drop, it comes there
+## normally like a gem from there" - the coin is QUEUED when the 30s clock
+## (running from the last COLLECTED) burns out, and the next refill wave
+## drops it in from behind the top line like any gem. It never matches,
+## it never breaks, it falls like everything else, and reaching the bottom
+## row earns it. AND the coin is a real swap partner: a gem can swap WITH
+## it so a match forms around it (the owner's [gem][coin][gem][gem] case -
+## swap the left gem with the coin and the three gems line up).
 
 
 func _collect_bottom_coins() -> void:
@@ -2697,13 +2869,14 @@ func _tick_idle(delta: float) -> void:
 
 
 func _tick_coin(delta: float) -> void:
-        if coin_cell.x >= 0 or busy:
+        if coin_cell.x >= 0 or coin_queued or busy:
                 return
         coin_clock -= delta
         if coin_clock <= 0.0:
-                _spawn_coin()
-                if coin_cell.x < 0:
-                        coin_clock = 2.0    # no seat right now - try again soon
+                # THE QUEUE LAW: no random materialization - the coin waits
+                # for the next match's refill and enters the board like a gem
+                coin_queued = true
+                coin_col = randi() % COLS
 
 
 ## v0.3.3-p3 THE AFTER-MOVE LAW: everything that answers a COMPLETED move
@@ -2773,14 +2946,12 @@ func _mode_aftercare() -> void:
                         _icr_win_lose()
                 "drop":
                         await _drop_settle()
-                        # a power blast that carried a parcel down CALMS it
-                        # (the risky climb counts real MOVES only)
-                        if grid.size() >= ROWS:
-                                for r in ROWS:
-                                        for c in COLS:
-                                                var cell: Dictionary = grid[r][c]
-                                                if not cell.is_empty() and _is_item(cell):
-                                                        cell["rose"] = 0
+                        # v0.3.3-6: the rose flags are _drop_rise_check's OWN
+                        # business now (it clears them on a real descent). The
+                        # old unconditional wipe here reset the counter after
+                        # EVERY wave - the two-climbs game-over could never
+                        # fire (the owner: "the item that been up for two
+                        # moves, it does not goes out and end the game?")
 
 
 ## the parcel rows at the move's start (the risky-climb comparison)
@@ -2865,7 +3036,11 @@ func _drop_rise_check() -> void:
         await get_tree().create_timer(0.22, false).timeout
 
 
+var ch_sweeping := false
+
 func _tick_challenge(delta: float) -> void:
+        if ch_sweeping:
+                return          # the loss theatre owns the board (sweep + pour)
         round_clock -= delta
         rush_left = maxf(0.0, rush_left - delta)
         round_bank = score - round_start
@@ -2877,18 +3052,65 @@ func _tick_challenge(delta: float) -> void:
                 ch_lives -= 1
                 set_score(maxi(0, score - 500))
                 Jukebox.sfx("m_lifelost", -4.0)
+                # v0.3.3-6: the transition flag covers the WHOLE theatre -
+                # the sweep AND the next round's pour (a tick racing the
+                # pour fired a second fail on a half-built grid)
+                ch_sweeping = true
                 if ch_lives <= 0:
                         _banner("OUT OF LIVES  -500", false)
+                        await _challenge_clear_sweep()
+                        ch_sweeping = false
                         _finish_run("out of lives - %d wins / %d losses" % [ch_wins, ch_losses])
                         return
                 _banner("ROUND LOST  -500  (%d LIVES LEFT)" % ch_lives, false)
-                _next_challenge_round()
+                # v0.3.3-6 THE LOSS THEATRE (the owner: "make losing more
+                # rich, like animation of clearing the grid from bottom to
+                # top line by line then re-fill it, this will make the game
+                # looks more cool"): the grid clears bottom-to-top line by
+                # line, then the next round's pour re-fills it
+                await _challenge_clear_sweep()
+                await _next_challenge_round()
+                ch_sweeping = false
         elif round_bank >= round_goal:
                 ch_wins += 1
                 Jukebox.sfx("m_win_fanfare", -4.0)
                 Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 34)
                 _banner("ROUND %d CLEAR!  (%d W / %d L)" % [round_no, ch_wins, ch_losses], true)
-                _next_challenge_round()
+                ch_sweeping = true
+                await _next_challenge_round()
+                ch_sweeping = false
+
+
+## THE LOSS THEATRE: the grid clears from the BOTTOM ROW to the top, one
+## line at a time (a pink sweep rides each row), no score - then the
+## caller's round roll pours the fresh board in (the CC spawn law)
+func _challenge_clear_sweep() -> void:
+        busy = true
+        for r in range(ROWS - 1, -1, -1):
+                if grid.size() <= r or grid[r].size() < COLS:
+                        # a half-built grid can only mean a teardown raced a
+                        # round transition - the sweep bows out, nothing pops
+                        push_warning("[matcher] loss sweep bowed out (grid %dx)" % grid.size())
+                        break
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if cell.is_empty() or _is_coin(cell) or _is_item(cell):
+                                continue
+                        _gem_pop_fx(_cell_pos(r, c), int(cell.get("color", 0)))
+                        if is_instance_valid(cell.get("node")):
+                                var n: Sprite2D = cell["node"]
+                                var tw := n.create_tween()
+                                tw.set_parallel(true)
+                                tw.tween_property(n, "scale", Vector2.ONE * 0.02, 0.11) \
+                                                .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+                                tw.tween_property(n, "modulate:a", 0.0, 0.11)
+                                tw.chain().tween_callback(n.queue_free)
+                        grid[r][c] = {}
+                wipes.append({"row": r, "t": 0.0, "max": 0.26,
+                                "col": Color(1.0, 0.55, 0.8), "delay": 0.0})
+                Jukebox.sfx("m_pop_candy", -11.0, 0.8 + 0.045 * float(ROWS - 1 - r))
+                await get_tree().create_timer(0.075, false).timeout
+        await get_tree().create_timer(0.12, false).timeout
 
 
 ## the pre-solve (the owner: "calculate the matches and the grid before even
@@ -2937,7 +3159,7 @@ func _next_challenge_round() -> void:
         round_no += 1
         _deal_board()
         _roll_round()
-        _deal_settle()
+        await _deal_settle()
         _refresh_hud()
 
 
@@ -3324,6 +3546,10 @@ func _jelly_frontier_cell(k: int, seen: Dictionary) -> Array:
                 if seen.has(nk):
                         continue
                 seen[nk] = true
+                # v0.3.3-6: the jelly never swallows the coin or a parcel
+                if not grid[nr][nc].is_empty() \
+                                and (_is_coin(grid[nr][nc]) or _is_item(grid[nr][nc])):
+                        continue
                 out.append(nk)
         return out
 
@@ -3889,13 +4115,31 @@ func _tick_ice(delta: float) -> void:
         for f in fronts:
                 var col := int(f["col"])
                 f["f"] = float(f["f"]) + float(f["speed"]) * delta
-                while float(f["f"]) >= 1.0:
+                while float(f["f"]) >= 1.0 and not over:
                         f["f"] = float(f["f"]) - 1.0
                         frost[col] = mini(ROWS, int(frost[col]) + 1)
                         _ice_segment_fx(col, int(frost[col]))
                         if int(frost[col]) >= ROWS:
-                                _ice_freeze_over()
-                                return
+                                if int(ice_tier[col]) <= 1:
+                                        # v0.3.3-6 THE SECOND LAYER (the owner:
+                                        # "when it reaches the top, there should
+                                        # be another layer of ice appear and
+                                        # takes slower to reach up, that one
+                                        # once goes up it ends the game, you
+                                        # completely forgot about the second
+                                        # layer"): tier 1 topping out summons
+                                        # the SLOWER second layer - tier 2
+                                        # topping out is the run's end
+                                        ice_tier[col] = 2
+                                        frost[col] = 0
+                                        f["f"] = 0.0
+                                        f["speed"] = float(f["speed"]) * 0.55
+                                        Jukebox.sfx("m_gong", -8.0, 0.8)
+                                        _banner("THE SECOND LAYER RISES - SLOWER BUT DEADLY!", false)
+                                        _refresh_ice()
+                                else:
+                                        _ice_freeze_over()
+                                        return
         _refresh_ice()
         melt_chain = maxf(0.0, melt_chain - delta)
         if melt_chain <= 0.0:
@@ -3954,7 +4198,51 @@ func _ice_freeze_over() -> void:
 ## while horizontal must never clear a line, vertical is the one that clears
 ## it"). Built in _resolve_loop from the wave's real groups; blasts mark
 ## their columns too (a full-column arm counts as vertical).
+## v0.3.3-6: the HORIZONTAL law joins - a horizontal match (or a row
+## sweeper) whose gem touches the ice line DROPS that column's ice by 3
+## grids (the owner: "doing horizontal match that touches the iced line
+## with one gem it should drops ice by three grids, currently it does
+## nothing")
 var ice_melt_cols := {}
+var ice_drop_cols := {}
+var ice_tier := [1, 1, 1, 1, 1, 1, 1, 1]   # the second-layer law per column
+
+## the horizontal drop: the frontier recedes 3 grids (the blocks slide down
+## and fade, top first) - the wave's horizontal law, built in _resolve_loop
+func _ice_drop_wave() -> void:
+        for c in ice_drop_cols.keys():
+                var ci := int(c)
+                var lvl := int(frost[ci])
+                if lvl <= 0:
+                        continue
+                var took := mini(3, lvl)
+                frost[ci] = lvl - took
+                add_score(2 * took)
+                Jukebox.sfx("m_melt", -6.0, 1.15)
+                melt_chain = 3.0
+                # the drop theatre: the TOP three blocks slide down and fade
+                for d in range(lvl - took, lvl):
+                        var r: int = ROWS - 1 - d
+                        if r < 0:
+                                continue
+                        _ring_fx(_cell_pos(r, ci), Color(0.75, 0.9, 1.0, 0.8))
+                _ice_slide_fx(ci, lvl, took)
+        ice_drop_cols = {}
+        _refresh_ice()
+        _refresh_hud()
+
+
+## the dropped blocks' slide: the top `took` blocks of a column dip and fade
+func _ice_slide_fx(ci: int, lvl: int, took: int) -> void:
+        for d in range(lvl - took, lvl):
+                var n: Sprite2D = _ice_nodes.get(Vector2i(ci, d))
+                if n != null and is_instance_valid(n):
+                        var tw := n.create_tween()
+                        tw.set_parallel(true)
+                        tw.tween_property(n, "position:y",
+                                        n.position.y + cell_px * 0.6, 0.2) \
+                                        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+                        tw.tween_property(n, "modulate:a", 0.0, 0.2)
 
 func _ice_melt_wave() -> void:
         for c in ice_melt_cols.keys():
@@ -3964,26 +4252,33 @@ func _ice_melt_wave() -> void:
                         continue
                 var took := lvl
                 frost[ci] = 0
+                # THE FULL MELT DEMOTES: the whole layer died - a fresh front
+                # on this column starts from tier 1 again (destroying the
+                # second layer spares the run)
+                ice_tier[ci] = 1
                 fronts = fronts.filter(func(f): return int(f["col"]) != ci)
                 add_score(5 * maxi(took, 1))
                 achievement_count("melted", maxi(took, 1))
                 Jukebox.sfx("m_melt", -5.0, randf_range(0.85, 1.1))
                 melt_chain = 3.0
                 temp = minf(1.0, temp + 0.2)
-                # the melt theatre: the blocks slide down and fade, top first
-                for r in range(ROWS - maxi(took, 1), ROWS):
-                        var cell: Dictionary = grid[r][ci]
-                        var key := "ice_ov%d" % ((ROWS - 1) - r)
-                        if cell.is_empty():
-                                continue
-                        var ov: Sprite2D = cell.get(key)
-                        if ov != null and is_instance_valid(ov):
-                                cell[key] = null
-                                var idx := (ROWS - 1) - r
-                                var tw := ov.create_tween()
-                                tw.tween_property(ov, "modulate:a", 0.0, 0.14 + 0.05 * idx)
-                                tw.tween_callback(ov.queue_free)
-                        _ring_fx(_cell_pos(r, ci), Color(0.75, 0.9, 1.0))
+                # the melt theatre: the REGISTRY's blocks slide down and fade,
+                # top first - a popped gem can never orphan them again
+                for d in maxi(took, 1):
+                        var n: Sprite2D = _ice_nodes.get(Vector2i(ci, d))
+                        if n != null and is_instance_valid(n):
+                                _ice_nodes.erase(Vector2i(ci, d))
+                                var tw := n.create_tween()
+                                tw.tween_property(n, "modulate:a", 0.0, 0.14 + 0.05 * d)
+                                tw.tween_callback(n.queue_free)
+                        _ring_fx(_cell_pos(ROWS - 1 - d, ci), Color(0.75, 0.9, 1.0))
+                # the front's partial segment dies with the layer
+                var fn: Sprite2D = _ice_front_nodes.get(ci)
+                if fn != null and is_instance_valid(fn):
+                        _ice_front_nodes.erase(ci)
+                        var tw2 := fn.create_tween()
+                        tw2.tween_property(fn, "modulate:a", 0.0, 0.12)
+                        tw2.tween_callback(fn.queue_free)
                 if temp >= 1.0:
                         temp = 0.0
                         add_score(10)
@@ -3994,74 +4289,97 @@ func _ice_melt_wave() -> void:
         _refresh_hud()
 
 
+## v0.3.3-6 THE ICE RENDER REGISTRY: the frosted sprites live HERE, keyed by
+## (col, depth_from_bottom) - the old build hung them INSIDE the cell dicts,
+## so every popped gem dropped the references and the blocks leaked on the
+## board forever (the owner: "it removes the effect, but the grids still
+## iced and not destroyed and never be destroyed which is weird, but if
+## another ice appear to same grid, it re-apply the ice thing again"). One
+## registry, one truth, an idempotent refresh - the patch-4 ice-crash
+## registry pattern that already killed this bug family there.
+var _ice_nodes := {}          # Vector2i(col, depth_from_bottom) -> Sprite2D
+var _ice_front_nodes := {}    # col -> Sprite2D (the live front's partial top)
+
 func _refresh_ice() -> void:
-        # v0.3.3-p4 THE CONNECTED COLUMN: solid full-cell frosted blocks
-        # stack from the bottom, the snow cap rides the top block, and the
-        # live front's PARTIAL segment slides in under it - the ice visibly
-        # RUNS UP without waiting (the owner's tile-by-tile blessing)
+        # THE CONNECTED COLUMN: solid full-cell frosted blocks stack from the
+        # bottom, the snow cap rides the top block, and the live front's
+        # PARTIAL segment slides in under it - the ice visibly RUNS UP. The
+        # SECOND LAYER wears the heavier blue coat.
         for c in COLS:
                 var lvl := int(frost[c])
-                for r in ROWS:
-                        var cell: Dictionary = grid[r][c]
-                        if cell.is_empty():
-                                continue
-                        var depth_from_bottom := (ROWS - 1) - r
-                        var want := clampi(lvl - depth_from_bottom, 0, 1)
-                        var key := "ice_ov%d" % depth_from_bottom
-                        var have: Sprite2D = cell.get(key) if cell.get(key) != null else null
-                        if want > 0 and (have == null or not is_instance_valid(have)):
-                                var ov := Sprite2D.new()
-                                ov.texture = _t("icebt") if depth_from_bottom == lvl - 1 \
-                                                else _t("iceb")
-                                ov.position = _cell_pos(r, c)
-                                ov.scale = Vector2.ONE * cell_px / 120.0
-                                ov.modulate.a = 0.0
-                                ov.z_index = 1
-                                world.add_child(ov)
-                                cell[key] = ov
-                                var tw := ov.create_tween().set_parallel(true)
-                                tw.tween_property(ov, "modulate:a", 0.94, 0.18)
-                        elif want == 0 and have != null and is_instance_valid(have):
-                                cell[key] = null
+                var tier := int(ice_tier[c]) if c < ice_tier.size() else 1
+                for d in ROWS:
+                        var key := Vector2i(c, d)
+                        var want: bool = d < lvl
+                        var have: Sprite2D = _ice_nodes.get(key)
+                        if have != null and not is_instance_valid(have):
+                                have = null
+                        if want:
+                                if have == null:
+                                        have = Sprite2D.new()
+                                        have.position = _cell_pos(ROWS - 1 - d, c)
+                                        have.scale = Vector2.ONE * cell_px / 120.0
+                                        have.z_index = 1
+                                        have.modulate.a = 0.0
+                                        world.add_child(have)
+                                        _ice_nodes[key] = have
+                                        var tw := have.create_tween()
+                                        tw.tween_property(have, "modulate:a", 0.94, 0.18)
+                                have.texture = _t("icebt") if d == lvl - 1 else _t("iceb")
+                                if tier >= 2:
+                                        have.modulate = Color(0.82, 0.93, 1.35, 0.96)
+                                else:
+                                        have.modulate = Color(1, 1, 1, 0.94)
+                        elif have != null:
+                                _ice_nodes.erase(key)
                                 var tw2 := have.create_tween()
                                 tw2.tween_property(have, "modulate:a", 0.0, 0.16)
                                 tw2.tween_callback(have.queue_free)
-                        elif want > 0 and have != null and is_instance_valid(have):
-                                have.texture = _t("icebt") if depth_from_bottom == lvl - 1 \
-                                                else _t("iceb")
-                                have.modulate.a = 0.94
                 # the front's partial segment - the sliding top of the column
                 var fr: Dictionary = _ice_front_at(c)
-                var pkey := "ice_front"
-                var cell2: Dictionary = grid[ROWS - 1 - lvl][c] if lvl < ROWS else {}
-                var phave: Sprite2D = cell2.get(pkey) if (not cell2.is_empty() \
-                                and cell2.get(pkey) != null) else null
-                if not fr.is_empty() and lvl < ROWS and not cell2.is_empty():
-                        if phave == null or not is_instance_valid(phave):
-                                phave = Sprite2D.new()
-                                phave.texture = _t("icebt")
-                                phave.scale = Vector2.ONE * cell_px / 120.0
-                                phave.z_index = 1
-                                phave.modulate.a = 0.0
-                                world.add_child(phave)
-                                cell2[pkey] = phave
-                                var tw3 := phave.create_tween()
-                                tw3.tween_property(phave, "modulate:a", 0.8, 0.14)
+                var fn: Sprite2D = _ice_front_nodes.get(c)
+                if fn != null and not is_instance_valid(fn):
+                        fn = null
+                if not fr.is_empty() and lvl < ROWS:
+                        if fn == null:
+                                fn = Sprite2D.new()
+                                fn.texture = _t("icebt")
+                                fn.scale = Vector2.ONE * cell_px / 120.0
+                                fn.z_index = 1
+                                fn.modulate.a = 0.0
+                                world.add_child(fn)
+                                _ice_front_nodes[c] = fn
+                                var tw3 := fn.create_tween()
+                                tw3.tween_property(fn, "modulate:a", 0.8, 0.14)
+                        fn.modulate = Color(0.82, 0.93, 1.35, 0.8) if tier >= 2 \
+                                        else Color(1, 1, 1, 0.8)
                         var ff: float = clampf(float(fr["f"]), 0.0, 1.0)
                         var base_y := _cell_pos(ROWS - 1 - lvl, c).y
-                        phave.position.y = base_y + (1.0 - ff) * cell_px * 0.9
-                        phave.position.x = _cell_pos(ROWS - 1 - lvl, c).x
-                elif phave != null and is_instance_valid(phave):
-                        cell2[pkey] = null
-                        var tw4 := phave.create_tween()
-                        tw4.tween_property(phave, "modulate:a", 0.0, 0.12)
-                        tw4.tween_callback(phave.queue_free)
+                        fn.position.y = base_y + (1.0 - ff) * cell_px * 0.9
+                        fn.position.x = _cell_pos(ROWS - 1 - lvl, c).x
+                elif fn != null:
+                        _ice_front_nodes.erase(c)
+                        var tw4 := fn.create_tween()
+                        tw4.tween_property(fn, "modulate:a", 0.0, 0.12)
+                        tw4.tween_callback(fn.queue_free)
 
 
 func _check_ice_over() -> void:
         for c in COLS:
                 if int(frost[c]) >= ROWS:
-                        _ice_freeze_over()
+                        # v0.3.3-6 THE SECOND LAYER: tier 1 finishing only
+                        # summons the slower second layer - THAT one ending
+                        # the run is the law
+                        if int(ice_tier[c]) >= 2:
+                                _ice_freeze_over()
+                        else:
+                                ice_tier[c] = 2
+                                frost[c] = 0
+                                for f in fronts:
+                                        if int(f["col"]) == c:
+                                                f["speed"] = float(f["speed"]) * 0.55
+                                _banner("THE SECOND LAYER RISES!", false)
+                                _refresh_ice()
                         return
 
 
@@ -4131,12 +4449,33 @@ func _mine_rise() -> void:
                         tw0.tween_property(tn, "modulate:a", 0.0, 0.28)
                         tw0.chain().tween_callback(tn.queue_free)
                 grid[0][c] = {}
-        # 2 - the model lifts: every row moves up one
+        # 2 - the model lifts: every row moves up one. v0.3.3-6 THE ALIASING
+        # LAW (the owner's ghost bug: "gems disappeared, and every gem drops
+        # in the grids there keeps overlapping on each other over and
+        # over"): the old `grid[r-1] = grid[r]` loop left the TWO BOTTOM
+        # ROWS as THE SAME ARRAY - every later write fell through both rows,
+        # nodes animated twice to two seats, matches popped one twin while
+        # the other wore an invisible zombie. The rows are rebuilt as
+        # DISTINCT arrays and the bottom row is born EMPTY (the fresh earth
+        # row owns it - nothing playable lives under the world push).
+        var lifted := []
         for r in range(1, ROWS):
-                grid[r - 1] = grid[r]
-        # the coin rode row 0 out of the frame - lost, the clock restarts
+                lifted.append(grid[r])
+        var fresh_row := []
+        for c in COLS:
+                fresh_row.append({})
+        lifted.append(fresh_row)
+        grid = lifted
+        # the coin rides the lift with its row - RE-FIND it (the old code
+        # dropped the tracking even when the coin survived mid-board); a
+        # coin on row 0 rode out of the frame and is lost, the clock restarts
         coin_cell = Vector2i(-1, -1)
         coin_clock = COIN_EVERY
+        for r in ROWS:
+                for c in COLS:
+                        if not grid[r][c].is_empty() and _is_coin(grid[r][c]):
+                                coin_cell = Vector2i(r, c)
+                                break
         # 3 - THE WORLD PUSH: the dirt rows shift up with everything else
         # (the holes ride inside the band), the fresh row enters at the bottom
         for r in range(earth_top, ROWS):
@@ -4533,7 +4872,8 @@ func _rail_tap(pid: String) -> void:
         _rail_punch(pid)
         _set_armed_cursor(true)
         _refresh_rail()
-        _toast_show("tap the board - %s" % String(POWERS[pid]["name"]).to_upper())
+        # v0.3.3-6: the hint over the rail IS the arm feedback now (the old
+        # bottom toast lived on top of the slots)
 
 
 ## THE ARM SFX FADE LAW (v0.3.3-p4, the owner: "the SFX that appears after
@@ -4601,6 +4941,38 @@ func _set_armed_cursor(on: bool) -> void:
                 _arm_sound_fade_out()
                 armed_cursor.queue_free()
                 armed_cursor = null
+        # v0.3.3-6 THE ARMED HINT LAW (the owner: "the hint that appears
+        # after selecting a powerup, makes it appear up and not in that
+        # area, make it appear over the powerups area"): the hint floats on
+        # its OWN label pinned just ABOVE the power rail - the shared bottom
+        # toast sat ON the slots
+        _set_armed_hint(String(POWERS[armed]["name"]).to_upper() \
+                        if (on and armed != "" and POWERS.has(armed)) else "")
+
+
+## the matcher's own armed hint: bottom-anchored ABOVE the rail
+var armed_hint: Label
+
+func _set_armed_hint(txt: String) -> void:
+        if armed_hint == null:
+                if txt == "":
+                        return
+                armed_hint = Arc.fit_label("", 22, Color("e0559b"), 620)
+                armed_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+                armed_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                armed_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                var bn := banner_bottom()
+                armed_hint.offset_bottom = -(bn + 158.0)
+                armed_hint.offset_top = armed_hint.offset_bottom - 46.0
+                armed_hint.modulate.a = 0.0
+                _overlay_root_ref().add_child(armed_hint)
+        if txt == "":
+                var tw := armed_hint.create_tween()
+                tw.tween_property(armed_hint, "modulate:a", 0.0, 0.14)
+                return
+        armed_hint.text = "TAP THE BOARD  -  %s" % txt
+        var tw2 := armed_hint.create_tween()
+        tw2.tween_property(armed_hint, "modulate:a", 1.0, 0.14)
 
 
 func _fire_power(cellp: Vector2i) -> void:
@@ -4632,6 +5004,9 @@ func _fire_power(cellp: Vector2i) -> void:
         _refresh_rail()
         busy = true
         _wave_o = Vector2(cellp.x, cellp.y)
+        move_pops = 0
+        _drop_capture_rows()      # v0.3.3-6: a power move counts for the
+                                  # risky parcel climb (it never captured)
         var pop := {}
         match pid:
                 "line":
@@ -4685,85 +5060,19 @@ func _fire_power(cellp: Vector2i) -> void:
                                                 "delay": float(ROWS - 1 - r) * REMOVER_ROW_T})
                         Jukebox.sfx("m_hyper", -5.0)
         achievement_count("powers_used", 1)
-        await _resolve_from_pop(pop)
+        # v0.3.3-6 THE ONE RESOLVE LAW: the power rides the SAME loop the
+        # swaps use - pop -> gravity -> re-scan, the chain rebuilds every
+        # wave, cascades birth specials. The old private resolve never
+        # re-scanned after the refill (the owner's "bomb then matches stop
+        # matching" / "vapor matched everything" bugs).
+        await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), pop)
         busy = false
 
 
-## the powers and the shuffle resolve through the same loop the swaps use
-func _resolve_from_pop(pop: Dictionary) -> void:
-        if pop.is_empty():
-                return
-        cascade = 0
-        cascade += 1
-        var queue := []
-        for key in pop.keys():
-                var r := int(key) / COLS
-                var c := int(key) % COLS
-                if _playable(r, c) and not grid[r][c].is_empty():
-                        var sp := String(grid[r][c].get("special", ""))
-                        if sp != "":
-                                queue.append({"r": r, "c": c, "kind": sp})
-        var detonated := {}
-        while not queue.is_empty():
-                var it: Dictionary = queue.pop_front()
-                var dkey := int(it["r"]) * COLS + int(it["c"])
-                if detonated.has(dkey):
-                        continue
-                detonated[dkey] = true
-                var extra := _blast_cells(String(it["kind"]), int(it["r"]), int(it["c"]))
-                for key in extra:
-                        if not pop.has(key):
-                                pop[key] = true
-                                var r := int(key) / COLS
-                                var c := int(key) % COLS
-                                if _playable(r, c) and not grid[r][c].is_empty():
-                                        var sp2 := String(grid[r][c].get("special", ""))
-                                        if sp2 != "" and not detonated.has(key):
-                                                queue.append({"r": r, "c": c, "kind": sp2})
-        # v0.3.3-p4: the powers ride the WAVE ORIGIN's stagger - the wave
-        # spreads from the tapped cell outward; the vapor CLIMBS bottom-up
-        # like the remover it imitates
-        _icr_mark_stone(pop)
-        var stag := {}
-        for key in pop.keys():
-                var r := int(key) / COLS
-                var c := int(key) % COLS
-                if _wave_bottomup:
-                        stag[key] = float(ROWS - 1 - r) * REMOVER_ROW_T \
-                                        + float(c) * REMOVER_CELL_T
-                else:
-                        stag[key] = Vector2(_wave_o.x - r, _wave_o.y - c).length() * BOMB_RING_T
-        await _pop_cells(pop, [], stag, pop.duplicate())
-        _wave_bottomup = false
-        while true:
-                if over:
-                        return
-                var groups := _find_matches()
-                if groups.is_empty():
-                        break
-                cascade += 1
-                var pop2 := {}
-                for g in groups:
-                        for key in g["cells"]:
-                                pop2[key] = true
-                await _pop_cells(pop2, [])
-                if cascade >= 2:
-                        _combo_banner(cascade)
-                await _gravity()
-        await _gravity()
-        _collect_bottom_coins()
-        if mode == "mine":
-                _mine_row_check()
-        # v0.3.3-p4: the layer modes' win/lose + the drop settle ride the
-        # power path too (a patch-3 gap: only the swap path checked them)
-        await _mode_aftercare()
-        move_pops = 0
-        if not _has_valid_move():
-                await _shuffle_board(true)
-
-
 func _resolve_after_power() -> void:
-        await _resolve_from_pop({})
+        # the shuffle's post-wake resolve - a plain match loop (the shuffle
+        # fallback can leave instant matches that cascade free)
+        await _resolve_loop()
 
 
 # ------------------------------------------------ the power sheets
@@ -4911,8 +5220,16 @@ func _refresh_hud() -> void:
                         var worst := 0
                         for f in frost:
                                 worst = maxi(worst, int(f))
-                        chip_info2.text = "fronts %d - ice %d/8 - VERTICAL melts" % \
-                                        [fronts.size(), worst]
+                        var tier2 := false
+                        for t in ice_tier:
+                                if int(t) >= 2:
+                                        tier2 = true
+                        if tier2:
+                                chip_info2.text = "fronts %d - ice %d/8 - SECOND LAYER RISES!" % \
+                                                [fronts.size(), worst]
+                        else:
+                                chip_info2.text = "fronts %d - ice %d/8 - VERTICAL melts" % \
+                                                [fronts.size(), worst]
                         chip_info2.add_theme_color_override("font_color",
                                 Color("1c6ea8") if worst >= 6 else Color("35210f"))
                 "mine":
@@ -5069,9 +5386,19 @@ func _draw() -> void:
         for f in floaters:
                 var a6: float = float(f["life"]) / float(f["max"])
                 var font := ThemeDB.fallback_font
-                draw_string(font, f["pos"] + Vector2(2, 2), String(f["txt"]),
-                                HORIZONTAL_ALIGNMENT_CENTER, 460, int(f["size"]), Color(0, 0, 0, a6 * 0.5))
-                draw_string(font, f["pos"], String(f["txt"]), HORIZONTAL_ALIGNMENT_CENTER,
-                                460, int(f["size"]), Color(f["col"], a6))
+                var ftxt := String(f["txt"])
+                var fsz := int(f["size"])
+                # v0.3.3-6 THE FITTED FLOAT LAW: the old draw_string centered
+                # the text inside a box whose LEFT EDGE was the anchor - every
+                # floater sat ~230px right of its anchor and the combo banner
+                # walked off the screen ("UNRE" on, "AL" gone). The box is
+                # centered on the anchor and clamped inside the viewport.
+                var fw := font.get_string_size(ftxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz).x
+                var fx: float = clampf(float(f["pos"].x) - fw / 2.0, 8.0,
+                                maxf(8.0, vp.x - fw - 8.0))
+                draw_string(font, Vector2(fx + 2, float(f["pos"].y) + 2), ftxt,
+                                HORIZONTAL_ALIGNMENT_LEFT, fw + 8, fsz, Color(0, 0, 0, a6 * 0.5))
+                draw_string(font, Vector2(fx, float(f["pos"].y)), ftxt,
+                                HORIZONTAL_ALIGNMENT_LEFT, fw + 8, fsz, Color(f["col"], a6))
 
 
