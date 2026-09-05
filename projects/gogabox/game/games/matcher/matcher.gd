@@ -1368,6 +1368,39 @@ func _deal_board() -> void:
         if mode == "butterflies":
                 for c in [1, 4, 6]:
                         _hatch_butterfly(ROWS - 1, c)
+        # v0.3.3-8 THE DEADLOCK BACKSTOP: with the rescue shuffle dead (the
+        # owner: "when there is no valid matches, make it as a lose/end
+        # instead of shuffling"), a fresh pour must never spawn a LOCKED
+        # board - quiet palette rerolls until a legal move exists. No shuffle
+        # VFX, no sound - the player never sees this; the no-shuffle loss
+        # only ever punishes a REAL mid-game lock.
+        var dg := 0
+        while not _has_valid_move() and dg < 100:
+                dg += 1
+                for r in ROWS:
+                        for c in COLS:
+                                if grid[r][c].is_empty() or _is_coin(grid[r][c]) \
+                                                or _is_item(grid[r][c]):
+                                        continue
+                                var cell: Dictionary = grid[r][c]
+                                cell["color"] = _roll_color()
+                                if bool(cell.get("wing", false)):
+                                        _retexture_cell(r, c)
+                                elif is_instance_valid(cell.get("node")):
+                                        (cell["node"] as Sprite2D).texture = tex_gem[int(cell["color"]) % tex_gem.size()]
+                var mg := 0
+                while not _find_matches().is_empty() and mg < 200:
+                        mg += 1
+                        for g in _find_matches():
+                                for key in g["cells"]:
+                                        var rr := int(key) / COLS
+                                        var cc := int(key) % COLS
+                                        var cell2: Dictionary = grid[rr][cc]
+                                        cell2["color"] = _roll_color()
+                                        if bool(cell2.get("wing", false)):
+                                                _retexture_cell(rr, cc)
+                                        elif is_instance_valid(cell2.get("node")):
+                                                (cell2["node"] as Sprite2D).texture = tex_gem[int(cell2["color"]) % tex_gem.size()]
 
 
 func _deal_settle() -> void:
@@ -1948,7 +1981,32 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
                 _mine_row_check()
         await _mode_aftercare()
         if not _has_valid_move():
-                await _shuffle_board(true)
+                # v0.3.3-8 THE DEADLOCK LAW (the owner: "when there is no
+                # valid matches, make it as a lose/end instead of shuffling")
+                # - the free rescue shuffle is DEAD. A locked board is a loss
+                # in the mode's own language: challenge pays the ROUND FAIL
+                # (the -500 law, a life, the sweep theatre, a fresh legal
+                # round), every other mode ends the run.
+                if mode == "challenge":
+                        ch_losses += 1
+                        ch_lives -= 1
+                        set_score(maxi(0, score - 500))
+                        Jukebox.sfx("m_lifelost", -4.0)
+                        ch_sweeping = true
+                        if ch_lives <= 0:
+                                _banner("NO MOVES LEFT  -500", false)
+                                await _challenge_clear_sweep()
+                                ch_sweeping = false
+                                _finish_run("the board locked - %d wins / %d losses" % [ch_wins, ch_losses])
+                        else:
+                                _banner("NO MOVES  ROUND LOST  -500  (%d LIVES LEFT)" % ch_lives, false)
+                                await _challenge_clear_sweep()
+                                await _next_challenge_round()
+                                ch_sweeping = false
+                else:
+                        _banner("NO MOVES LEFT - THE BOARD IS LOCKED!", false)
+                        await get_tree().create_timer(0.7, false).timeout
+                        _finish_run("the board locked - no valid matches")
         idle_clock = 0.0
         _paint_selection()
 

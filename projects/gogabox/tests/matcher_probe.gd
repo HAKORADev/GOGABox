@@ -114,7 +114,7 @@ func _mk_cell(r: int, c: int, color: int) -> void:
 
 
 ## waits until the game's async waves settle (the resolve chains run on
-## their own clock: staged pops, physics falls, deadlock shuffles). The
+## their own clock: staged pops, physics falls, the deadlock loss). The
 ## 0.35s lead lets the tick fire a pending refill first.
 func _wait_idle(max_s := 30.0) -> void:
         await get_tree().create_timer(0.35, false).timeout
@@ -126,7 +126,7 @@ func _wait_idle(max_s := 30.0) -> void:
 
 
 func _run() -> void:
-        print("=== matcher_probe (v0.3.3-7) ===")
+        print("=== matcher_probe (v0.3.3-8) ===")
         seed(20260905)          # THE DETERMINISM LAW: every run walks the
                                 # same rng stream - a pass is a pass forever
         await _boot("challenge")
@@ -339,6 +339,10 @@ func _run() -> void:
         G.sel = Vector2i(-1, -1)
 
         # ------------------------------------------------ the deadlock law
+        # v0.3.3-8 THE OWNER'S LAW: "when there is no valid matches, make it
+        # as a lose/end instead of shuffling" - the rescue shuffle is DEAD.
+        # Challenge pays the round fail (-500 + a life + the sweep theatre +
+        # a fresh LEGAL round); every other mode ends the run.
         for r in 8:
                 for c3 in 8:
                         if G.grid[r][c3].is_empty():
@@ -354,8 +358,16 @@ func _run() -> void:
                         if is_instance_valid(G.grid[r][c2].get("node")):
                                 G.grid[r][c2]["node"].texture = G.tex_gem[(r + c2) % 3]
         ck(not G._has_valid_move(), "the checker board reads as DEADLOCKED")
-        await G._resolve_loop()   # the after-care shuffles a dead board
-        ck(G._has_valid_move(), "the shuffle woke the dead board (a legal move exists)")
+        var dsc0: int = G.score
+        var dlv0: int = G.ch_lives
+        G.round_clock = 999.0     # the tick must not steal the loss first
+        G.phase = "play"
+        await G._resolve_loop()   # the after-care = the LOSS (no shuffle)
+        ck(G.ch_lives == dlv0 - 1,
+                "THE DEADLOCK LAW: the locked round cost a LIFE (no rescue shuffle)")
+        ck(G.score == maxi(0, dsc0 - 500), "THE DEADLOCK LAW: the -500 round-fail law paid")
+        ck(not G.ch_sweeping and G._has_valid_move(),
+                "THE DEADLOCK LAW: the fresh round poured LEGAL (no instant loss loop)")
 
         # ------------------------------------------------ THE CHALLENGE PRE-SOLVE v4
         G.phase = "play"

@@ -27,9 +27,13 @@ Owner laws, kept verbatim in spirit:
 - Portrait only. The board is the hero: wide as the screen allows, centered,
   rounded cells, soft drop shadows. Top bar = the box chrome (back / score /
   round-coins). Bottom = the power-up rail + the reserved banner strip.
-- Deadlock: after every settle, if no valid move exists the board shuffles
-  with a sparkle sweep (never a dead player). A gentle hint glows on a valid
-  swap after ~5s idle.
+- Deadlock (v0.3.3-8 THE OWNER'S LAW): after every settle, if no valid move
+  exists the run LOSES - no rescue shuffle. Challenge pays the round fail
+  (-500, a life, the sweep theatre, a fresh legal round); every other mode
+  ends the run. A fresh pour can never spawn locked (the quiet deal
+  backstop). A gentle hint glows on a valid swap after ~5s idle. The SHOP
+  shuffle power stays: a paid PRE-EMPTIVE reshuffle, the last legal move
+  of a dying board.
 
 ## SCORING
 
@@ -125,8 +129,9 @@ static up-up-up ladder:
   different ride.
 
 ### PEACE (Zen — the snake peace, mirrored)
-- Endless Classic board, no goals, no timer, no fail state. Locked valid
-  moves reshuffle silently; the board literally cannot kill you.
+- Endless Classic board, no goals, no timer. v0.3.3-8: a LOCKED board ends
+  the peaceful session (the owner's deadlock law - no reshuffles anywhere);
+  the run ends gently, the clock stands as the trophy.
 - 0 score bonus, 0 GOGACoins (no board coins either), NO power-ups.
 - The pause menu carries the END button (the snake/pong law) so a peaceful
   session can still be closed gently.
