@@ -1,19 +1,15 @@
 extends Node
-## matcher_probe - the v0.3.3-6 law battery (headless, hard asserts).
-## The owner does not hunt edge cases - the probe does. PATCH 6 coverage:
-## THE ONE RESOLVE LAW (the power path re-scans after gravity, cascades
-## chain + birth like the swap path), THE NEWBORN SHIELD (a special born
-## in a match survives its own wave + one later hit), THE MINE ALIASING
-## FIX (the lifted rows are DISTINCT arrays), THE COIN QUEUE LAW (no
-## random seat, no tap-collect - the coin rides the refill like a gem and
-## swaps with gems), THE CC SPAWN LAW (gems emerge behind the top line one
-## by one; the board starts TRULY empty), THE PHYSICAL GRID-FILLING (the
-## pocket pull + the perch slide), THE ICE LAWS (horizontal touch drops
-## 3 grids, vertical destroys the column through the registry, the SECOND
-## LAYER rises slower and only its topping-out ends the run), THE LOSS
-## THEATRE (challenge clears bottom-to-top then re-fills), THE ROOT LAW
-## (back cannot strand the boot optionals). Plus every law patches 1-5
-## shipped.
+## matcher_probe - the v0.3.3-7 law battery (headless, hard asserts).
+## The owner does not hunt edge cases - the probe does. PATCH 7 coverage:
+## THE COIN-REFILL RESOLVE LAW (the collect's refill is a real wave - a
+## legal match through it FIRES), THE TOP-LINE LAW (the two-ups game over
+## only ON the top line, armed only by a real first descent - a fresh
+## birth-line parcel can never end the run), THE DISCARD LAW (an armed
+## power aimed at an illegal grid goes back to the rail, the charge
+## stays), THE REMOVER IS CONSUMED (the fired color remover pops its own
+## seat - the transposed pop-key left a naked ghost wearing the shader),
+## THE DOUBLE REMOVER (vapor on a remover = SUPERNOVA: every gem pays +
+## the 1 damage). Plus every law patches 1-6 shipped.
 ##   godot --headless --path . res://tests/matcher_probe.tscn
 
 var fails := 0
@@ -117,8 +113,20 @@ func _mk_cell(r: int, c: int, color: int) -> void:
         G.grid[r][c] = {"color": color, "special": "", "wing": false, "node": n}
 
 
+## waits until the game's async waves settle (the resolve chains run on
+## their own clock: staged pops, physics falls, deadlock shuffles). The
+## 0.35s lead lets the tick fire a pending refill first.
+func _wait_idle(max_s := 30.0) -> void:
+        await get_tree().create_timer(0.35, false).timeout
+        var t := 0.0
+        while G.busy and t < max_s:
+                await get_tree().create_timer(0.05, false).timeout
+                t += 0.05
+        await get_tree().create_timer(0.25, false).timeout
+
+
 func _run() -> void:
-        print("=== matcher_probe (v0.3.3-6) ===")
+        print("=== matcher_probe (v0.3.3-7) ===")
         seed(20260905)          # THE DETERMINISM LAW: every run walks the
                                 # same rng stream - a pass is a pass forever
         await _boot("challenge")
@@ -309,6 +317,12 @@ func _run() -> void:
         G._collect_bottom_coins()
         ck(int(G.run_coins) == coins0 + 1, "the coin reached the bottom row and was EARNED (+1)")
         ck(absf(G.coin_clock - G.COIN_EVERY) < 0.01, "the 30s clock restarted from the COLLECTION")
+        # v0.3.3-7 THE COIN-REFILL RESOLVE LAW: the collect's refill is a
+        # REAL wave now - the tick resolves it (scan -> pop -> gravity ->
+        # re-scan), so the board lands QUIET instead of holding stale gems
+        await _wait_idle()
+        ck(not G.busy and G._find_matches().is_empty(),
+                "THE COIN-REFILL RESOLVE LAW: the collect's refill landed QUIET (a real wave)")
         # THE COIN SWAP LAW: a tap on the coin SELECTS it (no tap-collect)
         G.phase = "play"
         G.busy = false
@@ -569,6 +583,9 @@ func _run() -> void:
         G.frost = [0, 0, 0, 0, 0, 0, 0, 0]
         G.fronts = []
         G.frost[2] = 5
+        G.front_clock = 999.0    # no front may spawn mid-resolve - the drop
+                                # law owns the numbers here (the tick's live
+                                # rise once grew a tile mid-wave: 6 - 3 = 3)
         # the top iced row is ROWS-5 = 3; a gem at row 2 rests ON the line
         for r in 8:
                 for c2 in 8:
@@ -1468,32 +1485,84 @@ func _run() -> void:
         ck(G._is_item(G.grid[4][4]),
                 "THE PARCEL LAW: a drop item stays un-swappable (the owner confirmed)")
 
-        # THE RISKY PARCEL LAW: no descent = one climb; the next = over
+        # v0.3.3-7 THE TOP-LINE PARCEL LAW (the owner: "if goes up two times
+        # it is marked end of turn, it should be like that only if they are
+        # at the top line and not every time" + "only toggles the two-ups
+        # rule if they first dropped at least a grid down from their
+        # original first line so it does not be like an always lose")
         await _boot("drop")
         G.phase = "hold"
+        G.drop_left = 0          # no spawns - the battery owns the parcels
         for r in 8:
                 for c2 in 8:
                         if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
                                 if is_instance_valid(G.grid[r][c2].get("node")):
                                         (G.grid[r][c2]["node"] as Sprite2D).queue_free()
                                 G.grid[r][c2] = {}
-        _mk_cell(4, 6, 2)
-        var ps := Sprite2D.new()
-        ps.texture = G._t("parcel")
-        ps.position = G._cell_pos(3, 6)
-        G.world.add_child(ps)
+        _mk_cell(2, 6, 2)
+        # CASE 1 - THE BIRTH-LINE IMMUNITY: every parcel spawns on the FIRST
+        # line - one that never dropped below it can never end the run
+        var pb := Sprite2D.new()
+        pb.texture = G._t("parcel")
+        pb.position = G._cell_pos(0, 6)
+        G.world.add_child(pb)
         G.drop_seq += 1
-        var pid: int = G.drop_seq - 1
-        G.grid[3][6] = {"color": -2, "item": true, "node": ps, "drop_id": pid}
+        var pidb: int = G.drop_seq - 1
+        G.grid[0][6] = {"color": -2, "item": true, "node": pb, "drop_id": pidb}
         G.over = false
-        G.drop_prev = {pid: 3}
+        G.drop_prev = {pidb: 0}
+        await G._drop_rise_check()
+        ck(G._is_item(G.grid[0][6]) and int(G.grid[0][6].get("rose", 0)) == 0 \
+                        and not G.over,
+                "THE TOP-LINE LAW: a fresh parcel on its birth line arms NOTHING (strike 1)")
+        G.drop_prev = {pidb: 0}
+        await G._drop_rise_check()
+        ck(not G.over and int(G.grid[0][6].get("rose", 0)) == 0,
+                "THE TOP-LINE LAW: the birth-line parcel survives every strike (strike 2)")
+        # CASE 2 - THE MID-BOARD CLIMB: an ARMED parcel (it already dropped
+        # below its birth line) climbs on a strike but NEVER dies mid-board
+        var pm := Sprite2D.new()
+        pm.texture = G._t("parcel")
+        pm.position = G._cell_pos(3, 6)
+        G.world.add_child(pm)
+        G.drop_seq += 1
+        var pidm: int = G.drop_seq - 1
+        G.grid[3][6] = {"color": -2, "item": true, "node": pm, "drop_id": pidm,
+                        "dropped": true}
+        G.drop_prev = {pidm: 3}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[2][6]) and int(G.grid[2][6].get("rose", 0)) == 1 \
-                        and not G.grid[3][6].is_empty() and not G._is_item(G.grid[3][6]),
-                "THE RISKY PARCEL LAW: a parcel that did not descend climbed one row")
-        G.drop_prev = {pid: 2}
+                        and not G.over,
+                "THE TOP-LINE LAW: an armed parcel climbs on a strike (3 -> 2)")
+        G.drop_prev = {pidm: 2}
         await G._drop_rise_check()
-        ck(G.over, "THE RISKY PARCEL LAW: the second climb ends the run")
+        ck(G._is_item(G.grid[1][6]) and int(G.grid[1][6].get("rose", 0)) == 2 \
+                        and not G.over,
+                "THE TOP-LINE LAW: the second strike mid-board does NOT end the run")
+        # CASE 3 - THE DESCENT RESET: a real descent clears the strikes and
+        # the arm STAYS (the parcel keeps its risky life below the birth line)
+        if not G.grid[2][6].is_empty() and is_instance_valid(G.grid[2][6].get("node")):
+                (G.grid[2][6]["node"] as Sprite2D).queue_free()
+        G.grid[2][6] = G.grid[1][6]
+        G.grid[1][6] = {}
+        G.drop_prev = {pidm: 1}
+        await G._drop_rise_check()
+        ck(int(G.grid[2][6].get("rose", 0)) == 0 \
+                        and bool(G.grid[2][6].get("dropped", false)) and not G.over,
+                "THE TOP-LINE LAW: a real descent clears the strikes, the arm stays")
+        # CASE 4 - THE TOP-LINE KILL: the armed parcel climbs back up and the
+        # strike that catches it ON the top line ends the run
+        G.drop_prev = {pidm: 2}
+        await G._drop_rise_check()
+        ck(G._is_item(G.grid[1][6]) and not G.over,
+                "THE TOP-LINE LAW: the climb walks back up (2 -> 1)")
+        G.drop_prev = {pidm: 1}
+        await G._drop_rise_check()
+        ck(G._is_item(G.grid[0][6]) and not G.over,
+                "THE TOP-LINE LAW: the parcel reached the top line, the run still holds")
+        G.drop_prev = {pidm: 0}
+        await G._drop_rise_check()
+        ck(G.over, "THE TOP-LINE LAW: the strike ON the top line ends the run")
         G._refresh_hud()
         ck(String(G.chip_info.text).contains("parcels left"),
                 "the drop HUD survives the climb check")
@@ -1693,10 +1762,149 @@ func _run() -> void:
                                 refilled = false
         ck(refilled, "THE LOSS THEATRE: the grid was swept and RE-FILLED for the next round")
 
-        # v0.3.3-6 THE ROSE FLAG LAW: no aftercare wipe - two non-descending
-        # moves in a row END the run (the owner's drop-down game over)
+        # ================================================== the PATCH 7 battery
+        # v0.3.3-7 THE COIN-REFILL LAW, the forced-match proof (the owner:
+        # "the coin when dropped and collected, if there is a legal match
+        # that should be matched, it does not"): the collect's refill must
+        # RESOLVE, not just drop gems
+        await _boot("peace")
+        G.phase = "play"
+        G.busy = false
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty():
+                                if is_instance_valid(G.grid[r][c2].get("node")):
+                                        (G.grid[r][c2]["node"] as Sprite2D).queue_free()
+                                G.grid[r][c2] = {}
+        # three color-1 gems hover above the coin's bottom seat - the collect
+        # drops them one row and the 3-line MUST fire (the old build left it
+        # sitting on the board forever)
+        for r in [4, 5, 6]:
+                _mk_cell(r, 3, 1)
+        var cn7 := Sprite2D.new()
+        cn7.texture = G._t("coin")
+        cn7.position = G._cell_pos(7, 3)
+        G.world.add_child(cn7)
+        G.grid[7][3] = {"color": -1, "coin": true, "node": cn7}
+        G.coin_cell = Vector2i(7, 3)
+        var s_coin7 := int(G.score)
+        var coins_b7 := int(G.run_coins)
+        G._collect_coin_at(Vector2i(7, 3))
+        await _wait_idle()
+        ck(int(G.run_coins) == coins_b7 + 1, "THE COIN-REFILL LAW: the coin was earned (+1)")
+        ck(int(G.score) - s_coin7 >= 3,
+                "THE COIN-REFILL LAW: the collect's match FIRED (+%d - the old build left it sitting)" % (int(G.score) - s_coin7))
+        var ref7 := true
+        for r in 8:
+                if G.grid[r][3].is_empty():
+                        ref7 = false
+        ck(ref7 and G._find_matches().is_empty(),
+                "THE COIN-REFILL LAW: the wave settled clean (no holes, no stale matches)")
+
+        # v0.3.3-7 THE DISCARD LAW (the owner: "the powerup when selected and
+        # aimed to an illegal grid, it should be discarded and not waiting
+        # for a valid grid to be tapped"): the arm drops, the charge stays
+        await _wait_idle()          # the coin wave above owns the board first
+        Box.dev_set_cheat("all_owned", 1)
+        G.armed = "bomb"
+        G.charges["bomb"] = 2
+        G.power_used["bomb"] = 1
+        G._fire_power(Vector2i(-1, -1))          # a tap outside the board
+        ck(G.armed == "" and int(G.charges["bomb"]) == 2 \
+                        and int(G.power_used["bomb"]) == 1,
+                "THE DISCARD LAW: an aim outside the board drops the arm, the charge stays")
+        G.armed = "bomb"
+        G._fire_power(Vector2i(9, 9))            # off the grid
+        ck(G.armed == "" and int(G.charges["bomb"]) == 2,
+                "THE DISCARD LAW: an off-grid aim drops the arm too")
+        G.armed = "vapor"
+        G.charges["vapor"] = 1
+        G.power_used["vapor"] = 0
+        if is_instance_valid(G.grid[2][2].get("node")):
+                (G.grid[2][2]["node"] as Sprite2D).queue_free()
+        G.grid[2][2] = {}
+        G._fire_power(Vector2i(2, 2))            # the vapor needs a gem
+        ck(G.armed == "" and int(G.charges["vapor"]) == 1 \
+                        and int(G.power_used["vapor"]) == 0,
+                "THE DISCARD LAW: the vapor aimed at an empty seat goes back, the charge stays")
+        # v0.3.3-7 THE REMOVER IS CONSUMED (the owner: "it does the effect,
+        # but the special does not get removed and it stays with the VFX but
+        # acts like normal gem"): the fired remover pops its own seat - no
+        # naked ghost gem wearing the shader
+        G.phase = "hold"
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty():
+                                if is_instance_valid(G.grid[r][c2].get("node")):
+                                        (G.grid[r][c2]["node"] as Sprite2D).queue_free()
+                                G.grid[r][c2] = {}
+        for r in 8:
+                for c2 in 8:
+                        _mk_cell(r, c2, (r + c2) % 3)
+        G.grid[3][3]["special"] = "hyper"
+        G._dress_special(3, 3)
+        G.grid[3][4]["color"] = 4                # the zapped color lives ONLY here
+        G.grid[3][4]["node"].texture = G.tex_gem[4 % G.tex_gem.size()]
+        G.phase = "play"
+        G.busy = false
+        var s_rm := int(G.score)
+        await G._try_swap(Vector2i(3, 3), Vector2i(3, 4))
+        await _wait_idle()
+        var ghost := false
+        var rc: Dictionary = G.grid[3][3]
+        if not rc.is_empty():
+                if String(rc.get("special", "")) == "hyper":
+                        ghost = true
+                if is_instance_valid(rc.get("node")) and rc["node"].material != null:
+                        ghost = true
+        ck(not ghost,
+                "THE REMOVER IS CONSUMED: no naked ghost wears the fired remover's VFX")
+        ck(int(G.score) - s_rm >= 2,
+                "THE REMOVER IS CONSUMED: the zap popped the remover AND its color")
+        ck(G._find_matches().is_empty(),
+                "THE REMOVER IS CONSUMED: the wave settled quiet")
+
+        # v0.3.3-7 THE DOUBLE REMOVER (the owner: "i tried to mix color
+        # remover special with the powerup and the powerup removed the
+        # original gem type behind that special, while i said it should work
+        # like double-remover which do 1 damage and clears the grid from any
+        # gems"): vapor on a remover = SUPERNOVA - every gem pays
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty():
+                                if is_instance_valid(G.grid[r][c2].get("node")):
+                                        (G.grid[r][c2]["node"] as Sprite2D).queue_free()
+                                G.grid[r][c2] = {}
+        for r in 8:
+                for c2 in 8:
+                        _mk_cell(r, c2, (r + c2) % 3)
+        G.grid[3][3]["special"] = "hyper"
+        G._dress_special(3, 3)
+        G.phase = "play"
+        G.busy = false
+        G.armed = "vapor"
+        G.charges["vapor"] = 1
+        G.power_used["vapor"] = 0
+        G.move_pops = 0
+        G._fire_power(Vector2i(3, 3))
+        await _wait_idle()
+        ck(int(G.power_used["vapor"]) == 1, "THE DOUBLE REMOVER: the charge was spent")
+        ck(G.move_pops >= 64,
+                "THE DOUBLE REMOVER: EVERY gem paid the wave (%d pops - the old build zapped one color)" % int(G.move_pops))
+        var dbl_holes := 0
+        for r in 8:
+                for c2 in 8:
+                        if G.grid[r][c2].is_empty():
+                                dbl_holes += 1
+        ck(dbl_holes == 0 and G._find_matches().is_empty(),
+                "THE DOUBLE REMOVER: the supernova settled full and quiet")
+
+        # v0.3.3-7 THE ROSE FLAG LAW, the full-move edition: the aftercare
+        # never wipes the strikes, a mid-board second strike does NOT end
+        # the run anymore, and only the top-line strike does
         await _boot("drop")
         G.phase = "hold"
+        G.drop_left = 0          # no spawns - the battery owns the parcels
         for r in 8:
                 for c2 in 8:
                         if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
@@ -1709,7 +1917,9 @@ func _run() -> void:
         G.world.add_child(ps2)
         G.drop_seq += 1
         var pid2: int = G.drop_seq - 1
-        G.grid[3][6] = {"color": -2, "item": true, "node": ps2, "drop_id": pid2}
+        # armed: this parcel already dropped below its birth line earlier
+        G.grid[3][6] = {"color": -2, "item": true, "node": ps2, "drop_id": pid2,
+                        "dropped": true}
         G.over = false
         # move 1: a planted match far away that leaves the parcel unmoved
         _mk_cell(0, 0, 1)
@@ -1728,13 +1938,23 @@ func _run() -> void:
         await G._mode_aftercare()
         ck(int(G.grid[prow1.x][6].get("rose", 0)) == 1,
                 "THE ROSE FLAG LAW: the aftercare NEVER wipes the flag anymore")
-        # move 2: still no descent -> the run ends
+        # move 2: still no descent - MID-BOARD the run HOLDS (the old law
+        # ended it here; the top-line law keeps it alive)
         _mk_cell(1, 0, 4)
         _mk_cell(1, 1, 4)
         _mk_cell(1, 2, 4)
         G._drop_capture_rows()
         await G._try_swap(Vector2i(1, 0), Vector2i(1, 1))
-        ck(G.over, "THE ROSE FLAG LAW: the second up-move ends the run (the owner's law)")
+        ck(not G.over and int(G.grid[1][6].get("rose", 0)) == 2,
+                "THE ROSE FLAG LAW: the second up-move mid-board does NOT end the run")
+        # the climb walks it to the top line, and THERE the next strike ends it
+        G.drop_prev = {pid2: 1}
+        await G._drop_rise_check()
+        ck(G._is_item(G.grid[0][6]) and not G.over,
+                "THE ROSE FLAG LAW: the parcel reached the top line, the run still holds")
+        G.drop_prev = {pid2: 0}
+        await G._drop_rise_check()
+        ck(G.over, "THE ROSE FLAG LAW: the strike at the top line ends the run (the owner's law)")
 
         # v0.3.3-6 THE ROOT LAW: the boot optionals is the home - back cannot
         # strand a boardless game

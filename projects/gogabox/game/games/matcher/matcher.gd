@@ -1,5 +1,23 @@
 extends GogaGame
-## MATCHER - v0.3.3-6, the one-resolve-and-real-physics round.
+## MATCHER - v0.3.3-7, the coin-resolve and the remover-consumed round.
+## THE PATCH 7 LAWS (the owner's patch-6 test report):
+##  - THE COIN-REFILL RESOLVE LAW: the seat refill after a COLLECTED coin
+##    is a real wave now (the owner: "the coin when dropped and collected,
+##    if there is a legal match that should be matched, it does not") -
+##    the old fire-and-forget gravity left the fresh matches sitting.
+##  - THE TOP-LINE LAW (drop): the two-climbs game-over fires ONLY when
+##    the strike catches the parcel ON the top line, and only after the
+##    parcel FIRST dropped at least a grid below its birth line (the
+##    owner: "it should be like that only if they are at the top line and
+##    not every time" + "so it does not be like an always lose").
+##  - THE DISCARD LAW: an armed power aimed at an illegal grid is
+##    DISCARDED - it never waits for a valid grid (the charge stays).
+##  - THE REMOVER IS CONSUMED: a fired color remover pops its own seat
+##    (the transposed pop-key left it standing as a naked gem wearing
+##    ghost VFX), its shield cannot save it, the shader goes with it.
+##  - THE DOUBLE REMOVER: the vapor aimed AT a remover special goes
+##    SUPERNOVA - the grid clears from ANY gems + 1 damage on every
+##    damageable layer (the owner: "it should work like double-remover").
 ## THE PATCH 6 LAWS (the owner's patch-5 test report):
 ##  - THE ONE RESOLVE LAW: the swap path and the power path are THE SAME
 ##    loop now - pop -> gravity -> re-scan, the detonation chain rebuilds
@@ -2333,7 +2351,13 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
                                                 and not _is_item(grid[r][c]) \
                                                 and int(grid[r][c].get("color", -9)) == col:
                                         pop[r * COLS + c] = true
-                pop[hyper_at.y * COLS + hyper_at.x] = true
+                # v0.3.3-7 THE REMOVER IS CONSUMED (the owner: "it does the
+                # effect, but the special does not get removed and it stays
+                # with the VFX but acts like normal gem"): the seat joins the
+                # pop through its REAL key (the old c * COLS + r transposed
+                # key left the remover standing - the model shed `special`
+                # but the node kept the shader: a naked gem in ghost VFX)
+                pop[hyper_at.x * COLS + hyper_at.y] = true
         move_pops = 0
         _drop_capture_rows()
         moves_made += 1
@@ -2376,9 +2400,16 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
         # and never chained). The hypers themselves are consumed as plain
         # gems - their job is done, the queue must not re-zap a random color
         _wave_bottomup = true      # the wipe climbs bottom-to-up
+        # THE REMOVER IS CONSUMED: the model sheds the kind, the node sheds
+        # the shader, and no shield saves a remover that already fired -
+        # its job is done (a survivor here would be the naked-ghost gem)
         grid[hyper_at.x][hyper_at.y]["special"] = ""
+        grid[hyper_at.x][hyper_at.y]["shield"] = 0
+        _dress_special(hyper_at.x, hyper_at.y)
         if both:
                 grid[other_at.x][other_at.y]["special"] = ""
+                grid[other_at.x][other_at.y]["shield"] = 0
+                _dress_special(other_at.x, other_at.y)
         await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), pop)
         await _after_move()
         busy = false
@@ -2742,6 +2773,18 @@ func _auto_refill() -> void:
         _coin_refill_pending = true
 
 
+## v0.3.3-7 THE COIN-REFILL RESOLVE LAW (the owner: "the coin when dropped
+## and collected, if there is a legal match that should be matched, it does
+## not"): the refill that backfills the collected coin's seat is a REAL
+## wave now - the gems it drops can match and those matches FIRE. The old
+## fire-and-forget `_gravity()` dropped the fresh gems and left every match
+## they made sitting on the board until the next move.
+func _coin_refill_run() -> void:
+        busy = true
+        await _resolve_loop()
+        busy = false
+
+
 func _coin_fly_to_hud(from: Vector2) -> void:
         var vp := get_viewport_rect().size
         var fly := Sprite2D.new()
@@ -2834,7 +2877,7 @@ func _goga_tick(delta: float) -> void:
                 peace_secs += delta
         if _coin_refill_pending and not busy:
                 _coin_refill_pending = false
-                _gravity()                  # fire-and-forget: the seat refills
+                _coin_refill_run()          # v0.3.3-7: the REAL resolve
         match mode:
                 "challenge":
                         _tick_challenge(delta)
@@ -2973,8 +3016,17 @@ func _drop_capture_rows() -> void:
 ## grid, and make it risky because if it went up, and the next move still
 ## up, the game ends, similar to butterflies but a little different"): a
 ## parcel that did not descend on this move CLIMBS one row with a red
-## warning; two climbs in a row (or a second climb at the top row) and the
-## parcels climb away - the run ends.
+## warning.
+## v0.3.3-7 THE TOP-LINE LAW (the owner: "if goes up two times it is marked
+## end of turn, it should be like that only if they are at the top line and
+## not every time" + "they are always starts at first line, so make a
+## logical check that only toggles the two-ups rule if they first dropped
+## at least a grid down from their original first line so it does not be
+## like an always lose"): a parcel carries a `dropped` flag set by its
+## FIRST real descent - until then its strikes arm nothing, so a fresh
+## top-line parcel can never end the run. An ARMED parcel ends the run
+## only when its second strike catches it ON the top line; mid-board
+## strikes just push it up with the warning.
 func _drop_rise_check() -> void:
         if mode != "drop" or over or grid.size() < ROWS:
                 return
@@ -2988,24 +3040,33 @@ func _drop_rise_check() -> void:
                         if not drop_prev.has(id):
                                 continue        # born mid-move - it waits
                         if r > int(drop_prev[id]):
+                                cell["dropped"] = true   # it left its birth line
                                 cell["rose"] = 0
                                 continue        # it descended - safe
                         risers.append(Vector2i(r, c))
         drop_prev.clear()
         if risers.is_empty():
                 return
+        var top_struck := false         # an armed parcel struck ON the top line
         for at in risers:
                 var r: int = at.x
                 var c: int = at.y
                 if not grid[r][c].is_empty() and not _is_item(grid[r][c]):
                         continue        # the wave ate it mid-check
                 var cell: Dictionary = grid[r][c]
+                # THE FIRST-DESCENT ARM: a parcel that never left its birth
+                # line climbs for nothing - it can never end the run
+                if not bool(cell.get("dropped", false)):
+                        _ring_fx(_cell_pos(r, c), Color(1.0, 0.4, 0.4))
+                        continue
                 var rose: int = int(cell.get("rose", 0)) + 1
-                if rose >= 2:
+                if rose >= 2 and r == 0:
                         _banner("THE PARCELS CLIMBED AWAY!", false)
                         _finish_run("the parcels climbed away")
                         return
                 cell["rose"] = rose
+                if r == 0:
+                        top_struck = true
                 if r > 0:
                         # the climb: swap with the seat above, animate both
                         _swap_model(r, c, r - 1, c)
@@ -3032,7 +3093,10 @@ func _drop_rise_check() -> void:
                                 wt.tween_property(pn, "modulate", Color.WHITE, 0.3)
                 _ring_fx(_cell_pos(r, c), Color(1.0, 0.4, 0.4))
         Jukebox.sfx("m_grace", -7.0, 0.8)
-        _banner("A PARCEL ROSE - ONE MORE AND IT'S OVER!", false)
+        if top_struck:
+                _banner("A PARCEL STRUCK AT THE TOP - ONE MORE AND IT'S OVER!", false)
+        else:
+                _banner("A PARCEL ROSE - LOWER IT WITH A MATCH!", false)
         await get_tree().create_timer(0.22, false).timeout
 
 
@@ -4977,9 +5041,15 @@ func _set_armed_hint(txt: String) -> void:
 
 func _fire_power(cellp: Vector2i) -> void:
         var pid := armed
-        if pid == "" or cellp.x < 0 or busy:
+        if pid == "" or busy:
                 return
-        if pid != "shuffle" and not _playable(cellp.x, cellp.y):
+        # v0.3.3-7 THE DISCARD LAW (the owner: "the powerup when selected and
+        # aimed to an illegal grid, it should be discarded and not waiting
+        # for a valid grid to be tapped"): an aim that cannot fire DROPS the
+        # arm - cursor, hint, hum - with an error toast. The charge is NOT
+        # spent (the power never fired); the rail re-arms it in one tap.
+        if cellp.x < 0 or (pid != "shuffle" and not _playable(cellp.x, cellp.y)):
+                _discard_arm("no target there")
                 return
         var n := int(charges[pid])
         if n <= 0:
@@ -4988,13 +5058,11 @@ func _fire_power(cellp: Vector2i) -> void:
                 _refresh_rail()
                 return
         # THE VAPOR LAW (v0.3.3-p2, the owner's "sound only, no effect" bug):
-        # vapor aims at a COLOR - an empty seat or the coin is a rejected aim,
-        # the charge STAYS, the cursor stays armed
+        # vapor aims at a COLOR - an empty seat, the coin or a parcel has none
         if pid == "vapor":
                 var vc := _color_at(cellp.x, cellp.y)
                 if vc < 0:
-                        Jukebox.sfx("error", -10.0)
-                        _toast_show("tap a gem - the vapor needs a color")
+                        _discard_arm("the vapor needs a gem")
                         return
         charges[pid] = n - 1
         power_used[pid] = int(power_used[pid]) + 1
@@ -5036,23 +5104,53 @@ func _fire_power(cellp: Vector2i) -> void:
                                 pop[key] = true
                         Jukebox.sfx("m_flame", -4.0)
                 "vapor":
-                        var col := _color_at(cellp.x, cellp.y)
-                        for r in ROWS:
-                                for c in COLS:
-                                        if _playable(r, c) and not grid[r][c].is_empty() \
-                                                        and not _is_coin(grid[r][c]) \
-                                                        and not _is_item(grid[r][c]) \
-                                                        and _color_at(r, c) == col:
-                                                pop[r * COLS + c] = true
-                                                # the vapour wave is VISIBLE: every
-                                                # doomed gem flashes before it pops,
-                                                # and the wipe CLIMBS bottom-to-up
-                                                var vn: Sprite2D = grid[r][c].get("node")
-                                                if is_instance_valid(vn):
-                                                        var vt := vn.create_tween()
-                                                        vt.tween_property(vn, "modulate",
-                                                                        Color(1.6, 0.6, 1.8), 0.16)
-                        pop[cellp.y * COLS + cellp.x] = true
+                        # v0.3.3-7 THE DOUBLE REMOVER (the owner: "i tried to
+                        # mix color remover special with the powerup and the
+                        # powerup removed the original gem type behind that
+                        # special, while i said it should work like
+                        # double-remover which do 1 damage and clears the grid
+                        # from any gems"): the vapor aimed AT a remover special
+                        # does not zap the color behind it - the pair goes
+                        # SUPERNOVA: EVERY gem pops (any color), the remover
+                        # is consumed, and every damageable layer takes its 1
+                        # damage - the same law the remover+remover swap obeys.
+                        if not grid[cellp.x][cellp.y].is_empty() \
+                                        and String(grid[cellp.x][cellp.y] \
+                                                        .get("special", "")) == "hyper":
+                                for r in ROWS:
+                                        for c in COLS:
+                                                if _playable(r, c) \
+                                                                and not grid[r][c].is_empty() \
+                                                                and not _is_coin(grid[r][c]) \
+                                                                and not _is_item(grid[r][c]):
+                                                        pop[r * COLS + c] = true
+                                grid[cellp.x][cellp.y]["special"] = ""
+                                grid[cellp.x][cellp.y]["shield"] = 0
+                                _dress_special(cellp.x, cellp.y)
+                                _nova_damage()
+                                _float_text(_cell_pos(cellp.x, cellp.y),
+                                                "SUPERNOVA!", Color(1, 0.6, 0.9), 46)
+                        else:
+                                var col := _color_at(cellp.x, cellp.y)
+                                for r in ROWS:
+                                        for c in COLS:
+                                                if _playable(r, c) and not grid[r][c].is_empty() \
+                                                                and not _is_coin(grid[r][c]) \
+                                                                and not _is_item(grid[r][c]) \
+                                                                and _color_at(r, c) == col:
+                                                        pop[r * COLS + c] = true
+                                                        # the vapour wave is VISIBLE: every
+                                                        # doomed gem flashes before it pops,
+                                                        # and the wipe CLIMBS bottom-to-up
+                                                        var vn: Sprite2D = grid[r][c].get("node")
+                                                        if is_instance_valid(vn):
+                                                                var vt := vn.create_tween()
+                                                                vt.tween_property(vn, "modulate",
+                                                                                Color(1.6, 0.6, 1.8), 0.16)
+                                # the aim seat rides its REAL key (the old
+                                # c * COLS + r transposed key could pop a
+                                # random transposed seat)
+                                pop[cellp.x * COLS + cellp.y] = true
                         _wave_bottomup = true
                         for r in ROWS:
                                 wipes.append({"row": r, "t": 0.0, "max": 0.3,
@@ -5067,6 +5165,19 @@ func _fire_power(cellp: Vector2i) -> void:
         # matching" / "vapor matched everything" bugs).
         await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), pop)
         busy = false
+
+
+## v0.3.3-7 THE DISCARD: the armed power goes back to the rail - the charge
+## stays (it never fired), the cursor + hint + hum all drop, a toast says why
+func _discard_arm(why: String) -> void:
+        var pname := "POWER"
+        if POWERS.has(armed):
+                pname = String(POWERS[armed]["name"]).to_upper()
+        armed = ""
+        _set_armed_cursor(false)
+        _refresh_rail()
+        Jukebox.sfx("error", -10.0)
+        _toast_show("%s - the %s went back to the rail" % [why, pname])
 
 
 func _resolve_after_power() -> void:
