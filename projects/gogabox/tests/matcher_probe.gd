@@ -1,14 +1,15 @@
 extends Node
-## matcher_probe - the v0.3.3 PATCH 4 law battery (headless, hard asserts).
-## The owner does not hunt edge cases - the probe does. PATCH 3 coverage:
-## THE OWNER'S SPECIAL TABLE (L/T = bomb, 4v = row sweeper, 4h = column
-## sweeper, 5+ = color remover with the bottom-up wipe), the staged blast
-## pops, the butterflies' AFTER-MOVE rise + the one-move top grace, the
-## mine's pure dirt / clay / rock layers + the board-lift rise, the challenge
-## pre-solve rounds + the SHOWN lives/wins/losses, the JELLY virus (spread,
-## eat, plug), ICE CRASH (layers + the rock) and DROP DOWN (parcels, three
-## limits), plus every law patch 1/2 shipped: 1 point per gem, /300, the
-## coin laws, the shop/stack/back laws, the icon rail, the name-only skins.
+## matcher_probe - the v0.3.3 PATCH 5 law battery (headless, hard asserts).
+## The owner does not hunt edge cases - the probe does. PATCH 5 coverage:
+## THE DONUT PURGE (per-color pop frames, the donut files deleted), THE
+## SWEEPER SHADER SWAP (the two gem bodies traded), THE FALL-AROUND LAW
+## (gems slide diagonally around a jelly plug), THE RISE-MATCH LAW (a fly
+## rising into its color resolves), THE INTENSITY LADDER (10s dropping to
+## 9/8/7, 1..4 flies per hatch), THE COIN COURTESY (tap = collect, the hop
+## rides through the coin), THE POCKETS LAW (gems fit into the dug sand
+## holes; standing dirt stays impenetrable), THE RISKY PARCEL LAW (no
+## descent = one climb, two climbs = over). Plus every law patches 1-4
+## shipped.
 ##   godot --headless --path . res://tests/matcher_probe.tscn
 
 var fails := 0
@@ -113,7 +114,7 @@ func _mk_cell(r: int, c: int, color: int) -> void:
 
 
 func _run() -> void:
-        print("=== matcher_probe (v0.3.3 PATCH 4) ===")
+        print("=== matcher_probe (v0.3.3 PATCH 5) ===")
         await _boot("challenge")
 
         # ------------------------------------------------ the model
@@ -388,6 +389,25 @@ func _run() -> void:
                 G.grid[tw2.x][tw2.y] = {}
                 G.over = false
                 G.phase = "play"
+                # v0.3.3-p5 THE RISE-MATCH LAW: whatever lines the rise forms
+                # resolve - the grace rig must not sit on a match, so the
+                # fly's line neighbors wear off-colors until the board is quiet
+                var fc2: int = int(G.grid[0][tw2.y]["color"])
+                var nbs := [Vector2i(0, maxi(0, tw2.y - 1)),
+                                Vector2i(0, mini(7, tw2.y + 1)),
+                                Vector2i(1, tw2.y), Vector2i(2, tw2.y)]
+                var quiet_guard := 0
+                while not G._find_matches().is_empty() and quiet_guard < 60:
+                        quiet_guard += 1
+                        for nb in nbs:
+                                if G.grid[nb.x][nb.y].is_empty():
+                                        continue
+                                var nc4 := (fc2 + 1 + quiet_guard % 4) % 5
+                                if nc4 == fc2:
+                                        nc4 = (nc4 + 1) % 5
+                                G.grid[nb.x][nb.y]["color"] = nc4
+                                if is_instance_valid(G.grid[nb.x][nb.y].get("node")):
+                                        (G.grid[nb.x][nb.y]["node"] as Sprite2D).texture = G.tex_gem[nc4]
                 await G._rise_butterflies()
                 ck(not G.over, "THE GRACE LAW: a butterfly ON the top row is SAFE (the spider only stirs)")
                 ck(bool(G.grid[0][tw2.y].get("top_wait", false)),
@@ -551,9 +571,18 @@ func _run() -> void:
         var in_sand := 0
         for r in range(G.earth_top, 8):
                 for c2 in 8:
-                        if not G.grid[r][c2].is_empty():
+                        if not G.grid[r][c2].is_empty() and G._earth_at(r, c2):
                                 in_sand += 1
-        ck(in_sand == 0, "THE HARD LIMIT LAW: zero gems ever fell INTO the sand (%d waves)" % 6)
+        ck(in_sand == 0, "THE HARD LIMIT LAW: zero gems ever INSIDE standing dirt (%d waves)" % 6)
+        # v0.3.3-p5 THE POCKETS LAW (the owner: "an area with no sand in
+        # same row, it should let the gems fit in"): the dug holes ARE
+        # seats - the clay and the rock tests dug (7,3) and (7,5), and the
+        # gravity waves feed them gems
+        var pockets_filled := 0
+        for c2 in [3, 5]:
+                if not G.grid[7][c2].is_empty() and not G._earth_at(7, c2):
+                        pockets_filled += 1
+        ck(pockets_filled == 2, "THE POCKETS LAW: gems fell into the dug holes in the sand row")
         for c2 in 8:
                 var e0: Dictionary = G.earth[G.earth_top][c2]
                 if e0.has("node") and is_instance_valid(e0["node"]):
@@ -1151,9 +1180,192 @@ func _run() -> void:
         var banner_inset: float = G.banner_bottom()
         ck(banner_inset > 0.0, "the game reserves the real banner strip (%dpx)" % int(banner_inset))
 
+        # ================================================== the PATCH 5 laws
+        # THE DONUT PURGE: five per-color pop frames live on the disk, the
+        # template zip's donut frames are DELETED (the owner: "there is
+        # something deep wrong with donuts i guess")
+        var donut_ok := true
+        for i in 5:
+                if not ResourceLoader.exists("res://assets/games/matcher/fx/popfx_%d.png" % i):
+                        donut_ok = false
+        for i in [5, 6, 7]:
+                if ResourceLoader.exists("res://assets/games/matcher/fx/popfx_%d.png" % i):
+                        donut_ok = false
+        ck(donut_ok, "THE DONUT PURGE: five per-color pop frames live, the donut files are gone")
+        var fx_img: Image = (G._t_popfx(2) as Texture2D).get_image()
+        if fx_img.is_compressed():
+                fx_img.decompress()
+        var fx_c: Color = fx_img.get_pixel(fx_img.get_width() / 2, fx_img.get_height() / 2)
+        ck(fx_c.a > 0.9 and fx_c.r > 0.9 and fx_c.g > 0.9,
+                "the pop frame wears a white-hot core (a shatter burst, not a pastry)")
+
+        # THE SWEEPER SHADER SWAP: the two gem bodies traded places
+        var shd_txt: String = (load("res://assets/games/matcher/specials/special.gdshader") as Shader).code
+        var k2 := shd_txt.find("} else if (special == 2)")
+        var k3 := shd_txt.find("} else if (special == 3)")
+        var k4 := shd_txt.find("} else if (special == 4)")
+        var body2 := shd_txt.substr(k2, k3 - k2)
+        var body3 := shd_txt.substr(k3, k4 - k3)
+        ck(body2.find("UV.x") >= 0 and body2.find("abs(p.x)") >= 0 \
+                        and body2.find("vec3(0.55, 0.95, 1.0)") < 0,
+                "THE SWEEPER SWAP: the row sweeper's gem wears the traded body")
+        ck(body3.find("UV.y") >= 0 and body3.find("abs(p.y)") >= 0 \
+                        and body3.find("vec3(1.0, 0.55, 0.95)") < 0,
+                "THE SWEEPER SWAP: the column sweeper's gem wears the traded body")
+
+        # THE FALL-AROUND LAW (jelly): gems resting on a plug slide around
+        # it into the sealed seats beside - the pocket under the plug stays
+        await _boot("jelly")
+        for r in 8:
+                for c2 in 8:
+                        if is_instance_valid(G.grid[r][c2].get("node")):
+                                G.grid[r][c2]["node"].queue_free()
+                        G.grid[r][c2] = {}
+        G.jelly = {2 * 8 + 2: true, 4 * 8 + 3: true}
+        for r in 4:
+                _mk_cell(r, 3, (r + 2) % 5)
+        await G._gravity()
+        var slide_ok: bool = not G.grid[7][2].is_empty() and not G.grid[4][2].is_empty()
+        ck(slide_ok, "THE FALL-AROUND LAW: gems slid around the plug into the sealed side")
+        ck(G.grid[5][3].is_empty() and G.grid[4][3].is_empty(),
+                "THE FALL-AROUND LAW: the plug still seals its own column")
+
+        # THE RISE-MATCH LAW (butterflies): a fly that rises into its own
+        # color RESOLVES (the owner: "whatever three same-gems are real
+        # valid match btw bruh")
+        await _boot("butterflies")
+        var fly_at := Vector2i(-1, -1)
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty() \
+                                        and bool(G.grid[r][c2].get("wing", false)):
+                                fly_at = Vector2i(r, c2)
+                                break
+                if fly_at.x >= 0:
+                        break
+        if fly_at.x >= 3:
+                var fc: int = int(G.grid[fly_at.x][fly_at.y]["color"])
+                _mk_cell(fly_at.x - 2, fly_at.y, fc)
+                _mk_cell(fly_at.x - 3, fly_at.y, fc)
+                if not G.grid[fly_at.x - 1][fly_at.y].is_empty():
+                        var mid := fly_at.x - 1
+                        G.grid[mid][fly_at.y]["color"] = (fc + 1) % 5
+                        if is_instance_valid(G.grid[mid][fly_at.y].get("node")):
+                                (G.grid[mid][fly_at.y]["node"] as Sprite2D).texture \
+                                                = G.tex_gem[(fc + 1) % 5]
+                var sc3 := int(G.score)
+                G.over = false
+                G.phase = "play"
+                await G._rise_butterflies()
+                ck(int(G.score) > sc3,
+                        "THE RISE-MATCH LAW: the fly that rose into its color resolved the match")
+
+        # THE INTENSITY LADDER: 1..4 flies per hatch, the gap walks 10 -> 9 -> 7
+        await _boot("butterflies")
+        G.phase = "play"
+        G.busy = false
+        var wings0 := _count_wings()
+        G.fly_spawned = 0
+        G.hatch_clock = 0.001
+        G._tick_butterflies(0.01)
+        var hatched: int = _count_wings() - wings0
+        ck(hatched >= 1 and hatched <= 4, "THE INTENSITY LADDER: a hatch brings 1..4 flies")
+        ck(G.fly_spawned == hatched, "the ladder counts every hatch")
+        G.fly_spawned = 5
+        G.hatch_clock = 0.001
+        G._tick_butterflies(0.01)
+        ck(absf(G.hatch_clock - 9.0) < 0.05, "the gap drops to 9s at the sixth fly")
+        G.fly_spawned = 15
+        G.hatch_clock = 0.001
+        G._tick_butterflies(0.01)
+        ck(absf(G.hatch_clock - 7.0) < 0.05, "the gap drops to 7s at the 16th fly")
+        G._refresh_hud()
+        ck(not String(G.chip_info2.text).contains("one row"),
+                "the flies widget wears no guide words (the owner's cut)")
+
+        # THE COIN COURTESY: a tap on the coin collects it on the spot
+        await _boot("challenge")
+        G.phase = "play"
+        G.busy = false
+        G.over = false
+        var cs := Sprite2D.new()
+        cs.texture = G._t("coin")
+        cs.position = G._cell_pos(2, 3)
+        G.world.add_child(cs)
+        G.grid[2][3] = {"color": -1, "coin": true, "node": cs}
+        G.coin_cell = Vector2i(2, 3)
+        G.coin_clock = 12.0
+        G._tap(G._cell_pos(2, 3))
+        ck(G.coin_cell == Vector2i(-1, -1) and G.grid[2][3].is_empty(),
+                "THE COIN COURTESY: a tap on the coin collects it on the spot")
+        ck(G.coin_clock == G.COIN_EVERY, "the coin clock restarts from the collect")
+
+        # THE MATCH-THROUGH LAW: the hop rides through the coin
+        var cs2 := Sprite2D.new()
+        cs2.texture = G._t("coin")
+        cs2.position = G._cell_pos(5, 4)
+        G.world.add_child(cs2)
+        G.grid[5][4] = {"color": -1, "coin": true, "node": cs2}
+        G.coin_cell = Vector2i(5, 4)
+        _mk_cell(4, 4, 0)             # the mover above the coin
+        var beyond_col: int = int(G.grid[6][4].get("color", 1))
+        _mk_cell(6, 2, 0)
+        _mk_cell(6, 3, 0)
+        _mk_cell(6, 4, 1 if beyond_col != 1 else 2)
+        var hop: Vector2i = G._hop_target(Vector2i(4, 4), Vector2i(5, 4))
+        ck(hop == Vector2i(6, 4),
+                "THE MATCH-THROUGH LAW: the hop rides to the seat beyond the coin")
+        var sc4 := int(G.score)
+        G.busy = false
+        await G._try_swap(Vector2i(4, 4), hop)
+        ck(int(G.score) > sc4,
+                "THE MATCH-THROUGH LAW: the through-the-coin move lands a real match")
+
+        # THE RISKY PARCEL LAW: no descent = one climb; the next = over
+        await _boot("drop")
+        G.phase = "hold"
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
+                                if is_instance_valid(G.grid[r][c2].get("node")):
+                                        (G.grid[r][c2]["node"] as Sprite2D).queue_free()
+                                G.grid[r][c2] = {}
+        _mk_cell(4, 6, 2)
+        var ps := Sprite2D.new()
+        ps.texture = G._t("parcel")
+        ps.position = G._cell_pos(3, 6)
+        G.world.add_child(ps)
+        G.drop_seq += 1
+        var pid: int = G.drop_seq - 1
+        G.grid[3][6] = {"color": -2, "item": true, "node": ps, "drop_id": pid}
+        G.over = false
+        G.drop_prev = {pid: 3}
+        await G._drop_rise_check()
+        ck(G._is_item(G.grid[2][6]) and int(G.grid[2][6].get("rose", 0)) == 1 \
+                        and not G.grid[3][6].is_empty() and not G._is_item(G.grid[3][6]),
+                "THE RISKY PARCEL LAW: a parcel that did not descend climbed one row")
+        G.drop_prev = {pid: 2}
+        await G._drop_rise_check()
+        ck(G.over, "THE RISKY PARCEL LAW: the second climb ends the run")
+        G._refresh_hud()
+        ck(String(G.chip_info.text).contains("parcels left"),
+                "the drop HUD survives the climb check")
+
         Box.reset_all()
         print("=== matcher_probe: %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)
+
+
+func _count_wings() -> int:
+        var n := 0
+        if G == null or G.grid.size() < 8:
+                return 0
+        for r in 8:
+                for c in 8:
+                        if not G.grid[r][c].is_empty() \
+                                        and bool(G.grid[r][c].get("wing", false)):
+                                n += 1
+        return n
 
 
 func _ready() -> void:

@@ -1,8 +1,52 @@
 extends GogaGame
-## MATCHER - v0.3.3 PATCH 4, the physics-and-feel round. THE OWNER'S VERDICT
-## ON PATCH 3: "SFXs are good, VFXs needs more work, shaders needs real work,
-## animation+physics needs remake, algorithms needs fucking redesign ... the
-## game is still too simple". THE PATCH 4 LAWS:
+## MATCHER - v0.3.3 PATCH 5, the donut-purge-and-real-mechanics round.
+## THE PATCH 5 LAWS (the owner's patch-4 test report):
+##  - THE DONUT PURGE: the pop burst sprites were the template zip's
+##    DONUTS - every match wore a tiny donut funeral on the pure gem skin
+##    (the owner: "when doing a correct match, it shows donuts, there is
+##    something deep wrong with donuts i guess"). The pop frames are now
+##    per-color gem-shatter bursts and the donut files are DELETED.
+##  - THE SWEEPER SHADER SWAP (the owner: "see how the VFX/shader look
+##    now? just swap them, that's it ... i mean the shader on the gem"):
+##    the row and the column sweeper gem shaders traded bodies.
+##  - THE FALL-AROUND LAW (jelly, the candy-crush school - the owner:
+##    "the line next to the jelly line, in the empty grids, it will make
+##    the gems fell to that side in an accurate way then that side will
+##    get filled from top again"): gems resting on a jelly plug SLIDE
+##    diagonally around it into the open seats beside, keep falling, and
+##    the column refills from the top - no more airlocked pockets.
+##  - THE RISE-MATCH LAW (butterflies): whatever three same gems line up
+##    is a REAL match - by hand OR by a rise (the owner: "whatever three
+##    same-gems are real valid match btw bruh"); a fly that rises into
+##    its own color resolves on the spot. The "- one row per move"
+##    widget words are dead ("this is shitty thing that we do not use in
+##    our designing"). THE INTENSITY LADDER: the first hatch at 10s, the
+##    gap drops 1s per 5 flies spawned, every hatch brings 1..4 flies.
+##  - THE COIN COURTESY: a GOGACoin is TAPPABLE (tap = collect, the
+##    30s clock restarts from the collect) and gems pass THROUGH it - a
+##    drag across a coin carries the gem to the cell beyond, so a match
+##    across a coin finally lands (the owner: "i want to move red gem
+##    through it to do a match and go down").
+##  - THE BANNER SKIN (the owner: "that visual asset when you give game
+##    pop-ups is bad, that blue thing, remove it, keep just the text and
+##    make it purple/pink so it fits the game style more"): the blue
+##    ribbon is gone - the pop-ups speak as pure purple/pink text.
+##  - THE MINE POCKETS LAW (the owner: "an area with no sand in same row,
+##    it should let the gems fit in"): the earth is a per-CELL limit now
+##    - gems fall into the dug holes, matches inside a hole dig deeper,
+##    and THE RISE PUSHES THE WHOLE WORLD UP (dirt rows ride with the
+##    board so the holes keep their places in the band; the old
+##    new-line/full-line mixed bug is dead).
+##  - THE RISKY PARCEL LAW (drop, the owner: "make the item if a move
+##    happened and it did not moved down a single grid, makes it go up
+##    by one grid, and make it risky because if it went up, and the next
+##    move still up, the game ends"): a parcel that does not descend on
+##    a move CLIMBS one row with a red warning; two climbs in a row and
+##    the parcels climb away - the run ends.
+## THE PATCH 4 LAWS (the physics-and-feel round; the owner's verdict on
+## patch 3: "SFXs are good, VFXs needs more work, shaders needs real work,
+## animation+physics needs remake, algorithms needs fucking redesign ...
+## the game is still too simple"):
 ##  - THE HARD LIMIT LAW (diamond mine): gems fell INTO the sand - the
 ##    gravity write pen now clamps to playable rows; nothing goes through
 ##    the earth, for real.
@@ -159,6 +203,16 @@ const CH_TIME_PER_MOVE_MIN := 2.3
 const JELLY_SPREAD_MIN := 2
 const JELLY_SPREAD_MAX := 8
 
+## the BUTTERFLIES v5 laws (the owner, v0.3.3-p5: "there is no real
+## progression or intensity there, it just spawns one butterfly after a
+## long time then does not spawn more, it should spawn first after each
+## 10 seconds for first 5 butterflies, then gets 9 for sixth and 8 for 10
+## and 7 for 15 and like that with a range of 1-4 butterflies per spawn")
+const FLY_GAP0 := 10.0           # the first hatches ride a 10s clock
+const FLY_GAP_MIN := 3.0         # the ladder's floor
+const FLY_SPAWN_MIN := 1         # every hatch brings 1..4 flies
+const FLY_SPAWN_MAX := 4
+
 ## the ICE STORM v4 laws (the owner: "it spawns first in the tile at the
 ## bottom, then runs up, then another layer appear of running up then it
 ## freeze and the game is lost, you can modify the speed of each state")
@@ -241,6 +295,7 @@ var temp := 0.0                 # the temperature gauge (0..1)
 var melt_chain := 0.0           # consecutive melts within 3s
 var dig_clock := MINE_CLOCK
 var mine_rise_clock := MINE_ROW_TIME   # the 25s earth-row clock
+var mine_rising := false               # a rise is on the rails (the busy gate)
 var depth := 0                  # earth rows cleared (meters descended)
 var earth_top := ROWS           # mine: the first earth row (ROWS = no earth)
 var earth := []                 # earth rows: earth[r] = [{kind, hp, tr, node, tr_spr}]
@@ -275,6 +330,8 @@ var drop_limit_kind := "moves"  # moves | time | both
 var drop_moves := 22
 var drop_time := 75.0
 var drop_items := []            # [{r, c}] live parcels (the grid holds color -2 cells)
+var drop_seq := 0               # the parcel id issuer (the rise tracking)
+var drop_prev := {}             # drop_id -> row at the move's start
 
 ## the coin
 var coin_clock := COIN_EVERY
@@ -369,9 +426,13 @@ func _t_icec(lvl: int) -> Texture2D:
 
 
 func _t_popfx(i: int) -> Texture2D:
-        var k := "popfx%d" % (i % 8)
+        # v0.3.3-p5 THE DONUT PURGE: only the five per-color frames exist
+        # (the template zip's donut frames are deleted - the owner: "there
+        # is something deep wrong with donuts i guess")
+        var idx := clampi(i, 0, 4)
+        var k := "popfx%d" % idx
         if not _tex.has(k):
-                _tex[k] = load("res://assets/games/matcher/fx/popfx_%d.png" % (i % 8))
+                _tex[k] = load("res://assets/games/matcher/fx/popfx_%d.png" % idx)
         return _tex[k]
 
 ## the specials shader - one material per cell, ON the gem sprite (the owner:
@@ -444,39 +505,46 @@ func _retexture_cell(r: int, c: int) -> void:
 
 
 ## THE TOP BANNER (v0.3.3-p2, the owner: a lose/round message "appears inside
-## the grid and not somewhere at the top as example"): the template's ribbon
-## rides just under the HUD, slides in, fades out. Every mode event speaks
-## here - never inside the grid again.
+## the grid and not somewhere at the top as example"). v0.3.3-p5 THE BANNER
+## SKIN: the blue ribbon asset is DEAD (the owner: "that visual asset when
+## you give game pop-ups is bad, that blue thing, remove it, keep just the
+## text and make it purple/pink so it fits the game style more") - the
+## message speaks as pure text, purple for the bad news, pink for the good.
 func _banner(txt: String, good := true) -> void:
         var root := _overlay_root_ref()
         var holder := Control.new()
         holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
         holder.set_anchors_preset(Control.PRESET_TOP_WIDE)
         holder.offset_top = 186.0
-        holder.offset_bottom = 306.0
+        holder.offset_bottom = 276.0
         root.add_child(holder)
-        var ribbon := TextureRect.new()
-        ribbon.texture = _t("banner")
-        ribbon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ribbon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        ribbon.set_anchors_preset(Control.PRESET_FULL_RECT)
-        ribbon.offset_left = 190.0
-        ribbon.offset_right = -190.0
-        ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        ribbon.modulate = Color(1, 1, 1, 0.0)
-        holder.add_child(ribbon)
-        var l := Arc.fit_label(txt, 30, Arc.INK, 620)
+        var l := Arc.fit_label(txt, 34,
+                        Color("e0559b") if good else Color("a44ad0"), 640)
         l.set_anchors_preset(Control.PRESET_FULL_RECT)
-        l.offset_bottom = -18.0
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # the soft dark under-shadow keeps it readable on any sky
+        var sh := Arc.fit_label(txt, Arc.fit_size(txt, 34, 640, null, true),
+                        Color(0.08, 0.03, 0.12, 0.85), 640)
+        sh.set_anchors_preset(Control.PRESET_FULL_RECT)
+        sh.offset_left = 3
+        sh.offset_top = 3
+        sh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sh.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        sh.modulate.a = 0.0
+        holder.add_child(sh)
         l.modulate.a = 0.0
         holder.add_child(l)
+        l.scale = Vector2.ONE * 0.86
+        l.pivot_offset = Vector2(320, 45)
         var tw := holder.create_tween()
         tw.set_parallel(true)
-        tw.tween_property(ribbon, "modulate:a", 1.0, 0.22)
+        tw.tween_property(sh, "modulate:a", 1.0, 0.22)
         tw.tween_property(l, "modulate:a", 1.0, 0.22)
+        tw.tween_property(l, "scale", Vector2.ONE, 0.26) \
+                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
         tw.chain().tween_interval(1.15)
         tw.chain().tween_property(holder, "modulate:a", 0.0, 0.3)
         tw.chain().tween_callback(holder.queue_free)
@@ -991,7 +1059,7 @@ func _refresh_board_skin() -> void:
                 for c in COLS:
                         if grid[r].size() <= c:
                                 continue
-                        if _in_earth(r):
+                        if _earth_at(r, c):
                                 continue
                         var cell: Dictionary = grid[r][c]
                         if cell.is_empty() or int(cell.get("color", -1)) < 0:
@@ -1015,6 +1083,7 @@ func _start_mode(id: String) -> void:
         temp = 0.0
         dig_clock = MINE_CLOCK
         mine_rise_clock = MINE_ROW_TIME
+        mine_rising = false
         depth = 0
         earth_top = ROWS
         coin_clock = COIN_EVERY
@@ -1055,7 +1124,8 @@ func _start_mode(id: String) -> void:
         drop_items = []
         drop_level = 1
         fly_secs = 0.0
-        hatch_clock = 6.0
+        hatch_clock = FLY_GAP0         # v0.3.3-p5: the ladder's first beat
+        fly_spawned = 0
         move_pops = 0
         _wave_bottomup = false
         ice_melt_cols = {}
@@ -1141,7 +1211,7 @@ func _deal_board() -> void:
                 if _in_earth(r):
                         continue
                 for c in COLS:
-                        if _jelly_at(r, c):
+                        if _jelly_at(r, c) or _earth_at(r, c):
                                 continue
                         var cell := _new_cell(r, c, board_o.y - cell_px * (1.4 + float(ROWS - r)))
                         grid[r][c] = cell
@@ -1196,6 +1266,23 @@ func _in_earth(r: int) -> bool:
         return mode == "mine" and r >= earth_top
 
 
+## v0.3.3-p5 THE POCKETS LAW (the owner: "an area with no sand in same row,
+## it should let the gems fit in"): the earth limit is PER CELL now - a row
+## whose neighbor wears dirt can still own open seats. A cell is solid ONLY
+## where a live dirt/clay/rock node stands; every dug hole is a real seat
+## gems fall into and match inside.
+func _earth_at(r: int, c: int) -> bool:
+        if mode != "mine" or r < earth_top or r >= ROWS:
+                return false
+        if c < 0 or c >= COLS or r < 0:
+                return false
+        if earth.size() <= r or earth[r] == null or earth[r].size() <= c:
+                return false
+        var e: Dictionary = earth[r][c]
+        return not e.is_empty() and e.has("node") \
+                        and is_instance_valid(e.get("node"))
+
+
 # ================================================================ the model
 ## cell kinds: every playable cell holds a gem dict. A coin cell replaces
 ## the gem (color -1). A drop parcel replaces the gem (color -2). A jelly
@@ -1227,7 +1314,9 @@ func _playable(r: int, c: int) -> bool:
                 return false
         if _jelly_at(r, c):
                 return false            # a jelly cell is a solid block
-        return not _in_earth(r)
+        if _earth_at(r, c):
+                return false            # a standing dirt cell is solid
+        return true
 
 
 func _color_at(r: int, c: int) -> int:
@@ -1242,12 +1331,12 @@ func _color_at(r: int, c: int) -> int:
 ## scan for matches. Returns a list of groups:
 ##   {cells: {key:int -> true}, dir: "h"|"v", len: int, cross: Vector2i or (-1,-1)}
 ## The cross is the L/T/+ intersection point (the star gem's birthplace).
+## v0.3.3-p5: no more row-level earth skip - the per-cell _color_at decides,
+## so gems sitting in dug holes match like everywhere else.
 func _find_matches() -> Array:
         var runs := []
         # rows
         for r in ROWS:
-                if _in_earth(r):
-                        continue
                 var c := 0
                 while c < COLS:
                         var col := _color_at(r, c)
@@ -1268,15 +1357,12 @@ func _find_matches() -> Array:
         for c in COLS:
                 var r := 0
                 while r < ROWS:
-                        if _in_earth(r):
-                                r += 1
-                                continue
                         var col := _color_at(r, c)
                         if col < 0:
                                 r += 1
                                 continue
                         var e := r
-                        while e + 1 < ROWS and not _in_earth(e + 1) and _color_at(e + 1, c) == col:
+                        while e + 1 < ROWS and _color_at(e + 1, c) == col:
                                 e += 1
                         if e - r + 1 >= 3:
                                 var cells := {}
@@ -1347,6 +1433,28 @@ func _has_valid_move() -> bool:
                                 _swap_model(r, c, r2, c2)
                                 if ok:
                                         return true
+        # v0.3.3-p5 THE HOP MOVES COUNT TOO: a match THROUGH a coin is a
+        # real move (the deadlock check may not call a shuffle over a
+        # board the coin hop can still save)
+        for r in ROWS:
+                for c in COLS:
+                        if not _playable(r, c) or grid[r][c].is_empty():
+                                continue
+                        for d in [Vector2i(0, 1), Vector2i(1, 0)]:
+                                var r2: int = r + d.x
+                                var c2: int = c + d.y
+                                if not _playable(r2, c2) or grid[r2][c2].is_empty():
+                                        continue
+                                if not _is_coin(grid[r2][c2]):
+                                        continue
+                                var hop := _hop_target(Vector2i(r, c), Vector2i(r2, c2))
+                                if hop == Vector2i(-9, -9):
+                                        continue
+                                _swap_model(r, c, hop.x, hop.y)
+                                var ok2 := not _find_matches().is_empty()
+                                _swap_model(r, c, hop.x, hop.y)
+                                if ok2:
+                                        return true
         return false
 
 
@@ -1371,6 +1479,26 @@ func _find_a_move() -> Array:
                                 _swap_model(r, c, r2, c2)
                                 if ok:
                                         return [Vector2i(r, c), Vector2i(r2, c2)]
+        # the hop moves are hint-worthy too (the coin match-through)
+        for r in ROWS:
+                for c in COLS:
+                        if not _playable(r, c) or grid[r][c].is_empty():
+                                continue
+                        for d in [Vector2i(0, 1), Vector2i(1, 0)]:
+                                var r2: int = r + d.x
+                                var c2: int = c + d.y
+                                if not _playable(r2, c2) or grid[r2][c2].is_empty():
+                                        continue
+                                if not _is_coin(grid[r2][c2]):
+                                        continue
+                                var hop := _hop_target(Vector2i(r, c), Vector2i(r2, c2))
+                                if hop == Vector2i(-9, -9):
+                                        continue
+                                _swap_model(r, c, hop.x, hop.y)
+                                var ok2 := not _find_matches().is_empty()
+                                _swap_model(r, c, hop.x, hop.y)
+                                if ok2:
+                                        return [Vector2i(r, c), hop]
         return []
 
 
@@ -1404,9 +1532,38 @@ func _tap(p: Vector2) -> void:
         if cellp.x < 0:
                 _select(Vector2i(-1, -1))
                 return
-        if mode == "mine" and _in_earth(cellp.x):
+        if mode == "mine" and _earth_at(cellp.x, cellp.y):
+                return
+        # v0.3.3-p5 THE COIN COURTESY (the owner: "gogacoins can not be
+        # tapped ... fix that, it should accept this"): a tap ON the coin
+        # collects it - with a gem in hand, the gem HOPS THROUGH to the
+        # cell beyond (the match-through law)
+        if cellp.x >= 0 and not grid[cellp.x][cellp.y].is_empty() \
+                        and _is_coin(grid[cellp.x][cellp.y]):
+                if sel.x >= 0 and _hop_target(sel, cellp) != Vector2i(-9, -9):
+                        var a := sel
+                        sel = Vector2i(-1, -1)
+                        _paint_selection()
+                        _try_swap(a, _hop_target(a, cellp))
+                        return
+                _collect_coin_at(cellp)
                 return
         _select(cellp)
+
+
+## the hop law: dragging from a toward a coin, the gem rides THROUGH to the
+## cell beyond the coin (same direction) if that seat holds a swap-able gem
+func _hop_target(a: Vector2i, coin: Vector2i) -> Vector2i:
+        var d := coin - a
+        if absi(d.x) + absi(d.y) != 1:
+                return Vector2i(-9, -9)     # only a step lands on the coin
+        var beyond := coin + d
+        if not _playable(beyond.x, beyond.y) or grid[beyond.x][beyond.y].is_empty():
+                return Vector2i(-9, -9)
+        var cb: Dictionary = grid[beyond.x][beyond.y]
+        if _is_coin(cb) or _is_item(cb):
+                return Vector2i(-9, -9)
+        return beyond
 
 
 func _drag(from: Vector2, to: Vector2) -> void:
@@ -1428,6 +1585,15 @@ func _drag(from: Vector2, to: Vector2) -> void:
         else:
                 dir = Vector2i(1 if d.y > 0 else -1, 0)
         var b := a + dir
+        # v0.3.3-p5 THE MATCH-THROUGH LAW (the owner: "i want to move red
+        # gem through it to do a match and go down"): a drag INTO a coin
+        # carries the gem THROUGH it - the hop lands on the cell beyond
+        if b.x >= 0 and b.y >= 0 and b.x < ROWS and b.y < COLS \
+                        and not grid[b.x][b.y].is_empty() \
+                        and _is_coin(grid[b.x][b.y]):
+                var hop := _hop_target(a, b)
+                if hop != Vector2i(-9, -9):
+                        b = hop
         if not _playable(b.x, b.y):
                 return
         sel = Vector2i(-1, -1)
@@ -1503,6 +1669,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
                 return
         Jukebox.sfx("m_swap", -8.0)
         move_pops = 0
+        _drop_capture_rows()
         moves_made += 1
         round_moves += 1
         if mode == "jelly":
@@ -1930,11 +2097,12 @@ func _gem_pop_fx(p: Vector2, col: int, delay_s := 0.0) -> void:
                                 "max": 0.55, "r": randf_range(5.0, 12.0), "col": c, "hold": delay_s})
         rings.append({"pos": p, "r": 8.0, "life": 0.3 + delay_s, "max": 0.3,
                         "col": Color(c, 0.8), "w": 5.0, "hold": delay_s})
-        # THE TEMPLATE POP FRAME (the owner's zip effect pieces): the popped
-        # gem wears its matching pop frame for a beat - a real candy-crush
-        # style burst
+        # THE PER-COLOR SHATTER (v0.3.3-p5 THE DONUT PURGE: the old frames
+        # were the template zip's DONUTS - the owner: "when doing a correct
+        # match, it shows donuts"): the popped gem wears ITS OWN color's
+        # gem-shatter burst
         var fx := Sprite2D.new()
-        fx.texture = _t_popfx(col + randi() % 2)
+        fx.texture = _t_popfx(clampi(col, 0, 4))
         fx.position = p
         fx.scale = Vector2.ONE * cell_px / 120.0 * 0.2
         fx.z_index = 8
@@ -2006,6 +2174,7 @@ func _do_hyper_swap(a: Vector2i, b: Vector2i) -> void:
                                         pop[r * COLS + c] = true
                 pop[hyper_at.y * COLS + hyper_at.x] = true
         move_pops = 0
+        _drop_capture_rows()
         moves_made += 1
         round_moves += 1
         if mode == "jelly":
@@ -2198,55 +2367,116 @@ func _shake_node(n: Sprite2D, dur := 0.22) -> void:
 
 
 func _gravity() -> void:
-        var movers := []          # {node, ty, hold}
-        for c in COLS:
-                var write := ROWS - 1
-                for r in range(ROWS - 1, -1, -1):
-                        if _in_earth(r):
-                                # THE HARD LIMIT LAW (v0.3.3-p4, the owner:
-                                # "it should work like a real real hard limit
-                                # that nothing goes through it for real"):
-                                # the earth is never read NOR written - the
-                                # old pen started at ROWS-1 and a gem could
-                                # land INSIDE the sand band
-                                continue
-                        if _jelly_at(r, c):
-                                # THE JELLY PLUG LAW (the owner: "jelly do not
-                                # fall and nothing go past through it"): gems
-                                # above rest ON the jelly, nothing refills
-                                # under it
-                                write = r - 1
+        var movers := []          # {node, ty, hold} - the free-fall wave
+        var diag := []            # {node, to} - the fall-around slides
+        # v0.3.3-p5 THE SEGMENT SETTLE: the column is split into segments
+        # by its solids (standing dirt, jelly). Every segment compresses on
+        # its own; ONLY the segment connected to the sky refills (fresh
+        # gems enter from above the board - nothing teleports through a
+        # solid). THE POCKETS LAW rides here too: a dug hole belongs to the
+        # sky segment, so the gems FALL INTO IT (the owner: "an area with
+        # no sand in same row, it should let the gems fit in"), while a
+        # pocket sealed under dirt or a jelly plug stays sealed.
+        var guard := 0
+        while guard < 40:
+                guard += 1
+                var moved := false
+                for c in COLS:
+                        var r := ROWS - 1
+                        while r >= 0:
+                                if _earth_at(r, c) or _jelly_at(r, c):
+                                        r -= 1
+                                        continue
+                                var seg_top := r
+                                while seg_top >= 0 and not _earth_at(seg_top, c) \
+                                                and not _jelly_at(seg_top, c):
+                                        seg_top -= 1
+                                var write := r
+                                for rr in range(r, seg_top, -1):
+                                        var cell: Dictionary = grid[rr][c]
+                                        if cell.is_empty():
+                                                continue
+                                        if rr != write:
+                                                grid[write][c] = cell
+                                                grid[rr][c] = {}
+                                                movers.append({"node": cell["node"],
+                                                                "ty": _cell_pos(write, c).y})
+                                                moved = true
+                                        write -= 1
+                                # refill only when this segment touches the sky
+                                if seg_top < 0:
+                                        for rr in range(write, seg_top, -1):
+                                                if not grid[rr][c].is_empty():
+                                                        continue
+                                                var fresh := _new_cell(rr, c, board_o.y - cell_px * 1.2)
+                                                grid[rr][c] = fresh
+                                                movers.append({"node": fresh["node"],
+                                                                "ty": _cell_pos(rr, c).y,
+                                                                "hold": randf_range(0.0, 0.06)})
+                                r = seg_top
+                # v0.3.3-p5 THE FALL-AROUND LAW (the owner's candy-crush
+                # school: "the line next to the jelly line, in the empty
+                # grids, it will make the gems fell to that side in an
+                # accurate way then that side will get filled from top
+                # again"): gems resting on a jelly plug SLIDE diagonally
+                # around it into the open seats beside, keep falling, and
+                # both sides refill from the top
+                if mode == "jelly" and _jelly_slide_around(diag):
+                        moved = true
+                if not moved:
+                        break
+        # one physical wave - every mover free-falls and lands with a bounce
+        for m in movers:
+                _fall_to(m["node"], float(m["ty"]), float(m.get("hold", 0.0)))
+        # the slides tween on their diagonal path
+        for d in diag:
+                var n: Sprite2D = d["node"]
+                if n == null or not is_instance_valid(n):
+                        continue
+                var tw := n.create_tween()
+                tw.tween_property(n, "position", d["to"], 0.16) \
+                                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+        if not movers.is_empty():
+                await _await_bodies()
+        if not diag.is_empty():
+                await get_tree().create_timer(0.17, false).timeout
+        await get_tree().create_timer(0.04, false).timeout
+
+
+## the diagonal escape: one pass of slide-around moves (the caller loops
+## until quiet). A gem slides when it cannot fall straight (the seat below
+## is a plug) and a diagonal seat beside the plug is open - cutting the
+## corner through a solid is forbidden.
+func _jelly_slide_around(diag: Array) -> bool:
+        var moved := false
+        for r in range(ROWS - 2, -1, -1):
+                for c in COLS:
+                        if _jelly_at(r, c) or _earth_at(r, c):
                                 continue
                         var cell: Dictionary = grid[r][c]
                         if cell.is_empty():
                                 continue
-                        while write >= 0 and (_in_earth(write) or _jelly_at(write, c)):
-                                write -= 1
-                        if write < 0:
-                                break
-                        if r != write:
-                                grid[write][c] = cell
+                        var below := r + 1
+                        if not _jelly_at(below, c):
+                                continue        # only a PLUG spawns a slide
+                        var dirs := [1, -1] if randf() < 0.5 else [-1, 1]
+                        for dc in dirs:
+                                var nc: int = c + dc
+                                if nc < 0 or nc >= COLS:
+                                        continue
+                                if _jelly_at(r, nc) or _earth_at(r, nc):
+                                        continue    # no corner-cut through a solid
+                                if _jelly_at(below, nc) or _earth_at(below, nc):
+                                        continue
+                                if not grid[below][nc].is_empty():
+                                        continue
+                                grid[below][nc] = cell
                                 grid[r][c] = {}
-                                movers.append({"node": cell["node"],
-                                                "ty": _cell_pos(write, c).y})
-                        write -= 1
-                # refill every empty seat above the last write - never inside
-                # earth, never inside jelly
-                for r in range(mini(write, ROWS - 1), -1, -1):
-                        if _in_earth(r) or _jelly_at(r, c):
-                                continue
-                        if not grid[r][c].is_empty():
-                                continue
-                        var cell := _new_cell(r, c, board_o.y - cell_px * 1.2)
-                        grid[r][c] = cell
-                        movers.append({"node": cell["node"], "ty": _cell_pos(r, c).y,
-                                        "hold": randf_range(0.0, 0.06)})
-        # one physical wave - every mover free-falls and lands with a bounce
-        for m in movers:
-                _fall_to(m["node"], float(m["ty"]), float(m.get("hold", 0.0)))
-        if not movers.is_empty():
-                await _await_bodies()
-        await get_tree().create_timer(0.04, false).timeout
+                                diag.append({"node": cell["node"],
+                                                "to": _cell_pos(below, nc)})
+                                moved = true
+                                break
+        return moved
 
 
 # ================================================================ the coin
@@ -2504,6 +2734,19 @@ func _after_move() -> void:
                         # NEVER step on their own - they ride the gravity
                         # waves the player's matches open under them
                         await _drop_settle()
+                        if over:
+                                return
+                        # v0.3.3-p5 THE RISKY PARCEL LAW (the owner: "make
+                        # the item if a move happened and it did not moved
+                        # down a single grid, makes it go up by one grid,
+                        # and make it risky because if it went up, and the
+                        # next move still up, the game ends, similar to
+                        # butterflies but a little different"): a parcel
+                        # that did not descend CLIMBS one row - two climbs
+                        # in a row and the parcels climb away
+                        await _drop_rise_check()
+                        if over:
+                                return
                         # THE SPAWN-AFTER-MATCH LAW: a move that popped
                         # something feeds the next parcel in from the top
                         if move_pops > 0 and drop_left > 0 and _count_items() < 4:
@@ -2530,6 +2773,96 @@ func _mode_aftercare() -> void:
                         _icr_win_lose()
                 "drop":
                         await _drop_settle()
+                        # a power blast that carried a parcel down CALMS it
+                        # (the risky climb counts real MOVES only)
+                        if grid.size() >= ROWS:
+                                for r in ROWS:
+                                        for c in COLS:
+                                                var cell: Dictionary = grid[r][c]
+                                                if not cell.is_empty() and _is_item(cell):
+                                                        cell["rose"] = 0
+
+
+## the parcel rows at the move's start (the risky-climb comparison)
+func _drop_capture_rows() -> void:
+        if mode != "drop":
+                return
+        drop_prev.clear()
+        if grid.size() < ROWS:
+                return
+        for r in ROWS:
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if not cell.is_empty() and _is_item(cell):
+                                drop_prev[int(cell.get("drop_id", -1))] = r
+
+
+## v0.3.3-p5 THE RISKY PARCEL LAW (the owner: "make the item if a move
+## happened and it did not moved down a single grid, makes it go up by one
+## grid, and make it risky because if it went up, and the next move still
+## up, the game ends, similar to butterflies but a little different"): a
+## parcel that did not descend on this move CLIMBS one row with a red
+## warning; two climbs in a row (or a second climb at the top row) and the
+## parcels climb away - the run ends.
+func _drop_rise_check() -> void:
+        if mode != "drop" or over or grid.size() < ROWS:
+                return
+        var risers := []
+        for r in ROWS:
+                for c in COLS:
+                        var cell: Dictionary = grid[r][c]
+                        if cell.is_empty() or not _is_item(cell):
+                                continue
+                        var id := int(cell.get("drop_id", -1))
+                        if not drop_prev.has(id):
+                                continue        # born mid-move - it waits
+                        if r > int(drop_prev[id]):
+                                cell["rose"] = 0
+                                continue        # it descended - safe
+                        risers.append(Vector2i(r, c))
+        drop_prev.clear()
+        if risers.is_empty():
+                return
+        for at in risers:
+                var r: int = at.x
+                var c: int = at.y
+                if not grid[r][c].is_empty() and not _is_item(grid[r][c]):
+                        continue        # the wave ate it mid-check
+                var cell: Dictionary = grid[r][c]
+                var rose: int = int(cell.get("rose", 0)) + 1
+                if rose >= 2:
+                        _banner("THE PARCELS CLIMBED AWAY!", false)
+                        _finish_run("the parcels climbed away")
+                        return
+                cell["rose"] = rose
+                if r > 0:
+                        # the climb: swap with the seat above, animate both
+                        _swap_model(r, c, r - 1, c)
+                        var above: Dictionary = grid[r - 1][c]
+                        var below2: Dictionary = grid[r][c]
+                        var tw_nodes := []
+                        if is_instance_valid(above.get("node")):
+                                tw_nodes.append({"n": above["node"],
+                                                "to": _cell_pos(r - 1, c)})
+                        if not below2.is_empty() and is_instance_valid(below2.get("node")):
+                                tw_nodes.append({"n": below2["node"],
+                                                "to": _cell_pos(r, c)})
+                        for m in tw_nodes:
+                                var n: Sprite2D = m["n"]
+                                var tw := n.create_tween()
+                                tw.tween_property(n, "position", m["to"], 0.2) \
+                                                .set_trans(Tween.TRANS_SINE) \
+                                                .set_ease(Tween.EASE_IN_OUT)
+                        var pn: Sprite2D = above.get("node")
+                        if is_instance_valid(pn):
+                                var wt := pn.create_tween()
+                                wt.tween_property(pn, "modulate",
+                                                Color(1.6, 0.5, 0.5), 0.14)
+                                wt.tween_property(pn, "modulate", Color.WHITE, 0.3)
+                _ring_fx(_cell_pos(r, c), Color(1.0, 0.4, 0.4))
+        Jukebox.sfx("m_grace", -7.0, 0.8)
+        _banner("A PARCEL ROSE - ONE MORE AND IT'S OVER!", false)
+        await get_tree().create_timer(0.22, false).timeout
 
 
 func _tick_challenge(delta: float) -> void:
@@ -3230,7 +3563,8 @@ func _drop_spawn(c: int) -> void:
         var tw := n.create_tween()
         tw.tween_property(n, "position", target, 0.28) \
                         .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-        grid[0][c] = {"color": -2, "item": true, "node": n}
+        grid[0][c] = {"color": -2, "item": true, "node": n, "drop_id": drop_seq}
+        drop_seq += 1
         drop_left -= 1
         Jukebox.sfx("m_itemspawn", -6.0)
 
@@ -3308,15 +3642,18 @@ func _tick_drop(delta: float) -> void:
 
 
 func _tick_butterflies(delta: float) -> void:
-        # v0.3.3-p4 THE ONE-STEP LAW: the old pace clock multiplied the rise
-        # (the owner rode 4 rows per move) - the difficulty now walks the
-        # HATCH clock instead: new butterflies join more often
+        # v0.3.3-p5 THE INTENSITY LADDER (the owner: "it just spawns one
+        # butterfly after a long time then does not spawn more"): the first
+        # hatch at 10s, the gap drops 1s per 5 flies spawned (10, 9, 8,
+        # 7 ...), and every hatch brings 1..4 flies. The old clock hatched
+        # on a 40% dice roll and ONLY when the board was flyless - the
+        # mode had no pulse at all.
         fly_secs += delta
         hatch_clock -= delta
         if hatch_clock <= 0.0:
-                hatch_clock = maxf(4.5, 7.0 - 0.02 * fly_secs)
+                hatch_clock = maxf(FLY_GAP_MIN,
+                                FLY_GAP0 - float(fly_spawned / 5))
                 _tick_butterfly_hatch()
-                _tick_butterfly_hatch()      # two seats a beat as time walks
 
 
 func _rise_butterflies() -> void:
@@ -3380,6 +3717,16 @@ func _rise_butterflies() -> void:
                                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
         if not movers.is_empty():
                 await get_tree().create_timer(max_dur + 0.02, false).timeout
+        # v0.3.3-p5 THE RISE-MATCH LAW (the owner: "if the fly is in a red
+        # gem, and there is 2 red gems over it, when it moves, it does not
+        # do a match, but if i moved it, it will do a match, this is
+        # inaccurate logic ... whatever three same-gems are real valid
+        # match"): the rise is a real board change - whatever lines it
+        # forms RESOLVE right here, before the spider even looks
+        if not over and not _find_matches().is_empty():
+                await _resolve_loop()
+                if over:
+                        return
         # THE GRACE LAW, the walk: a butterfly already waiting on row 0 is
         # grabbed; one that just landed gets the spider's stare for a move
         for c in COLS:
@@ -3480,6 +3827,7 @@ func _hatch_butterfly(r: int, c: int) -> void:
         if _is_coin(cell):
                 return
         cell["wing"] = true
+        fly_spawned += 1               # the ladder counts every hatch
         # v0.3.3-p2: the wings are BAKED into the gem's own texture - they
         # move with the sprite forever, nothing can desync or overlap
         _retexture_cell(r, c)
@@ -3494,26 +3842,33 @@ func _hatch_butterfly(r: int, c: int) -> void:
 
 
 var peace_secs := 0.0
-var hatch_clock := 6.0
-var fly_secs := 0.0            # the butterflies run age (the hatch ramp)
+var hatch_clock := 10.0         # v0.3.3-p5: the ladder starts at 10s
+var fly_secs := 0.0            # the butterflies run age
+var fly_spawned := 0            # flies hatched this run (the ladder step)
 
 func _tick_butterfly_hatch_timer(delta: float) -> void:
         pass                     # v0.3.3-p4: the hatch rides _tick_butterflies
 
 
-## new butterflies hatch on the bottom row as the board thins
+## new butterflies hatch on the bottom row - THE INTENSITY LADDER: 1..4
+## flies per hatch, the gap walks down 1s per 5 flies spawned
 func _tick_butterfly_hatch() -> void:
-        if mode != "butterflies" or busy:
+        if mode != "butterflies":
                 return
-        var count := 0
-        for r in ROWS:
-                for c in COLS:
-                        var cell: Dictionary = grid[r][c]
-                        if not cell.is_empty() and bool(cell.get("wing", false)):
-                                count += 1
-        if count == 0 and randf() < 0.4:
-                var c := randi() % COLS
-                _hatch_butterfly(ROWS - 1, c)
+        if busy:
+                hatch_clock = maxf(hatch_clock, 0.5)   # wait out the wave
+                return
+        var want := FLY_SPAWN_MIN + randi() % (FLY_SPAWN_MAX - FLY_SPAWN_MIN + 1)
+        var cols := []
+        for c in COLS:
+                if _playable(ROWS - 1, c) and not grid[ROWS - 1][c].is_empty() \
+                                and not _is_coin(grid[ROWS - 1][c]) \
+                                and not _is_item(grid[ROWS - 1][c]) \
+                                and not bool(grid[ROWS - 1][c].get("wing", false)):
+                        cols.append(c)
+        cols.shuffle()
+        for i in mini(want, cols.size()):
+                _hatch_butterfly(ROWS - 1, cols[i])
 
 
 func _tick_ice(delta: float) -> void:
@@ -3726,19 +4081,41 @@ func _tick_mine(delta: float) -> void:
                 return
         mine_rise_clock -= delta
         if mine_rise_clock <= 0.0:
+                # v0.3.3-p5 THE BUSY GATE: the rise never fires under a live
+                # resolve, and a double rise walks ONE AT A TIME (the old
+                # un-awaited pair lifted the model twice while the first
+                # wave was still flying - the owner's mixed-bug family:
+                # "the new line comes with the empty areas and the top line
+                # become full")
+                if busy or mine_rising:
+                        mine_rise_clock = 0.05
+                        return
                 mine_rise_clock = MINE_ROW_TIME
                 var rows := 1
                 if randf() < MINE_DOUBLE:
                         rows = 2         # "some times it make two rows"
-                for i in rows:
-                        _mine_rise()
+                mine_rising = true
+                _mine_rise_deferred(rows)
+
+
+## the rises run sequentially, never interleaved
+func _mine_rise_deferred(rows: int) -> void:
+        for i in rows:
+                await _mine_rise()
+                if over:
+                        break
+        mine_rising = false
 
 
 ## one earth row rises from the bottom - v0.3.3-p3 THE BOARD LIFT (the owner:
 ## "when a line comes, it will raise the top line up and remove it in a
-## smooth way"): the WHOLE board glides up one cell, the top row glides out
-## of the frame and fades, the freed bottom row becomes pure dirt sliding in
-## from below. Nothing overlaps - the model moves first, every node tweens.
+## smooth way"): the whole board glides up one cell, the top row glides out
+## of the frame and fades. v0.3.3-p5 THE WORLD PUSH (the owner's mixed-bug
+## report: "when it moves up while the line has empty areas, the new line
+## comes with the empty areas and the top line become full"): the DIRT ROWS
+## now RIDE UP with the board exactly like the gems do - the holes keep
+## their places inside the band - and the fresh row slides in at the BOTTOM
+## (the real Diamond Mine push), never re-laid at the top.
 func _mine_rise() -> void:
         if earth_top <= 0:
                 return
@@ -3754,24 +4131,40 @@ func _mine_rise() -> void:
                         tw0.tween_property(tn, "modulate:a", 0.0, 0.28)
                         tw0.chain().tween_callback(tn.queue_free)
                 grid[0][c] = {}
-        # 2 - the model lifts: rows 1..earth_top-1 move up one row
+        # 2 - the model lifts: every row moves up one
         for r in range(1, ROWS):
                 grid[r - 1] = grid[r]
         # the coin rode row 0 out of the frame - lost, the clock restarts
         coin_cell = Vector2i(-1, -1)
         coin_clock = COIN_EVERY
-        # 3 - the earth band grows: the freed last gem row becomes fresh dirt
+        # 3 - THE WORLD PUSH: the dirt rows shift up with everything else
+        # (the holes ride inside the band), the fresh row enters at the bottom
+        for r in range(earth_top, ROWS):
+                earth[r - 1] = earth[r]
         earth_top -= 1
         earth.resize(ROWS)
-        _lay_earth_row(earth_top, 1.0)
+        _lay_earth_row(ROWS - 1, 1.0)
         # 4 - every surviving gem glides to its new row (one wave, together)
         var movers := []
-        for r in range(0, earth_top):
+        for r in range(0, ROWS):
                 for c in COLS:
                         var cell: Dictionary = grid[r][c]
                         if cell.is_empty() or not is_instance_valid(cell.get("node")):
                                 continue
                         movers.append({"node": cell["node"], "to": _cell_pos(r, c)})
+        # 5 - the dirt glides with the world (every surviving dirt node rides
+        # one row up from where it stands)
+        for r in range(earth_top, ROWS - 1):
+                if earth[r] == null:
+                        continue
+                for c in COLS:
+                        if c >= earth[r].size():
+                                continue
+                        var e: Dictionary = earth[r][c]
+                        if e.is_empty() or not e.has("node") \
+                                        or not is_instance_valid(e["node"]):
+                                continue
+                        movers.append({"node": e["node"], "to": _cell_pos(r, c)})
         var max_dur := 0.0
         for m in movers:
                 var n: Sprite2D = m["node"]
@@ -3781,8 +4174,8 @@ func _mine_rise() -> void:
                 var tw := n.create_tween()
                 tw.tween_property(n, "position", m["to"], dur) \
                                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-        # 5 - the fresh dirt slides in from below the frame
-        var row: Array = earth[earth_top]
+        # 6 - the fresh dirt slides in from below the frame
+        var row: Array = earth[ROWS - 1]
         for c in COLS:
                 var e: Dictionary = row[c]
                 if e.has("node") and is_instance_valid(e["node"]):
@@ -3790,7 +4183,7 @@ func _mine_rise() -> void:
                         n.position.y += cell_px
                         var tw2 := n.create_tween()
                         tw2.tween_property(n, "position:y",
-                                        _cell_pos(earth_top, c).y, 0.3) \
+                                        _cell_pos(ROWS - 1, c).y, 0.3) \
                                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
                         if n.has_meta("tr_spr"):
                                 var sp: Sprite2D = n.get_meta("tr_spr")
@@ -3798,7 +4191,7 @@ func _mine_rise() -> void:
                                         sp.position.y += cell_px
                                         var tw3 := sp.create_tween()
                                         tw3.tween_property(sp, "position:y",
-                                                        _cell_pos(earth_top, c).y, 0.3) \
+                                                        _cell_pos(ROWS - 1, c).y, 0.3) \
                                                         .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
         if max_dur > 0.0:
                 await get_tree().create_timer(max_dur + 0.05, false).timeout
@@ -3862,30 +4255,36 @@ func _earth_sprite(r: int, c: int, kind: String, tr: String) -> Sprite2D:
         return n
 
 
-## a match wave drills the columns whose MATCHED CELLS sit directly on the
-## earth (match against the dirt to dig - the Bejeweled Classic feel).
+## a match wave drills the earth: v0.3.3-p5 THE POCKETS DIG - every matched
+## cell digs the standing earth cell DIRECTLY below itself, so gems sitting
+## inside a dug hole dig DEEPER (the old rule only saw the gem row above the
+## band, so a hole the gems had fallen into went dead).
 ## v0.3.3-p3 THE LAYER LAW: clay takes two digs, rock only answers to the
 ## special blasts (blast_keys) - a plain match just clanks off it.
 func _mine_dig(pop: Dictionary, blast_keys := {}) -> void:
         if earth_top >= ROWS:
                 return
-        var cols := {}
+        var digs := []
         for key in pop.keys():
                 var r := int(key) / COLS
                 var c := int(key) % COLS
-                if r == earth_top - 1:
-                        cols[c] = true
-        for ci in cols.keys():
-                var c := int(ci)
-                var row: Array = earth[earth_top]
+                var dr: int = r + 1
+                if dr < earth_top or dr >= ROWS or not _earth_at(dr, c):
+                        continue
+                digs.append(dr * COLS + c)
+        digs.sort()
+        for dkey in digs:
+                var dr: int = int(dkey) / COLS
+                var c: int = int(dkey) % COLS
+                var row: Array = earth[dr]
                 if row.size() <= c:
                         continue
                 var e: Dictionary = row[c]
                 if e.is_empty() or not e.has("node") \
                                 or not is_instance_valid(e["node"]):
                         continue
-                var force: bool = blast_keys.has((earth_top - 1) * COLS + c) \
-                                or blast_keys.has(earth_top * COLS + c)
+                var force: bool = blast_keys.has(dkey) \
+                                or blast_keys.has((dr - 1) * COLS + c)
                 var kind := String(e.get("kind", "dirt"))
                 if kind == "rock" and not force:
                         Jukebox.sfx("m_rockhit", -6.0, randf_range(0.9, 1.2))
@@ -4504,7 +4903,9 @@ func _refresh_hud() -> void:
                                                 if not grid[r][c].is_empty() \
                                                                 and bool(grid[r][c].get("wing", false)):
                                                         wings_n += 1
-                        chip_info2.text = "flies %d - one row per move" % wings_n
+                        # v0.3.3-p5: the owner cut the guide words ("this is
+                        # shitty thing that we do not use in our designing")
+                        chip_info2.text = "flies %d" % wings_n
                 "ice":
                         chip_info.text = "heat %d%%" % int(temp * 100.0)
                         var worst := 0
@@ -4540,9 +4941,19 @@ func _refresh_hud() -> void:
                                         lim = "mv %d - %ds" % [maxi(0, drop_moves),
                                                         int(ceilf(maxf(0.0, drop_time)))]
                         chip_info.text = "parcels left %d" % (drop_left + _count_items())
-                        chip_info2.text = "%s  -  round %d" % [lim, drop_level]
+                        var any_rose := false
+                        if grid.size() >= ROWS:
+                                for r in ROWS:
+                                        for c in COLS:
+                                                if not grid[r][c].is_empty() \
+                                                                and _is_item(grid[r][c]) \
+                                                                and int(grid[r][c].get("rose", 0)) > 0:
+                                                        any_rose = true
+                        chip_info2.text = "%s  -  round %d%s" % [lim, drop_level,
+                                        "  -  RISE!" if any_rose else ""]
                         chip_info2.add_theme_color_override("font_color",
-                                Color("d84a3a") if (drop_moves <= 4 or drop_time <= 10.0) \
+                                Color("d84a3a") if (any_rose or drop_moves <= 4 \
+                                                or drop_time <= 10.0) \
                                                 else Color("35210f"))
 
 

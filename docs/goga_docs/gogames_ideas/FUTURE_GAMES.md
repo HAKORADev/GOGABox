@@ -87,6 +87,9 @@ one concept two flavors) and the beyblade battling arena.
 - **heavy-weapon-like** - PopCap's Heavy Weapon (the owner's "heavy tank
   (or tank war, i forgot the real name)"): side-scrolling tank WAR, hold to
   aim and spray, waves of planes, the nuke when it all gets too much.
+- **craze-caves-like** — Gamesnacks' Craze Caves, same concept (the owner's
+  v0.3.3-p5 dump): dig/drill your way through the caves, grab everything
+  shiny, don't get crushed - the one-thumb dig-and-collect loop.
 - **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
   chain, match 3 of a color, pop the run - never let the chain reach the
   hole.
@@ -249,8 +252,42 @@ one concept two flavors) and the beyblade battling arena.
 - **plants-vs-zombies-like** - PopCap PvZ: lane defense - plant your
   fighters on the grid, harvest the sun economy, stop the wave before it
   crosses the lawn.
+- **swamp-attack-like** — Swamp Attack, the owner: "a game like swamp attack
+  in that concept/type of tower-defense in a different way": defend the
+  porch, tap-to-shoot the horde, reload rhythm + power-ups - tower defense
+  re-skinned as a point-and-hold shooter.
 - (the beyblade-like above also leans here - parts loadout before the
   match is a strategy layer on top of an arcade battle.)
+
+## The kitchen shelf (the owner's v0.3.3-p5 dump: three serving styles +
+## one idle)
+- **cooking-fever-like** — the classic: the restaurant with stations, the
+  customer queue patience bars, cook-serve-upgrade loop, level targets.
+  (Owner: "a game like cooking fever where there is food serving in that
+  style".)
+- **cooking-dash-like** — the DASH flavor: YOU are the cook AND the
+  waiter - seat them, take the order, cook, deliver, bus the tables, all
+  in one frantic loop, combos for chained service.
+- **burger-shop-like** — the Burger Shop style of COLLECT-AND-SERVE: the
+  machine drops ingredients, the player COLLECTS them in order and
+  assembles the burger - build-the-line satisfaction more than panic.
+- **idle-restaurant** — the fourth one, the owner: "maybe fourth but this
+  will be an idle restaurant under the study idle games" - tables earn
+  while away, hire cooks/waiters, unlock recipes; the idle-games study
+  shelf applies.
+
+## The fighter shelf (the owner's v0.3.3-p5 dump: three swords, zero guns)
+- **shadow-fight-like** — Shadow Fight 1v1: silhouette fighters, the
+  martial-arts move set (punches, kicks, the weapon swings), the duel on
+  one screen. (Owner: "a game like shadow fight 1v1 ofc".)
+- **side-scroll-sword-fighter** — side-scrolling SWORDS fight and NOT
+  shooting (the owner's words): run, jump, slash - melee ranges, blocks
+  and parries, waves of blade enemies. A rhythm-of-steel brawler.
+- **ronin-samurai-rogue-like** — "Ronin: The Last Samurai" Android energy:
+  the owner says it "feels like brotato but with real swords instead of
+  shooting" - the run-based horde survivors loop, but every weapon is a
+  blade (katana arcs, dash-slashes, parry windows), pick sword perks
+  between waves.
 
 ## Ports & redesigns
 - **the rest of the python game box games** — carried over with proper
@@ -303,3 +340,12 @@ balloon connect + circle connect were mined from My Talking Angela 2).
 - **tap the frog** — the owner's add (the v0.2.5 round, while Snowy Tower
   was being rebuilt): a whole box of quick tap-timing mini-games around one
   frog. Mine it for reflex/timing mini-game shapes.
+- **MSN Games** — the owner's v0.3.3-p5 add: the classic MSN Games vault
+  (board/card/puzzle casual classics) - study the shelf and mine the
+  evergreen shapes.
+- **gamesnacks** — the owner's v0.3.3-p5 add (craze caves' home): Google's
+  quick-play casual snack site - study HOW each game stays one-thumb +
+  instant-resume, and mine the catalog.
+- **google play casual games** — the owner's v0.3.3-p5 add: the Play Store
+  casual section and "any games" there - walk the charts regularly, mine
+  what's trending and what holds.
