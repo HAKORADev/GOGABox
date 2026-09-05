@@ -940,6 +940,51 @@ def scene_xo(spec=XO_SPEC):
     return sc.render()
 
 
+# ------------------------------------------------------------------ v0.3.4
+# COSMIC SPUD: SPUDNIK holds the line on the decayed desert, the swarm
+# closing in from both flanks, an xp gem and a cosmic coin on the ground.
+def scene_spud():
+    sc = Scene()
+    # the desert day: bleached ochre bands + a warm horizon glow
+    sc.backdrop((196, 158, 106), (150, 116, 72))
+    sc.glow(W * 0.5, H * 0.30, 300, (255, 224, 160), 60)
+    # cracked-ground speckles (the baked ground's language)
+    import random as _r
+    rng = _r.Random(3407)
+    for i in range(130):
+        sx = rng.randint(0, W)
+        sy = rng.randint(int(H * 0.25), H)
+        r = 1 + (i % 3)
+        c = (150 + (i * 7) % 30, 116 + (i * 5) % 24, 72)
+        sc.ellipse([sx - r, sy - r, sx + r, sy + r], fill=c + (110,))
+    # THE SWARM: blabs low, a sprinter + a chunk behind, the wraith looming
+    swarm = [
+        ("enemies/blab.png", 0.22, 0.66, 2.2),
+        ("enemies/blab.png", 0.34, 0.82, 1.7),
+        ("enemies/sprinter.png", 0.70, 0.78, 2.0),
+        ("enemies/chunk.png", 0.84, 0.62, 2.4),
+        ("enemies/wraith.png", 0.12, 0.30, 2.6),
+        ("enemies/minion.png", 0.55, 0.88, 1.6),
+    ]
+    for rel, fx, fy, s in swarm:
+        sc.glow(fx * W, fy * H, 44, (255, 120, 90), 34)
+        sc.stamp(load_sprite("games/cosmic_spud/" + rel), fx * W, fy * H, scale=s)
+    # the loot on the ground: an xp gem + the cosmic coin
+    sc.glow(W * 0.62, H * 0.86, 30, (90, 230, 255), 120)
+    sc.stamp(load_sprite("games/cosmic_spud/pickups/xp.png"), W * 0.62, H * 0.86, scale=2.4)
+    sc.glow(W * 0.38, H * 0.90, 30, (255, 208, 84), 120)
+    sc.stamp(load_sprite("games/cosmic_spud/pickups/coin.png"), W * 0.38, H * 0.90, scale=2.4)
+    # SPUDNIK center-right, aiming left into the swarm, muzzle flash lit
+    hx, hy = W * 0.74, H * 0.56
+    sc.glow(hx, hy, 120, (255, 240, 200), 70)
+    hero = load_sprite("games/cosmic_spud/hero/spudnik.png")
+    hero = hero.rotate(-38, expand=True, resample=Image.BICUBIC)
+    sc.stamp(hero, hx, hy, scale=3.4)
+    sc.stamp(load_sprite("games/cosmic_spud/fx/muzzle.png"), hx - 120, hy - 78, scale=0.7)
+    sc.vignette(90)
+    return sc.render()
+
+
 # ----------------------------------------------------------- registry/CLI
 
 # Real-game scenes (composed, 960x640, no baked text - rule R2).
@@ -953,11 +998,12 @@ SCENES = {
     "merge": scene_merge,
     "dario": scene_dario,
     "xo": scene_xo,
+    "spud": scene_spud,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks
-# as games leave the workshop - dario/xo left in v0.1.7.
-SOON_NAMES = {"hen": "HEN INVADERS", "spud": "COSMIC SPUD",
+# as games leave the workshop - dario/xo left in v0.1.7, spud in v0.3.4.
+SOON_NAMES = {"hen": "HEN INVADERS",
               "maze": "ESCAPE THE MAZE", "matcher": "MATCHER",
               "keys": "KEY SINGER", "poptd": "POP TD"}
 

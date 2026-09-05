@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "project": "gogabox",
-  "_doc": "Every visual/audio asset the MATCHER game wears, where it came from, its license, and how to re-fetch or re-derive it. Re-derive: python3 tools/v033p3_art.py + python3 tools/v033p3_sfx.py (patch 3 re-derives the p1/p2 set too). All sources CC0 or the owner's own upload.",
+  "_doc": "Every visual/audio asset the MATCHER and COSMIC SPUD games wear, where it came from, its license, and how to re-fetch or re-derive it. Re-derive: python3 tools/v033p3_art.py + python3 tools/v033p3_sfx.py (patch 3 re-derives the p1/p2 set too). All sources CC0 or the owner's own upload. COSMIC SPUD (v0.3.4) re-derive: python3 tools/v034_cs_art.py + python3 tools/v034_cs_audio.py (the raw hunt cache lives outside the repo; the manifest lines below carry the sources).",
   "sources": [
     {
       "id": "kenney-fonts",
@@ -82,6 +82,27 @@
       "url": "(owner upload - GameMaker template project)",
       "license": "the owner's own asset drop - project use",
       "used_for": "v0.3.3-p3 THE DEFAULTS: bg/cell_tpl_light+dark (the board checker), bg/bg_tpl (the default backdrop), fx/popfx_0..7 (the pop burst frames), the richer gems/donut_0..4 (objective tokens), matcher_game.mp3 (the in-game music), and most SFX: m_swap, m_land, m_pop_candy, m_match_soft/big, m_invalid, m_tok_bomb, m_tok_whoosh, m_arm, m_shuffle, m_freeze, m_jelly_spread, m_gulp, m_special, m_goal, m_win_fanfare, m_lose_org, m_ui, m_ui_close"
+    },
+    {
+      "id": "cs-kenney-sprites",
+      "name": "Kenney - Top-down Shooter + Top-down Tanks + RTS Sci-fi + Tower Defense + Particle Pack (via GitHub mirrors of the kenney.nl packs; kenney.nl itself blocks curl)",
+      "url": "https://kenney.nl/assets/topdown-shooter ; mirrors on github.com (see download/cs_assets/MANIFEST.md for exact mirror URLs)",
+      "license": "CC0 1.0 Universal",
+      "used_for": "assets/games/cosmic_spud/fx/* (the particle pack subset: circle/dirt/fire/flame/flare/light/smoke/star/muzzle, downscaled 128px) - the enemy/unit/hero/weapon/bullet/ground sprites are PIL-DRAWN in the same style (tools/v034_cs_art.py)"
+    },
+    {
+      "id": "cs-oga-cc0",
+      "name": "OpenGameArt CC0 - the audio hunt (music loops + gun impacts)",
+      "url": "https://opengameart.org/ (exact per-file URLs in download/cs_assets/MANIFEST.md)",
+      "license": "CC0 1.0 Universal",
+      "used_for": "assets/audio/music/cs_desert_day.ogg (desert_loop.mp3), cs_desert_night.ogg (manaosdrone1.ogg), cs_park_day.ogg (musicbox3_sad_tune.ogg), cs_park_night.ogg (aurora.mp3), cs_boss.ogg (Cinematic_percussion_loop_2.wav) - all ffmpeg-converted to ogg 128k; assets/audio/sfx/cs_wave_horn.wav (call_to_war.wav trimmed 0-4s), cs_shot_*.wav (impacts_gun pack), cs_shield_crack/cs_crit/cs_hit.ogg (kenney impact pack), cs_buy/cs_draft/cs_hover (kenney ui), cs_xp/cs_levelup/cs_heal/cs_error/cs_death (kenney digital), cs_coin/cs_sell (kenney rpg), cs_shot_laser/cs_shot_minigun/cs_boom/cs_boom_big/cs_aura/cs_shield_up/cs_charge/cs_burn/cs_flash/cs_kill_big (kenney sci-fi)"
+    },
+    {
+      "id": "cs-synth",
+      "name": "numpy-synthesized gaps (tools/v034_cs_audio.py, 44.1k stereo WAV)",
+      "url": "this repo",
+      "license": "HAKORADev (same as the code)",
+      "used_for": "cs_hurt.wav (player grunt), cs_boss_roar.wav (layered saw growl), cs_frost.wav (icy shimmer), cs_rail.wav (charge+crack), cs_tick.wav (aura thump)"
     }
   ],
   "audit": {

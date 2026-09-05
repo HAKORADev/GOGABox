@@ -407,13 +407,44 @@ const GAMES := [
         # v0.1.4 THE MYSTERY QUEUE: only the first 4 mystery-able teasers
         # (catalog order) exist at once - the rest stay inexistent until a
         # queue slot frees (Roadmap.MYSTERY_CAP).
-        {"id": "spud", "title": "Cosmic Spud", "tag": "wave shooter port", "coming_soon": true,
+        # ---- v0.3.4 COSMIC SPUD graduated from the v0.1.x teaser into the
+        # REAL game (the Brotato-competitor): the rogue-like top-down shooter
+        # with the camera law, the 6 starts, 12 enemies, bosses every 10
+        # waves, the drafts with teeth, the XP tree, merging, allies, themes
+        # and the cosmic-coin economy. The kill bonus is /200 (the owner's
+        # law). The old "real 24h hours" teaser ritual retires with it.
+        {
+                "id": "cosmic_spud", "title": "Cosmic Spud", "tag": "the potato vs the swarm",
+                "script": "res://game/games/cosmic_spud/cosmic_spud.gd",
                 "thumb": "res://assets/thumbs/spud.png",
-                "desc": "One potato against the galaxy. Hold the line, spud.",
-                "genres": {"main": ["shooter", "sci-fi"], "sub": ["singleplayer", "survival"]},
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 200, "price": 500, "fee": 50, "shop": true,
+                "banner": true,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 500, "needs_games": 3},
+                "desc": "THE BROTATO-COMPETITOR: SPUDNIK the potato cosmonaut drops into a ground bigger than the screen - the camera follows, the world keeps going. SIX starts (Soldier/Ranger/Brawler/Engineer/Pyro/Frostbite), TWELVE enemies with real teeth (the aura wraith burns a zone, the mender heals the horde, the TRI-SHIELD wears three rotating crackable rings), elites with affixes and a boss every 10 waves (THE HEAP, THE PRISM MATRIARCH, SPUD REAPER). Waves end into a choose-one-of-three draft that GIVES and TAKES; XP levels open pure tree picks. The GogaShop sells 12 weapons (start with 3, merge copies into higher tiers for half the next price), 6 allies (the highest prices, they deploy in the wave shop) and two themes - DECAYED DESERT and ABANDONED PARK - each with a day and a night face. Everything is bought and sold for COSMIC COINS; kills are the score; XP banks into SPUDNIK's level and gates the tiers. Endless. The swarm never stops growing.",
+                "controls": [
+                        "touch ANYWHERE and drag: the invisible analog stick is born under your finger - SPUDNIK walks where you pull",
+                        "the weapons shoot by themselves at the best target (bosses first, elites next, then the closest) - you only move",
+                        "kills are the score: blabs +1, most +2, elites +3, bosses +50 to +100; the GOGABox bonus pays /200 at the end",
+                        "every wave ends into a DRAFT: choose one of three cards - each gives a buff, most take something back (or skip)",
+                        "XP gems level the run: every level offers three pure tree picks; XP also banks into SPUDNIK's character level, which gates weapon tiers, allies and tree nodes",
+                        "the wave shop spends in-run coins: weapons, supplies, ally deploys and (with the WEAPON LAB) merges at half the next tier's price",
+                        "the GogaShop (between runs) sells the 9 other weapons one by one, the 6 allies at the highest prices, and the ABANDONED PARK theme - both themes wear a day and a night face",
+                        "the skill tree unlocks one node at a time for cosmic coins - OFFENSE, DEFENSE, UTILITY and the LAB that teaches WEAPON MERGING",
+                        "the tri-shield's rings only break where you crack them - carve a window through all three rings to reach the core",
+                ],
+                "genres": {"main": ["shooter", "roguelite"], "sub": ["survival", "singleplayer"]},
                 "age": "teens",
-                "reveal": {"kind": "real", "appear_after": 1, "price": 350, "needs_games": 0,
-                        "hours": 24}},
+                "ach": [
+                        {"id": "cs_kills", "title": "Swatter", "desc": "Defeat 500 enemies total"},
+                        {"id": "cs_wave", "title": "Wave Rider", "desc": "Reach wave 20 in one run"},
+                        {"id": "cs_score", "title": "Spud Legend", "desc": "Score 400 in one run"},
+                        {"id": "cs_merge", "title": "Weapon Smith", "desc": "Perform 5 weapon merges total"},
+                        {"id": "cs_runs", "title": "Drop In", "desc": "Finish 10 runs"},
+                ],
+        },
+
+
         {"id": "maze", "title": "Escape The Maze", "tag": "procedural maze port", "coming_soon": true,
                 "thumb": "res://assets/thumbs/maze.png",
                 "desc": "Every maze is generated fresh. Find the exit before you lose your mind.",

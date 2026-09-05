@@ -305,14 +305,24 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 10, "10 playable games (matcher joined)")
+        var ok := _check(GameReg.playable().size() == 11,
+                "11 playable games (cosmic spud joined)")
         # v0.3.2: 6 teasers - HEN graduated into SPACE INVADERS (the rename law)
-        ok += _check(GameReg.workshop().size() == 5, "5 workshop teasers (matcher graduated)")
+        ok += _check(GameReg.workshop().size() == 4,
+                "4 workshop teasers (spud graduated)")
         ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
                 "the hen teaser ships as SPACE INVADERS (rename law)")
         ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
                 and int(GameReg.get_game("invaders")["fee"]) == 100,
                 "invaders wears the owner's economy (bonus /500, fee 100)")
+        # v0.3.4: cosmic spud wears the owner's economy (bonus /200, fee 50)
+        ok += _check(String(GameReg.get_game("cosmic_spud")["title"]) == "Cosmic Spud",
+                "the spud teaser ships as COSMIC SPUD (graduation law)")
+        ok += _check(int(GameReg.get_game("cosmic_spud")["coin_div"]) == 200
+                and int(GameReg.get_game("cosmic_spud")["fee"]) == 50,
+                "cosmic spud wears the owner's economy (bonus /200, fee 50)")
+        ok += _check(String(GameReg.get_game("cosmic_spud")["orientation"]) == "landscape",
+                "cosmic spud is landscape (the camera law)")
         ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dash",
                 "the lane-dodger ships as SPACE DASH (rename law)")
         # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
@@ -547,9 +557,12 @@ func _t_roadmap() -> int:
                 geo_in = geo_in or String(p["id"]) == "geometry"
         ok += _check(not geo_in, "the geometry SOON teaser never picks")
         Box.dev_set_cheat("all_owned", 0)
-        # v0.0.7 two-level badges: mystery teaser wears NEW!
+        # v0.0.7 two-level badges: a freshly visible tile wears NEW!
+        # v0.3.4: the spud teaser GRADUATED into the real COSMIC SPUD - its
+        # direct reveal makes it a visible GATED tile right away.
         Roadmap.tick()
-        ok += _check(Box.badge("spud") == "new", "fresh teaser badge NEW! (%s)" % Box.badge("spud"))
+        ok += _check(Box.badge("cosmic_spud") == "new",
+                "fresh tile badge NEW! (%s)" % Box.badge("cosmic_spud"))
         # playing snake reveals rally (chain) but it stays hidden until Roadmap.tick stamps it
         Box.record_started("snake")
         ok += _check(Roadmap.state("rally") == "LOCKED", "rally revealed after snake played")
@@ -589,10 +602,11 @@ func _t_roadmap() -> int:
                 "CHARGING wears NEW! (%s)" % Box.badge("matcher"))
         Box.unlock_game("lanes", 0)
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze still mystery (orders pending)")
-        ok += _check(Box.badge("spud") == "new" or Box.is_seen("spud"),
+        ok += _check(Box.badge("maze") == "new" or Box.is_seen("maze"),
                 "mystery teasers keep NEW! semantics")
-        # timed mystery
-        ok += _check(Roadmap.time_left("spud") > 23.0 * 3600.0, "spud ~24h left")
+        # v0.3.4: the ONLY real-hours teaser retired with the graduation
+        ok += _check(GameReg.get_game("spud").is_empty(),
+                "the spud teaser retired (cosmic spud is a REAL game now)")
         ok += _check(Roadmap.state("invaders") == "HIDDEN",
                 "invaders still hidden (xo owned, unplayed - the chain grew a link)")
         Box.reset_all()
@@ -602,12 +616,12 @@ func _t_roadmap() -> int:
 
 ## THE MYSTERY QUEUE (owner brainstorm): at most 4 mysteries exist at once;
 ## the rest are INEXISTENT (HIDDEN, untracked) until a queue slot frees.
-## v0.3.2: hen graduated into SPACE INVADERS, so the queue is spud/maze/poptd
-## - 3 mystery-able teasers under the 4 cap, never overflowed.
+## v0.3.4: spud graduated into COSMIC SPUD, so the queue is maze/poptd -
+## maze joins at 2 owned, poptd at 4; under the 4 cap, never overflowed.
 func _t_mystery_queue() -> int:
         Box.reset_all()
-        var ok := _check(Roadmap.state("spud") == "MYSTERY", "queue: spud slot 1")
-        ok += _check(Roadmap.state("maze") == "HIDDEN", "maze waits (appear_after 2 at 1 owned)")
+        var ok := _check(Roadmap.state("maze") == "HIDDEN",
+                "queue: empty right after the graduation (1 owned, maze waits)")
         ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd waits (appear_after 4)")
         ok += _check(Roadmap.state("matcher") == "CHARGING",
                 "matcher is NO mystery (direct): visible CHARGING tile")
@@ -616,7 +630,7 @@ func _t_mystery_queue() -> int:
                 "dario/xo/invaders are chain games, never queue members")
         # own 2 -> maze joins (and keys' direct meter shows up CHARGING)
         Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 2 at 2 owned")
+        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 1 at 2 owned")
         ok += _check(Roadmap.state("keys") == "CHARGING",
                 "keys CHARGING at 2 owned (direct + 200-charge meter)")
         # own 3 -> nothing new (poptd needs 4)
@@ -624,9 +638,8 @@ func _t_mystery_queue() -> int:
         ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd still waiting at 3 owned")
         # own 4 -> poptd joins: the queue stays under MYSTERY_CAP
         Box.unlock_game("slasher", 0)
-        ok += _check(Roadmap.state("poptd") == "MYSTERY", "poptd takes slot 3 at 4 owned")
-        ok += _check(Roadmap.state("spud") == "MYSTERY" \
-                and Roadmap.state("maze") == "MYSTERY", "rest of the queue intact")
+        ok += _check(Roadmap.state("poptd") == "MYSTERY", "poptd takes slot 2 at 4 owned")
+        ok += _check(Roadmap.state("maze") == "MYSTERY", "rest of the queue intact")
         Box.reset_all()
         return ok
 
@@ -652,7 +665,7 @@ func _t_charging() -> int:
         Box.unlock_game("rally", 0)
         Box.unlock_game("lanes", 0)
         ok += _check(Roadmap.state("matcher") == "LOCKED",
-			"3 owned + meter full: matcher LOCKED (buyable - it is REAL now)")
+                        "3 owned + meter full: matcher LOCKED (buyable - it is REAL now)")
         # keys = the 200-charge meter, deeper in the box
         Box.unlock_game("slasher", 0)   # owned 4 > appear_after 2
         ok += _check(Roadmap.state("keys") == "CHARGING", "keys CHARGING (200 meter)")
@@ -794,6 +807,7 @@ func _t_time_fmt() -> int:
 func _t_feed_order() -> int:
         Box.reset_all()
         Box.record_started("snake")   # reveals rally (chain) + the mysteries
+        Box.unlock_game("rally", 0)   # 2 owned: maze's appear_after opens
         Roadmap.tick()
         var rows := Roadmap.feed_rows()
         var ids: Array = []
