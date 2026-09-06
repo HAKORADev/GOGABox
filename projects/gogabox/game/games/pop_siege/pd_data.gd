@@ -26,21 +26,21 @@ const ENERGY := "energy"
 # hp, speed px/s, children, immunities, coins on pop, rbe lives on leak,
 # tex scale, points note: score = hits, so hp IS the point value.
 const BLOONS := {
-        "red":      {"hp": 1, "sp": 1.05, "kids": [], "imm": [], "coins": 1, "rbe": 1, "scl": 0.42},
-        "blue":     {"hp": 1, "sp": 1.4, "kids": ["red", "red"], "imm": [], "coins": 1, "rbe": 2, "scl": 0.42},
-        "green":    {"hp": 1, "sp": 1.7, "kids": ["blue", "blue"], "imm": [], "coins": 1, "rbe": 3, "scl": 0.45},
-        "yellow":   {"hp": 1, "sp": 2.35, "kids": ["green", "green"], "imm": [], "coins": 2, "rbe": 4, "scl": 0.45},
-        "pink":     {"hp": 1, "sp": 3.0, "kids": ["yellow", "yellow"], "imm": [], "coins": 2, "rbe": 5, "scl": 0.45},
-        "black":    {"hp": 1, "sp": 2.15, "kids": ["pink", "pink"], "imm": [EXPLOSION], "coins": 3, "rbe": 11, "scl": 0.42},
-        "white":    {"hp": 1, "sp": 2.35, "kids": ["pink", "pink"], "imm": [ICE], "coins": 3, "rbe": 11, "scl": 0.42},
-        "zebra":    {"hp": 1, "sp": 2.15, "kids": ["black", "white"], "imm": [EXPLOSION, ICE], "coins": 4, "rbe": 23, "scl": 0.48},
-        "lead":     {"hp": 1, "sp": 0.85, "kids": ["black", "black"], "imm": [SHARP], "coins": 3, "rbe": 23, "scl": 0.5},
-        "rainbow":  {"hp": 1, "sp": 2.15, "kids": ["zebra", "zebra"], "imm": [], "coins": 6, "rbe": 47, "scl": 0.48},
-        "ceramic":  {"hp": 10, "sp": 2.15, "kids": ["rainbow", "rainbow"], "imm": [], "coins": 10, "rbe": 104, "scl": 0.52},
+        "red":      {"hp": 1, "sp": 1.05, "kids": [], "imm": [], "coins": 2, "rbe": 1, "scl": 0.40},
+        "blue":     {"hp": 1, "sp": 1.4, "kids": ["red", "red"], "imm": [], "coins": 2, "rbe": 2, "scl": 0.40},
+        "green":    {"hp": 1, "sp": 1.7, "kids": ["blue", "blue"], "imm": [], "coins": 3, "rbe": 3, "scl": 0.42},
+        "yellow":   {"hp": 1, "sp": 2.35, "kids": ["green", "green"], "imm": [], "coins": 4, "rbe": 4, "scl": 0.42},
+        "pink":     {"hp": 1, "sp": 3.0, "kids": ["yellow", "yellow"], "imm": [], "coins": 4, "rbe": 5, "scl": 0.42},
+        "black":    {"hp": 1, "sp": 2.15, "kids": ["pink", "pink"], "imm": [EXPLOSION], "coins": 5, "rbe": 11, "scl": 0.40},
+        "white":    {"hp": 1, "sp": 2.35, "kids": ["pink", "pink"], "imm": [ICE], "coins": 5, "rbe": 11, "scl": 0.40},
+        "zebra":    {"hp": 1, "sp": 2.15, "kids": ["black", "white"], "imm": [EXPLOSION, ICE], "coins": 7, "rbe": 23, "scl": 0.44},
+        "lead":     {"hp": 1, "sp": 0.85, "kids": ["black", "black"], "imm": [SHARP], "coins": 7, "rbe": 23, "scl": 0.46},
+        "rainbow":  {"hp": 1, "sp": 2.15, "kids": ["zebra", "zebra"], "imm": [], "coins": 10, "rbe": 47, "scl": 0.44},
+        "ceramic":  {"hp": 10, "sp": 2.15, "kids": ["rainbow", "rainbow"], "imm": [], "coins": 18, "rbe": 104, "scl": 0.48},
         "moab":     {"hp": 200, "sp": 0.65, "kids": ["ceramic", "ceramic", "ceramic", "ceramic"],
-                        "imm": [], "coins": 40, "rbe": 616, "scl": 1.0, "blimp": true},
+                        "imm": [], "coins": 80, "rbe": 616, "scl": 0.72, "blimp": true},
         "brutus":   {"hp": 700, "sp": 0.55, "kids": ["moab", "moab"], "imm": [],
-                        "coins": 120, "rbe": 1932, "scl": 1.2, "blimp": true, "half_sharp": true},
+                        "coins": 250, "rbe": 1932, "scl": 0.88, "blimp": true, "half_sharp": true},
 }
 
 static func rbe(kind: String) -> int:
@@ -327,6 +327,13 @@ static func wave_groups(w: int, stars: int) -> Array:
 ## the endless law: past wave 40 everything speeds up (fatigue).
 static func fatigue_for(wave: int) -> float:
         return 1.0 + FATIGUE * maxf(0.0, float(wave - VICTORY_WAVE))
+
+## the art truth: the rotation that points a head's muzzle RIGHT at 0 deg
+## (the drawn crossbow heads face up, the cannon heads face right)
+static func head_offset(fid: String) -> float:
+        match fid:
+                "darty", "longeye": return PI / 2.0
+        return 0.0
 
 # ------------------------------------------------------------------ helpers
 static func imm_allows(kind: String, cls: String) -> bool:

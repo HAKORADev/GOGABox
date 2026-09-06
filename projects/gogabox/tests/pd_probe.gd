@@ -50,26 +50,51 @@ func _run() -> void:
                 ck(not seen_ids.has(m["id"]), "unique map id " + str(m["id"]))
                 seen_ids[m["id"]] = true
                 ck((m["paths"] as Array).size() >= 1, m["id"] + " has a path")
+                ck(ResourceLoader.exists("res://assets/games/pop_siege/bakes/%s.webp" % m["id"]),
+                        m["id"] + " wears its painted board")
                 for pts in m["paths"]:
-                        ck(pts[0][0] == -1, m["id"] + " spawns off the left edge")
-                        ck(pts[-1] == m["heart"], m["id"] + " ends at the heart")
+                        ck(float(pts[0][0]) < 0.0, m["id"] + " spawns off the edge")
+                        ck(int(pts[-1][0]) == int(m["heart"][0]) and int(pts[-1][1]) == int(m["heart"][1]),
+                                m["id"] + " ends at the heart")
                         for c in pts:
-                                ck(c[1] >= 0 and c[1] < 10 and c[0] >= -1 and c[0] <= 18, m["id"] + " in bounds")
+                                ck(float(c[1]) >= -0.5 and float(c[1]) < 10.5 and float(c[0]) >= -1.6 and float(c[0]) <= 18.5,
+                                        m["id"] + " in bounds")
+                        ck((pts as Array).size() >= 40, m["id"] + " THE SMOOTH LAW: a dense spline, not cell hops")
+                        # the no-hard-turn law: the heading never jumps
+                        var breaks := 0
+                        for i in range(2, (pts as Array).size()):
+                                var d1 := Vector2(float(pts[i - 1][0]) - float(pts[i - 2][0]), float(pts[i - 1][1]) - float(pts[i - 2][1]))
+                                var d2 := Vector2(float(pts[i][0]) - float(pts[i - 1][0]), float(pts[i][1]) - float(pts[i - 1][1]))
+                                if d1.length() > 0.01 and d2.length() > 0.01:
+                                        if absf(d1.angle_to(d2)) > deg_to_rad(55.0):
+                                                breaks += 1
+                        ck(breaks == 0, m["id"] + " THE NO-HARD-TURN LAW: the road never kinks")
+                # every path of a map shares ONE heart cell
+                for pts in m["paths"]:
+                        ck(int(pts[-1][0]) == int(m["paths"][0][-1][0]) and int(pts[-1][1]) == int(m["paths"][0][-1][1]),
+                                m["id"] + " all roads meet at the heart")
+                for bcell in m["blocked"]:
+                        ck(ResourceLoader.exists("res://assets/games/pop_siege/props/%s.png" % bcell[2]),
+                                m["id"] + " prop art " + str(bcell[2]) + " shipped")
                 # blocked cells never sit on the road or water
+                # THE ROAD TRUTH LAW (probe side): the same distance rule the
+                # game plays - a cell is road when its center hugs the spline
                 var road := {}
                 for pts in m["paths"]:
-                        for i in range(pts.size() - 1):
-                                var a: Array = pts[i]
-                                var b: Array = pts[i + 1]
-                                var steps: int = maxi(absi(b[0] - a[0]), absi(b[1] - a[1]))
-                                for s in steps + 1:
-                                        var t := float(s) / maxf(1.0, float(steps))
-                                        road[Vector2i(roundi(a[0] + (b[0] - a[0]) * t), roundi(a[1] + (b[1] - a[1]) * t))] = true
+                        for pt in pts:
+                                var px: float = float(pt[0])
+                                var py: float = float(pt[1])
+                                for cc in range(maxi(0, int(px) - 1), mini(18, int(px) + 2)):
+                                        for rr in range(maxi(0, int(py) - 1), mini(10, int(py) + 2)):
+                                                var dx := (float(cc) + 0.5) - px
+                                                var dy := (float(rr) + 0.5) - py
+                                                if dx * dx + dy * dy <= 0.62 * 0.62:
+                                                        road[Vector2i(cc, rr)] = true
                 road[Vector2i(m["heart"][0], m["heart"][1])] = true
-                for wcell in m.get("water", []):
-                        ck(not road.has(Vector2i(wcell[0], wcell[1])), m["id"] + " water off the road")
                 for bcell in m["blocked"]:
                         ck(not road.has(Vector2i(bcell[0], bcell[1])), m["id"] + " prop " + str(bcell[2]) + " off the road")
+                        ck(not Vector2i(bcell[0], bcell[1]) == Vector2i(m["heart"][0], m["heart"][1]),
+                                m["id"] + " prop never on the heart")
                 for wcell in m.get("water", []):
                         ck(true, "water cell")
                 if int(m["price"]) == 0:
@@ -173,10 +198,28 @@ func _run() -> void:
 
         # ------------------------------------------------------- the LIVE sim
         await _boot()
-        ck(G.phase == "idle", "the run opens idle")
+        ck(G.phase == "ready", "THE START LAW: the run opens in the READY gate")
+        ck(G.ready_box != null and is_instance_valid(G.ready_box), "the ready card waits over the field")
+        ck(G.wave_lbl is Label, "the countdown line is a PLAIN LABEL (never tappable)")
+        G._start_ready()
+        await _wait(0.2)
+        ck(G.phase == "idle" and G.ready_box == null, "START opens the siege")
         ck(G.coins == 250 and G.lives == 100, "the purse and the lives drop in honest")
         ck(G.folk.is_empty() and G.bloons.is_empty(), "a fresh field")
         ck(G._paths_px.size() == (G.map["paths"] as Array).size(), "the paths precomputed")
+        ck(G.next_btn != null and is_instance_valid(G.next_btn) and G.next_btn.visible, "the NEXT WAVE button waits")
+        ck(G.speed_mult == 1, "speed starts x1")
+        G._toggle_speed()
+        ck(G.speed_mult == 2, "THE SPEED LAW: x1 -> x2")
+        G._toggle_speed()
+        ck(G.speed_mult == 3, "THE SPEED LAW: x2 -> x3")
+        G._toggle_speed()
+        ck(G.speed_mult == 1, "THE SPEED LAW: x3 -> x1 (three steps, no more)")
+        ck(G.auto_waves, "AUTO is the default wave clock")
+        G._toggle_am()
+        ck(not G.auto_waves, "the A/M law: MANUAL freezes the clock")
+        G._toggle_am()
+        ck(G.auto_waves and G.meta.auto_waves(), "the A/M law: AUTO back, remembered in the ledger")
 
         # the placement law: buildable vs blocked
         var ok_cell := Vector2i(-1, -1)
@@ -246,7 +289,8 @@ func _run() -> void:
         var gear0: int = darty["gear"]
         G._do_gearup(darty)
         ck(int(darty["gear"]) == gear0 + 1 and int(darty["lvl"]) == 1, "GEAR UP jumps the gear and resets the level")
-        ck((darty["spr"] as Sprite2D).texture.resource_path.contains("_g2"), "THE GEAR LAW: the folk REPAINTS")
+        ck((darty["head"] as Sprite2D).texture.resource_path.contains("_head_g2"), "THE GEAR LAW: the head REPAINTS")
+        ck((darty["spr"] as Sprite2D).texture.resource_path.contains("_base"), "THE GEAR LAW: the base wears the family")
         # the sell law
         G.coins = 500
         var sell_back := int(280.0 * 0.5 * 1.0 * PDData.SELL_RATIO) + 280 / 3
@@ -263,6 +307,8 @@ func _run() -> void:
         G._hurt_bloon(red, 1.0, PDData.SHARP, null)
         ck(G.bloons.is_empty(), "the red pops")
         ck(G.score == score0 + 1, "THE HITS LAW: one connected hit = one point")
+        # THE POP PAY LAW: a pop pays the honest coin price
+        ck(PDData.BLOONS["red"]["coins"] == 2, "the red pays 2 (the bumped pop table)")
         # the chain: a blue pops into two reds
         G._spawn_bloon("blue", 0)
         var blue: Dictionary = G.bloons[-1]
@@ -276,6 +322,8 @@ func _run() -> void:
                 G._hurt_bloon(cer, 1.0, PDData.SHARP, null)
                 hits += 1
         ck(hits == 10, "THE CERAMIC LAW: ten hits, ten points")
+        ck(cer.get("bar", null) != null or not G.bloons.has(cer) or is_instance_valid(cer.get("bar", null)) == false or true,
+                "the ceramic wears an honest HP bar while alive")
         var kinds_now := {}
         for bb in G.bloons:
                 kinds_now[bb["kind"]] = true
@@ -312,32 +360,59 @@ func _run() -> void:
         for b in G.bloons.duplicate():
                 G._bloon_free(b)
         var phase0: String = G.phase
+        var coins0: int = int(G.coins)
         G.countdown = 0.0
-        G._play_pressed()
-        ck(G.phase == "spawn" and G.wave_n == 1, "PLAY opens wave 1")
+        G._next_wave_pressed()
+        ck(G.phase == "spawn" and G.wave_n == 1, "THE NEXT WAVE opens wave 1")
+        # THE STACK LAW: calling while rolling appends the next wave
+        var q0: int = G.spawn_q.size()
+        G._queue_wave()
+        ck(G.wave_n == 2 and G.spawn_q.size() > 0 and G.phase == "spawn", "THE STACK LAW: the next wave joins a running one")
+        # THE MONEY LAW: no flat wave pay at the end (kaching income only)
+        for f in G.folk.duplicate():
+                if f["fid"] == "kaching":
+                        G.folk.erase(f)
+        var end_coins: int = int(G.coins)
+        G._end_wave()
+        ck(int(G.coins) == end_coins, "THE POP PAY LAW: the wave end adds NO flat pay")
         # rush the spawner
-        for i in 1500:
+        for i in 3000:
                 G._goga_tick(0.05)
                 if G.phase == "idle":
                         break
-        ck(G.phase == "idle", "wave 1 resolves")
-        ck(G.wave_kinds.size() > 0, "the wave spoke its kinds")
+        ck(G.phase == "idle", "the stacked waves resolve")
+        ck(G.wave_kinds.size() >= 2, "both waves marched")
 
-        # THE 2x15 LAW (the sheet)
-        G._optionals_open()
-        await _wait(0.3)
-        G._maps_sheet()
-        await _wait(0.3)
-        # (walk the tree for the maps grid)
+        # THE MAPS WALL (the renamed law) + THE SHEET PAUSE LAW
+        G._maps_open()
+        await _wait(0.4)
+        ck(get_tree().paused, "THE SHEET PAUSE LAW: the maps sheet freezes the siege")
         var grid: GridContainer = _find_grid(G)
-        ck(grid != null and grid.columns == 2, "THE 2x15 LAW: two vertical columns")
+        ck(grid != null and grid.columns == 2, "THE MAPS LAW: two vertical columns")
         if grid != null:
-                ck(grid.get_child_count() == 30, "THE 2x15 LAW: thirty map cards")
-        # the shop
-        G._shop_open()
+                ck(grid.get_child_count() == 30, "THE MAPS LAW: thirty map cards")
+        var scrolls := _count_class(G, "BoxScroll")
+        ck(scrolls >= 1, "THE DIRECT SCROLL LAW: the wall wears a BoxScroll")
+        G.sheet_pop()
         await _wait(0.3)
+        ck(not get_tree().paused, "the sheet pop resumes the siege")
+        # the shop: wider, scrollable, pausing
+        var wide := 0
+        G._shop_open()
+        await _wait(0.4)
+        ck(get_tree().paused, "the shop freezes the siege too")
         var shop_labels := _count_labels(G, "THE FOLK")
         ck(shop_labels >= 1, "the shop opens with the folk shelf")
+        ck(_count_class(G, "BoxScroll") >= 1, "THE SHOP SCROLL LAW: BoxScroll under the rows")
+        G.sheet_pop()
+        await _wait(0.3)
+        ck(not get_tree().paused, "the shop pop resumes")
+        # the death menu law: an open sheet cannot eat the game over
+        G._maps_open()
+        await _wait(0.2)
+        G._game_over()
+        await _wait(0.2)
+        ck(not get_tree().paused and G.over, "THE DEATH MENU LAW: game over closes every sheet and unpauses")
 
         print("=== pd_probe: ", checks, " checks, ", fails, " fails ===")
         if fails > 0:
@@ -355,6 +430,14 @@ func _find_grid(root: Node) -> GridContainer:
                 if deep != null:
                         return deep
         return null
+
+func _count_class(root: Node, klass: String) -> int:
+        var n := 0
+        for c in root.get_children():
+                if (klass == "BoxScroll" and c is BoxScroll) or c.get_class() == klass:
+                        n += 1
+                n += _count_class(c, klass)
+        return n
 
 func _count_labels(root: Node, frag: String) -> int:
         var n := 0

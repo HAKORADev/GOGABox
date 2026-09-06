@@ -3634,9 +3634,15 @@ func _build_info(box: VBoxContainer) -> void:
         h2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         hv.add_child(h1)
         hv.add_child(h2)
-        var scroll := ScrollContainer.new()
+        # THE DIRECT SCROLL LAW (v0.3.5-1, the owner: "the info menu is not
+        # directly scrollable, there is a sidebar but i want to scroll up-down
+        # directly normally"): the raw-touch BoxScroll owns the drag - the
+        # finger scrolls the sheet ANYWHERE, the scrollbar-sidebar is dead
+        var scroll := BoxScroll.new()
+        scroll.game_safe = true
+        scroll.process_mode = Node.PROCESS_MODE_ALWAYS
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.5)
         box.add_child(scroll)
         var shelf := VBoxContainer.new()
@@ -3669,7 +3675,14 @@ func _build_info(box: VBoxContainer) -> void:
                                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                         vb.add_child(l)
                         first = false
-        _fit_scroll(scroll, shelf, 0.58)
+        # the BoxScroll owns the height: the shelf hugs its content, the
+        # scroll clamps at half the viewport (the _fit_scroll ghost pass
+        # was a ScrollContainer law - the raw-touch scroll needs no second pass)
+        await get_tree().process_frame
+        if is_instance_valid(scroll) and is_instance_valid(shelf):
+                scroll.custom_minimum_size.y = clampf(
+                                shelf.get_combined_minimum_size().y + 8.0, 120.0,
+                                get_viewport_rect().size.y * 0.58)
 
 # ============================================================== OPTIONALS
 ## THE BOOT SCREEN, REBORN (the owner: the old one was FUCKING WEIRD):

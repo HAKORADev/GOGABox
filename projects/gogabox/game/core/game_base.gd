@@ -124,9 +124,9 @@ func quit_to_box() -> void:
 ## the sheet chain gets PROCESS_MODE_ALWAYS so it stays alive even while the
 ## tree is paused, and BoxScroll's topmost law hands every tap above it to
 ## THIS sheet.
-func sheet_push(sheet_height := 0.0, id := "") -> VBoxContainer:
+func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxContainer:
         var root := _overlay_root_ref()
-        var vb := Arc.sheet(root, sheet_height)
+        var vb := Arc.sheet(root, sheet_height, sheet_width)
         var kids := root.get_children()
         var dim: Control = kids[kids.size() - 2]
         var cc: Control = kids[kids.size() - 1]

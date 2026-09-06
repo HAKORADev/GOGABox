@@ -248,7 +248,8 @@ static func toast(t: Dictionary, msg: String) -> void:
         tw.tween_property(l, "modulate:a", 0.0, 0.4)
 
 ## Full-screen dim + centered sheet. Returns the inner VBox to fill.
-static func sheet(parent: Control, sheet_height := 0.0) -> VBoxContainer:
+## sheet_width > 0 overrides the default 620 (the wide shop/map walls).
+static func sheet(parent: Control, sheet_height := 0.0, sheet_width := -1.0) -> VBoxContainer:
         var dim := ColorRect.new()
         dim.color = DIM_BG
         dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -262,7 +263,8 @@ static func sheet(parent: Control, sheet_height := 0.0) -> VBoxContainer:
         var sb := panel_style(CARD, 30, 30)
         pc.add_theme_stylebox_override("panel", sb)
         if sheet_height > 0:
-                pc.custom_minimum_size = Vector2(620, sheet_height)
+                var w := 620.0 if sheet_width <= 0.0 else sheet_width
+                pc.custom_minimum_size = Vector2(w, sheet_height)
         cc.add_child(pc)
         var vbox := VBoxContainer.new()
         vbox.add_theme_constant_override("separation", 16)
