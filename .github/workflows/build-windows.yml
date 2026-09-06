@@ -54,8 +54,11 @@ jobs:
           cd "godot-${GODOT_VERSION}-${GODOT_RELEASE}"
           # THE BASELINE LAW: the owner's line - -march=x86-64 (generic SSE2)
           # overrides any newer default, so pre-Haswell CPUs can run the box.
+          # d3d12/winrt/accesskit=no: the box renders GL Compatibility - the
+          # optional drivers' SDKs are not needed for this forge
           scons platform=windows target=template_release arch=x86_64 \
             lto=full use_static_cpp=yes debug_symbols=no \
+            d3d12=no winrt=no accesskit=no \
             custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" \
             -j"$(nproc)"
       - name: THE SSE2 LAW - no SSE4.2-only instructions in the template
@@ -95,6 +98,7 @@ jobs:
           cd "godot-${GODOT_VERSION}-${GODOT_RELEASE}"
           scons platform=windows target=template_release arch=x86 \
             lto=full use_static_cpp=yes debug_symbols=no \
+            d3d12=no winrt=no accesskit=no \
             custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" \
             -j"$(nproc)"
       - name: Upload the x86 template
