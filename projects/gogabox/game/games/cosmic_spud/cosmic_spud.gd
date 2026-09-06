@@ -1,15 +1,22 @@
 extends GogaGame
-## COSMIC SPUD (v0.3.4-1) - the Brotato-competitor, PATCH 1.
-## THE GDD: docs/goga_docs/gogames_ideas/cosmic_spud.md + cosmic_spud_patch1.md.
-## PATCH 1 LAWS (the owner's playtest round):
-##   THE NODE-SYNC LAW: every enemy's sprite follows its body EVERY tick
-##   (v0.3.4 shipped the frozen sprites - the "invisible enemies" lie).
-##   THE GAME'S OWN FACE: gray field, black inner boxes, text only in
-##   white/green/red/blue/yellow. NO GOGABox ui code renders a game screen.
-##   THE STAY-INVISIBLE STICK: born under any touch, nothing ever draws.
-##   LUCK / DODGE / REROLL: the Brotato mouthfuls, real stats.
-##   THE GOGACOIN RIDER: every 5th wave one enemy carries the box's real
-##   gogacoin - it drops on death and pays the GOGABox wallet.
+## COSMIC SPUD (v0.3.4-3) - the Brotato-competitor, PATCH 3.
+## THE GDD: docs/goga_docs/gogames_ideas/cosmic_spud.md + cosmic_spud_patch3.md.
+## PATCH 3 LAWS (the owner finally played past the door):
+##   THE HUD LAW: the empty chrome chips are GONE - the game wears its own
+##   SCORE, KILLS, COSMIC COINS and GOGACoins widgets (black boxes).
+##   THE SILENCE LAW: the gogacoin never announces itself - no banners, no
+##   CARRIER! chip, no fanfare sfx. Silent is cool.
+##   THE SHARED CONTACT LAW: colliding damages BOTH sides - the enemy's
+##   attack hurts you, your potato RAMS it back - and EVERY contact tick
+##   speaks (sfx + numbers + dust). No more silent grinding.
+##   THE FLASH LAW: the muzzle flash flies WITH the barrel (no more candle).
+##   THE BREAK CHAIN: draft -> THE WAVE MARKET (items/weapons/allies, the
+##   5-slot HOLD DECK, the reroll lives HERE only) -> THE MERGE BENCH (its
+##   own menu) -> THE STATS MENU (level-up points, costs 1-3) -> THE SKILLS
+##   MENU (1 point per 100 kills, ten unique skills) -> next wave.
+##   THE UNIVERSAL SHOP LAW: the HUD SHOP button opens THE SHOP - the
+##   GOGACoins store - at any phase, exactly as described many times.
+##   THE WOW PASS: camera shake, the low-HP vignette, pickup sparkles.
 
 const ARENA := Rect2(0, 0, 2400, 1350)
 const ARENA_MARGIN := 90.0        # the ground paints past the bounds
@@ -83,18 +90,19 @@ var stick_active := false
 var stick_origin := Vector2.ZERO
 var stick_vec := Vector2.ZERO
 
-# THE GOGACOIN RIDER (every 5th wave)
+# THE GOGACOIN RIDER (every 5th wave) - THE SILENCE LAW: it glints, it
+# drops, it pays. Nothing announces it, ever.
 var goga_pending := false         # the wave owes a coin carrier
 var goga_carry := false           # a living carrier rolled into the next wave
 var goga_carrier_alive := false
-var goga_chip: PanelContainer     # the HUD chip while a carrier lives
 
 # THE SHOP's live state (the offers roll once per break)
-var shop_offers_w: Array = []     # [{wid, tier, rar, price, sold}]
-var shop_offers_i: Array = []     # [{iid, rar, price, sold}]
+var shop_offers_w: Array = []     # [{wid, tier, rar, price, sold, held}]
+var shop_offers_i: Array = []     # [{iid, rar, price, sold, held}]
 var shop_rerolls := 0
-var draft_rerolls := 0
-var draft_reroll_free := false
+var shop_free_reroll := false     # u3 FATE REROLL: one free market shuffle
+var market_tab := "items"         # the wave market's tab
+var _break_in_market := false     # the break chain is inside the market
 
 # hud widgets (all CS-styled)
 var hp_fill: ColorRect
@@ -104,8 +112,10 @@ var xp_fill: ColorRect
 var lvl_txt: Label
 var wave_txt: Label
 var wave_fill: ColorRect
-var kill_txt: Label
-var cc_txt: Label
+var kill_txt: Label               # the KILLS widget (the owner's two)
+var score_txt: Label              # the SCORE widget (the owner's two)
+var cc_txt: Label                 # the cosmic coins widget
+var gg_txt: Label                 # the GOGACoins widget (live wallet)
 var boss_bar: Control
 var boss_fill: ColorRect
 var boss_txt: Label
@@ -113,6 +123,15 @@ var slot_row: HBoxContainer
 var _slot_widgets: Array = []     # [{box, cd, tier_txt}]
 var _tex: Dictionary = {}
 var _hud_built := false
+
+# THE WOW PASS
+var _shake := 0.0                 # the camera shake energy (decays)
+
+# THE SKILLS (the meta perks, wired in the run)
+var p_shield_up := false          # SHATTERED SHIELD: one hit, then gone
+var p_shield_cd := 0.0            # the reform timer (12s)
+var _static_cd := 0.0             # STATIC BURST clock
+var _adrenaline := 0.0            # ADRENALINE ROOT burst timer
 
 # ================================================================ textures
 func _t(key: String) -> Texture2D:
@@ -219,8 +238,21 @@ func _cs_fit_label(txt: String, sz: int, col: Color, max_w: float,
 ## THE HUG LAW (v0.3.4-2): a sheet's scroll area HUGS its content - a tall
 ## empty gray void under three cards is slop. The scroll grows to the shelf's
 ## measured minimum, capped at the viewport fraction so big shelves still scroll.
+## v0.3.4-3: the SECOND PASS - autowrap labels only know their real wrapped
+## height one frame after layout, so the hug re-fits then (the measured
+## ghost void under the market/stats/skills shelves is dead).
 func _fit_scroll(scroll: ScrollContainer, shelf: Control, frac: float) -> void:
         var cap: float = get_viewport_rect().size.y * frac
+        scroll.custom_minimum_size.y = clampf(
+                        shelf.get_combined_minimum_size().y + 8.0, 120.0, cap)
+        _fit_scroll_second_pass(scroll, shelf, cap)
+
+func _fit_scroll_second_pass(scroll: ScrollContainer, shelf: Control,
+                cap: float) -> void:
+        await get_tree().process_frame
+        if scroll == null or not is_instance_valid(scroll) \
+                        or shelf == null or not is_instance_valid(shelf):
+                return
         scroll.custom_minimum_size.y = clampf(
                         shelf.get_combined_minimum_size().y + 8.0, 120.0, cap)
 
@@ -373,6 +405,12 @@ func _back_pressed() -> void:
                 return
         if not cs_sheets.is_empty():
                 _cs_close_top()
+                # THE BREAK LAW (v0.3.4-3): a break that lost its sheet falls
+                # back to the market - the chain can never strand the player
+                _resume_break()
+                return
+        if phase == "break":
+                _market_open()
                 return
         super._back_pressed()
 
@@ -572,6 +610,11 @@ func _base_stats() -> Dictionary:
                 st["coin_m"] += 0.10
         if meta.tree_node("l2"):
                 st["ally_dmg"] += 0.25
+        # THE SKILLS (the meta perks, v0.3.4-3)
+        if meta.has_skill("golden_gut"):
+                st["coin_m"] += 0.25
+        if meta.has_skill("magnetic_skin"):
+                st["magnet"] += 0.6
         return st
 
 func _max_hp() -> float:
@@ -588,6 +631,7 @@ func _goga_tick(delta: float) -> void:
         if phase != "play" and phase != "break":
                 return
         _tick_player(delta)
+        _tick_skills(delta)
         _tick_weapons(delta)
         _tick_allies(delta)
         _tick_bullets(delta)
@@ -639,6 +683,12 @@ func _tick_player(delta: float) -> void:
 func _tick_camera(delta: float) -> void:
         var target := _cam_clamp_pos(p_pos)
         cam.position = cam.position.lerp(target, clampf(8.0 * delta, 0.0, 1.0))
+        # THE WOW PASS: the shake decays fast and rides the clamped position
+        if _shake > 0.01:
+                _shake = maxf(0.0, _shake - 24.0 * delta)
+                cam.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
+        else:
+                cam.offset = Vector2.ZERO
 
 # ================================================================ the stick
 func _goga_input(event: InputEvent) -> void:
@@ -671,6 +721,9 @@ func _goga_input(event: InputEvent) -> void:
 ## THE GAME'S OWN WIDGETS: black boxes, colored text. HP green/red, XP blue,
 ## wave yellow, KILLS red, coins yellow, boss red. The money widget wears
 ## the NEW cosmic coin (a potato embossed in gold - never the gogacoin).
+## v0.3.4-3 THE HUD LAW: the box chrome chips die WHOLE (hiding only their
+## labels left an EMPTY chip floating next to the coin chip - the owner's
+## report), and the game builds its own SCORE + KILLS + GOGACoins widgets.
 func _build_hud() -> void:
         if _hud_built:
                 return
@@ -678,12 +731,13 @@ func _build_hud() -> void:
         # the box chrome FIRST (its canvas layer + overlay root + back button),
         # then the game's own widgets on top - the box labels hide after
         super._build_hud()
-        var sl := _score_label_ref()
-        var cl := _coins_label_ref()
-        if sl != null:
-                sl.visible = false
-        if cl != null:
-                cl.visible = false
+        # THE CHIP LAW: the whole chrome chips vanish (score chip + coin chip)
+        var sc_chip := _score_chip_ref()
+        var cc_chip := _coins_chip_ref()
+        if sc_chip != null and is_instance_valid(sc_chip):
+                sc_chip.visible = false
+        if cc_chip != null and is_instance_valid(cc_chip):
+                cc_chip.visible = false
         if _hud_row != null and is_instance_valid(_hud_row):
                 _hud_row.offset_top = 44.0
                 _hud_row.offset_bottom = 104.0
@@ -709,8 +763,6 @@ func _build_hud() -> void:
         lvl_txt = _cs_label("LV 1", 12, CS_BLUE)
         lvl_txt.custom_minimum_size = Vector2(64, 0)
         sub.add_child(lvl_txt)
-        kill_txt = _cs_label("KILLS 0", 12, CS_RED)
-        sub.add_child(kill_txt)
         # the XP bar
         var xp_box := _cs_black_box(left, Vector2(300, 12))
         xp_fill = ColorRect.new()
@@ -728,32 +780,45 @@ func _build_hud() -> void:
         wave_fill.color = Color(1.0, 0.62, 0.26)
         wave_fill.custom_minimum_size = Vector2(280, 4)
         wv.add_child(wave_fill)
-        # ---- the money widget (top right, under the chrome band)
-        var cc := _cs_black_box(root, Vector2(128, 30))
-        cc.position = Vector2(get_viewport_rect().size.x - 140, 116)
+        # ---- THE RIGHT STACK (the owner's two live here): cosmic coins,
+        # SCORE, KILLS, GOGACoins - one black box each, big enough to read
+        var right := VBoxContainer.new()
+        right.position = Vector2(get_viewport_rect().size.x - 192, 116)
+        right.custom_minimum_size = Vector2(180, 0)
+        right.add_theme_constant_override("separation", 4)
+        root.add_child(right)
+        # the cosmic coins (THE BIG WIDGET - the owner: "the cosmic coins
+        # widget is small too")
+        var cc := _cs_black_box(right, Vector2(180, 38))
         var h := HBoxContainer.new()
+        h.add_theme_constant_override("separation", 6)
         cc.add_child(h)
-        var ic := TextureRect.new()
-        ic.texture = _t("coin")
-        ic.custom_minimum_size = Vector2(20, 20)
-        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        h.add_child(ic)
-        cc_txt = _cs_label("0", 15, CS_YELLOW)
+        h.add_child(_cs_icon(_t("coin"), 24))
+        cc_txt = _cs_label("0", 18, CS_YELLOW)
         h.add_child(cc_txt)
-        # ---- the gogacoin chip (hidden unless a carrier lives)
-        goga_chip = _cs_black_box(root, Vector2(190, 30))
-        goga_chip.position = Vector2(get_viewport_rect().size.x - 140, 152)
-        var h2 := HBoxContainer.new()
-        goga_chip.add_child(h2)
-        var ic2 := TextureRect.new()
-        ic2.texture = _t("gogacoin")
-        ic2.custom_minimum_size = Vector2(20, 20)
-        ic2.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        h2.add_child(ic2)
-        _cs_label("CARRIER!", 12, CS_GREEN, h2)
-        goga_chip.visible = false
+        # SCORE (yellow) + KILLS (red) - the two the owner named
+        var sc_box := _cs_black_box(right, Vector2(180, 32))
+        var h3 := HBoxContainer.new()
+        h3.add_theme_constant_override("separation", 6)
+        sc_box.add_child(h3)
+        h3.add_child(_cs_icon(_t("star"), 18))
+        score_txt = _cs_label("SCORE 0", 15, CS_YELLOW)
+        h3.add_child(score_txt)
+        var kl_box := _cs_black_box(right, Vector2(180, 32))
+        var h4 := HBoxContainer.new()
+        h4.add_theme_constant_override("separation", 6)
+        kl_box.add_child(h4)
+        h4.add_child(_cs_icon(_t("skull"), 18))
+        kill_txt = _cs_label("KILLS 0", 15, CS_RED)
+        h4.add_child(kill_txt)
+        # the GOGACoins widget: the live wallet (+ this run's riders), silent
+        var gg_box := _cs_black_box(right, Vector2(180, 30))
+        var h5 := HBoxContainer.new()
+        h5.add_theme_constant_override("separation", 6)
+        gg_box.add_child(h5)
+        h5.add_child(_cs_icon(_t("gogacoin"), 18))
+        gg_txt = _cs_label("%d GOGACOINS" % Box.coins(), 11, CS_GREEN)
+        h5.add_child(gg_txt)
         # ---- the boss bar (top center)
         boss_bar = _cs_black_box(root, Vector2(430, 20))
         boss_bar.position = Vector2((get_viewport_rect().size.x - 430) * 0.5, 116)
@@ -771,6 +836,15 @@ func _build_hud() -> void:
         slot_row.add_theme_constant_override("separation", 6)
         root.add_child(slot_row)
         _rebuild_slots()
+
+## a fixed-size icon TextureRect for the HUD rows
+func _cs_icon(tex: Texture2D, px: int) -> TextureRect:
+        var ic := TextureRect.new()
+        ic.texture = tex
+        ic.custom_minimum_size = Vector2(px, px)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        return ic
 
 func _rebuild_slots() -> void:
         if slot_row == null or not is_instance_valid(slot_row):
@@ -825,8 +899,13 @@ func _refresh_hud() -> void:
                 wave_fill.custom_minimum_size.x = 280.0 * clampf(wave_clock / total, 0.0, 1.0)
         if cc_txt != null:
                 cc_txt.text = str(run_ccoins)
-        if goga_chip != null:
-                goga_chip.visible = goga_carrier_alive
+        if score_txt != null:
+                score_txt.text = "SCORE %d" % score
+        if kill_txt != null:
+                kill_txt.text = "KILLS %d" % run_kills
+        if gg_txt != null:
+                # THE GOGACoins WIDGET: the live wallet plus this run's riders
+                gg_txt.text = "%d GOGACOINS" % (Box.coins() + run_coins)
         if boss_fill != null:
                 var found := false
                 for e in enemies:
@@ -853,8 +932,12 @@ func _refresh_hud() -> void:
 func _tick_weapons(delta: float) -> void:
         # aim: the best target for the FIRST weapon sets Spudnik's facing
         p_aim = _aim_angle()
+        var aspeed: float = float(stats["aspeed_m"])
+        # THE ADRENALINE ROOT: a dodge revs the guns for 2s
+        if _adrenaline > 0.0:
+                aspeed *= 1.8
         for w in weapons_run:
-                w["cd"] -= delta * float(stats["aspeed_m"])
+                w["cd"] -= delta * aspeed
                 if w["cd"] <= 0.0:
                         if _fire_weapon(w):
                                 var mult: Dictionary = CSData.tier_mult(int(w["tier"]))
@@ -897,20 +980,31 @@ func _fire_weapon(w: Dictionary) -> bool:
         var pierce: int = int(wd["pierce"])
         if int(stats["pierce_all"]) > 0:
                 pierce = 99
+        var base_dmg: float = float(wd["dmg"]) * float(mult["dmg"]) * float(stats["dmg_m"])
+        # THE STARCH RAGE: below 35% HP the potato bites back harder
+        if meta.has_skill("starch_rage") and p_hp < p_max_hp * 0.35:
+                base_dmg *= 1.4
         for i in count:
                 var a := base_a
                 if count > 1:
                         a += (float(i) - float(count - 1) * 0.5) * float(wd["spread"])
-                var dmg: float = float(wd["dmg"]) * float(mult["dmg"]) * float(stats["dmg_m"])
+                var dmg: float = base_dmg
                 var kind: String = wd["proj"]
                 if kind == "strike":
                         _orbital_strike(te["pos"], dmg, float(wd.get("aoe", 60.0)))
                         continue
                 _spawn_bullet(p_pos + Vector2.from_angle(a) * 26.0, a, wd, dmg, pierce, tier)
         Jukebox.sfx(shot_name, -6.0, randf_range(0.94, 1.06))
-        # the muzzle kiss at the gun tip
-        _parts.append({"pos": p_pos + Vector2.from_angle(base_a) * 30.0, "vel": Vector2.ZERO,
-                "t": 0.06, "max": 0.06, "col": Color(1, 0.9, 0.5), "size": 9.0, "tex": "muzzle"})
+        # THE FLASH LAW (v0.3.4-3): the muzzle kiss rides the BARREL - it was
+        # drawn upright (a standing candle at the gun tip, the owner's
+        # report); now the particle carries the aim angle and draws rotated.
+        _parts.append({"pos": p_pos + Vector2.from_angle(base_a) * 34.0, "vel": Vector2.ZERO,
+                "t": 0.07, "max": 0.07, "col": Color(1, 0.9, 0.5), "size": 9.0,
+                "tex": "muzzle", "rot": base_a})
+        # THE TWIN TAIL: the ghost gun answers every volley backwards at 40%
+        if meta.has_skill("twin_tail"):
+                _spawn_bullet(p_pos + Vector2.from_angle(base_a + PI) * 26.0,
+                                base_a + PI, wd, base_dmg * 0.4, 0, tier)
         return true
 
 func _pick_target(rng: float) -> Variant:
@@ -1230,8 +1324,7 @@ func _plant_goga_carrier() -> void:
         e["goga"] = true
         goga_carrier_alive = true
         goga_pending = false
-        _banner("A GOGACOIN HIDES IN THE SWARM!", true)
-        Jukebox.sfx("cs_coin", -2.0, 1.2)
+        # THE SILENCE LAW: the coin never announces itself - the glint only
 
 func _mk_rings(radii: Array) -> Array:
         # the python law: radii, thickness 8, counter-rotating rad/frame speeds,
@@ -1434,20 +1527,21 @@ func _tick_enemies(delta: float) -> void:
                                                 _heal_flash(o)
                 if e.get("rings", null) != null:
                         _tick_rings(e, delta)
-                # ===== contact (the python law: the enemy's REMAINING HP hits you,
-                # then the enemy dies on your skin) =====
+                # ===== THE SHARED CONTACT LAW (v0.3.4-3): colliding damages
+                # BOTH sides and EVERY tick speaks - the old splatter law
+                # (remaining HP as damage, then silent iframes) is DEAD.
                 var touch_r: float = float(e["size"]) * 0.5 * float(e.get("scale_m", 1.0)) + PLAYER_R - 6.0
                 if e.get("boss", false):
                         touch_r = float(e["size"]) * 0.5 + PLAYER_R - 10.0
-                if dist < touch_r and p_iframe <= 0.0:
-                        if e.get("boss", false):
-                                _hurt_player(float(e["dmg"]), e)
-                        else:
-                                var raw := float(e["hp"])
-                                var contact := clampf(raw, 1.0, 80.0) * float(stats["contact_cut"])
-                                _hurt_player(contact, e)
-                                to_kill.append(e)   # the splatter kills the enemy too
-                                continue
+                if dist < touch_r:
+                        e["touch_cd"] = float(e.get("touch_cd", 0.0)) - delta
+                        if e["touch_cd"] <= 0.0:
+                                e["touch_cd"] = 0.55
+                                _contact_hit(e)
+                                # the ram may have splattered the enemy -
+                                # never touch the corpse again this tick
+                                if e.get("dead", false):
+                                        continue
                 # the flash decay
                 if e["flash"] > 0.0:
                         e["flash"] -= delta
@@ -1481,7 +1575,6 @@ func _tick_enemies(delta: float) -> void:
                         goga_carrier_alive = false
                         _drop_pickup("gogacoin", e2["pos"], 1)
                         e2["goga"] = false
-                        _banner("THE CARRIER DROPPED THE COIN!", true)
                 _kill_enemy(e2, false)
         # the milestone owes its carrier - plant it on the living swarm
         if goga_pending and phase == "play":
@@ -1506,12 +1599,76 @@ func _tick_ebullets(delta: float) -> void:
                 if b["life"] <= 0.0:
                         dead.append(b)
                         continue
+                # THE GHOST ROUND (the meta skill): a shot that hits Spudnik
+                # PASSES THROUGH, poisoned against its own masters - half
+                # damage to any enemy it meets behind the body.
+                if b.get("ghosted", false):
+                        for e in enemies:
+                                if e.get("dead", false):
+                                        continue
+                                if e["pos"].distance_to(b["pos"]) < float(e["size"]) * 0.5 + 8.0:
+                                        _hurt_enemy(e, float(b["dmg"]) * 0.5)
+                                        dead.append(b)
+                                        break
+                        continue     # a turned shot never re-hits the body
                 if b["pos"].distance_to(p_pos) < PLAYER_R + 6.0:
                         _hurt_player(float(b["dmg"]), null)
+                        if meta.has_skill("ghost_round"):
+                                b["ghosted"] = true
+                                b["life"] = minf(float(b["life"]), 2.0)
+                                b["node"].modulate = Color(0.6, 1.0, 0.7, 0.9)
+                                continue     # the shot flies on, turned
                         dead.append(b)
+                        continue
         for b2 in dead:
                 b2["node"].queue_free()
                 ebullets.erase(b2)
+
+## THE SKILLS TICK (v0.3.4-3): the meta perks live in the run loop.
+func _tick_skills(delta: float) -> void:
+        if phase != "play":
+                return
+        # the shield reform clock
+        if meta.has_skill("shattered_shield") and not p_shield_up:
+                p_shield_cd -= delta
+                if p_shield_cd <= 0.0:
+                        p_shield_up = true
+                        _sparkle(p_pos, Color(0.5, 0.85, 1.0))
+        # THE ADRENALINE ROOT decays
+        if _adrenaline > 0.0:
+                _adrenaline = maxf(0.0, _adrenaline - delta)
+        if meta.has_skill("leech_aura"):
+                var near := 0
+                for e in enemies:
+                        if e.get("dead", false) or near >= 3:
+                                continue
+                        if e["pos"].distance_to(p_pos) < 140.0:
+                                near += 1
+                                p_hp = minf(p_max_hp, p_hp + 2.0 * delta)
+        if meta.has_skill("frost_aura"):
+                for e2 in enemies:
+                        if not e2.get("dead", false) and e2["pos"].distance_to(p_pos) < 170.0:
+                                e2["chill_t"] = maxf(float(e2.get("chill_t", 0.0)), 0.2)
+        if meta.has_skill("static_burst"):
+                _static_cd -= delta
+                if _static_cd <= 0.0 and not enemies.is_empty():
+                        _static_cd = 6.0
+                        var targets: Array = enemies.duplicate()
+                        targets.sort_custom(func(x, y):
+                                return x["pos"].distance_squared_to(p_pos) \
+                                                < y["pos"].distance_squared_to(p_pos))
+                        var zapped := 0
+                        for t in targets:
+                                if zapped >= 3:
+                                        break
+                                if t["pos"].distance_to(p_pos) > 320.0:
+                                        break
+                                _hurt_enemy(t, 12.0 + float(run_wave) * 2.0)
+                                _rings.append({"pos": t["pos"], "r": 26.0, "t": 0.25,
+                                        "max": 0.25, "col": CS_BLUE, "w": 3.0})
+                                zapped += 1
+                        if zapped > 0:
+                                Jukebox.sfx("cs_flash", -6.0, 1.3)
 
 func _boss_ai(e: Dictionary, delta: float, to_p: Vector2, dist: float) -> void:
         var b: Dictionary = e["bdata"]
@@ -1637,7 +1794,7 @@ func _kill_enemy(e: Dictionary, drops: bool) -> void:
                 if e.get("goga", false):
                         goga_carrier_alive = false
                         _drop_pickup("gogacoin", e["pos"], 1)
-                        _banner("THE CARRIER DROPPED THE COIN!", true)
+                        # THE SILENCE LAW: no banner - the glint was the tell
                 if e.get("coins_drop", 0) > 0:
                         for i in int(e["coins_drop"]):
                                 _drop_pickup("coin", e["pos"] + Vector2.from_angle(randf() * TAU) * 20.0,
@@ -1669,13 +1826,32 @@ func _kill_enemy(e: Dictionary, drops: bool) -> void:
         if e.get("boss", false):
                 boss_alive = false
                 Jukebox.sfx("cs_boom_big", -2.0)
+                _shake = 10.0
                 var th: Dictionary = CSData.THEMES[theme_id]
                 Jukebox.music(th["night_music"] if night else th["day_music"])
         enemies.erase(e)
         e["node"].queue_free()
 
-func _hurt_player(dmg: float, src: Variant) -> void:
-        if p_iframe > 0.0 or over or phase != "play":
+func _hurt_player(dmg: float, src: Variant, contact := false) -> void:
+        if over or phase != "play":
+                return
+        # THE SHARED CONTACT LAW: a contact tick NEVER hides behind the long
+        # iframe - an ongoing collision always lands its damage AND its
+        # feedback (the owner's "still get hit with no feedback" bug). It
+        # only takes the SHORT guard so five bodies can't land on one frame.
+        if not contact and p_iframe > 0.0:
+                return
+        # THE SHATTERED SHIELD (the meta skill): one hit is eaten whole and
+        # the shield shatters into blue dust, reforming 12s later.
+        if p_shield_up and meta.has_skill("shattered_shield"):
+                p_shield_up = false
+                p_shield_cd = 12.0
+                _rings.append({"pos": p_pos, "r": 46.0, "t": 0.4, "max": 0.4,
+                        "col": Color(0.45, 0.8, 1.0), "w": 5.0})
+                _sparkle(p_pos, Color(0.5, 0.85, 1.0))
+                Jukebox.sfx("cs_shield_crack", -3.0, 0.8)
+                _dmg_number(p_pos, 0.0, false, CS_BLUE)
+                _floaters[_floaters.size() - 1]["txt"] = "BLOCKED!"
                 return
         # THE DODGE LAW (patch 1): a real chance to no-hit, capped at 60%
         var dodge := clampf(float(stats.get("dodge", 0.0)), 0.0, 0.6)
@@ -1683,12 +1859,16 @@ func _hurt_player(dmg: float, src: Variant) -> void:
                 _dmg_number(p_pos, 0.0, false, CS_BLUE)
                 _floaters[_floaters.size() - 1]["txt"] = "DODGE!"
                 Jukebox.sfx("cs_flash", -12.0, 1.6)
+                # THE ADRENALINE ROOT: a dodge revs the guns
+                if meta.has_skill("adrenaline"):
+                        _adrenaline = 2.0
                 return
         var actual: float = maxf(1.0, dmg - float(stats["armor"]))
         p_hp -= actual
-        p_iframe = IFRAME
+        p_iframe = 0.28 if contact else IFRAME
         _dmg_number(p_pos, actual, false, Color(1, 0.5, 0.5))
         Jukebox.sfx("cs_hurt", -4.0)
+        _shake = maxf(_shake, 5.0)
         if src != null and src is Dictionary and (src as Dictionary).get("affix", "") == "vampiric":
                 var s: Dictionary = src
                 s["hp"] = minf(float(s["max_hp"]), float(s["hp"]) + actual * 0.2)
@@ -1702,11 +1882,42 @@ func _hurt_player(dmg: float, src: Variant) -> void:
                         return
                 _die()
 
+## THE SHARED CONTACT LAW (v0.3.4-3): one tick of an ongoing collision.
+## The enemy ATTACKS the potato; the potato RAMS back. Both sides wear
+## their numbers, the thud speaks, the dust flies - every single tick.
+func _contact_hit(e: Dictionary) -> void:
+        var hit_at: Vector2 = (p_pos + e["pos"]) * 0.5
+        # ---- the enemy's attack (armor + dodge + contact_cut apply)
+        _hurt_player(float(e["dmg"]) * float(stats["contact_cut"]), e, true)
+        if p_hp <= 0.0 or over:
+                return
+        # ---- THE RAM: the potato shoves back (8% of the enemy's max HP,
+        # +3 flat, +1 per armor point; bosses take half)
+        var ram: float = float(e["max_hp"]) * 0.08 + 3.0 + float(stats["armor"])
+        if e.get("boss", false):
+                ram *= 0.5
+        _hurt_enemy(e, ram)
+        # the dust + the thud
+        for i in 6:
+                var a := randf() * TAU
+                _parts.append({"pos": hit_at, "vel": Vector2.from_angle(a) * randf_range(60.0, 180.0),
+                        "t": 0.25, "max": 0.25, "col": Color(0.85, 0.78, 0.6),
+                        "size": randf_range(2.5, 5.0), "tex": ""})
+        _rings.append({"pos": hit_at, "r": 22.0, "t": 0.22, "max": 0.22,
+                "col": Color(1, 0.75, 0.45), "w": 3.0})
+        Jukebox.sfx("cs_hit", -8.0, randf_range(0.55, 0.7))
+        _shake = maxf(_shake, 3.0)
+
 # ================================================================ pickups
 func _drop_pickup(kind: String, pos: Vector2, v: int) -> void:
         var spr := Sprite2D.new()
         spr.texture = _t(kind)
         spr.position = pos
+        if kind == "gogacoin":
+                # THE COIN SIZE LAW (v0.3.4-3, the owner: "the gogacoins
+                # appear in the game are very very weirdly HUGE"): the box's
+                # big ui coin art lands in the world at pickup scale.
+                spr.scale = Vector2.ONE * 0.16
         spr.z_index = 4
         world.add_child(spr)
         pickups.append({"kind": kind, "v": v, "pos": pos, "node": spr, "bob": randf() * TAU})
@@ -1714,6 +1925,8 @@ func _drop_pickup(kind: String, pos: Vector2, v: int) -> void:
 func _tick_pickups(delta: float) -> void:
         var dead := []
         var magnet: float = MAGNET_BASE * float(stats["magnet"])
+        if meta.has_skill("magnetic_skin"):
+                magnet *= 1.6
         for pk in pickups:
                 pk["bob"] += delta * 4.0
                 pk["node"].position = pk["pos"] + Vector2(0, sin(pk["bob"]) * 3.0)
@@ -1732,25 +1945,43 @@ func _tick_pickups(delta: float) -> void:
                                                 run_xp -= CSData.xp_for_run_level(run_level)
                                                 run_level += 1
                                                 pending_levels += 1
-                                        if pending_levels > 0:
-                                                _level_draft_open()
+                                                # THE WOW PASS: the level-up burst
+                                                _rings.append({"pos": p_pos, "r": 70.0,
+                                                        "t": 0.5, "max": 0.5,
+                                                        "col": CS_BLUE, "w": 5.0})
+                                        # THE BREAK CHAIN LAW (v0.3.4-3): a
+                                        # level-up NEVER interrupts the wave -
+                                        # the STATS menu waits for the break.
                                 "coin":
                                         run_ccoins += int(pk["v"])
                                         Jukebox.sfx("cs_coin", -8.0)
+                                        _sparkle(pk["pos"], CS_YELLOW)
                                 "heart":
-                                        p_hp = minf(p_max_hp, p_hp + float(pk["v"]))
+                                        var heal := float(pk["v"])
+                                        if meta.has_skill("magnetic_skin"):
+                                                heal *= 1.5
+                                        p_hp = minf(p_max_hp, p_hp + heal)
                                         Jukebox.sfx("cs_heal", -6.0)
+                                        _sparkle(pk["pos"], CS_GREEN)
                                 "gogacoin":
-                                        # THE REAL GOGACOIN: +1 to the GOGABox wallet
+                                        # THE REAL GOGACOIN: +1 to the GOGABox
+                                        # wallet. THE SILENCE LAW: nothing
+                                        # announces it - the counter ticks.
                                         add_run_coins(1)
                                         meta.d["gogacoins"] = int(meta.d.get("gogacoins", 0)) + 1
                                         meta.save()
-                                        Jukebox.sfx("cs_coin", 0.0, 1.3)
-                                        _banner("GOGACOIN +1 (the box wallet)", true)
                         dead.append(pk)
         for pk2 in dead:
                 pk2["node"].queue_free()
                 pickups.erase(pk2)
+
+## a little burst of glitter where something good happened
+func _sparkle(pos: Vector2, col: Color) -> void:
+        for i in 5:
+                var a := randf() * TAU
+                _parts.append({"pos": pos, "vel": Vector2.from_angle(a) * randf_range(40.0, 130.0),
+                        "t": 0.3, "max": 0.3, "col": col,
+                        "size": randf_range(2.0, 4.0), "tex": ""})
 
 func _tick_zones(delta: float) -> void:
         var dead := []
@@ -1776,6 +2007,7 @@ func _boom_at(pos: Vector2, r: float, dmg: float, hits_player: bool) -> void:
                 _hurt_player(dmg * 0.8, null)
         _shockwave(pos, r)
         Jukebox.sfx("cs_boom", -4.0)
+        _shake = maxf(_shake, 4.0)
 
 # ================================================================ waves
 func _tick_waves(delta: float) -> void:
@@ -1861,38 +2093,64 @@ func _wave_clear() -> void:
         _wave_break_open()
 
 # ================================================================ the breaks
-## the wave-break flow: clear -> the WAVE DRAFT (1 of 3, with teeth, now
-## REROLLABLE) -> THE SHOP (the store-like rebuild) -> the next wave.
+## THE BREAK CHAIN (v0.3.4-3, the owner: "we will have shop menu, stats
+## menu, skills menu... splitting merge menu to be as another menu instead
+## of in shop, put it after shop"):
+##   clear -> the WAVE DRAFT (pick 1 of 3, NO reroll - the reroll lives in
+##   the market) -> THE WAVE MARKET (items/weapons/allies + the HOLD DECK)
+##   -> THE MERGE BENCH (its own menu) -> THE STATS MENU (the level-ups)
+##   -> THE SKILLS MENU (when points wait) -> the next wave.
 var _draft_cards: Array = []
-var _break_in_shop := false
 
 func _wave_break_open() -> void:
-        _break_in_shop = false
-        draft_rerolls = 0
-        draft_reroll_free = meta.tree_has("u3")
+        _break_in_market = false
         shop_rerolls = 0
+        shop_free_reroll = meta.tree_has("u3")
+        market_tab = "items"
         _roll_shop_offers()
-        if pending_levels > 0:
-                _level_draft_open()
-                return
         _wave_draft_open()
 
-func _after_draft_or_shop() -> void:
+## every CONTINUE in the chain lands on one of these - each step closes its
+## own sheet first, so the stack never grows and the chain never strands
+func _chain_after_draft() -> void:
+        _cs_close_top()
+        _market_open()
+
+func _chain_after_market() -> void:
+        _cs_close_top()
+        _merge_menu_open()
+
+func _chain_after_merge() -> void:
+        _cs_close_top()
         if pending_levels > 0:
-                _level_draft_open()
+                _stats_menu_open()
                 return
-        if not _break_in_shop:
-                _break_in_shop = true
-                _shop_open()
+        _chain_after_stats()
+
+func _chain_after_stats() -> void:
+        _cs_close_top()
+        if meta.skill_points_free(run_kills) > 0:
+                _skills_menu_open()
                 return
+        _chain_after_skills()
+
+func _chain_after_skills() -> void:
         _cs_close_all()
         _begin_wave(run_wave)
+
+## the break fell out of a sheet (a universal shop visit closed over it) -
+## the market is the break's hub, so back it comes
+func _resume_break() -> void:
+        if phase == "break" and cs_sheets.is_empty():
+                _market_open()
 
 # ------------------------------------------------------------- wave draft
 func _wave_draft_open() -> void:
         _draft_cards = _roll_wave_drafts(3)
+        # closable=false: a closed draft used to strand the break with no
+        # sheet - the SKIP button is the way out
         _cs_open("WAVE %d CLEARED - CHOOSE ONE" % (run_wave - 1), func(box: VBoxContainer):
-                _build_draft(box), CS_YELLOW)
+                _build_draft(box), CS_YELLOW, false)
 
 func _roll_wave_drafts(n: int) -> Array:
         # weighted pick without repeats
@@ -1913,12 +2171,9 @@ func _roll_wave_drafts(n: int) -> Array:
                                 break
         return out
 
-func _draft_reroll_cost() -> int:
-        return 6 + draft_rerolls * 6
-
 func _build_draft(box: VBoxContainer) -> void:
         var sub := _cs_label("every card GIVES something - most TAKE something back",
-                        12, CS_WHITE)
+                        13, CS_WHITE)
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(sub)
         var row := HBoxContainer.new()
@@ -1931,25 +2186,10 @@ func _build_draft(box: VBoxContainer) -> void:
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
         actions.add_theme_constant_override("separation", 14)
         box.add_child(actions)
-        # THE REROLL (patch 1): u3 owns one free shuffle per break, then coins
-        var rr := _cs_button("REROLL  %s" % ("FREE" if draft_reroll_free
-                        else "%d CC" % _draft_reroll_cost()), 14, CS_BLUE, func():
-                if draft_reroll_free:
-                        draft_reroll_free = false
-                elif run_ccoins >= _draft_reroll_cost():
-                        run_ccoins -= _draft_reroll_cost()
-                        draft_rerolls += 1
-                else:
-                        Jukebox.sfx("cs_error", -6.0)
-                        _toast_show("not enough coins")
-                        return
-                _draft_cards = _roll_wave_drafts(3)
-                Jukebox.sfx("cs_draft", -6.0, 1.2)
-                _cs_reopen(func(): _wave_draft_open()))
-        actions.add_child(rr)
-        var skip := _cs_button("SKIP - take nothing", 14, CS_WHITE, func():
-                _after_draft_or_shop())
-        actions.add_child(skip)
+        # THE REROLL IS GONE from the drafts (the owner: "a re-roll should be
+        # for shop items") - the market owns it now
+        actions.add_child(_cs_button("SKIP - take nothing", 14, CS_WHITE,
+                        func(): _chain_after_draft()))
 
 func _draft_card(d: Dictionary) -> Button:
         var b := Button.new()
@@ -1984,7 +2224,7 @@ func _draft_card(d: Dictionary) -> Button:
         b.pressed.connect(func():
                 _apply_draft(d)
                 Jukebox.sfx("cs_draft", -4.0)
-                _after_draft_or_shop())
+                _chain_after_draft())
         return b
 
 func _apply_draft(d: Dictionary) -> void:
@@ -2005,78 +2245,180 @@ func _apply_stat(k: String, v: Variant) -> void:
                 "luck": stats["luck"] = float(stats.get("luck", 0.0)) + float(v)
                 "dodge": stats["dodge"] = float(stats.get("dodge", 0.0)) + float(v)
                 "magnet": stats["magnet"] = float(stats["magnet"]) + float(v)
+                "lifesteal": stats["lifesteal"] = float(stats["lifesteal"]) + float(v)
+                "pierce_all": stats["pierce_all"] = int(stats["pierce_all"]) + int(v)
                 "hp":
                         stats["hp_add"] = float(stats.get("hp_add", 0.0)) + float(v)
                         p_max_hp = _max_hp()
                         p_hp = clampf(p_hp + maxf(0.0, float(v)), 1.0, p_max_hp)
                 "proj": stats["proj_add"] = int(stats["proj_add"]) + int(v)
 
-# ------------------------------------------------------------ level draft
-func _level_draft_open() -> void:
-        _cs_open("LEVEL %d - THE TREE OFFERS" % run_level, func(box: VBoxContainer):
-                _build_level_draft(box), CS_BLUE)
+# ------------------------------------------------------------ STATS menu
+## THE STATS MENU (v0.3.4-3, the owner: "design it as a menu that appears
+## after the game shop when the level-up happens... some stuff requires more
+## than one point"): every XP level is ONE stats point; the packs cost 1-3;
+## the sheet is closable=false (no X - the DONE button walks the chain).
+func _stats_menu_open() -> void:
+        _cs_open("LEVEL UP - SPEND STATS POINTS", func(box: VBoxContainer):
+                _build_stats_menu(box), CS_BLUE, false)
 
-func _build_level_draft(box: VBoxContainer) -> void:
-        var row := HBoxContainer.new()
-        row.alignment = BoxContainer.ALIGNMENT_CENTER
-        row.add_theme_constant_override("separation", 12)
-        box.add_child(row)
-        var pool := CSData.LEVEL_DRAFTS.duplicate()
-        pool.shuffle()
-        var picks := pool.slice(0, 3)
-        for d in picks:
-                var b := Button.new()
-                b.custom_minimum_size = Vector2(220, 96)
-                var st := _cs_box_style(CS_BLUE, CS_BOX)
-                st.corner_radius_top_left = 12
-                st.corner_radius_top_right = 12
-                st.corner_radius_bottom_left = 12
-                st.corner_radius_bottom_right = 12
-                b.add_theme_stylebox_override("normal", st)
-                var hov := _cs_box_style(CS_YELLOW, CS_BOX2)
-                b.add_theme_stylebox_override("hover", hov)
-                var l := _cs_label(String(d["t"]), 15, CS_WHITE)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                l.set_anchors_preset(Control.PRESET_CENTER)
-                l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                b.add_child(l)
-                var dd: Dictionary = d
-                b.pressed.connect(func():
-                        _apply_stat(String(dd["k"]), dd["v"])
-                        pending_levels -= 1
-                        Jukebox.sfx("cs_levelup", -4.0)
-                        if phase == "break":
-                                _after_draft_or_shop()
-                        elif not cs_sheets.is_empty():
-                                _cs_close_top())
-                row.add_child(b)
+func _build_stats_menu(box: VBoxContainer) -> void:
+        var head := _cs_label("%d STATS POINTS  -  one per level, packs cost 1-3" \
+                        % pending_levels, 15, CS_BLUE)
+        head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(head)
+        # THE BIG-UI LAW: a real two-axis scroll, big text, nothing cramped
+        var scroll := ScrollContainer.new()
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.42)
+        box.add_child(scroll)
+        var shelf := VBoxContainer.new()
+        shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shelf.add_theme_constant_override("separation", 6)
+        scroll.add_child(shelf)
+        var grid := GridContainer.new()
+        grid.columns = 3
+        grid.add_theme_constant_override("h_separation", 8)
+        grid.add_theme_constant_override("v_separation", 8)
+        grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        shelf.add_child(grid)
+        for p in CSData.STAT_PACKS:
+                var pk: Dictionary = p
+                grid.add_child(_stat_pack_card(pk))
+        _fit_scroll(scroll, shelf, 0.44)
+        var actions := HBoxContainer.new()
+        actions.alignment = BoxContainer.ALIGNMENT_CENTER
+        actions.add_theme_constant_override("separation", 14)
+        box.add_child(actions)
+        actions.add_child(_cs_button("DONE - TO THE SKILLS >", 16, CS_GREEN,
+                        func(): _chain_after_stats()))
 
-# ================================================================ THE SHOP
-## THE STORE-LIKE REBUILD (the owner: the example HTML had a good store -
-## this is that shape): a header with the fat balance, stat chips, WEAPON
-## offers with rarities, ITEMS, SUPPLIES, ALLIES, THE MERGE BENCH, YOUR
-## LOADOUT with SELL, and the REROLL + START WAVE actions.
-func _shop_button() -> void:
-        if phase == "play":
-                _toast_show("the shop opens at the wave break - hold on!")
+func _stat_pack_card(p: Dictionary) -> PanelContainer:
+        var cost := int(p["cost"])
+        var broke := pending_levels < cost
+        var once_used: bool = String(p["k"]) == "pierce_all" \
+                        and int(stats["pierce_all"]) > 0
+        var lines := [String(p["d"]), "%d PTS" % cost]
+        var card := _shop_card(String(p["t"]), CS_BLUE, lines, CS_BLUE,
+                        "BUY" if not broke and not once_used else
+                        ("LEARNED" if once_used else "NEED %d" % cost),
+                        CS_YELLOW, func(): _buy_stat_pack(p),
+                        not broke and not once_used)
+        return card
+
+func _buy_stat_pack(p: Dictionary) -> void:
+        var cost := int(p["cost"])
+        if pending_levels < cost:
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("not enough points (%d left)" % pending_levels)
                 return
+        pending_levels -= cost
+        _apply_stat(String(p["k"]), p["v"])
+        Jukebox.sfx("cs_levelup", -4.0)
+        _cs_reopen(func(): _stats_menu_open())
+
+# ----------------------------------------------------------- SKILLS menu
+## THE SKILLS MENU (v0.3.4-3, the owner: "skills should be earned from each
+## 100 kill as a point, skills should be unique... a real high cool-factor").
+## The points are LIFETIME - they never reset with a round.
+func _skills_menu_open() -> void:
+        _cs_open("THE SKILLS", func(box: VBoxContainer): _build_skills_menu(box),
+                        CS_GREEN, false)
+
+func _build_skills_menu(box: VBoxContainer) -> void:
+        var free := meta.skill_points_free(run_kills)
+        var head := _cs_label("%d SKILL POINTS  -  one point per 100 kills, they NEVER reset" \
+                        % free, 15, CS_GREEN)
+        head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        box.add_child(head)
+        var scroll := ScrollContainer.new()
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.42)
+        box.add_child(scroll)
+        var shelf := VBoxContainer.new()
+        shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shelf.add_theme_constant_override("separation", 6)
+        scroll.add_child(shelf)
+        var grid := GridContainer.new()
+        grid.columns = 2
+        grid.add_theme_constant_override("h_separation", 8)
+        grid.add_theme_constant_override("v_separation", 8)
+        grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        shelf.add_child(grid)
+        for sid in CSData.SKILL_ORDER:
+                var sid_s: String = sid
+                grid.add_child(_skill_card(sid_s, free))
+        _fit_scroll(scroll, shelf, 0.44)
+        var actions := HBoxContainer.new()
+        actions.alignment = BoxContainer.ALIGNMENT_CENTER
+        actions.add_theme_constant_override("separation", 14)
+        box.add_child(actions)
         if phase == "break":
-                _break_in_shop = true
-                _shop_open()
+                actions.add_child(_cs_button("CONTINUE - TO WAVE %d >" % run_wave,
+                                16, CS_GREEN, func(): _chain_after_skills()))
         else:
-                _armory_open()
+                actions.add_child(_cs_button("BACK", 14, CS_WHITE, func():
+                        _cs_close_top()
+                        if phase == "boot":
+                                _optionals_open()))
 
-func _shop_open() -> void:
-        _cs_open("THE SHOP", func(box: VBoxContainer): _build_shop(box), CS_YELLOW)
+func _skill_card(sid: String, free: int) -> PanelContainer:
+        var sk: Dictionary = CSData.SKILLS[sid]
+        var cost := int(sk["cost"])
+        var owned := meta.has_skill(sid)
+        var lines := [String(sk["desc"]), "%d %s" % [cost, "PT" if cost == 1 else "PTS"]]
+        var can := not owned and free >= cost
+        return _shop_card(String(sk["name"]), CS_GREEN if owned else CS_WHITE, lines,
+                        CS_GREEN if owned else CS_EDGE,
+                        "OWNED" if owned else ("BUY" if can else "NEED %d" % cost),
+                        CS_GREEN, func(): _buy_skill(sid, free), can or owned)
 
-func _roll_shop_offers() -> void:
-        # 4 weapon offers + 3 item offers, luck-weighted rarities
+func _buy_skill(sid: String, free: int) -> void:
+        if meta.buy_skill(sid, run_kills):
+                Jukebox.sfx("cs_levelup", -3.0, 1.1)
+                _cs_reopen(func(): _skills_menu_open())
+        else:
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("not enough skill points")
+
+# ========================================================= THE WAVE MARKET
+## THE BREAK'S STORE (v0.3.4-3, the owner: "make shop has items, weapons,
+## allies... a re-roll should be for shop items... in brotato there was like
+## extra-deck-style in the shop where the user can save up to 5 things for
+## later, not affected by rerolls"): three tabs - ITEMS / WEAPONS / ALLIES -
+## the REROLL lives here (u3's free shuffle first), and THE HOLD DECK pins
+## up to 5 offers across rerolls, THIS market visit only, never saved.
+func _shop_button() -> void:
+        # THE UNIVERSAL SHOP LAW (the owner, round after round): the HUD
+        # button opens THE SHOP - the GOGACoins store - at ANY phase. The
+        # wave market is the break's own flow, it opens itself.
+        _shop_open()
+
+func _market_open() -> void:
+        _break_in_market = true
+        _cs_open("THE WAVE MARKET", func(box: VBoxContainer): _build_market(box),
+                        CS_YELLOW, false)
+
+func _roll_shop_offers(keep_held := false) -> void:
+        # 4 weapon offers + 3 item offers, luck-weighted rarities.
+        # THE HOLD DECK: when keep_held, the HELD offers survive untouched.
         var luck := float(stats.get("luck", 0.0))
+        var kept_w: Array = []
+        var kept_i: Array = []
+        if keep_held:
+                for o in shop_offers_w:
+                        if bool(o["held"]):
+                                kept_w.append(o)
+                for o2 in shop_offers_i:
+                        if bool(o2["held"]):
+                                kept_i.append(o2)
         shop_offers_w.clear()
         var used := {}
         var owned_n := meta.armory().size()
-        for k in 4:
+        var wneed := 4
+        for k in wneed:
                 var wid := _pick_offer_weapon(used)
                 used[wid] = true
                 var rar := CSData.roll_rarity(luck)
@@ -2086,7 +2428,7 @@ func _roll_shop_offers() -> void:
                 var price := int(round(CSData.weapon_price(wid, tier)
                                 * CSData.RARITIES[rar]["pm"] * meta.shop_discount()))
                 shop_offers_w.append({"wid": wid, "tier": tier, "rar": rar,
-                        "price": price, "sold": false})
+                        "price": price, "sold": false, "held": false})
         shop_offers_i.clear()
         var iused := {}
         for k in 3:
@@ -2101,7 +2443,10 @@ func _roll_shop_offers() -> void:
                 var price2 := int(round(base_p * float(CSData.RARITIES[rar2]["pm"])
                                 + run_wave * 1.5))
                 shop_offers_i.append({"iid": iid, "rar": rar2, "price": price2,
-                        "sold": false})
+                        "sold": false, "held": false})
+        # the pins return on top of the fresh shelf
+        shop_offers_w = kept_w + shop_offers_w.slice(0, maxi(0, 4 - kept_w.size()))
+        shop_offers_i = kept_i + shop_offers_i.slice(0, maxi(0, 3 - kept_i.size()))
 
 func _pick_offer_weapon(used: Dictionary) -> String:
         # prefer owned kinds (the Brotato copy-buy), fall wide otherwise
@@ -2141,7 +2486,8 @@ func _stat_chips_row(box: VBoxContainer) -> void:
 
 func _shop_card(title: String, title_col: Color, body_lines: Array,
                 border: Color, btn_txt: String, btn_col: Color,
-                cb: Callable, enabled := true) -> PanelContainer:
+                cb: Callable, enabled := true, extra_txt := "",
+                extra_cb := Callable(), extra_col := CS_BLUE) -> PanelContainer:
         var card := PanelContainer.new()
         var st := _cs_box_style(border, CS_BOX)
         st.corner_radius_top_left = 10
@@ -2149,22 +2495,25 @@ func _shop_card(title: String, title_col: Color, body_lines: Array,
         st.corner_radius_bottom_left = 10
         st.corner_radius_bottom_right = 10
         card.add_theme_stylebox_override("panel", st)
-        card.custom_minimum_size = Vector2(196, 0)
+        card.custom_minimum_size = Vector2(206, 0)
         var vb := VBoxContainer.new()
         vb.add_theme_constant_override("separation", 2)
         card.add_child(vb)
-        var nm := _cs_label(title, 13, title_col)
+        var nm := _cs_label(title, 14, title_col)
         nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         vb.add_child(nm)
         for ln in body_lines:
-                var l2 := _cs_label(String(ln), 10, CS_WHITE)
+                var l2 := _cs_label(String(ln), 11, CS_WHITE)
                 l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 vb.add_child(l2)
-        var buy := _cs_button(btn_txt, 12, btn_col, cb)
+        var buy := _cs_button(btn_txt, 13, btn_col, cb)
         buy.disabled = not enabled
         vb.add_child(buy)
+        if extra_txt != "":
+                var ex := _cs_button(extra_txt, 11, extra_col, extra_cb)
+                vb.add_child(ex)
         return card
 
 func _cards_row(box: VBoxContainer, cards: Array) -> void:
@@ -2180,47 +2529,105 @@ func _section(box: VBoxContainer, txt: String) -> void:
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(l)
 
-func _build_shop(box: VBoxContainer) -> void:
-        # the header: the fat balance + the wave info
+func _build_market(box: VBoxContainer) -> void:
+        # the header: the fat balance + the wave info + the HOLD DECK chip
         var head := HBoxContainer.new()
         head.alignment = BoxContainer.ALIGNMENT_CENTER
         head.add_theme_constant_override("separation", 8)
         box.add_child(head)
-        var ccbox := _cs_black_box(head, Vector2(150, 34))
+        var ccbox := _cs_black_box(head, Vector2(160, 36))
         var hh := HBoxContainer.new()
         ccbox.add_child(hh)
-        var ic := TextureRect.new()
-        ic.texture = _t("coin")
-        ic.custom_minimum_size = Vector2(22, 22)
-        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        hh.add_child(ic)
-        var bal := _cs_label(str(run_ccoins), 18, CS_YELLOW)
-        hh.add_child(bal)
+        hh.add_child(_cs_icon(_t("coin"), 24))
+        hh.add_child(_cs_label(str(run_ccoins), 18, CS_YELLOW))
+        var held_box := _cs_black_box(head, Vector2(120, 36))
+        held_box.add_child(_cs_label("HELD %d/5" % _held_count(), 13, CS_BLUE))
         var boss_next: bool = (run_wave % CSData.BOSS_CYCLE) == 0
         _cs_label("wave %d cleared - next: %sWAVE %d - LV %d" % [run_wave - 1,
                 ("BOSS " if boss_next else ""), run_wave, run_level],
-                12, CS_RED if boss_next else CS_WHITE, head)
+                13, CS_RED if boss_next else CS_WHITE, head)
         _stat_chips_row(box)
-        # the scroll holds the shelves
+        # the tabs: ITEMS / WEAPONS / ALLIES (the owner's three)
+        var tabs := HBoxContainer.new()
+        tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+        tabs.add_theme_constant_override("separation", 6)
+        box.add_child(tabs)
+        for tab in ["items", "weapons", "allies"]:
+                var t_s: String = tab
+                var b := _cs_button(t_s.to_upper(), 13,
+                                CS_YELLOW if market_tab == t_s else CS_WHITE, func():
+                        market_tab = t_s
+                        _cs_reopen(func(): _market_open()))
+                tabs.add_child(b)
+        # THE BIG-UI LAW: the shelf scrolls BOTH ways, the text reads big
         var scroll := ScrollContainer.new()
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.5)
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.42)
         box.add_child(scroll)
         var shelf := VBoxContainer.new()
         shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shelf.add_theme_constant_override("separation", 6)
         scroll.add_child(shelf)
-        # ---- WEAPONS
-        _section(shelf, "- WEAPONS (slots %d/%d) -" % [weapons_run.size(), meta.weapon_slots()])
+        match market_tab:
+                "items": _market_items(shelf)
+                "weapons": _market_weapons(shelf)
+                "allies": _market_allies(shelf)
+        _fit_scroll(scroll, shelf, 0.44)
+        # ---- the actions: THE REROLL + the chain's next step
+        var actions := HBoxContainer.new()
+        actions.alignment = BoxContainer.ALIGNMENT_CENTER
+        actions.add_theme_constant_override("separation", 16)
+        box.add_child(actions)
+        var rc := CSData.shop_reroll_cost(shop_rerolls)
+        actions.add_child(_cs_button("REROLL OFFERS - %s" % ("FREE" if shop_free_reroll
+                        else "%d CC" % rc), 14, CS_BLUE, func(): _reroll_market()))
+        actions.add_child(_cs_button("TO THE MERGE BENCH >", 15, CS_GREEN, func():
+                _chain_after_market()))
+
+func _market_items(shelf: VBoxContainer) -> void:
+        _section(shelf, "- ITEMS (the Brotato shelf) -")
+        var icards := []
+        for o2 in shop_offers_i:
+            var off2: Dictionary = o2
+            if off2["sold"] and not bool(off2["held"]):
+                    icards.append(_shop_card("SOLD", Color(0.5, 0.5, 0.55), ["gone"],
+                                    CS_EDGE, "-", CS_WHITE, func(): pass, false))
+                    continue
+            var iid: String = off2["iid"]
+            var it: Dictionary = CSData.ITEMS[iid]
+            var rar2: String = off2["rar"]
+            var rarc2: Color = CSData.RARITIES[rar2]["col"]
+            var lines2 := [String(CSData.RARITIES[rar2]["name"]), String(it["desc"])]
+            var can2 := run_ccoins >= int(off2["price"])
+            icards.append(_shop_card(String(it["name"]), CS_YELLOW if off2["held"] else rarc2,
+                            lines2, CS_YELLOW if off2["held"] else rarc2,
+                            "SOLD" if off2["sold"] else "BUY %d CC" % int(off2["price"]),
+                            CS_YELLOW, func(): _shop_buy_item(off2), can2 and not off2["sold"],
+                            "UNHOLD" if off2["held"] else "HOLD",
+                            func(): _toggle_hold(off2), CS_BLUE))
+        _cards_row(shelf, icards)
+        _section(shelf, "- SUPPLIES -")
+        var scards := []
+        for cid in CSData.CONSUMABLES:
+            var cid_s: String = cid
+            var cd: Dictionary = CSData.CONSUMABLES[cid_s]
+            var price := int(round(int(cd["price"]) * meta.shop_discount()))
+            var can3 := run_ccoins >= price
+            scards.append(_shop_card(String(cd["name"]), CS_WHITE,
+                            [String(cd["desc"])], CS_EDGE, "BUY %d CC" % price, CS_YELLOW,
+                            func(): _shop_buy_supply(cid_s, price), can3))
+        _cards_row(shelf, scards)
+
+func _market_weapons(shelf: VBoxContainer) -> void:
+        _section(shelf, "- WEAPON OFFERS (slots %d/%d) -" % [weapons_run.size(), meta.weapon_slots()])
         var wcards := []
         for o in shop_offers_w:
             var off: Dictionary = o
-            if off["sold"]:
-                    var soldc := _shop_card("SOLD", Color(0.5, 0.5, 0.55), ["come back next wave"],
-                                    CS_EDGE, "-", CS_WHITE, func(): pass, false)
-                    wcards.append(soldc)
+            if off["sold"] and not bool(off["held"]):
+                    wcards.append(_shop_card("SOLD", Color(0.5, 0.5, 0.55),
+                                    ["come back next wave"], CS_EDGE, "-", CS_WHITE,
+                                    func(): pass, false))
                     continue
             var wid: String = off["wid"]
             var wd: Dictionary = CSData.WEAPONS[wid]
@@ -2232,88 +2639,16 @@ func _build_shop(box: VBoxContainer) -> void:
                             float(wd["cad"]) * float(CSData.tier_mult(int(off["tier"]))["cad"]), int(float(wd["rng"]))],
                     String(CSData.RARITIES[rar]["blurb"]),
             ]
-            var can := run_ccoins >= int(off["price"]) and weapons_run.size() < meta.weapon_slots() \
-                            and int(off["tier"]) <= meta.tier_cap()
-            wcards.append(_shop_card(String(wd["name"]), rarc, lines, rarc,
-                            "BUY %d CC" % int(off["price"]), CS_YELLOW, func():
-                            _shop_buy_weapon(off), can))
+            var can: bool = run_ccoins >= int(off["price"]) and weapons_run.size() < meta.weapon_slots() \
+                            and int(off["tier"]) <= meta.tier_cap() and not bool(off["sold"])
+            wcards.append(_shop_card(String(wd["name"]),
+                            CS_YELLOW if off["held"] else rarc, lines,
+                            CS_YELLOW if off["held"] else rarc,
+                            "SOLD" if off["sold"] else "BUY %d CC" % int(off["price"]),
+                            CS_YELLOW, func(): _shop_buy_weapon(off), can,
+                            "UNHOLD" if off["held"] else "HOLD",
+                            func(): _toggle_hold(off), CS_BLUE))
         _cards_row(shelf, wcards)
-        # ---- ITEMS
-        _section(shelf, "- ITEMS -")
-        var icards := []
-        for o2 in shop_offers_i:
-            var off2: Dictionary = o2
-            if off2["sold"]:
-                    icards.append(_shop_card("SOLD", Color(0.5, 0.5, 0.55), ["gone"],
-                                    CS_EDGE, "-", CS_WHITE, func(): pass, false))
-                    continue
-            var iid: String = off2["iid"]
-            var it: Dictionary = CSData.ITEMS[iid]
-            var rar2: String = off2["rar"]
-            var rarc2: Color = CSData.RARITIES[rar2]["col"]
-            var lines2 := [String(CSData.RARITIES[rar2]["name"]), String(it["desc"])]
-            var can2 := run_ccoins >= int(off2["price"])
-            icards.append(_shop_card(String(it["name"]), rarc2, lines2, rarc2,
-                            "BUY %d CC" % int(off2["price"]), CS_YELLOW, func():
-                            _shop_buy_item(off2), can2))
-        _cards_row(shelf, icards)
-        # ---- SUPPLIES
-        _section(shelf, "- SUPPLIES -")
-        var scards := []
-        for cid in CSData.CONSUMABLES:
-            var cd: Dictionary = CSData.CONSUMABLES[cid]
-            var price := int(round(int(cd["price"]) * meta.shop_discount()))
-            var can3 := run_ccoins >= price
-            scards.append(_shop_card(String(cd["name"]), CS_WHITE,
-                            [String(cd["desc"])], CS_EDGE, "BUY %d CC" % price, CS_YELLOW,
-                            func(): _shop_buy_supply(cid, price), can3))
-        _cards_row(shelf, scards)
-        # ---- ALLIES (deploy / raise)
-        if not (meta.d["owned_allies"] as Array).is_empty():
-                _section(shelf, "- ALLIES (deploy + raise) -")
-                var acards := []
-                for aid in meta.d["owned_allies"]:
-                    var aid_s: String = aid
-                    var deployed := _allies_deployed(aid_s)
-                    var at_cap := allies.size() >= _ally_cap() and deployed == 0
-                    var price3 := int(round(CSData.ally_level_price(aid_s, deployed + 1) * meta.shop_discount()))
-                    var lines3 := [String(CSData.ALLIES[aid_s]["desc"]),
-                            "level %d -> %d" % [deployed, deployed + 1]]
-                    var can4 := run_ccoins >= price3 and not at_cap
-                    acards.append(_shop_card(String(CSData.ALLIES[aid_s]["name"]), CS_GREEN, lines3,
-                                    CS_GREEN, "DEPLOY %d CC" % price3, CS_YELLOW, func():
-                                    _shop_buy_ally(aid_s, price3), can4))
-                _cards_row(shelf, acards)
-        # ---- THE MERGE BENCH (the owner's law, always VISIBLE now; locked
-        # shows the reason instead of hiding)
-        _section(shelf, "- THE MERGE BENCH -")
-        if meta.merging_learned():
-                var mcards := []
-                var pairs := _merge_pairs()
-                if pairs.is_empty():
-                        var none := _cs_label("no pairs on the bench (two same weapons, same tier)",
-                                        11, CS_WHITE)
-                        none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                        shelf.add_child(none)
-                for pr in pairs.slice(0, 3):
-                    var pr_d: Dictionary = pr
-                    var cost := int(round(float(pr_d["cost"]) * meta.merge_discount()))
-                    var tcap_ok := meta.tier_cap() >= int(pr_d["tier"]) + 1
-                    var can5 := run_ccoins >= cost and tcap_ok
-                    var why := "" if tcap_ok else " (LV %d gates T%d)" % [meta.char_level(), int(pr_d["tier"]) + 1]
-                    mcards.append(_shop_card("MERGE: " + String(CSData.WEAPONS[pr_d["wid"]]["name"]),
-                                    CS_YELLOW,
-                                    ["T%d + T%d -> T%d" % [int(pr_d["tier"]), int(pr_d["tier"]), int(pr_d["tier"]) + 1],
-                                     "two copies consumed" + why],
-                                    CS_YELLOW, "MERGE %d CC" % cost, CS_YELLOW, func():
-                                    _wave_buy_merge(pr_d, cost), can5))
-                _cards_row(shelf, mcards)
-        else:
-                var locked := _cs_label("LOCKED - the WEAPON LAB (skill tree, LAB branch) teaches merging",
-                                11, CS_RED)
-                locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                shelf.add_child(locked)
-        # ---- YOUR LOADOUT (with SELL)
         _section(shelf, "- YOUR LOADOUT (sell refunds 40%%) -")
         var lcards := []
         for wr in weapons_run:
@@ -2326,25 +2661,121 @@ func _build_shop(box: VBoxContainer) -> void:
                             CS_EDGE, "SELL +%d CC" % refund, CS_RED, func():
                             _shop_sell_weapon(wr_d, refund), keep))
         _cards_row(shelf, lcards)
-        _fit_scroll(scroll, shelf, 0.5)
-        # ---- the actions
+
+func _market_allies(shelf: VBoxContainer) -> void:
+        _section(shelf, "- ALLIES (deploy + raise, they fight beside you) -")
+        if (meta.d["owned_allies"] as Array).is_empty():
+                var note := _cs_label("no allies yet - THE SHOP sells them (the highest prices in the game)",
+                                12, CS_WHITE)
+                note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                shelf.add_child(note)
+                return
+        var acards := []
+        for aid in meta.d["owned_allies"]:
+            var aid_s: String = aid
+            var deployed := _allies_deployed(aid_s)
+            var at_cap := allies.size() >= _ally_cap() and deployed == 0
+            var price3 := int(round(CSData.ally_level_price(aid_s, deployed + 1) * meta.shop_discount()))
+            var lines3 := [String(CSData.ALLIES[aid_s]["desc"]),
+                    "level %d -> %d" % [deployed, deployed + 1]]
+            var can4 := run_ccoins >= price3 and not at_cap
+            acards.append(_shop_card(String(CSData.ALLIES[aid_s]["name"]), CS_GREEN, lines3,
+                            CS_GREEN, "DEPLOY %d CC" % price3, CS_YELLOW, func():
+                            _shop_buy_ally(aid_s, price3), can4))
+        _cards_row(shelf, acards)
+
+## THE HOLD DECK (the Brotato law): 5 pins, this market visit only
+func _held_count() -> int:
+        var n := 0
+        for o in shop_offers_w:
+                if bool(o["held"]):
+                        n += 1
+        for o2 in shop_offers_i:
+                if bool(o2["held"]):
+                        n += 1
+        return n
+
+func _toggle_hold(off: Dictionary) -> void:
+        if bool(off["held"]):
+                off["held"] = false    # removable, always, for free
+        else:
+                if _held_count() >= 5:
+                        Jukebox.sfx("cs_error", -6.0)
+                        _toast_show("the deck holds five - unhold something first")
+                        return
+                off["held"] = true
+        Jukebox.sfx("cs_draft", -8.0, 1.3)
+        _cs_reopen(func(): _market_open())
+
+## THE REROLL (the owner: it lives HERE): u3's free shuffle first, then the
+## climbing price. HELD offers survive; everything else re-rolls.
+func _reroll_market() -> void:
+        var rc := CSData.shop_reroll_cost(shop_rerolls)
+        if shop_free_reroll:
+                shop_free_reroll = false
+        elif run_ccoins >= rc:
+                run_ccoins -= rc
+                shop_rerolls += 1
+        else:
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("not enough coins")
+                return
+        _roll_shop_offers(true)
+        Jukebox.sfx("cs_draft", -6.0, 1.2)
+        _cs_reopen(func(): _market_open())
+
+# --------------------------------------------------------- THE MERGE BENCH
+## ITS OWN MENU (v0.3.4-3, the owner: "splitting merge menu to be as another
+## menu instead of in shop, put it after shop")
+func _merge_menu_open() -> void:
+        _cs_open("THE MERGE BENCH", func(box: VBoxContainer): _build_merge_menu(box),
+                        CS_YELLOW, false)
+
+func _build_merge_menu(box: VBoxContainer) -> void:
+        var scroll := ScrollContainer.new()
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.4)
+        box.add_child(scroll)
+        var shelf := VBoxContainer.new()
+        shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shelf.add_theme_constant_override("separation", 6)
+        scroll.add_child(shelf)
+        if not meta.merging_learned():
+                var locked := _cs_label(
+                                "LOCKED - the WEAPON LAB (skill tree, LAB branch) teaches merging",
+                                13, CS_RED)
+                locked.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                locked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                shelf.add_child(locked)
+        else:
+                var pairs := _merge_pairs()
+                if pairs.is_empty():
+                        var none := _cs_label(
+                                        "no pairs on the bench (two same weapons, same tier)",
+                                        13, CS_WHITE)
+                        none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        shelf.add_child(none)
+                for pr in pairs:
+                    var pr_d: Dictionary = pr
+                    var cost := int(round(float(pr_d["cost"]) * meta.merge_discount()))
+                    var tcap_ok := meta.tier_cap() >= int(pr_d["tier"]) + 1
+                    var can5 := run_ccoins >= cost and tcap_ok
+                    var why := "" if tcap_ok else " (LV %d gates T%d)" % [meta.char_level(), int(pr_d["tier"]) + 1]
+                    var card := _shop_card("MERGE: " + String(CSData.WEAPONS[pr_d["wid"]]["name"]),
+                                    CS_YELLOW,
+                                    ["T%d + T%d -> T%d" % [int(pr_d["tier"]), int(pr_d["tier"]), int(pr_d["tier"]) + 1],
+                                     "two copies consumed" + why],
+                                    CS_YELLOW, "MERGE %d CC" % cost, CS_YELLOW, func():
+                                    _wave_buy_merge(pr_d, cost), can5)
+                    _cards_row(shelf, [card])
+        _fit_scroll(scroll, shelf, 0.42)
         var actions := HBoxContainer.new()
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
-        actions.add_theme_constant_override("separation", 16)
+        actions.add_theme_constant_override("separation", 14)
         box.add_child(actions)
-        var rc := 8 + shop_rerolls * 6
-        actions.add_child(_cs_button("REROLL OFFERS - %d CC" % rc, 14, CS_BLUE, func():
-                if run_ccoins >= rc:
-                        run_ccoins -= rc
-                        shop_rerolls += 1
-                        _roll_shop_offers()
-                        Jukebox.sfx("cs_draft", -6.0, 1.2)
-                        _cs_reopen(func(): _shop_open())
-                else:
-                        Jukebox.sfx("cs_error", -6.0)
-                        _toast_show("not enough coins")))
-        actions.add_child(_cs_button("START WAVE %d >" % run_wave, 16, CS_GREEN, func():
-                _after_draft_or_shop()))
+        actions.add_child(_cs_button("CONTINUE >", 16, CS_GREEN, func():
+                _chain_after_merge()))
 
 func _shop_buy_weapon(off: Dictionary) -> void:
         var price := int(off["price"])
@@ -2476,44 +2907,42 @@ func _merge_pairs() -> Array:
                                         "cost": CSData.merge_price(wid, tier)})
         return out
 
-# ============================================================== THE ARMORY
-## the meta shop - "GOGASHOP" is DEAD (the owner's naming law). This is THE
-## ARMORY: the 12 weapons one by one at high prices, the allies at the
-## HIGHEST prices, the themes, SELL duplicates - all in cosmic coins.
+# ============================================================== THE SHOP
+## THE UNIVERSAL SHOP (v0.3.4-3, the owner: "where is the shop that uses
+## gogacoins, this button should open a normal universal style shop as i
+## described many times"): THE SHOP is THE GOGACoins store and the HUD
+## button opens it at ANY phase. "GOGASHOP" and "THE ARMORY" are dead names.
+## Tabs: PLACES (GOGACoins) / WEAPONS / ALLIES / LOADOUT (cosmic coins).
 var _armory_tab := "weapons"
 
-func _armory_open() -> void:
-        _cs_open("THE ARMORY", func(box: VBoxContainer): _build_armory(box), CS_YELLOW)
+func _shop_open() -> void:
+        # closable=false: the flow always walks out through BACK, which knows
+        # where the player came from (the boot door or the break)
+        _cs_open("THE SHOP", func(box: VBoxContainer): _build_shop(box), CS_YELLOW,
+                        false)
 
-func _build_armory(box: VBoxContainer) -> void:
-        # the wallet header
+## the old name lives on (the probe + old callers)
+func _armory_open() -> void:
+        _shop_open()
+
+func _build_shop(box: VBoxContainer) -> void:
+        # the wallet header - the GOGACoins chip is ALWAYS visible now
         var head := HBoxContainer.new()
         head.alignment = BoxContainer.ALIGNMENT_CENTER
         head.add_theme_constant_override("separation", 8)
         box.add_child(head)
-        var ccbox := _cs_black_box(head, Vector2(160, 34))
+        var ccbox := _cs_black_box(head, Vector2(170, 36))
         var hh := HBoxContainer.new()
         ccbox.add_child(hh)
-        var ic := TextureRect.new()
-        ic.texture = _t("coin")
-        ic.custom_minimum_size = Vector2(22, 22)
-        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        hh.add_child(ic)
+        hh.add_child(_cs_icon(_t("coin"), 24))
         hh.add_child(_cs_label(str(meta.coins()), 18, CS_YELLOW))
+        var gcbox := _cs_black_box(head, Vector2(210, 36))
+        var gh := HBoxContainer.new()
+        gcbox.add_child(gh)
+        gh.add_child(_cs_icon(_t("gogacoin"), 22))
+        gh.add_child(_cs_label("%d GOGACoins" % Box.coins(), 14, CS_GREEN))
         _cs_label("SPUDNIK LV %d - tier cap T%d" % [meta.char_level(), meta.tier_cap()],
-                        12, CS_BLUE, head)
-        if _armory_tab == "themes":
-                var gcbox := _cs_black_box(head, Vector2(190, 34))
-                var gh := HBoxContainer.new()
-                gcbox.add_child(gh)
-                var ic2 := TextureRect.new()
-                ic2.texture = _t("gogacoin")
-                ic2.custom_minimum_size = Vector2(22, 22)
-                ic2.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                ic2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                gh.add_child(ic2)
-                gh.add_child(_cs_label("%d GOGACoins" % Box.coins(), 14, CS_GREEN))
+                        13, CS_BLUE, head)
         # the tabs
         var tabs := HBoxContainer.new()
         tabs.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2521,16 +2950,17 @@ func _build_armory(box: VBoxContainer) -> void:
         box.add_child(tabs)
         for tab in ["weapons", "allies", "themes", "loadout"]:
                 var t_s: String = tab
-                var b := _cs_button(t_s.to_upper(), 12,
+                var lbl := "PLACES" if t_s == "themes" else t_s.to_upper()
+                var b := _cs_button(lbl, 13,
                                 CS_YELLOW if _armory_tab == t_s else CS_WHITE, func():
                         _armory_tab = t_s
-                        _cs_reopen(func(): _armory_open()))
+                        _cs_reopen(func(): _shop_open()))
                 tabs.add_child(b)
-        # the shelf scroll
+        # the shelf scroll (both axes, THE BIG-UI LAW)
         var scroll := ScrollContainer.new()
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.54)
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.46)
         box.add_child(scroll)
         var shelf := VBoxContainer.new()
         shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2541,7 +2971,7 @@ func _build_armory(box: VBoxContainer) -> void:
                 "allies": _armory_allies(shelf)
                 "themes": _armory_themes(shelf)
                 "loadout": _armory_loadout(shelf)
-        _fit_scroll(scroll, shelf, 0.54)
+        _fit_scroll(scroll, shelf, 0.48)
         # the actions
         var actions := HBoxContainer.new()
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2550,7 +2980,8 @@ func _build_armory(box: VBoxContainer) -> void:
         actions.add_child(_cs_button("BACK", 14, CS_WHITE, func():
                 _cs_close_top()
                 if phase == "boot":
-                        _optionals_open()))
+                        _optionals_open()
+                _resume_break()))
 
 func _armory_weapons(shelf: VBoxContainer) -> void:
         var note := _cs_label("every weapon starts T1 - own all 12, merge copies to climb tiers",
@@ -2788,7 +3219,7 @@ func _build_optionals(box: VBoxContainer) -> void:
                 trow.add_child(_theme_card(tid))
         # the wallet line - BOTH currencies, named (THE ECONOMY BORDER LAW)
         var info := _cs_label("LV %d   -   %d cosmic coins   -   tier cap T%d   -   %d GOGACoins" \
-                        % [meta.char_level(), meta.coins(), meta.tier_cap(), Box.coins()], 12, CS_YELLOW)
+                        % [meta.char_level(), meta.coins(), meta.tier_cap(), Box.coins()], 14, CS_YELLOW)
         info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         shelf.add_child(info)
         _fit_scroll(scroll, shelf, 0.5)
@@ -2797,7 +3228,8 @@ func _build_optionals(box: VBoxContainer) -> void:
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
         actions.add_theme_constant_override("separation", 14)
         box.add_child(actions)
-        actions.add_child(_cs_button("THE ARMORY", 15, CS_YELLOW, func(): _armory_open()))
+        actions.add_child(_cs_button("THE SHOP", 15, CS_YELLOW, func(): _shop_open()))
+        actions.add_child(_cs_button("SKILLS", 15, CS_GREEN, func(): _skills_menu_open()))
         actions.add_child(_cs_button("SKILL TREE", 15, CS_BLUE, func(): _tree_open()))
         actions.add_child(_cs_button("DROP IN", 18, CS_GREEN, func(): _start_run()))
 
@@ -2827,7 +3259,7 @@ func _start_card(sid: String) -> Button:
         vb.add_child(hrow)
         var art := TextureRect.new()
         art.texture = _t("hero_" + sid + "_f0")
-        art.custom_minimum_size = Vector2(52, 52)
+        art.custom_minimum_size = Vector2(64, 64)
         art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         hrow.add_child(art)
@@ -2838,35 +3270,35 @@ func _start_card(sid: String) -> Button:
                 int(s["hp"]), int(s["dmg"] * 100), int(s["spd"] * 100),
                 int(s["aspeed"] * 100), int(s["range"] * 100), int(s["armor"]),
                 int(round(float(s.get("luck", 0.0)) * 100)), int(round(float(s.get("dodge", 0.0)) * 100))]
-        var w1 := _cs_text_w(stats_txt.split("\n")[0], 10)
-        var w2 := _cs_text_w(stats_txt.split("\n")[1], 10)
+        var w1 := _cs_text_w(stats_txt.split("\n")[0], 12)
+        var w2 := _cs_text_w(stats_txt.split("\n")[1], 12)
         var stats_w: float = maxf(w1, w2)
-        var cw: float = maxf(stats_w, 214.0)
-        var nm := _cs_fit_label(String(s["name"]), 14, s["tint"], maxf(90.0, cw - 62.0))
+        var cw: float = maxf(stats_w, 250.0)
+        var nm := _cs_fit_label(String(s["name"]), 16, s["tint"], maxf(90.0, cw - 74.0))
         nm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         hrow.add_child(nm)
-        var st_txt := _cs_label(stats_txt, 10, CS_WHITE)
+        var st_txt := _cs_label(stats_txt, 12, CS_WHITE)
         st_txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(st_txt)
         var perk_txt := String(s["perk"])
-        var pk := _cs_label(perk_txt, 10, CS_GREEN)
+        var pk := _cs_label(perk_txt, 12, CS_GREEN)
         pk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         pk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         pk.custom_minimum_size = Vector2(cw, 0)
         pk.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         vb.add_child(pk)
-        var perk_h := _cs_text_h(perk_txt, 10, cw)
-        var stats_h := _cs_text_h(stats_txt, 10, cw)
-        var name_w := _cs_text_w(String(s["name"]), 14)
-        var tag_h := 15.0 if picked else 0.0
+        var perk_h := _cs_text_h(perk_txt, 12, cw)
+        var stats_h := _cs_text_h(stats_txt, 12, cw)
+        var name_w := _cs_text_w(String(s["name"]), 16)
+        var tag_h := 17.0 if picked else 0.0
         if picked:
-                var tag := _cs_label("PICKED", 10, CS_YELLOW)
+                var tag := _cs_label("PICKED", 11, CS_YELLOW)
                 tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 vb.add_child(tag)
-        # 6 top offset + 52 art + 3 separations + bottom air + stylebox margins
-        var min_h := 6.0 + 52.0 + 3.0 + stats_h + perk_h + tag_h + 8.0 + 12.0
-        var min_w: float = maxf(230.0, maxf(stats_w + 34.0, 62.0 + name_w + 26.0))
-        b.custom_minimum_size = Vector2(min_w, maxf(148.0, min_h))
+        # 6 top offset + 64 art + 3 separations + bottom air + stylebox margins
+        var min_h := 6.0 + 64.0 + 3.0 + stats_h + perk_h + tag_h + 8.0 + 12.0
+        var min_w: float = maxf(262.0, maxf(stats_w + 34.0, 74.0 + name_w + 26.0))
+        b.custom_minimum_size = Vector2(min_w, maxf(168.0, min_h))
         b.pressed.connect(func():
                 start_id = sid
                 meta.d["last_start"] = sid
@@ -2882,12 +3314,12 @@ func _theme_card(tid: String) -> PanelContainer:
         var card := PanelContainer.new()
         card.add_theme_stylebox_override("panel",
                         _cs_box_style(CS_YELLOW if worn else (CS_GREEN if owned else CS_EDGE), CS_BOX))
-        card.custom_minimum_size = Vector2(300, 84)
+        card.custom_minimum_size = Vector2(340, 96)
         var vb := VBoxContainer.new()
         vb.add_theme_constant_override("separation", 4)
         card.add_child(vb)
-        var nm := _cs_fit_label(String(th["name"]) + ("  - WORN" if worn else ""), 13,
-                        CS_YELLOW if worn else CS_WHITE, 268.0)
+        var nm := _cs_fit_label(String(th["name"]) + ("  - WORN" if worn else ""), 15,
+                        CS_YELLOW if worn else CS_WHITE, 300.0)
         nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(nm)
         var chips := HBoxContainer.new()
@@ -2934,6 +3366,11 @@ func _start_run() -> void:
         pickups.clear()
         allies.clear()
         zones.clear()
+        # the skills + run state reset (the meta perks wake up fresh)
+        p_shield_up = meta.has_skill("shattered_shield")
+        p_shield_cd = 0.0
+        _static_cd = 6.0
+        _adrenaline = 0.0
         stats = _base_stats()
         p_max_hp = _max_hp()
         p_hp = p_max_hp
@@ -2963,7 +3400,7 @@ func _build_tree(box: VBoxContainer) -> void:
         box.add_child(sub)
         var scroll := ScrollContainer.new()
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
         scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.48)
         box.add_child(scroll)
         var shelf := VBoxContainer.new()
@@ -3190,6 +3627,19 @@ func _draw_fx(L: CanvasItem) -> void:
                 if e.get("state", "") == "wind" and e.get("dash_dir", null) != null:
                         var dd: Vector2 = e["dash_dir"]
                         L.draw_line(e["pos"], e["pos"] + dd * 240.0, Color(1, 0.4, 0.3, 0.5), 3.0)
+        # the skills' own fields (drawn under everything)
+        if phase == "play" or phase == "break":
+                if meta.has_skill("frost_aura"):
+                        var breathe_f := 0.5 + 0.12 * sin(Time.get_ticks_msec() / 300.0)
+                        L.draw_circle(p_pos, 170.0, Color(0.5, 0.8, 1.0, 0.07 * breathe_f))
+                        L.draw_arc(p_pos, 170.0, 0, TAU, 48, Color(0.55, 0.85, 1.0, 0.4), 2.0)
+                if meta.has_skill("leech_aura"):
+                        var breathe_l := 0.5 + 0.12 * sin(Time.get_ticks_msec() / 240.0)
+                        L.draw_circle(p_pos, 140.0, Color(0.85, 0.3, 0.45, 0.06 * breathe_l))
+                        L.draw_arc(p_pos, 140.0, 0, TAU, 48, Color(0.9, 0.35, 0.5, 0.35), 2.0)
+                # THE SHATTERED SHIELD: the ready ring (a thin blue halo)
+                if p_shield_up and meta.has_skill("shattered_shield"):
+                        L.draw_arc(p_pos, 30.0, 0, TAU, 32, Color(0.5, 0.85, 1.0, 0.75), 2.5)
         # the zones (strike telegraphs / slams)
         for z in zones:
                 var f := 1.0 - float(z["t"]) / float(z["max"])
@@ -3201,6 +3651,13 @@ func _draw_fx(L: CanvasItem) -> void:
                 L.draw_line(p_pos + Vector2.from_angle(p_aim) * 30.0,
                                 p_pos + Vector2.from_angle(p_aim) * (70.0 + 26.0 * sin(Time.get_ticks_msec() / 180.0)),
                                 Color(1, 0.9, 0.4, 0.35), 2.0)
+        # THE WOW PASS: the low-HP pulse (a red edge breathing on the screen)
+        if phase == "play" and p_hp < p_max_hp * 0.3:
+                var pulse := 0.5 + 0.5 * absf(sin(Time.get_ticks_msec() / 260.0))
+                var ctr: Vector2 = cam.get_screen_center_position()
+                var rad: float = _cam_half().length() * 1.05
+                L.draw_arc(ctr, rad, 0, TAU, 64,
+                                Color(0.9, 0.15, 0.12, 0.08 + 0.14 * pulse), rad * 0.22)
         # the gun (rotates with the aim, flips upright when aiming left)
         if p_node != null and is_instance_valid(p_node) and not weapons_run.is_empty():
                 var wid: String = String(weapons_run[0]["id"])
@@ -3213,8 +3670,19 @@ func _draw_fx(L: CanvasItem) -> void:
         for p in _parts:
                 var a := float(p["t"]) / float(p["max"])
                 if p.get("tex", "") != "":
-                        L.draw_texture(_t(String(p["tex"])), p["pos"] - Vector2(16, 16),
-                                        Color(1, 1, 1, a))
+                        if p.has("rot"):
+                                # THE FLASH LAW: rotated particles (the muzzle
+                                # flash rides the barrel, never a candle)
+                                var pt: Texture2D = _t(String(p["tex"]))
+                                L.draw_set_transform(p["pos"], float(p["rot"]),
+                                                Vector2(1.6, 1.6))
+                                L.draw_texture(pt,
+                                                -Vector2(pt.get_width(), pt.get_height()) * 0.5,
+                                                Color(1, 1, 1, a))
+                                L.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                        else:
+                                L.draw_texture(_t(String(p["tex"])), p["pos"] - Vector2(16, 16),
+                                                Color(1, 1, 1, a))
                 else:
                         L.draw_circle(p["pos"], float(p["size"]) * a, Color(p["col"], a))
         for r in _rings:

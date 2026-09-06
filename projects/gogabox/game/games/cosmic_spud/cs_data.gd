@@ -214,7 +214,7 @@ const TREE := {
         "u2": {"name": "GOLDEN DRIP", "branch": "UTILITY", "cost": 240, "need": "u1",
                 "clv": 1, "desc": "+10% cosmic coins earned"},
         "u3": {"name": "FATE REROLL", "branch": "UTILITY", "cost": 480, "need": "u2",
-                "clv": 3, "desc": "1 free wave-draft reroll each break"},
+                "clv": 3, "desc": "1 free market reroll each break"},
         "u4": {"name": "MARKET TONGUE", "branch": "UTILITY", "cost": 760, "need": "u3",
                 "clv": 6, "desc": "wave shop prices -10%"},
         "l1": {"name": "EXTRA LEASH", "branch": "LAB", "cost": 340, "need": "",
@@ -282,21 +282,56 @@ const WAVE_DRAFTS := [
                 "down": {}, "w": 2},
 ]
 
-# ============================================================ XP-LEVEL DRAFTS
-## the per-XP-level picks: pure buffs drawn from the tree's in-run branch
-const LEVEL_DRAFTS := [
-        {"t": "DAMAGE +12%", "k": "dmg", "v": 0.12, "stack": true},
-        {"t": "ATTACK SPEED +10%", "k": "aspeed", "v": 0.10, "stack": true},
-        {"t": "MAX HP +20", "k": "hp", "v": 20, "stack": true},
-        {"t": "MOVE SPEED +8%", "k": "spd", "v": 0.08, "stack": true},
-        {"t": "RANGE +10%", "k": "range", "v": 0.10, "stack": true},
-        {"t": "ARMOR +1", "k": "armor", "v": 1, "stack": true},
-        {"t": "REGEN +1 HP/S", "k": "regen", "v": 1.0, "stack": true},
-        {"t": "CRIT +8%", "k": "crit", "v": 0.08, "stack": true},
-        {"t": "MAGNET +25%", "k": "magnet", "v": 0.25, "stack": true},
-        {"t": "PIERCE ALL", "k": "pierce_all", "v": 1, "stack": false},
-        {"t": "LIFESTEAL 3%", "k": "lifesteal", "v": 0.03, "stack": true},
+# ============================================================ STAT PACKS
+## THE STATS MENU's shelf (v0.3.4-3, the owner: "there is two things, skill
+## points and stats points... some stuff requires more than one point"):
+## every XP level pays ONE stats point, the packs cost 1-3.
+const STAT_PACKS := [
+        {"t": "DAMAGE +10%", "d": "+10% damage on every gun", "k": "dmg", "v": 0.10, "cost": 1},
+        {"t": "MAX HP +20", "d": "+20 max HP, healed in full", "k": "hp", "v": 20, "cost": 1},
+        {"t": "MOVE SPEED +8%", "d": "+8% walk speed", "k": "spd", "v": 0.08, "cost": 1},
+        {"t": "ATTACK SPEED +10%", "d": "+10% on every gun", "k": "aspeed", "v": 0.10, "cost": 1},
+        {"t": "RANGE +10%", "d": "+10% weapon range", "k": "range", "v": 0.10, "cost": 1},
+        {"t": "CRIT +8%", "d": "+8% critical chance", "k": "crit", "v": 0.08, "cost": 1},
+        {"t": "LUCK +15%", "d": "+15% luck (rarer shelves, fatter drops)", "k": "luck", "v": 0.15, "cost": 1},
+        {"t": "MAGNET +30%", "d": "+30% pickup range", "k": "magnet", "v": 0.30, "cost": 1},
+        {"t": "ARMOR +2", "d": "+2 armor - every hit lands softer", "k": "armor", "v": 2, "cost": 2},
+        {"t": "REGEN +1.5 HP/S", "d": "+1.5 HP per second, forever", "k": "regen", "v": 1.5, "cost": 2},
+        {"t": "DODGE +6%", "d": "+6% dodge (cap 60%)", "k": "dodge", "v": 0.06, "cost": 2},
+        {"t": "LIFESTEAL +3%", "d": "3% of damage dealt returns as HP", "k": "lifesteal", "v": 0.03, "cost": 2},
+        {"t": "+1 PROJECTILE", "d": "every gun fires one more shot", "k": "proj", "v": 1, "cost": 3},
+        {"t": "PIERCE ALL", "d": "every shot drills through everything", "k": "pierce_all", "v": 1, "cost": 3},
 ]
+
+# ================================================================ SKILLS
+## THE TEN (v0.3.4-3, the owner: "skills should be unique... a real high
+## cool-factor skills that feels amazing"). ONE point per 100 kills,
+## LIFETIME - they never reset with a round. cost = SKILL POINTS.
+const SKILLS := {
+        "shattered_shield": {"name": "SHATTERED SHIELD", "cost": 2,
+                "desc": "a shield blocks ONE hit whole, reforms 12s later"},
+        "leech_aura": {"name": "LEECH AURA", "cost": 2,
+                "desc": "enemies within 140px bleed 2 HP/s each to you (3 max)"},
+        "frost_aura": {"name": "FROST AURA", "cost": 2,
+                "desc": "enemies within 170px crawl 30% slower, always"},
+        "ghost_round": {"name": "GHOST ROUND", "cost": 2,
+                "desc": "shots that hit you FLY THROUGH and strike enemies behind for half damage"},
+        "starch_rage": {"name": "STARCH RAGE", "cost": 1,
+                "desc": "below 35% HP: +40% damage - the potato bites back"},
+        "static_burst": {"name": "STATIC BURST", "cost": 1,
+                "desc": "every 6s lightning zaps the 3 nearest enemies"},
+        "twin_tail": {"name": "TWIN TAIL", "cost": 2,
+                "desc": "a ghost gun guards your back - every volley fires backwards at 40%"},
+        "adrenaline": {"name": "ADRENALINE ROOT", "cost": 1,
+                "desc": "a dodge revs +80% attack speed for 2s"},
+        "golden_gut": {"name": "GOLDEN GUT", "cost": 1,
+                "desc": "+25% cosmic coins from every source"},
+        "magnetic_skin": {"name": "MAGNETIC SKIN", "cost": 1,
+                "desc": "pickups fly to you from 60% farther, hearts heal +50%"},
+}
+const SKILL_ORDER := ["shattered_shield", "leech_aura", "frost_aura",
+        "ghost_round", "starch_rage", "static_burst", "twin_tail",
+        "adrenaline", "golden_gut", "magnetic_skin"]
 
 # ==================================================================== SHOP
 ## the wave shop consumables (in-run coins)
@@ -371,13 +406,12 @@ const ITEMS := {
 const ITEM_ORDER := ["spikeplate", "coffee", "clover", "rabbit", "protein",
         "boots", "magnetring", "lens", "salve", "leech", "scope", "battery"]
 
-## the reroll laws (the Brotato mouthful #3): the shop reroll climbs, the
-## draft reroll too (the u3 tree node owns one free draft shuffle per break)
+## the reroll law (the Brotato mouthful #3, v0.3.4-3 edition): the reroll
+## lives in THE WAVE MARKET only - the drafts lost theirs (the owner:
+## "a re-roll should be for shop items"). The price climbs 8 + 6n; the u3
+## tree node owns one FREE market shuffle per break.
 static func shop_reroll_cost(n: int) -> int:
         return 8 + n * 6
-
-static func draft_reroll_cost(n: int) -> int:
-        return 6 + n * 6
 
 # =================================================================== WAVES
 const WAVE_SECS := 25.0

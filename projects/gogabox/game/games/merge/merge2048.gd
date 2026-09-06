@@ -976,8 +976,19 @@ func _goga_tick(delta: float) -> void:
         coin_layer.queue_redraw()        # ALWAYS: spawn, bob, glint, ERASE
         _update_fx(delta)
 
-func _goga_input(_event: InputEvent) -> void:
-        pass   # the swipes arrive through tk.swiped
+func _goga_input(event: InputEvent) -> void:
+        # THE PC LAW (v0.3.4-3): the ARROW keys slide the board (the owner's
+        # 2048 controls) - the swipes still arrive through tk.swiped
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                if event.is_action_pressed("ui_left"):
+                        _on_swipe(Vector2i(-1, 0), Vector2.ZERO)
+                elif event.is_action_pressed("ui_right"):
+                        _on_swipe(Vector2i(1, 0), Vector2.ZERO)
+                elif event.is_action_pressed("ui_up"):
+                        _on_swipe(Vector2i(0, -1), Vector2.ZERO)
+                elif event.is_action_pressed("ui_down"):
+                        _on_swipe(Vector2i(0, 1), Vector2.ZERO)
 
 ## swipe ANY direction moves the board (the owner's control law). A board
 ## nudge sells the hit; a deny wobble sells the wall.

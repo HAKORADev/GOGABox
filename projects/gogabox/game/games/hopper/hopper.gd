@@ -661,6 +661,13 @@ func _goga_tick(delta: float) -> void:
                 return
         var vp := _vp()
 
+        # THE PC LAW (v0.3.4-3): LEFT/RIGHT arrows run, SPACE jumps
+        var kb := Input.get_axis("ui_left", "ui_right")
+        if kb != 0.0:
+                move_dir = signf(kb)
+        if Input.is_action_just_pressed("ui_accept"):
+                _do_jump()
+
         # ---- the slide-up: the camera RISES on its own, pushing the player
         # toward the bottom of the screen. Falling below = end of round.
         scroll_now = _scroll_speed()
@@ -1016,12 +1023,14 @@ func _set_move(dir: int) -> void:
 ## act like dead-point/stopping movement"), full deflection = full force,
 ## left-right only (Y never matters).
 func _set_axis(dx_px: float) -> void:
+        # THE FIXED-SPEED LAW (v0.3.4-3, the owner: "moving the finger faster
+        # meant make moving faster, you can fix this by making the arrow
+        # button make the move in fixed proper speed"): past the dead point
+        # the run is FULL FORCE - the drag distance never scales it.
         var dead := AXIS_DEAD * U
-        var full := AXIS_FULL * U
-        var a := 0.0
+        move_dir = 0.0
         if absf(dx_px) > dead:
-                a = clampf((absf(dx_px) - dead) / maxf(1.0, full - dead), 0.0, 1.0)
-        move_dir = signf(dx_px) * a
+                move_dir = 1.0 if dx_px > 0.0 else -1.0
 
 # ------------------------------------------------------------- coins / pickups
 

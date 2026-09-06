@@ -221,6 +221,9 @@ push needs the PAT (§7).
 
 **CI** — pushes matching `projects/** plugins/** config/** .ci/** tools/**
 build.sh` trigger `build-android` (every `ci_auto` project × every ABI).
+`build-windows.yml` (manual dispatch) forges the SSE2-baseline Windows
+export templates (x64 + x86) and exports the two single-exe builds - the
+"test the workflow until it's mature" loop lives there (docs/CI.md).
 **Docs-only pushes do not trigger CI — that is fine.** Terminal watching:
 `./tools/ci.sh` (list last runs) · `./tools/ci.sh watch` (tail one to
 completion). Cached runs ≈ 8–12 min per ABI, cold ≈ 20–25.

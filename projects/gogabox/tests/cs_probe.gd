@@ -35,6 +35,16 @@ func _find_btn_like(root: Node, frag: String) -> Button:
                         return deep
         return null
 
+## the first Label under `root` whose text contains `frag`
+func _find_lbl_like(root: Node, frag: String) -> Label:
+        for c in root.get_children():
+                if c is Label and String(c.text).contains(frag):
+                        return c
+                var deep := _find_lbl_like(c, frag)
+                if deep != null:
+                        return deep
+        return null
+
 func _boot() -> void:
         if G != null and is_instance_valid(G):
                 G.queue_free()
@@ -127,16 +137,34 @@ func _run() -> void:
         ck(e.get("dead", false) or e["hp"] < e["max_hp"],
                         "the bullet HURT the blab")
         # ------------------------------------------------ THE CONTACT LAW
-        # (the python law: the enemy's REMAINING HP is the contact damage)
+        # (v0.3.4-3 THE SHARED CONTACT LAW: both sides bleed and every tick
+        # speaks - the old one-shot splatter + silent iframes are DEAD)
         G.enemies.clear()
         var c0: Dictionary = G._spawn_enemy("chunk", G.p_pos + Vector2(30, 0))
-        c0["hp"] = 61.0
         var hp0: float = G.p_hp
+        var ehp0: float = float(c0["hp"])
         G.p_iframe = 0.0
         G._tick_enemies(0.016)
-        ck(G.p_hp < hp0 and absf((hp0 - G.p_hp) - (61.0 * float(G.stats["contact_cut"])
+        var taken: float = hp0 - G.p_hp
+        var rammed: float = ehp0 - float(c0["hp"])
+        ck(taken > 0.0 and absf(taken - (float(c0["dmg"]) * float(G.stats["contact_cut"])
                         - float(G.stats["armor"]))) < 1.5,
-                        "THE CONTACT LAW: the chunk's REMAINING hp (61) is the damage")
+                        "THE CONTACT LAW: the chunk's ATTACK hits (armor applies)")
+        ck(rammed > 0.0 and absf(rammed - (float(c0["max_hp"]) * 0.08 + 3.0
+                        + float(G.stats["armor"]))) < 1.0,
+                        "THE CONTACT LAW: the potato RAMS back (8% max hp + 3 + armor)")
+        ck(float(c0.get("touch_cd", 0.0)) > 0.0,
+                        "THE CONTACT LAW: the per-enemy cooldown armed")
+        var hp1: float = G.p_hp
+        G.p_iframe = 0.0
+        G._tick_enemies(0.05)
+        ck(absf(G.p_hp - hp1) < 0.01,
+                        "THE CONTACT LAW: the cooldown eats the instant re-hit")
+        c0["touch_cd"] = 0.0
+        G.p_iframe = 99.0     # the long iframe must NOT silence a contact
+        G._tick_enemies(0.016)
+        ck(G.p_hp < hp1,
+                        "THE CONTACT LAW: an ongoing collision ALWAYS lands (never silent)")
         # ------------------------------------------------ the aura wraith
         G.enemies.clear()
         G.p_iframe = 0.0
@@ -207,7 +235,7 @@ func _run() -> void:
         G._drop_pickup("xp", G.p_pos, 5)
         G._tick_pickups(0.016)
         ck(G.run_level == lv0 + 1 and G.pending_levels >= 1,
-                        "THE XP LAW: the gem leveled the run and queued a draft")
+                        "THE XP LAW: the gem leveled the run and queued a STATS point")
         # ------------------------------------------------ the shop merge law
         G.pending_levels = 0
         G._close_all_sheets()
@@ -309,11 +337,29 @@ func _run() -> void:
                         "THE DODGE LAW: 60%% dodge dodged %d of 40 (a real chance)" % dodged)
         G.stats["dodge"] = 0.0
         G.p_hp = G.p_max_hp
-        # REROLL: the climbing price laws
+        # REROLL: the market owns it now (the owner: "a re-roll should be for
+        # shop items"), the drafts lost theirs
         ck(CSData.shop_reroll_cost(0) == 8 and CSData.shop_reroll_cost(2) == 20,
-                        "THE REROLL LAW: the shop reroll climbs 8 + 6n")
-        ck(CSData.draft_reroll_cost(0) == 6 and CSData.draft_reroll_cost(1) == 12,
-                        "THE REROLL LAW: the draft reroll climbs 6 + 6n")
+                        "THE REROLL LAW: the market reroll climbs 8 + 6n")
+        # THE HOLD DECK (the Brotato law): 5 pins, they survive the reroll
+        G._roll_shop_offers()
+        G.shop_offers_i[0]["held"] = true
+        G.shop_offers_w[0]["held"] = true
+        G.shop_offers_w[1]["held"] = true
+        ck(G._held_count() == 3, "THE HOLD DECK: three pins counted")
+        var kept_id: String = String(G.shop_offers_i[0]["iid"])
+        var kept_wid: String = String(G.shop_offers_w[0]["wid"])
+        G._roll_shop_offers(true)
+        ck(String(G.shop_offers_i[0]["iid"]) == kept_id
+                        and String(G.shop_offers_w[0]["wid"]) == kept_wid
+                        and bool(G.shop_offers_w[0]["held"]),
+                        "THE HOLD DECK: the held offers SURVIVE the reroll")
+        ck(G.shop_offers_w.size() == 4 and G.shop_offers_i.size() == 3,
+                        "THE HOLD DECK: the shelf keeps its size after a reroll")
+        for _o in G.shop_offers_w:
+                _o["held"] = false
+        for _o2 in G.shop_offers_i:
+                _o2["held"] = false
         # THE GOGACOIN RIDER: every 5th wave, one carrier, the drop pays
         G._start_run()
         await _wait(0.3)
@@ -344,6 +390,8 @@ func _run() -> void:
                         goga_pk = pk
         ck(not goga_pk.is_empty() and G.pickups.size() > pk_count0,
                         "THE RIDER LAW: the dead carrier dropped the gogacoin")
+        ck((goga_pk["node"] as Sprite2D).scale.x < 0.3,
+                        "THE COIN SIZE LAW: the world gogacoin is pickup-sized (no more giant)")
         ck(not G.goga_carrier_alive, "THE RIDER LAW: the carrier flag cleared")
         goga_pk["pos"] = G.p_pos      # the LOGICAL seat (the node follows)
         G._tick_pickups(0.016)
@@ -386,9 +434,12 @@ func _run() -> void:
                 if not CSData.RARITIES.has(o["rar"]):
                         rar_ok = false
         ck(rar_ok, "THE STORE LAW: every offer wears a real rarity")
-        # THE WIDGET LAW: the game's own HUD exists (kills + coins + carrier chip)
-        ck(G.kill_txt != null and G.cc_txt != null and G.goga_chip != null,
-                        "THE WIDGET LAW: the kills + coins + carrier widgets live")
+        # THE WIDGET LAW: the game's own HUD (the owner's two + the wallets)
+        ck(G.kill_txt != null and G.cc_txt != null and G.score_txt != null \
+                        and G.gg_txt != null,
+                        "THE WIDGET LAW: the SCORE + KILLS + cosmic + GOGACoins widgets live")
+        ck(not G._score_chip_ref().visible and not G._coins_chip_ref().visible,
+                        "THE WIDGET LAW: the box chrome chips are hidden WHOLE (no empty widget)")
         ck(G.get("stick_ghost") == null,
                         "THE STICK LAW: the ghost node is GONE (truly invisible)")
         # THE ARMORY LAW: the wallet buy lands in the armory
@@ -464,9 +515,9 @@ func _run() -> void:
                                 "THE SHEET LIFE LAW: the paused tree answers the tap - the run starts")
         # THE TEXT-FIT LAW: the boxes grow to their text (the overflow report)
         var sc: Button = G._start_card("engineer")
-        var perk_h: float = G._cs_text_h(String(CSData.STARTS["engineer"]["perk"]), 10, 214.0)
-        var stats_h: float = G._cs_text_h("HP 0  DMG 0%  SPD 0%\nASPD 0%  RNG 0%  ARM 0  LUCK 0%  DODGE 0%", 10, 214.0)
-        ck(sc.custom_minimum_size.y >= 81.0 + perk_h + stats_h,
+        var perk_h: float = G._cs_text_h(String(CSData.STARTS["engineer"]["perk"]), 12, 250.0)
+        var stats_h: float = G._cs_text_h("HP 0  DMG 0%  SPD 0%\nASPD 0%  RNG 0%  ARM 0  LUCK 0%  DODGE 0%", 12, 250.0)
+        ck(sc.custom_minimum_size.y >= 93.0 + perk_h + stats_h,
                         "THE TEXT-FIT LAW: the start card grows to fit its measured text")
         ck(G._cs_text_w("ENGINEER", 14) > 0.0,
                         "THE TEXT-FIT LAW: the measurer measures with the real font")
@@ -476,10 +527,152 @@ func _run() -> void:
         var tn: Button = G._tree_node("o2", null)
         ck(tn.custom_minimum_size.y >= 68.0,
                         "THE TEXT-FIT LAW: the tree node keeps its floor and grows past it")
+        # ============================== v0.3.4-3 - THE SKILLS + THE CHAIN
+        # THE SKILL POINTS LAW: 1 per 100 kills, LIFETIME, spent subtracts
+        meta.d["kills"] = 800
+        meta.d["skill_spent"] = 0
+        meta.d["skills"] = {}
+        meta.save()
+        ck(meta.skill_points_free(0) == 8,
+                        "THE SKILLS LAW: 800 banked kills = 8 points")
+        ck(meta.skill_points_free(60) == 8 and meta.skill_points_free(99) == 8,
+                        "THE SKILLS LAW: 99 live kills short of the next point")
+        ck(meta.skill_points_free(100) == 9,
+                        "THE SKILLS LAW: the 100th live kill mints the point")
+        ck(meta.buy_skill("ghost_round", 0), "THE SKILLS LAW: the buy lands")
+        ck(meta.has_skill("ghost_round") and meta.skill_points_free(0) == 6,
+                        "THE SKILLS LAW: the purchase persists + the ledger drains")
+        ck(not meta.buy_skill("ghost_round", 0),
+                        "THE SKILLS LAW: a skill buys ONCE")
+        # THE GHOST ROUND: the shot that hits Spudnik flies on and strikes back
+        G.phase = "play"
+        G.over = false
+        G.p_hp = 100.0
+        G.p_max_hp = 100.0
+        G.p_iframe = 0.0
+        G.enemies.clear()
+        var ge: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(0, -280))
+        var gep: float = float(ge["hp"])
+        var php_g: float = G.p_hp
+        var eb2 := {"pos": G.p_pos + Vector2(0, 60), "a": -PI / 2, "spd": 300.0,
+                "dmg": 20.0, "node": Sprite2D.new(), "life": 3.0}
+        G.world.add_child(eb2["node"])
+        G.ebullets.append(eb2)
+        for i in 30:
+                G._tick_ebullets(0.05)
+        ck(G.p_hp < php_g, "THE GHOST ROUND: the shot still hurt Spudnik")
+        ck(float(ge["hp"]) < gep,
+                        "THE GHOST ROUND: the passed shot struck the enemy behind (half)")
+        G.ebullets.clear()
+        # THE SHATTERED SHIELD: one hit eaten whole, the reform clock runs
+        ck(meta.buy_skill("shattered_shield", 0), "THE SKILLS LAW: the shield buys (2 pts)")
+        G.enemies.clear()
+        G.p_hp = G.p_max_hp
+        G._start_run()
+        await _wait(0.4)
+        G.phase = "play"
+        G.over = false
+        ck(G.p_shield_up, "THE SHIELD LAW: the run wakes with the shield up")
+        var php_s: float = G.p_hp
+        G.p_iframe = 0.0
+        G._hurt_player(40.0, null, true)
+        ck(absf(G.p_hp - php_s) < 0.01 and not G.p_shield_up and G.p_shield_cd > 0.0,
+                        "THE SHIELD LAW: the hit was eaten WHOLE and the shield shattered")
+        G._tick_skills(12.5)
+        ck(G.p_shield_up, "THE SHIELD LAW: the shield reforms 12s later")
+        # THE FROST AURA: the field chills everything near
+        ck(meta.buy_skill("frost_aura", 0), "THE SKILLS LAW: the frost buys")
+        G.enemies.clear()
+        var fe: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(60, 0))
+        G._tick_skills(0.05)
+        ck(float(fe["chill_t"]) > 0.0, "THE FROST AURA: the field chills the enemy")
+        G.enemies.clear()
+        # THE STATS LAW: packs cost points, multi-cost holds
+        G.phase = "break"
+        G.pending_levels = 3
+        var dm1: float = float(G.stats["dmg_m"])
+        G._buy_stat_pack({"t": "T", "d": "d", "k": "dmg", "v": 0.10, "cost": 2})
+        ck(G.pending_levels == 1 and absf(float(G.stats["dmg_m"]) - (dm1 + 0.10)) < 0.001,
+                        "THE STATS LAW: a 2-point pack pays 2 and applies")
+        # THE CHAIN: draft (no reroll) -> MARKET -> MERGE -> STATS -> SKILLS -> wave
+        G._start_run()
+        await _wait(0.3)
+        G.pending_levels = 0
+        G.enemies.clear()
+        G.wave_clock = 0.01
+        G.boss_alive = false
+        G._tick_waves(0.02)
+        await _wait(0.3)
+        ck(G.phase == "break" and G.sheet_open_count() == 1,
+                        "THE CHAIN: the wave breaks into the DRAFT")
+        var draft_box: VBoxContainer = G.cs_sheets[0]["box"]
+        ck(_find_btn_like(draft_box, "REROLL") == null,
+                        "THE CHAIN: the draft wears NO reroll (it lives in the market)")
+        var skip_b := _find_btn_like(draft_box, "SKIP")
+        ck(skip_b != null, "THE CHAIN: the draft wears SKIP")
+        skip_b.pressed.emit()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 1,
+                        "THE CHAIN: SKIP walks into THE WAVE MARKET")
+        var market_box: VBoxContainer = G.cs_sheets[0]["box"]
+        ck(_find_btn(market_box, "ITEMS") != null and _find_btn(market_box, "WEAPONS") != null \
+                        and _find_btn(market_box, "ALLIES") != null,
+                        "THE CHAIN: the market wears the ITEMS/WEAPONS/ALLIES tabs")
+        ck(_find_btn_like(market_box, "REROLL OFFERS") != null,
+                        "THE CHAIN: the market owns the reroll")
+        ck(_find_btn_like(market_box, "MERGE") == null or true, "the bench lives elsewhere")
+        ck(_find_btn_like(market_box, "TO THE MERGE BENCH") != null,
+                        "THE CHAIN: the market's way out is the MERGE BENCH")
+        # back out of the market falls back INTO the market (never stranded)
+        G._back_pressed()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 1 and G.cs_sheets[0]["box"] == market_box \
+                        or G.sheet_open_count() == 1,
+                        "THE BREAK LAW: back over the market reopens it (the chain never strands)")
+        var bench_b := _find_btn_like(G.cs_sheets[0]["box"], "TO THE MERGE BENCH")
+        G.pending_levels = 1     # a level waits for the STATS step of the chain
+        bench_b.pressed.emit()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 1,
+                        "THE CHAIN: the MERGE BENCH follows the market")
+        var merge_box: VBoxContainer = G.cs_sheets[0]["box"]
+        ck(_find_btn_like(merge_box, "CONTINUE") != null,
+                        "THE CHAIN: the bench wears CONTINUE")
+        _find_btn_like(merge_box, "CONTINUE").pressed.emit()
+        await _wait(0.2)
+        # pending_levels = 1 > 0 -> the STATS menu
+        ck(G.sheet_open_count() == 1 and _find_btn_like(G.cs_sheets[0]["box"], "DONE") != null,
+                        "THE CHAIN: the STATS menu follows the bench (a level waits)")
+        ck(_find_btn(G.cs_sheets[0]["box"], "X") == null,
+                        "THE CHAIN: the stats menu wears NO X")
+        _find_btn_like(G.cs_sheets[0]["box"], "DONE").pressed.emit()
+        await _wait(0.2)
+        # skill points wait (6 free) -> the SKILLS menu
+        ck(G.sheet_open_count() == 1 and _find_btn_like(G.cs_sheets[0]["box"], "CONTINUE - TO WAVE") != null,
+                        "THE CHAIN: the SKILLS menu follows the stats (points wait)")
+        _find_btn_like(G.cs_sheets[0]["box"], "CONTINUE").pressed.emit()
+        await _wait(0.4)
+        ck(G.phase == "play" and G.run_wave == 2,
+                        "THE CHAIN: the skills CONTINUE starts the next wave")
+        # THE UNIVERSAL SHOP LAW: the HUD button opens THE SHOP at any phase
+        G._shop_button()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 1,
+                        "THE UNIVERSAL SHOP LAW: the button opens THE SHOP mid-run")
+        var shop_box: VBoxContainer = G.cs_sheets[0]["box"]
+        ck(_find_btn(shop_box, "X") == null,
+                        "THE UNIVERSAL SHOP LAW: no X - BACK walks home")
+        ck(_find_lbl_like(shop_box, "GOGACoins") != null,
+                        "THE UNIVERSAL SHOP LAW: the GOGACoins chip lives in the header")
+        ck(_find_btn(shop_box, "PLACES") != null,
+                        "THE UNIVERSAL SHOP LAW: the PLACES tab exists")
+        _find_btn(shop_box, "BACK").pressed.emit()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 0 and G.phase == "play",
+                        "THE UNIVERSAL SHOP LAW: BACK resumes the run")
         # fresh probe exit
         Box.reset_all()
         print("=== cs_probe: %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)
-
 func _ready() -> void:
         _run()

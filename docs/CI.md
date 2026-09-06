@@ -2,6 +2,35 @@
 
 ## Workflows
 
+### `build-windows.yml` — the template forge + the two exe builds (manual)
+
+The owner's law: modern Godot x86_64 requires SSE4.2 (Haswell+); GOGABox
+must run on older CPUs. So the Windows exports NEVER use the official
+templates - the workflow FORGES them from the pinned source:
+
+```
+scons platform=windows target=template_release arch=x86_64 \
+  lto=full use_static_cpp=yes debug_symbols=no d3d12=no angle=no \
+  winrt=no accesskit=no \
+  custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" -j"$(nproc)"
+```
+
+- `arch=x86_64` → the 64-bit template; `arch=x86` → the 32-bit one.
+- The forge then runs `objdump` over the template and FAILS if any
+  SSE4.2/AES-only mnemonics (`pcmpgtq`, `pcmpestr*`, `crc32`, `aesenc`)
+  appear - THE SSE2 LAW, machine-checked.
+- The x86_64 job also switches mingw to its **posix-threads** flavor
+  (`update-alternatives --set ...-posix`) - Godot refuses the win32 one.
+- `d3d12/angle/winrt/accesskit=no`: GOGABox renders GL Compatibility; the
+  optional driver SDKs are not part of this forge.
+- The export job seats the forged templates in
+  `~/.local/share/godot/export_templates/<version>.stable/`, materializes
+  the project, and exports BOTH presets (`Windows x86_64`, `Windows x86_32`)
+  with `binary_format/embed_pck=true` - each result is ONE exe. Artifacts
+  ship zipped (`zip -9`) as `GOGABox-windows-<version>.zip`.
+
+### `build-android.yml` — the dispatcher
+
 ### `build-android.yml` — the dispatcher
 
 | trigger | behavior |

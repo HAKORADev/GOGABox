@@ -227,3 +227,23 @@ Verification (tests/geometry_probe.gd, rewritten v0.1.3):
   regression back to KEEP), and no visible Control pokes outside.
 - LAYER 3 - rotation ping-pong: landscape -> portrait -> landscape ->
   portrait on one live scene (the owner's third screenshot regression).
+
+
+## 6. THE PC WINDOWS (v0.3.4-3): THE VERTICAL SLICE LAW
+
+The desktop builds (Windows x64 + x86) keep the SAME two internal designs,
+but the window laws differ from the phone:
+
+- A real desktop session is `ScaleRule.is_pc()` - false on Android/iOS AND
+  on the headless test runs (probes and CI stay on the phone rules).
+- PORTRAIT designs (the box menu, portrait games) render KEEP-aspect at
+  1080x1920 in the middle of the window; the letterbox is painted the BOX
+  BROWN (`ScaleRule.PC_BAR_BROWN`, the splash veil's brown) - never the
+  engine's black (the owner: "vertical will run like, taking a vertical
+  slice and the sides be the gogabox background").
+- LANDSCAPE designs keep the phone's EXPAND rule - the full window is the
+  canvas (cosmic spud, space dash, cursed dario, space invaders).
+- `host_node._apply_orientation` swaps between the two laws per game;
+  `_restore` and the menu governor put the slice back after a run.
+- The desktop window opens at 1280x720 (`window_width_override` /
+  `window_height_override` in project.godot).

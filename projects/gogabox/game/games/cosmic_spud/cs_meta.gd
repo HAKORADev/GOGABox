@@ -37,6 +37,8 @@ func _heal() -> void:
                 "banked_total": 0,
                 "runs": 0,
                 "gogacoins": 0,             # the every-5th-wave riders, lifetime
+                "skills": {},               # THE SKILLS (v0.3.4-3): id -> true
+                "skill_spent": 0,           # the spent skill points
         }
         for k in base:
                 if not d.has(k):
@@ -221,6 +223,32 @@ func merge_discount() -> float:
 
 func shop_discount() -> float:
         return 0.9 if tree_has("u4") else 1.0
+
+# ------------------------------------------------------------------ skills
+## THE SKILLS LAW (v0.3.4-3, the owner: "skills should be earned from each
+## 100 kill as a point" + "why are coins and skills currently saved per
+## different game rounds"): the points are LIFETIME - banked kills plus the
+## live run's kills, one point per 100, minus the spent ones. They NEVER
+## reset with a round.
+func skill_points_free(live_kills := 0) -> int:
+        var earned := int(floor(float(int(d["kills"]) + int(live_kills)) / 100.0))
+        return earned - int(d.get("skill_spent", 0))
+
+func has_skill(sid: String) -> bool:
+        return bool((d.get("skills", {}) as Dictionary).get(sid, false))
+
+func buy_skill(sid: String, live_kills := 0) -> bool:
+        if not CSData.SKILLS.has(sid) or has_skill(sid):
+                return false
+        var cost := int(CSData.SKILLS[sid]["cost"])
+        if skill_points_free(live_kills) < cost:
+                return false
+        if not d.has("skills"):
+                d["skills"] = {}
+        (d["skills"] as Dictionary)[sid] = true
+        d["skill_spent"] = int(d.get("skill_spent", 0)) + cost
+        save()
+        return true
 
 # ------------------------------------------------------------- run results
 func record_run(wave: int, sc: int, kills: int, merges: int, start_id: String) -> void:

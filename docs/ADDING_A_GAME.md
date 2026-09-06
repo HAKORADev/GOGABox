@@ -31,3 +31,18 @@
 
 Every game idea gets a GDD in `docs/goga_docs/gogames_ideas/<id>.md` before
 it gets a script. Raw ideas go to `docs/goga_docs/brainstorms/`.
+
+
+## THE PLATFORM LAW (v0.3.4-3)
+
+Every registry entry carries:
+
+- `"os": ["android", "pc"]` - the platform badge/tag (the search sheet's
+  PLATFORM chips filter on it; platform exclusives become possible later).
+- `"controls_pc": [...]` - the PC keyboard/mouse controls; the game guide
+  renders them as their own "CONTROLS - PC (WINDOWS BUILD)" section, under
+  the touch controls.
+
+A new game that plays fine with the mouse/touch alone may ship with just
+the `os` tag. Any keyboard need goes through the shared default actions:
+`ui_left` / `ui_right` (arrows), `ui_accept` (SPACE), `ui_up` / `ui_down`.

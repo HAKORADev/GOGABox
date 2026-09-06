@@ -359,6 +359,20 @@ func _score_label_ref() -> Label:
 func _coins_label_ref() -> Label:
         return _coins_label
 
+## v0.3.4-3 THE CHIP LAWS: games that draw their OWN widgets (the CS face)
+## can hide the whole chrome chips - hiding only the labels left EMPTY
+## panels floating in the top bar (the owner's "empty widget next to the
+## gogacoins widget" report).
+func _score_chip_ref() -> Control:
+        if _score_label == null or _score_label.get_parent() == null:
+                return null
+        return _score_label.get_parent().get_parent() as Control
+
+func _coins_chip_ref() -> Control:
+        if _coins_label == null or _coins_label.get_parent() == null:
+                return null
+        return _coins_label.get_parent().get_parent() as Control
+
 ## host-facing refs
 func _overlay_root_ref() -> Control:
         return _overlay_root

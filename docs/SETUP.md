@@ -79,6 +79,35 @@ ls dist/jellyjump/                # JellyJump-v1.0.0-arm64-v8a.apk + -armeabi-v7
 5. **verify**: `.ci/verify-apk.sh` checks signature, badging, ABI content,
    prints a size summary (`dist/<g>/BUILD_SUMMARY.md`).
 
+## Building for WINDOWS (local, optional - CI does this)
+
+The forge works on any Linux box with mingw-w64:
+
+```bash
+sudo apt install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+                 gcc-mingw-w64-i686 g++-mingw-w64-i686 scons
+sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
+sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
+sudo update-alternatives --set i686-w64-mingw32-gcc    /usr/bin/i686-w64-mingw32-gcc-posix
+sudo update-alternatives --set i686-w64-mingw32-g++    /usr/bin/i686-w64-mingw32-g++-posix
+# the pinned source (see config/environment.lock for the version)
+curl -LO https://github.com/godotengine/godot/archive/refs/tags/4.7.2-stable.tar.gz
+tar -xzf 4.7.2-stable.tar.gz && cd godot-4.7.2-stable
+scons platform=windows target=template_release arch=x86_64 lto=full \
+  use_static_cpp=yes debug_symbols=no d3d12=no angle=no winrt=no accesskit=no \
+  custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" -j"$(nproc)"
+# ...and again with arch=x86 for the 32-bit build
+```
+
+Seat the templates where the editor looks
+(`~/.local/share/godot/export_templates/4.7.2.stable/`), then:
+
+```bash
+godot --headless --path projects/gogabox --import
+godot --headless --path projects/gogabox --export-release "Windows x86_64" ../build/GOGABox_x64.exe
+godot --headless --path projects/gogabox --export-release "Windows x86_32" ../build/GOGABox_x86.exe
+```
+
 ## Signing for release
 
 ```bash

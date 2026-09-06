@@ -707,6 +707,22 @@ func _follow_finger(at: Vector2) -> void:
                                 clampf(at.y, field.position.y + half,
                                 field.end.y - half))
 
+## THE PC LAW (v0.3.4-3): the keyboard paddle - FIXED speed, never ramping
+func _kb_move(dir: float, delta: float) -> void:
+        var p: Dictionary = pads_by_id.get("user", null)
+        if p == null:
+                return
+        var half := _pad_half_len(p)
+        var spd := 700.0
+        if int(p["axis"]) == 0:
+                p["c"] = Vector2(clampf((p["c"] as Vector2).x + dir * spd * delta,
+                                field.position.x + half, field.end.x - half),
+                                (p["c"] as Vector2).y)
+        else:
+                p["c"] = Vector2((p["c"] as Vector2).x,
+                                clampf((p["c"] as Vector2).y + dir * spd * delta,
+                                field.position.y + half, field.end.y - half))
+
 # ================================================================ THE RUN
 
 func _goga_tick(delta: float) -> void:
@@ -729,6 +745,15 @@ func _goga_tick(delta: float) -> void:
                 ball_pos += ball_dir * spd * delta
                 _push_trail()
         _tick_walls_and_goals()
+        # THE PC LAW (v0.3.4-3): the arrows drive the paddle at a fixed speed
+        # (left/right on a horizontal field, up/down on a vertical one)
+        var axis_i := 0
+        if pads_by_id.has("user"):
+                axis_i = int(pads_by_id["user"]["axis"])
+        var kb := Input.get_axis("ui_left", "ui_right") if axis_i == 0 \
+                        else Input.get_axis("ui_up", "ui_down")
+        if kb != 0.0:
+                _kb_move(signf(kb), delta)
         _tick_pads()
         _tick_coins(delta)
         _tick_pus(delta)

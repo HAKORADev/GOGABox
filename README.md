@@ -18,6 +18,11 @@ clone → ./tools/bootstrap.sh → ./build.sh gogabox      # that's the whole pi
   reveal, favorites are hearted.
 - Android-native extras through small Godot plugins: Unity Ads
   (banner / interstitial / rewarded) and local notifications ("reminders").
+- **Windows builds too** (v0.3.4-3): `GOGABox_x64.exe` + `GOGABox_x86.exe`,
+  each a SINGLE exe (pck embedded), forged from custom export templates with
+  a **SSE2 baseline** (`-march=x86-64`) so pre-Haswell CPUs run the box.
+  Portrait designs render as a vertical slice with the box brown sides;
+  landscape designs fill the window. No ads / no rewarded DOUBLE on PC.
 
 ## Repo map
 
@@ -69,6 +74,17 @@ build, commit/push/CI conventions, sandbox recovery.
 
 Caching is keyed on `config/environment.lock`, so bumping a version re-fetches
 exactly once. See [docs/CI.md](docs/CI.md).
+
+`.github/workflows/build-windows.yml` (manual dispatch):
+
+- **"Forge templates only"** → builds the two custom export templates
+  (x86_64 + x86) from the pinned Godot source with the SSE2 baseline flags
+  and objdump-verifies NO SSE4.2-only instructions landed in the binary.
+- **"Forge + export"** → also exports `GOGABox_x64.exe` + `GOGABox_x86.exe`
+  (single-file exes, embedded pck) and uploads them zipped.
+
+The forge is iterative by design - run it from the Actions tab until it is
+green, then keep the artifacts. See [docs/CI.md](docs/CI.md).
 
 ## Monetization
 

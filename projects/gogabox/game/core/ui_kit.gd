@@ -134,6 +134,7 @@ static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
                 "genre": txt = Meta.genre_label(id)
                 "sub": txt = Meta.sub_label(id)
                 "age": txt = Meta.age_label(id)
+                "os": txt = Meta.os_label(id)
         return chip(txt, Meta.icon_for(kind, id), bg, font_size, color)
 
 ## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so

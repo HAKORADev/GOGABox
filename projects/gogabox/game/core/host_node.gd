@@ -158,6 +158,13 @@ func _apply_orientation(landscape: bool) -> void:
         # more canvas in design px on taller/wider phones (games read the
         # real viewport W/H, they absorb it naturally).
         var root := get_window()
+        # THE VERTICAL SLICE LAW (v0.3.4-3): on PC a PORTRAIT game never
+        # fills a wide window - it renders a vertical slice down the middle
+        # and the sides wear the box brown. Landscape games keep EXPAND.
+        if ScaleRule.is_pc() and not landscape:
+                ScaleRule.apply_vertical_slice(root, ScaleRule.DESIGN_PORTRAIT)
+                return
+        ScaleRule.apply_expand(root)
         root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE if landscape \
                         else ScaleRule.DESIGN_PORTRAIT
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE
@@ -170,7 +177,11 @@ func _restore() -> void:
         # governor keep watching from here: whenever the system actually
         # rotates the window, the design follows within one frame.
         _flush_time()
-        ScaleRule.apply(get_window())
+        if ScaleRule.is_pc():
+                # back to the box's vertical slice (the menu is portrait)
+                ScaleRule.apply_vertical_slice(get_window(), ScaleRule.DESIGN_PORTRAIT)
+        else:
+                ScaleRule.apply(get_window())
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:
@@ -299,7 +310,11 @@ func _on_finish(final_score: int, earned: int) -> void:
                 hype.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 sheet.add_child(hype)
 
-        if total > 0:
+        # THE PC LAW (v0.3.4-3, the owner: "drop the double gogacoins in
+        # death menu"): there are no ads on the desktop builds - the whole
+        # rewarded theatre stays off there (ScaleRule.is_pc is FALSE on the
+        # headless tests, so they keep verifying the Android flow).
+        if total > 0 and not ScaleRule.is_pc():
                 # TIERED rewarded: watch-time decides the payout (15s+ = half,
                 # 20s+ = 75%, full ad = full reward; config in ads_config.json)
                 var hint := Arc.label(Ads.reward_hint(), 16, Color("8a6a40"), false)
