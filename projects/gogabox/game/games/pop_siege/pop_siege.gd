@@ -1,10 +1,10 @@
 extends GogaGame
-## POP SIEGE (v0.3.5-1) - the bloon siege, rebuilt on REAL art (the ES atlas
-## recompose + the owner's template kit) with painted map boards, smooth
-## spline roads, gadget folk with tracking heads, and the honest flow laws:
-## the READY gate, pausing sheets, A/M waves, the NEXT WAVE button, x1..x3
-## speed, and PopCoins from pops only. THE LAWS live in the GDD
-## (docs/goga_docs/gogames_ideas/pop_siege.md) + PLAN_v035p1.md.
+## POP SIEGE (v0.3.5-2) - the wheel patch. Grid roads, bloon COLOR LEVELS
+## (each level cracks for +1 more), hidden STRIPS (10 on balloons, 50 on
+## blimps), ARMOR shells (metal fears fire, rock fears bombs), PopCoins pay
+## PER DAMAGE, tap AND drag placement with honest range rings, the manual
+## first wave (no timer - the SEND button calls every wave the owner wants),
+## and the 60 FPS siege. The laws live in the GDD + PLAN_v035p2.md.
 
 const COLS := 18
 const ROWS := 10
@@ -108,26 +108,10 @@ func _blocked_cells() -> Dictionary:
                         b[Vector2i(int(c[0]), int(c[1]))] = true
                 for w in map.get("water", []):
                         b[Vector2i(int(w[0]), int(w[1]))] = true
-                # THE ROAD TRUTH LAW: a cell is road when its center sits
-                # within half a road width of the DENSE spline (the old
-                # integer walk skipped whole cells and let towers on the road)
-                for pts in map["paths"]:
-                        for p in pts:
-                                var px: float = float(p[0])
-                                var py: float = float(p[1])
-                                var c0 := int(floorf(px - 1.0))
-                                var c1 := int(ceilf(px + 1.0))
-                                var r0 := int(floorf(py - 1.0))
-                                var r1 := int(ceilf(py + 1.0))
-                                for cc in range(maxi(0, c0), mini(COLS, c1 + 1)):
-                                        for rr in range(maxi(0, r0), mini(ROWS, r1 + 1)):
-                                                var key := Vector2i(cc, rr)
-                                                if b.has(key):
-                                                        continue
-                                                var dx := (float(cc) + 0.5) - px
-                                                var dy := (float(rr) + 0.5) - py
-                                                if dx * dx + dy * dy <= 0.62 * 0.62:
-                                                        b[key] = true
+                # THE GRID LAW: the roads ARE cells now - the map's road_cells
+                # are the paint truth AND the build truth (one source)
+                for rc in map.get("road_cells", []):
+                        b[Vector2i(int(rc[0]), int(rc[1]))] = true
                 b[Vector2i(map["heart"][0], map["heart"][1])] = true
                 _blocked_cache = b
         return _blocked_cache
@@ -165,11 +149,10 @@ func _goga_setup() -> void:
         _pop_frames = _frames("fx/pop_", 10)
         _boom_frames = _frames("fx/boom_", 7)
         set_hud_score_prefix("POPS")
+        _score_icon()                        # THE SCORE ICON LAW: the layered bloon
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("MAPS", func(): _maps_open())
-        add_hud_button("PAUSE", func():
-                if _sheet_stack.is_empty() and not over:
-                        _pause_open())
+        # the PAUSE button is dead (the owner: back does the same thing)
         _build_field()
         _build_panel()
         _rebuild_cards()
@@ -218,8 +201,32 @@ func _start_ready() -> void:
                 ready_box.queue_free()
                 ready_box = null
         phase = "idle"
-        _next_wave_countdown(10.0)
+        countdown = 0.0
+        # THE FIRST WAVE LAW: wave 1 NEVER rides a countdown - the owner
+        # calls it with the SEND button, in AUTO and MANUAL alike
+        _refresh_chips()
         Jukebox.sfx("ps_click", -6.0)
+
+## THE SCORE ICON LAW: a layered bloon next to the score (the owner asked
+## for a bloon shape that reflects the layers and the damage).
+func _score_icon() -> void:
+        var chip := _score_chip_ref()
+        if chip == null or not is_instance_valid(chip):
+                return
+        var h := chip.get_child(0)
+        if h == null or not is_instance_valid(h) or h.get_child_count() == 0:
+                return
+        if (h as Control).has_meta("pops_icon"):
+                return
+        var ic := TextureRect.new()
+        ic.texture = _t("ui/ic_pops.png")
+        ic.custom_minimum_size = Vector2(34, 34)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        ic.set_meta("pops_icon", true)
+        (h as Control).add_child(ic)
+        (h as Control).move_child(ic, 0)
 
 # ------------------------------------------------------------ field build
 func _build_field() -> void:
@@ -386,6 +393,7 @@ func _build_panel() -> void:
         var am := Arc.button("AUTO", Vector2(104, 44), _fs(18), Arc.GOOD, func(): _toggle_am())
         wave_row.add_child(am)
         chips["am_btn"] = am
+        _paint_am()      # THE A/M TRUTH LAW: the button paints the RESTORED mode
         wave_lbl = Arc.label("PRESS START", _fs(22), Color(1, 0.95, 0.8))
         wave_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         wave_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -429,15 +437,24 @@ func _chip_label(pc: PanelContainer) -> Label:
 func _refresh_chips() -> void:
         if chips.is_empty():
                 return
-        _chip_label(chips["lives"]).text = str(lives)
-        _chip_label(chips["coins"]).text = str(coins)
+        var sig := "%d|%d|%d|%d|%s" % [lives, int(coins), wave_n, int(countdown), phase]
+        if sig == _chip_sig:
+                return
+        _chip_sig = sig
+        _chip_label(chips["lives"]).text = str(maxi(0, lives))     # the lives floor: 0, never negative
+        _chip_label(chips["coins"]).text = str(int(coins))
         _chip_label(chips["wave"]).text = "WAVE %d" % wave_n
         if wave_lbl == null:
                 return
         if phase == "ready":
                 wave_lbl.text = "PRESS START"
         elif phase == "idle":
-                wave_lbl.text = ("NEXT WAVE IN %ds" % int(ceil(countdown))) if auto_waves else "WAVE %d READY" % (wave_n + 1)
+                if wave_n == 0:
+                        wave_lbl.text = "SEND THE FIRST WAVE"
+                elif auto_waves:
+                        wave_lbl.text = "NEXT WAVE IN %ds" % int(ceil(countdown))
+                else:
+                        wave_lbl.text = "WAVE %d READY" % (wave_n + 1)
         else:
                 wave_lbl.text = "WAVE %d ROLLING" % wave_n
         if next_btn != null and is_instance_valid(next_btn):
@@ -447,6 +464,9 @@ func _refresh_chips() -> void:
                         next_btn.text = "NEXT WAVE"
                 next_btn.visible = phase != "ready"
         _paint_cards()
+        _paint_menu_afford()
+
+var _chip_sig := ""
 
 # ------------------------------------------------------------ the folk cards
 func _rebuild_cards() -> void:
@@ -499,8 +519,21 @@ func _rebuild_cards() -> void:
                 cost_row.add_child(Arc.label(str(f["place"]), _fs(21), Color(1, 0.85, 0.4)))
                 var fid_c: String = fid
                 card.gui_input.connect(func(ev: InputEvent):
-                        if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
-                                _card_tapped(fid_c))
+                        if ev is InputEventScreenTouch:
+                                var t := ev as InputEventScreenTouch
+                                if t.pressed:
+                                        _card_press = fid_c
+                                        _card_drag = false
+                                        _card_press_pos = t.position
+                                elif _card_press == fid_c:
+                                        # a clean press-and-release ON the card = the tap toggle
+                                        _card_press = ""
+                                        if not _card_drag:
+                                                _card_tapped(fid_c)
+                        elif ev is InputEventScreenDrag and _card_press == fid_c:
+                                var p := (ev as InputEventScreenDrag).position
+                                if not _card_drag and p.distance_to(_card_press_pos) > 26.0:
+                                        _begin_card_drag())
                 cards_box.add_child(card)
                 card_panels[fid] = {"panel": card, "style": style}
         _paint_cards()
@@ -564,15 +597,56 @@ func _select_folk(f: Dictionary) -> void:
         sel_draw.queue_redraw()
 
 # --------------------------------------------------------- tick: input
+var _card_press := ""            # the folk card under the finger (drag&drop law)
+var _card_drag := false
+
 func _goga_input(event: InputEvent) -> void:
         if over:
                 return
         # the ghost breathes with the finger/mouse even before a drag starts
         if event is InputEventMouseMotion and selected_place != "" and ghost != null and not tk.busy():
                 _ghost_follow(get_global_mouse_position())
+        # THE DRAG LAW part 2: a drag that STARTED on a folk card keeps coming
+        # through the raw stream once the finger leaves the card's Control
+        if event is InputEventScreenDrag and _card_press != "":
+                var p := (event as InputEventScreenDrag).position
+                if not _card_drag and p.distance_to(_card_press_pos) > 26.0:
+                        _begin_card_drag()
+                if _card_drag:
+                        _ghost_follow(p)
+        elif event is InputEventScreenTouch and not (event as InputEventScreenTouch).pressed \
+                        and _card_press != "":
+                var p2 := (event as InputEventScreenTouch).position
+                var fid := _card_press
+                _card_press = ""
+                if _card_drag:
+                        _card_drag = false
+                        _placing_drag = false
+                        if _in_field(p2):
+                                _try_place_at(p2)
+                        else:
+                                _cancel_place()
+
+var _card_press_pos := Vector2.ZERO
+
+func _begin_card_drag() -> void:
+        # the drag&drop law: pressing a card and MOVING picks the folk up
+        var fid := _card_press
+        if fid == "" or coins < int(PDData.FOLK[fid]["place"]):
+                return
+        if selected_place != fid:
+                _select_folk({})
+                selected_place = fid
+                _ensure_ghost(fid)
+                _paint_cards()
+                Jukebox.sfx("ps_click", -10.0)
+        _card_drag = true
+        _placing_drag = true
 
 func _goga_tk_ready() -> void:
-        # TouchKit wiring (the base built tk): taps place, drags preview
+        # TouchKit wiring: tap-tap placement AND raw field drags (the drag
+        # that starts ON THE FIELD) - the card drags ride _goga_input above
+        tk.tap_max_ms = 520.0        # a slow deliberate tap is still a tap
         tk.tapped.connect(func(p: Vector2): _field_tapped(p))
         tk.dragged.connect(func(_from: Vector2, to: Vector2):
                 if selected_place != "":
@@ -639,7 +713,11 @@ func _place_folk(fid: String, c: Vector2i) -> void:
         node.add_child(spr)
         var head := Sprite2D.new()
         head.texture = _t("folk/%s_head_g1.png" % fid)
-        head.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.28)
+        # THE PIVOT LAW: the head rotates around its MOUNT (the top of the
+        # base) - the texture draws ABOVE the pivot through its offset, so
+        # the body never fights the aim again (the steering glitch is dead)
+        head.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.34)
+        head.offset = Vector2(0, -head.texture.get_height() * 0.42)
         head.scale = Vector2(CELL / 62.0, CELL / 62.0)
         node.add_child(head)
         var puff := _fx_spawn("smoke", pos + Vector2(0, 14), 0.5)
@@ -648,8 +726,9 @@ func _place_folk(fid: String, c: Vector2i) -> void:
                 "id": rng.randi(), "fid": fid, "gear": 1, "lvl": 1, "cell": c, "pos": pos,
                 "cd": 0.0, "mode": 0, "inflicted": 0.0, "node": node, "spr": spr, "head": head,
                 "badges": [],
+                "invested": int(fdef["place"]),
                 "buffs": {"rate_f": 1.0, "rng_f": 1.0, "dmg_f": 0.0, "pierce_f": 0, "blast_f": 1.0, "coin_pop": 0},
-                "timers": {}, "target": -1,
+                "timers": {}, "target": -1, "aim_at": Vector2.ZERO, "aim_t": 0.0,
         }
         folk.append(f)
         _recompute_auras()
@@ -718,10 +797,11 @@ func _recompute_auras() -> void:
                                         if gear >= 3:
                                                 f["flags"]["ignite"] = true
                                                 _badge_add(f, "drop_flame")
-                # range recompute (the aura could have grown it)
-                f["eff_rng"] = PDData.stat(fid, gear, f["lvl"], "rng") * CELL * CELL * float(f["buffs"]["rng_f"])
-                if fid == "kaching" or PDData.FOLK[fid]["cls"] == "support":
-                        f["eff_rng"] = PDData.stat(fid, gear, f["lvl"], "rng") * CELL
+                # range recompute (the aura could have grown it) - THE RANGE
+                # TRUTH LAW: eff_rng is stat x CELL x the aura factor. The old
+                # CELL x CELL typo made every shooter omniscient (the endless
+                # range + the map brightening + the across-map snipes)
+                f["eff_rng"] = PDData.stat(fid, gear, f["lvl"], "rng") * CELL * float(f["buffs"]["rng_f"])
         zones2d.queue_redraw()
         if not selected_folk.is_empty():
                 _build_menu()
@@ -750,8 +830,8 @@ func _next_wave_pressed() -> void:
         if over or phase == "ready":
                 return
         if phase == "idle":
-                if auto_waves and countdown > 0.5:
-                        var bonus := 10 + wave_n          # the early-call bonus
+                if auto_waves and countdown > 0.5 and wave_n >= 1:
+                        var bonus := 25 + 5 * wave_n    # the early-call bonus
                         coins += bonus
                         Jukebox.sfx("ps_coin", -8.0)
                 countdown = 0.0
@@ -779,6 +859,7 @@ func _queue_wave() -> void:
                                 "kind": g["kind"],
                                 "at": base + float(g["delay"]) + i * float(g["spacing"]),
                                 "pi": (gi % n_paths) if n_paths > 1 else 0,   # multi-path alternation
+                                "w": wave_n,                                  # the wave's OWN difficulty bands
                         })
                 gi += 1
         spawn_q.sort_custom(func(a, b): return float(a["at"]) < float(b["at"]))
@@ -822,19 +903,86 @@ func _end_wave() -> void:
 # ---------------------------------------------------------------- bloons
 var _bloon_seq := 0
 
-func _spawn_bloon(kind: String, pi: int) -> void:
+# THE WHEEL ROSTER: strip + level colors speak at a glance
+const KIND_COLORS := {
+        "red": Color(0.95, 0.3, 0.3), "blue": Color(0.35, 0.55, 0.95),
+        "green": Color(0.35, 0.8, 0.4), "yellow": Color(0.98, 0.85, 0.3),
+        "pink": Color(0.98, 0.5, 0.75), "black": Color(0.25, 0.25, 0.3),
+        "white": Color(0.95, 0.95, 1.0), "zebra": Color(0.85, 0.85, 0.9),
+        "lead": Color(0.6, 0.63, 0.68), "rainbow": Color(0.9, 0.6, 0.95),
+        "ceramic": Color(0.85, 0.55, 0.3),
+}
+
+func _bloon_tex(kind: String, lv: int) -> Texture2D:
+        # THE WHEEL ART: lv1 wears the honest kind, deeper levels wear the
+        # recolored wheel variants (a visible step per level)
+        if lv <= 1:
+                return _t("bloons/%s.png" % kind)
+        return _t("bloons/%s_lv%d.png" % [kind, clampi(lv, 2, 8)])
+
+## roll the wave's difficulty bands into ONE bloon (level, strips, armor).
+func _roll_bloon_mods(kind: String, w: int) -> Array:
+        var mods: Dictionary = PDData.wave_mods(w)
+        var blimp: bool = bool(PDData.BLOONS[kind].get("blimp", false))
+        var lv := 1
+        var lv_max := int(mods["lv_max"])
+        if lv_max > 1:
+                lv = clampi(1 + int(floorf(pow(rng.randf(), 1.4) * lv_max)), 1, lv_max)
+        var strips: Array = []
+        var s_max := int(mods["blimp_strips_max"]) if blimp else int(mods["strips_max"])
+        if s_max > 0:
+                var n := int(floorf(pow(rng.randf(), 1.5) * (s_max + 1)))
+                for i in n:
+                        strips.append(_strip_kind(w))
+        var armor := ""
+        var roll := rng.randf()
+        if roll < float(mods["rock"]):
+                armor = PDData.ARMOR_ROCK
+        elif roll < float(mods["rock"]) + float(mods["metal"]):
+                armor = PDData.ARMOR_METAL
+        var armor_hp := 0.0
+        if armor != "":
+                armor_hp = (20.0 + w * 0.6) if blimp else (2.0 + w * 0.12)
+        return [lv, strips, armor, armor_hp]
+
+func _strip_kind(w: int) -> String:
+        var pool: Array = []
+        for k in PDData.BLOONS:
+                if not bool(PDData.BLOONS[k].get("blimp", false)) and PDData.unlock_band(k) <= w:
+                        pool.append(k)
+        if pool.is_empty():
+                return "red"
+        return pool[rng.randi() % pool.size()]
+
+func _spawn_bloon(kind: String, pi: int, lv := 1, strips: Array = [], armor := "", armor_hp := 0.0) -> void:
         var def: Dictionary = PDData.BLOONS[kind]
         var spr := Sprite2D.new()
-        spr.texture = _t("bloons/%s.png" % kind)
+        spr.texture = _bloon_tex(kind, lv)
         bloon_layer.add_child(spr)
-        var lane := rng.randf_range(-CELL * 0.22, CELL * 0.22)
+        var lane := rng.randf_range(-CELL * 0.26, CELL * 0.26)
         _bloon_seq += 1
+        var crack := PDData.crack_hp(kind, lv)
         var b := {
-                "id": _bloon_seq, "kind": kind, "hp": float(def["hp"]), "max_hp": float(def["hp"]),
-                "pi": pi, "dist": -rng.randf_range(0.0, 10.0), "lane": lane,
+                "id": _bloon_seq, "kind": kind, "lv": lv, "strips": strips, "armor": armor,
+                "armor_hp": armor_hp,
+                "hp": crack, "max_hp": crack,
+                "pi": pi, "dist": -rng.randf_range(0.0, 8.0), "lane": lane, "seg": 1,
                 "slow_f": 0.0, "slow_t": 0.0, "glue_t": 0.0, "glue_dps": 0.0, "burn_dps": 0.0, "burn_t": 0.0,
                 "stun_t": 0.0, "rider": false, "depth": 0, "spr": spr, "frozen": false,
+                "pay_f": 0.0, "paid": 0,
+                "threat": PDData.threat(kind, lv, strips),
         }
+        if armor != "":
+                var sh := Sprite2D.new()
+                sh.texture = _t("bloons/armor_%s.png" % armor)
+                sh.name = "armor"
+                spr.add_child(sh)
+        if strips.size() > 0:
+                var sd := StripDraw.new()
+                sd.bloons_ref = b
+                sd.game = self
+                spr.add_child(sd)
+                b["strip_draw"] = sd
         if def.get("blimp", false) and not meta.seen_blimp():
                 meta.mark_blimp()
                 Arc.toast(Arc.toast_overlay(self), "A BLIMP!")
@@ -845,36 +993,83 @@ func _paint_bloon(b: Dictionary) -> void:
         var spr: Sprite2D = b["spr"]
         var def: Dictionary = PDData.BLOONS[b["kind"]]
         var base_s: float = CELL * float(def["scl"])
-        spr.scale = Vector2(base_s / float(spr.texture.get_height()), base_s / float(spr.texture.get_height()))
+        # THE WHEEL TRUTH: the texture speaks the color level
+        spr.texture = _bloon_tex(b["kind"], int(b["lv"]))
         # ceramic cracks by hp (the honest shell)
         if b["kind"] == "ceramic":
-                var ratio: float = b["hp"] / b["max_hp"]
+                var ratio: float = float(b["hp"]) / maxf(1.0, float(b["max_hp"]))
                 if ratio < 0.35:
                         spr.texture = _t("bloons/ceramic_c2.png")
                 elif ratio < 0.7:
                         spr.texture = _t("bloons/ceramic_c1.png")
-                else:
-                        spr.texture = _t("bloons/ceramic.png")
-                spr.scale = Vector2(base_s / float(spr.texture.get_height()), base_s / float(spr.texture.get_height()))
+        spr.scale = Vector2(base_s / float(spr.texture.get_height()), base_s / float(spr.texture.get_height()))
+        # the armor shell sits ON the body until it cracks
+        var sh: Node2D = spr.get_node_or_null("armor")
+        if sh != null:
+                sh.visible = float(b.get("armor_hp", 0.0)) > 0.0
+                (sh as Sprite2D).scale = Vector2(1.16, 1.16)
         # the rider's faint golden shimmer
         spr.modulate = Color(1.06, 1.03, 0.85) if b["rider"] else Color.WHITE
         _hp_bar(b)
 
 func _hp_bar(b: Dictionary) -> void:
-        # the tanks wear an honest bar (ceramic and the blimps only)
+        # the tanks wear an honest bar (deep cracks + ceramics + blimps)
         var spr: Sprite2D = b["spr"]
-        var def: Dictionary = PDData.BLOONS[b["kind"]]
-        if float(def["hp"]) < 10.0:
-                return
         var bar: Node2D = b.get("bar", null)
+        var worth_bar := float(b["max_hp"]) >= 10.0 or bool(PDData.BLOONS[b["kind"]].get("blimp", false))
+        if not worth_bar:
+                if bar != null and is_instance_valid(bar):
+                        bar.queue_free()
+                        b.erase("bar")
+                return
         if bar == null or not is_instance_valid(bar):
                 bar = HpBar.new()
                 bar.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.5 - 10)
                 spr.add_child(bar)
                 b["bar"] = bar
-        (bar as HpBar).ratio = clampf(float(b["hp"]) / float(b["max_hp"]), 0.0, 1.0)
+        (bar as HpBar).ratio = clampf(float(b["hp"]) / maxf(1.0, float(b["max_hp"])), 0.0, 1.0)
         bar.w = maxf(34.0, spr.texture.get_width() * spr.scale.x * 0.7)
         bar.queue_redraw()
+
+# ----------------------------------------------------- the spatial grid
+# THE CORE LAW (the owner's optimization round): thousands of bloons march
+# while the phones stay cool - targeting and collisions query a rebuilt
+# bucket grid instead of scanning every bloon every frame.
+var _bgrid: Dictionary = {}
+var _bgrid_cs := 112.0
+
+func _grid_key(p: Vector2) -> Vector2i:
+        return Vector2i(int(floor(p.x / _bgrid_cs)), int(floor(p.y / _bgrid_cs)))
+
+func _grid_near(p: Vector2, r: float) -> Array:
+        var out: Array = []
+        var k0 := _grid_key(p - Vector2(r, r))
+        var k1 := _grid_key(p + Vector2(r, r))
+        for cx in range(k0.x, k1.x + 1):
+                for cy in range(k0.y, k1.y + 1):
+                        var arr: Array = _bgrid.get(Vector2i(cx, cy), [])
+                        for b in arr:
+                                out.append(b)
+        return out
+
+## the cached march: one segment index per bloon, advanced in place (the
+## old pos_on rescanned the whole polyline for every bloon every frame).
+func _pos_on_cached(b: Dictionary) -> Dictionary:
+        var P: Dictionary = _paths_px[b["pi"]]
+        var d := clampf(float(b["dist"]), 0.0, float(P["total"]))
+        var pts: PackedVector2Array = P["pts"]
+        var lens: PackedFloat32Array = P["lens"]
+        var i: int = int(b.get("seg", 1))
+        if i < 1 or i >= pts.size():
+                i = 1
+        if d < lens[i - 1]:
+                i = 1          # the flux shoved it back - rescan from the door
+        while i < pts.size() - 1 and d > lens[i]:
+                i += 1
+        b["seg"] = i
+        var seg := maxf(0.001, lens[i] - lens[i - 1])
+        var t := clampf((d - lens[i - 1]) / seg, 0.0, 1.0)
+        return {"p": pts[i - 1].lerp(pts[i], t), "dir": (pts[i] - pts[i - 1]).normalized()}
 
 func _move_bloons(delta: float) -> void:
         var dead: Array = []
@@ -901,7 +1096,7 @@ func _move_bloons(delta: float) -> void:
                 else:
                         _burn_paint(b)
                 b["dist"] += spd * delta
-                var at: Dictionary = pos_on(b["pi"], b["dist"])
+                var at: Dictionary = _pos_on_cached(b)
                 var dir: Vector2 = at["dir"]
                 var nrm := Vector2(-dir.y, dir.x)
                 var p: Vector2 = at["p"] + nrm * b["lane"]
@@ -910,6 +1105,14 @@ func _move_bloons(delta: float) -> void:
                         dead.append(b)
         for b in dead:
                 _leak(b)
+        # the grid rebuilds once per tick - the whole siege queries it
+        _bgrid.clear()
+        for b in bloons:
+                var k := _grid_key((b["spr"] as Sprite2D).position)
+                if not _bgrid.has(k):
+                        _bgrid[k] = [b]
+                else:
+                        (_bgrid[k] as Array).append(b)
 
 func _burn_paint(b: Dictionary) -> void:
         var spr: Sprite2D = b["spr"]
@@ -934,15 +1137,16 @@ func _burn_paint(b: Dictionary) -> void:
                 spr.self_modulate = Color.WHITE
 
 func _leak(b: Dictionary) -> void:
-        var rbe := PDData.rbe(b["kind"])
-        lives -= rbe
+        var dmg := int(b.get("threat", PDData.rbe(b["kind"])))
+        lives -= dmg
         Jukebox.sfx("ps_leak", -6.0)
-        shake_t = 0.35 if rbe >= 40 else 0.18
+        shake_t = 0.35 if dmg >= 40 else 0.18
         _heart_flash()
         _bloon_free(b)
         _refresh_chips()
         if lives <= 0 and not over:
                 lives = 0
+                _refresh_chips()
                 _game_over()
 
 func _heart_flash() -> void:
@@ -951,8 +1155,27 @@ func _heart_flash() -> void:
         tw.tween_property(heart_spr, "modulate", Color.WHITE, 0.5)
 
 # ------------------------------------------------------------ damage + pop
+var _score_f := 0.0            # the fractional damage ledger (score = damage)
+
 func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent := false) -> bool:
-        # the honest matrix (immunities block, BRUTUS halves sharp)
+        # THE ARMOR LAW: the shell eats the hit FIRST - and only its feared
+        # class bites at all (metal fears fire, rock fears bombs)
+        if float(b.get("armor_hp", 0.0)) > 0.0:
+                if not PDData.armor_allows(String(b["armor"]), cls):
+                        if not silent:
+                                Jukebox.sfx("ps_tick_bad", -18.0, 1.6)
+                                _fx_spawn("spark", b["spr"].position, 0.18, Color(0.8, 0.8, 0.8))
+                        return false
+                var a_real: float = maxf(0.0, dmg)
+                b["armor_hp"] = float(b["armor_hp"]) - a_real
+                _pay_damage(b, a_real, src)
+                if float(b["armor_hp"]) <= 0.0:
+                        b["armor_hp"] = 0.0
+                        _paint_bloon(b)
+                        if not silent:
+                                _fx_spawn("smoke", b["spr"].position, 0.4)
+                return true
+        # the honest matrix (immunities block, the fat blimps halve sharp)
         var real := PDData.dmg_vs(b["kind"], cls, dmg)
         if real <= 0.0:
                 if not silent:
@@ -965,49 +1188,66 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         # KOLDA G3: the deep freeze - frozen bloons take +1 from everything
         if b["frozen"]:
                 real += 1.0
-        b["hp"] -= real
-        add_score(1)                     # THE HITS LAW: every connected hit = 1 point
-        if src != null:
-                src["inflicted"] = float(src.get("inflicted", 0.0)) + real
+        b["hp"] = float(b["hp"]) - real
+        _pay_damage(b, real, src)
         _paint_bloon(b)
-        if b["hp"] <= 0.0:
-                _pop_bloon(b, src)
+        if float(b["hp"]) <= 0.0:
+                # THE WHEEL LADDER: the level cracks down (each level cost +1
+                # more - the over-damage spills into the next ring)
+                while float(b["hp"]) <= 0.0 and int(b["lv"]) > 1:
+                        var over := -float(b["hp"])
+                        b["lv"] = int(b["lv"]) - 1
+                        b["max_hp"] = PDData.crack_hp(b["kind"], int(b["lv"]))
+                        b["hp"] = float(b["max_hp"]) - over
+                if float(b["hp"]) <= 0.0:
+                        _pop_bloon(b, src)
         if not selected_folk.is_empty() and src == selected_folk:
                 _menu_paint_live()
         return true
+
+## THE POP PAY LAW v2: a popcoin per DAMAGE dealt (the owner's ladder).
+func _pay_damage(b: Dictionary, real: float, src: Variant) -> void:
+        if real <= 0.0:
+                return
+        b["pay_f"] = float(b.get("pay_f", 0.0)) + real
+        var n := int(b["pay_f"])
+        if n > 0:
+                b["pay_f"] = float(b["pay_f"]) - float(n)
+                coins += n
+                b["paid"] = int(b.get("paid", 0)) + n
+        _score_f += real
+        var s := int(_score_f)
+        if s > 0:
+                _score_f -= float(s)
+                add_score(s)
+        if src != null:
+                src["inflicted"] = float(src.get("inflicted", 0.0)) + real
 
 func _pop_bloon(b: Dictionary, src: Variant) -> void:
         var def: Dictionary = PDData.BLOONS[b["kind"]]
         # the pop: the ladder pitch climbs with depth (the star sound)
         var pitch_idx: int = clampi(int(b["depth"]), 0, 4)
         Jukebox.sfx("ps_pop%d" % pitch_idx, -6.0, randf_range(0.94, 1.06))
-        var col := Color.WHITE
-        match b["kind"]:
-                "red": col = Color(0.95, 0.3, 0.3)
-                "blue": col = Color(0.35, 0.55, 0.95)
-                "green": col = Color(0.35, 0.8, 0.4)
-                "yellow": col = Color(0.98, 0.85, 0.3)
-                "pink": col = Color(0.98, 0.5, 0.75)
-                "rainbow": col = Color(0.9, 0.6, 0.95)
-                "ceramic": col = Color(0.85, 0.55, 0.3)
-                "black", "white", "zebra", "lead": col = Color(0.85, 0.85, 0.9)
-                "moab", "brutus":
-                        col = Color(0.5, 0.6, 0.95)
-                        Jukebox.sfx("ps_moab_pop", -4.0)
-                        shake_t = 0.5
-                        _boom_fx(b["spr"].position, 1.6)
-                        _moabs_run += 1
-                        achievement_max("moab_kills", _moabs_run)
+        var col: Color = KIND_COLORS.get(b["kind"], Color(0.5, 0.6, 0.95))
+        if def.get("blimp", false):
+                col = Color(0.5, 0.6, 0.95)
+                Jukebox.sfx("ps_moab_pop", -4.0)
+                shake_t = 0.5
+                _boom_fx(b["spr"].position, 1.6)
+                _moabs_run += 1
+                achievement_max("moab_kills", _moabs_run)
         # the splash frames (modulate speaks the bloon's color)
         _splash_fx(b["spr"].position, col)
         # the shockwave shader
         _shock_fx(b["spr"].position, col, 0.9 if def.get("blimp", false) else 0.5)
-        # the coins (THE POP PAY LAW: paid on the kill, never on the leak)
-        var pay := int(def["coins"])
+        # THE POP PAY LAW: the body's damage already paid per point - the
+        # pop speaks the total + the kaching gold-wing bonus
+        var pay := int(b.get("paid", 0))
         if src != null:
                 pay += int((src as Dictionary)["buffs"].get("coin_pop", 0))
-        coins += pay
-        _coin_text(b["spr"].position, pay)
+                coins += int((src as Dictionary)["buffs"].get("coin_pop", 0))
+        if pay > 0:
+                _coin_text(b["spr"].position, pay)
         _pops_run += 1
         achievement_max("pops_run", _pops_run)
         # THE RIDER: the hidden GOGACoin flies to the wallet
@@ -1018,17 +1258,31 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
                 _fx_spawn("spark", b["spr"].position, 0.8, Color(1.0, 0.85, 0.3))
                 Arc.toast(Arc.toast_overlay(self), "GOGACOIN!")
         # the children carry on (same path, spread)
-        var kids: Array = def["kids"]
         var off := 2.0
-        for k in kids:
+        for k in def["kids"]:
                 _spawn_child(k, b, off)
                 off += 6.0
+        # THE STRIPS LAW: each band hid a bloon of that color - the counts
+        # never showed, and the inner bloons can wear strips of their own
+        var strips: Array = b.get("strips", [])
+        var sof: float = 1.2
+        for s in strips:
+                var n := 1 + (1 if rng.randf() < 0.25 else 0)
+                for i in n:
+                        var inner_strips: Array = []
+                        if wave_n >= PDData.STRIP_WAVE + 8 and int(b["depth"]) < 2 and rng.randf() < 0.3:
+                                inner_strips.append(_strip_kind(wave_n))
+                                if rng.randf() < 0.4:
+                                        inner_strips.append(_strip_kind(wave_n))
+                        _spawn_child(String(s), b, sof, 1, inner_strips)
+                        sof += 4.0
         _bloon_free(b)
         _refresh_chips()
 
 func _splash_fx(at: Vector2, tint: Color) -> void:
-        if _pop_frames.is_empty():
+        if _pop_frames.is_empty() or _splashes >= 22:
                 return
+        _splashes += 1
         var spr := Sprite2D.new()
         spr.texture = _pop_frames[0]
         spr.position = at
@@ -1037,36 +1291,63 @@ func _splash_fx(at: Vector2, tint: Color) -> void:
         var last := _pop_frames.size() - 1
         var tw := create_tween()
         tw.tween_method(func(i: int): _splash_frame(spr, i), 0, last, 0.32)
-        tw.tween_callback(spr.queue_free)
+        tw.tween_callback(func():
+                _splashes -= 1
+                if is_instance_valid(spr):
+                        spr.queue_free())
+
+var _splashes := 0
 
 func _splash_frame(spr: Sprite2D, i: int) -> void:
         if is_instance_valid(spr) and i >= 0 and i < _pop_frames.size():
                 spr.texture = _pop_frames[i]
 
 func _coin_text(at: Vector2, n: int) -> void:
+        # the floaters cap themselves (a thousand pops must not spawn a
+        # thousand labels - the pool law)
+        if _coin_texts >= 14:
+                return
+        _coin_texts += 1
         var l := Arc.label("+%d" % n, int(CELL * 0.34), Color(1.0, 0.9, 0.45))
         l.position = at + Vector2(-14, -CELL * 0.5)
         fx_layer.add_child(l)
         var tw := create_tween().set_parallel(true)
         tw.tween_property(l, "position:y", l.position.y - CELL * 0.7, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
         tw.tween_property(l, "modulate:a", 0.0, 0.55).set_delay(0.12)
-        tw.chain().tween_callback(l.queue_free)
+        tw.chain().tween_callback(func():
+                _coin_texts -= 1
+                if is_instance_valid(l):
+                        l.queue_free())
 
-func _spawn_child(kind: String, parent: Dictionary, off: float) -> void:
+var _coin_texts := 0
+
+func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips: Array = []) -> void:
         var def: Dictionary = PDData.BLOONS[kind]
         var spr := Sprite2D.new()
-        spr.texture = _t("bloons/%s.png" % kind)
+        spr.texture = _bloon_tex(kind, lv)
         bloon_layer.add_child(spr)
         _bloon_seq += 1
+        var crack := PDData.crack_hp(kind, lv)
         var b := {
-                "id": _bloon_seq, "kind": kind, "hp": float(def["hp"]), "max_hp": float(def["hp"]),
+                "id": _bloon_seq, "kind": kind, "lv": lv, "strips": strips, "armor": "",
+                "armor_hp": 0.0,
+                "hp": crack, "max_hp": crack,
                 "pi": parent["pi"], "dist": maxf(0.0, float(parent["dist"]) - off),
-                "lane": clampf(float(parent["lane"]) + randf_range(-8, 8), -CELL * 0.24, CELL * 0.24),
+                "lane": clampf(float(parent["lane"]) + randf_range(-8, 8), -CELL * 0.28, CELL * 0.28),
+                "seg": 1,
                 "slow_f": parent["slow_f"], "slow_t": parent["slow_t"], "glue_t": parent["glue_t"],
                 "glue_dps": parent["glue_dps"], "burn_dps": parent["burn_dps"], "burn_t": parent["burn_t"],
                 "stun_t": parent["stun_t"], "rider": false, "depth": int(parent["depth"]) + 1,
                 "spr": spr, "frozen": parent["frozen"],
+                "pay_f": 0.0, "paid": 0,
+                "threat": PDData.threat(kind, lv, strips),
         }
+        if strips.size() > 0:
+                var sd := StripDraw.new()
+                sd.bloons_ref = b
+                sd.game = self
+                spr.add_child(sd)
+                b["strip_draw"] = sd
         bloons.append(b)
         _paint_bloon(b)
 
@@ -1085,8 +1366,10 @@ func _goga_tick(delta: float) -> void:
                 field.position = Vector2(rng.randf_range(-6, 6), rng.randf_range(-6, 6)) * (shake_t / 0.35)
                 if shake_t <= 0.0:
                         field.position = Vector2.ZERO
-        if phase == "idle" and not over and auto_waves:
-                # the A/M law: only AUTO marches the clock; MANUAL waits for the call
+        if phase == "idle" and not over and auto_waves and wave_n >= 1:
+                # THE A/M LAW v2: only AUTO marches the clock, and NEVER for
+                # the first wave - the owner opens every siege with the SEND
+                # button (the timer is AUTO's between-waves clock only)
                 countdown -= d
                 if countdown <= 0.0:
                         countdown = 0.0
@@ -1099,7 +1382,8 @@ func _goga_tick(delta: float) -> void:
                 while spawn_q.size() > 0 and float(spawn_q[0]["at"]) <= spawn_clock:
                         var s: Dictionary = spawn_q.pop_front()
                         var b_idx := spawn_count
-                        _spawn_bloon(s["kind"], int(s["pi"]))
+                        var mods: Array = _roll_bloon_mods(String(s["kind"]), int(s.get("w", wave_n)))
+                        _spawn_bloon(String(s["kind"]), int(s["pi"]), int(mods[0]), mods[1], String(mods[2]), float(mods[3]))
                         if b_idx == rider_index:
                                 (bloons[-1] as Dictionary)["rider"] = true
                                 _paint_bloon(bloons[-1])
@@ -1117,16 +1401,18 @@ func _goga_tick(delta: float) -> void:
 # ------------------------------------------------------------ folk firing
 func _pick_target(f: Dictionary, rng_px: float) -> Dictionary:
         # modes: 0 first (max dist), 1 last (min dist), 2 strong (max hp), 3 close (min dist to folk)
+        # THE GRID LAW: the candidates come from the bucket grid, never a
+        # whole-roster scan (thousands of bloons, cool phones)
         var best := {}
         var best_v := -1.0
-        for b in bloons:
+        var near: Array = _grid_near(f["pos"], rng_px + _bgrid_cs)
+        for b in near:
                 var d2: float = (b["spr"] as Sprite2D).position.distance_to(f["pos"])
                 if d2 > rng_px:
                         continue
-                var at: Dictionary = pos_on(b["pi"], b["dist"])
                 var v: float
                 match int(f["mode"]):
-                        0: v = b["dist"]
+                        0: v = float(b["dist"])
                         1: v = -float(b["dist"])
                         2: v = float(b["hp"])
                         _: v = -d2
@@ -1145,12 +1431,14 @@ func _tick_folk(delta: float) -> void:
                 var buffs: Dictionary = f["buffs"]
                 var rate: float = PDData.stat(fid, f["gear"], f["lvl"], "rate")
                 var rng_px: float = float(f.get("eff_rng", PDData.stat(fid, f["gear"], f["lvl"], "rng") * CELL))
-                # the gadget head tracks its target (the shooter families)
-                var tgt := _pick_target(f, rng_px)
-                if not tgt.is_empty() and f.get("head") != null and is_instance_valid(f["head"]):
+                # the aim decays: the head holds its last shot's bearing for a
+                # beat, then rests (no more firing at nothing - the wave-start
+                # misfire glitch is dead WITH the endless range)
+                f["aim_t"] = float(f.get("aim_t", 0.0)) - delta
+                if float(f["aim_t"]) > 0.0 and f.get("head") != null and is_instance_valid(f["head"]):
                         var head: Sprite2D = f["head"]
-                        var want := ((tgt["spr"] as Sprite2D).position - (f["pos"] as Vector2)).angle() + PDData.head_offset(fid)
-                        head.rotation = lerp_angle(head.rotation, want, minf(1.0, delta * 10.0))
+                        var want := ((f["aim_at"] as Vector2) - (f["pos"] as Vector2)).angle() + PDData.head_offset(fid)
+                        head.rotation = lerp_angle(head.rotation, want, minf(1.0, delta * 12.0))
                 # gear specials on their own clocks
                 _tick_specials(f, g, delta, rng_px)
                 if rate <= 0.0:
@@ -1158,9 +1446,14 @@ func _tick_folk(delta: float) -> void:
                 f["cd"] = float(f["cd"]) - delta
                 if float(f["cd"]) > 0.0:
                         continue
+                # THE AIM LAW: the target search happens ONLY when the gadget
+                # can actually shoot - no per-frame roster scans
+                var tgt := _pick_target(f, rng_px)
                 if tgt.is_empty():
                         continue
                 f["cd"] = rate / float(buffs["rate_f"])
+                f["aim_at"] = (tgt["spr"] as Sprite2D).position
+                f["aim_t"] = 0.4
                 _fire_folk(f, tgt, g)
 
 func _fire_folk(f: Dictionary, target: Dictionary, g: Dictionary) -> void:
@@ -1192,7 +1485,7 @@ func _fire_folk(f: Dictionary, target: Dictionary, g: Dictionary) -> void:
                         Jukebox.sfx("ps_shoot_flame", -14.0, randf_range(0.9, 1.1))
                 "kolda":
                         # the pulse: everything in range feels the chill
-                        for b in bloons.duplicate():
+                        for b in _grid_near(from, rng_px):
                                 if (b["spr"] as Sprite2D).position.distance_to(from) <= rng_px:
                                         var slowed := _hurt_bloon(b, dmg, cls, f, true)
                                         if slowed or PDData.dmg_vs(b["kind"], cls, dmg) > 0.0:
@@ -1217,7 +1510,7 @@ func _fire_folk(f: Dictionary, target: Dictionary, g: Dictionary) -> void:
                 "marshal":
                         # the drum pulse: a soft smack to everything in the aura
                         var hit_n := 0
-                        for b in bloons.duplicate():
+                        for b in _grid_near(from, rng_px):
                                 if (b["spr"] as Sprite2D).position.distance_to(from) <= rng_px:
                                         if _hurt_bloon(b, dmg, PDData.EXPLOSION, f, true):
                                                 hit_n += 1
@@ -1244,7 +1537,7 @@ func _tick_specials(f: Dictionary, g: Dictionary, delta: float, rng_px: float) -
                                 (f["node"] as Node2D).add_child(ring)
                         if f["gear"] >= 3 and f["node"].has_node("ring"):
                                 var dps: float = float(g.get("ring_dps", 2.0))
-                                for b in bloons.duplicate():
+                                for b in _grid_near(f["pos"], rng_px * 0.55):
                                         if (b["spr"] as Sprite2D).position.distance_to(f["pos"]) <= rng_px * 0.55:
                                                 _hurt_bloon(b, dps * delta, PDData.FIRE, f, true)
                         # G2+: the fire traps on the road
@@ -1267,7 +1560,7 @@ func _tick_specials(f: Dictionary, g: Dictionary, delta: float, rng_px: float) -
                                 t["orbit_hit"] = float(t.get("orbit_hit", 0.0)) - delta
                                 if float(t["orbit_hit"]) <= 0.0:
                                         var hit := false
-                                        for b in bloons.duplicate():
+                                        for b in _grid_near(orb.global_position, 0.46 * CELL):
                                                 if (b["spr"] as Sprite2D).position.distance_to(f["pos"] + orb.position) < 0.46 * CELL:
                                                         var dmg: float = float(g.get("orbit_dps", 1.0)) * (float(g.get("moab_x", 1.0)) if bool(PDData.BLOONS[b["kind"]].get("blimp", false)) else 1.0)
                                                         if _hurt_bloon(b, dmg, PDData.SHARP, f, true):
@@ -1287,6 +1580,7 @@ func _tick_specials(f: Dictionary, g: Dictionary, delta: float, rng_px: float) -
                                         if not furthest.is_empty():
                                                 t["flux"] = float(g["flux_every"])
                                                 furthest["dist"] = maxf(0.0, float(furthest["dist"]) - float(g["flux_back"]) * CELL)
+                                                furthest["seg"] = 1
                                                 furthest["glue_t"] = maxf(furthest["glue_t"], 1.5)
                                                 Jukebox.sfx("ps_teleport", -10.0)
                                                 _fx_spawn("spark", furthest["spr"].position, 0.4, Color(0.6, 1.0, 0.5))
@@ -1302,7 +1596,7 @@ func _tick_specials(f: Dictionary, g: Dictionary, delta: float, rng_px: float) -
                                 t["bf"] = float(t.get("bf", 0.0)) - delta
                                 if float(t["bf"]) <= 0.0:
                                         t["bf"] = 6.0
-                                        for b in bloons:
+                                        for b in _grid_near(f["pos"], rng_px):
                                                 if bool(PDData.BLOONS[b["kind"]].get("blimp", false)) and (b["spr"] as Sprite2D).position.distance_to(f["pos"]) <= rng_px:
                                                         b["stun_t"] = maxf(b["stun_t"], float(g.get("blimp_freeze", 1.2)))
                                                         _fx_spawn("snow", b["spr"].position, 0.5)
@@ -1314,7 +1608,7 @@ func _tick_specials(f: Dictionary, g: Dictionary, delta: float, rng_px: float) -
                                 if float(t["storm"]) <= 0.0:
                                         t["storm"] = float(g["storm_every"])
                                         var in_rng := []
-                                        for b in bloons:
+                                        for b in _grid_near(f["pos"], rng_px):
                                                 if (b["spr"] as Sprite2D).position.distance_to(f["pos"]) <= rng_px:
                                                         in_rng.append(b)
                                         if in_rng.size() > 0:
@@ -1352,7 +1646,7 @@ func _plant_trap(f: Dictionary, rng_px: float) -> void:
 func _tick_traps(delta: float) -> void:
         for tr in traps.duplicate():
                 tr["t"] -= delta
-                for b in bloons.duplicate():
+                for b in _grid_near(tr["spr"].position, 0.45 * CELL):
                         if (b["spr"] as Sprite2D).position.distance_to(tr["spr"].position) < 0.45 * CELL:
                                 _hurt_bloon(b, float(tr["dps"]) * delta, PDData.FIRE, tr["src"], true)
                                 b["burn_t"] = maxf(b["burn_t"], 1.2)
@@ -1486,7 +1780,7 @@ func _tick_bullets(delta: float) -> void:
                                 b["pos"] += (b["vel"] as Vector2) * delta
                                 (b["spr"] as Sprite2D).position = b["pos"]
                                 b["life"] = float(b["life"]) - delta
-                                for blo in bloons.duplicate():
+                                for blo in _grid_near(b["pos"], 0.4 * CELL):
                                         var bid: int = blo["id"]
                                         if (b["hit_ids"] as Dictionary).has(bid):
                                                 continue
@@ -1505,7 +1799,7 @@ func _tick_bullets(delta: float) -> void:
                                                 else:
                                                         _hurt_bloon(blo, float(b["dmg"]), String(b["cls"]), b["src"])
                                                         if float(b.get("aoe", 0.0)) > 0.0:
-                                                                for o in bloons.duplicate():
+                                                                for o in _grid_near(b["pos"], float(b["aoe"]) * CELL):
                                                                         if o != blo and (o["spr"] as Sprite2D).position.distance_to(b["pos"]) < float(b["aoe"]) * CELL:
                                                                                 _hurt_bloon(o, float(b["dmg"]) * 0.6, String(b["cls"]), b["src"], true)
                                                                                 if float(b["burn_dps"]) > 0.0:
@@ -1533,7 +1827,7 @@ func _tick_bullets(delta: float) -> void:
                                         b["pos"] = to.lerp(from, (tt - half) / (float(b["dur"]) - half))
                                 (b["spr"] as Sprite2D).position = b["pos"]
                                 (b["spr"] as Sprite2D).rotation += delta * 16.0
-                                for blo in bloons.duplicate():
+                                for blo in _grid_near(b["pos"], 0.4 * CELL):
                                         var bid: int = blo["id"]
                                         if (b["hit_ids"] as Dictionary).has(bid):
                                                 continue
@@ -1562,7 +1856,7 @@ func _explosion(b: Dictionary) -> void:
         Jukebox.sfx("ps_boom", -6.0, randf_range(0.9, 1.1))
         var dmg: float = float(b["dmg"])
         var cls := PDData.EXPLOSION
-        for blo in bloons.duplicate():
+        for blo in _grid_near(at, float(b["blast"]) * CELL + 0.3 * CELL):
                 var d2: float = (blo["spr"] as Sprite2D).position.distance_to(at)
                 if d2 <= float(b["blast"]) * CELL + 0.3 * CELL:
                         var use := dmg
@@ -1715,18 +2009,26 @@ func _build_menu() -> void:
         var inf := Arc.label("INFLICTED %d" % int(float(f.get("inflicted", 0.0))), _fs(15), Color(0.8, 0.78, 0.7))
         vb.add_child(inf)
         menu_box.set_meta("inflicted_lbl", inf)
-        # the buttons
-        var cost := PDData.up_cost(fid, lvl)
-        var up := Arc.coin_button("UPGRADE  %d" % cost, Vector2(0, 46), _fs(20), Arc.ACCENT, func():
-                _do_upgrade(f))
-        up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        vb.add_child(up)
+        # THE BUTTON TRUTH LAW: the level door UPGRADES; the gear door GEAR
+        # UPS; a maxed folk speaks MAX and never wears a fake price again
+        menu_box.set_meta("up_btn", null)
+        menu_box.set_meta("gear_btn", null)
+        if lvl < 10:
+                var cost := PDData.up_cost(fid, lvl)
+                var up := Arc.coin_button("UPGRADE  %d" % cost, Vector2(0, 46), _fs(20), Arc.ACCENT, func():
+                        _do_upgrade(f))
+                up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                vb.add_child(up)
+                menu_box.set_meta("up_btn", up)
+                menu_box.set_meta("up_cost", cost)
         if lvl >= 10 and gear < 3:
                 var gcost := PDData.gear_cost(fid, gear)
                 var gb := Arc.coin_button("GEAR UP  %d" % gcost, Vector2(0, 46), _fs(20), Color(1.0, 0.62, 0.1), func():
                         _do_gearup(f))
                 gb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 vb.add_child(gb)
+                menu_box.set_meta("gear_btn", gb)
+                menu_box.set_meta("gear_cost", gcost)
         if gear >= 3 and lvl >= 10:
                 vb.add_child(Arc.label("THE FINAL GEAR", _fs(15), Color(1, 0.85, 0.4)))
         var row2 := HBoxContainer.new()
@@ -1739,19 +2041,26 @@ func _build_menu() -> void:
                 _build_menu())
         tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         row2.add_child(tb)
-        var sell_price := int(float(PDData.FOLK[fid]["place"]) * 0.5 * float(lvl) * PDData.SELL_RATIO) + int(PDData.FOLK[fid]["place"]) / 3
+        var sell_price := int(float(f.get("invested", int(PDData.FOLK[fid]["place"]))) * PDData.SELL_RATIO)
         var sb := Arc.button("SELL %d" % sell_price, Vector2(0, 42), _fs(18), Arc.BAD, func():
                 _do_sell(f))
         sb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         row2.add_child(sb)
-        _paint_menu_afford(cost)
+        _paint_menu_afford()
 
-func _paint_menu_afford(cost: int) -> void:
-        # gray the UPGRADE button when the wallet can't sing
-        for n in menu_box.find_children("*", "Button", true, false):
-                var b := n as Button
-                if b.text.begins_with("UPGRADE"):
-                        b.modulate = Color(1, 1, 1) if coins >= cost else Color(0.5, 0.5, 0.5, 0.8)
+func _paint_menu_afford() -> void:
+        # THE GRAY LAW: the wallet speaks through the buttons - an upgrade or
+        # gear door the purse cannot open wears gray (live, on every coin)
+        if menu_box == null or not is_instance_valid(menu_box) or menu_box.get_child_count() == 0:
+                return
+        var up: Button = menu_box.get_meta("up_btn", null)
+        if up != null and is_instance_valid(up):
+                var c := int(menu_box.get_meta("up_cost", 0))
+                up.modulate = Color(1, 1, 1) if coins >= c else Color(0.45, 0.45, 0.45, 0.85)
+        var gb: Button = menu_box.get_meta("gear_btn", null)
+        if gb != null and is_instance_valid(gb):
+                var gc := int(menu_box.get_meta("gear_cost", 0))
+                gb.modulate = Color(1, 1, 1) if coins >= gc else Color(0.45, 0.45, 0.45, 0.85)
 
 func _stat_text(key: String, v: float) -> String:
         match key:
@@ -1804,6 +2113,7 @@ func _do_upgrade(f: Dictionary) -> void:
                 return
         coins -= cost
         f["lvl"] = int(f["lvl"]) + 1
+        f["invested"] = int(f.get("invested", 0)) + cost
         Jukebox.sfx("ps_upgrade", -6.0)
         _fx_spawn("spark", f["pos"], 0.5, Color(1, 0.9, 0.5))
         _recompute_auras()
@@ -1820,6 +2130,7 @@ func _do_gearup(f: Dictionary) -> void:
         coins -= cost
         f["gear"] = gear + 1
         f["lvl"] = 1
+        f["invested"] = int(f.get("invested", 0)) + cost
         if f["gear"] == 3:
                 meta.d["gears3"] = int(meta.d["gears3"]) + 1
                 achievement_max("gears3", int(meta.d["gears3"]))
@@ -1849,7 +2160,8 @@ func _do_gearup(f: Dictionary) -> void:
         _build_menu()
 
 func _do_sell(f: Dictionary) -> void:
-        var back := int(float(PDData.FOLK[f["fid"]]["place"]) * 0.5 * float(f["lvl"]) * PDData.SELL_RATIO) + int(PDData.FOLK[f["fid"]]["place"]) / 3
+        # THE SELL LAW: 70% of EVERYTHING invested (place + upgrades + gears)
+        var back := int(float(f.get("invested", int(PDData.FOLK[f["fid"]]["place"]))) * PDData.SELL_RATIO)
         coins += back
         folk.erase(f)
         (f["node"] as Node2D).queue_free()
@@ -1863,10 +2175,11 @@ func _do_sell(f: Dictionary) -> void:
 func _game_over() -> void:
         if over:
                 return
-        over = true
         phase = "over"
-        # THE DEATH MENU LAW: every sheet dies FIRST and the tree unpauses, so
-        # the host's dead menu ALWAYS surfaces (the open-shop death bug)
+        # THE DEATH MENU LAW: every sheet dies FIRST and the tree unpauses;
+        # over stays FALSE until finish_run flips it - the old pre-set guard
+        # made finish_run bail and the death menu NEVER surface (the owner's
+        # "when lose, the death menu does not show up")
         while _sheet_stack.size() > 0:
                 sheet_pop()
         get_tree().paused = false
@@ -1900,10 +2213,16 @@ func _maps_open() -> void:
 func _build_maps(vb: VBoxContainer) -> void:
         # THE MAPS WALL: the two-column thumbs, directly scrollable (BoxScroll
         # owns the raw touch - scroll works even when the finger hits a card)
-        vb.add_child(Arc.label("THE MAPS", _fs(30), Arc.INK))
-        var wallet := Arc.coin_chip()
-        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        vb.add_child(wallet)
+        # THE CLOSE LAW: every game sheet wears its own X (the owner's round)
+        var head := HBoxContainer.new()
+        head.add_theme_constant_override("separation", 10)
+        vb.add_child(head)
+        head.add_child(Arc.label("THE MAPS", _fs(30), Arc.INK))
+        var spacer := Control.new()
+        spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        head.add_child(spacer)
+        head.add_child(Arc.coin_chip())
+        head.add_child(Arc.button("X", Vector2(56, 56), 26, Arc.BAD, func(): sheet_pop()))
         var vp := get_viewport_rect().size
         var sc := BoxScroll.new()
         sc.game_safe = true
@@ -1973,7 +2292,7 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
                         Jukebox.sfx("ps_click", -10.0)
                         _maps_open())
                 row.add_child(dn_btn)
-        var action := Arc.button("PLAY", Vector2(0, 42), _fs(18), Arc.GOOD, func(): pass)
+        var action := Arc.button("PLAY", Vector2(0, 46), _fs(18), Arc.GOOD, func(): pass)
         if owned:
                 if map["id"] == m["id"]:
                         action.text = "HERE"
@@ -2000,13 +2319,15 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
 
 func _coin_price(txt: String) -> Control:
         var h := HBoxContainer.new()
-        h.add_theme_constant_override("separation", 4)
+        h.add_theme_constant_override("separation", 5)
         var ic := TextureRect.new()
         ic.texture = load("res://assets/ui/coin.png")
-        ic.custom_minimum_size = Vector2(22, 22)
+        ic.custom_minimum_size = Vector2(28, 28)
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.add_child(ic)
-        h.add_child(Arc.label(txt, _fs(18), Color(0.75, 0.5, 0.05)))
+        h.add_child(Arc.label(txt, _fs(20), Color(0.75, 0.5, 0.05)))
         return h
 
 func _switch_map(mid: String) -> void:
@@ -2025,14 +2346,17 @@ func _shop_open() -> void:
 
 func _build_shop(vb: VBoxContainer) -> void:
         # THE SHOP LAWS: WIDER sheet, BoxScroll body (scroll under the finger,
-        # rows stay tappable - the registered-tappable law), one wallet chip
+        # rows stay tappable - the registered-tappable law), one wallet chip,
+        # and THE CLOSE LAW: the sheet wears its own X
         var head := HBoxContainer.new()
+        head.add_theme_constant_override("separation", 10)
         vb.add_child(head)
         head.add_child(Arc.label("THE SHOP", _fs(30), Arc.INK))
         var spacer := Control.new()
         spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         head.add_child(spacer)
         head.add_child(Arc.coin_chip())
+        head.add_child(Arc.button("X", Vector2(56, 56), 26, Arc.BAD, func(): sheet_pop()))
         var vp := get_viewport_rect().size
         var sc := BoxScroll.new()
         sc.game_safe = true
@@ -2082,7 +2406,7 @@ func _shop_folk_row(fid: String) -> Control:
                 var free_txt := "FREE" if int(fdef["goga"]) == 0 else "OWNED"
                 h.add_child(Arc.label(free_txt, _fs(18), Arc.GOOD))
         else:
-                var buy := Arc.coin_button("BUY %d" % int(fdef["goga"]), Vector2(150, 48), _fs(18), Arc.ACCENT, func():
+                var buy := Arc.coin_button("BUY %d" % int(fdef["goga"]), Vector2(210, 56), _fs(20), Arc.ACCENT, func():
                         if Box.spend(int(fdef["goga"])):
                                 meta.gogabuy_folk(fid)
                                 Jukebox.sfx("ps_gogacoin", -4.0)
@@ -2125,7 +2449,7 @@ func _shop_map_row(m: Dictionary) -> Control:
                 var free_txt := "FREE" if int(m["price"]) == 0 else "OWNED"
                 h.add_child(Arc.label(free_txt, _fs(18), Arc.GOOD))
         else:
-                var buy := Arc.coin_button("BUY %d" % int(m["price"]), Vector2(150, 48), _fs(18), Arc.ACCENT, func():
+                var buy := Arc.coin_button("BUY %d" % int(m["price"]), Vector2(210, 56), _fs(20), Arc.ACCENT, func():
                         if Box.spend(int(m["price"])):
                                 meta.gogabuy_map(m["id"])
                                 Jukebox.sfx("ps_gogacoin", -4.0)
@@ -2187,3 +2511,24 @@ class HpBar extends Node2D:
                         col = Color(0.95, 0.75, 0.25)
                 if ratio > 0.01:
                         draw_rect(Rect2(-w / 2, 0, w * ratio, h), col)
+
+class StripDraw extends Node2D:
+        ## THE STRIPS LAW made visible: each band hides a bloon of that color
+        ## (the counts never show). Drawn over the bloon body in TEXTURE local
+        ## coords (the parent sprite's scale applies - one draw, no nodes).
+        var bloons_ref
+        var game                # the pop_siege (the KIND_COLORS table lives there)
+        func _draw() -> void:
+                if bloons_ref == null or not is_instance_valid(bloons_ref.get("spr")):
+                        return
+                var strips: Array = bloons_ref.get("strips", [])
+                if strips.is_empty():
+                        return
+                var tex: Texture2D = (bloons_ref["spr"] as Sprite2D).texture
+                var tw := float(tex.get_width()) * 0.74
+                var th := float(tex.get_height())
+                var bh := th / float(strips.size() + 2)
+                for i in strips.size():
+                        var col: Color = game.KIND_COLORS.get(String(strips[i]), Color(0.8, 0.8, 0.8))
+                        var y := th * 0.5 - (strips.size() * bh) * 0.5 + i * bh
+                        draw_rect(Rect2(-tw / 2, y, tw, maxf(2.0, bh * 0.66)), Color(col.r, col.g, col.b, 0.85))

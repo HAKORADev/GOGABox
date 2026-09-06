@@ -204,3 +204,31 @@ ritual, matcher-style. Achievements: pop_1000, moab_1, wave_25, gear3_any.
 8. THE FREE TRIO LAW - 3 folk + 3 maps free; the rest are GOGACoins, never steep.
 9. THE BLOCKED LAW - props block cells; green/red drag feedback + tick sfx.
 10. THE SMOOTH LAW - pooled, capped, no per-frame trash.
+
+## 17. PATCH 2 - THE WHEEL LAWS (v0.3.5-2)
+
+11. THE GRID LAW - the roads ARE grid cells (full-cell paint, merged rounded
+    corners); 9 archetypes x per-map mirrors; the 3-lane wide highway; props
+    wall 36-46% of the free land; ground chevrons mark every door.
+12. THE WHEEL LAW - color levels 1..12 (crack cost = base + L - 1, the total
+    is the pyramid, over-damage spills); 8 wheel art variants per kind.
+13. THE STRIPS LAW - up to 10 bands on balloons / 50 on blimps; each band
+    hides a bloon of its color; counts never show; inner bloons can be
+    striped (depth 2).
+14. THE ARMOR LAW - metal (fire only) from wave 22, rock (bombs only) from
+    wave 26; the shell eats the hit first; wrong class = clink.
+15. THE BLIMP TIERS - moab -> brutus -> gargantua -> titan (shapes are tiers,
+    colors are contents).
+16. THE POP PAY LAW v2 - a PopCoin per damage dealt; score = damage; the
+    threat (leak) counts the whole chain + levels + strips.
+17. THE FIRST WAVE LAW - wave 1 never rides a timer; AUTO clocks only the
+    between-waves space; MANUAL has no clock at all.
+18. THE DRAG LAW - tap-tap AND press-drag-release placement; range rings on
+    place AND select; every range finite (the CELL x CELL typo is dead).
+19. THE DEATH MENU LAW - `over` belongs to finish_run; game over pops every
+    sheet, unpauses, and FIRES.
+20. THE CLOSE LAW - the shop and the maps wall wear their own X.
+21. THE CORE LAW - the bucket grid + segment caches + capped fx keep
+    thousands of bloons at a real 60 (run/max_fps).
+22. THE GEAR DOOR - gear-ups cost 2800..15000; upgrades climb at 1.22;
+    sell pays 70% of everything invested; broke doors gray live.
