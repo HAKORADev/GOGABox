@@ -40,7 +40,6 @@ const GAMES := [
                 # v0.1.8: BOTH orientations - the mode is chosen once, when
                 # the game loads, from how the phone is held right then.
                 "orientation": "auto", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 2, "price": 0, "fee": 10, "shop": true,
                 "banner": true,
                 # v0.1.5 SHARED ENTRY POLICY (was the v0.1.4 snake-only
@@ -56,7 +55,6 @@ const GAMES := [
                         "power fruits wear auras: slower, faster, ghost, magnet, golden, wither, SPRINT/SLOG (+/-50% speed FOREVER), snake-eater - it bites tails AND your own body costs length, not the run",
                         "PLACES live in the shop: classic is free, the day garden (sun + shadows) and the night garden (moon, stars and tiny flies) cost GOGACoins",
                         "bugs steal the fruit and bite (never death); obstacles kill everyone; big enemies try to wrap around you - the run only ends when YOU die"],
-                        "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the head bends where the cursor moves"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [
@@ -71,7 +69,6 @@ const GAMES := [
                 "script": "res://game/games/rally/pong.gd",
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "auto", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 4, "price": 150, "fee": 8, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
@@ -79,7 +76,6 @@ const GAMES := [
                 "daily_rounds": 6,   # v0.1.4: 6 rounds a day, resets 12AM 00:00
                 "desc": "Real pong now: goals pay points, every hit heats the ball x1.1 until it burns red, coins and powerups ride the court, and the extra walls hunt YOU. The pause menu's END banks the run.",
                 "controls": ["hold anywhere - your platform follows the finger along its axis", "a goal for you +1, a goal on you -1", "every hit heats the ball x1.1 until the next serve", "END in the pause menu banks the earnings"],
-                "controls_pc": ["LEFT / RIGHT arrow keys move the paddle (UP/DOWN on a vertical field)"],
                 "genres": {"main": ["arcade", "sports"], "sub": ["retro", "competitive", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -112,7 +108,6 @@ const GAMES := [
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 50, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
@@ -130,7 +125,6 @@ const GAMES := [
                         "weapon power ladders 0/1/3/6/10/15/20 PER weapon - dying drops the held weapon 3 rungs",
                         "some ships wear shield bubbles; shatter carriers spin invulnerable shards - shoot the gap that faces you; rare UFO elites fire shotguns",
                         "the shop sells ship skins, the laser/thunder/bomb weapons (they join the loot), the shield power, and 3 spaces - no options menu, just fly"],
-                        "controls_pc": ["LEFT / RIGHT arrow keys change lanes", "SPACE holds the fire"],
                 "genres": {"main": ["action", "arcade", "shooter"], "sub": ["retro", "singleplayer", "survival"]},
                 "age": "everyone",
                 "ach": [
@@ -150,7 +144,6 @@ const GAMES := [
                 "script": "res://game/games/slasher/slasher.gd",
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "auto", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 15, "price": 250, "fee": 15, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
@@ -166,7 +159,6 @@ const GAMES := [
                         "a GOGACoin flies by every 20 seconds - slash it like a fruit",
                         "the shop's vegetable basket (1500) adds a fruits/vegetables toggle in the options",
                 ],
-                "controls_pc": ["hold the LEFT MOUSE BUTTON and swipe across the fruit"],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -204,7 +196,6 @@ const GAMES := [
                 "script": "res://game/games/hopper/hopper.gd",
                 "thumb": "res://assets/thumbs/hopper.png",
                 "orientation": "portrait", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 10, "price": 300, "fee": 12, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
@@ -225,7 +216,6 @@ const GAMES := [
                         "past 30 a new kind joins: SIZE platforms that breathe wide and small; past 50: DROPPERS that drop away when you land on them, wait, then rise back - jump off in time",
                         "vanish platforms crack (jagged, growing cracks) and SHATTER into chunks; blinking platforms take their snow with them when they blink",
                         "the shop sells characters (ball/square/triangle/egg, each its own physics and its own real tumbling), platform skins (sand/rock/metal/grass), the night place, the powerups and MELTING"],
-                        "controls_pc": ["LEFT / RIGHT arrow keys run", "SPACE jumps"],
                 "genres": {"main": ["arcade", "adventure"], "sub": ["platformer", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -240,7 +230,6 @@ const GAMES := [
                 "script": "res://game/games/merge/merge2048.gd",
                 "thumb": "res://assets/thumbs/merge.png",
                 "orientation": "portrait", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 20, "price": 400, "fee": 15, "shop": true,
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
@@ -256,7 +245,6 @@ const GAMES := [
                         "big tiles pulse the board gold; reach 2048 and the run keeps going",
                         "the run ends when no move is left - plan the corners",
                 ],
-                "controls_pc": ["the ARROW keys slide the board"],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "turnbased", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -272,7 +260,6 @@ const GAMES := [
                 "script": "res://game/games/dario/dario.gd",
                 "thumb": "res://assets/thumbs/dario.png",
                 "orientation": "landscape", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 10, "price": 350, "fee": 100, "shop": true,
                 "reveal": {"kind": "chain"},
                 "banner": true,   # the ground rises above the strip
@@ -288,7 +275,6 @@ const GAMES := [
                         "the shop sells the night sky (wear it or take it off) and the powerups: STRONG FOOT, THE SHIELD, POWER JUMP",
                         "grab every trophy. Beat the Witcher. Escape. (You won't.)",
                 ],
-                "controls_pc": ["LEFT / RIGHT arrow keys run", "SPACE jumps"],
                 "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "story", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -305,7 +291,6 @@ const GAMES := [
                 "script": "res://game/games/xo/xo.gd",
                 "thumb": "res://assets/thumbs/xo.png",
                 "orientation": "portrait", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 2, "price": 450, "fee": 10, "shop": false,
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "chain"},
@@ -317,7 +302,6 @@ const GAMES := [
                         "after every 3 rounds a GOGACoin grows in an empty cell - mark that cell FIRST and it is yours (the CPU can take it too)",
                         "the bank is in the pause sheet: END ends the run and pays",
                 ],
-                "controls_pc": ["click a square with the mouse"],
                 "genres": {"main": ["strategy", "puzzle"], "sub": ["turnbased", "competitive", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -337,7 +321,6 @@ const GAMES := [
                 "script": "res://game/games/matcher/matcher.gd",
                 "thumb": "res://assets/thumbs/matcher.png",
                 "orientation": "portrait", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 300, "price": 400, "fee": 10, "shop": true,
                 "banner": true,   # the rail seats itself above the strip
                 "charge_unlock": 100,
@@ -357,7 +340,6 @@ const GAMES := [
                         "ICE CRASH: layered ice 1-5 (gems fall straight through it) - hits INSIDE the ice crack one layer, level 6 is a ROCK only specials crack; no damage this move = it spreads",
                         "DROP DOWN: parcels enter at the top line and trade places downward every move - deliver them all before the moves, the clock or both run out (each round rolls one of the three limits)",
                 ],
-                "controls_pc": ["click two tiles with the mouse to swap them"],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["match3", "singleplayer", "relax"]},
                 "age": "everyone",
                 "ach": [
@@ -384,7 +366,6 @@ const GAMES := [
                 "script": "res://game/games/invaders/invaders.gd",
                 "thumb": "res://assets/thumbs/invaders.png",
                 "orientation": "landscape", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 500, "price": 350, "fee": 100, "shop": true,
                 "banner": true,
                 "reveal": {"kind": "chain"},
@@ -399,7 +380,6 @@ const GAMES := [
                         "the shop sells Thunder (an electric beam that chains around itself) and the Bomb Launcher (no ammo, contact fuse only) - the Stage Themes pack paints every world",
                         "bosses 3, 6 and 9 escape at low health and return for the Hideout gauntlet; THE INVADER never truly dies - and neither does the war",
                 ],
-                "controls_pc": ["LEFT / RIGHT arrow keys steer", "SPACE holds the fire"],
                 "genres": {"main": ["shooter", "arcade"], "sub": ["retro", "singleplayer"]},
                 "age": "everyone",
                 "ach": [
@@ -438,7 +418,6 @@ const GAMES := [
                 "script": "res://game/games/cosmic_spud/cosmic_spud.gd",
                 "thumb": "res://assets/thumbs/spud.png",
                 "orientation": "landscape", "dim": "2d",
-                "os": ["android", "pc"],
                 "coin_div": 200, "price": 500, "fee": 50, "shop": true,
                 "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 0, "price": 500, "needs_games": 3},
@@ -454,7 +433,6 @@ const GAMES := [
                         "the skill tree unlocks one node at a time for cosmic coins - OFFENSE, DEFENSE, UTILITY and the LAB that teaches WEAPON MERGING",
                         "the tri-shield's rings only break where you crack them - carve a window through all three rings to reach the core",
                 ],
-                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the invisible stick follows the cursor; the guns aim and fire by themselves"],
                 "genres": {"main": ["shooter", "roguelite"], "sub": ["survival", "singleplayer"]},
                 "age": "teens",
                 "ach": [

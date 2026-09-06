@@ -3,6 +3,18 @@
 **Owner law, set 2026-09-04 (v0.3.3 round):** GitHub Releases are NOT automatic
 anymore and NOT per-build by default.
 
+## THE ANDROID-ONLY LAW
+
+**Owner law, set 2026-09-06 (the v0.3.4-4 android-only revision):** GOGABox
+builds for ANDROID ONLY. No Windows / desktop builds, no forging, no exe
+presets, no PC-only code branches. The owner's words: "we should not do
+windows builds because no way to make money from them at all". The one
+exception that survives the windows era (the owner liked it): the menu's
+NAME SEARCH BAR - but with no example in it, it just asks for a name.
+If a future round is tempted to ship desktop builds again: THIS LAW is the
+answer, the whole rollback is recorded in
+`docs/goga_docs/plans/PLAN_v034p4_ANDROID_ONLY.md`.
+
 ## The rule
 
 - A push to `main` builds via CI - that is the default delivery. **Wait for the

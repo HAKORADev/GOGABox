@@ -220,13 +220,10 @@ include the WORKLOG.md entry with it.
 push needs the PAT (§7).
 
 **CI** — pushes matching `projects/** plugins/** config/** .ci/** tools/**
-build.sh` trigger `build.yml` — THE one action (v0.3.4-4): every `ci_auto`
-project × every APK ABI **plus** the one Windows exe (`GOGABox.exe`, 32-bit,
-official templates, cached) in the same run. No forge. (docs/CI.md).
+build.sh` trigger `build-android` (every `ci_auto` project × every ABI).
 **Docs-only pushes do not trigger CI — that is fine.** Terminal watching:
 `./tools/ci.sh` (list last runs) · `./tools/ci.sh watch` (tail one to
-completion). Cached runs ≈ 8–12 min per ABI, cold ≈ 20–25; the exe job is
-minutes.
+completion). Cached runs ≈ 8–12 min per ABI, cold ≈ 20–25.
 
 **Version bump (GOGABox design rule, owner-locked v0.1.8; THE PATCH NAMING
 LAW, owner-locked v0.3.3-6)** — every new build gets `version_name`

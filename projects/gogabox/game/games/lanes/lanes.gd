@@ -622,7 +622,6 @@ func _press(pos: Vector2, idx := 0) -> void:
                 _tap_fire()
 
 var _fire_idx := -1   # which touch owns the hold (move taps never end it)
-var _kb_fire := false # THE PC LAW: the keyboard's own fire latch (v0.3.4-3)
 
 func _move_lane(dir: int) -> void:
         var target := clampi(lane + dir, 0, LANES - 1)
@@ -895,25 +894,6 @@ func _spawn_enemy(kind: String, lane_i := -1, at := Vector2.ZERO,
 # ================================================================== TICK
 
 func _goga_tick(delta: float) -> void:
-        # THE PC LAW (v0.3.4-3): LEFT/RIGHT arrows change lanes, SPACE holds
-        # the fire. The keyboard owns its own fire latch - a release only
-        # clears `firing` when IT turned it on (the touch finger and the
-        # probes keep full ownership of their own state).
-        if phase == "run" and not paused and not over:
-                if Input.is_action_just_pressed("ui_left"):
-                        _move_lane(-1)
-                if Input.is_action_just_pressed("ui_right"):
-                        _move_lane(1)
-                var space: bool = Input.is_action_pressed("ui_accept")
-                if space and not _kb_fire:
-                        _kb_fire = true
-                        _tap_fire()
-                elif not space and _kb_fire:
-                        _kb_fire = false
-                        if _fire_idx == -1:
-                                firing = false
-                if space:
-                        firing = true
         var vp := get_viewport_rect().size
         frame_floor_ms = maxf(SPAM_FLOOR_MS,
                         1000.0 / maxf(10.0, Engine.get_frames_per_second()))

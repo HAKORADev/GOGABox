@@ -81,7 +81,9 @@ law (no spelled-out GOGACOINS words on the door + the icon present).
 flow_test + every game probe green. qa_v034p4 rigs: shop / door / arena.
 
 ## VERSION
-0.3.4-4 / version_code_base 30510; preset stamps 0.3.4.4; THE one Windows
-preset (`Windows x86_32` → `GOGABox.exe`, architecture x86_32 — the
-hand-written "x86" value never matched the editor's template names and was
-never exported until this patch).
+0.3.4-4 / version_code_base 30511 (android-only revision). THE WINDOWS
+ROUND IS RETIRED — the owner's law after seeing the numbers: no Windows
+builds at all (no way to make money from them), the box is ANDROID-ONLY
+again. The search bar stays (its example placeholder is gone), every PC
+branch / os tag / keyboard control / Windows preset / workflow job from the
+v0.3.4-3+v0.3.4-4 windows era is rolled back to the pre-forge state.

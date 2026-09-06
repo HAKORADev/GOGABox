@@ -79,31 +79,6 @@ ls dist/jellyjump/                # JellyJump-v1.0.0-arm64-v8a.apk + -armeabi-v7
 5. **verify**: `.ci/verify-apk.sh` checks signature, badging, ABI content,
    prints a size summary (`dist/<g>/BUILD_SUMMARY.md`).
 
-## Building for WINDOWS (local, optional - CI does this)
-
-v0.3.4-4: there is ONE Windows build and NO template forging. Use the
-official editor + the official export templates (the same ones the Android
-build bootstraps), extract just the two 32-bit Windows files, and export:
-
-```bash
-# 1. the editor + templates (already in the toolchain cache after bootstrap;
-#    a fresh box extracts only the Android files - add the Windows two)
-curl -fLO https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
-unzip -o Godot_v4.7.2-stable_export_templates.tpz \
-  "templates/windows_release_x86_32.exe" \
-  "templates/windows_release_x86_32_console.exe" -d tmpex
-mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
-mv tmpex/templates/* ~/.local/share/godot/export_templates/4.7.2.stable/
-
-# 2. import + export THE one exe (32-bit; runs on every Windows)
-mkdir -p projects/build
-godot --headless --path projects/gogabox --import
-godot --headless --path projects/gogabox --export-release "Windows x86_32" ../build/GOGABox.exe
-```
-
-`file GOGABox.exe` must read `PE32 executable for MS Windows ... Intel i386`.
-The whole run takes minutes - the multi-hour scons forge is retired.
-
 ## Signing for release
 
 ```bash

@@ -1131,13 +1131,6 @@ func _controls(_delta: float) -> void:
                 var dx := _walk_pos.x - _walk_anchor
                 if absf(dx) > 14.0:
                         target = clampf(dx / 90.0, -1.0, 1.0)
-        # THE PC LAW (v0.3.4-3): LEFT/RIGHT arrows run at a fixed speed,
-        # SPACE jumps
-        var kb := Input.get_axis("ui_left", "ui_right")
-        if kb != 0.0:
-                target = signf(kb)
-        if Input.is_action_just_pressed("ui_accept"):
-                _jump_queued = true
         if _jump_queued and on_floor and not _locked:
                 _jump()
         _jump_queued = false

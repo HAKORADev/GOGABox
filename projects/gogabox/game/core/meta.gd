@@ -56,14 +56,6 @@ const AGES := {
 	"teens": {"label": "TEENS 12+", "icon": "res://assets/meta/age_teens.png"},
 }
 
-# v0.3.4-3 THE PLATFORM LAW: every game wears an os tag (the badge on all
-# games; platform exclusives become possible later). No icons yet - the
-# chip renders text-only.
-const OS_TAGS := {
-	"android": {"label": "PHONE"},
-	"pc": {"label": "PC"},
-}
-
 static func genre_label(id: String) -> String:
 	if GENRES.has(id):
 		return String(GENRES[id]["label"])
@@ -79,19 +71,13 @@ static func age_label(id: String) -> String:
 		return String(AGES[id]["label"])
 	return id.to_upper()
 
-static func os_label(id: String) -> String:
-	if OS_TAGS.has(id):
-		return String(OS_TAGS[id]["label"])
-	return id.to_upper()
-
 static func icon_for(kind: String, id: String) -> String:
-	# kind: "genre" | "sub" | "age" | "os"
+	# kind: "genre" | "sub" | "age"
 	var table := {}
 	match kind:
 		"genre": table = GENRES
 		"sub": table = SUBS
 		"age": table = AGES
-		"os": table = OS_TAGS
 	if table.has(id) and String(table[id].get("icon", "")) != "":
 		return String(table[id]["icon"])
 	return ""

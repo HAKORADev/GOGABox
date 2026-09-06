@@ -68,10 +68,9 @@ var _filter_age := ""
 var _filter_genre := ""
 var _filter_sub := ""
 var _filter_state := ""          # "" = all | "favorites" | "mystery" (single-select)
-# v0.3.4-3 THE SEARCH LAW: a real text search (a piece of the name finds the
-# game: "slash" finds FRUIT SLASHER) + the PLATFORM filter (the os tag).
+# v0.3.4-4 THE SEARCH LAW: a real text search (a piece of the name finds
+# the game) - the owner's wish, kept in the android-only state.
 var _filter_text := ""
-var _filter_os := ""             # "" = all | "android" | "pc"
 
 func _ready() -> void:
         banner_safe = _banner_safe_px()
@@ -240,13 +239,6 @@ func _apply_base() -> void:
                         return
                 want = ScaleRule.want_for(ws)
         var win := get_window()
-        # THE VERTICAL SLICE LAW (v0.3.4-3): the box on PC is a PORTRAIT
-        # slice down the middle of the window, the sides wear the box brown
-        # - never the engine's black, never a stretched menu.
-        if ScaleRule.is_pc() and want == ScaleRule.DESIGN_PORTRAIT:
-                ScaleRule.apply_vertical_slice(win, want)
-        elif ScaleRule.is_pc():
-                ScaleRule.apply_expand(win)
         if win.content_scale_size != want:
                 win.content_scale_size = want
         # v0.1.3: the banner margin follows the REAL stretch scale of THIS
@@ -882,9 +874,6 @@ func _passes_filters(g: Dictionary) -> bool:
                 return false
         if _filter_sub != "" and not (_filter_sub in (geo.get("sub", []) as Array)):
                 return false
-        # THE SEARCH LAW: the platform tag filters (every game wears one now)
-        if _filter_os != "" and not (_filter_os in (g.get("os", ["android", "pc"]) as Array)):
-                return false
         # THE SEARCH LAW: the name search - lowercase, spaces stripped, a
         # SUBSTRING of title+id. "slash" finds FRUIT SLASHER; "inv" finds
         # SPACE INVADERS. Case never matters.
@@ -1288,7 +1277,8 @@ func _open_search() -> void:
         row.add_theme_constant_override("separation", 8)
         vb.add_child(row)
         var search := LineEdit.new()
-        search.placeholder_text = "type a name - 'slash' finds fruit slasher"
+        # v0.3.4-4 (the owner): NO example in the bar - it just asks for a name.
+        search.placeholder_text = "type a name"
         search.text = _filter_text
         search.custom_minimum_size = Vector2(560, 64)
         search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1315,9 +1305,6 @@ func _open_search() -> void:
         v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(v)
 
-        # THE PLATFORM LAW: every game wears an os tag - filter by it
-        v.add_child(_chip_row(scroll, "PLATFORM", ["android", "pc"],
-                        func(id: String): _filter_os = "" if _filter_os == id else id, "os"))
         v.add_child(_chip_row(scroll, "AGE", Meta.used_ages(),
                         func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
         v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
@@ -1347,13 +1334,12 @@ func _open_search() -> void:
                 _filter_sub = ""
                 _filter_state = ""
                 _filter_text = ""
-                _filter_os = ""
                 _close_sheet()
                 _refresh()))
 
 func _filters_dirty() -> bool:
         return _filter_age != "" or _filter_genre != "" or _filter_sub != "" \
-                        or _filter_state != "" or _filter_text != "" or _filter_os != ""
+                        or _filter_state != "" or _filter_text != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -1374,13 +1360,11 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "age": active = _filter_age == sid
                         "genre": active = _filter_genre == sid
                         "sub": active = _filter_sub == sid
-                        "os": active = _filter_os == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
                         "sub": lbl = Meta.sub_label(sid)
                         "age": lbl = Meta.age_label(sid)
-                        "os": lbl = "PHONE" if sid == "android" else "PC"
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -1555,34 +1539,12 @@ func _open_guide(g: Dictionary) -> void:
         about.custom_minimum_size = Vector2(540, 0)
         v.add_child(about)
 
-        # THE PLATFORM LAW (v0.3.4-3): the os badge lives where players read
-        var os_arr: Array = g.get("os", ["android", "pc"])
-        if not os_arr.is_empty():
-                v.add_child(Arc.label("PLATFORMS", 24, Arc.HOT))
-                var prow := HFlowContainer.new()
-                prow.add_theme_constant_override("h_separation", 8)
-                prow.add_theme_constant_override("v_separation", 8)
-                for oid in os_arr:
-                        prow.add_child(Arc.meta_chip("os", String(oid)))
-                v.add_child(prow)
-
         v.add_child(Arc.label("HOW TO PLAY", 24, Arc.HOT))
         for line in g.get("controls", []):
                 var l := Arc.label("- " + String(line), 19, Arc.INK, false)
                 l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 l.custom_minimum_size = Vector2(540, 0)
                 v.add_child(l)
-
-        # THE PC LAW (v0.3.4-3): the guide carries BOTH control schemes -
-        # the phone's touch and the PC's mouse/keyboard, clearly separated
-        var pc_controls: Array = g.get("controls_pc", [])
-        if not pc_controls.is_empty():
-                v.add_child(Arc.label("CONTROLS - PC (WINDOWS BUILD)", 24, Arc.HOT))
-                for pline in pc_controls:
-                        var pl := Arc.label("- " + String(pline), 19, Arc.INK, false)
-                        pl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                        pl.custom_minimum_size = Vector2(540, 0)
-                        v.add_child(pl)
 
         v.add_child(Arc.label("GOOD TO KNOW", 24, Arc.HOT))
         var facts := ""

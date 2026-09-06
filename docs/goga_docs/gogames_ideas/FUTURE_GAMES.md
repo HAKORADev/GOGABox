@@ -252,6 +252,15 @@ one concept two flavors) and the beyblade battling arena.
 - **plants-vs-zombies-like** - PopCap PvZ: lane defense - plant your
   fighters on the grid, harvest the sun economy, stop the wave before it
   crosses the lawn.
+- **vertical-lanes-td** - the same lane defense stood UPRIGHT (the owner:
+  "next to the PvZ-like horizontal TD, another game that should be vertical
+  lines TD"): lanes run top-to-bottom, defenders hold the bottom edge, the
+  drop economy falls from the sky - portrait phones are the natural frame
+  for this one.
+- **zombie-catchers-like** - Zombie Catchers in CONCEPT: stealth and
+  tactical hunting instead of raw shooting - plan the trap, bait the horde,
+  catch quiet, flee loud; the owner wants that sneaky hunter loop
+  ("some Stealth and tactical and like that").
 - **swamp-attack-like** — Swamp Attack, the owner: "a game like swamp attack
   in that concept/type of tower-defense in a different way": defend the
   porch, tap-to-shoot the horde, reload rhythm + power-ups - tower defense

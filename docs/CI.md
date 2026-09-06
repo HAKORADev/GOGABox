@@ -2,40 +2,12 @@
 
 ## Workflows
 
-### `build.yml` — THE one build action (push + manual)
-
-ONE run builds BOTH platforms: the `build` job (the APK matrix) and the
-`windows` job (the exe) run in parallel; `release` (manual only) attaches
-the APKs + the Windows zip.
+### `build-android.yml` — the dispatcher
 
 | trigger | behavior |
 |---|---|
-| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI (release) + the Windows exe |
+| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI in its `abi_presets` (release) |
 | **manual dispatch** | pick `project` + `abi` (`all`/`arm64-v8a`/`armeabi-v7a`) + `build_type` (`release`/`debug`), optional `create_release` |
-
-### The Windows law (v0.3.4-4) — ONE exe, official templates, minutes not hours
-
-The forge era is dead. Three forge attempts burned ~30 minutes each
-compiling templates from source and the export stage never once produced an
-exe. The owner's law now:
-
-- **THE SAME official Godot** the Android build uses (pinned
-  `4.7.2-stable` editor) + **THE SAME official export templates tpz** — the
-  workflow extracts just `windows_release_x86_32.exe` (+ the console
-  wrapper) and seats them in `~/.local/share/godot/export_templates/4.7.2.stable/`.
-- **ONE exe ships**: `GOGABox.exe` (`binary_format/architecture="x86_32"`,
-  `embed_pck=true`) — a 32-bit binary that runs on EVERY Windows: 32-bit
-  natively, 64-bit through WOW64. The `Windows x86_64` preset was deleted.
-- **THE REAL-EXE LAW** (machine-checked): `file` must read
-  `PE32 executable for MS Windows ... Intel i386`, and the size must exceed
-  50 MB (the embedded pck guard).
-- Cached under `win-toolchain-<lock hash>` (editor + the two template
-  files). A cold run costs one tpz download (~1.3 GB); a warm run takes
-  minutes: import → export → verify → `zip -9` as
-  `GOGABox-windows-<version>.zip`.
-- The export path `projects/build/` is created by the job; locally:
-  `mkdir -p projects/build && godot --headless --path projects/gogabox
-  --export-release "Windows x86_32" ../build/GOGABox.exe`.
 
 Job flow: `plan` (generates the matrix with `.ci/ci-matrix.sh` — the same
 script runs locally) → one `build` job per (project, abi) → optional `release`.
@@ -65,7 +37,7 @@ First uncached run ≈ 20–25 min per ABI; cached runs ≈ 8–12 min.
 
 ## Releases
 
-Manual dispatch with `create_release: true` attaches both ABIs + the Windows zip to a GitHub
+Manual dispatch with `create_release: true` attaches both ABIs to a GitHub
 release tagged `<project>-v<version_name>` — project-scoped, so two games
 can both be at v1.0.0 without colliding (older global `v<version>` tags like
 `v1.0.0` remain from before this scheme). Re-running with
@@ -77,7 +49,7 @@ the same version re-uploads (clobbers).
    - `RELEASE_KEYSTORE_B64` — base64 of your release keystore:
      `base64 -w0 release.keystore`
    - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEYSTORE_ALIAS`
-2. Add a decode step before the build step in `build.yml`:
+2. Add a decode step before the build step in `build-android.yml`:
 
 ```yaml
       - name: Decode release keystore
