@@ -45,6 +45,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils mingw-w64-tools
+          # THE POSIX-THREADS LAW: Godot links winpthreads - Ubuntu's mingw
+          # defaults to the win32-thread flavor, so switch both binaries.
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
           python3 -m pip install --quiet scons
       - name: Fetch the pinned Godot source
         run: |
@@ -58,7 +62,7 @@ jobs:
           # optional drivers' SDKs are not needed for this forge
           scons platform=windows target=template_release arch=x86_64 \
             lto=full use_static_cpp=yes debug_symbols=no \
-            d3d12=no winrt=no accesskit=no \
+            d3d12=no angle=no winrt=no accesskit=no \
             custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" \
             -j"$(nproc)"
       - name: THE SSE2 LAW - no SSE4.2-only instructions in the template
@@ -89,6 +93,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-mingw-w64-i686 g++-mingw-w64-i686 binutils mingw-w64-tools
+          sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
+          sudo update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-posix
           python3 -m pip install --quiet scons
       - name: Fetch the pinned Godot source
         run: |
@@ -98,7 +104,7 @@ jobs:
           cd "godot-${GODOT_VERSION}-${GODOT_RELEASE}"
           scons platform=windows target=template_release arch=x86 \
             lto=full use_static_cpp=yes debug_symbols=no \
-            d3d12=no winrt=no accesskit=no \
+            d3d12=no angle=no winrt=no accesskit=no \
             custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" \
             -j"$(nproc)"
       - name: Upload the x86 template
