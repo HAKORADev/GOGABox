@@ -89,6 +89,11 @@ var p_iframe := 0.0
 var p_walk := 0.0
 var p_node: Sprite2D
 var stats := {}                   # the live stat block (see _base_stats)
+# THE INFO LAW (v0.3.5): the run's stat truth - the base snapshot + the
+# up/down ledgers every delta files into (see _apply_stat)
+var stat_base := {}
+var stat_up := {}
+var stat_down := {}
 
 # the entities
 var enemies: Array = []
@@ -202,6 +207,15 @@ func _t(key: String) -> Texture2D:
 
 # ===================================================== THE CSUI (the kit)
 ## the game's own UI kit. NOTHING here touches the box's ui_kit.
+## THE BIG TEXT LAW (v0.3.5, the owner: "the game overall text is too small,
+## it needs to get like 75% bigger with proper UI handling"): ONE multiplier
+## feeds every CSUI helper - the text grows, the buttons grow with it, and
+## the TEXT-FIT measurements stay truthful (they scale through the same door).
+const FS := 1.75
+
+func _fs(sz: int) -> int:
+        return maxi(8, int(round(float(sz) * FS)))
+
 func _cs_box_style(edge := CS_EDGE, bg := CS_BOX) -> StyleBoxFlat:
         var st := StyleBoxFlat.new()
         st.bg_color = bg
@@ -246,11 +260,11 @@ func _cs_font() -> Font:
 ## box dynamically fit the text"): no CSUI box may GUESS its size. Measure
 ## the real string with the real font, then size the box to the measurement.
 func _cs_text_w(txt: String, sz: int) -> float:
-        return _cs_font().get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+        return _cs_font().get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(sz)).x
 
 func _cs_text_h(txt: String, sz: int, w: float) -> float:
         return _cs_font().get_multiline_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT,
-                        w, sz, -1, TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
+                        w, _fs(sz), -1, TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
                         | TextServer.BREAK_ADAPTIVE).y
 
 ## a label that steps its own font size down until it fits max_w
@@ -286,7 +300,7 @@ func _cs_label(txt: String, sz: int, col: Color, parent: Node = null) -> Label:
         var l := Label.new()
         l.text = txt
         l.add_theme_font_override("font", _cs_font())
-        l.add_theme_font_size_override("font_size", sz)
+        l.add_theme_font_size_override("font_size", _fs(sz))
         l.add_theme_color_override("font_color", col)
         if parent != null:
                 parent.add_child(l)
@@ -296,7 +310,7 @@ func _cs_button(txt: String, sz: int, col: Color, cb: Callable) -> Button:
         var b := Button.new()
         b.text = txt
         b.add_theme_font_override("font", _cs_font())
-        b.add_theme_font_size_override("font_size", sz)
+        b.add_theme_font_size_override("font_size", _fs(sz))
         b.add_theme_color_override("font_color", col)
         b.add_theme_color_override("font_hover_color", col.lightened(0.25))
         b.add_theme_color_override("font_pressed_color", col.darkened(0.2))
@@ -327,7 +341,7 @@ func _cs_coin_button(txt: String, sz: int, col: Color, cb: Callable) -> Button:
         h.add_child(l)
         var c := TextureRect.new()
         c.texture = load("res://assets/ui/coin.png")
-        c.custom_minimum_size = Vector2(sz + 10, sz + 10)
+        c.custom_minimum_size = Vector2(_fs(sz) + 10, _fs(sz) + 10)
         c.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         c.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         c.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -359,7 +373,7 @@ func sheet_open_count() -> int:
         return cs_sheets.size()
 
 func _cs_open(title: String, build: Callable, col: Color = CS_YELLOW,
-                closable := true) -> VBoxContainer:
+                closable := true, id := "cs") -> VBoxContainer:
         get_tree().paused = true
         paused = true
         var root := _overlay_root_ref()
@@ -400,7 +414,7 @@ func _cs_open(title: String, build: Callable, col: Color = CS_YELLOW,
         if closable:
                 var x := _cs_button("X", 16, CS_RED, func(): _cs_close_top())
                 bh.add_child(x)
-        var sheet := {"dim": dim, "panel": panel, "box": box, "id": "cs",
+        var sheet := {"dim": dim, "panel": panel, "box": box, "id": id,
                         "closable": closable}
         cs_sheets.append(sheet)
         build.call(box)
@@ -408,13 +422,40 @@ func _cs_open(title: String, build: Callable, col: Color = CS_YELLOW,
 
 func _cs_close_top() -> void:
         if cs_sheets.is_empty():
+                # THE RESUME LAW's self-heal: a stranded break (no sheet at
+                # all) comes back to the market on the very next close/back
+                _resume_break()
+                return
+        _cs_pop_top()
+        if cs_sheets.is_empty():
+                # THE RESUME LAW (v0.3.5): the X / CLOSE buttons carry the same
+                # safety the Android back always had - a break that lost its
+                # last sheet falls back to the market, never stranded.
+                _resume_break()
+        elif String(cs_sheets.back()["id"]) == "door":
+                _door_reveal_refresh()
+        Jukebox.sfx("ui_click", -10.0)
+
+## the RAW pop: the break-chain steps use this (each step opens the next
+## sheet itself - no resume, no door refresh, no double-opens)
+func _cs_pop_top() -> void:
+        if cs_sheets.is_empty():
                 return
         var s: Dictionary = cs_sheets.pop_back()
         (s["dim"] as Control).queue_free()
         if cs_sheets.is_empty():
                 get_tree().paused = false
                 paused = false
-        Jukebox.sfx("ui_click", -10.0)
+
+## THE FRESH DOOR LAW (v0.3.5, the owner: "i bought the other theme and
+## closed shop, the optionals menu still tells me to buy the place - it
+## should get updated"): whenever a close reveals THE DOOR, the door
+## rebuilds from LIVE state - a purchase under any sheet can never leave
+## a stale card on it.
+func _door_reveal_refresh() -> void:
+        if phase != "boot" or cs_sheets.is_empty():
+                return
+        _cs_reopen(func(): _optionals_open())
 
 func _cs_close_all() -> void:
         while not cs_sheets.is_empty():
@@ -486,6 +527,7 @@ func _goga_setup() -> void:
         world.add_child(fx)
         _build_player()
         _build_hud()
+        add_hud_button("INFO", func(): _info_open())
         add_hud_button("SHOP", func(): _shop_button())
         add_hud_button("TREE", func(): _tree_open())
         var theme: Dictionary = CSData.THEMES[theme_id]
@@ -781,6 +823,13 @@ func _build_hud() -> void:
         # the box chrome FIRST (its canvas layer + overlay root + back button),
         # then the game's own widgets on top - the box labels hide after
         super._build_hud()
+        # THE TOP BUTTONS LAW (v0.3.5, the owner: "first time it let me open
+        # the shop from the top button, but now it's not"): the box's top bar
+        # (the "<" back + the SHOP button) processes while the CS sheets
+        # pause the tree - the top buttons answer EVERY time now, over every
+        # sheet. The BACK LAW still guards the door.
+        if _hud_row != null and is_instance_valid(_hud_row):
+                _hud_row.process_mode = Node.PROCESS_MODE_ALWAYS
         # THE CHIP LAW: the whole chrome chips vanish (score chip + coin chip)
         var sc_chip := _score_chip_ref()
         var cc_chip := _coins_chip_ref()
@@ -801,12 +850,13 @@ func _build_hud() -> void:
         # THE HONEST METERS LAW: plain-Control meters + free-floating labels.
         # HP: the fill MOVES for each HP (animated approach) and its color
         # runs a continuous green -> yellow -> red by the true ratio.
-        hp_meter = _cs_meter(300, 26, CS_GREEN)
+        hp_meter = _cs_meter(300, 34, CS_GREEN)
         left.add_child(hp_meter)
         hp_meter.get_meta("set_ratio").call(1.0, CS_GREEN)   # full at boot
         hp_txt = _cs_label("", 12, CS_WHITE)
         hp_meter.add_child(hp_txt)
         var sub := HBoxContainer.new()
+        sub.add_theme_constant_override("separation", 12)
         left.add_child(sub)
         arm_txt = _cs_label("ARM 0", 12, CS_BLUE)
         sub.add_child(arm_txt)
@@ -814,10 +864,10 @@ func _build_hud() -> void:
         lvl_txt.custom_minimum_size = Vector2(64, 0)
         sub.add_child(lvl_txt)
         # the XP bar (blue, honest: run_xp / xp needed for the next level)
-        xp_meter = _cs_meter(300, 12, CS_BLUE)
+        xp_meter = _cs_meter(300, 14, CS_BLUE)
         left.add_child(xp_meter)
         # the wave box with its time bar
-        var wave_box := _cs_black_box(left, Vector2(300, 30))
+        var wave_box := _cs_black_box(left, Vector2(300, 42))
         var wv := VBoxContainer.new()
         wave_box.add_child(wv)
         wave_txt = _cs_label("WAVE 1", 12, CS_YELLOW)
@@ -827,13 +877,13 @@ func _build_hud() -> void:
         # ---- THE RIGHT STACK (the owner's two live here): cosmic coins,
         # SCORE, KILLS, GOGACoins - one black box each, big enough to read
         var right := VBoxContainer.new()
-        right.position = Vector2(get_viewport_rect().size.x - 192, 116)
-        right.custom_minimum_size = Vector2(180, 0)
+        right.position = Vector2(get_viewport_rect().size.x - 266, 116)
+        right.custom_minimum_size = Vector2(250, 0)
         right.add_theme_constant_override("separation", 4)
         root.add_child(right)
         # the cosmic coins (THE BIG WIDGET - the owner: "the cosmic coins
         # widget is small too")
-        var cc := _cs_black_box(right, Vector2(180, 38))
+        var cc := _cs_black_box(right, Vector2(250, 46))
         var h := HBoxContainer.new()
         h.add_theme_constant_override("separation", 6)
         cc.add_child(h)
@@ -841,14 +891,14 @@ func _build_hud() -> void:
         cc_txt = _cs_label("0", 18, CS_YELLOW)
         h.add_child(cc_txt)
         # SCORE (yellow) + KILLS (red) - the two the owner named
-        var sc_box := _cs_black_box(right, Vector2(180, 32))
+        var sc_box := _cs_black_box(right, Vector2(250, 40))
         var h3 := HBoxContainer.new()
         h3.add_theme_constant_override("separation", 6)
         sc_box.add_child(h3)
         h3.add_child(_cs_icon(_t("star"), 18))
         score_txt = _cs_label("SCORE 0", 15, CS_YELLOW)
         h3.add_child(score_txt)
-        var kl_box := _cs_black_box(right, Vector2(180, 32))
+        var kl_box := _cs_black_box(right, Vector2(250, 40))
         var h4 := HBoxContainer.new()
         h4.add_theme_constant_override("separation", 6)
         kl_box.add_child(h4)
@@ -872,9 +922,9 @@ func _build_hud() -> void:
         gg_txt = gg_h.get_child(gg_h.get_child_count() - 1) as Label
         gg_txt.text = "0"
         # ---- the boss bar (top center)
-        boss_bar = _cs_black_box(root, Vector2(430, 20))
+        boss_bar = _cs_black_box(root, Vector2(430, 28))
         boss_bar.position = Vector2((get_viewport_rect().size.x - 430) * 0.5, 116)
-        boss_meter = _cs_meter(430, 20, CS_RED)
+        boss_meter = _cs_meter(430, 28, CS_RED)
         boss_bar.add_child(boss_meter)
         boss_txt = _cs_label("", 11, CS_WHITE)
         boss_bar.add_child(boss_txt)
@@ -945,14 +995,14 @@ func _rebuild_slots() -> void:
         for wr in weapons_run:
                 var box := PanelContainer.new()
                 box.add_theme_stylebox_override("panel", _cs_box_style())
-                box.custom_minimum_size = Vector2(46, 46)
+                box.custom_minimum_size = Vector2(60, 60)
                 slot_row.add_child(box)
                 var vb := VBoxContainer.new()
                 vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 box.add_child(vb)
                 var ic := TextureRect.new()
                 ic.texture = _t("icon_" + String(wr["id"]))
-                ic.custom_minimum_size = Vector2(40, 30)
+                ic.custom_minimum_size = Vector2(52, 40)
                 ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
                 ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
                 vb.add_child(ic)
@@ -962,7 +1012,7 @@ func _rebuild_slots() -> void:
                 var cd := ColorRect.new()
                 cd.color = Color(0, 0, 0, 0.55)
                 cd.position = Vector2(2, 2)
-                cd.size = Vector2(0, 42)
+                cd.size = Vector2(0, 54)
                 box.add_child(cd)
                 _slot_widgets.append({"box": box, "cd": cd, "id": wr["id"]})
 
@@ -1079,7 +1129,8 @@ func _fire_weapon(w: Dictionary) -> bool:
         var wd: Dictionary = CSData.WEAPONS[wid]
         var tier: int = int(w["tier"])
         var mult := CSData.tier_mult(tier)
-        var rng: float = float(wd["rng"]) * float(stats["range_m"])
+        var rng: float = float(wd["rng"]) * float(stats["range_m"]) \
+                        * float(mult.get("rng", 1.0))
         var count: int = int(wd["count"]) + int(mult["count"]) + int(stats["proj_add"])
         var target: Variant = _pick_target(rng)
         if target == null:
@@ -1094,6 +1145,25 @@ func _fire_weapon(w: Dictionary) -> bool:
         # THE STARCH RAGE: below 35% HP the potato bites back harder
         if meta.has_skill("starch_rage") and p_hp < p_max_hp * 0.35:
                 base_dmg *= 1.4
+        # THE MELEE LAW (v0.3.5): THE PEEL CLEAVER - one fast arc chop, the
+        # whole swing bites everything inside. No bullet: the arc IS it.
+        if bool(wd.get("melee", false)):
+                var arc: float = float(wd.get("arc", 2.1))
+                for e in enemies.duplicate():
+                        if e.get("dead", false):
+                                continue
+                        var dv: Vector2 = e["pos"] - p_pos
+                        if dv.length() > rng + float(e["size"]) * 0.4:
+                                continue
+                        if absf(angle_difference(base_a, dv.angle())) > arc * 0.5:
+                                continue
+                        _hurt_enemy(e, base_dmg, false)
+                _slash_fx(base_a, rng, arc)
+                Jukebox.sfx(shot_name, -6.0, randf_range(0.94, 1.06))
+                # THE TWIN TAIL answers with a backhand swing
+                if meta.has_skill("twin_tail"):
+                        _slash_fx(base_a + PI, rng * 0.6, arc)
+                return true
         for i in count:
                 var a := base_a
                 if count > 1:
@@ -1146,7 +1216,7 @@ func _spawn_bullet(pos: Vector2, a: float, wd: Dictionary, dmg: float,
         var b := {
                 "pos": pos, "a": a, "spd": float(wd["pspd"]), "dmg": dmg,
                 "pierce": pierce, "hit": {}, "range_left": float(wd["rng"])
-                                * float(stats["range_m"]),
+                                * float(stats["range_m"]) * float(CSData.tier_mult(tier).get("rng", 1.0)),
                 "aoe": float(wd.get("aoe", 0.0)), "burn": bool(wd.get("burn", false))
                                 or bool(stats["burn_hit"]),
                 "chill": float(wd.get("chill", 0.0)), "kind": kind,
@@ -1411,7 +1481,20 @@ func _spawn_enemy(kind: String, pos: Vector2, elite := false) -> Dictionary:
                 e["hurt_m"] = CSData.ELITE_AFFIX["armored"]["hurt"]
         if kind == "trishield":
                 e["rings"] = _mk_rings([90.0, 70.0, 50.0])
+        # THE SPECIAL-KEY LAW (v0.3.5 root-cause fix): the enemy dict carries
+        # its OWN aura/ward/heal numbers - v0.3.4 left them only in the data
+        # table, so the wraith's aura NEVER drew (e.get("aura", 0.0) was
+        # always 0 - the owner only ever saw the ring baked into the art)
+        # and the warden's guard had nothing to read.
+        for special in ["aura", "aura_dps", "ward", "heal"]:
+                if ed.has(special):
+                        e[special] = float(ed[special])
         enemies.append(e)
+        # THE FIRST-GLANCE LAW (v0.3.5): the first time a special enemy
+        # shows up, one hint banner speaks its truth - once per save.
+        if String(ed.get("hint", "")) != "" and not meta.seen_kind(kind):
+                meta.mark_seen_kind(kind)
+                _banner(String(ed["hint"]), true)
         # the spawn poof (they ARRIVE, they never blink in)
         _rings.append({"pos": pos, "r": float(e["size"]) * 1.6, "t": 0.3, "max": 0.3,
                 "col": Color(0.9, 0.4, 0.4), "w": 3.0})
@@ -1623,6 +1706,13 @@ func _tick_enemies(delta: float) -> void:
                                 if e["aura_tick"] <= 0.0:
                                         e["aura_tick"] = 1.0
                                         _hurt_player(float(e.get("aura_dps", 15.0)), e)
+                                        # THE WRAITH TRUTH LAW (v0.3.5): the tick
+                                        # SPEAKS - a violet pulse rides the ring
+                                        # (the owner felt damage with no feedback)
+                                        _rings.append({"pos": e["pos"],
+                                                        "r": float(e.get("aura", 250.0)),
+                                                        "t": 0.4, "max": 0.4,
+                                                        "col": Color(0.8, 0.4, 1.0), "w": 5.0})
                 if kind == "mender":
                         e["heal_tick"] = float(e.get("heal_tick", 0.0)) - delta
                         if e["heal_tick"] <= 0.0:
@@ -1869,10 +1959,23 @@ func _spawn_boss(wave: int) -> void:
         Jukebox.music("res://assets/audio/music/cs_boss.ogg")
         _banner("%s ARRIVES!" % String(bd["name"]), false)
 
+## THE WARDEN's guard (v0.3.5): 0.5 while `e` stands inside a living
+## warden's gold ring - the warden never wards itself.
+func _ward_cut(e: Dictionary) -> float:
+        for w in enemies:
+                if w == e or w.get("dead", false):
+                        continue
+                if String(w.get("kind", "")) != "warden":
+                        continue
+                if e["pos"].distance_to(w["pos"]) < float(w.get("ward", 0.0)):
+                        return 0.5
+        return 1.0
+
 # ================================================================ damage
 func _hurt_enemy(e: Dictionary, dmg: float, crit := false, silent := false) -> void:
         if e.get("dead", false):
                 return
+        dmg *= _ward_cut(e)
         e["hp"] = float(e["hp"]) - dmg
         e["flash"] = 0.06
         if not silent:
@@ -2221,22 +2324,22 @@ func _wave_break_open() -> void:
 ## every CONTINUE in the chain lands on one of these - each step closes its
 ## own sheet first, so the stack never grows and the chain never strands
 func _chain_after_draft() -> void:
-        _cs_close_top()
+        _cs_pop_top()
         _market_open()
 
 func _chain_after_market() -> void:
-        _cs_close_top()
+        _cs_pop_top()
         _merge_menu_open()
 
 func _chain_after_merge() -> void:
-        _cs_close_top()
+        _cs_pop_top()
         if pending_levels > 0:
                 _stats_menu_open()
                 return
         _chain_after_stats()
 
 func _chain_after_stats() -> void:
-        _cs_close_top()
+        _cs_pop_top()
         if meta.skill_points_free(run_kills) > 0:
                 _skills_menu_open()
                 return
@@ -2257,8 +2360,8 @@ func _wave_draft_open() -> void:
         _draft_cards = _roll_wave_drafts(3)
         # closable=false: a closed draft used to strand the break with no
         # sheet - the SKIP button is the way out
-        _cs_open("WAVE %d CLEARED - CHOOSE ONE" % (run_wave - 1), func(box: VBoxContainer):
-                _build_draft(box), CS_YELLOW, false)
+        _cs_open("WAVE %d CLEARED" % (run_wave - 1), func(box: VBoxContainer):
+                _build_draft(box), CS_YELLOW, false, "draft")
 
 func _roll_wave_drafts(n: int) -> Array:
         # weighted pick without repeats
@@ -2341,7 +2444,19 @@ func _apply_draft(d: Dictionary) -> void:
         for k2 in d["down"]:
                 _apply_stat(String(k2), d["down"][k2])
 
+## the ledger's key map: _apply_stat speaks the draft/item tongue ("dmg"),
+## the INFO rows read the live stat block's keys ("dmg_m")
+const STAT_LEDGER_KEY := {"dmg": "dmg_m", "spd": "spd_m", "aspeed": "aspeed_m",
+        "range": "range_m", "armor": "armor", "regen": "regen", "crit": "crit",
+        "luck": "luck", "dodge": "dodge", "magnet": "magnet",
+        "lifesteal": "lifesteal", "pierce_all": "pierce_all",
+        "hp": "hp_add", "proj": "proj_add"}
+
 func _apply_stat(k: String, v: Variant) -> void:
+        # THE INFO LAW: every delta files under the up or the down ledger
+        var bk: String = String(STAT_LEDGER_KEY.get(k, k))
+        var book: Dictionary = stat_up if float(v) >= 0.0 else stat_down
+        book[bk] = float(book.get(bk, 0.0)) + absf(float(v))
         match k:
                 "dmg": stats["dmg_m"] = float(stats["dmg_m"]) + float(v)
                 "spd": stats["spd_m"] = float(stats["spd_m"]) + float(v)
@@ -2367,8 +2482,8 @@ func _apply_stat(k: String, v: Variant) -> void:
 ## than one point"): every XP level is ONE stats point; the packs cost 1-3;
 ## the sheet is closable=false (no X - the DONE button walks the chain).
 func _stats_menu_open() -> void:
-        _cs_open("LEVEL UP - SPEND STATS POINTS", func(box: VBoxContainer):
-                _build_stats_menu(box), CS_BLUE, false)
+        _cs_open("LEVEL UP", func(box: VBoxContainer):
+                _build_stats_menu(box), CS_BLUE, false, "stats")
 
 func _build_stats_menu(box: VBoxContainer) -> void:
         var head := _cs_label("%d STATS POINTS  -  one per level, packs cost 1-3" \
@@ -2432,7 +2547,7 @@ func _buy_stat_pack(p: Dictionary) -> void:
 ## The points are LIFETIME - they never reset with a round.
 func _skills_menu_open() -> void:
         _cs_open("THE SKILLS", func(box: VBoxContainer): _build_skills_menu(box),
-                        CS_GREEN, false)
+                        CS_GREEN, false, "skills")
 
 func _build_skills_menu(box: VBoxContainer) -> void:
         var free := meta.skill_points_free(run_kills)
@@ -2468,9 +2583,7 @@ func _build_skills_menu(box: VBoxContainer) -> void:
                                 16, CS_GREEN, func(): _chain_after_skills()))
         else:
                 actions.add_child(_cs_button("BACK", 14, CS_WHITE, func():
-                        _cs_close_top()
-                        if phase == "boot":
-                                _optionals_open()))
+                        _cs_close_top()))
 
 func _skill_card(sid: String, free: int) -> PanelContainer:
         var sk: Dictionary = CSData.SKILLS[sid]
@@ -2509,7 +2622,7 @@ func _shop_button() -> void:
 func _market_open() -> void:
         _break_in_market = true
         _cs_open("THE WAVE MARKET", func(box: VBoxContainer): _build_market(box),
-                        CS_YELLOW, false)
+                        CS_YELLOW, false, "market")
 
 func _roll_shop_offers(keep_held := false) -> void:
         # 4 weapon offers + 3 item offers, luck-weighted rarities.
@@ -2711,7 +2824,7 @@ func _build_market(box: VBoxContainer) -> void:
                 _chain_after_market()))
 
 func _market_items(shelf: VBoxContainer) -> void:
-        _section(shelf, "- ITEMS (the Brotato shelf) -")
+        _section(shelf, "ITEMS")
         var icards := []
         for o2 in shop_offers_i:
             var off2: Dictionary = o2
@@ -2732,7 +2845,7 @@ func _market_items(shelf: VBoxContainer) -> void:
                             "UNHOLD" if off2["held"] else "HOLD",
                             func(): _toggle_hold(off2), CS_BLUE))
         _cards_row(shelf, icards)
-        _section(shelf, "- SUPPLIES -")
+        _section(shelf, "SUPPLIES")
         var scards := []
         for cid in CSData.CONSUMABLES:
             var cid_s: String = cid
@@ -2744,8 +2857,19 @@ func _market_items(shelf: VBoxContainer) -> void:
                             func(): _shop_buy_supply(cid_s, price), can3))
         _cards_row(shelf, scards)
 
+## THE TIER RANGE LAW's face (v0.3.5): ONE honest stat line - the EFFECTIVE
+## dmg / cadence / range of this weapon at this tier. Melee says "melee".
+func _weapon_stat_line(wid: String, tier: int) -> String:
+        var wd: Dictionary = CSData.WEAPONS[wid]
+        var mult: Dictionary = CSData.tier_mult(tier)
+        var rng_v: float = float(wd["rng"]) * float(mult.get("rng", 1.0))
+        var tail := " (melee)" if bool(wd.get("melee", false)) else ""
+        return "%d dmg / %.2fs / rng %d%s" % [
+                int(float(wd["dmg"]) * float(mult["dmg"])),
+                float(wd["cad"]) * float(mult["cad"]), int(rng_v), tail]
+
 func _market_weapons(shelf: VBoxContainer) -> void:
-        _section(shelf, "- WEAPON OFFERS (slots %d/%d) -" % [weapons_run.size(), meta.weapon_slots()])
+        _section(shelf, "WEAPON OFFERS")
         var wcards := []
         for o in shop_offers_w:
             var off: Dictionary = o
@@ -2760,8 +2884,7 @@ func _market_weapons(shelf: VBoxContainer) -> void:
             var rarc: Color = CSData.RARITIES[rar]["col"]
             var lines := [
                     "T%d - %s" % [int(off["tier"]), String(CSData.RARITIES[rar]["name"])],
-                    "%d dmg / %.2fs / rng %d" % [int(float(wd["dmg"]) * float(CSData.tier_mult(int(off["tier"]))["dmg"])),
-                            float(wd["cad"]) * float(CSData.tier_mult(int(off["tier"]))["cad"]), int(float(wd["rng"]))],
+                    _weapon_stat_line(String(off["wid"]), int(off["tier"])),
                     String(CSData.RARITIES[rar]["blurb"]),
             ]
             var can: bool = run_ccoins >= int(off["price"]) and weapons_run.size() < meta.weapon_slots() \
@@ -2774,7 +2897,7 @@ func _market_weapons(shelf: VBoxContainer) -> void:
                             "UNHOLD" if off["held"] else "HOLD",
                             func(): _toggle_hold(off), CS_BLUE))
         _cards_row(shelf, wcards)
-        _section(shelf, "- YOUR LOADOUT (sell refunds 40%%) -")
+        _section(shelf, "YOUR LOADOUT")
         var lcards := []
         for wr in weapons_run:
             var wr_d: Dictionary = wr
@@ -2782,13 +2905,13 @@ func _market_weapons(shelf: VBoxContainer) -> void:
             var refund := int(CSData.sell_price(CSData.weapon_price(wid2, int(wr_d["tier"]))))
             var keep := weapons_run.size() > 1
             lcards.append(_shop_card("%s T%d" % [String(CSData.WEAPONS[wid2]["name"]), int(wr_d["tier"])],
-                            CS_WHITE, ["equipped now"],
+                            CS_WHITE, [_weapon_stat_line(wid2, int(wr_d["tier"])), "equipped now"],
                             CS_EDGE, "SELL +%d CC" % refund, CS_RED, func():
                             _shop_sell_weapon(wr_d, refund), keep))
         _cards_row(shelf, lcards)
 
 func _market_allies(shelf: VBoxContainer) -> void:
-        _section(shelf, "- ALLIES (deploy + raise, they fight beside you) -")
+        _section(shelf, "ALLIES")
         if (meta.d["owned_allies"] as Array).is_empty():
                 var note := _cs_label("no allies yet - the ARMORY sells them (cosmic coins), THE CREW joins via THE SHOP (GOGACoins)",
                                 12, CS_WHITE)
@@ -2854,7 +2977,7 @@ func _reroll_market() -> void:
 ## menu instead of in shop, put it after shop")
 func _merge_menu_open() -> void:
         _cs_open("THE MERGE BENCH", func(box: VBoxContainer): _build_merge_menu(box),
-                        CS_YELLOW, false)
+                        CS_YELLOW, false, "merge")
 
 func _build_merge_menu(box: VBoxContainer) -> void:
         var scroll := ScrollContainer.new()
@@ -2890,6 +3013,7 @@ func _build_merge_menu(box: VBoxContainer) -> void:
                     var card := _shop_card("MERGE: " + String(CSData.WEAPONS[pr_d["wid"]]["name"]),
                                     CS_YELLOW,
                                     ["T%d + T%d -> T%d" % [int(pr_d["tier"]), int(pr_d["tier"]), int(pr_d["tier"]) + 1],
+                                     _weapon_stat_line(String(pr_d["wid"]), int(pr_d["tier"]) + 1),
                                      "two copies consumed" + why],
                                     CS_YELLOW, "MERGE %d CC" % cost, CS_YELLOW, func():
                                     _wave_buy_merge(pr_d, cost), can5)
@@ -2922,7 +3046,10 @@ func _shop_buy_weapon(off: Dictionary) -> void:
         off["sold"] = true
         Jukebox.sfx("cs_buy", -4.0)
         _rebuild_slots()
-        _cs_reopen(func(): _shop_open())
+        # THE RIGHT-SHEET LAW (v0.3.5): a market buy rebuilds THE MARKET -
+        # the patch-4 rename pointed these at the universal shop and a buy
+        # hijacked the whole break.
+        _cs_reopen(func(): _market_open())
 
 func _shop_buy_item(off: Dictionary) -> void:
         var price := int(off["price"])
@@ -2935,7 +3062,7 @@ func _shop_buy_item(off: Dictionary) -> void:
         _apply_stat(String(it["stat"]), it["v"])
         off["sold"] = true
         Jukebox.sfx("cs_buy", -4.0)
-        _cs_reopen(func(): _shop_open())
+        _cs_reopen(func(): _market_open())
 
 func _shop_buy_supply(cid: String, price: int) -> void:
         if run_ccoins < price:
@@ -2945,13 +3072,13 @@ func _shop_buy_supply(cid: String, price: int) -> void:
         run_ccoins -= price
         match cid:
                 "heal30": p_hp = minf(p_max_hp, p_hp + 30.0)
-                "plate": stats["armor"] = int(stats["armor"]) + 1
+                "plate": _apply_stat("armor", 1)
                 "crate":
                         for e in enemies.duplicate():
                                 _hurt_enemy(e, 60.0)
                         _shockwave(p_pos, 900.0)
         Jukebox.sfx("cs_buy", -4.0)
-        _cs_reopen(func(): _shop_open())
+        _cs_reopen(func(): _market_open())
 
 func _allies_deployed(aid: String) -> int:
         var n := 0
@@ -2979,7 +3106,7 @@ func _shop_buy_ally(aid: String, price: int) -> void:
                                 a["level"] = int(a["level"]) + 1
                                 break
         Jukebox.sfx("cs_buy", -4.0)
-        _cs_reopen(func(): _shop_open())
+        _cs_reopen(func(): _market_open())
 
 func _wave_buy_merge(pr: Dictionary, cost: int) -> void:
         var wid: String = pr["wid"]
@@ -3008,7 +3135,9 @@ func _wave_buy_merge(pr: Dictionary, cost: int) -> void:
         Jukebox.sfx("cs_levelup", -3.0)
         _banner("MERGED! %s T%d" % [CSData.WEAPONS[wid]["name"], tier + 1], false)
         _rebuild_slots()
-        _cs_reopen(func(): _shop_open())
+        # THE RIGHT-SHEET LAW: the merge lives on the MERGE BENCH - the bench
+        # rebuilds, the chain never loses its sheet.
+        _cs_reopen(func(): _merge_menu_open())
 
 func _shop_sell_weapon(wr: Dictionary, refund: int) -> void:
         if weapons_run.size() <= 1:
@@ -3020,7 +3149,7 @@ func _shop_sell_weapon(wr: Dictionary, refund: int) -> void:
         run_ccoins += refund
         Jukebox.sfx("cs_sell", -6.0)
         _rebuild_slots()
-        _cs_reopen(func(): _shop_open())
+        _cs_reopen(func(): _market_open())
 
 func _merge_pairs() -> Array:
         # two same weapons, same tier -> the next tier at half price (the law)
@@ -3051,7 +3180,7 @@ var _armory_tab := "weapons"
 
 func _shop_open() -> void:
         _cs_open("THE SHOP", func(box: VBoxContainer): _build_shop(box), CS_YELLOW,
-                        true)
+                        true, "shop")
 
 ## the stack-safe rebuild: the live shop pops, a fresh one pushes
 func _shop_rebuild() -> void:
@@ -3061,7 +3190,7 @@ func _shop_rebuild() -> void:
 ## cosmic-coin store, THE ARMORY
 func _armory_open() -> void:
         _cs_open("THE ARMORY", func(box: VBoxContainer): _build_armory(box),
-                        CS_YELLOW, false)
+                        CS_YELLOW, false, "armory")
 
 func _build_shop(box: VBoxContainer) -> void:
         # the universal wallet header - the full GOGABox wallet
@@ -3077,44 +3206,44 @@ func _build_shop(box: VBoxContainer) -> void:
         shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shelf.add_theme_constant_override("separation", 6)
         scroll.add_child(shelf)
-        _shop_section(shelf, "THE PLACES - WEAR A WORLD")
+        _shop_section(shelf, "THE PLACES")
         for tid in CSData.THEME_ORDER:
                 shelf.add_child(_shop_theme_row(tid))
-        _shop_section(shelf, "THE GUNS - THEY JOIN THE WAVE MARKET")
+        _shop_section(shelf, "THE GUNS")
         for wid in CSData.SHOP_GUNS:
                 shelf.add_child(_shop_gun_row(wid))
-        _shop_section(shelf, "THE LAB - THE MERGING, FOREVER")
+        _shop_section(shelf, "THE LAB")
         shelf.add_child(_shop_lab_row("l3", "WEAPON LAB", 800,
                         "two same weapons, same tier, merge one tier up"))
         shelf.add_child(_shop_lab_row("l4", "FOUNDRY", 500,
                         "every merge costs 25% less"))
-        _shop_section(shelf, "THE CREW - THEY JOIN THE DEPLOY LIST")
+        _shop_section(shelf, "THE CREW")
         for aid in CSData.ALLY_ORDER:
                 shelf.add_child(_shop_crew_row(aid))
         _fit_scroll(scroll, shelf, 0.5)
         var actions := HBoxContainer.new()
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
         box.add_child(actions)
-        var cb := Arc.button("CLOSE", Vector2(0, 74), 24, Arc.GOOD,
+        var cb := Arc.button("CLOSE", Vector2(0, 108), _fs(24), Arc.GOOD,
                         func(): _cs_close_top())
         cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         actions.add_child(cb)
 
 ## a small yellow shelf caption inside the universal list
 func _shop_section(shelf: VBoxContainer, txt: String) -> void:
-        var l := Arc.fit_label(txt, 20, Arc.HOT, 1000)
+        var l := Arc.fit_label(txt, _fs(20), Arc.HOT, 1000)
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         shelf.add_child(l)
 
 ## the owned row of the universal list (matcher/invaders green line)
 func _shop_row_owned(txt: String) -> Control:
-        var l := Arc.fit_label(txt, 20, Color("58c470"), 1000)
+        var l := Arc.fit_label(txt, _fs(20), Color("58c470"), 1000)
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         return l
 
 ## one universal price row: an Arc.coin_button, disabled while broke
 func _shop_price_row(txt: String, price: int, col: Color, cb: Callable) -> Button:
-        var b := Arc.coin_button(txt, Vector2(0, 64), 22, col, cb)
+        var b := Arc.coin_button(txt, Vector2(0, 96), _fs(22), col, cb)
         b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         if Box.coins() < price:
                 b.disabled = true
@@ -3227,7 +3356,10 @@ func _build_armory(box: VBoxContainer) -> void:
                 var b := _cs_button(lbl, 13,
                                 CS_YELLOW if _armory_tab == t_s else CS_WHITE, func():
                         _armory_tab = t_s
-                        _cs_reopen(func(): _shop_open()))
+                        # THE ARMORY TABS LAW (v0.3.5): a tab rebuilds THE
+                        # ARMORY - the patch-4 copy-paste sent it to THE SHOP
+                        # and hijacked the sheet.
+                        _cs_reopen(func(): _armory_open()))
                 tabs.add_child(b)
         # the shelf scroll (both axes, THE BIG-UI LAW)
         var scroll := ScrollContainer.new()
@@ -3251,13 +3383,12 @@ func _build_armory(box: VBoxContainer) -> void:
         actions.add_theme_constant_override("separation", 14)
         box.add_child(actions)
         actions.add_child(_cs_button("BACK", 14, CS_WHITE, func():
-                _cs_close_top()
-                if phase == "boot":
-                        _optionals_open()
-                _resume_break()))
+                # the RESUME + FRESH DOOR laws live inside _cs_close_top now:
+                # the close resumes a stranded break and refreshes the door.
+                _cs_close_top()))
 
 func _armory_weapons(shelf: VBoxContainer) -> void:
-        var note := _cs_label("every weapon starts T1 - own all 12, merge copies to climb tiers",
+        var note := _cs_label("every weapon starts T1 - own all 13, merge copies to climb tiers",
                         11, CS_WHITE)
         note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         shelf.add_child(note)
@@ -3268,7 +3399,7 @@ func _armory_weapons(shelf: VBoxContainer) -> void:
             var owned := meta.has_weapon(wid_s)
             var price := CSData.weapon_price(wid_s, 1)
             var lines := [
-                    "%d dmg / %.2fs / rng %d" % [int(wd["dmg"]), float(wd["cad"]), int(wd["rng"])],
+                    _weapon_stat_line(wid_s, 1),
                     ("%d copies owned" % meta.weapon_count(wid_s)) if owned else "high price - the one-by-one law",
             ]
             var can := not owned and meta.coins() >= price
@@ -3393,7 +3524,7 @@ func _armory_loadout(shelf: VBoxContainer) -> void:
             var on: bool = lo.has(wid)
             rows.append(_shop_card("%s T%d" % [String(CSData.WEAPONS[wid]["name"]), tier],
                             CS_YELLOW if on else CS_WHITE,
-                            ["equipped" if on else "benched"],
+                            [_weapon_stat_line(wid, tier), "equipped" if on else "benched"],
                             CS_GREEN if on else CS_EDGE,
                             "UNEQUIP" if on else "EQUIP",
                             CS_BLUE, func(): _armory_toggle(wid, tier)))
@@ -3445,6 +3576,101 @@ func _armory_sell(wid: String, tier: int, refund: int) -> void:
         Jukebox.sfx("cs_sell", -6.0)
         _cs_reopen(func(): _armory_open())
 
+# ================================================================== INFO
+## THE INFO LAW (v0.3.5, the owner: "put another button in the top left and
+## call it info... show the whole status for real, like luck = nn% and
+## damage = nn... as a list"): the run's own truth sheet. The header carries
+## what was collected; every stat wears his exact five-line shape.
+const INFO_STATS := [
+        ["dmg_m", "DAMAGE", true], ["aspeed_m", "ATTACK SPEED", true],
+        ["spd_m", "MOVE SPEED", true], ["range_m", "RANGE", true],
+        ["crit", "CRIT CHANCE", true], ["armor", "ARMOR", false],
+        ["regen", "REGEN", false], ["luck", "LUCK", true],
+        ["dodge", "DODGE", true], ["hp_add", "BONUS HP", false],
+        ["lifesteal", "LIFESTEAL", true],
+]
+
+func _info_open() -> void:
+        _cs_open("RUN INFO", func(box: VBoxContainer): _build_info(box),
+                        CS_BLUE, true, "info")
+
+## the pure model (the probe reads it): one block per stat, the owner's
+## exact shape - line 0 the name, then base / up / down / result.
+func _info_stat_rows() -> Array:
+        var rows := []
+        for def in INFO_STATS:
+                var k: String = def[0]
+                var is_pct: bool = bool(def[2])
+                var base: float = float(stat_base.get(k, 0.0))
+                var up: float = float(stat_up.get(k, 0.0))
+                var down: float = float(stat_down.get(k, 0.0))
+                var live_v: float = float(stats.get(k, base))
+                var fmt := func(v: float) -> String:
+                        if is_pct:
+                                return "%d%%" % int(round(v * 100.0))
+                        return String.num(v, 1)
+                var pct_of := func(v: float) -> String:
+                        if absf(base) < 0.0001:
+                                return ""
+                        return " (%+d%%)" % int(round(v / absf(base) * 100.0))
+                rows.append({
+                        "key": k,
+                        "name": String(def[1]),
+                        "base": fmt.call(base), "up": fmt.call(up),
+                        "down": fmt.call(down), "result": fmt.call(live_v),
+                        "up_pct": pct_of.call(up), "down_pct": pct_of.call(down),
+                })
+        return rows
+
+func _build_info(box: VBoxContainer) -> void:
+        var head := _cs_black_box(box, Vector2(0, 0))
+        var hv := VBoxContainer.new()
+        head.add_child(hv)
+        var h1 := _cs_label("WAVE %d   KILLS %d   SCORE %d" \
+                        % [run_wave, run_kills, score], 14, CS_YELLOW)
+        var h2 := _cs_label("collected this run: %d cosmic coins   -   %d XP   -   LV %d" \
+                        % [run_ccoins, run_xp, run_level], 13, CS_GREEN)
+        h1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        h2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        hv.add_child(h1)
+        hv.add_child(h2)
+        var scroll := ScrollContainer.new()
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.5)
+        box.add_child(scroll)
+        var shelf := VBoxContainer.new()
+        shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shelf.add_theme_constant_override("separation", 6)
+        scroll.add_child(shelf)
+        for r in _info_stat_rows():
+                var b := _cs_black_box(shelf, Vector2(560, 0))
+                var vb := VBoxContainer.new()
+                vb.add_theme_constant_override("separation", 1)
+                b.add_child(vb)
+                var lines: Array = [
+                        "%s:" % String(r["name"]),
+                        "base: %s" % String(r["base"]),
+                        "up: +%s%s" % [String(r["up"]), String(r["up_pct"])],
+                        "down: -%s%s" % [String(r["down"]), String(r["down_pct"])],
+                        "result: %s" % String(r["result"]),
+                ]
+                var first := true
+                for ln in lines:
+                        var col := CS_WHITE
+                        if first:
+                                col = CS_YELLOW
+                        elif String(ln).begins_with("up"):
+                                col = CS_GREEN
+                        elif String(ln).begins_with("down"):
+                                col = CS_RED
+                        var l := _cs_label(String(ln), 12, col)
+                        if first:
+                                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        vb.add_child(l)
+                        first = false
+        _fit_scroll(scroll, shelf, 0.58)
+
 # ============================================================== OPTIONALS
 ## THE BOOT SCREEN, REBORN (the owner: the old one was FUCKING WEIRD):
 ## the 6 start cards wear the NEW potato art, the themes are two cards with
@@ -3453,10 +3679,10 @@ func _optionals_open() -> void:
         ## closable=false: THE DOOR (v0.3.4-2, the owner: "why could someone
         ## close the important window?") - no X, and the back law guards it.
         _cs_open("COSMIC SPUD", func(box: VBoxContainer): _build_optionals(box),
-                        CS_YELLOW, false)
+                        CS_YELLOW, false, "door")
 
 func _build_optionals(box: VBoxContainer) -> void:
-        var sub := _cs_label("pick one of the six starts - SPUDNIK wears every mask", 12, CS_WHITE)
+        var sub := _cs_label("pick one of the six starts", 12, CS_WHITE)
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         box.add_child(sub)
         if not _boot_hint.is_empty():
@@ -3474,7 +3700,9 @@ func _build_optionals(box: VBoxContainer) -> void:
         shelf.add_theme_constant_override("separation", 8)
         scroll.add_child(shelf)
         var grid := GridContainer.new()
-        grid.columns = 3
+        # THE BIG TEXT LAW's door handling (v0.3.5): two across - three big
+        # cards overflow the portrait door, two fill it with room to read
+        grid.columns = 2
         grid.add_theme_constant_override("h_separation", 10)
         grid.add_theme_constant_override("v_separation", 10)
         grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -3482,7 +3710,7 @@ func _build_optionals(box: VBoxContainer) -> void:
         for sid in CSData.START_ORDER:
                 grid.add_child(_start_card(sid))
         # the themes: two cards with DAY / NIGHT chips
-        var tsec := _cs_label("- THE GROUNDS -", 12, CS_BLUE)
+        var tsec := _cs_label("THE GROUNDS", 12, CS_BLUE)
         tsec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         shelf.add_child(tsec)
         var trow := HBoxContainer.new()
@@ -3592,11 +3820,11 @@ func _theme_card(tid: String) -> PanelContainer:
         var card := PanelContainer.new()
         card.add_theme_stylebox_override("panel",
                         _cs_box_style(CS_YELLOW if worn else (CS_GREEN if owned else CS_EDGE), CS_BOX))
-        card.custom_minimum_size = Vector2(340, 96)
+        card.custom_minimum_size = Vector2(340, 124)
         var vb := VBoxContainer.new()
         vb.add_theme_constant_override("separation", 4)
         card.add_child(vb)
-        var nm := _cs_fit_label(String(th["name"]) + ("  - WORN" if worn else ""), 15,
+        var nm := _cs_fit_label(String(th["name"]) + ("  WORN" if worn else ""), 15,
                         CS_YELLOW if worn else CS_WHITE, 300.0)
         nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(nm)
@@ -3648,12 +3876,33 @@ func _start_run() -> void:
         _static_cd = 6.0
         _adrenaline = 0.0
         stats = _base_stats()
+        # THE INFO LAW: the snapshot + clean ledgers for this run
+        stat_base = {
+                "dmg_m": float(stats["dmg_m"]), "spd_m": float(stats["spd_m"]),
+                "aspeed_m": float(stats["aspeed_m"]), "range_m": float(stats["range_m"]),
+                "armor": float(stats["armor"]), "crit": float(stats["crit"]),
+                "regen": float(stats["regen"]), "luck": float(stats["luck"]),
+                "dodge": float(stats["dodge"]), "hp_add": 0.0,
+                "lifesteal": float(stats["lifesteal"]),
+        }
+        stat_up.clear()
+        stat_down.clear()
         p_max_hp = _max_hp()
         p_hp = p_max_hp
         p_pos = ARENA.get_center()
         p_node.texture = _t("hero_" + start_id + "_f0")
         cam.position = _cam_clamp_pos(p_pos)
         _rebuild_weapons()
+        # THE VARIED HOLSTER LAW (v0.3.5, the owner: "it is weird how all
+        # types of characters starts with same weapons"): the start's
+        # signature gun rides slot 1 (when owned).
+        var sig: String = String(CSData.START_SIG.get(start_id, ""))
+        var lo := meta.loadout()
+        if sig != "" and lo.has(sig) and String(lo[0]) != sig:
+                lo.erase(sig)
+                lo.push_front(sig)
+                meta.set_loadout(lo)
+                _rebuild_weapons()
         if start_id == "engineer":
                 _deploy_ally("drone", 1)
         _begin_wave(1)
@@ -3667,7 +3916,8 @@ func _start_id_persist() -> void:
 ## node a black box speaking its state: OWNED (green), CAN BUY (yellow),
 ## LOCKED (a red padlock + the reason - the chain or the level gate).
 func _tree_open() -> void:
-        _cs_open("THE SKILL TREE", func(box: VBoxContainer): _build_tree(box), CS_BLUE)
+        _cs_open("THE SKILL TREE", func(box: VBoxContainer): _build_tree(box), CS_BLUE,
+                        true, "tree")
 
 func _build_tree(box: VBoxContainer) -> void:
         var sub := _cs_label("SPUDNIK LV %d  -  %d CC  -  everything starts locked, unlock one by one" \
@@ -3831,7 +4081,7 @@ func _banner(txt: String, good := true) -> void:
         root.add_child(holder)
         var l := Label.new()
         l.text = txt
-        l.add_theme_font_size_override("font_size", 26)
+        l.add_theme_font_size_override("font_size", _fs(15))
         l.add_theme_color_override("font_color", CS_YELLOW if good else CS_RED)
         l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
         l.add_theme_constant_override("shadow_offset_x", 2)
@@ -3862,6 +4112,7 @@ class FxLayer extends Node2D:
 var _floaters: Array = []    # {pos, txt, col, t, max, size}
 var _rings: Array = []       # {pos, r, max, t, col, w}
 var _parts: Array = []       # {pos, vel, t, max, col, size, tex}
+var _slashes: Array = []     # THE MELEE LAW: {pos, a, rng, arc, t, max}
 
 func _draw_fx(L: CanvasItem) -> void:
         # the auras (under everything)
@@ -3870,10 +4121,31 @@ func _draw_fx(L: CanvasItem) -> void:
                         continue
                 if e.get("aura", 0.0) > 0.0:
                         var breathe := 0.5 + 0.14 * sin(Time.get_ticks_msec() / 260.0)
+                        # THE WRAITH TRUTH LAW (v0.3.5): the ring READS - a fat
+                        # breathing violet field, never a whisper
                         L.draw_circle(e["pos"], float(e["aura"]),
-                                        Color(0.72, 0.42, 1.0, 0.10 * breathe))
+                                        Color(0.72, 0.42, 1.0, 0.15 * breathe))
                         L.draw_arc(e["pos"], float(e["aura"]), 0, TAU, 48,
-                                        Color(0.75, 0.45, 1.0, 0.35), 2.0)
+                                        Color(0.78, 0.45, 1.0, 0.6), 3.5)
+                        L.draw_arc(e["pos"], float(e["aura"]) - 8.0, 0, TAU, 48,
+                                        Color(0.78, 0.45, 1.0, 0.25), 2.0)
+                # THE HEALER IN THE OPEN LAW (v0.3.5): the mender's 500px
+                # heal field draws - green cross care, visible care
+                if String(e.get("kind", "")) == "mender":
+                        var hb := 0.5 + 0.12 * sin(Time.get_ticks_msec() / 320.0)
+                        L.draw_circle(e["pos"], float(e.get("heal", 500.0)),
+                                        Color(0.35, 1.0, 0.5, 0.07 * hb))
+                        L.draw_arc(e["pos"], float(e.get("heal", 500.0)), 0, TAU, 56,
+                                        Color(0.4, 1.0, 0.55, 0.5), 3.0)
+                # THE WARDEN LAW (v0.3.5): the gold half-damage field draws
+                if float(e.get("ward", 0.0)) > 0.0:
+                        var wb := 0.5 + 0.13 * sin(Time.get_ticks_msec() / 280.0)
+                        L.draw_circle(e["pos"], float(e["ward"]),
+                                        Color(1.0, 0.78, 0.2, 0.09 * wb))
+                        L.draw_arc(e["pos"], float(e["ward"]), 0, TAU, 48,
+                                        Color(1.0, 0.8, 0.25, 0.55), 3.0)
+                        L.draw_arc(e["pos"], float(e["ward"]) - 9.0, 0, TAU, 48,
+                                        Color(1.0, 0.85, 0.35, 0.28), 5.0)
                 if e.get("marked", false):
                         L.draw_arc(e["pos"], float(e["size"]) * 0.7, 0, TAU, 24,
                                         Color(1, 0.9, 0.3, 0.5), 2.0)
@@ -3892,7 +4164,7 @@ func _draw_fx(L: CanvasItem) -> void:
                         L.draw_arc(e["pos"], float(e["size"]) * 0.62 * float(e.get("scale_m", 1.0)),
                                         0, TAU, 32, Color(0.8, 0.4, 1.0, 0.8), 2.5)
                         L.draw_string(ThemeDB.fallback_font, e["pos"] + Vector2(-40, -float(e["size"]) - 18),
-                                        String(e["affix"]).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 80, 9,
+                                        String(e["affix"]).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 80, _fs(7),
                                         Color(0.9, 0.6, 1.0))
                 # THE CARRIER'S GLINT (the gogacoin rider marks its host)
                 if e.get("goga", false):
@@ -3933,6 +4205,35 @@ func _draw_fx(L: CanvasItem) -> void:
                 var rad: float = _cam_half().length() * 1.05
                 L.draw_arc(ctr, rad, 0, TAU, 64,
                                 Color(0.9, 0.15, 0.12, 0.08 + 0.14 * pulse), rad * 0.22)
+        # the melee swings (THE MELEE LAW): a bright arc sweeping across
+        for s in _slashes:
+                var sa: float = float(s["t"]) / float(s["max"])
+                var sweep: float = float(s["arc"]) * 0.5 * (1.0 - sa)
+                var a0: float = float(s["a"]) - sweep
+                L.draw_arc(s["pos"], float(s["rng"]) * (0.8 + 0.2 * sa),
+                                a0 - 0.45, a0 + 0.45, 14,
+                                Color(1.0, 0.96, 0.8, 0.85 * sa), 10.0)
+                L.draw_arc(s["pos"], float(s["rng"]) * (0.55 + 0.3 * sa),
+                                float(s["a"]) - float(s["arc"]) * 0.5,
+                                float(s["a"]) + float(s["arc"]) * 0.5, 20,
+                                Color(1.0, 0.9, 0.55, 0.35 * sa), 4.0)
+        # the aim sight (THE AIM SIGHT LAW, v0.3.5): the aim aid is back,
+        # PROPER - a calm straight line along the aim to the first gun's
+        # real reach. Steady alpha (never flickers), a soft brighter core,
+        # a small end dot. The ugly wobbly laser stays dead.
+        if phase == "play" and not weapons_run.is_empty():
+                var wid0: String = String(weapons_run[0]["id"])
+                var sight_rng: float = float(CSData.WEAPONS[wid0]["rng"]) \
+                                * float(stats["range_m"]) \
+                                * float(CSData.tier_mult(int(weapons_run[0]["tier"])).get("rng", 1.0))
+                var sdir := Vector2.from_angle(p_aim)
+                L.draw_line(p_pos + sdir * 34.0, p_pos + sdir * sight_rng,
+                                Color(1.0, 0.95, 0.78, 0.22), 2.0)
+                L.draw_line(p_pos + sdir * 34.0,
+                                p_pos + sdir * minf(sight_rng, 210.0),
+                                Color(1.0, 0.97, 0.85, 0.4), 3.0)
+                L.draw_circle(p_pos + sdir * sight_rng, 4.5,
+                                Color(1.0, 0.95, 0.78, 0.5))
         # the gun (rotates with the aim, flips upright when aiming left)
         if p_node != null and is_instance_valid(p_node) and not weapons_run.is_empty():
                 var wid: String = String(weapons_run[0]["id"])
@@ -4000,7 +4301,7 @@ func _dmg_number(pos: Vector2, v: float, crit: bool, col := Color(1, 1, 1)) -> v
         _floaters.append({"pos": pos + Vector2(randf_range(-10, 10), -18),
                 "txt": ("%d!" % int(round(v))) + (" CRIT" if crit else ""),
                 "col": CS_YELLOW if crit else col,
-                "t": 0.7, "max": 0.7, "size": 18 if crit else 13})
+                "t": 0.7, "max": 0.7, "size": _fs(10) if crit else _fs(8)})
 
 func _shockwave(pos: Vector2, r: float) -> void:
         _rings.append({"pos": pos, "r": r, "t": 0.42, "max": 0.42,
@@ -4022,6 +4323,11 @@ func _heal_flash(e: Dictionary) -> void:
                 "vel": Vector2(0, -60), "t": 0.4, "max": 0.4,
                 "col": Color(0.5, 1, 0.6), "size": 5.0, "tex": ""})
 
+## THE MELEE LAW's swing theatre: a bright arc that sweeps once and dies.
+func _slash_fx(a: float, rng: float, arc: float) -> void:
+        _slashes.append({"pos": p_pos, "a": a, "rng": rng, "arc": arc,
+                "t": 0.22, "max": 0.22})
+
 func _tick_fx(delta: float) -> void:
         var dead := []
         for p in _parts:
@@ -4040,6 +4346,13 @@ func _tick_fx(delta: float) -> void:
                         dead2.append(r)
         for r2 in dead2:
                 _rings.erase(r2)
+        var dead4 := []
+        for s2 in _slashes:
+                s2["t"] -= delta
+                if s2["t"] <= 0.0:
+                        dead4.append(s2)
+        for s3 in dead4:
+                _slashes.erase(s3)
         var dead3 := []
         for f in _floaters:
                 f["t"] -= delta

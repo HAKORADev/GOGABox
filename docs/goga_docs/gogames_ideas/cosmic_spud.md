@@ -342,3 +342,28 @@ The owner's v0.3.4 verdict: 0.5/10. The full defect list + the fixes live in
   allies and everything in-run cost COSMIC coins. Both wallets are named
   in the optionals line; the armory themes tab wears the green GOGACoin
   chip and says which side of the border each currency owns.
+
+## 16. PATCH 5 (v0.3.5, the owner's full-playtest round — the laws)
+
+The full tracker: `cosmic_spud_patch5.md`. The headline laws:
+
+- **THE RIGHT-SHEET / ARMORY TABS / RESUME / FRESH DOOR / TOP BUTTONS
+  LAWS** — the patch-4 rename's sheet hijacks are dead (market buys
+  rebuild the market, armory tabs stay put, every close resumes a
+  stranded break, the door rebuilds fresh on reveal, the top bar answers
+  over every paused sheet).
+- **THE SPECIAL-KEY LAW** — the root cause of the "invisible" wraith: the
+  enemy dicts now carry their own aura/ward/heal numbers, so the auras
+  DRAW. The wraith's ring reads (a pulse rides it on every damage tick),
+  the mender's green care draws, the baked art ring is gone.
+- **THE WARDEN** — wave 9+: the gold half-damage aura.
+- **THE FIRST-GLANCE LAW** — first-encounter hint banners, once per save.
+- **THE AIM SIGHT LAW** — the calm straight aim line is back (no wobble).
+- **THE TIER RANGE LAW + THE MELEE LAW + THE VARIED HOLSTER LAW** — tiers
+  climb range, every card speaks effective numbers, THE PEEL CLEAVER is
+  the first melee arm, and the six starts wear signature first guns.
+- **THE BIG TEXT LAW (x1.75) + THE INFO LAW + THE CLEAN TITLES LAW** —
+  the whole CSUI scales through one `_fs()` door; the top-left INFO button
+  shows the run's collected CC/XP and every stat in the owner's exact
+  five-line shape (base / up / down / result); the "NAME - extra" titles
+  are clean.

@@ -92,9 +92,9 @@ func _run() -> void:
         var pool12 := CSData.pool_for_wave(12)
         ck(pool1.size() == 3 and pool12.has("orbiter") and pool12.size() > pool1.size(),
                         "the unlock table (w1 = 3 blabs, w12 = everything)")
-        ck(CSData.START_ORDER.size() == 6 and CSData.WEAPON_ORDER.size() == 12
+        ck(CSData.START_ORDER.size() == 6 and CSData.WEAPON_ORDER.size() == 13
                         and CSData.ALLY_ORDER.size() == 6 and CSData.TREE_ORDER.size() == 18,
-                        "the tables: 6 starts, 12 weapons, 6 allies, 18 tree nodes")
+                        "the tables: 6 starts, 13 weapons (the cleaver joined), 6 allies, 18 tree nodes")
         # tree chains: every non-root need exists and costs climb
         var chain_ok := true
         for nid in CSData.TREE_ORDER:
@@ -604,8 +604,8 @@ func _run() -> void:
                                 "THE SHEET LIFE LAW: the paused tree answers the tap - the run starts")
         # THE TEXT-FIT LAW: the boxes grow to their text (the overflow report)
         var sc: Button = G._start_card("engineer")
-        var perk_h: float = G._cs_text_h(String(CSData.STARTS["engineer"]["perk"]), 12, 250.0)
-        var stats_h: float = G._cs_text_h("HP 0  DMG 0%  SPD 0%\nASPD 0%  RNG 0%  ARM 0  LUCK 0%  DODGE 0%", 12, 250.0)
+        var perk_h: float = G._cs_text_h(String(CSData.STARTS["engineer"]["perk"]), 12, 500.0)
+        var stats_h: float = G._cs_text_h("HP 0  DMG 0%  SPD 0%\nASPD 0%  RNG 0%  ARM 0  LUCK 0%  DODGE 0%", 12, 500.0)
         ck(sc.custom_minimum_size.y >= 93.0 + perk_h + stats_h,
                         "THE TEXT-FIT LAW: the start card grows to fit its measured text")
         ck(G._cs_text_w("ENGINEER", 14) > 0.0,
@@ -792,6 +792,172 @@ func _run() -> void:
         G._shop_buy_crew("drone", int(CSData.SHOP_CREW["drone"]))
         ck(meta.has_ally("drone"),
                         "THE SHOP CREW LAW: the drone is owned and lists in the deploy rows")
+        # ================================================ THE PATCH 5 LAWS
+        # THE RIGHT-SHEET LAW: a market buy rebuilds THE MARKET, never the
+        # universal shop (the patch-4 rename hijack is dead)
+        await _boot()
+        G._start_run()
+        G.phase = "break"
+        G._market_open()
+        await _wait(0.3)
+        G._shop_buy_item({"iid": "protein", "price": 0, "sold": false})
+        await _wait(0.3)
+        ck(String(G.cs_sheets.back()["id"]) == "market",
+                        "THE RIGHT-SHEET LAW: a market buy rebuilds THE WAVE MARKET")
+        # ... and a merge rebuilds THE MERGE BENCH
+        G._cs_close_all()
+        meta.d["char_level"] = 6
+        meta.add_armory("smg", 1)
+        meta.add_armory("smg", 1)
+        G._merge_menu_open()
+        await _wait(0.3)
+        G._wave_buy_merge({"wid": "smg", "tier": 1, "cost": 100}, 100)
+        await _wait(0.3)
+        ck(String(G.cs_sheets.back()["id"]) == "merge",
+                        "THE RIGHT-SHEET LAW: a merge rebuilds THE MERGE BENCH")
+        # THE ARMORY TABS LAW: a tab rebuilds THE ARMORY, never THE SHOP
+        G._cs_close_all()
+        G.phase = "boot"
+        G._optionals_open()
+        await _wait(0.3)
+        G._armory_open()
+        await _wait(0.3)
+        var arm_box: VBoxContainer = G.cs_sheets.back()["box"]
+        var tab_b := _find_btn(arm_box, "PLACES")
+        ck(tab_b != null, "THE ARMORY TABS LAW: the PLACES tab exists")
+        if tab_b != null:
+                tab_b.pressed.emit()
+                await _wait(0.3)
+                ck(String(G.cs_sheets.back()["id"]) == "armory",
+                                "THE ARMORY TABS LAW: the tab stays in THE ARMORY")
+        # THE RESUME LAW: a close with no sheets back on a break brings the market
+        G._cs_close_all()
+        G.phase = "break"
+        G._cs_close_top()
+        await _wait(0.3)
+        ck(G.cs_sheets.size() == 1 and String(G.cs_sheets.back()["id"]) == "market",
+                        "THE RESUME LAW: the stranded break rides back to the market")
+        # THE FRESH DOOR LAW: the shop rides over the door, the buy stays in
+        # the shop, and CLOSE reveals a door that already owns the place
+        G._cs_close_all()
+        G.phase = "boot"
+        Box.earn(2000)
+        G._optionals_open()
+        await _wait(0.3)
+        G._shop_open()
+        await _wait(0.3)
+        ck(G.cs_sheets.size() == 2 and String(G.cs_sheets.back()["id"]) == "shop",
+                        "THE FRESH DOOR LAW: the shop rides OVER the door")
+        G._shop_buy_theme("park", int(CSData.THEMES["park"]["gogacoins"]))
+        await _wait(0.3)
+        ck(G.cs_sheets.size() == 2 and String(G.cs_sheets.back()["id"]) == "shop",
+                        "THE FRESH DOOR LAW: the theme buy stays inside THE SHOP")
+        var shop_row := _find_lbl_like(G.cs_sheets.back()["box"], "PARK")
+        ck(shop_row != null and (String(shop_row.text).contains("OWNED")
+                        or String(shop_row.text).contains("WORN")),
+                        "THE FRESH DOOR LAW: the shop row reads OWNED/WORN right after the buy")
+        _find_btn(G.cs_sheets.back()["box"], "CLOSE").pressed.emit()
+        await _wait(0.4)
+        ck(String(G.cs_sheets.back()["id"]) == "door",
+                        "THE FRESH DOOR LAW: CLOSE reveals the door")
+        ck(_find_lbl_like(G.cs_sheets.back()["box"], "WORN") != null,
+                        "THE FRESH DOOR LAW: the door wears the bought place (no stale BUY)")
+        ck(_find_btn_like(G.cs_sheets.back()["box"], "BUY") == null,
+                        "THE FRESH DOOR LAW: no stale BUY card on the door")
+        # THE TOP BUTTONS LAW: the top bar answers over every paused sheet
+        ck(G._hud_row != null and G._hud_row.process_mode == Node.PROCESS_MODE_ALWAYS,
+                        "THE TOP BUTTONS LAW: the top bar processes over the pause")
+        # THE WARDEN LAW: friends inside the gold ring take HALF damage
+        G._cs_close_all()
+        G._start_run()
+        G.phase = "play"
+        G.enemies.clear()
+        var ward_target: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(100, 0))
+        var warden: Dictionary = G._spawn_enemy("warden", G.p_pos + Vector2(120, 0))
+        var ward_far: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(1200, 0))
+        G._hurt_enemy(ward_target, 20.0)
+        ck(absf((float(ward_target["max_hp"]) - 10.0) - float(ward_target["hp"])) < 0.01,
+                        "THE WARDEN LAW: a friend inside the ring takes HALF damage")
+        G._hurt_enemy(ward_far, 20.0)
+        ck(absf((float(ward_far["max_hp"]) - 20.0) - float(ward_far["hp"])) < 0.01,
+                        "THE WARDEN LAW: an enemy outside the ring takes full damage")
+        warden["dead"] = true
+        G._hurt_enemy(ward_target, 20.0)
+        ck(absf(float(ward_target["hp"]) - (float(ward_target["max_hp"]) - 30.0)) < 0.01,
+                        "THE WARDEN LAW: the warden falls, the guard dies with it")
+        # THE FIRST-GLANCE LAW: the first special enemy explains itself, once
+        meta.d["seen_kinds"] = []
+        G._spawn_enemy("wraith", G.p_pos + Vector2(-300, 0))
+        ck(meta.seen_kind("wraith"),
+                        "THE FIRST-GLANCE LAW: the first wraith marks itself seen")
+        G._spawn_enemy("wraith", G.p_pos + Vector2(-500, 0))
+        ck((meta.d["seen_kinds"] as Array).count("wraith") == 1,
+                        "THE FIRST-GLANCE LAW: the hint speaks ONCE per save")
+        # THE MELEE LAW: the cleaver's arc chops what's inside, not behind
+        G.enemies.clear()
+        G.weapons_run = [{"id": "cleaver", "tier": 1, "cd": 0.0}]
+        var melee_front: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(90, 0))
+        var melee_back: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(-90, 0))
+        G.p_aim = 0.0
+        var fired: bool = G._fire_weapon(G.weapons_run[0])
+        ck(fired and float(melee_front["hp"]) < float(melee_front["max_hp"]),
+                        "THE MELEE LAW: the arc chops the enemy in the swing")
+        ck(float(melee_back["hp"]) == float(melee_back["max_hp"]),
+                        "THE MELEE LAW: the enemy behind the swing stays untouched")
+        ck(G._slashes.size() > 0,
+                        "THE MELEE LAW: the swing draws its slash arc")
+        # THE TIER RANGE LAW: tiers climb the range, the cards say the truth
+        ck(absf(float(CSData.tier_mult(2)["rng"]) - 1.1) < 0.001,
+                        "THE TIER RANGE LAW: T2 range x1.1")
+        ck(absf(float(CSData.tier_mult(3)["rng"]) - 1.25) < 0.001,
+                        "THE TIER RANGE LAW: T3 range x1.25")
+        ck("rng 130" in G._weapon_stat_line("cleaver", 1)
+                        and "(melee)" in G._weapon_stat_line("cleaver", 1),
+                        "THE TIER RANGE LAW: the cleaver's card reads rng 130 (melee)")
+        ck("rng 330" in G._weapon_stat_line("smg", 2),
+                        "THE TIER RANGE LAW: the card shows the tier's real range")
+        # THE BIG TEXT LAW: one multiplier feeds every CSUI helper
+        ck(G._fs(12) == 21 and G._fs(20) == 35,
+                        "THE BIG TEXT LAW: the scale is x1.75")
+        var scaled: Label = G._cs_label("x", 12, Color.WHITE)
+        ck(int(scaled.get_theme_font_size("font_size")) == 21,
+                        "THE BIG TEXT LAW: labels render scaled")
+        # THE INFO LAW: the ledgers file the deltas, the rows speak the shape
+        G.stat_up.clear()
+        G.stat_down.clear()
+        G._apply_stat("dmg", 0.20)
+        G._apply_stat("dmg", -0.08)
+        var info_rows: Array = G._info_stat_rows()
+        ck(info_rows.size() == G.INFO_STATS.size(),
+                        "THE INFO LAW: every stat has a block")
+        var dmg_row := {}
+        for r in info_rows:
+                if String(r["key"]) == "dmg_m":
+                        dmg_row = r
+        ck(String(dmg_row["up"]) == "20%" and String(dmg_row["down"]) == "8%",
+                        "THE INFO LAW: the ledgers file the ups and the downs")
+        ck(String(dmg_row["result"]) == "122%",
+                        "THE INFO LAW: the result is the live truth (base +20 -8)")
+        G._cs_close_all()
+        G._info_open()
+        await _wait(0.3)
+        ck(String(G.cs_sheets.back()["id"]) == "info",
+                        "THE INFO LAW: the INFO button opens RUN INFO")
+        # THE VARIED HOLSTER LAW: every start wears a signature gun
+        for sid in CSData.STARTS:
+                ck(CSData.START_SIG.has(sid),
+                                "THE VARIED HOLSTER LAW: %s wears a signature gun" % String(sid))
+        meta.set_loadout(["smg", "shotgun", "rifle"])
+        G.start_id = "brawler"
+        G._start_run()
+        await _wait(0.3)
+        ck(String(G.meta.loadout()[0]) == "shotgun",
+                        "THE VARIED HOLSTER LAW: DROP IN arms the brawler's SCATTER SPUD first")
+        # the new pixels exist
+        ck(G._t("warden") != null and G._t("gun_cleaver") != null \
+                        and G._t("icon_cleaver") != null,
+                        "THE ART: the warden + the cleaver wear their new pixels")
+
         # fresh probe exit
         Box.reset_all()
         print("=== cs_probe: %d checks, %d fails ===" % [checks, fails])

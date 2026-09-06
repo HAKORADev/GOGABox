@@ -72,18 +72,31 @@ const WEAPONS := {
         "gravity":   {"name": "GRAVITY WELL",   "dmg": 18.0, "cad": 2.20, "rng": 420.0,
                 "pspd": 260.0, "count": 1, "spread": 0.0, "pierce": 0, "price": 900,
                 "shot": "cs_boom", "proj": "orb", "aoe": 90.0, "pull": 2.0},
+        "cleaver":   {"name": "PEEL CLEAVER",    "dmg": 16.0, "cad": 0.55, "rng": 130.0,
+                "pspd": 0.0, "count": 1, "spread": 0.0, "pierce": 99, "price": 350,
+                "shot": "cs_slash", "proj": "melee", "melee": true, "arc": 2.1},
 }
 const WEAPON_ORDER := ["smg", "shotgun", "rifle", "laser", "cannon", "frost",
-        "flame", "rail", "boomerang", "minigun", "fryer", "gravity"]
+        "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "cleaver"]
 ## the 3 weapons every new player owns (the owner: "starts with only 3")
 const START_WEAPONS := ["smg", "shotgun", "rifle"]
+## THE VARIED HOLSTER LAW (v0.3.5, the owner: "it is weird how all types of
+## characters starts with same weapons"): each start's signature gun rides
+## slot 1 on DROP IN (when owned).
+const START_SIG := {
+        "soldier": "smg", "ranger": "rifle", "brawler": "shotgun",
+        "engineer": "smg", "pyro": "shotgun", "frostbite": "rifle",
+}
 
 static func tier_mult(tier: int) -> Dictionary:
-        # T1 = the table; T2 = x1.6 dmg / x0.9 cad; T3 = x2.4 dmg / x0.8 cad +1 proj
+        # T1 = the table; T2 = x1.6 dmg / x0.9 cad / x1.1 rng;
+        # T3 = x2.4 dmg / x0.8 cad / x1.25 rng +1 proj
+        # THE TIER RANGE LAW (v0.3.5, the owner: "a merge should really
+        # increase those stuff"): range climbs with the tier now too.
         match tier:
-                2: return {"dmg": 1.6, "cad": 0.9, "count": 0}
-                3: return {"dmg": 2.4, "cad": 0.8, "count": 1}
-        return {"dmg": 1.0, "cad": 1.0, "count": 0}
+                2: return {"dmg": 1.6, "cad": 0.9, "count": 0, "rng": 1.1}
+                3: return {"dmg": 2.4, "cad": 0.8, "count": 1, "rng": 1.25}
+        return {"dmg": 1.0, "cad": 1.0, "count": 0, "rng": 1.0}
 
 static func weapon_price(wid: String, tier: int) -> int:
         var base: int = int(WEAPONS[wid]["price"])
@@ -110,16 +123,20 @@ const ENEMIES := {
                 "xp": 2, "score": 2, "tex": "chunk", "from": 3},
         "spitter":  {"name": "SPITTER", "hp": 25.0, "spd": 60.0, "dmg": 15.0, "size": 23.0,
                 "xp": 2, "score": 2, "tex": "spitter", "from": 4, "shoot": true,
-                "keep": 260.0},
+                "keep": 260.0,
+                "hint": "THE SPITTER spits - watch the green glob and dodge it!"},
         "wraith":   {"name": "AURA WRAITH", "hp": 100.0, "spd": 30.0, "dmg": 10.0, "size": 30.0,
                 "xp": 4, "score": 4, "tex": "wraith", "from": 5, "aura": 250.0,
-                "aura_dps": 15.0},
+                "aura_dps": 15.0,
+                "hint": "THE AURA WRAITH - its violet ring hurts you while you stand inside!"},
         "brood":    {"name": "BROODMOTHER", "hp": 50.0, "spd": 45.0, "dmg": 10.0, "size": 26.0,
                 "xp": 3, "score": 3, "tex": "brood", "from": 6, "split": ["minion", "minion"]},
         "trishield": {"name": "TRI-SHIELD", "hp": 300.0, "spd": 50.0, "dmg": 20.0, "size": 30.0,
-                "xp": 6, "score": 6, "tex": "trishield", "from": 7, "rings": true},
+                "xp": 6, "score": 6, "tex": "trishield", "from": 7, "rings": true,
+                "hint": "THE TRI-SHIELD - its blue rings are a shield: shoot through the gaps!"},
         "mender":   {"name": "MENDER", "hp": 1000.0, "spd": 35.0, "dmg": 10.0, "size": 30.0,
-                "xp": 8, "score": 8, "tex": "mender", "from": 8, "heal": 500.0},
+                "xp": 8, "score": 8, "tex": "mender", "from": 8, "heal": 500.0,
+                "hint": "THE MENDER heals its friends inside the green ring - end it first!"},
         "charger":  {"name": "CHARGER", "hp": 45.0, "spd": 95.0, "dmg": 18.0, "size": 26.0,
                 "xp": 2, "score": 2, "tex": "charger", "from": 9, "charge": true},
         "boomling": {"name": "BOOMLING", "hp": 20.0, "spd": 115.0, "dmg": 5.0, "size": 20.0,
@@ -128,6 +145,9 @@ const ENEMIES := {
                 "xp": 2, "score": 2, "tex": "splitter", "from": 11, "split_gen": 2},
         "orbiter":  {"name": "ORBITER", "hp": 35.0, "spd": 135.0, "dmg": 10.0, "size": 24.0,
                 "xp": 2, "score": 2, "tex": "orbiter", "from": 12, "orbit": true},
+        "warden":   {"name": "THE WARDEN", "hp": 320.0, "spd": 38.0, "dmg": 15.0, "size": 30.0,
+                "xp": 7, "score": 7, "tex": "warden", "from": 9, "ward": 260.0,
+                "hint": "THE WARDEN - its friends take HALF damage inside the gold ring!"},
         "minion":   {"name": "MINION", "hp": 15.0, "spd": 140.0, "dmg": 8.0, "size": 13.0,
                 "xp": 1, "score": 1, "tex": "minion", "from": 99},
 }
@@ -262,6 +282,7 @@ const THEME_ORDER := ["desert", "park"]
 ## GOGACoins; the in-run costs stay cosmic coins.
 const SHOP_GUNS := {
         "shotgun": 300, "laser": 350, "rail": 450, "gravity": 550,
+        "cleaver": 350,
 }
 const SHOP_CREW := {
         "drone": 250, "turret": 300, "guard": 300,
@@ -461,8 +482,8 @@ static func elite_chance(wave: int) -> float:
 static func pool_for_wave(wave: int) -> Array:
         var pool: Array = ["blab", "blab", "blab"]
         var unlock := {"sprinter": 2, "chunk": 3, "spitter": 4, "wraith": 5,
-                "brood": 6, "trishield": 7, "mender": 8, "charger": 9, "boomling": 10,
-                "splitter": 11, "orbiter": 12}
+                "brood": 6, "trishield": 7, "mender": 8, "warden": 9, "charger": 9,
+                "boomling": 10, "splitter": 11, "orbiter": 12}
         for k in unlock:
                 if wave >= int(unlock[k]):
                         pool.append(k)
