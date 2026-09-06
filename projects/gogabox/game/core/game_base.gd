@@ -240,6 +240,11 @@ func check_achievements() -> int:
                         "depth_20": ok = Box.counter(game_id, "depth") >= 20
                         "peace_300": ok = Box.counter(game_id, "peace_secs") >= 300
                         "challenge_1500": ok = Box.counter(game_id, "challenge_best") >= 1500
+                        # v0.3.5 - pop siege (the bloon siege)
+                        "pop_1000": ok = Box.counter(game_id, "pops_run") >= 1000
+                        "moab_1": ok = Box.counter(game_id, "moab_kills") >= 1
+                        "wave_25": ok = Box.counter(game_id, "wave_best") >= 25
+                        "gear3_any": ok = Box.counter(game_id, "gears3") >= 1
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)

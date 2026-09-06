@@ -465,16 +465,45 @@ const GAMES := [
                 "age": "everyone",
                 "charge_unlock": 200,
                 "reveal": {"kind": "direct", "appear_after": 2, "price": 450, "needs_games": 4}},
-        {"id": "poptd", "title": "Pop TD", "tag": "tower defense port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/poptd.png",
-                "desc": "Place towers, pop the waves, defend the base. Classic TD energy.",
+        # v0.3.5 POP SIEGE - graduated from the old "Pop TD" SOON teaser (the
+        # owner's PGB port grew up into the real thing). The bloon siege:
+        # 30 maps (day + night bundled), 10 folk x 3 gears x 10 upgrades,
+        # the in-range pacts, PopCoins, and a GOGACoin hiding in a bloon
+        # every 10 waves. The owner's graduation ritual honored (matcher
+        # style): direct reveal, 100 charges, 3 games, 400 coins.
+        {
+                "id": "pop_siege", "title": "Pop Siege", "tag": "the bloon siege",
+                "script": "res://game/games/pop_siege/pop_siege.gd",
+                "thumb": "res://assets/thumbs/pop_siege.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 1000, "price": 400, "fee": 10, "shop": true,
+                "banner": true,   # the field ends above the strip
+                "charge_unlock": 100,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
+                "desc": "The bloons march the winding roads and the folk hold the line. 30 handcrafted maps (each with its own day and night), 10 defenders with 3 gears and 10 upgrades each, pacts between neighbors (the marshal's drum, the rally, thermal shock), fire traps, eternal flames, THE FLUX that teleports bloons back, and every 10 waves a GOGACoin hides inside a bloon. Every hit is a point; the run bonus is score /1000.",
+                "controls": [
+                        "tap a folk card, then drag onto GREEN grass - red cells are road, water or blocked by props",
+                        "tap a placed folk to open its panel: every stat row shows its value >> what the next upgrade adds",
+                        "10 levels per gear; at 10 the GEAR UP button jumps it to the next gear - new power, new look",
+                        "folk near each other earn PACTS - small badges appear over the buffed folk",
+                        "the target button cycles first / last / strong / close; SELL pays back",
+                        "PLAY calls the wave early for bonus PopCoins; the x1/x2 button speeds the siege",
+                        "OPTIONALS > MAPS opens the 2x15 map wall - every map wears day and night",
+                        "the SHOP (top bar) sells the folk and the maps for GOGACoins - the trio and the three starter maps are free",
+                ],
                 "genres": {"main": ["strategy", "action"], "sub": ["tower-defense", "singleplayer"]},
                 "age": "everyone",
-                "reveal": {"kind": "orders", "appear_after": 4, "price": 500, "needs_games": 4,
-                        "orders": [
-                                {"type": "spend_in", "game": "merge", "amount": 200},
-                                {"type": "plays", "game": "lanes", "count": 10},
-                        ]}},
+                "ach": [
+                        {"id": "pop_1000", "title": "Pop Authority", "desc": "Pop 1000 bloon layers total"},
+                        {"id": "moab_1", "title": "The Big One", "desc": "Ground a blimp"},
+                        {"id": "wave_25", "title": "Half the Siege", "desc": "Reach wave 25 on any map"},
+                        {"id": "gear3_any", "title": "Full Gear", "desc": "Push a folk to gear 3"},
+                ],
+        },
+
+
+        # (the old "Pop TD" teaser graduated into POP SIEGE above - the PGB
+        # port is real now)
         # v0.2.3 patch (owner: "add a game called geometry flash put it as
         # 'soon' because the current one will be a new game instead of the
         # geometry flash game i planned for"): the REAL Geometry Flash takes

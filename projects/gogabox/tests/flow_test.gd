@@ -305,11 +305,11 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 11,
-                "11 playable games (cosmic spud joined)")
-        # v0.3.2: 6 teasers - HEN graduated into SPACE INVADERS (the rename law)
-        ok += _check(GameReg.workshop().size() == 4,
-                "4 workshop teasers (spud graduated)")
+        var ok := _check(GameReg.playable().size() == 12,
+                "12 playable games (pop siege joined)")
+        # v0.3.5: the POPTD teaser graduated into POP SIEGE (the rename law)
+        ok += _check(GameReg.workshop().size() == 3,
+                "3 workshop teasers (poptd graduated)")
         ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
                 "the hen teaser ships as SPACE INVADERS (rename law)")
         ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
@@ -633,12 +633,12 @@ func _t_mystery_queue() -> int:
         ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 1 at 2 owned")
         ok += _check(Roadmap.state("keys") == "CHARGING",
                 "keys CHARGING at 2 owned (direct + 200-charge meter)")
-        # own 3 -> nothing new (poptd needs 4)
+        # own 3 -> nothing new (keys needs 4, geometry resolved at 2)
         Box.unlock_game("lanes", 0)
-        ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd still waiting at 3 owned")
-        # own 4 -> poptd joins: the queue stays under MYSTERY_CAP
+        ok += _check(Roadmap.state("maze") == "MYSTERY", "the queue holds at 3 owned")
+        # own 4 -> keys joins the workshop, the queue stays under MYSTERY_CAP
         Box.unlock_game("slasher", 0)
-        ok += _check(Roadmap.state("poptd") == "MYSTERY", "poptd takes slot 2 at 4 owned")
+        ok += _check(Roadmap.state("keys") != "HIDDEN", "keys resolves at 4 owned")
         ok += _check(Roadmap.state("maze") == "MYSTERY", "rest of the queue intact")
         Box.reset_all()
         return ok
