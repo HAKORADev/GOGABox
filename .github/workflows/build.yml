@@ -179,6 +179,20 @@ jobs:
           cp "$DIR/templates/"* "$HOME/.local/share/godot/export_templates/${V}.${R}/"
           ls -la "$HOME/.local/share/godot/export_templates/${V}.${R}/"
 
+      - name: Stage the shared plugin addons (the GDScript autoloads)
+        run: |
+          # the addons are NOT committed (gitignored) - the android flow
+          # stages them in materialize-project.sh; the exe needs the same
+          # GDScript side (notify.gd / ads.gd are project autoloads)
+          mkdir -p projects/gogabox/addons
+          for plugin in $(jq -r '.projects.gogabox.use_plugins[]' config/projects.json); do
+            ADDON_DIR="$(jq -r '.addon_dir' "plugins/$plugin/plugin.meta.json")"
+            rm -rf "projects/gogabox/addons/$ADDON_DIR"
+            cp -a "plugins/$plugin/addon" "projects/gogabox/addons/$ADDON_DIR"
+            echo "staged addon: $ADDON_DIR"
+          done
+          ls projects/gogabox/addons/
+
       - name: Import the project
         run: .cache/godot-win/bin/godot --headless --path projects/gogabox --import
 
