@@ -1,11 +1,11 @@
-# PLAN v0.3.5 — COSMIC SPUD PATCH 5 (the owner's full playtest round)
+# PLAN v0.3.4-5 — COSMIC SPUD PATCH 5 (the owner's full playtest round)
 
 **Round:** 2026-09-06. The owner finally felt the rogue-like loop ("now it
 really feels like a real rogue-like game") and shipped a full report. This is
 likely the last CS patch for a while — the owner is planning the next game's
 GDD in parallel, so quality bar: bug-free, probed, QA-shot.
-**Status:** DONE — one commit, CI green, no release (the law). All 18 laws shipped: cs_probe 186/0, flow_test + every game probe green, qa_v035 shots eyeballed.
-**Version:** 0.3.5 / version_code_base 30600.
+**Status:** DONE — one commit, CI green, no release (the law). All 18 laws shipped: cs_probe 186/0, flow_test + every game probe green, qa_v034p5 shots eyeballed.
+**Version:** 0.3.4-5 / version_code_base 30520.
 
 ## THE LAWS
 

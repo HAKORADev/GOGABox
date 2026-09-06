@@ -39,7 +39,7 @@ func _heal() -> void:
                 "gogacoins": 0,             # the every-5th-wave riders, lifetime
                 "skills": {},               # THE SKILLS (v0.3.4-3): id -> true
                 "skill_spent": 0,           # the spent skill points
-                "seen_kinds": [],           # THE FIRST-GLANCE LAW (v0.3.5)
+                "seen_kinds": [],           # THE FIRST-GLANCE LAW (v0.3.4-5)
         }
         for k in base:
                 if not d.has(k):
@@ -48,7 +48,7 @@ func _heal() -> void:
 func save() -> void:
         Box.set_progress("cosmic_spud", KEY, d)
 
-## THE FIRST-GLANCE LAW (v0.3.5): each special enemy's hint banner speaks
+## THE FIRST-GLANCE LAW (v0.3.4-5): each special enemy's hint banner speaks
 ## ONCE per save - the first encounter explains itself, then never nags.
 func seen_kind(kind: String) -> bool:
         return kind in (d.get("seen_kinds", []) as Array)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v0.3.5 - THE PEEL CLEAVER's chop: a synthesized whoosh+thud (the raw CC0
+"""v0.3.4-5 - THE PEEL CLEAVER's chop: a synthesized whoosh+thud (the raw CC0
 hunt from the v034 round is gone with the sandbox, so numpy it is)."""
 import numpy as np, wave, os
 

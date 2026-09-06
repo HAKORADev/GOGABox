@@ -1,11 +1,11 @@
 extends Node
-## qa_v035 - the PATCH-5 Xvfb shot driver. Rigs (QA_RIG env):
+## qa_v034p5 - the PATCH-5 Xvfb shot driver. Rigs (QA_RIG env):
 ##   door   - THE DOOR with THE BIG TEXT law (x1.75) + the WORN theme card
 ##   info   - the RUN INFO sheet (the 5-line stat blocks)
 ##   arena  - the auras READING: the wraith's violet field, the warden's gold
 ##            ring, the mender's green care + THE AIM SIGHT line
 ##   armory - the armory with the cleaver's "rng 130 (melee)" card
-##   DISPLAY=:95 QA_RIG=info godot --path . res://tests/qa_v035.tscn
+##   DISPLAY=:95 QA_RIG=info godot --path . res://tests/qa_v034p5.tscn
 
 var G: GogaGame
 
@@ -68,10 +68,10 @@ func _ready() -> void:
                         await _wait_frames(30)
         var shot := OS.get_environment("QA_SHOT")
         if shot.is_empty():
-                shot = "/tmp/qa_v035_%s.png" % rig
+                shot = "/tmp/qa_v034p5_%s.png" % rig
         await RenderingServer.frame_post_draw
         get_viewport().get_texture().get_image().save_png(shot)
-        print("qa_v035 shot: ", shot)
+        print("qa_v034p5 shot: ", shot)
         get_tree().quit(0)
 
 func _settle() -> void:

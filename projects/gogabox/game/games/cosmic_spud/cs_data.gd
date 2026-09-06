@@ -80,7 +80,7 @@ const WEAPON_ORDER := ["smg", "shotgun", "rifle", "laser", "cannon", "frost",
         "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "cleaver"]
 ## the 3 weapons every new player owns (the owner: "starts with only 3")
 const START_WEAPONS := ["smg", "shotgun", "rifle"]
-## THE VARIED HOLSTER LAW (v0.3.5, the owner: "it is weird how all types of
+## THE VARIED HOLSTER LAW (v0.3.4-5, the owner: "it is weird how all types of
 ## characters starts with same weapons"): each start's signature gun rides
 ## slot 1 on DROP IN (when owned).
 const START_SIG := {
@@ -91,7 +91,7 @@ const START_SIG := {
 static func tier_mult(tier: int) -> Dictionary:
         # T1 = the table; T2 = x1.6 dmg / x0.9 cad / x1.1 rng;
         # T3 = x2.4 dmg / x0.8 cad / x1.25 rng +1 proj
-        # THE TIER RANGE LAW (v0.3.5, the owner: "a merge should really
+        # THE TIER RANGE LAW (v0.3.4-5, the owner: "a merge should really
         # increase those stuff"): range climbs with the tier now too.
         match tier:
                 2: return {"dmg": 1.6, "cad": 0.9, "count": 0, "rng": 1.1}

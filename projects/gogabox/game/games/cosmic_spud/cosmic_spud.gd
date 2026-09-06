@@ -89,7 +89,7 @@ var p_iframe := 0.0
 var p_walk := 0.0
 var p_node: Sprite2D
 var stats := {}                   # the live stat block (see _base_stats)
-# THE INFO LAW (v0.3.5): the run's stat truth - the base snapshot + the
+# THE INFO LAW (v0.3.4-5): the run's stat truth - the base snapshot + the
 # up/down ledgers every delta files into (see _apply_stat)
 var stat_base := {}
 var stat_up := {}
@@ -207,7 +207,7 @@ func _t(key: String) -> Texture2D:
 
 # ===================================================== THE CSUI (the kit)
 ## the game's own UI kit. NOTHING here touches the box's ui_kit.
-## THE BIG TEXT LAW (v0.3.5, the owner: "the game overall text is too small,
+## THE BIG TEXT LAW (v0.3.4-5, the owner: "the game overall text is too small,
 ## it needs to get like 75% bigger with proper UI handling"): ONE multiplier
 ## feeds every CSUI helper - the text grows, the buttons grow with it, and
 ## the TEXT-FIT measurements stay truthful (they scale through the same door).
@@ -428,7 +428,7 @@ func _cs_close_top() -> void:
                 return
         _cs_pop_top()
         if cs_sheets.is_empty():
-                # THE RESUME LAW (v0.3.5): the X / CLOSE buttons carry the same
+                # THE RESUME LAW (v0.3.4-5): the X / CLOSE buttons carry the same
                 # safety the Android back always had - a break that lost its
                 # last sheet falls back to the market, never stranded.
                 _resume_break()
@@ -447,7 +447,7 @@ func _cs_pop_top() -> void:
                 get_tree().paused = false
                 paused = false
 
-## THE FRESH DOOR LAW (v0.3.5, the owner: "i bought the other theme and
+## THE FRESH DOOR LAW (v0.3.4-5, the owner: "i bought the other theme and
 ## closed shop, the optionals menu still tells me to buy the place - it
 ## should get updated"): whenever a close reveals THE DOOR, the door
 ## rebuilds from LIVE state - a purchase under any sheet can never leave
@@ -823,7 +823,7 @@ func _build_hud() -> void:
         # the box chrome FIRST (its canvas layer + overlay root + back button),
         # then the game's own widgets on top - the box labels hide after
         super._build_hud()
-        # THE TOP BUTTONS LAW (v0.3.5, the owner: "first time it let me open
+        # THE TOP BUTTONS LAW (v0.3.4-5, the owner: "first time it let me open
         # the shop from the top button, but now it's not"): the box's top bar
         # (the "<" back + the SHOP button) processes while the CS sheets
         # pause the tree - the top buttons answer EVERY time now, over every
@@ -1145,7 +1145,7 @@ func _fire_weapon(w: Dictionary) -> bool:
         # THE STARCH RAGE: below 35% HP the potato bites back harder
         if meta.has_skill("starch_rage") and p_hp < p_max_hp * 0.35:
                 base_dmg *= 1.4
-        # THE MELEE LAW (v0.3.5): THE PEEL CLEAVER - one fast arc chop, the
+        # THE MELEE LAW (v0.3.4-5): THE PEEL CLEAVER - one fast arc chop, the
         # whole swing bites everything inside. No bullet: the arc IS it.
         if bool(wd.get("melee", false)):
                 var arc: float = float(wd.get("arc", 2.1))
@@ -1481,7 +1481,7 @@ func _spawn_enemy(kind: String, pos: Vector2, elite := false) -> Dictionary:
                 e["hurt_m"] = CSData.ELITE_AFFIX["armored"]["hurt"]
         if kind == "trishield":
                 e["rings"] = _mk_rings([90.0, 70.0, 50.0])
-        # THE SPECIAL-KEY LAW (v0.3.5 root-cause fix): the enemy dict carries
+        # THE SPECIAL-KEY LAW (v0.3.4-5 root-cause fix): the enemy dict carries
         # its OWN aura/ward/heal numbers - v0.3.4 left them only in the data
         # table, so the wraith's aura NEVER drew (e.get("aura", 0.0) was
         # always 0 - the owner only ever saw the ring baked into the art)
@@ -1490,7 +1490,7 @@ func _spawn_enemy(kind: String, pos: Vector2, elite := false) -> Dictionary:
                 if ed.has(special):
                         e[special] = float(ed[special])
         enemies.append(e)
-        # THE FIRST-GLANCE LAW (v0.3.5): the first time a special enemy
+        # THE FIRST-GLANCE LAW (v0.3.4-5): the first time a special enemy
         # shows up, one hint banner speaks its truth - once per save.
         if String(ed.get("hint", "")) != "" and not meta.seen_kind(kind):
                 meta.mark_seen_kind(kind)
@@ -1706,7 +1706,7 @@ func _tick_enemies(delta: float) -> void:
                                 if e["aura_tick"] <= 0.0:
                                         e["aura_tick"] = 1.0
                                         _hurt_player(float(e.get("aura_dps", 15.0)), e)
-                                        # THE WRAITH TRUTH LAW (v0.3.5): the tick
+                                        # THE WRAITH TRUTH LAW (v0.3.4-5): the tick
                                         # SPEAKS - a violet pulse rides the ring
                                         # (the owner felt damage with no feedback)
                                         _rings.append({"pos": e["pos"],
@@ -1959,7 +1959,7 @@ func _spawn_boss(wave: int) -> void:
         Jukebox.music("res://assets/audio/music/cs_boss.ogg")
         _banner("%s ARRIVES!" % String(bd["name"]), false)
 
-## THE WARDEN's guard (v0.3.5): 0.5 while `e` stands inside a living
+## THE WARDEN's guard (v0.3.4-5): 0.5 while `e` stands inside a living
 ## warden's gold ring - the warden never wards itself.
 func _ward_cut(e: Dictionary) -> float:
         for w in enemies:
@@ -2857,7 +2857,7 @@ func _market_items(shelf: VBoxContainer) -> void:
                             func(): _shop_buy_supply(cid_s, price), can3))
         _cards_row(shelf, scards)
 
-## THE TIER RANGE LAW's face (v0.3.5): ONE honest stat line - the EFFECTIVE
+## THE TIER RANGE LAW's face (v0.3.4-5): ONE honest stat line - the EFFECTIVE
 ## dmg / cadence / range of this weapon at this tier. Melee says "melee".
 func _weapon_stat_line(wid: String, tier: int) -> String:
         var wd: Dictionary = CSData.WEAPONS[wid]
@@ -3046,7 +3046,7 @@ func _shop_buy_weapon(off: Dictionary) -> void:
         off["sold"] = true
         Jukebox.sfx("cs_buy", -4.0)
         _rebuild_slots()
-        # THE RIGHT-SHEET LAW (v0.3.5): a market buy rebuilds THE MARKET -
+        # THE RIGHT-SHEET LAW (v0.3.4-5): a market buy rebuilds THE MARKET -
         # the patch-4 rename pointed these at the universal shop and a buy
         # hijacked the whole break.
         _cs_reopen(func(): _market_open())
@@ -3356,7 +3356,7 @@ func _build_armory(box: VBoxContainer) -> void:
                 var b := _cs_button(lbl, 13,
                                 CS_YELLOW if _armory_tab == t_s else CS_WHITE, func():
                         _armory_tab = t_s
-                        # THE ARMORY TABS LAW (v0.3.5): a tab rebuilds THE
+                        # THE ARMORY TABS LAW (v0.3.4-5): a tab rebuilds THE
                         # ARMORY - the patch-4 copy-paste sent it to THE SHOP
                         # and hijacked the sheet.
                         _cs_reopen(func(): _armory_open()))
@@ -3577,7 +3577,7 @@ func _armory_sell(wid: String, tier: int, refund: int) -> void:
         _cs_reopen(func(): _armory_open())
 
 # ================================================================== INFO
-## THE INFO LAW (v0.3.5, the owner: "put another button in the top left and
+## THE INFO LAW (v0.3.4-5, the owner: "put another button in the top left and
 ## call it info... show the whole status for real, like luck = nn% and
 ## damage = nn... as a list"): the run's own truth sheet. The header carries
 ## what was collected; every stat wears his exact five-line shape.
@@ -3700,7 +3700,7 @@ func _build_optionals(box: VBoxContainer) -> void:
         shelf.add_theme_constant_override("separation", 8)
         scroll.add_child(shelf)
         var grid := GridContainer.new()
-        # THE BIG TEXT LAW's door handling (v0.3.5): two across - three big
+        # THE BIG TEXT LAW's door handling (v0.3.4-5): two across - three big
         # cards overflow the portrait door, two fill it with room to read
         grid.columns = 2
         grid.add_theme_constant_override("h_separation", 10)
@@ -3893,7 +3893,7 @@ func _start_run() -> void:
         p_node.texture = _t("hero_" + start_id + "_f0")
         cam.position = _cam_clamp_pos(p_pos)
         _rebuild_weapons()
-        # THE VARIED HOLSTER LAW (v0.3.5, the owner: "it is weird how all
+        # THE VARIED HOLSTER LAW (v0.3.4-5, the owner: "it is weird how all
         # types of characters starts with same weapons"): the start's
         # signature gun rides slot 1 (when owned).
         var sig: String = String(CSData.START_SIG.get(start_id, ""))
@@ -4121,7 +4121,7 @@ func _draw_fx(L: CanvasItem) -> void:
                         continue
                 if e.get("aura", 0.0) > 0.0:
                         var breathe := 0.5 + 0.14 * sin(Time.get_ticks_msec() / 260.0)
-                        # THE WRAITH TRUTH LAW (v0.3.5): the ring READS - a fat
+                        # THE WRAITH TRUTH LAW (v0.3.4-5): the ring READS - a fat
                         # breathing violet field, never a whisper
                         L.draw_circle(e["pos"], float(e["aura"]),
                                         Color(0.72, 0.42, 1.0, 0.15 * breathe))
@@ -4129,7 +4129,7 @@ func _draw_fx(L: CanvasItem) -> void:
                                         Color(0.78, 0.45, 1.0, 0.6), 3.5)
                         L.draw_arc(e["pos"], float(e["aura"]) - 8.0, 0, TAU, 48,
                                         Color(0.78, 0.45, 1.0, 0.25), 2.0)
-                # THE HEALER IN THE OPEN LAW (v0.3.5): the mender's 500px
+                # THE HEALER IN THE OPEN LAW (v0.3.4-5): the mender's 500px
                 # heal field draws - green cross care, visible care
                 if String(e.get("kind", "")) == "mender":
                         var hb := 0.5 + 0.12 * sin(Time.get_ticks_msec() / 320.0)
@@ -4137,7 +4137,7 @@ func _draw_fx(L: CanvasItem) -> void:
                                         Color(0.35, 1.0, 0.5, 0.07 * hb))
                         L.draw_arc(e["pos"], float(e.get("heal", 500.0)), 0, TAU, 56,
                                         Color(0.4, 1.0, 0.55, 0.5), 3.0)
-                # THE WARDEN LAW (v0.3.5): the gold half-damage field draws
+                # THE WARDEN LAW (v0.3.4-5): the gold half-damage field draws
                 if float(e.get("ward", 0.0)) > 0.0:
                         var wb := 0.5 + 0.13 * sin(Time.get_ticks_msec() / 280.0)
                         L.draw_circle(e["pos"], float(e["ward"]),
@@ -4217,7 +4217,7 @@ func _draw_fx(L: CanvasItem) -> void:
                                 float(s["a"]) - float(s["arc"]) * 0.5,
                                 float(s["a"]) + float(s["arc"]) * 0.5, 20,
                                 Color(1.0, 0.9, 0.55, 0.35 * sa), 4.0)
-        # the aim sight (THE AIM SIGHT LAW, v0.3.5): the aim aid is back,
+        # the aim sight (THE AIM SIGHT LAW, v0.3.4-5): the aim aid is back,
         # PROPER - a calm straight line along the aim to the first gun's
         # real reach. Steady alpha (never flickers), a soft brighter core,
         # a small end dot. The ugly wobbly laser stays dead.

@@ -343,7 +343,7 @@ The owner's v0.3.4 verdict: 0.5/10. The full defect list + the fixes live in
   in the optionals line; the armory themes tab wears the green GOGACoin
   chip and says which side of the border each currency owns.
 
-## 16. PATCH 5 (v0.3.5, the owner's full-playtest round — the laws)
+## 16. PATCH 5 (v0.3.4-5, the owner's full-playtest round — the laws)
 
 The full tracker: `cosmic_spud_patch5.md`. The headline laws:
 

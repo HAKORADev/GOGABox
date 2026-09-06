@@ -1,9 +1,9 @@
-# COSMIC SPUD — PATCH 5 (v0.3.5, the owner's full-playtest round)
+# COSMIC SPUD — PATCH 5 (v0.3.4-5, the owner's full-playtest round)
 
 > "ok tested it and now it really feels like a real rogue-like game" — and
 > then the report. This patch fixes every line of it. Likely the last CS
 > patch for a while: the owner is planning the NEXT game's GDD while this
-> ships. The plan lives in `docs/goga_docs/plans/PLAN_v035.md`.
+> ships. The plan lives in `docs/goga_docs/plans/PLAN_v034p5.md`.
 
 ## THE FLOW LAWS (the three stuck reports)
 
@@ -100,11 +100,11 @@
 - cs_probe: 186 checks 0 fails (38 new patch-5 laws).
 - flow_test ALL PASS; matcher 211/0; invaders/slasher/dario/merge/pong
   ALL PASS.
-- qa_v035 Xvfb shots eyeballed: the door (big text, WORN card, no
+- qa_v034p5 Xvfb shots eyeballed: the door (big text, WORN card, no
   overflow), RUN INFO (the five-line blocks), the armory (effective stat
   lines), the arena (the wraith's violet field, the warden's gold ring,
   the mender's green care, the aim sight).
 
 ## VERSION
 
-0.3.5 / version_code_base 30600. NO release (the law).
+0.3.4-5 / version_code_base 30520. NO release (the law).

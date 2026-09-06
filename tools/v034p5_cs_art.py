@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v0.3.5 patch art - THE WRAITH TRUTH + THE WARDEN + THE PEEL CLEAVER.
+"""v0.3.4-5 patch art - THE WRAITH TRUTH + THE WARDEN + THE PEEL CLEAVER.
 
 Regenerates:
   enemies/wraith.png      - the tattered ghost WITHOUT the pale ring baked
