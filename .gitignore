@@ -38,3 +38,7 @@ Thumbs.db
 
 # ---- never ship binaries from the working tree ----
 download/
+
+# ---- Windows export outputs ----
+projects/*/build/
+projects/build/
