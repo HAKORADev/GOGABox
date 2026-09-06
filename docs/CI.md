@@ -2,41 +2,40 @@
 
 ## Workflows
 
-### `build-windows.yml` — the template forge + the two exe builds (manual)
+### `build.yml` — THE one build action (push + manual)
 
-The owner's law: modern Godot x86_64 requires SSE4.2 (Haswell+); GOGABox
-must run on older CPUs. So the Windows exports NEVER use the official
-templates - the workflow FORGES them from the pinned source:
-
-```
-scons platform=windows target=template_release arch=x86_64 \
-  lto=full use_static_cpp=yes debug_symbols=no d3d12=no angle=no \
-  winrt=no accesskit=no \
-  custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" -j"$(nproc)"
-```
-
-- `arch=x86_64` → the 64-bit template; `arch=x86` → the 32-bit one.
-- The forge then runs `objdump` over the template and FAILS if any
-  SSE4.2/AES-only mnemonics (`pcmpgtq`, `pcmpestr*`, `crc32`, `aesenc`)
-  appear - THE SSE2 LAW, machine-checked.
-- The x86_64 job also switches mingw to its **posix-threads** flavor
-  (`update-alternatives --set ...-posix`) - Godot refuses the win32 one.
-- `d3d12/angle/winrt/accesskit=no`: GOGABox renders GL Compatibility; the
-  optional driver SDKs are not part of this forge.
-- The export job seats the forged templates in
-  `~/.local/share/godot/export_templates/<version>.stable/`, materializes
-  the project, and exports BOTH presets (`Windows x86_64`, `Windows x86_32`)
-  with `binary_format/embed_pck=true` - each result is ONE exe. Artifacts
-  ship zipped (`zip -9`) as `GOGABox-windows-<version>.zip`.
-
-### `build-android.yml` — the dispatcher
-
-### `build-android.yml` — the dispatcher
+ONE run builds BOTH platforms: the `build` job (the APK matrix) and the
+`windows` job (the exe) run in parallel; `release` (manual only) attaches
+the APKs + the Windows zip.
 
 | trigger | behavior |
 |---|---|
-| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI in its `abi_presets` (release) |
+| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI (release) + the Windows exe |
 | **manual dispatch** | pick `project` + `abi` (`all`/`arm64-v8a`/`armeabi-v7a`) + `build_type` (`release`/`debug`), optional `create_release` |
+
+### The Windows law (v0.3.4-4) — ONE exe, official templates, minutes not hours
+
+The forge era is dead. Three forge attempts burned ~30 minutes each
+compiling templates from source and the export stage never once produced an
+exe. The owner's law now:
+
+- **THE SAME official Godot** the Android build uses (pinned
+  `4.7.2-stable` editor) + **THE SAME official export templates tpz** — the
+  workflow extracts just `windows_release_x86_32.exe` (+ the console
+  wrapper) and seats them in `~/.local/share/godot/export_templates/4.7.2.stable/`.
+- **ONE exe ships**: `GOGABox.exe` (`binary_format/architecture="x86_32"`,
+  `embed_pck=true`) — a 32-bit binary that runs on EVERY Windows: 32-bit
+  natively, 64-bit through WOW64. The `Windows x86_64` preset was deleted.
+- **THE REAL-EXE LAW** (machine-checked): `file` must read
+  `PE32 executable for MS Windows ... Intel i386`, and the size must exceed
+  50 MB (the embedded pck guard).
+- Cached under `win-toolchain-<lock hash>` (editor + the two template
+  files). A cold run costs one tpz download (~1.3 GB); a warm run takes
+  minutes: import → export → verify → `zip -9` as
+  `GOGABox-windows-<version>.zip`.
+- The export path `projects/build/` is created by the job; locally:
+  `mkdir -p projects/build && godot --headless --path projects/gogabox
+  --export-release "Windows x86_32" ../build/GOGABox.exe`.
 
 Job flow: `plan` (generates the matrix with `.ci/ci-matrix.sh` — the same
 script runs locally) → one `build` job per (project, abi) → optional `release`.
@@ -66,7 +65,7 @@ First uncached run ≈ 20–25 min per ABI; cached runs ≈ 8–12 min.
 
 ## Releases
 
-Manual dispatch with `create_release: true` attaches both ABIs to a GitHub
+Manual dispatch with `create_release: true` attaches both ABIs + the Windows zip to a GitHub
 release tagged `<project>-v<version_name>` — project-scoped, so two games
 can both be at v1.0.0 without colliding (older global `v<version>` tags like
 `v1.0.0` remain from before this scheme). Re-running with
@@ -78,7 +77,7 @@ the same version re-uploads (clobbers).
    - `RELEASE_KEYSTORE_B64` — base64 of your release keystore:
      `base64 -w0 release.keystore`
    - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEYSTORE_ALIAS`
-2. Add a decode step before the build step in `build-android.yml`:
+2. Add a decode step before the build step in `build.yml`:
 
 ```yaml
       - name: Decode release keystore

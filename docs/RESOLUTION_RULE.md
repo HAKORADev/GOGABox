@@ -231,7 +231,7 @@ Verification (tests/geometry_probe.gd, rewritten v0.1.3):
 
 ## 6. THE PC WINDOWS (v0.3.4-3): THE VERTICAL SLICE LAW
 
-The desktop builds (Windows x64 + x86) keep the SAME two internal designs,
+The desktop build (Windows, THE one 32-bit exe) keeps the SAME two internal designs,
 but the window laws differ from the phone:
 
 - A real desktop session is `ScaleRule.is_pc()` - false on Android/iOS AND

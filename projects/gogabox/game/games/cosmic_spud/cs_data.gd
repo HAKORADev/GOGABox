@@ -254,6 +254,20 @@ const THEMES := {
 }
 const THEME_ORDER := ["desert", "park"]
 
+# ================================================================= THE SHOP
+## v0.3.4-4 THE SHOP LIST LAW: the universal THE SHOP (the HUD button) sells
+## REAL-GOGACoins shelves. THE GUNS: owning one plants its offer in EVERY
+## wave market roll (the invaders law - "they join the wave loot"). THE CREW:
+## owning one lists the ally in the deploy rows forever. Prices are
+## GOGACoins; the in-run costs stay cosmic coins.
+const SHOP_GUNS := {
+        "shotgun": 300, "laser": 350, "rail": 450, "gravity": 550,
+}
+const SHOP_CREW := {
+        "drone": 250, "turret": 300, "guard": 300,
+        "medic": 350, "bomber": 400, "scout": 350,
+}
+
 # =============================================================== WAVE DRAFTS
 ## per-wave drafts WITH TEETH (the owner: "offer things and take things,
 ## like +20 damage and -20 speed"). Each card: an UP and most a DOWN.

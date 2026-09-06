@@ -204,6 +204,17 @@ func tree_node(nid: String) -> bool:
         # the read helpers the run uses
         return tree_has(nid)
 
+## v0.3.4-4 THE SHOP LIST LAW: the universal THE SHOP sells the LAB nodes
+## (WEAPON LAB = the merging, FOUNDRY) for REAL GOGACoins - the box wallet
+## paid first (Box.spend in the caller), this just flips the same flag the
+## cosmic-coin tree writes, so the run reads one source of truth.
+func gogabuy_node(nid: String) -> bool:
+        if not (CSData.TREE.has(nid)):
+                return false
+        (d["tree"] as Dictionary)[nid] = true
+        save()
+        return true
+
 func merging_learned() -> bool:
         return tree_has("l3")
 

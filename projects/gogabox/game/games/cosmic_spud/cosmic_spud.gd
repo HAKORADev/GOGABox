@@ -1,7 +1,25 @@
 extends GogaGame
-## COSMIC SPUD (v0.3.4-3) - the Brotato-competitor, PATCH 3.
-## THE GDD: docs/goga_docs/gogames_ideas/cosmic_spud.md + cosmic_spud_patch3.md.
-## PATCH 3 LAWS (the owner finally played past the door):
+## COSMIC SPUD (v0.3.4-4) - the Brotato-competitor, PATCH 4.
+## THE GDD: docs/goga_docs/gogames_ideas/cosmic_spud.md + cosmic_spud_patch4.md.
+## PATCH 4 LAWS (the owner's played-again report):
+##   THE NO-SHOOT-VFX LAW: every shooting flicker/light is DEAD - the muzzle
+##   flash, the wobbly aim laser. The gun speaks through its sound alone.
+##   THE UNIVERSAL WIDGET LAW: the HUD GOGACoins widget IS the universal
+##   Arc.chip + coin.png every game wears - and it counts the coins
+##   COLLECTED THIS RUN (starts 0), never the wallet total.
+##   THE SHOP LIST LAW: the HUD SHOP button opens THE SHOP - the universal
+##   GOGACoins LIST (the invaders/matcher shape): THE PLACES, THE GUNS
+##   (they join every wave market), THE LAB (the merging, learned forever),
+##   THE CREW (they join the deploy list). The cosmic-coin store is THE
+##   ARMORY again; the wave market stays the break's own flow.
+##   THE COIN-ICON PRICE LAW: a GOGACoins price is NEVER spelled out - the
+##   label + THE coin icon (optionals theme cards, the armory themes tab).
+##   THE HONEST METERS LAW: the HP/XP/wave/boss fills are custom-drawn plain
+##   Controls (a Container resets a child's manual size whenever a sibling's
+##   minimum size changes - the probe-proven root cause of the dead meters).
+##   HP moves for each HP with a continuous green->yellow->red; the XP bar
+##   shows the true run_xp / xp-needed ratio and animates both ways.
+## PATCH 3 LAWS:
 ##   THE HUD LAW: the empty chrome chips are GONE - the game wears its own
 ##   SCORE, KILLS, COSMIC COINS and GOGACoins widgets (black boxes).
 ##   THE SILENCE LAW: the gogacoin never announces itself - no banners, no
@@ -9,13 +27,10 @@ extends GogaGame
 ##   THE SHARED CONTACT LAW: colliding damages BOTH sides - the enemy's
 ##   attack hurts you, your potato RAMS it back - and EVERY contact tick
 ##   speaks (sfx + numbers + dust). No more silent grinding.
-##   THE FLASH LAW: the muzzle flash flies WITH the barrel (no more candle).
 ##   THE BREAK CHAIN: draft -> THE WAVE MARKET (items/weapons/allies, the
 ##   5-slot HOLD DECK, the reroll lives HERE only) -> THE MERGE BENCH (its
 ##   own menu) -> THE STATS MENU (level-up points, costs 1-3) -> THE SKILLS
 ##   MENU (1 point per 100 kills, ten unique skills) -> next wave.
-##   THE UNIVERSAL SHOP LAW: the HUD SHOP button opens THE SHOP - the
-##   GOGACoins store - at any phase, exactly as described many times.
 ##   THE WOW PASS: camera shake, the low-HP vignette, pickup sparkles.
 
 const ARENA := Rect2(0, 0, 2400, 1350)
@@ -105,20 +120,31 @@ var market_tab := "items"         # the wave market's tab
 var _break_in_market := false     # the break chain is inside the market
 
 # hud widgets (all CS-styled)
-var hp_fill: ColorRect
+# v0.3.4-4 THE HONEST METERS LAW: the fills are NO LONGER ColorRects inside
+# PanelContainers - a Container resets a child's manual size whenever a
+# sibling's minimum size changes (probe-proven: 298 -> 100 -> 298), which is
+# exactly what the HP bar's own number label did to its fill every frame.
+# Every meter is now a custom-drawn plain Control no container can touch.
+var hp_meter: Control
 var hp_txt: Label
 var arm_txt: Label
-var xp_fill: ColorRect
+var xp_meter: Control
 var lvl_txt: Label
 var wave_txt: Label
-var wave_fill: ColorRect
+var wave_meter: Control
 var kill_txt: Label               # the KILLS widget (the owner's two)
 var score_txt: Label              # the SCORE widget (the owner's two)
 var cc_txt: Label                 # the cosmic coins widget
-var gg_txt: Label                 # the GOGACoins widget (live wallet)
+var gg_txt: Label                 # the GOGACoins widget - the UNIVERSAL chip,
+                                  # counting the coins COLLECTED THIS RUN
 var boss_bar: Control
-var boss_fill: ColorRect
+var boss_meter: Control
 var boss_txt: Label
+# the displayed (animated) ratios - the meters MOVE toward their truth
+var _hp_disp := 1.0
+var _xp_disp := 0.0
+var _wave_disp := 0.0
+var _boss_disp := 1.0
 var slot_row: HBoxContainer
 var _slot_widgets: Array = []     # [{box, cd, tier_txt}]
 var _tex: Dictionary = {}
@@ -283,6 +309,30 @@ func _cs_button(txt: String, sz: int, col: Color, cb: Callable) -> Button:
         var dis := _cs_box_style(Color(0.13, 0.13, 0.15), Color(0.08, 0.08, 0.09))
         b.add_theme_stylebox_override("disabled", dis)
         b.pressed.connect(cb)
+        return b
+
+## v0.3.4-4 THE COIN-ICON PRICE LAW (the owner: "when the theme not bought,
+## it says buy nn GOGACOINS, instead of gogacoins, it should show the coin
+## icon because this is how the design is"): a GOGACoins price is NEVER
+## spelled out in words - the label + THE coin.png icon, the universal
+## Arc.coin_button design wearing the CS face.
+func _cs_coin_button(txt: String, sz: int, col: Color, cb: Callable) -> Button:
+        var b := _cs_button("", sz, col, cb)
+        var h := HBoxContainer.new()
+        h.set_anchors_preset(Control.PRESET_FULL_RECT)
+        h.alignment = BoxContainer.ALIGNMENT_CENTER
+        h.add_theme_constant_override("separation", 8)
+        h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var l := _cs_label(txt, sz, col)
+        h.add_child(l)
+        var c := TextureRect.new()
+        c.texture = load("res://assets/ui/coin.png")
+        c.custom_minimum_size = Vector2(sz + 10, sz + 10)
+        c.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        c.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        h.add_child(c)
+        b.add_child(h)
         return b
 
 func _cs_black_box(parent: Node, min_size: Vector2) -> PanelContainer:
@@ -748,14 +798,14 @@ func _build_hud() -> void:
         left.custom_minimum_size = Vector2(300, 0)
         left.add_theme_constant_override("separation", 4)
         root.add_child(left)
-        var hp_box := _cs_black_box(left, Vector2(300, 26))
-        hp_fill = ColorRect.new()
-        hp_fill.color = CS_GREEN
-        hp_fill.position = Vector2(2, 2)
-        hp_fill.size = Vector2(296, 22)
-        hp_box.add_child(hp_fill)
+        # THE HONEST METERS LAW: plain-Control meters + free-floating labels.
+        # HP: the fill MOVES for each HP (animated approach) and its color
+        # runs a continuous green -> yellow -> red by the true ratio.
+        hp_meter = _cs_meter(300, 26, CS_GREEN)
+        left.add_child(hp_meter)
+        hp_meter.get_meta("set_ratio").call(1.0, CS_GREEN)   # full at boot
         hp_txt = _cs_label("", 12, CS_WHITE)
-        hp_box.add_child(hp_txt)
+        hp_meter.add_child(hp_txt)
         var sub := HBoxContainer.new()
         left.add_child(sub)
         arm_txt = _cs_label("ARM 0", 12, CS_BLUE)
@@ -763,23 +813,17 @@ func _build_hud() -> void:
         lvl_txt = _cs_label("LV 1", 12, CS_BLUE)
         lvl_txt.custom_minimum_size = Vector2(64, 0)
         sub.add_child(lvl_txt)
-        # the XP bar
-        var xp_box := _cs_black_box(left, Vector2(300, 12))
-        xp_fill = ColorRect.new()
-        xp_fill.color = CS_BLUE
-        xp_fill.position = Vector2(2, 2)
-        xp_fill.size = Vector2(296, 8)
-        xp_box.add_child(xp_fill)
+        # the XP bar (blue, honest: run_xp / xp needed for the next level)
+        xp_meter = _cs_meter(300, 12, CS_BLUE)
+        left.add_child(xp_meter)
         # the wave box with its time bar
         var wave_box := _cs_black_box(left, Vector2(300, 30))
         var wv := VBoxContainer.new()
         wave_box.add_child(wv)
         wave_txt = _cs_label("WAVE 1", 12, CS_YELLOW)
         wv.add_child(wave_txt)
-        wave_fill = ColorRect.new()
-        wave_fill.color = Color(1.0, 0.62, 0.26)
-        wave_fill.custom_minimum_size = Vector2(280, 4)
-        wv.add_child(wave_fill)
+        wave_meter = _cs_meter(280, 6, Color(1.0, 0.62, 0.26))
+        wv.add_child(wave_meter)
         # ---- THE RIGHT STACK (the owner's two live here): cosmic coins,
         # SCORE, KILLS, GOGACoins - one black box each, big enough to read
         var right := VBoxContainer.new()
@@ -811,22 +855,27 @@ func _build_hud() -> void:
         h4.add_child(_cs_icon(_t("skull"), 18))
         kill_txt = _cs_label("KILLS 0", 15, CS_RED)
         h4.add_child(kill_txt)
-        # the GOGACoins widget: the live wallet (+ this run's riders), silent
-        var gg_box := _cs_black_box(right, Vector2(180, 30))
-        var h5 := HBoxContainer.new()
-        h5.add_theme_constant_override("separation", 6)
-        gg_box.add_child(h5)
-        h5.add_child(_cs_icon(_t("gogacoin"), 18))
-        gg_txt = _cs_label("%d GOGACOINS" % Box.coins(), 11, CS_GREEN)
-        h5.add_child(gg_txt)
+        # THE GOGACoins widget (v0.3.4-4 THE UNIVERSAL WIDGET LAW, the
+        # owner: "the widget you made for gogacoins is not the right widget
+        # that is universally used in gogabox, also i see you made a mistake
+        # where you even made the GOGAcoins widget to show total coins
+        # instead of the collected"): the widget IS Arc.chip + coin.png -
+        # the exact universal chip every game's HUD wears - and it counts
+        # the coins COLLECTED THIS RUN (starts 0, ticks on pickup), never
+        # the wallet total. The total lives in the shop header, where it
+        # belongs. SILENCE LAW unchanged: it never announces itself.
+        var gg_chip := Arc.chip("0", "res://assets/ui/coin.png", Color(0, 0, 0, 0.4), 24, Arc.COIN)
+        right.add_child(gg_chip)
+        # the label is the LAST child of the chip's HBox (the same accessor
+        # game_base._build_hud uses for its own score/coins chips)
+        var gg_h: HBoxContainer = gg_chip.get_child(0)
+        gg_txt = gg_h.get_child(gg_h.get_child_count() - 1) as Label
+        gg_txt.text = "0"
         # ---- the boss bar (top center)
         boss_bar = _cs_black_box(root, Vector2(430, 20))
         boss_bar.position = Vector2((get_viewport_rect().size.x - 430) * 0.5, 116)
-        boss_fill = ColorRect.new()
-        boss_fill.color = CS_RED
-        boss_fill.position = Vector2(2, 2)
-        boss_fill.size = Vector2(426, 16)
-        boss_bar.add_child(boss_fill)
+        boss_meter = _cs_meter(430, 20, CS_RED)
+        boss_bar.add_child(boss_meter)
         boss_txt = _cs_label("", 11, CS_WHITE)
         boss_bar.add_child(boss_txt)
         boss_bar.visible = false
@@ -845,6 +894,47 @@ func _cs_icon(tex: Texture2D, px: int) -> TextureRect:
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         return ic
+
+## v0.3.4-4 THE HONEST METERS LAW - the one-true-meter.
+## A PLAIN Control (never a PanelContainer child: a Container resets a
+## child's manual geometry whenever a sibling's minimum size changes - the
+## probe-proven root cause of the dead meters). The meter draws its own
+## trough, fill and rim; the fill's width and color are driven by
+## set_ratio. The HP bar passes its LIVE color (green -> yellow -> red);
+## every meter animates toward its true ratio in _refresh_hud, so a hit,
+## a heal, an XP gem or a boss slam visibly MOVES the bar.
+func _cs_meter(w: float, h: float, col: Color) -> Control:
+        var c := Control.new()
+        c.custom_minimum_size = Vector2(w, h)
+        c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var st := {"r": 0.0, "col": col}
+        c.draw.connect(func():
+                var ww: float = c.size.x
+                var hh: float = c.size.y
+                # the trough
+                c.draw_rect(Rect2(0, 0, ww, hh), Color(0, 0, 0, 0.62))
+                # the fill (2px inset, never negative)
+                var r: float = st["r"]
+                if r > 0.001:
+                        c.draw_rect(Rect2(2, 2, maxf(0.0, (ww - 4.0) * r), hh - 4.0),
+                                        st["col"])
+                # the rim
+                c.draw_rect(Rect2(0, 0, ww, hh), Color(0.08, 0.06, 0.04, 0.9), false, 2.0))
+        c.set_meta("set_ratio", func(r: float, col2: Variant = null) -> void:
+                st["r"] = clampf(r, 0.0, 1.0)
+                if col2 != null:
+                        st["col"] = col2
+                c.queue_redraw())
+        c.set_meta("state", st)     # probe-readable: the live fill + color
+        return c
+
+## the HP meter's continuous green -> yellow -> red, the owner's "color goes
+## dynamically from green to red in a better way"
+func _hp_color(r: float) -> Color:
+        var yellow := Color(1.0, 0.82, 0.15)
+        if r > 0.5:
+                return CS_GREEN.lerp(yellow, (1.0 - r) * 2.0)
+        return yellow.lerp(CS_RED, 1.0 - r * 2.0)
 
 func _rebuild_slots() -> void:
         if slot_row == null or not is_instance_valid(slot_row):
@@ -877,26 +967,41 @@ func _rebuild_slots() -> void:
                 _slot_widgets.append({"box": box, "cd": cd, "id": wr["id"]})
 
 func _refresh_hud() -> void:
-        if hp_fill != null and is_instance_valid(hp_fill):
+        # THE HONEST METERS LAW: every meter animates toward its true ratio
+        # (the lerp step is per-tick at 60fps - a full swing settles in
+        # ~0.2s, so each HP point, gem or boss slam visibly MOVES the bar).
+        var _step := 0.28
+        if hp_meter != null and is_instance_valid(hp_meter):
                 var f := clampf(p_hp / p_max_hp, 0.0, 1.0)
-                hp_fill.size.x = 296.0 * f
-                hp_fill.color = CS_GREEN if f > 0.35 else CS_RED
+                _hp_disp = lerpf(_hp_disp, f, _step)
+                if absf(_hp_disp - f) < 0.004:
+                        _hp_disp = f
+                var col := _hp_color(f) if f > 0.0 else CS_RED
+                hp_meter.get_meta("set_ratio").call(_hp_disp, col)
                 hp_txt.text = "%d / %d" % [int(ceilf(p_hp)), int(p_max_hp)]
-                hp_txt.position = Vector2((300 - hp_txt.size.x) * 0.5, 2)
+                hp_txt.position = Vector2((300.0 - hp_txt.size.x) * 0.5, 4.0)
+        if xp_meter != null and is_instance_valid(xp_meter):
+                # THE HONEST XP LAW: the true ratio of THIS level's progress;
+                # a level-up drains the bar and it refills with every gem
+                var need := maxi(1, CSData.xp_for_run_level(run_level))
+                var xr := clampf(float(run_xp) / float(need), 0.0, 1.0)
+                _xp_disp = lerpf(_xp_disp, xr, _step)
+                if absf(_xp_disp - xr) < 0.004:
+                        _xp_disp = xr
+                xp_meter.get_meta("set_ratio").call(_xp_disp)
         if arm_txt != null:
                 arm_txt.text = "ARM %d" % int(stats.get("armor", 0))
                 lvl_txt.text = "LV %d" % run_level
                 kill_txt.text = "KILLS %d" % run_kills
-        if xp_fill != null:
-                var need := CSData.xp_for_run_level(run_level)
-                xp_fill.size.x = 296.0 * clampf(float(run_xp) / float(need), 0.0, 1.0)
         if wave_txt != null:
                 wave_txt.text = ("BOSS WAVE - SLAY IT" if boss_alive
                                 else "WAVE %d" % run_wave)
                 wave_txt.add_theme_color_override("font_color", CS_RED if boss_alive else CS_YELLOW)
                 var total := CSData.BOSS_WAVE_SECS if (run_wave % CSData.BOSS_CYCLE == 0) \
                                 else CSData.WAVE_SECS
-                wave_fill.custom_minimum_size.x = 280.0 * clampf(wave_clock / total, 0.0, 1.0)
+                var wr := clampf(wave_clock / maxf(0.01, float(total)), 0.0, 1.0)
+                _wave_disp = lerpf(_wave_disp, wr, _step)
+                wave_meter.get_meta("set_ratio").call(_wave_disp)
         if cc_txt != null:
                 cc_txt.text = str(run_ccoins)
         if score_txt != null:
@@ -904,20 +1009,25 @@ func _refresh_hud() -> void:
         if kill_txt != null:
                 kill_txt.text = "KILLS %d" % run_kills
         if gg_txt != null:
-                # THE GOGACoins WIDGET: the live wallet plus this run's riders
-                gg_txt.text = "%d GOGACOINS" % (Box.coins() + run_coins)
-        if boss_fill != null:
+                # THE UNIVERSAL WIDGET LAW: the chip counts the coins
+                # COLLECTED THIS RUN (add_run_coins banks them at finish) -
+                # never the wallet total
+                gg_txt.text = str(run_coins)
+        if boss_meter != null and is_instance_valid(boss_meter):
                 var found := false
                 for e in enemies:
                         if e.get("boss", false):
                                 found = true
                                 boss_bar.visible = true
-                                boss_fill.size.x = 426.0 * clampf(float(e["hp"]) / float(e["max_hp"]), 0.0, 1.0)
+                                var br := clampf(float(e["hp"]) / float(e["max_hp"]), 0.0, 1.0)
+                                _boss_disp = lerpf(_boss_disp, br, _step)
+                                boss_meter.get_meta("set_ratio").call(_boss_disp)
                                 boss_txt.text = "%s  %d%%" % [e["name"], int(100.0 * float(e["hp"]) / float(e["max_hp"]))]
-                                boss_txt.position = Vector2((430 - boss_txt.size.x) * 0.5, 0)
+                                boss_txt.position = Vector2((430.0 - boss_txt.size.x) * 0.5, 1.0)
                                 break
                 if not found:
                         boss_bar.visible = false
+                        _boss_disp = 1.0
         # the slot cooldown fills
         for i in _slot_widgets.size():
                 if i >= weapons_run.size():
@@ -995,12 +1105,10 @@ func _fire_weapon(w: Dictionary) -> bool:
                         continue
                 _spawn_bullet(p_pos + Vector2.from_angle(a) * 26.0, a, wd, dmg, pierce, tier)
         Jukebox.sfx(shot_name, -6.0, randf_range(0.94, 1.06))
-        # THE FLASH LAW (v0.3.4-3): the muzzle kiss rides the BARREL - it was
-        # drawn upright (a standing candle at the gun tip, the owner's
-        # report); now the particle carries the aim angle and draws rotated.
-        _parts.append({"pos": p_pos + Vector2.from_angle(base_a) * 34.0, "vel": Vector2.ZERO,
-                "t": 0.07, "max": 0.07, "col": Color(1, 0.9, 0.5), "size": 9.0,
-                "tex": "muzzle", "rot": base_a})
+        # v0.3.4-4 THE NO-SHOOT-VFX LAW (the owner: "remove the shooting
+        # flickers/lights or whatever VFX you did, it's ugly anyway"): the
+        # muzzle flash is DEAD - the patch-3 FLASH LAW with it. The gun speaks
+        # through its sound alone; no lights, no flickers, no candles.
         # THE TWIN TAIL: the ghost gun answers every volley backwards at 40%
         if meta.has_skill("twin_tail"):
                 _spawn_bullet(p_pos + Vector2.from_angle(base_a + PI) * 26.0,
@@ -2391,9 +2499,11 @@ func _buy_skill(sid: String, free: int) -> void:
 ## the REROLL lives here (u3's free shuffle first), and THE HOLD DECK pins
 ## up to 5 offers across rerolls, THIS market visit only, never saved.
 func _shop_button() -> void:
-        # THE UNIVERSAL SHOP LAW (the owner, round after round): the HUD
-        # button opens THE SHOP - the GOGACoins store - at ANY phase. The
-        # wave market is the break's own flow, it opens itself.
+        # v0.3.4-4 THE SHOP LIST LAW (the owner: the button must open the
+        # same universal GOGACoins LIST every other game opens - themes,
+        # weapons, the merging - NOT the game's own cosmic-coin store):
+        # THE SHOP opens at ANY phase; the wave market is the break's own
+        # flow and opens itself.
         _shop_open()
 
 func _market_open() -> void:
@@ -2416,9 +2526,22 @@ func _roll_shop_offers(keep_held := false) -> void:
                                 kept_i.append(o2)
         shop_offers_w.clear()
         var used := {}
-        var owned_n := meta.armory().size()
         var wneed := 4
-        for k in wneed:
+        # v0.3.4-4 THE SHOP LIST LAW: THE SHOP's GOGACoins guns join the wave
+        # loot - owning one plants its offer FIRST, every roll, held deck
+        # space permitting (the same law the invaders shop runs on).
+        for gid in CSData.SHOP_GUNS:
+            if shop_offers_w.size() >= wneed - kept_w.size():
+                break
+            if Box.item_owned(game_id, "guns", gid) and not used.has(gid):
+                used[gid] = true
+                var grar := CSData.roll_rarity(luck)
+                var gprice := int(round(CSData.weapon_price(gid, 1)
+                                * CSData.RARITIES[grar]["pm"] * meta.shop_discount()))
+                shop_offers_w.append({"wid": gid, "tier": 1, "rar": grar,
+                        "price": gprice, "sold": false, "held": false})
+        var owned_n := meta.armory().size()
+        for k in wneed - shop_offers_w.size():
                 var wid := _pick_offer_weapon(used)
                 used[wid] = true
                 var rar := CSData.roll_rarity(luck)
@@ -2487,7 +2610,8 @@ func _stat_chips_row(box: VBoxContainer) -> void:
 func _shop_card(title: String, title_col: Color, body_lines: Array,
                 border: Color, btn_txt: String, btn_col: Color,
                 cb: Callable, enabled := true, extra_txt := "",
-                extra_cb := Callable(), extra_col := CS_BLUE) -> PanelContainer:
+                extra_cb := Callable(), extra_col := CS_BLUE,
+                coin_price := false) -> PanelContainer:
         var card := PanelContainer.new()
         var st := _cs_box_style(border, CS_BOX)
         st.corner_radius_top_left = 10
@@ -2508,7 +2632,8 @@ func _shop_card(title: String, title_col: Color, body_lines: Array,
                 l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 vb.add_child(l2)
-        var buy := _cs_button(btn_txt, 13, btn_col, cb)
+        var buy := _cs_coin_button(btn_txt, 13, btn_col, cb) if coin_price \
+                        else _cs_button(btn_txt, 13, btn_col, cb)
         buy.disabled = not enabled
         vb.add_child(buy)
         if extra_txt != "":
@@ -2665,7 +2790,7 @@ func _market_weapons(shelf: VBoxContainer) -> void:
 func _market_allies(shelf: VBoxContainer) -> void:
         _section(shelf, "- ALLIES (deploy + raise, they fight beside you) -")
         if (meta.d["owned_allies"] as Array).is_empty():
-                var note := _cs_label("no allies yet - THE SHOP sells them (the highest prices in the game)",
+                var note := _cs_label("no allies yet - the ARMORY sells them (cosmic coins), THE CREW joins via THE SHOP (GOGACoins)",
                                 12, CS_WHITE)
                 note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 shelf.add_child(note)
@@ -2908,24 +3033,172 @@ func _merge_pairs() -> Array:
         return out
 
 # ============================================================== THE SHOP
-## THE UNIVERSAL SHOP (v0.3.4-3, the owner: "where is the shop that uses
-## gogacoins, this button should open a normal universal style shop as i
-## described many times"): THE SHOP is THE GOGACoins store and the HUD
-## button opens it at ANY phase. "GOGASHOP" and "THE ARMORY" are dead names.
-## Tabs: PLACES (GOGACoins) / WEAPONS / ALLIES / LOADOUT (cosmic coins).
+## v0.3.4-4 THE SHOP LIST LAW (the owner: "the shop button opens the game
+## shop which is not what i said it should do, as you see in all other
+## games, shop button opens a list that lets you buy things that costs real
+## GOGAcoins like the themes or weapons or the merging and other stuff i
+## described tons of times"): THE SHOP is the UNIVERSAL GOGACoins list -
+## the invaders/matcher shape: the Arc.coin_chip wallet header, plain
+## Arc.coin_button rows (label + price + THE coin icon), a CLOSE. The HUD
+## button opens it at ANY phase. Four shelves, every price REAL GOGACoins:
+##   THE PLACES - the worlds (desert free-default, park 400)
+##   THE GUNS   - owning one puts its offer in EVERY wave market
+##   THE LAB    - the merging (WEAPON LAB) + FOUNDRY, learned forever
+##   THE CREW   - owning one lists it in the deploy rows forever
+## The cosmic-coin store is THE ARMORY again (_armory_open, the tree's
+## button); the wave market stays the break's own flow.
 var _armory_tab := "weapons"
 
 func _shop_open() -> void:
-        # closable=false: the flow always walks out through BACK, which knows
-        # where the player came from (the boot door or the break)
         _cs_open("THE SHOP", func(box: VBoxContainer): _build_shop(box), CS_YELLOW,
-                        false)
+                        true)
 
-## the old name lives on (the probe + old callers)
+## the stack-safe rebuild: the live shop pops, a fresh one pushes
+func _shop_rebuild() -> void:
+        _cs_reopen(func(): _shop_open())
+
+## the old name lives on (the probe + old callers): the four-tab
+## cosmic-coin store, THE ARMORY
 func _armory_open() -> void:
-        _shop_open()
+        _cs_open("THE ARMORY", func(box: VBoxContainer): _build_armory(box),
+                        CS_YELLOW, false)
 
 func _build_shop(box: VBoxContainer) -> void:
+        # the universal wallet header - the full GOGABox wallet
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(wallet)
+        var scroll := ScrollContainer.new()
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.44)
+        box.add_child(scroll)
+        var shelf := VBoxContainer.new()
+        shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shelf.add_theme_constant_override("separation", 6)
+        scroll.add_child(shelf)
+        _shop_section(shelf, "THE PLACES - WEAR A WORLD")
+        for tid in CSData.THEME_ORDER:
+                shelf.add_child(_shop_theme_row(tid))
+        _shop_section(shelf, "THE GUNS - THEY JOIN THE WAVE MARKET")
+        for wid in CSData.SHOP_GUNS:
+                shelf.add_child(_shop_gun_row(wid))
+        _shop_section(shelf, "THE LAB - THE MERGING, FOREVER")
+        shelf.add_child(_shop_lab_row("l3", "WEAPON LAB", 800,
+                        "two same weapons, same tier, merge one tier up"))
+        shelf.add_child(_shop_lab_row("l4", "FOUNDRY", 500,
+                        "every merge costs 25% less"))
+        _shop_section(shelf, "THE CREW - THEY JOIN THE DEPLOY LIST")
+        for aid in CSData.ALLY_ORDER:
+                shelf.add_child(_shop_crew_row(aid))
+        _fit_scroll(scroll, shelf, 0.5)
+        var actions := HBoxContainer.new()
+        actions.alignment = BoxContainer.ALIGNMENT_CENTER
+        box.add_child(actions)
+        var cb := Arc.button("CLOSE", Vector2(0, 74), 24, Arc.GOOD,
+                        func(): _cs_close_top())
+        cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        actions.add_child(cb)
+
+## a small yellow shelf caption inside the universal list
+func _shop_section(shelf: VBoxContainer, txt: String) -> void:
+        var l := Arc.fit_label(txt, 20, Arc.HOT, 1000)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        shelf.add_child(l)
+
+## the owned row of the universal list (matcher/invaders green line)
+func _shop_row_owned(txt: String) -> Control:
+        var l := Arc.fit_label(txt, 20, Color("58c470"), 1000)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        return l
+
+## one universal price row: an Arc.coin_button, disabled while broke
+func _shop_price_row(txt: String, price: int, col: Color, cb: Callable) -> Button:
+        var b := Arc.coin_button(txt, Vector2(0, 64), 22, col, cb)
+        b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        if Box.coins() < price:
+                b.disabled = true
+        return b
+
+func _shop_theme_row(tid: String) -> Control:
+        var th: Dictionary = CSData.THEMES[tid]
+        var price := int(th["gogacoins"])
+        if meta.has_theme(tid) or price == 0:
+                return _shop_row_owned("%s  -  %s" % [String(th["name"]).to_upper(),
+                                "WORN NOW" if theme_id == tid else "OWNED"])
+        return _shop_price_row("%s  -  %d" % [String(th["name"]).to_upper(), price],
+                        price, Color("c47a2a"), func(): _shop_buy_theme(tid, price))
+
+func _shop_buy_theme(tid: String, price: int) -> void:
+        # idempotent-safe: an already-Box-owned place never pays twice - it
+        # just syncs the game's own ownership and wears
+        if not Box.item_owned(game_id, "theme", tid) \
+                        and not Box.buy_item(game_id, "theme", tid, price):
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("need %d more GOGACoins" % maxi(0, price - Box.coins()))
+                return
+        meta.own_theme(tid)
+        _retheme(tid, night)
+        Jukebox.sfx("cs_buy", -4.0)
+        Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+        _shop_rebuild()
+
+func _shop_gun_row(wid: String) -> Control:
+        var wd: Dictionary = CSData.WEAPONS[wid]
+        var price: int = int(CSData.SHOP_GUNS[wid])
+        if Box.item_owned(game_id, "guns", wid):
+                return _shop_row_owned("%s  -  IN THE MARKET"
+                                % String(wd["name"]).to_upper())
+        return _shop_price_row("%s  -  %d" % [String(wd["name"]).to_upper(), price],
+                        price, Color("8a4ab8"), func(): _shop_buy_gun(wid, price))
+
+func _shop_buy_gun(wid: String, price: int) -> void:
+        if not Box.buy_item(game_id, "guns", wid, price):
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("need %d more GOGACoins" % maxi(0, price - Box.coins()))
+                return
+        Jukebox.sfx("cs_buy", -4.0)
+        Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+        _shop_rebuild()
+
+func _shop_lab_row(nid: String, nm: String, price: int, desc: String) -> Control:
+        if meta.tree_node(nid):
+                return _shop_row_owned("%s  -  LEARNED" % nm)
+        return _shop_price_row("%s  -  %d" % [nm, price], price, Color("2a8a5a"),
+                        func(): _shop_buy_lab(nid, price))
+
+func _shop_buy_lab(nid: String, price: int) -> void:
+        if not Box.spend(price):
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("need %d more GOGACoins" % maxi(0, price - Box.coins()))
+                return
+        meta.gogabuy_node(nid)
+        Jukebox.sfx("cs_buy", -4.0)
+        Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+        _shop_rebuild()
+
+func _shop_crew_row(aid: String) -> Control:
+        var ad: Dictionary = CSData.ALLIES[aid]
+        var price: int = int(CSData.SHOP_CREW[aid])
+        if meta.has_ally(aid):
+                return _shop_row_owned("%s  -  DEPLOYABLE" %
+                                String(ad["name"]).to_upper())
+        return _shop_price_row("%s  -  %d" % [String(ad["name"]).to_upper(), price],
+                        price, Color("4a5ab8"), func(): _shop_buy_crew(aid, price))
+
+func _shop_buy_crew(aid: String, price: int) -> void:
+        # idempotent-safe: box-owned crew just syncs the deploy list
+        if not Box.item_owned(game_id, "crew", aid) \
+                        and not Box.buy_item(game_id, "crew", aid, price):
+                Jukebox.sfx("cs_error", -6.0)
+                _toast_show("need %d more GOGACoins" % maxi(0, price - Box.coins()))
+                return
+        meta.own_ally(aid)
+        Jukebox.sfx("cs_buy", -4.0)
+        Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+        _shop_rebuild()
+
+func _build_armory(box: VBoxContainer) -> void:
         # the wallet header - the GOGACoins chip is ALWAYS visible now
         var head := HBoxContainer.new()
         head.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -3081,9 +3354,10 @@ func _armory_themes(shelf: VBoxContainer) -> void:
             var can := not owned and Box.coins() >= price
             rows.append(_shop_card(String(th["name"]), CS_YELLOW if on else (CS_GREEN if owned else CS_WHITE),
                             lines, CS_YELLOW if on else (CS_GREEN if owned else CS_EDGE),
-                            "WORN" if on else ("OWNED" if owned else "BUY %d GOGACOINS" % price),
+                            "WORN" if on else ("OWNED" if owned else "BUY %d" % price),
                             CS_GREEN if on else CS_YELLOW, func():
-                            _armory_buy_theme(tid_s, price), not on and can))
+                            _armory_buy_theme(tid_s, price), not on and can, "", Callable(), CS_BLUE,
+                            not on and not owned))
         _cards_grid(shelf, rows, 2)
 
 func _armory_buy_theme(tid: String, price: int) -> void:
@@ -3228,9 +3502,13 @@ func _build_optionals(box: VBoxContainer) -> void:
         actions.alignment = BoxContainer.ALIGNMENT_CENTER
         actions.add_theme_constant_override("separation", 14)
         box.add_child(actions)
-        actions.add_child(_cs_button("THE SHOP", 15, CS_YELLOW, func(): _shop_open()))
+        # v0.3.4-4 THE SHOP LIST LAW: every SHOP button in the game opens
+        # the universal GOGACoins list; the cosmic-coin store is THE ARMORY
+        # and wears its own name again.
+        actions.add_child(_cs_button("SHOP", 15, CS_YELLOW, func(): _shop_open()))
+        actions.add_child(_cs_button("ARMORY", 15, CS_YELLOW, func(): _armory_open()))
         actions.add_child(_cs_button("SKILLS", 15, CS_GREEN, func(): _skills_menu_open()))
-        actions.add_child(_cs_button("SKILL TREE", 15, CS_BLUE, func(): _tree_open()))
+        actions.add_child(_cs_button("TREE", 15, CS_BLUE, func(): _tree_open()))
         actions.add_child(_cs_button("DROP IN", 18, CS_GREEN, func(): _start_run()))
 
 func _start_card(sid: String) -> Button:
@@ -3334,12 +3612,10 @@ func _theme_card(tid: String) -> PanelContainer:
                 chips.add_child(day_b)
                 chips.add_child(nite_b)
         else:
-                ## THE ECONOMY BORDER LAW (v0.3.4-2, the owner: places are
-                ## GOGACoin purchases - "i have clearly listed exactly what to
-                ## be bought using gogacoins"): the card charges the BOX wallet
-                ## directly and says so, in full words, no bare "CC".
+                ## v0.3.4-4 THE COIN-ICON PRICE LAW: the price wears THE coin
+                ## icon (the universal design), never the spelled-out words.
                 var price: int = int(th["gogacoins"])
-                var buy_b := _cs_button("BUY %d GOGACOINS" % price, 12, CS_YELLOW,
+                var buy_b := _cs_coin_button("BUY %d" % price, 12, CS_YELLOW,
                                 func(): _armory_buy_theme(tid, price))
                 chips.add_child(buy_b)
         return card
@@ -3647,10 +3923,9 @@ func _draw_fx(L: CanvasItem) -> void:
                                 Color(1, 0.6, 0.2, 0.7), 3.0)
                 L.draw_circle(z["pos"], float(z["aoe"]) * f, Color(1, 0.6, 0.2, 0.10))
         # the aim line (a subtle laser sight)
-        if phase == "play":
-                L.draw_line(p_pos + Vector2.from_angle(p_aim) * 30.0,
-                                p_pos + Vector2.from_angle(p_aim) * (70.0 + 26.0 * sin(Time.get_ticks_msec() / 180.0)),
-                                Color(1, 0.9, 0.4, 0.35), 2.0)
+        # v0.3.4-4 THE NO-SHOOT-VFX LAW: the wobbly aim laser line is dead
+        # too (it flickered every frame - the same ugly family). The gun's
+        # own rotation already says where the bullets go.
         # THE WOW PASS: the low-HP pulse (a red edge breathing on the screen)
         if phase == "play" and p_hp < p_max_hp * 0.3:
                 var pulse := 0.5 + 0.5 * absf(sin(Time.get_ticks_msec() / 260.0))
@@ -3666,23 +3941,13 @@ func _draw_fx(L: CanvasItem) -> void:
                 L.draw_set_transform(p_pos, p_aim, Vector2(1, -1 if flip else 1))
                 L.draw_texture(gt, Vector2(12, -5) - Vector2(0, gt.get_height() * 0.5))
                 L.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-        # the particles + rings + floaters
+        # the particles + rings + floaters (v0.3.4-4: the rotated-texture
+        # branch died with THE NO-SHOOT-VFX LAW - the muzzle was its only user)
         for p in _parts:
                 var a := float(p["t"]) / float(p["max"])
                 if p.get("tex", "") != "":
-                        if p.has("rot"):
-                                # THE FLASH LAW: rotated particles (the muzzle
-                                # flash rides the barrel, never a candle)
-                                var pt: Texture2D = _t(String(p["tex"]))
-                                L.draw_set_transform(p["pos"], float(p["rot"]),
-                                                Vector2(1.6, 1.6))
-                                L.draw_texture(pt,
-                                                -Vector2(pt.get_width(), pt.get_height()) * 0.5,
-                                                Color(1, 1, 1, a))
-                                L.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-                        else:
-                                L.draw_texture(_t(String(p["tex"])), p["pos"] - Vector2(16, 16),
-                                                Color(1, 1, 1, a))
+                        L.draw_texture(_t(String(p["tex"])), p["pos"] - Vector2(16, 16),
+                                        Color(1, 1, 1, a))
                 else:
                         L.draw_circle(p["pos"], float(p["size"]) * a, Color(p["col"], a))
         for r in _rings:

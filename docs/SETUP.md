@@ -81,32 +81,28 @@ ls dist/jellyjump/                # JellyJump-v1.0.0-arm64-v8a.apk + -armeabi-v7
 
 ## Building for WINDOWS (local, optional - CI does this)
 
-The forge works on any Linux box with mingw-w64:
+v0.3.4-4: there is ONE Windows build and NO template forging. Use the
+official editor + the official export templates (the same ones the Android
+build bootstraps), extract just the two 32-bit Windows files, and export:
 
 ```bash
-sudo apt install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
-                 gcc-mingw-w64-i686 g++-mingw-w64-i686 scons
-sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
-sudo update-alternatives --set i686-w64-mingw32-gcc    /usr/bin/i686-w64-mingw32-gcc-posix
-sudo update-alternatives --set i686-w64-mingw32-g++    /usr/bin/i686-w64-mingw32-g++-posix
-# the pinned source (see config/environment.lock for the version)
-curl -LO https://github.com/godotengine/godot/archive/refs/tags/4.7.2-stable.tar.gz
-tar -xzf 4.7.2-stable.tar.gz && cd godot-4.7.2-stable
-scons platform=windows target=template_release arch=x86_64 lto=full \
-  use_static_cpp=yes debug_symbols=no d3d12=no angle=no winrt=no accesskit=no \
-  custom_cflags="-march=x86-64" custom_cxxflags="-march=x86-64" -j"$(nproc)"
-# ...and again with arch=x86 for the 32-bit build
-```
+# 1. the editor + templates (already in the toolchain cache after bootstrap;
+#    a fresh box extracts only the Android files - add the Windows two)
+curl -fLO https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+unzip -o Godot_v4.7.2-stable_export_templates.tpz \
+  "templates/windows_release_x86_32.exe" \
+  "templates/windows_release_x86_32_console.exe" -d tmpex
+mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
+mv tmpex/templates/* ~/.local/share/godot/export_templates/4.7.2.stable/
 
-Seat the templates where the editor looks
-(`~/.local/share/godot/export_templates/4.7.2.stable/`), then:
-
-```bash
+# 2. import + export THE one exe (32-bit; runs on every Windows)
+mkdir -p projects/build
 godot --headless --path projects/gogabox --import
-godot --headless --path projects/gogabox --export-release "Windows x86_64" ../build/GOGABox_x64.exe
-godot --headless --path projects/gogabox --export-release "Windows x86_32" ../build/GOGABox_x86.exe
+godot --headless --path projects/gogabox --export-release "Windows x86_32" ../build/GOGABox.exe
 ```
+
+`file GOGABox.exe` must read `PE32 executable for MS Windows ... Intel i386`.
+The whole run takes minutes - the multi-hour scons forge is retired.
 
 ## Signing for release
 

@@ -18,11 +18,12 @@ clone → ./tools/bootstrap.sh → ./build.sh gogabox      # that's the whole pi
   reveal, favorites are hearted.
 - Android-native extras through small Godot plugins: Unity Ads
   (banner / interstitial / rewarded) and local notifications ("reminders").
-- **Windows builds too** (v0.3.4-3): `GOGABox_x64.exe` + `GOGABox_x86.exe`,
-  each a SINGLE exe (pck embedded), forged from custom export templates with
-  a **SSE2 baseline** (`-march=x86-64`) so pre-Haswell CPUs run the box.
-  Portrait designs render as a vertical slice with the box brown sides;
-  landscape designs fill the window. No ads / no rewarded DOUBLE on PC.
+- **THE one Windows build** (v0.3.4-4): `GOGABox.exe` - a single 32-bit exe
+  (pck embedded) that runs on EVERY Windows: 32-bit natively, 64-bit through
+  WOW64. Built with the official Godot export templates - no forging, and
+  the whole build takes minutes. Portrait designs render as a vertical slice
+  with the box brown sides; landscape designs fill the window. No ads / no
+  rewarded DOUBLE on PC.
 
 ## Repo map
 
@@ -67,24 +68,16 @@ build, commit/push/CI conventions, sandbox recovery.
 
 ## CI
 
-`.github/workflows/build-android.yml`:
+`.github/workflows/build.yml` — THE one build action (v0.3.4-4):
 
-- **push to main** → builds GOGABox, both ABIs, uploads APK artifacts.
-- **manual dispatch** → choose ABI / build type, optionally publish a GitHub release.
+- **push to main** → builds GOGABox for BOTH platforms in one run:
+  the APKs (both ABIs) **and** the one Windows exe (`GOGABox.exe`, 32-bit,
+  official templates, cached — minutes, not hours).
+- **manual dispatch** → choose ABI / build type, optionally publish a GitHub
+  release (APKs + the Windows zip).
 
 Caching is keyed on `config/environment.lock`, so bumping a version re-fetches
 exactly once. See [docs/CI.md](docs/CI.md).
-
-`.github/workflows/build-windows.yml` (manual dispatch):
-
-- **"Forge templates only"** → builds the two custom export templates
-  (x86_64 + x86) from the pinned Godot source with the SSE2 baseline flags
-  and objdump-verifies NO SSE4.2-only instructions landed in the binary.
-- **"Forge + export"** → also exports `GOGABox_x64.exe` + `GOGABox_x86.exe`
-  (single-file exes, embedded pck) and uploads them zipped.
-
-The forge is iterative by design - run it from the Actions tab until it is
-green, then keep the artifacts. See [docs/CI.md](docs/CI.md).
 
 ## Monetization
 

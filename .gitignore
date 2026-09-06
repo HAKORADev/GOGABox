@@ -42,3 +42,6 @@ download/
 # ---- Windows export outputs ----
 projects/*/build/
 projects/build/
+
+# ---- stray build deliveries (they live in releases / the sandbox download) ----
+projects/*.zip

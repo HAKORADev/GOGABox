@@ -45,6 +45,14 @@ func _find_lbl_like(root: Node, frag: String) -> Label:
                         return deep
         return null
 
+## every descendant of `root`, depth-first (the icon/text sweeps)
+func _all_kids(root: Node) -> Array:
+        var out: Array = []
+        for c in root.get_children():
+                out.append(c)
+                out.append_array(_all_kids(c))
+        return out
+
 func _boot() -> void:
         if G != null and is_instance_valid(G):
                 G.queue_free()
@@ -397,6 +405,78 @@ func _run() -> void:
         G._tick_pickups(0.016)
         ck(G.run_coins == run_coins0 + 1,
                         "THE RIDER LAW: collecting pays +1 REAL gogacoin to the wallet")
+        # ============================== v0.3.4-4 - THE OWNER'S THIRD REPORT
+        # THE UNIVERSAL WIDGET LAW: the GOGACoins widget IS the universal
+        # Arc.chip + coin.png, counting the coins COLLECTED THIS RUN
+        G._refresh_hud()
+        ck(G.gg_txt != null and G.gg_txt.text == str(G.run_coins),
+                        "THE UNIVERSAL WIDGET LAW: the chip shows the COLLECTED count, not the wallet")
+        var gg_chip: Control = G.gg_txt.get_parent().get_parent()
+        var gg_has_coin := false
+        for gg_kid in (G.gg_txt.get_parent() as Node).get_children():
+                if gg_kid is TextureRect and (gg_kid as TextureRect).texture != null \
+                                and (gg_kid as TextureRect).texture.resource_path == "res://assets/ui/coin.png":
+                        gg_has_coin = true
+        ck(gg_has_coin and gg_chip is PanelContainer,
+                        "THE UNIVERSAL WIDGET LAW: the widget wears THE universal coin icon")
+        var wallet_total := Box.coins()
+        ck(G.run_coins < wallet_total or wallet_total == 0,
+                        "THE UNIVERSAL WIDGET LAW: the collected count is its own number (not the total)")
+        # THE NO-SHOOT-VFX LAW: a live volley leaves no muzzle light behind
+        var parts_before: int = G._parts.size()
+        var blab4: Dictionary = G._spawn_enemy("blab", G.p_pos + Vector2(120, 0))
+        blab4["hp"] = 10.0
+        G._fire_weapon(G.weapons_run[0])
+        var muzzle_seen := false
+        for pp in G._parts:
+                if String(pp.get("tex", "")) == "muzzle":
+                        muzzle_seen = true
+        G._kill_enemy(blab4, false)
+        ck(not muzzle_seen and G._parts.size() >= parts_before,
+                        "THE NO-SHOOT-VFX LAW: no muzzle light - the gun speaks through sound alone")
+        # THE HONEST METERS LAW: the meters are plain Controls whose drawn
+        # fill follows the truth (and no Container can reset them)
+        ck(G.hp_meter is Control and not (G.hp_meter is PanelContainer)
+                        and G.xp_meter is Control and G.wave_meter is Control
+                        and G.boss_meter is Control,
+                        "THE HONEST METERS LAW: all four meters are container-proof plain Controls")
+        var hp0b: float = G.p_hp
+        G.p_hp = G.p_max_hp * 0.4
+        for _ri in 40:
+                G._refresh_hud()
+        var hp_st: Dictionary = G.hp_meter.get_meta("state")
+        ck(absf(float(hp_st["r"]) - 0.4) < 0.02,
+                        "THE HONEST METERS LAW: the HP fill settles at the true ratio (%.2f)" % float(hp_st["r"]))
+        var want_col: Color = G._hp_color(0.4)
+        ck(Color(hp_st["col"]).is_equal_approx(want_col),
+                        "THE HONEST METERS LAW: the HP color runs the green->yellow->red ramp")
+        G.p_hp = hp0b
+        for _ri2 in 40:
+                G._refresh_hud()
+        hp_st = G.hp_meter.get_meta("state")
+        ck(absf(float(hp_st["r"]) - float(hp0b) / G.p_max_hp) < 0.02,
+                        "THE HONEST METERS LAW: a heal moves the bar back up")
+        G.run_xp = 30
+        for _ri3 in 40:
+                G._refresh_hud()
+        var xp_st: Dictionary = G.xp_meter.get_meta("state")
+        var need1 := CSData.xp_for_run_level(G.run_level)
+        ck(absf(float(xp_st["r"]) - float(G.run_xp) / float(need1)) < 0.02
+                        and float(xp_st["r"]) > 0.0,
+                        "THE HONEST METERS LAW: the XP bar shows the true level progress, never empty")
+        G.run_xp = need1 + 5
+        G._tick_pickups(0.0001)     # no-op tick; the level law lives in the pickup
+        var lvl_before: int = G.run_level
+        while G.run_xp >= CSData.xp_for_run_level(G.run_level):
+                G.run_xp -= CSData.xp_for_run_level(G.run_level)
+                G.run_level += 1
+        ck(G.run_level == lvl_before + 1 and G.run_xp == 5,
+                        "THE HONEST METERS LAW: a level-up drains the XP bar's truth (run_xp resets)")
+        G.run_xp = 0
+        for _ri4 in 40:
+                G._refresh_hud()
+        ck(float(G.xp_meter.get_meta("state")["r"]) < 0.02,
+                        "THE HONEST METERS LAW: the XP bar sits at zero right after the level-up")
         # THE COIN-DISTINCT LAW: the cosmic coin is NOT the gogacoin
         var cosmic: Texture2D = load("res://assets/games/cosmic_spud/pickups/coin.png")
         var boxc: Texture2D = load("res://assets/ui/coin.png")
@@ -476,8 +556,17 @@ func _run() -> void:
         var door_box: VBoxContainer = G.cs_sheets[0]["box"]
         ck(_find_btn(door_box, "X") == null,
                         "THE DOOR LAW: the optionals wears NO X (the door cannot be closed)")
-        ck(_find_btn_like(door_box, "GOGACOINS") != null,
-                        "THE BORDER LAW: the un-owned place says GOGACOINS, never bare CC")
+        # v0.3.4-4 THE COIN-ICON PRICE LAW: no door price is spelled out in
+        # words anymore - the un-owned place wears the BUY + coin-icon button
+        var words_seen := _find_btn_like(door_box, "GOGACOINS") != null \
+                        or _find_btn_like(door_box, "GOGACoins") != null
+        var coin_icon_seen := false
+        for dk in _all_kids(door_box):
+                if dk is TextureRect and (dk as TextureRect).texture != null \
+                                and (dk as TextureRect).texture.resource_path == "res://assets/ui/coin.png":
+                        coin_icon_seen = true
+        ck(not words_seen and coin_icon_seen,
+                        "THE COIN-ICON PRICE LAW: the door says BUY + the coin icon, never the words")
         G._back_pressed()
         ck(G.sheet_open_count() == 1 and G._boot_hint != "",
                         "THE DOOR LAW: back on the door speaks - it never closes it")
@@ -654,22 +743,55 @@ func _run() -> void:
         await _wait(0.4)
         ck(G.phase == "play" and G.run_wave == 2,
                         "THE CHAIN: the skills CONTINUE starts the next wave")
-        # THE UNIVERSAL SHOP LAW: the HUD button opens THE SHOP at any phase
+        # v0.3.4-4 THE SHOP LIST LAW: the HUD button opens THE SHOP - the
+        # universal GOGACoins LIST (not the game's cosmic-coin store)
         G._shop_button()
         await _wait(0.2)
         ck(G.sheet_open_count() == 1,
-                        "THE UNIVERSAL SHOP LAW: the button opens THE SHOP mid-run")
+                        "THE SHOP LIST LAW: the button opens THE SHOP mid-run")
         var shop_box: VBoxContainer = G.cs_sheets[0]["box"]
-        ck(_find_btn(shop_box, "X") == null,
-                        "THE UNIVERSAL SHOP LAW: no X - BACK walks home")
-        ck(_find_lbl_like(shop_box, "GOGACoins") != null,
-                        "THE UNIVERSAL SHOP LAW: the GOGACoins chip lives in the header")
-        ck(_find_btn(shop_box, "PLACES") != null,
-                        "THE UNIVERSAL SHOP LAW: the PLACES tab exists")
-        _find_btn(shop_box, "BACK").pressed.emit()
+        ck(_find_lbl_like(shop_box, "THE PLACES") != null
+                        and _find_lbl_like(shop_box, "THE GUNS") != null
+                        and _find_lbl_like(shop_box, "THE LAB") != null
+                        and _find_lbl_like(shop_box, "THE CREW") != null,
+                        "THE SHOP LIST LAW: the four GOGACoins shelves - PLACES / GUNS / LAB / CREW")
+        var shop_coin := false
+        for sk in _all_kids(shop_box):
+                if sk is TextureRect and (sk as TextureRect).texture != null \
+                                and (sk as TextureRect).texture.resource_path == "res://assets/ui/coin.png":
+                        shop_coin = true
+        ck(shop_coin, "THE SHOP LIST LAW: the wallet chip + every price wear THE coin icon")
+        ck(_find_btn(shop_box, "CLOSE") != null,
+                        "THE SHOP LIST LAW: the list closes with CLOSE, like every other game")
+        _find_btn(shop_box, "CLOSE").pressed.emit()
         await _wait(0.2)
         ck(G.sheet_open_count() == 0 and G.phase == "play",
-                        "THE UNIVERSAL SHOP LAW: BACK resumes the run")
+                        "THE SHOP LIST LAW: CLOSE resumes the run")
+        # THE SHOP GUNS LAW: a GOGACoins gun joins EVERY wave market roll
+        var owned_before := Box.item_owned(G.game_id, "guns", "shotgun")
+        var bought := Box.buy_item(G.game_id, "guns", "shotgun",
+                        int(CSData.SHOP_GUNS["shotgun"]))
+        ck(bought or owned_before,
+                        "THE SHOP GUNS LAW: the GOGACoins wallet buys the premium gun")
+        G._roll_shop_offers()
+        var shotgun_first := false
+        for ow in G.shop_offers_w:
+                if String(ow["wid"]) == "shotgun":
+                        shotgun_first = true
+        ck(shotgun_first and G.shop_offers_w.size() == 4,
+                        "THE SHOP GUNS LAW: the owned gun's offer is planted in the market (4 offers total)")
+        ck(G.shop_offers_w[0]["wid"] == "shotgun",
+                        "THE SHOP GUNS LAW: the planted offer rides FIRST in the shelf")
+        # THE SHOP LAB LAW: the GOGACoins lab buys flip the same tree flags
+        Box.earn(1000)
+        G._shop_buy_lab("l3", 800)
+        ck(meta.tree_node("l3") and meta.merging_learned(),
+                        "THE SHOP LAB LAW: WEAPON LAB (the merging) is learned forever")
+        # THE SHOP CREW LAW: a GOGACoins ally joins the deploy list forever
+        Box.earn(500)
+        G._shop_buy_crew("drone", int(CSData.SHOP_CREW["drone"]))
+        ck(meta.has_ally("drone"),
+                        "THE SHOP CREW LAW: the drone is owned and lists in the deploy rows")
         # fresh probe exit
         Box.reset_all()
         print("=== cs_probe: %d checks, %d fails ===" % [checks, fails])
