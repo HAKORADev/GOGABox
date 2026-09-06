@@ -207,8 +207,9 @@ jobs:
         run: |
           F="projects/build/GOGABox.exe"
           file "$F"
-          file "$F" | grep -q "PE32 executable for MS Windows" || { echo "::error::not a Windows PE32"; exit 1; }
-          file "$F" | grep -q "Intel i386" || { echo "::error::not the 32-bit (i386) build"; exit 1; }
+          # file(1) wording differs across versions - match the FACTS not the order
+          file "$F" | grep -q "PE32 executable" || { echo "::error::not a Windows PE32"; exit 1; }
+          file "$F" | grep -Eq "Intel (i386|80386)" || { echo "::error::not the 32-bit (i386) build"; exit 1; }
           SZ="$(stat -c%s "$F")"
           [ "$SZ" -gt 50000000 ] || { echo "::error::exe suspiciously small ($SZ bytes) - the pck is missing"; exit 1; }
           echo "OK: a real i386 PE32 with the embedded game ($SZ bytes)"
