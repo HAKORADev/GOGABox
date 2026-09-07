@@ -202,6 +202,16 @@ func _t(key: String) -> Texture2D:
                 for proj in ["bolt", "pellet", "slug", "lance", "bomb", "shard",
                                 "rail", "spit", "orb", "boomerang", "tracer"]:
                         paths["proj_" + proj] = base + "bullets/" + proj + ".png"
+                # v0.3.5-5 THE ALLY TRUTH (the crash law): the allies wore tex
+                # keys that were NEVER registered here - the engineer's drop-in
+                # deploy hit `_t("orbiter")` and the missing dictionary key
+                # killed the run before the first wave (the owner: "selecting
+                # the engineer and tap drop-in makes the app crash"). Every
+                # ally texture registers now; the art lives with the enemies'
+                # sheets it was recomposed from.
+                for aid in CSData.ALLY_ORDER:
+                        paths[String(CSData.ALLIES[aid]["tex"])] = \
+                                        base + "enemies/" + String(CSData.ALLIES[aid]["tex"]) + ".png"
                 _tex[key] = load(paths[key])
         return _tex[key]
 
@@ -1232,12 +1242,28 @@ func _orbital_strike(at: Vector2, dmg: float, aoe: float) -> void:
         Jukebox.sfx("cs_flash", -8.0)
 
 # ================================================================ allies
+## v0.3.5-5 THE ALLY VARIETY LAW (the owner: "make sure that existing
+## allies are differ, like some with the character, some go fight around,
+## some have auras? some have cool weapons ... make sure they are not too
+## cool from the start because there is upgrades and allies usually do
+## not die"): every ally wears its own tint and its own job - the drone
+## orbits and shoots, the turret plants and sweeps, the guard carries a
+## PROTECTIVE AURA (the damage you take inside its ring shrinks), the
+## medic heals with a visible pulse, the bomber kamikaze-dives, the
+## scout marks AND plinks a weak pea-shooter dart. Level 1 stays humble.
+const ALLY_TINTS := {
+        "drone": Color(0.82, 1.0, 0.9), "turret": Color(1.0, 0.9, 0.72),
+        "guard": Color(0.8, 1.0, 0.78), "medic": Color(0.85, 0.95, 1.0),
+        "bomber": Color(1.0, 0.8, 0.68), "scout": Color(0.95, 1.0, 0.72),
+}
+const GUARD_AURA := 130.0       # the guard's protective ring, px
+
 func _deploy_ally(aid: String, level: int) -> void:
         var ad: Dictionary = CSData.ALLIES[aid]
         var spr := Sprite2D.new()
         spr.texture = _t(String(ad["tex"]))
         spr.scale = Vector2.ONE * 0.7
-        spr.modulate = Color(0.82, 1.0, 0.9)
+        spr.modulate = ALLY_TINTS.get(aid, Color(0.82, 1.0, 0.9))
         spr.z_index = 8
         world.add_child(spr)
         allies.append({"id": aid, "level": level, "pos": p_pos
@@ -1259,7 +1285,7 @@ func _tick_allies(delta: float) -> void:
                                 a["cd"] -= delta * float(stats["ally_dmg"])
                                 if a["cd"] <= 0.0 and not enemies.is_empty():
                                         a["cd"] = 0.5
-                                        var tgt: Dictionary = _nearest_enemy(a["pos"], 520.0)
+                                        var tgt: Variant = _nearest_enemy(a["pos"], 520.0)
                                         if tgt != null:
                                                 var dir: Vector2 = tgt["pos"] - a["pos"]
                                                 _ally_bullet(a["pos"], dir.angle(),
@@ -1275,7 +1301,7 @@ func _tick_allies(delta: float) -> void:
                                 a["cd"] -= delta * float(stats["ally_dmg"])
                                 if a["cd"] <= 0.0:
                                         a["cd"] = 0.42
-                                        var tgt2: Dictionary = _nearest_enemy(a["pos"], 440.0)
+                                        var tgt2: Variant = _nearest_enemy(a["pos"], 440.0)
                                         if tgt2 != null:
                                                 var d2: Vector2 = tgt2["pos"] - a["pos"]
                                                 _ally_bullet(a["pos"], d2.angle(),
@@ -1292,9 +1318,24 @@ func _tick_allies(delta: float) -> void:
                                                         6.0 * delta)
                                 else:
                                         a["pos"] = a["pos"].lerp(p_pos + Vector2(40, 40), 4.0 * delta)
+                                # THE GUARD AURA: the ring breathes so the
+                                # potato can read where the shield stands
+                                a["cd"] -= delta
+                                if a["cd"] <= 0.0:
+                                        a["cd"] = 2.5
+                                        _rings.append({"pos": a["pos"], "r": GUARD_AURA,
+                                                        "t": 0.55, "max": 0.55,
+                                                        "col": Color(0.55, 1.0, 0.7, 0.5), "w": 4.0})
                         "medic":
                                 a["pos"] = a["pos"].lerp(p_pos + Vector2(-40, -40), 4.0 * delta)
                                 p_hp = minf(p_max_hp, p_hp + (2.0 + lv) * delta)
+                                # the heal PULSES so the care reads
+                                a["cd"] -= delta
+                                if a["cd"] <= 0.0:
+                                        a["cd"] = 2.0
+                                        _rings.append({"pos": a["pos"], "r": 40.0,
+                                                        "t": 0.4, "max": 0.4,
+                                                        "col": Color(0.5, 1.0, 0.6, 0.6), "w": 3.0})
                         "bomber":
                                 a["cd"] -= delta
                                 if a["state"] == "dive":
@@ -1317,7 +1358,7 @@ func _tick_allies(delta: float) -> void:
                                                 a["pos"] = p_pos
                                                 a["node"].visible = true
                                 elif a["cd"] <= 0.0 and not enemies.is_empty():
-                                        var tgt3: Dictionary = _nearest_enemy(a["pos"], 400.0)
+                                        var tgt3: Variant = _nearest_enemy(a["pos"], 400.0)
                                         if tgt3 != null:
                                                 a["state"] = "dive"
                                                 a["target"] = tgt3
@@ -1329,6 +1370,16 @@ func _tick_allies(delta: float) -> void:
                                 for e in enemies:
                                         if e["pos"].distance_to(p_pos) < 300.0:
                                                 e["marked"] = true
+                                # THE SCOUT'S PEA SHOOTER (v0.3.5-5): the
+                                # spotter fights around with a weak dart gun
+                                a["cd"] -= delta * float(stats["ally_dmg"])
+                                if a["cd"] <= 0.0:
+                                        a["cd"] = 1.8
+                                        var tgt4: Variant = _nearest_enemy(a["pos"], 360.0)
+                                        if tgt4 != null:
+                                                var d4: Vector2 = tgt4["pos"] - a["pos"]
+                                                _ally_bullet(a["pos"], d4.angle(),
+                                                                3.0 + 1.5 * float(lv))
                 a["node"].position = a["pos"]
 
 func _nearest_enemy(from: Vector2, rng: float) -> Variant:
@@ -2074,6 +2125,20 @@ func _hurt_player(dmg: float, src: Variant, contact := false) -> void:
                 if meta.has_skill("adrenaline"):
                         _adrenaline = 2.0
                 return
+        # THE GUARD AURA (v0.3.5-5 THE ALLY VARIETY LAW): a deployed GUARD
+        # SPUD hardens the potato inside its ring - the incoming damage
+        # shrinks before armor. The BEST guard's ring counts once; two
+        # guards never stack the shield (allies do not die, upgrades exist,
+        # level 1 stays humble: 12% at lv1, 20% at lv3).
+        var guard_cut := 0.0
+        for a in allies:
+                if String(a["id"]) != "guard":
+                        continue
+                if p_pos.distance_to(a["pos"]) > GUARD_AURA:
+                        continue
+                guard_cut = maxf(guard_cut, 0.12 + 0.04 * float(int(a["level"]) - 1))
+        if guard_cut > 0.0:
+                dmg *= 1.0 - guard_cut
         var actual: float = maxf(1.0, dmg - float(stats["armor"]))
         p_hp -= actual
         p_iframe = 0.28 if contact else IFRAME

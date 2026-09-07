@@ -338,6 +338,46 @@ func _run() -> void:
         g._do_jump()
         _check(g.air_jumped and g.vy == vy_after_first, "x2 gives exactly ONE mid-air jump")
         _check(not g.grounded, "the x2 jump happens in the air")
+        # v0.3.5-5 THE x2 RELANDING LAW: a landing refunds the air jump -
+        # the old refund only rode a fresh ground jump, so "double-jump,
+        # land, walk off a ledge, press jump" was silently dead air
+        _seat(g, g.platforms[g.platforms.size() - 2])
+        g.grounded = false
+        g.air_jumped = true         # the x2 was spent mid-air
+        g.vy = 260.0 * g.U          # a REAL fall - the swept landing calls _land
+        g.py -= 4.0 * g.U
+        _ticks(g, 6)
+        _check(g.grounded and not g.air_jumped,
+                        "x2 RELANDS: the real landing refunds the air jump")
+        g.grounded = false          # walk off the ledge
+        g._do_jump()                # the refunded mid-air jump must answer
+        _check(g.air_jumped and not g.grounded,
+                        "x2 RELANDS: the refunded air jump fires after walking off a ledge")
+        # speed: the walk CAP grows x1.5 - the walk is accel-limited, so
+        # the probe measures the cap AIRBORNE (lifted 1000px: no landing
+        # zeroes vx, no walking off any platform, a 30-tick fall is a
+        # safe ~330px)
+        g.pw = {"id": "", "t": 0.0}
+        g.snow_load = 0.0
+        _seat(g, g.platforms[g.platforms.size() - 2])
+        g.grounded = false
+        g.py -= 1000.0 * g.U
+        g.vy = 0.0
+        g.move_dir = 1
+        _ticks(g, 30)
+        var walk_base: float = g.vx
+        _seat(g, g.platforms[g.platforms.size() - 2])
+        g.pw = {"id": "speed", "t": 9.0}
+        g.snow_load = 0.0
+        g.grounded = false
+        g.py -= 1000.0 * g.U
+        g.vy = 0.0
+        g.move_dir = 1
+        _ticks(g, 30)
+        _check(g.vx > walk_base * 1.3,
+                        "the speed powerup walks x1.5 (%.1f -> %.1f)" % [walk_base, g.vx])
+        g.move_dir = 0
+        g.pw = {"id": "", "t": 0.0}
         if g.phase != "run":
                 print("  [TRACE] the run died right after: powerups")
 

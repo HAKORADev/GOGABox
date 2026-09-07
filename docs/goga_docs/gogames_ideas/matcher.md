@@ -395,3 +395,29 @@ icon rail, the skin-name law, the music law, plus every p1/p2 regression
 (coin, shop stack, back law, wallet, fuzz 2000). Full battery green:
 flow_test + invaders + merge + dario + slasher + dash + snake + xo +
 tower + pong.
+
+## PATCH 8 (v0.3.5-5) — THE AUTO-RESOLVE TRUTH + THE COMBO TABLE
+- THE PREFILL RESOLVE LAW: the collect's refill (and every parcel
+  delivery) is gravity FIRST, then the re-scan — the coin's seat fills
+  itself and the fresh gems' matches fire without any player move (the
+  old scan-first loop broke on a quiet board and never ran gravity).
+- THE DROP STREAM LAW: parcels pour like butterflies hatch (1..3 on a
+  shrinking beat), each round rolls a quota up to 100 and a limit of
+  time / moves / BOTH; beat the quota before the limit, or the entrance
+  jam / the limit ends the run. A parcel that cannot descend climbs and
+  PARKS on the top line (the STAY law) — only the next parcel's arrival
+  with every top seat parked ends anything.
+- THE SHAPE LAW: jelly + ice crash levels roll one of seven connected
+  shapes (blob, twins, pyramid, sides, plus, stairs, band) — one flat
+  line forever is dead.
+- THE MINE SHAKE LAW: the earth rise rolls 1, 2 or 3 rows, likelier with
+  depth; the rise clock tightens as you dig.
+- THE COMBO TABLE: special + special swap fires with no match — double
+  sweeps (two rows / two columns / the plus), bomb+bomb = 4x4, bomb +
+  sweeper = three sweeps, remover + sweeper = the whole color drafted as
+  random-axis sweepers (all executed), remover + bomb = that color all
+  bombs (all executed), remover + remover stays the SUPERNOVA.
+- THE EXECUTION TRUTH: any blast that touches a special executes it; the
+  only shield that survives is THE BORN-MATCH SHIELD — a newborn of the
+  current wave is untouchable and the hit never spends its charge.
+- matcher_probe: 241 checks, 0 fails.

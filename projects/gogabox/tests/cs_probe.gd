@@ -958,6 +958,81 @@ func _run() -> void:
                         and G._t("icon_cleaver") != null,
                         "THE ART: the warden + the cleaver wear their new pixels")
 
+        # ================================================ THE PATCH 6 LAWS
+        # v0.3.5-5 THE ALLY TRUTH: every ally texture resolves - the missing
+        # registration used to kill the run on the engineer's drop-in
+        await _boot()
+        var ally_tex_ok := true
+        for aid in CSData.ALLY_ORDER:
+                if G._t(String(CSData.ALLIES[aid]["tex"])) == null:
+                        ally_tex_ok = false
+        ck(ally_tex_ok, "THE ALLY TRUTH: every ally texture resolves (no missing key)")
+        # THE ENGINEER DROP-IN LAW: the engineer's start deploys the drone
+        # and the first wave begins - the app must NEVER crash here
+        G.start_id = "engineer"
+        G._start_run()
+        await _wait(0.6)
+        ck(G.allies.size() == 1 and String(G.allies[0]["id"]) == "drone",
+                "THE ENGINEER DROP-IN: the drone buddy deployed with the run")
+        ck(G.phase == "play" or G.phase == "break",
+                "THE ENGINEER DROP-IN: the run is ALIVE past the wave start (no crash)")
+        ck(is_instance_valid(G.allies[0]["node"]),
+                "THE ENGINEER DROP-IN: the drone wears its sprite (the texture loaded)")
+        # THE ALLY VARIETY LAW: tints, the guard's aura, the scout's gun
+        var tint_ok: bool = G.ALLY_TINTS.size() == CSData.ALLY_ORDER.size()
+        ck(tint_ok, "THE ALLY VARIETY: every ally wears its own tint")
+        G._deploy_ally("guard", 1)
+        G._deploy_ally("scout", 1)
+        ck(G.allies.size() == 3, "THE ALLY VARIETY: the guard and the scout joined")
+        # the guard's aura: inside the ring the damage shrinks, outside it
+        # does not - and two guards never stack the cut. The cheat owns the
+        # shattered-shield skill - the battery turns it off so the hits
+        # land raw.
+        G.p_shield_up = false
+        var hp0g: float = float(G.p_hp)
+        G.allies[1]["pos"] = G.p_pos            # the guard hugs the potato
+        G.p_iframe = 0.0
+        G._hurt_player(20.0, null, false)
+        var hp_inside: float = float(G.p_hp)
+        G.allies[1]["pos"] = G.p_pos + Vector2(900, 900)   # out of the ring
+        G.p_iframe = 0.0
+        G._hurt_player(20.0, null, false)
+        var hp_outside: float = float(G.p_hp)
+        var loss_inside: float = hp0g - hp_inside
+        var loss_outside: float = hp_inside - hp_outside
+        ck(loss_inside > 0.0 and loss_inside < loss_outside,
+                "THE GUARD AURA: the damage inside the ring is smaller than outside")
+        # the outside hit lands heavier by EXACTLY the lv1 cut (12% of 20 =
+        # 2.4) - armor shifts both hits equally, the LOSS DELTA is the law
+        ck(absf((loss_outside - loss_inside) - 2.4) < 0.01,
+                "THE GUARD AURA: the ring cut exactly 12%% at lv1 (loss delta %.2f)" \
+                                % (loss_outside - loss_inside))
+        G._deploy_ally("guard", 1)              # a SECOND guard on the spot
+        G.allies[3]["pos"] = G.p_pos
+        G.p_iframe = 0.0
+        var hp_two: float = float(G.p_hp)
+        G._hurt_player(20.0, null, false)
+        var loss_two: float = hp_two - float(G.p_hp)
+        ck(absf(loss_two - loss_inside) < 0.01,
+                "THE GUARD AURA: two guards never stack the cut (the best ring counts once; loss_two=%.3f loss_inside=%.3f)" % [loss_two, loss_inside])
+        # the scout plinks: its fire cycle re-arms and the mark lands
+        # (the bullet COUNT races the game's own guns - the cycle is the
+        # deterministic proof)
+        G.allies[2]["pos"] = G.p_pos + Vector2(60, 0)      # guard out, scout in
+        G.allies[1]["pos"] = G.p_pos + Vector2(900, 900)
+        G.allies[0]["cd"] = 99.0        # the drone holds its fire
+        G.enemies.clear()
+        G.enemies.append({"uid": 4242, "pos": G.p_pos + Vector2(200, 0),
+                "hp": 50.0, "max_hp": 50.0, "spd": 0.0, "dmg": 1.0, "size": 20.0,
+                "node": Node2D.new(), "marked": false})
+        G.world.add_child(G.enemies[0]["node"])
+        G.allies[2]["cd"] = 0.0
+        G._tick_allies(0.05)
+        ck(G.allies[2]["cd"] > 0.0 and G.allies[2]["cd"] <= 1.8,
+                "THE SCOUT'S GUN: the pea-shooter cycle re-armed (the dart fired)")
+        ck(bool(G.enemies[0].get("marked", false)),
+                "THE SCOUT'S GUN: the spotter marked the enemy in range")
+
         # fresh probe exit
         Box.reset_all()
         print("=== cs_probe: %d checks, %d fails ===" % [checks, fails])

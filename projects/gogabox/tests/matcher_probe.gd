@@ -113,6 +113,21 @@ func _mk_cell(r: int, c: int, color: int) -> void:
         G.grid[r][c] = {"color": color, "special": "", "wing": false, "node": n}
 
 
+## a FULL match-free paint: color = (c + 2*r) % 5 - every row is a rotation
+## (no equal neighbors), every column steps 2 mod 5 (no equal neighbors), so
+## no match and no cascade can ever come from the paint itself, and gravity
+## never finds an empty seat to argue with.
+func _paint_quiet_board() -> void:
+        for r in 8:
+                for c in 8:
+                        if is_instance_valid(G.grid[r][c].get("node")):
+                                G.grid[r][c]["node"].queue_free()
+                        G.grid[r][c] = {}
+        for r in 8:
+                for c in 8:
+                        _mk_cell(r, c, (c + 2 * r) % 5)
+
+
 ## waits until the game's async waves settle (the resolve chains run on
 ## their own clock: staged pops, physics falls, the deadlock loss). The
 ## 0.35s lead lets the tick fire a pending refill first.
@@ -630,8 +645,17 @@ func _run() -> void:
         _mk_cell(0, 6, 2)
         _mk_cell(0, 7, 2)
         await G._resolve_loop()
+        # v0.3.3-8: the in-board check asserts the DROP happened (a refill
+        # cascade may legitimately drop MORE - the exact-3 law is proven by
+        # the deterministic unit right below)
+        ck(int(G.frost[2]) < 5,
+                "ICE v6: the horizontal match touching the line DROPPED the ice (5 -> %d)" % int(G.frost[2]))
+        # the deterministic unit: one drop wave takes EXACTLY 3 grids
+        G.frost[2] = 5
+        G.ice_drop_cols = {2: 3}
+        G._ice_drop_wave()
         ck(int(G.frost[2]) == 2,
-                "ICE v6: the horizontal match touching the line DROPPED the ice 3 grids (5 -> %d)" % int(G.frost[2]))
+                "ICE v6: one drop wave takes EXACTLY 3 grids (5 -> %d)" % int(G.frost[2]))
         # THE VERTICAL MELT GOES THROUGH THE REGISTRY: the column's ice dies
         # state AND sprites (no orphans, no re-applied ghosts)
         G.frost[4] = 6
@@ -749,12 +773,17 @@ func _run() -> void:
         # ------------------------------------------------ JELLY
         await _boot("jelly")
         ck(not G.jelly.is_empty(), "JELLY: the virus waits on the board")
-        var bottom_jelly := true
-        for c2 in 8:
-                if not G.jelly.has(7 * 8 + c2):
-                        bottom_jelly = false
-        ck(bottom_jelly, "JELLY: it starts as a full line from the BOTTOM")
-        var solid: bool = not G._playable(7, 0)
+        # v0.3.3-8 THE SHAPE LAW: the lay is a real SHAPE in the bottom
+        # half - never required to be one flat full line anymore
+        var shape_rows_ok := true
+        for k in G.jelly.keys():
+                if int(k) / 8 < 1:
+                        shape_rows_ok = false
+        ck(shape_rows_ok, "JELLY: the shape stays inside the bottom half (SHAPE LAW)")
+        ck(_blob_connected(G.jelly), "JELLY: the starting shape is one connected blob (SHAPE LAW)")
+        # a jelly cell is a SOLID (nothing is playable inside it)
+        var jk: int = G.jelly.keys()[0]
+        var solid: bool = not G._playable(int(jk) / 8, int(jk) % 8)
         ck(solid, "JELLY: a jelly cell is a SOLID (nothing is playable inside it)")
         # the eat law: the jelly cells hold NO gem (the node dict is the
         # jelly's own body - only a COLOR would mean a gem survived)
@@ -763,14 +792,55 @@ func _run() -> void:
                 if G.grid[int(k) / 8][int(k) % 8].has("color"):
                         eaten = false
         ck(eaten, "JELLY: it ATE the gems under itself (no gems inside the jelly)")
-        # the clear law: a match adjacent to jelly dissolves it (cols 2..4:
-        # the side jelly of an odd level owns cols 0 and 7 of row 6)
-        var j0: int = G.jelly.size()
-        _mk_cell(6, 2, 1)
-        _mk_cell(6, 3, 1)
-        _mk_cell(6, 4, 1)
-        await G._resolve_loop()
-        ck(G.jelly.size() < j0, "JELLY: a match NEXT TO the jelly dissolves it")
+        # the clear law: a match adjacent to jelly dissolves it - find a
+        # jelly cell with three same-line free seats beside it and plant
+        # the trio there (the shape is random, the law is not)
+        var trio := []          # three Vector2i free seats in a line
+        for k in G.jelly.keys():
+                var jr: int = int(k) / 8
+                var jc: int = int(k) % 8
+                for dc in [-1, 1]:
+                        var cand := []
+                        var ok3 := true
+                        for i in [1, 2, 3]:
+                                var tc: int = jc + dc * i
+                                if tc < 0 or tc > 7 or G.jelly.has(jr * 8 + tc) \
+                                                or G.grid[jr][tc].is_empty():
+                                        ok3 = false
+                                        break
+                                cand.append(Vector2i(jr, tc))
+                        if ok3:
+                                trio = cand
+                                break
+                if not trio.is_empty():
+                        break
+        if trio.is_empty():
+                # a wall-hugging shape - fall back to a vertical trio
+                for k in G.jelly.keys():
+                        var jr2: int = int(k) / 8
+                        var jc2: int = int(k) % 8
+                        for dr in [-1, 1]:
+                                var cand2 := []
+                                var okv := true
+                                for i in [1, 2, 3]:
+                                        var rr5: int = jr2 + dr * i
+                                        if rr5 < 0 or rr5 > 7 or G.jelly.has(rr5 * 8 + jc2) \
+                                                        or G.grid[rr5][jc2].is_empty():
+                                                okv = false
+                                                break
+                                        cand2.append(Vector2i(rr5, jc2))
+                                if okv:
+                                        trio = cand2
+                                        break
+                        if not trio.is_empty():
+                                break
+        ck(not trio.is_empty(), "JELLY: the battery found an adjacent trio seat for the dissolve law")
+        if not trio.is_empty():
+                var j0: int = G.jelly.size()
+                for t in trio:
+                        _mk_cell(t.x, t.y, 1)
+                await G._resolve_loop()
+                ck(G.jelly.size() < j0, "JELLY: a match NEXT TO the jelly dissolves it")
         # v0.3.3-p4 THE SPREAD LAW (the owner: "it should be from 2-8 tiles
         # i guess per a match that does not destroy one of it, from my tests
         # it spreads by 0-2?"): EVERY dry move spreads 2..8 connected cells
@@ -941,7 +1011,13 @@ func _run() -> void:
         ck(G.drop_limit_kind in ["moves", "time", "both"],
                 "DROP: the round rolled one of the THREE limits (%s)" % G.drop_limit_kind)
         var items0: int = G._count_items()
-        ck(items0 >= 1 and items0 <= 5, "DROP: the round opens with 1..5 parcels on the top line")
+        ck(items0 >= 1 and items0 <= 4, "DROP: the round opens with 2..4 parcels on the top line (%d)" % items0)
+        ck(G.drop_total >= 4 and G.drop_total <= G.DROP_QUOTA_MAX,
+                "DROP: the quota rolled inside the stream law (%d, cap %d)" % [G.drop_total, G.DROP_QUOTA_MAX])
+        ck(G.drop_delivered == 0 and G.drop_spawned >= items0,
+                "DROP: the stream bookkeeping woke up (spawned %d)" % G.drop_spawned)
+        ck(G.drop_gap >= G.DROP_GAP_MIN and G.drop_clock > 0.0,
+                "DROP: the hatch beat is live (%.2fs, floor %.2fs)" % [G.drop_gap, G.DROP_GAP_MIN])
         var top_ok := true
         for r in 8:
                 for c2 in 8:
@@ -1008,38 +1084,57 @@ func _run() -> void:
                 G.drop_left = 0          # the last parcel of the round
                 var items_before: int = G._count_items()
                 await G._drop_settle()
-                ck(int(G.score) == s3 + 3, "DROP: the bottom row delivers the parcel (+3)")
+                # v0.3.3-8: the delivery's refill is a REAL wave now - its
+                # fresh gems may cascade on their own, so the score is at
+                # least +3 (the delivery) instead of exactly +3
+                ck(int(G.score) >= s3 + 3, "DROP: the bottom row delivers the parcel (+3, cascades may add)")
                 ck(G.drop_level >= 2, "DROP: delivering everything rolls the NEXT round")
                 ck(not G.grid[7][2].is_empty() and not G._is_item(G.grid[7][2]),
                         "DROP: the delivered seat REFILLED (no hanging empty grid)")
-        # THE SPAWN-AFTER-MATCH LAW: a move that popped something feeds a
-        # parcel in from the top
-        G.drop_left = 2
-        G.move_pops = 4
-        # clear the live parcels (the fresh round laid its own) - the count
-        # must start at zero for the +1 spawn assertion
-        for r in 8:
+        # v0.3.3-8 THE DROP STREAM LAW: the parcels pour in on their OWN
+        # hatch clock - the old spawn-after-match feed is dead. The battery
+        # clears the top line (gems AND parcels - the hatch needs empty
+        # top seats) and calls the hatch by hand.
+        for c2 in 8:
+                if not G.grid[0][c2].is_empty() \
+                                and is_instance_valid(G.grid[0][c2].get("node")):
+                        G.grid[0][c2]["node"].queue_free()
+                G.grid[0][c2] = {}
+        for r in range(1, 8):
                 for c2 in 8:
                         if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
                                 if is_instance_valid(G.grid[r][c2].get("node")):
                                         (G.grid[r][c2]["node"] as Sprite2D).queue_free()
                                 G.grid[r][c2] = {}
-        var items_n0: int = G._count_items()
-        var free_top := -1
-        for c2 in 8:
-                if G.grid[0][c2].is_empty() or not G._is_item(G.grid[0][c2]):
-                        free_top = c2
-                        break
-        if free_top >= 0:
-                if not G.grid[0][free_top].is_empty():
-                        if is_instance_valid(G.grid[0][free_top].get("node")):
-                                G.grid[0][free_top]["node"].queue_free()
-                        G.grid[0][free_top] = {}
-                await G._after_move()
-                ck(G._count_items() == items_n0 + 1,
-                        "DROP: a popping move SPAWNS the next parcel from the top")
-                ck(G.drop_left == 1, "DROP: the spawn consumed the queue")
-        G.move_pops = 0
+        G.drop_spawned = 0
+        G.drop_total = 20         # room to hatch
+        G.drop_clock = 0.0
+        G.busy = false
+        G.over = false
+        var stream_n0: int = G._count_items()
+        G._drop_hatch()
+        var stream_n1: int = G._count_items()
+        ck(stream_n1 > stream_n0,
+                "DROP STREAM: the hatch poured parcels in WITHOUT a move (%d -> %d)" % [stream_n0, stream_n1])
+        ck(G.drop_spawned == stream_n1,
+                "DROP STREAM: the bookkeeping counts every spawned parcel")
+        ck(G.drop_clock >= G.DROP_GAP_MIN,
+                "DROP STREAM: the beat re-armed itself (%.2fs)" % G.drop_clock)
+        # THE STREAM CEILING: the hatch never exceeds the round quota
+        G.drop_spawned = G.drop_total
+        var ceiling_n: int = G._count_items()
+        G._drop_hatch()
+        ck(G._count_items() == ceiling_n,
+                "DROP STREAM: the quota ceiling holds (no parcel beyond the round roll)")
+        # THE CLEAN ENTRANCE: a spawn never deletes the gem under it
+        G.drop_spawned = 0
+        G.drop_total = 40
+        if not G.grid[0][1].is_empty() and is_instance_valid(G.grid[0][1].get("node")):
+                G.grid[0][1]["node"].queue_free()
+        _mk_cell(0, 1, 3)         # a live gem squats the seat
+        var spawned_ok: bool = G._drop_spawn(1)
+        ck(not spawned_ok and G._color_at(0, 1) == 3,
+                "DROP STREAM: the clean entrance never deletes a gem")
 
         # ---------------------------------------- v0.3.3-p4 THE NOVA LAW
         # (the owner: "a color remover + color remover = grid clear with 1
@@ -1460,7 +1555,12 @@ func _run() -> void:
         G.phase = "play"
         G.busy = false
         G.over = false
-        # board layout: (5,2)=S1(color 1), (5,3)=coin, (5,4)=A, (5,5)=A
+        # board layout: (5,2)=S1(color 1), (5,3)=coin, (5,4)=A, (5,5)=A.
+        # v0.3.3-8: start from a QUIET paint - the random dealt rows below
+        # could hand the painted row an instant vertical match, and its
+        # cascade would walk the coin out of its seat (a battery flake,
+        # never a game bug)
+        _paint_quiet_board()
         _mk_cell(5, 2, 1)
         var csn := Sprite2D.new()
         csn.texture = G._t("coin")
@@ -1497,11 +1597,13 @@ func _run() -> void:
         ck(G._is_item(G.grid[4][4]),
                 "THE PARCEL LAW: a drop item stays un-swappable (the owner confirmed)")
 
-        # v0.3.3-7 THE TOP-LINE PARCEL LAW (the owner: "if goes up two times
-        # it is marked end of turn, it should be like that only if they are
-        # at the top line and not every time" + "only toggles the two-ups
-        # rule if they first dropped at least a grid down from their
-        # original first line so it does not be like an always lose")
+        # v0.3.3-8 THE TOP-LINE STAY LAW (the owner: "the item when goes
+        # down, it has to go to the top line and stay at it, the next up
+        # when it is already on top is an end, not by just going to the top
+        # from first moment I mean"): a strike climbs the parcel and PARKS
+        # it on the top line - the climb NEVER ends the run; only the next
+        # parcel's arrival with every top seat parked (THE ENTRANCE JAM)
+        # does, and that lives in _drop_hatch (covered above).
         await _boot("drop")
         G.phase = "hold"
         G.drop_left = 0          # no spawns - the battery owns the parcels
@@ -1512,8 +1614,8 @@ func _run() -> void:
                                         (G.grid[r][c2]["node"] as Sprite2D).queue_free()
                                 G.grid[r][c2] = {}
         _mk_cell(2, 6, 2)
-        # CASE 1 - THE BIRTH-LINE IMMUNITY: every parcel spawns on the FIRST
-        # line - one that never dropped below it can never end the run
+        # CASE 1 - THE BIRTH-LINE PARK: a fresh parcel on its birth line
+        # just WARNS - no climb, no end, any number of strikes
         var pb := Sprite2D.new()
         pb.texture = G._t("parcel")
         pb.position = G._cell_pos(0, 6)
@@ -1524,59 +1626,61 @@ func _run() -> void:
         G.over = false
         G.drop_prev = {pidb: 0}
         await G._drop_rise_check()
-        ck(G._is_item(G.grid[0][6]) and int(G.grid[0][6].get("rose", 0)) == 0 \
+        ck(G._is_item(G.grid[0][6]) and int(G.grid[0][6].get("rose", 0)) == 1 \
                         and not G.over,
-                "THE TOP-LINE LAW: a fresh parcel on its birth line arms NOTHING (strike 1)")
+                "THE TOP-LINE STAY: a fresh parcel on its birth line only warns (strike 1)")
         G.drop_prev = {pidb: 0}
         await G._drop_rise_check()
-        ck(not G.over and int(G.grid[0][6].get("rose", 0)) == 0,
-                "THE TOP-LINE LAW: the birth-line parcel survives every strike (strike 2)")
-        # CASE 2 - THE MID-BOARD CLIMB: an ARMED parcel (it already dropped
-        # below its birth line) climbs on a strike but NEVER dies mid-board
+        G.drop_prev = {pidb: 0}
+        await G._drop_rise_check()
+        ck(not G.over and G._is_item(G.grid[0][6]),
+                "THE TOP-LINE STAY: the parked parcel survives EVERY strike, the run holds")
+        # CASE 2 - THE MID-BOARD CLIMB: a stuck parcel climbs one row per
+        # strike but NEVER dies mid-board
         var pm := Sprite2D.new()
         pm.texture = G._t("parcel")
         pm.position = G._cell_pos(3, 6)
         G.world.add_child(pm)
         G.drop_seq += 1
         var pidm: int = G.drop_seq - 1
-        G.grid[3][6] = {"color": -2, "item": true, "node": pm, "drop_id": pidm,
-                        "dropped": true}
+        G.grid[3][6] = {"color": -2, "item": true, "node": pm, "drop_id": pidm}
         G.drop_prev = {pidm: 3}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[2][6]) and int(G.grid[2][6].get("rose", 0)) == 1 \
                         and not G.over,
-                "THE TOP-LINE LAW: an armed parcel climbs on a strike (3 -> 2)")
+                "THE TOP-LINE STAY: a stuck parcel climbs on a strike (3 -> 2)")
         G.drop_prev = {pidm: 2}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[1][6]) and int(G.grid[1][6].get("rose", 0)) == 2 \
                         and not G.over,
-                "THE TOP-LINE LAW: the second strike mid-board does NOT end the run")
-        # CASE 3 - THE DESCENT RESET: a real descent clears the strikes and
-        # the arm STAYS (the parcel keeps its risky life below the birth line)
+                "THE TOP-LINE STAY: the second strike mid-board does NOT end the run")
+        # CASE 3 - THE DESCENT RESET: a real descent clears the climb count
         if not G.grid[2][6].is_empty() and is_instance_valid(G.grid[2][6].get("node")):
                 (G.grid[2][6]["node"] as Sprite2D).queue_free()
         G.grid[2][6] = G.grid[1][6]
         G.grid[1][6] = {}
         G.drop_prev = {pidm: 1}
         await G._drop_rise_check()
-        ck(int(G.grid[2][6].get("rose", 0)) == 0 \
-                        and bool(G.grid[2][6].get("dropped", false)) and not G.over,
-                "THE TOP-LINE LAW: a real descent clears the strikes, the arm stays")
-        # CASE 4 - THE TOP-LINE KILL: the armed parcel climbs back up and the
-        # strike that catches it ON the top line ends the run
+        ck(int(G.grid[2][6].get("rose", 0)) == 0 and not G.over,
+                "THE TOP-LINE STAY: a real descent clears the climb count")
+        # CASE 4 - THE TOP-LINE PARK: the climb carries it up to the top
+        # line and it STAYS there - no strike on the line ever ends anything
         G.drop_prev = {pidm: 2}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[1][6]) and not G.over,
-                "THE TOP-LINE LAW: the climb walks back up (2 -> 1)")
+                "THE TOP-LINE STAY: the climb walks back up (2 -> 1)")
         G.drop_prev = {pidm: 1}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[0][6]) and not G.over,
-                "THE TOP-LINE LAW: the parcel reached the top line, the run still holds")
+                "THE TOP-LINE STAY: the parcel reached the top line and PARKS")
         G.drop_prev = {pidm: 0}
         await G._drop_rise_check()
-        ck(G.over, "THE TOP-LINE LAW: the strike ON the top line ends the run")
+        G.drop_prev = {pidm: 0}
+        await G._drop_rise_check()
+        ck(not G.over and G._is_item(G.grid[0][6]),
+                "THE TOP-LINE STAY: parking on the top line NEVER ends the run on its own")
         G._refresh_hud()
-        ck(String(G.chip_info.text).contains("parcels left"),
+        ck(String(G.chip_info.text).contains("parcels"),
                 "the drop HUD survives the climb check")
 
         # ================================================== the PATCH 6 battery
@@ -1590,7 +1694,9 @@ func _run() -> void:
         G.charges["bomb"] = 1
         G.power_used["bomb"] = 0
         G._fire_power(Vector2i(4, 4))
-        await get_tree().create_timer(2.5).timeout
+        # v0.3.3-8: the chains grew LONGER (blasts execute the specials they
+        # touch) - wait for the resolve to actually settle, not a fixed nap
+        await _wait_idle()
         ck(G._find_matches().is_empty(),
                 "THE ONE RESOLVE LAW: after a power, the board is QUIET (no stale matches)")
         var holes := 0
@@ -1628,10 +1734,11 @@ func _run() -> void:
         G.grid[3][3]["special"] = "bomb"
         G._dress_special(3, 3)
         # the wave must leave the newborn ALIVE - a refill cascade may
-        # legitimately EXECUTE it afterwards, so the board replants until a
-        # quiet-wave attempt proves the shield (deterministic per seed)
+        # legitimately EXECUTE it afterwards (v0.3.3-8 THE EXECUTION
+        # TRUTH), so the board replants until a quiet-wave attempt proves
+        # the shield (deterministic per seed)
         var born_ok := false
-        var shield_spent := false
+        var shield_kept := false
         for attempt in 8:
                 seed(4242 + attempt)
                 for r in 8:
@@ -1663,13 +1770,15 @@ func _run() -> void:
                                                 and String(G.grid[r][c2].get("special", "")) == "rowh" \
                                                 and not bool(G.grid[r][c2].get("born_wave", false)):
                                         born_ok = true
-                                        shield_spent = int(G.grid[r][c2].get("shield", 0)) == 0
+                                        # v0.3.3-8: the born-wave hit NEVER spends
+                                        # the charge (the owner's "ofc" law)
+                                        shield_kept = int(G.grid[r][c2].get("shield", 0)) == 1
                                         break
         ck(born_ok,
                 "THE NEWBORN SHIELD: the fresh special SURVIVED its own birth wave")
         if born_ok:
-                ck(shield_spent,
-                        "THE NEWBORN SHIELD: the birth wave spent the shield, the flag cleared")
+                ck(shield_kept,
+                        "THE NEWBORN SHIELD: the born-wave hit NEVER spent the charge (the ofc law)")
 
         # v0.3.3-6 THE EXECUTION LAW: the vapor power EXECUTES a special it
         # removes (the bomb's crater joins the wipe)
@@ -1720,11 +1829,32 @@ func _run() -> void:
 
         # v0.3.3-6 THE JELLY DAMAGE LAW (the owner: "three of them was on-top
         # of jellies, only the last one destroyed one jelly, the supposed
-        # thing is all the three destroys three jellies"). NOTE: level 1's
-        # side jelly owns (6,0) and (6,7) - the matches avoid those seats.
+        # thing is all the three destroys three jellies"). v0.3.3-8: the
+        # battery plants its OWN jelly seats on a QUIET board - the SHAPE
+        # LAW made the lay random, and this law is about ADJACENCY, never
+        # about the layout. Every match re-quiets the board first: a random
+        # refill cascade here would dissolve jelly the match never touched
+        # (and an emptied board would even LEVEL UP mid-battery).
         await _boot("jelly")
         G.phase = "hold"
         seed(77)
+        _paint_quiet_board()
+        G.jelly = {}
+        for c2 in range(1, 7):
+                G.jelly[7 * 8 + c2] = true
+        G.jelly[6 * 8 + 0] = true
+        # THE SACRIFICE: one jelly seat in the far corner that no refill
+        # cascade can ever touch - if the stage jelly ever emptied, the
+        # level-up would re-lay a random SHAPE mid-battery and every later
+        # assertion would read the wrong board
+        G.jelly[0] = true
+        for k in G.jelly.keys():
+                var jrow: int = int(k) / 8
+                var jcol: int = int(k) % 8
+                if is_instance_valid(G.grid[jrow][jcol].get("node")):
+                        G.grid[jrow][jcol]["node"].queue_free()
+                G.grid[jrow][jcol] = {}
+        G._refresh_jelly()
         var row_pat := [0, 1, 2, 0, 1, 2, 0, 1]
         var up_pat := [2, 0, 1, 2, 0, 1, 2, 0]
         for c2 in 8:
@@ -1739,16 +1869,33 @@ func _run() -> void:
                 if not G.jelly.has(7 * 8 + c2):
                         d1 += 1
         ck(d1 == 3, "JELLY v6: match 1 on top destroyed ITS three jellies (%d/3)" % d1)
+        # re-quiet: wipe every non-jelly seat and repaint it quiet, so
+        # match 2's wave is the only actor on the board
+        for r in 8:
+                for c2 in 8:
+                        if G.jelly.has(r * 8 + c2):
+                                continue
+                        if is_instance_valid(G.grid[r][c2].get("node")):
+                                G.grid[r][c2]["node"].queue_free()
+                        G.grid[r][c2] = {}
+        for r in 8:
+                for c2 in 8:
+                        if not G.jelly.has(r * 8 + c2) and G.grid[r][c2].is_empty():
+                                _mk_cell(r, c2, (c2 + 2 * r) % 5)
         for c2 in [4, 5, 6]:
                 _mk_cell(6, c2, 4)
         _mk_cell(6, 3, 1)
+        _mk_cell(6, 7, 2)       # the pin: no 4-run stretches into the match
         await G._resolve_loop()
         var d2 := 0
         for c2 in [4, 5, 6]:
                 if not G.jelly.has(7 * 8 + c2):
                         d2 += 1
         ck(d2 == 3, "JELLY v6: match 2 on top destroyed ITS three jellies (%d/3)" % d2)
-        # match 3: a VERTICAL run over the side jelly at (6,0)
+        # match 3: a VERTICAL run over the side jelly at (6,0) - force the
+        # seat back (a level-up re-lay could have rolled it away)
+        G.jelly = {6 * 8 + 0: true, 0: true}
+        G._refresh_jelly()
         _mk_cell(3, 0, 2)
         _mk_cell(4, 0, 2)
         _mk_cell(5, 0, 2)
@@ -1959,14 +2106,231 @@ func _run() -> void:
         await G._try_swap(Vector2i(1, 0), Vector2i(1, 1))
         ck(not G.over and int(G.grid[1][6].get("rose", 0)) == 2,
                 "THE ROSE FLAG LAW: the second up-move mid-board does NOT end the run")
-        # the climb walks it to the top line, and THERE the next strike ends it
+        # the climb walks it to the top line, and it PARKS there - the run
+        # holds forever (v0.3.3-8: only the ENTRANCE JAM ends a run now)
         G.drop_prev = {pid2: 1}
         await G._drop_rise_check()
         ck(G._is_item(G.grid[0][6]) and not G.over,
-                "THE ROSE FLAG LAW: the parcel reached the top line, the run still holds")
+                "THE ROSE FLAG LAW: the parcel reached the top line and PARKS")
         G.drop_prev = {pid2: 0}
         await G._drop_rise_check()
-        ck(G.over, "THE ROSE FLAG LAW: the strike at the top line ends the run (the owner's law)")
+        ck(not G.over and G._is_item(G.grid[0][6]),
+                "THE ROSE FLAG LAW: the top-line strike never ends the run (the STAY law)")
+
+        # ================================================== the PATCH 8 battery
+        # v0.3.3-8 THE PREFILL RESOLVE LAW: the collect's refill is gravity
+        # FIRST (the old scan-first loop broke on a quiet board and left the
+        # collected coin's seat a HOLE until the player's next move)
+        await _boot("peace")
+        G.phase = "play"
+        G.busy = false
+        G.over = false
+        _paint_quiet_board()
+        # one guaranteed legal move: swapping (0,0) with (1,0) lines the
+        # row-0 trio 1,1,1 - the deadlock law must never fire here
+        G.grid[0][2]["color"] = 1
+        (G.grid[0][2]["node"] as Sprite2D).texture = G.tex_gem[1]
+        G.grid[1][0]["color"] = 1
+        (G.grid[1][0]["node"] as Sprite2D).texture = G.tex_gem[1]
+        var hole := Vector2i(4, 4)
+        if is_instance_valid(G.grid[hole.x][hole.y].get("node")):
+                G.grid[hole.x][hole.y]["node"].queue_free()
+        G.grid[hole.x][hole.y] = {}
+        ck(G._find_matches().is_empty(), "PREFILL: the constructed battery board starts quiet")
+        ck(G.grid[hole.x][hole.y].is_empty(), "PREFILL: the hole sits on the board")
+        G.busy = true
+        await G._coin_refill_run()
+        await _wait_idle()
+        ck(not G.grid[hole.x][hole.y].is_empty(),
+                "PREFILL RESOLVE: the collect's seat FILLED itself without any player move")
+        var full_ok := true
+        for r in 8:
+                for c2 in 8:
+                        if G.grid[r][c2].is_empty():
+                                full_ok = false
+        ck(full_ok, "PREFILL RESOLVE: the whole board is full again (no hanging holes)")
+        ck(not G.over, "PREFILL RESOLVE: the quiet refill never trips the deadlock law")
+
+        # v0.3.3-8 THE COMBO TABLE - the unit law first: the bomb4 blast
+        await _boot("peace")
+        G.phase = "hold"
+        var b4: Array = G._blast_cells("bomb4", 2, 2)
+        ck(b4.size() == 16, "COMBO TABLE: the bomb4 blast covers exactly 16 cells (%d)" % b4.size())
+        var b4_ok := true
+        for key in b4:
+                var br: int = int(key) / 8
+                var bc: int = int(key) % 8
+                if br < 2 or br > 5 or bc < 2 or bc > 5:
+                        b4_ok = false
+        ck(b4_ok, "COMBO TABLE: the bomb4 crater is the 4x4 box rows 2-5 / cols 2-5")
+
+        # THE DOUBLE SWEEP: rowh + rowh clears BOTH rows through a real
+        # swap - the proof is the pop count (two full rows = 16 gems) with
+        # a match-free painted board that cannot cascade below it
+        _paint_quiet_board()
+        var s_double: int = int(G.score)
+        G.grid[3][3]["special"] = "rowh"
+        G.grid[4][3]["special"] = "rowh"
+        G._dress_special(3, 3)
+        G._dress_special(4, 3)
+        G.busy = false
+        await G._try_swap(Vector2i(3, 3), Vector2i(4, 3))
+        await _wait_idle()
+        ck(String(G.grid[3][3].get("special", "")) == "" \
+                        and String(G.grid[4][3].get("special", "")) == "",
+                "COMBO TABLE: the double sweep CONSUMED both sweepers")
+        ck(int(G.score) - s_double >= 16,
+                "COMBO TABLE: the double sweep popped BOTH rows (score +%d >= 16)" % (int(G.score) - s_double))
+
+        # THE PLUS: rowh + colv clears the row AND the column (15 pops min)
+        _paint_quiet_board()
+        var s_plus: int = int(G.score)
+        G.grid[3][2]["special"] = "rowh"
+        G.grid[4][2]["special"] = "colv"
+        G._dress_special(3, 2)
+        G._dress_special(4, 2)
+        G.busy = false
+        await G._try_swap(Vector2i(3, 2), Vector2i(4, 2))
+        await _wait_idle()
+        ck(int(G.score) - s_plus >= 15,
+                "COMBO TABLE: the plus popped the row AND the column (score +%d >= 15)" % (int(G.score) - s_plus))
+        ck(String(G.grid[3][2].get("special", "")) == "",
+                "COMBO TABLE: the plus consumed both specials")
+
+        # BOMB + BOMB: the 4x4 crater through a real swap (16 pops min)
+        _paint_quiet_board()
+        var s_b4: int = int(G.score)
+        G.grid[3][3]["special"] = "bomb"
+        G.grid[3][4]["special"] = "bomb"
+        G._dress_special(3, 3)
+        G._dress_special(3, 4)
+        G.busy = false
+        await G._try_swap(Vector2i(3, 3), Vector2i(3, 4))
+        await _wait_idle()
+        ck(int(G.score) - s_b4 >= 16,
+                "COMBO TABLE: bomb + bomb cratered the 4x4 (score +%d >= 16)" % (int(G.score) - s_b4))
+        ck(String(G.grid[3][3].get("special", "")) == "" \
+                        and String(G.grid[3][4].get("special", "")) == "",
+                "COMBO TABLE: bomb + bomb consumed both bombs")
+
+        # BOMB + SWEEPER: THREE sweeps of the sweeper's kind (rows 1,2,3
+        # around the rowh at row 2 = 24 pops min)
+        _paint_quiet_board()
+        var s_tri: int = int(G.score)
+        G.grid[3][4]["special"] = "bomb"
+        G.grid[2][4]["special"] = "rowh"
+        G._dress_special(3, 4)
+        G._dress_special(2, 4)
+        G.busy = false
+        await G._try_swap(Vector2i(3, 4), Vector2i(2, 4))
+        await _wait_idle()
+        ck(int(G.score) - s_tri >= 24,
+                "COMBO TABLE: bomb + rowh swept THREE rows (score +%d >= 24)" % (int(G.score) - s_tri))
+
+        # THE COLOR ARMY: remover + sweeper drafts the whole color as
+        # random-axis sweepers and the volley executes them all. Six
+        # color-2 draftees on distinct lines pop >= 39 cells (three rows +
+        # three columns minus the nine crossings); a plain color wipe
+        # scores ~13, so 35 is an honest army proof.
+        _paint_quiet_board()
+        var army_cells := [Vector2i(0, 0), Vector2i(2, 5), Vector2i(5, 1),
+                        Vector2i(7, 6), Vector2i(4, 7)]
+        for ac in army_cells:
+                G.grid[ac.x][ac.y]["color"] = 2
+                (G.grid[ac.x][ac.y]["node"] as Sprite2D).texture = G.tex_gem[2]
+        G.grid[3][3]["special"] = "hyper"
+        G._dress_special(3, 3)
+        G.grid[3][2]["color"] = 2
+        (G.grid[3][2]["node"] as Sprite2D).texture = G.tex_gem[2]
+        G.grid[3][2]["special"] = "rowh"
+        G._dress_special(3, 2)
+        ck(G._find_matches().is_empty(),
+                "COMBO TABLE: the army board starts quiet (no accidental matches)")
+        var s_army: int = int(G.score)
+        G.busy = false
+        await G._try_swap(Vector2i(3, 3), Vector2i(3, 2))
+        await _wait_idle()
+        ck(int(G.score) - s_army >= 35,
+                "COMBO TABLE: the color army executed the volley (score +%d >= 35)" % (int(G.score) - s_army))
+        ck(String(G.grid[3][3].get("special", "")) == "",
+                "COMBO TABLE: the remover is consumed by the army combo")
+
+        # v0.3.3-8 THE EXECUTION TRUTH: a blast that touches an OLD special
+        # (born in an earlier wave, no born_wave flag) EXECUTES it - the
+        # swept row fires the bomb sitting inside it (its 3x3 joins: 8 row
+        # + 6 crater cells = 14 pops min; a lone sweep is 8)
+        _paint_quiet_board()
+        var s_exec: int = int(G.score)
+        G.grid[3][3]["special"] = "rowh"
+        G._dress_special(3, 3)
+        G.grid[3][6]["special"] = "bomb"
+        G.grid[3][6]["shield"] = 0       # an OLD special - no born wave
+        G.grid[3][6].erase("born_wave")
+        G._dress_special(3, 6)
+        G.busy = false
+        await G._resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1),
+                        {3 * 8 + 3: true})   # the row sweep fires
+        await _wait_idle()
+        ck(int(G.score) - s_exec >= 14,
+                "EXECUTION TRUTH: the swept row EXECUTED the old bomb (score +%d >= 14)" % (int(G.score) - s_exec))
+
+        # v0.3.3-8 THE SHAPE LAW: the jelly / ice-crash lays roll SHAPES,
+        # never one flat line forever, and every shape is one connected blob
+        var shapes_seen := {}
+        for i in 60:
+                var cells: Dictionary = G._lay_shape_cells(10)
+                var row_widths := {}
+                for k in cells.keys():
+                        var rr3: int = int(k) / 8
+                        row_widths[rr3] = int(row_widths.get(rr3, 0)) + 1
+                var widest := 0
+                for w in row_widths.values():
+                        widest = maxi(widest, int(w))
+                var off_cells: int = cells.size() - widest
+                shapes_seen["wide" if off_cells == 0 else "shaped"] = true
+        ck(shapes_seen.has("shaped"),
+                "SHAPE LAW: the lays roll real shapes, not only flat bands")
+        var conn_ok := true
+        for i in 40:
+                var cells2: Dictionary = G._lay_shape_cells(12)
+                var seen := {}
+                var start: int = cells2.keys()[0]
+                seen[start] = true
+                var stack := [start]
+                while not stack.is_empty():
+                        var k: int = stack.pop_back()
+                        var rr4: int = int(k) / 8
+                        var cc4: int = int(k) % 8
+                        for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+                                var nr: int = rr4 + d.x
+                                var nc: int = cc4 + d.y
+                                var nk := nr * 8 + nc
+                                if nr < 0 or nc < 0 or nr > 7 or nc > 7 or seen.has(nk) \
+                                                or not cells2.has(nk):
+                                        continue
+                                seen[nk] = true
+                                stack.append(nk)
+                if seen.size() != cells2.size():
+                        conn_ok = false
+        ck(conn_ok, "SHAPE LAW: every rolled shape is one connected blob")
+
+        # v0.3.3-8 THE MINE SHAKE LAW: the rise roll speaks 1, 2 or 3 rows
+        G.depth = 40            # deep dig - the multi rows are likely
+        var saw := {"1": 0, "2": 0, "3": 0}
+        for i in 400:
+                saw[str(G._mine_roll_rows())] += 1
+        G.depth = 0
+        ck(saw["2"] > 0 and saw["3"] > 0,
+                "MINE SHAKE LAW: deep digs roll TWO and THREE earth rows (%d/%d/%d of 400)" \
+                                % [saw["1"], saw["2"], saw["3"]])
+        var shallow := {"1": 0, "2": 0, "3": 0}
+        for i in 400:
+                shallow[str(G._mine_roll_rows())] += 1
+        ck(shallow["2"] + shallow["3"] > 0,
+                "MINE SHAKE LAW: even shallow digs sometimes rise double")
+        ck(shallow["1"] > shallow["2"] + shallow["3"],
+                "MINE SHAKE LAW: singles dominate the SHALLOW digs (the roll stays fair)")
+
 
         # v0.3.3-6 THE ROOT LAW: the boot optionals is the home - back cannot
         # strand a boardless game

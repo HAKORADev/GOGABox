@@ -249,6 +249,35 @@ func _run() -> void:
         _check(g4.hearts == 2,
                 "a graze on the bomb's SIDE detonates it (no pass-through needed)")
 
+        # v0.3.5-5 THE CASUAL CUT LAW: the fruit hitboxes grew past their
+        # own drawn edge - reaching the OUTER HALF cuts (the old 0.42*
+        # drawn-width circle left the outer skin uncuttable); the bomb
+        # stays honest so the generosity never multiplies detonations
+        var cc_ap: Dictionary = _make_live(g4, "apple", Vector2(400, 300))
+        var cc_shp: Dictionary = g4._shape_of(cc_ap)
+        var cc_dw: float = float(cc_ap["node"].texture.get_width()) * float(cc_ap["scale"])
+        _check(float(cc_shp["r"]) > cc_dw * 0.5,
+                "CASUAL CUT: the fruit hitbox reaches past its own drawn edge (r=%.1f, dw=%.1f)" \
+                                % [float(cc_shp["r"]), cc_dw])
+        g4.items.append(cc_ap)
+        var cc_skin := cc_dw * 0.48     # inside the NEW r, outside the old 0.42
+        var cc_score := int(g4.score)
+        g4._on_drag(Vector2(400.0 + cc_skin, 380.0),
+                        Vector2(400.0 + cc_skin, 220.0))
+        _check(int(g4.score) == cc_score + 1 and not g4.items.has(cc_ap),
+                "CASUAL CUT: a slash through the fruit's OUTER HALF cuts it now")
+        var cc_bm: Dictionary = _make_live(g4, "bomb", Vector2(400, 300))
+        var cc_bsh: Dictionary = g4._shape_of(cc_bm)
+        var cc_bdw: float = float(cc_bm["node"].texture.get_width()) * float(cc_bm["scale"])
+        _check(float(cc_bsh["r"]) < cc_bdw * 0.5,
+                "CASUAL CUT: the bomb stays honest (r=%.1f < half its drawn width %.1f)" \
+                                % [float(cc_bsh["r"]), cc_bdw * 0.5])
+        var cc_bn: Dictionary = _make_live(g4, "banana", Vector2(400, 300))
+        var cc_bshp: Dictionary = g4._shape_of(cc_bn)
+        var cc_bdw2: float = float(cc_bn["node"].texture.get_width()) * float(cc_bn["scale"])
+        _check(float(cc_bshp["r"]) >= 0.35 * cc_bdw2,
+                "CASUAL CUT: the capsule grew fat (r=%.1f, dw=%.1f)"                                 % [float(cc_bshp["r"]), cc_bdw2])
+
         # ---- THE ANCHOR-CHORD REGRESSION (v0.3.2 patch, the owner AGAIN:
         # "i move my finger in an arch shape... then i close the arch, BOM,
         # it's slashed, how? why?") - the v0.3.1 probe called _on_drag

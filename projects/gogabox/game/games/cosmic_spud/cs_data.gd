@@ -186,13 +186,13 @@ const ALLIES := {
         "turret": {"name": "TATER TURRET", "price": 1500, "tex": "boomling",
                 "desc": "plants near you, sweeps 360"},
         "guard":  {"name": "GUARD SPUD", "price": 1800, "tex": "chunk",
-                "desc": "bodyblocks and taunts nearby enemies"},
+                "desc": "bodyblocks - its AURA cuts the damage you take inside"},
         "medic":  {"name": "MEDIC SPROUT", "price": 2000, "tex": "mender",
-                "desc": "heals you 2 HP/s (+1 per level)"},
+                "desc": "heals you 2 HP/s (+1 per level), the care pulses"},
         "bomber": {"name": "BOMBER CHIP", "price": 2300, "tex": "boomling",
                 "desc": "kamikaze dives every 8s, respawns in 5s"},
         "scout":  {"name": "SCOUT FRY", "price": 2600, "tex": "orbiter",
-                "desc": "marks enemies in 300px: +15% damage taken"},
+                "desc": "marks enemies in 300px: +15% taken, plinks a pea dart"},
 }
 const ALLY_ORDER := ["drone", "turret", "guard", "medic", "bomber", "scout"]
 const ALLY_MAX_LEVEL := 3

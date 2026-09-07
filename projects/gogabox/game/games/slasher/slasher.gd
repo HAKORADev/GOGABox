@@ -755,8 +755,18 @@ func _on_drag(from: Vector2, to: Vector2) -> void:
                 elif _seg_circle_hit(from, to, n.position, float(shp["r"])):
                         _cut_item(p, from, to)
 
-## the item's own collision shape, sized from the DRAWN pixels (the blade
-## ribbon is ~26px wide - the hit zone is the body, never a 200px swath)
+## the item's own collision shape, sized from the DRAWN pixels.
+## v0.3.5-5 THE CASUAL CUT LAW (the owner: "the collision detection of
+## fruits and vegs are small in somehow too realistic way for a casual
+## arcade game, making it a little bigger for each one and changing the
+## logic of side-to-side cut to just be to the half of the fruit, this
+## will make the focus go from perfect cuts to trying to not let any
+## fruit drop in one piece"): every fruit/veg wears a GENEROUS hitbox -
+## a circle past its own drawn edge (0.55 of the drawn width) and a fat
+## capsule - so reaching the OUTER HALF of a fruit with the blade is a
+## cut. The blade ribbon is ~26px wide; the slash no longer demands a
+## center-line surgery. The BOMB stays honest (its drawn size + a graze)
+## so accidental detonations do not multiply with the generosity.
 func _shape_of(p: Dictionary) -> Dictionary:
         var shp: Dictionary = p.get("shape", {})
         if not shp.is_empty():
@@ -765,17 +775,20 @@ func _shape_of(p: Dictionary) -> Dictionary:
         var sc: float = float(p["scale"])
         var dw := float(n.texture.get_width()) * sc
         var dh := float(n.texture.get_height()) * sc
-        if ELONG.has(String(p["kind"])):
-                shp = {"type": "capsule", "half": dh * 0.34, "r": dw * 0.30}
+        if String(p["kind"]) == "bomb":
+                shp = {"type": "circle", "r": dw * 0.44}
+        elif ELONG.has(String(p["kind"])):
+                shp = {"type": "capsule", "half": dh * 0.42, "r": dw * 0.40}
         else:
-                shp = {"type": "circle", "r": dw * 0.42}
+                shp = {"type": "circle", "r": dw * 0.55}
         p["shape"] = shp
         return shp
 
-## true when the segment REALLY crosses the disc (the owner: "the slash
-## should only slash when the slash visual line really collides with the
-## thing from side to side") - a line beside the disc, or a loop AROUND
-## it that never enters, is not a cut
+## true when the blade reaches the fruit's HALF (v0.3.5-5 THE CASUAL CUT
+## LAW - the owner's older "side to side" rule grew generous: with the
+## hitbox past the drawn edge, ANY touch of the outer half is a cut) - a
+## line fully beside the disc, or a loop AROUND it that never enters,
+## is still not a cut
 func _seg_circle_hit(a: Vector2, b: Vector2, c: Vector2, r: float) -> bool:
         return _point_segment_dist(c, a, b) < r
 

@@ -954,6 +954,11 @@ func _land(p: Dictionary) -> void:
         if was_air:
                 vx *= 0.55
                 Jukebox.sfx("tower_land", -13.0, 1.0 + rng.randf() * 0.12)
+                # v0.3.5-5 THE x2 RELANDING LAW: the double jump refunds on
+                # EVERY landing - the old refund only rode a fresh ground
+                # jump, so "double-jump, land, walk off a ledge, press jump"
+                # was silently dead air (the owner could not trust the x2)
+                air_jumped = false
                 _fx_poof(Vector2(px, py + _pr() * 0.8), 6, 0.8)
                 # the snow pops off on impact (per character)
                 var shed: float = float(c["shed_land"])

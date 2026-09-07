@@ -1,5 +1,45 @@
 extends GogaGame
-## MATCHER - v0.3.3-7, the coin-resolve and the remover-consumed round.
+## MATCHER - v0.3.3-8, the auto-resolve truth and the special-combo table.
+## THE PATCH 8 LAWS (the owner's next test round):
+##  - THE PREFILL RESOLVE LAW: the resolve loop now PRE-FILLS the board
+##    when it is asked to (the coin's collect, the parcels' deliveries) -
+##    the old loop scanned matches FIRST and broke on a quiet board, so
+##    gravity NEVER ran: the collected coin's seat stayed a hole until the
+##    player's next move, and the refill's legal matches sat waiting. Now
+##    the refill IS gravity + re-scan, whatever the board feels like.
+##  - THE DROP STREAM LAW: the parcels pour like the butterflies hatch -
+##    a clock brings 1..3 of them in from the top line on its own beat,
+##    the gap shrinks as the round digs in. A round is a REAL exam: it
+##    rolls time / moves / BOTH as its limit and a delivery quota up to
+##    100; beat the quota before the limit eats you and the next round
+##    rolls harder. The spawn-after-match feed is dead - the stream never
+##    waits for the player.
+##  - THE TOP-LINE STAY LAW (drop): a parcel that cannot descend climbs
+##    one row per strike and PARKS on the top line - it stays there, it
+##    does not end anything. The run ends when the NEXT parcel arrives
+##    and every top seat is a parked parcel (THE ENTRANCE JAM) - never
+##    from a parcel merely sitting at the top from its first moment.
+##  - THE SHAPE LAW (jelly + ice crash): the levels are never one flat
+##    line anymore - every lay rolls a SHAPE: a blob, twin blobs, a
+##    pyramid, side columns, a plus, a checker patch, a band. Connected,
+##    bottom-heavy, bigger every level.
+##  - THE MINE SHAKE LAW: the earth rise rolls 1, 2 or 3 rows now (2 and
+##    3 grow likelier with depth) and the rise clock tightens as you dig -
+##    "sometimes it makes two rows" became sometimes two OR three.
+##  - THE COMBO TABLE (the owner's exact words): special + special on a
+##    swap EXECUTES the combo - sweeper+sweeper clears two rows / two
+##    columns / a row AND a column (the plus), bomb+bomb = a 4x4 crater,
+##    bomb+sweeper = THREE sweeps of the sweeper's kind, remover+sweeper
+##    turns the sweeper's whole color into random-axis sweepers and
+##    fires them all, remover+bomb turns that color all bombs and fires
+##    them all (remover+remover stays the SUPERNOVA).
+##  - THE EXECUTION TRUTH: a blast that touches a special EXECUTES it
+##    (its blast joins the wave) - every path, every wave. The only
+##    shield that survives is THE BORN-MATCH SHIELD: a special born in
+##    the current wave is untouchable and the hit NEVER spends its
+##    shield charge (the owner: "make sure that making a special get
+##    executed will not remove the shield that protect it during it's
+##    born match ofc").
 ## THE PATCH 7 LAWS (the owner's patch-6 test report):
 ##  - THE COIN-REFILL RESOLVE LAW: the seat refill after a COLLECTED coin
 ##    is a real wave now (the owner: "the coin when dropped and collected,
@@ -220,7 +260,7 @@ const MODES := {
                 "line": "shatter the layered ice to the last flake"},
         "drop": {"name": "DROP DOWN", "price": 480,
                 "card": "res://assets/games/matcher/modes/card_drop.png",
-                "line": "bring the parcels home, beat the limit"},
+                "line": "out-deliver the stream before the limit eats you"},
 }
 const MODE_ORDER := ["challenge", "peace", "butterflies", "ice", "mine",
                 "jelly", "icecrash", "drop"]
@@ -308,16 +348,29 @@ const FALL_G := 4300.0          # px/s^2
 const FALL_REST := 0.17         # the landing bounce restitution
 const FALL_BOUNCE_V := 430.0    # below this impact speed the fall settles
 
-## the DROP laws (the owner: "the round will start with 1-5 items at the top
-## line ... it will use both moves and timing or one of them as a limit, so
-## there is 3 possibilities")
+## the DROP laws v2 (v0.3.3-8 THE DROP STREAM LAW - the owner: "the
+## drop-down mode should work in a similar way like butterflies in the
+## logic of endless spawning ... it also has to get more dynamic random
+## rounds like be time based and moves based or both at the same round
+## with tweaked algorithm that makes it hard but not impossible and
+## numbers of items up to 100 and like that with tweaked spawn rate"):
+## every round rolls a DELIVERY QUOTA (climbs to 100) and a limit -
+## time, moves or BOTH; the parcels pour in on their own hatch clock
+## (the gap shrinks as the round digs in, 1..3 at a beat) and the run
+## ends when the quota is beaten (next round) or the limit / the top
+## jam eats you.
+const DROP_QUOTA_MAX := 100      # the owner's "numbers of items up to 100"
+const DROP_GAP0 := 6.5           # the hatch beat at round 1
+const DROP_GAP_MIN := 1.6        # the beat's floor
+const DROP_GAP_STEP := 0.12      # every hatch quickens the next a bit
+const DROP_BATCH_MAX := 3        # a hatch brings up to 3 parcels
 # DIAMOND MINE - the owner's Bejeweled-Classic spec: "each specific like 25
 # seconds it makes another row and clearing a row gives extra 25 seconds and
-# the round starts with 60 seconds and some times it make two rows"
+# the round starts with 60 seconds and some times it make two rows" - v0.3.3-8:
+# "sometimes" grew into sometimes TWO or THREE rows, likelier the deeper you dig.
 const MINE_CLOCK := 60.0        # the dig clock starts at 60s
 const MINE_ROW_TIME := 25.0     # a new earth row every 25s...
 const MINE_ROW_BONUS := 25.0    # ...and a cleared row pays +25s
-const MINE_DOUBLE := 0.25       # ...sometimes two rows at once
 
 # ------------------------------------------------------------ state
 var skin := "gem"
@@ -386,15 +439,20 @@ var icr_level := 1
 var icr_moves := 24
 var icr_hit_move := 0
 
-## drop state
-var drop_total := 5             # items to deliver this round
-var drop_left := 5              # still to deliver (spawn queue included)
+## drop state (v0.3.3-8 THE DROP STREAM LAW)
+var drop_total := 5             # the round's delivery quota (climbs to 100)
+var drop_left := 5              # still to deliver this round
+var drop_delivered := 0         # landed on the bottom row this round
+var drop_spawned := 0           # entered the board this round
 var drop_limit_kind := "moves"  # moves | time | both
 var drop_moves := 22
 var drop_time := 75.0
+var drop_clock := DROP_GAP0     # the hatch beat (the stream's own pulse)
+var drop_gap := DROP_GAP0       # the beat's current length (it shrinks)
 var drop_items := []            # [{r, c}] live parcels (the grid holds color -2 cells)
 var drop_seq := 0               # the parcel id issuer (the rise tracking)
 var drop_prev := {}             # drop_id -> row at the move's start
+var _drop_settling := false     # the delivery resolve re-entry guard
 
 ## the coin
 var coin_clock := COIN_EVERY
@@ -1186,11 +1244,16 @@ func _start_mode(id: String) -> void:
         icr_hit_move = 0
         drop_total = 5
         drop_left = 5
+        drop_delivered = 0
+        drop_spawned = 0
         drop_limit_kind = "moves"
         drop_moves = 22
         drop_time = 75.0
+        drop_clock = DROP_GAP0
+        drop_gap = DROP_GAP0
         drop_items = []
         drop_level = 1
+        _drop_settling = false
         fly_secs = 0.0
         hatch_clock = FLY_GAP0         # v0.3.3-p5: the ladder's first beat
         fly_spawned = 0
@@ -1364,6 +1427,15 @@ func _deal_board() -> void:
         if mode == "icecrash":
                 _icr_lay_level()
         if mode == "drop":
+                # the round's first parcels take the top line: the not-yet-
+                # seen pour gems there go back quietly (the player never saw
+                # them - the CLEAN ENTRANCE law only governs the mid-round
+                # stream, which never deletes a live gem)
+                for c in COLS:
+                        if not grid[0][c].is_empty() \
+                                        and is_instance_valid(grid[0][c].get("node")):
+                                grid[0][c]["node"].queue_free()
+                        grid[0][c] = {}
                 _drop_roll_round()
         if mode == "butterflies":
                 for c in [1, 4, 6]:
@@ -1578,9 +1650,12 @@ func _has_valid_move() -> bool:
                                         continue
                                 if _is_coin(grid[r][c]) and _is_coin(grid[r2][c2]):
                                         continue
-                                # hypercube swap is ALWAYS legal (it detonates on contact)
-                                if String(grid[r][c].get("special", "")) == "hyper" \
-                                                or String(grid[r2][c2].get("special", "")) == "hyper":
+                                # v0.3.3-8: a remover swap is ALWAYS legal, and ANY
+                                # special+special pair is a combo move (no match needed)
+                                var sa := String(grid[r][c].get("special", ""))
+                                var sb := String(grid[r2][c2].get("special", ""))
+                                if sa == "hyper" or sb == "hyper" \
+                                                or (sa != "" and sb != ""):
                                         return true
                                 _swap_model(r, c, r2, c2)
                                 var ok := not _find_matches().is_empty()
@@ -1604,8 +1679,11 @@ func _find_a_move() -> Array:
                                         continue
                                 if _is_coin(grid[r][c]) and _is_coin(grid[r2][c2]):
                                         continue
-                                if String(grid[r][c].get("special", "")) == "hyper" \
-                                                or String(grid[r2][c2].get("special", "")) == "hyper":
+                                # v0.3.3-8: same law for the hint finder
+                                var sa2 := String(grid[r][c].get("special", ""))
+                                var sb2 := String(grid[r2][c2].get("special", ""))
+                                if sa2 == "hyper" or sb2 == "hyper" \
+                                                or (sa2 != "" and sb2 != ""):
                                         return [Vector2i(r, c), Vector2i(r2, c2)]
                                 _swap_model(r, c, r2, c2)
                                 var ok := not _find_matches().is_empty()
@@ -1740,6 +1818,15 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
                 return
         var special_a := String(ca.get("special", ""))
         var special_b := String(cb.get("special", ""))
+        # v0.3.3-8 THE COMBO TABLE: special + special on a swap fires the
+        # combo (no match needed - the swap IS the trigger); the remover
+        # pair keeps its own SUPERNOVA door
+        if special_a == "hyper" and special_b == "hyper":
+                _do_hyper_swap(a, b)
+                return
+        if special_a != "" and special_b != "":
+                _do_combo_swap(a, b, special_a, special_b)
+                return
         if special_a == "hyper" or special_b == "hyper":
                 _do_hyper_swap(a, b)
                 return
@@ -1843,7 +1930,7 @@ func _birth_kinds(groups: Array, swap_a: Vector2i, swap_b: Vector2i) -> Array:
 
 
 func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
-                initial_pop := {}) -> void:
+                initial_pop := {}, prefill := false) -> void:
         # v0.3.3-6 THE ONE RESOLVE LAW: the swap path and the power path are
         # THE SAME LOOP now (the owner: "i bet this game core physics and
         # animating and core logic needs remake because no way every fix
@@ -1854,8 +1941,18 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
         # match" + "vapor: once i matched one match, all other matches got
         # matched" were this one gap). Now: pop -> gravity -> re-scan, every
         # wave rebuilds the detonation chain, whatever started it.
+        # v0.3.3-8 THE PREFILL RESOLVE LAW: `prefill` runs ONE gravity wave
+        # BEFORE the first scan - the caller refilled the board out of band
+        # (the collected coin's seat, the parcels' deliveries) and the old
+        # loop broke on a quiet board WITHOUT ever filling the holes: the
+        # coin's seat stayed empty until the player's next move (the owner:
+        # "the gogacoin leaves the grid where it dropped from empty until i
+        # make a move then it get filled"). The prefill also lets the fresh
+        # gems' matches FIRE on their own - no move needed.
         cascade = 0
         var power_wave := not initial_pop.is_empty()
+        if prefill:
+                await _gravity()
         while true:
                 if over:
                         return
@@ -1948,13 +2045,19 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
                                 if not _playable(rr, cc) or grid[rr][cc].is_empty():
                                         continue
                                 var cd: Dictionary = grid[rr][cc]
-                                # THE NEWBORN SHIELD: a shielded special is
-                                # nobody's collateral - the hit is absorbed
-                                if int(cd.get("shield", 0)) > 0:
-                                        cd["shield"] = int(cd["shield"]) - 1
-                                        _shield_flash(rr, cc)
-                                        continue
+                                # v0.3.3-8 THE EXECUTION TRUTH: a blast that
+                                # touches a special EXECUTES it (its blast
+                                # joins the wave) - the owner: "specials when
+                                # hit a special, they do not execute it, they
+                                # should". The ONLY shield that holds is THE
+                                # BORN-MATCH SHIELD: a special born in the
+                                # CURRENT wave is untouchable and the hit
+                                # never spends its charge (the owner: "make
+                                # sure that making a special get executed
+                                # will not remove the shield that protect it
+                                # during it's born match ofc").
                                 if bool(cd.get("born_wave", false)):
+                                        _shield_flash(rr, cc)
                                         continue
                                 pop[key] = true
                                 var sp2 := String(cd.get("special", ""))
@@ -2072,6 +2175,25 @@ func _blast_cells(kind: String, r: int, c: int) -> Array:
                         rings.append({"pos": _cell_pos(r, c), "r": 4.0, "life": 0.3,
                                         "max": 0.3, "col": Color(1.0, 0.85, 0.4, 0.8), "w": 5.0})
                         _float_text(_cell_pos(r, c), "BOOM!", Color(1.0, 0.6, 0.2), 32)
+                "bomb4":
+                        # THE COMBO TABLE: bomb + bomb = a 4x4 crater (the
+                        # owner: "a bomb with bomb do 4x4 bombing") - (r, c)
+                        # is the caller's clamped TOP-LEFT anchor
+                        for rr in range(r, r + 4):
+                                for cc in range(c, c + 4):
+                                        if _playable(rr, cc):
+                                                out[rr * COLS + cc] = true
+                                                _stagger_hint[rr * COLS + cc] = \
+                                                                Vector2(rr - r - 1.5, cc - c - 1.5).length() \
+                                                                * BOMB_RING_T
+                        shake = 0.9
+                        Jukebox.sfx("m_tok_bomb", -1.0, 0.68)
+                        var b4c: Vector2 = _cell_pos(mini(r + 2, ROWS - 1), mini(c + 2, COLS - 1))
+                        rings.append({"pos": b4c, "r": 18.0, "life": 0.5,
+                                        "max": 0.5, "col": Color(1.0, 0.5, 0.15, 0.95), "w": 11.0})
+                        rings.append({"pos": b4c, "r": 6.0, "life": 0.34,
+                                        "max": 0.34, "col": Color(1.0, 0.85, 0.4, 0.8), "w": 6.0})
+                        _float_text(b4c, "4x4 BOOM!", Color(1.0, 0.55, 0.15), 40)
                 "rowh":
                         for cc in COLS:
                                 if _playable(r, cc):
@@ -2155,15 +2277,14 @@ func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -
                 # the coin and the parcels are NEVER destroyed by pops
                 if _is_coin(cell) or _is_item(cell):
                         continue
-                # THE NEWBORN SHIELD (v0.3.3-6): a shielded special tanks ONE
-                # hit and stays - the owner: "the logic currently executes the
-                # existing special and makes it destroy the match special ...
-                # it eats the new special". Never again.
+                # THE BORN-MATCH SHIELD (v0.3.3-8 order): a newborn is
+                # skipped WITHOUT spending its charge; a leftover shield
+                # (pre-8 semantics) still tanks one hit and stays
+                if bool(cell.get("born_wave", false)):
+                        continue
                 if int(cell.get("shield", 0)) > 0:
                         cell["shield"] = int(cell["shield"]) - 1
                         _shield_flash(r, c)
-                        continue
-                if bool(cell.get("born_wave", false)):
                         continue
                 count += 1
                 move_pops += 1
@@ -2369,6 +2490,152 @@ func _combo_banner(n: int) -> void:
         # are the most weirdest ones")
         var step := clampi(n, 2, 7)
         Jukebox.sfx("m_combo_%d" % step, -6.0)
+
+
+# ================================================================ the combo table
+## v0.3.3-8 THE COMBO TABLE (the owner's exact words): "do double sweepers
+## double horizontal remove two horizontal ... and double vertical removes
+## two vertical and mixed do vertical and horizontal line removing like a
+## '+' sign and a bomb with bomb do 4x4 bombing and make bomb with sweeper
+## to do three horizontal sweeps or vertical based on the kind and make
+## the color remover with sweeper of any kind to make that gem color to
+## has sweeper from randomly horizontal or vertical then execute them all
+## and make color remover with bomb makes that gen color be all bombs".
+## A special-special swap needs no match - the swap IS the trigger. Both
+## specials are consumed up front; every special the blasts touch still
+## executes (THE EXECUTION TRUTH), and the whole volley rides THE ONE
+## RESOLVE LOOP so cascades birth new specials like any other wave.
+func _do_combo_swap(a: Vector2i, b: Vector2i, ka: String, kb: String) -> void:
+        busy = true
+        # the bookkeeping: a combo IS a move
+        move_pops = 0
+        _drop_capture_rows()
+        moves_made += 1
+        round_moves += 1
+        if mode == "jelly":
+                jelly_moves -= 1
+        if mode == "icecrash":
+                icr_moves -= 1
+        if mode == "drop":
+                drop_moves -= 1
+        # the two specials are CONSUMED - their job is the combo
+        for at in [a, b]:
+                grid[at.x][at.y]["special"] = ""
+                grid[at.x][at.y]["shield"] = 0
+                _dress_special(at.x, at.y)
+        var pop := {}
+        var add_cell := func(r: int, c: int) -> void:
+                if _playable(r, c) and not grid[r][c].is_empty() \
+                                and not _is_coin(grid[r][c]) and not _is_item(grid[r][c]):
+                        pop[r * COLS + c] = true
+        var union_blast := func(kind: String, r: int, c: int) -> void:
+                for key in _blast_cells(kind, r, c):
+                        pop[key] = true
+        var words := ""
+        var mid := Vector2(float(a.x + b.x) / 2.0, float(a.y + b.y) / 2.0)
+        # the combo's stagger radiates from the swap midpoint (the color
+        # army below overrides it with its own bottom-up climb)
+        _wave_o = Vector2(mid.x, mid.y)
+        var hyper_at := a if ka == "hyper" else b
+        var other_at := b if ka == "hyper" else a
+        var kind_other := kb if ka == "hyper" else ka
+        if (ka == "rowh" or ka == "colv") and (kb == "rowh" or kb == "colv"):
+                if ka == kb:
+                        # DOUBLE SWEEP: two rows or two columns
+                        if ka == "rowh":
+                                var r1 := a.x
+                                var r2 := b.x
+                                if r1 == r2:
+                                        r2 = r1 + 1 if r1 + 1 < ROWS else r1 - 1
+                                union_blast.call("rowh", r1, a.y)
+                                union_blast.call("rowh", r2, b.y)
+                        else:
+                                var c1 := a.y
+                                var c2 := b.y
+                                if c1 == c2:
+                                        c2 = c1 + 1 if c1 + 1 < COLS else c1 - 1
+                                union_blast.call("colv", a.x, c1)
+                                union_blast.call("colv", b.x, c2)
+                        words = "DOUBLE SWEEP!"
+                else:
+                        # THE PLUS: the rowh cell's row + the colv cell's col
+                        var rowh_at: Vector2i = a if ka == "rowh" else b
+                        var colv_at: Vector2i = b if ka == "rowh" else a
+                        union_blast.call("rowh", rowh_at.x, rowh_at.y)
+                        union_blast.call("colv", colv_at.x, colv_at.y)
+                        words = "THE PLUS!"
+        elif (ka == "bomb" and (kb == "rowh" or kb == "colv")) \
+                        or (kb == "bomb" and (ka == "rowh" or ka == "colv")):
+                # BOMB + SWEEPER: THREE sweeps of the sweeper's kind (the
+                # kinds ride ka/kb - the seats were already stripped)
+                var axis := ""
+                var sw_at: Vector2i
+                if ka == "rowh" or ka == "colv":
+                        axis = ka
+                        sw_at = a
+                else:
+                        axis = kb
+                        sw_at = b
+                if axis == "rowh":
+                        for rr in [sw_at.x - 1, sw_at.x, sw_at.x + 1]:
+                                if rr >= 0 and rr < ROWS:
+                                        union_blast.call("rowh", rr, sw_at.y)
+                else:
+                        for cc in [sw_at.y - 1, sw_at.y, sw_at.y + 1]:
+                                if cc >= 0 and cc < COLS:
+                                        union_blast.call("colv", sw_at.x, cc)
+                words = "TRIPLE SWEEP!"
+        elif ka == "bomb" and kb == "bomb":
+                # 4x4 BOOM: the crater covers both bombs
+                var r0 := clampi(mini(a.x, b.x) - 1, 0, ROWS - 4)
+                var c0 := clampi(mini(a.y, b.y) - 1, 0, COLS - 4)
+                union_blast.call("bomb4", r0, c0)
+                words = "4x4 BOOM!"
+        elif ka == "hyper" or kb == "hyper":
+                # THE COLOR ARMY: the remover drafts the whole color as the
+                # partner's kind and the volley executes them all
+                var col := int(grid[other_at.x][other_at.y].get("color", 0))
+                var drafted := 0
+                for r in ROWS:
+                        for c in COLS:
+                                if not _playable(r, c) or grid[r][c].is_empty() \
+                                                or _is_coin(grid[r][c]) or _is_item(grid[r][c]):
+                                        continue
+                                if int(grid[r][c].get("color", -9)) != col:
+                                        continue
+                                var draft := ""
+                                if kind_other == "bomb":
+                                        draft = "bomb"
+                                else:
+                                        draft = "rowh" if randf() < 0.5 else "colv"
+                                grid[r][c]["special"] = draft
+                                grid[r][c]["shield"] = 0
+                                _dress_special(r, c)
+                                pop[r * COLS + c] = true
+                                drafted += 1
+                                var wn: Sprite2D = grid[r][c].get("node")
+                                if is_instance_valid(wn):
+                                        var vt := wn.create_tween()
+                                        vt.tween_property(wn, "modulate",
+                                                        Color(1.6, 0.6, 1.8), 0.16)
+                add_cell.call(hyper_at.x, hyper_at.y)
+                _wave_bottomup = true
+                _wave_o = Vector2(hyper_at.x, hyper_at.y)
+                words = "COLOR ARMY! x%d" % drafted
+                Jukebox.sfx("m_colorwipe", -3.0)
+        # the two consumed seats join the pop (they are plain gems now)
+        add_cell.call(a.x, a.y)
+        add_cell.call(b.x, b.y)
+        if words != "":
+                _float_text(Vector2(board_o.x + (mid.y + 0.5) * cell_px,
+                                board_o.y + (mid.x + 0.5) * cell_px), words,
+                                Color(1, 0.9, 0.4), 36)
+        Jukebox.sfx("m_special", -3.0, 0.8)
+        # THE ONE RESOLVE LAW: the combo rides the unified loop - caught
+        # specials chain, cascades birth, gravity refills, everything
+        await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), pop)
+        await _after_move()
+        busy = false
 
 
 # ================================================================ hypercube
@@ -2839,7 +3106,11 @@ func _auto_refill() -> void:
 ## they made sitting on the board until the next move.
 func _coin_refill_run() -> void:
         busy = true
-        await _resolve_loop()
+        # v0.3.3-8 THE PREFILL RESOLVE LAW: the collected seat's refill is
+        # gravity FIRST, then the re-scan - the fresh gems' matches fire on
+        # their own (the patch-7 scan-first loop broke on a quiet board and
+        # never filled the hole at all)
+        await _resolve_loop(Vector2i(-1, -1), Vector2i(-1, -1), {}, true)
         busy = false
 
 
@@ -3010,27 +3281,14 @@ func _after_move() -> void:
                         await _drop_settle()
                         if over:
                                 return
-                        # v0.3.3-p5 THE RISKY PARCEL LAW (the owner: "make
-                        # the item if a move happened and it did not moved
-                        # down a single grid, makes it go up by one grid,
-                        # and make it risky because if it went up, and the
-                        # next move still up, the game ends, similar to
-                        # butterflies but a little different"): a parcel
-                        # that did not descend CLIMBS one row - two climbs
-                        # in a row and the parcels climb away
+                        # THE RISKY CLIMB (v0.3.3-p5) under THE TOP-LINE STAY
+                        # LAW (v0.3.3-8): a parcel that did not descend climbs
+                        # one row and PARKS on the top line - the climb never
+                        # ends the run; the NEXT parcel's arrival judges the
+                        # jam (see _drop_hatch)
                         await _drop_rise_check()
                         if over:
                                 return
-                        # THE SPAWN-AFTER-MATCH LAW: a move that popped
-                        # something feeds the next parcel in from the top
-                        if move_pops > 0 and drop_left > 0 and _count_items() < 4:
-                                var free := []
-                                for c in COLS:
-                                        if grid[0][c].is_empty() and not _jelly_at(0, c) \
-                                                        and not _is_item(grid[0][c]):
-                                                free.append(c)
-                                if not free.is_empty():
-                                        _drop_spawn(free[randi() % free.size()])
                         _drop_limits_check()
                         move_pops = 0
 
@@ -3047,12 +3305,9 @@ func _mode_aftercare() -> void:
                         _icr_win_lose()
                 "drop":
                         await _drop_settle()
-                        # v0.3.3-6: the rose flags are _drop_rise_check's OWN
-                        # business now (it clears them on a real descent). The
-                        # old unconditional wipe here reset the counter after
-                        # EVERY wave - the two-climbs game-over could never
-                        # fire (the owner: "the item that been up for two
-                        # moves, it does not goes out and end the game?")
+                        # v0.3.3-8: the settle re-enters safely under the
+                        # _drop_settling guard - the resolve loop's aftercare
+                        # may call it while a delivery wave is still walking
 
 
 ## the parcel rows at the move's start (the risky-climb comparison)
@@ -3069,22 +3324,15 @@ func _drop_capture_rows() -> void:
                                 drop_prev[int(cell.get("drop_id", -1))] = r
 
 
-## v0.3.3-p5 THE RISKY PARCEL LAW (the owner: "make the item if a move
-## happened and it did not moved down a single grid, makes it go up by one
-## grid, and make it risky because if it went up, and the next move still
-## up, the game ends, similar to butterflies but a little different"): a
-## parcel that did not descend on this move CLIMBS one row with a red
-## warning.
-## v0.3.3-7 THE TOP-LINE LAW (the owner: "if goes up two times it is marked
-## end of turn, it should be like that only if they are at the top line and
-## not every time" + "they are always starts at first line, so make a
-## logical check that only toggles the two-ups rule if they first dropped
-## at least a grid down from their original first line so it does not be
-## like an always lose"): a parcel carries a `dropped` flag set by its
-## FIRST real descent - until then its strikes arm nothing, so a fresh
-## top-line parcel can never end the run. An ARMED parcel ends the run
-## only when its second strike catches it ON the top line; mid-board
-## strikes just push it up with the warning.
+## v0.3.3-p5 THE RISKY PARCEL LAW + v0.3.3-8 THE TOP-LINE STAY LAW (the
+## owner: "the item when goes down, it has to go to the top line and stay
+## at it, the next up when it is already on top is an end, not by just
+## going to the top from first moment I mean"): a parcel that did not
+## descend on this move CLIMBS one row with a red warning - the climb
+## carries it up TO the top line and it STAYS there (the patch-7
+## two-climbs game-over is dead). Nothing about parking ends a run: the
+## only judge is the NEXT parcel's arrival (THE ENTRANCE JAM, in
+## _drop_hatch).
 func _drop_rise_check() -> void:
         if mode != "drop" or over or grid.size() < ROWS:
                 return
@@ -3098,33 +3346,20 @@ func _drop_rise_check() -> void:
                         if not drop_prev.has(id):
                                 continue        # born mid-move - it waits
                         if r > int(drop_prev[id]):
-                                cell["dropped"] = true   # it left its birth line
                                 cell["rose"] = 0
                                 continue        # it descended - safe
                         risers.append(Vector2i(r, c))
         drop_prev.clear()
         if risers.is_empty():
                 return
-        var top_struck := false         # an armed parcel struck ON the top line
+        var top_parked := false
         for at in risers:
                 var r: int = at.x
                 var c: int = at.y
                 if not grid[r][c].is_empty() and not _is_item(grid[r][c]):
                         continue        # the wave ate it mid-check
                 var cell: Dictionary = grid[r][c]
-                # THE FIRST-DESCENT ARM: a parcel that never left its birth
-                # line climbs for nothing - it can never end the run
-                if not bool(cell.get("dropped", false)):
-                        _ring_fx(_cell_pos(r, c), Color(1.0, 0.4, 0.4))
-                        continue
-                var rose: int = int(cell.get("rose", 0)) + 1
-                if rose >= 2 and r == 0:
-                        _banner("THE PARCELS CLIMBED AWAY!", false)
-                        _finish_run("the parcels climbed away")
-                        return
-                cell["rose"] = rose
-                if r == 0:
-                        top_struck = true
+                cell["rose"] = int(cell.get("rose", 0)) + 1
                 if r > 0:
                         # the climb: swap with the seat above, animate both
                         _swap_model(r, c, r - 1, c)
@@ -3149,10 +3384,14 @@ func _drop_rise_check() -> void:
                                 wt.tween_property(pn, "modulate",
                                                 Color(1.6, 0.5, 0.5), 0.14)
                                 wt.tween_property(pn, "modulate", Color.WHITE, 0.3)
+                else:
+                        # THE TOP-LINE STAY: it parks on the top line - it
+                        # does not climb out, it does not end anything
+                        top_parked = true
                 _ring_fx(_cell_pos(r, c), Color(1.0, 0.4, 0.4))
         Jukebox.sfx("m_grace", -7.0, 0.8)
-        if top_struck:
-                _banner("A PARCEL STRUCK AT THE TOP - ONE MORE AND IT'S OVER!", false)
+        if top_parked:
+                _banner("A PARCEL WAITS ON THE TOP LINE - LOWER IT!", false)
         else:
                 _banner("A PARCEL ROSE - LOWER IT WITH A MATCH!", false)
         await get_tree().create_timer(0.22, false).timeout
@@ -3524,19 +3763,101 @@ func _presolve_round(budget: int) -> Dictionary:
 ## zero jelly cleared SPREADS it (+1..3 connected cells), a spread ONTO a gem
 ## EATS the gem, jelly never falls and nothing falls past it, and the round
 ## is limited moves with no score or clock - clear the whole grid from it.
+## v0.3.3-8 THE SHAPE LAW (the owner: "make sure that jelly mode and ice
+## crash not always start with one flat line and that they can make many
+## different shapes"): every level rolls ONE of seven archetypes - a blob,
+## twin colonies, a pyramid, side columns, a plus, a staircase, a band -
+## connected, anchored in the bottom half, sized by `want`. Pure - the
+## probe reads it.
+func _lay_shape_cells(want: int) -> Dictionary:
+        var shapes := ["blob", "twins", "pyramid", "sides", "plus", "stairs", "band"]
+        var shape: String = shapes[randi() % shapes.size()]
+        var cells := {}
+        var put := func(r: int, c: int) -> void:
+                if r >= 0 and r < ROWS and c >= 0 and c < COLS:
+                        cells[r * COLS + c] = true
+        match shape:
+                "band":
+                        # the classic flat band - ONE option among seven now
+                        var rows_n := clampi(1 + (want - 1) / COLS, 1, 3)
+                        for r in range(ROWS - rows_n, ROWS):
+                                for c in COLS:
+                                        put.call(r, c)
+                "blob":
+                        var guard := 0
+                        var sr := ROWS - 1 - randi() % 2
+                        var sc := 1 + randi() % (COLS - 2)
+                        put.call(sr, sc)
+                        while cells.size() < want and guard < 500:
+                                guard += 1
+                                var k: int = cells.keys()[randi() % cells.size()]
+                                # ONE direction per step - independent row and
+                                # column picks walked DIAGONALLY (disconnected)
+                                var dir: int = randi() % 4
+                                var r: int = int(k) / COLS + [1, -1, 0, 0][dir]
+                                var c: int = int(k) % COLS + [0, 0, 1, -1][dir]
+                                if r < ROWS - 5 or r >= ROWS or c < 0 or c >= COLS:
+                                        continue
+                                put.call(r, c)
+                "twins":
+                        # two colonies joined by a bottom-row bridge
+                        for anchor in [[ROWS - 2, 1], [ROWS - 2, COLS - 2]]:
+                                var guard2 := 0
+                                put.call(anchor[0], anchor[1])
+                                while cells.size() < want and guard2 < 220:
+                                        guard2 += 1
+                                        var keys := cells.keys()
+                                        var k: int = keys[randi() % keys.size()]
+                                        var dir2: int = randi() % 4
+                                        var r: int = int(k) / COLS + [1, -1, 0, 0][dir2]
+                                        var c: int = int(k) % COLS + [0, 0, 1, -1][dir2]
+                                        if r < ROWS - 4 or r >= ROWS or c < 0 or c >= COLS:
+                                                continue
+                                        put.call(r, c)
+                                        if cells.size() >= want:
+                                                break
+                        for c in COLS:
+                                put.call(ROWS - 1, c)
+                "pyramid":
+                        var rows_n := clampi(2 + (want - 1) / COLS, 2, 5)
+                        for i in rows_n:
+                                var r := ROWS - 1 - i
+                                var span := maxi(2, COLS - 2 * i)
+                                var c0 := (COLS - span) / 2
+                                for c in range(c0, c0 + span):
+                                        put.call(r, c)
+                "sides":
+                        var h := clampi(2 + (want - 1) / (2 * COLS) + 1, 2, 4)
+                        for r in range(ROWS - h, ROWS):
+                                put.call(r, 0)
+                                put.call(r, COLS - 1)
+                        for c in COLS:
+                                put.call(ROWS - 1, c)
+                "plus":
+                        var mid := COLS / 2
+                        var arm := clampi(1 + want / 8, 1, 3)
+                        # the horizontal bar + the vertical bar climbing from it
+                        for i in range(-arm, arm + 1):
+                                put.call(ROWS - 1, mid + i)
+                        for r in range(ROWS - 1, ROWS - 1 - (2 * arm + 1), -1):
+                                put.call(r, mid)
+                "stairs":
+                        # a connected diagonal band - every row overlaps the
+                        # one below by at least one cell
+                        var steps := clampi(2 + (want - 1) / 6, 3, 4)
+                        for i in steps:
+                                var r := ROWS - 1 - i
+                                var c0 := mini(2 * i, COLS - 3)
+                                for c in range(c0, c0 + 3):
+                                        put.call(r, c)
+        # the want is a target, never a hard cap for the wide archetypes
+        return cells
+
+
 func _jelly_lay_level() -> void:
-        jelly = {}
-        var rows_n := mini(1 + (jelly_level - 1) / 2, 3)
-        for r in range(ROWS - rows_n, ROWS):
-                for c in COLS:
-                        jelly[r * COLS + c] = true
-        # side jelly on odd levels (the owner: "some levels may have jelly in
-        # the sides and like that")
-        if jelly_level % 2 == 1:
-                var side := COLS - 1
-                for r in range(ROWS - 2, ROWS - 2 - mini(1 + jelly_level / 3, 3), -1):
-                        jelly[r * COLS + 0] = true
-                        jelly[r * COLS + side] = true
+        # v0.3.3-8 THE SHAPE LAW: the level rolls a real shape, sized by
+        # the level - one flat line forever is dead
+        jelly = _lay_shape_cells(clampi(8 + 2 * (jelly_level - 1), 8, 22))
         jelly_moves = clampi(8 + jelly.size() * 2, 14, 34)
         # eat the gems under the jelly + kill any matches the eating made
         for k in jelly.keys():
@@ -3702,16 +4023,23 @@ func _jelly_win_lose() -> void:
 func _icr_lay_level() -> void:
         icel = {}
         _icel_nodes.clear()
-        var rows_n := mini(1 + (icr_level - 1) / 2, 3)
-        for r in range(ROWS - rows_n, ROWS):
-                for c in COLS:
-                        # v0.3.3-p4: the layers ramp faster (the owner: "it
-                        # has to feel much intense")
-                        icel[r * COLS + c] = clampi(1 + (icr_level - 1) / 2, 1, 5)
+        # v0.3.3-8 THE SHAPE LAW: the level rolls a real shape - the flat
+        # line is one roll among seven now - and the layers deepen toward
+        # the bottom row of the shape
+        var cells := _lay_shape_cells(clampi(8 + 2 * (icr_level - 1), 8, 22))
+        var base_lvl := clampi(1 + (icr_level - 1) / 2, 1, 5)
+        var max_r := 0
+        for k in cells.keys():
+                max_r = maxi(max_r, int(k) / COLS)
+        for k in cells.keys():
+                var r := int(k) / COLS
+                var depth := max_r - r      # 0 at the shape's bottom edge
+                icel[k] = clampi(base_lvl - depth / 2, 1, 5)
         # a ROCK core appears from level 3 (the owner's level-6 law)
         if icr_level >= 3:
-                var rr6 := ROWS - 1 - randi() % rows_n
-                icel[rr6 * COLS + randi() % COLS] = ICE_CRASH_ROCK
+                var rock_keys := cells.keys()
+                var rk: int = rock_keys[randi() % rock_keys.size()]
+                icel[rk] = ICE_CRASH_ROCK
         var total_hits := 0
         for k in icel.keys():
                 total_hits += mini(int(icel[k]), ICE_CRASH_ROCK - 1)
@@ -3860,47 +4188,60 @@ func _icr_mark_stone(pop: Dictionary) -> void:
 
 
 # ================================================================ DROP DOWN
-## v0.3.3-p3 (the owner: "items dropped from top after there is a match ...
-## the round will start with 1-5 items at the top line first, with a UI
-## widget tells user how many remaining, it will use both moves and timing or
-## one of them as a limit, so there is 3 possibilities ... the drop logic will
-## be like the gogacoin one here, make it down down down, make the items be
-## simply like this, index of all gems except the selected skin")
+## v0.3.3-8 THE DROP STREAM LAW (the owner: "the drop-down mode should
+## work in a similar way like butterflies in the logic of endless
+## spawning ... more dynamic random rounds like be time based and moves
+## based or both at the same round ... hard but not impossible and
+## numbers of items up to 100 ... tweaked spawn rate"): a round rolls a
+## quota + a limit, the stream pours the parcels on its own clock, and
+## delivering every parcel before the limit ends the round. The old
+## spawn-only-after-a-match feed is dead - the stream never waits.
 func _drop_roll_round() -> void:
-        drop_total = clampi(3 + drop_level * 2 + randi() % 2, 3, 9)
+        # THE QUOTA: climbs to the owner's 100 ceiling; the limit kind rolls
+        # time / moves / both EVERY round (the three possibilities live)
+        drop_total = clampi(4 + 3 * (drop_level - 1) + randi() % 3,
+                        4, DROP_QUOTA_MAX)
         drop_left = drop_total
+        drop_delivered = 0
+        drop_spawned = 0
         var kinds := ["moves", "time", "both"]
         drop_limit_kind = kinds[randi() % 3]
-        drop_moves = clampi(12 + drop_total * 2 - drop_level * 2, 10, 26)
-        drop_time = clampf(42.0 + 5.0 * float(drop_total) - 4.0 * float(drop_level), 32.0, 80.0)
+        # THE BUDGETS: a steady hand delivers a parcel in ~1.6 moves or
+        # ~5.5s (cascades and sweeps pay for the rest) - the budgets pay
+        # a little more than that and tighten every level. Hard, never
+        # impossible (the probe verifies the margins on every round).
+        var per_mv := clampf(2.1 - 0.06 * float(drop_level - 1), 1.45, 2.1)
+        drop_moves = clampi(int(round(float(drop_total) * per_mv)) + 6, 12, 130)
+        var per_s := clampf(7.2 - 0.18 * float(drop_level - 1), 4.2, 7.2)
+        drop_time = clampf(float(drop_total) * per_s + 15.0, 30.0, 240.0)
+        # THE STREAM: the hatch beat shrinks every level and quickens with
+        # every hatch inside the round
+        drop_gap = clampf(DROP_GAP0 - 0.45 * float(drop_level - 1), 2.2, DROP_GAP0)
+        drop_clock = drop_gap
         _drop_lay()
 
 
 var drop_level := 1
 
 func _drop_lay() -> void:
-        # the round opens with 1-5 parcels already sitting on the top line
-        var starting := clampi(1 + randi() % 5, 1, mini(5, drop_left))
+        # the round opens with a few parcels already parked on the top line
+        var starting := mini(2 + randi() % 3, drop_total)
         var cols_free := []
         for c in COLS:
-                cols_free.append(c)
+                if grid.size() >= ROWS and grid[0][c].is_empty() \
+                                and not _jelly_at(0, c):
+                        cols_free.append(c)
         cols_free.shuffle()
-        for i in starting:
-                var c: int = cols_free[i]
-                # the parcel TAKES the top seat (the gem that lived there goes)
-                var cell: Dictionary = grid[0][c]
-                if not cell.is_empty() and is_instance_valid(cell.get("node")):
-                        (cell["node"] as Sprite2D).queue_free()
-                grid[0][c] = {}
-                _drop_spawn(c)
+        for i in mini(starting, cols_free.size()):
+                _drop_spawn(cols_free[i])
 
 
-func _drop_spawn(c: int) -> void:
-        if drop_left <= 0 or not grid[0][c].is_empty() or _jelly_at(0, c):
-                return
-        var cell: Dictionary = grid[0][c]
-        if not cell.is_empty() and is_instance_valid(cell.get("node")):
-                (cell["node"] as Sprite2D).queue_free()
+## the CLEAN ENTRANCE: a parcel takes an EMPTY top seat - it never
+## deletes the gem that lived there (the old lay killed it outright)
+func _drop_spawn(c: int) -> bool:
+        if grid.size() < ROWS or drop_spawned >= drop_total \
+                        or not grid[0][c].is_empty() or _jelly_at(0, c):
+                return false
         var n := Sprite2D.new()
         n.texture = _t("parcel")
         n.scale = Vector2.ONE * cell_px * 0.92 / 120.0
@@ -3913,19 +4254,65 @@ func _drop_spawn(c: int) -> void:
                         .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
         grid[0][c] = {"color": -2, "item": true, "node": n, "drop_id": drop_seq}
         drop_seq += 1
-        drop_left -= 1
+        drop_spawned += 1
         Jukebox.sfx("m_itemspawn", -6.0)
+        return true
+
+
+## THE HATCH: the stream's own beat - 1..3 parcels enter from the top
+## line without waiting for the player. The jam check lives here: the
+## next parcel's arrival with every top seat a parked parcel ends the
+## run (THE TOP-LINE STAY LAW's other face).
+func _drop_hatch() -> void:
+        if over or busy or drop_spawned >= drop_total:
+                return
+        var free := []
+        var all_parked := true
+        for c in COLS:
+                var cell: Dictionary = grid[0][c]
+                if cell.is_empty() and not _jelly_at(0, c):
+                        free.append(c)
+                        all_parked = false
+                elif not cell.is_empty() and not _is_item(cell):
+                        all_parked = false     # a gem squats the seat - it moves
+        if free.is_empty():
+                if all_parked:
+                        # THE ENTRANCE JAM (the owner: "the next up when it
+                        # is already on top is an end, not by just going to
+                        # the top from first moment") - the parcels never
+                        # ended the run by PARKING; the run ends when the
+                        # next parcel has nowhere to land
+                        _banner("THE ENTRANCE JAMMED!", false)
+                        _finish_run("the entrance jammed - round %d, %d/%d delivered" \
+                                        % [drop_level, drop_delivered, drop_total])
+                else:
+                        drop_clock = 0.8       # the gems will move - retry
+                return
+        var bmax := mini(DROP_BATCH_MAX, 1 + (drop_level - 1) / 3)
+        var batch: int = mini(1 + randi() % bmax, free.size())
+        batch = mini(batch, drop_total - drop_spawned)
+        var landed := 0
+        for i in batch:
+                if _drop_spawn(free[i]):
+                        landed += 1
+        drop_gap = maxf(DROP_GAP_MIN, drop_gap - DROP_GAP_STEP * float(landed))
+        drop_clock = drop_gap
 
 
 ## v0.3.3-p4 THE GRAVITY-ONLY DELIVERY: the parcels ride the gravity waves
 ## exactly like the GOGACoin - a parcel falls when the player's matches open
 ## the seats under it, NEVER on a timer or a per-move step (the owner: "the
 ## drop logic will be like the gogacoin one here, make it down down down").
-## The loop collects what reached the bottom row and lets the column refill
-## until every chain has landed - the old build left the grid hanging empty.
+## v0.3.3-8 THE PREFILL RESOLVE LAW: every delivery's refill is a REAL
+## wave now - gravity first, then the re-scan - so the fresh gems' matches
+## fire on their own (the owner's "the grid has valid matches they do not
+## match until i do a move").
 func _drop_settle() -> void:
+        if _drop_settling:
+                return
+        _drop_settling = true
         var guard := 0
-        while guard < 8 and not over:
+        while guard < 10 and not over:
                 guard += 1
                 var got := 0
                 for c in COLS:
@@ -3933,6 +4320,8 @@ func _drop_settle() -> void:
                         if cell.is_empty() or not _is_item(cell):
                                 continue
                         got += 1
+                        drop_delivered += 1
+                        drop_left = maxi(0, drop_left - 1)
                         add_score(3)
                         achievement_count("items", 1)
                         Jukebox.sfx("m_itemget", -4.0)
@@ -3943,15 +4332,19 @@ func _drop_settle() -> void:
                                 (cell["node"] as Sprite2D).queue_free()
                         grid[ROWS - 1][c] = {}
                 if got > 0:
-                        await _gravity()      # the column refills, chains land
+                        await _gravity()
+                        await _resolve_loop()   # the refill's matches FIRE
                 else:
                         break
-        if drop_left <= 0 and _count_items() == 0 and not over:
-                # THE ROUND CLEAR: every parcel delivered
+        _drop_settling = false
+        if over:
+                return
+        if drop_left <= 0 and _count_items() == 0:
+                # THE ROUND CLEAR: the quota is beaten before the limit
                 drop_level += 1
                 Jukebox.sfx("m_levelup", -3.0)
                 Arc.confetti(_overlay_root_ref(), Vector2(get_viewport_rect().size.x / 2.0, board_o.y), 30)
-                _banner("ALL PARCELS HOME!  ROUND %d" % (drop_level - 1), true)
+                _banner("ROUND %d CLEAR - %d PARCELS HOME!" % [drop_level - 1, drop_delivered], true)
                 _drop_roll_round()
 
 
@@ -3968,18 +4361,23 @@ func _count_items() -> int:
         return n
 
 
+## the limit is the exam: time, moves, or both at once - whichever burns
+## out first ends the run (the owner: "the drop-down mode's challenge is
+## about dropping things before the time runs out")
 func _drop_limits_check() -> void:
         if over:
                 return
-        if drop_limit_kind == "time" or drop_limit_kind == "both":
-                if drop_time <= 0.0:
-                        _banner("TIME UP!", false)
-                        _finish_run("the parcels waited too long")
-                        return
-        if drop_limit_kind == "moves" or drop_limit_kind == "both":
-                if drop_moves <= 0:
-                        _banner("OUT OF MOVES!", false)
-                        _finish_run("the moves ran out on the parcels")
+        if (drop_limit_kind == "time" or drop_limit_kind == "both") \
+                        and drop_time <= 0.0:
+                _banner("TIME UP - THE PARCELS WAITED TOO LONG!", false)
+                _finish_run("time ran out - round %d, %d/%d delivered" \
+                                % [drop_level, drop_delivered, drop_total])
+                return
+        if (drop_limit_kind == "moves" or drop_limit_kind == "both") \
+                        and drop_moves <= 0:
+                _banner("OUT OF MOVES!", false)
+                _finish_run("the moves ran out - round %d, %d/%d delivered" \
+                                % [drop_level, drop_delivered, drop_total])
 
 
 func _tick_drop(delta: float) -> void:
@@ -3987,6 +4385,14 @@ func _tick_drop(delta: float) -> void:
                 drop_time -= delta
                 if drop_time <= 0.0:
                         _drop_limits_check()
+                        return
+        # THE STREAM: the hatch beats only on a quiet board - a resolve
+        # owns the grid while it runs, the next beat waits for it
+        if busy:
+                return
+        drop_clock -= delta
+        if drop_clock <= 0.0:
+                _drop_hatch()
 
 
 func _tick_butterflies(delta: float) -> void:
@@ -4530,12 +4936,28 @@ func _tick_mine(delta: float) -> void:
                 if busy or mine_rising:
                         mine_rise_clock = 0.05
                         return
-                mine_rise_clock = MINE_ROW_TIME
-                var rows := 1
-                if randf() < MINE_DOUBLE:
-                        rows = 2         # "some times it make two rows"
+                # v0.3.3-8 THE MINE SHAKE LAW (the owner: "make the diamond
+                # mine mode sometimes spawns 2 or 3 lines instead of just
+                # always one, with modified spawn rate and more tweaks"):
+                # the rise rolls 1, 2 or 3 rows - 2 and 3 grow likelier the
+                # deeper the dig - and the clock tightens with depth
+                var rows := _mine_roll_rows()
+                mine_rise_clock = maxf(16.0, MINE_ROW_TIME - 0.35 * float(depth))
                 mine_rising = true
                 _mine_rise_deferred(rows)
+
+
+## the pure roll behind THE MINE SHAKE LAW: 1, 2 or 3 earth rows, the
+## multi rows likelier the deeper the dig (the probe reads it)
+func _mine_roll_rows() -> int:
+        var p2 := clampf(0.26 + 0.004 * float(depth), 0.0, 0.34)
+        var p3 := clampf(0.08 + 0.006 * float(depth), 0.0, 0.18)
+        var roll := randf()
+        if roll < p3:
+                return 3
+        if roll < p3 + p2:
+                return 2
+        return 1
 
 
 ## the rises run sequentially, never interleaved
@@ -5426,7 +5848,10 @@ func _refresh_hud() -> void:
                                 "both":
                                         lim = "mv %d - %ds" % [maxi(0, drop_moves),
                                                         int(ceilf(maxf(0.0, drop_time)))]
-                        chip_info.text = "parcels left %d" % (drop_left + _count_items())
+                        # v0.3.3-8 THE STREAM HUD: the quota, the beat and
+                        # the climb warnings live on the two chips
+                        chip_info.text = "parcels %d/%d - live %d" % \
+                                        [drop_delivered, drop_total, _count_items()]
                         var any_rose := false
                         if grid.size() >= ROWS:
                                 for r in ROWS:
