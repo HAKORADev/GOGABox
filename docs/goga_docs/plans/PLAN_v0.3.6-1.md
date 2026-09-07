@@ -84,3 +84,14 @@ the art/sfx scripts, the probe, and the QA rigs. Nothing else may regress.
 - gf_probe: new laws for every item above; ALL PASS. flow_test pass.
 - QA rigs (Xvfb): before/after shots - tails, landing, death, power-ups,
   coin size, stick mode. Owner gets the patch; no release (THE LAW).
+
+## ship record
+- [x] every item implemented + law-named in geometry.gd
+- [x] gf_probe 73/0, gf_replay_repro CLEAN, gf_soak CLEAN, flow_test + all
+      game probes green (invaders shelf count made save-state proof)
+- [x] qa_v036p1 12 Xvfb rigs eyeballed (tails behind / none dead / landing
+      ring / collect implosion / death layers / the three powers + chips /
+      the 44px coin / the power shop rows / stick_roof at y=342)
+- [x] version 0.3.6-1 / 30680 (arm32 30681 / arm64 30682), cert 6db87aca...
+      unchanged; APKs backed up to the download folder
+- [x] pushed a266edb, CI run 34168216706 GREEN, NO release (the law)
