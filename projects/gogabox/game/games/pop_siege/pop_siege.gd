@@ -320,11 +320,21 @@ func _build_next_button() -> void:
 func _build_paths() -> void:
         # the dense spline points -> px polylines (the bake drew the SAME
         # points, so the road and the march agree pixel for pixel)
+        # v0.3.5-6 THE CENTERLINE TRUTH (the owner: "the bloons are walking
+        # on non-perfect grid-based movement so they are visualized out of
+        # the center and on each direction they shift in much weirder
+        # positions"): the path data is authored in CELL-CENTER coordinates
+        # (the heart's walk-in point [17.5, 5.5] IS the house's center, the
+        # door [-0.5, 1.5] pokes in from the edge) and the bake strokes the
+        # road at point * 64 - the old runtime's extra + 0.5 marched every
+        # bloon HALF A CELL off the painted road (up on horizontals, left on
+        # verticals - the weird per-direction shift). The march rides the
+        # raw point now, pixel for pixel with the paint.
         _paths_px.clear()
         for pts in map["paths"]:
                 var px := PackedVector2Array()
                 for c in pts:
-                        px.append(Vector2(FIELD.x + (c[0] + 0.5) * CELL, FIELD.y + (c[1] + 0.5) * CELL))
+                        px.append(Vector2(FIELD.x + c[0] * CELL, FIELD.y + c[1] * CELL))
                 var lens := PackedFloat32Array()
                 lens.resize(px.size())
                 var total := 0.0
@@ -349,10 +359,15 @@ func pos_on(pi: int, dist: float) -> Dictionary:
         return {"p": pts[-1], "dir": Vector2.RIGHT}
 
 # ------------------------------------------------------------ day / night
+var night_lamp: Sprite2D
+
 func _build_night() -> void:
         if night_rect != null:
                 night_rect.queue_free()
                 night_rect = null
+        if night_lamp != null:
+                night_lamp.queue_free()
+                night_lamp = null
         if fireflies != null:
                 fireflies.visible = night
         if not night:
@@ -384,6 +399,7 @@ func _build_night() -> void:
         lm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
         lamp.material = lm
         field.add_child(lamp)
+        night_lamp = lamp
 
 # ------------------------------------------------------------ right panel
 func _build_panel() -> void:
@@ -1770,6 +1786,12 @@ func _bullet_spawn(from: Vector2, to: Vector2, tex: String, dmg: float, cls: Str
         bullets.append({
                 "kind": "bullet", "spr": spr, "pos": from, "vel": dir * spd, "dmg": dmg,
                 "cls": cls, "pierce": pierce, "hit_ids": {}, "src": src, "life": 1.6,
+                # v0.3.5-6 THE SHOT DIES AT ITS TARGET (the owner: "pyra's shot
+                # have that old bomber ball bug which is goes then flies forever
+                # in a weird floating way" - the same family the bomber shell
+                # died of in v0.3.5-4): an aimed bullet's flight ends at the
+                # aimed point + half a cell of grace, never a cross-field float
+                "travel": 0.0, "max_d": from.distance_to(to) + 0.5 * CELL,
                 "aoe": float(extra.get("aoe", 0.0)), "burn_dps": float(extra.get("burn_dps", 0.0)),
                 "burn_t": float(extra.get("burn_t", 0.0)), "glue": bool(extra.get("glue", false)),
                 "slow": float(extra.get("slow", 0.0)), "slow_t": float(extra.get("slow_t", 0.0)),
@@ -1888,6 +1910,11 @@ func _tick_bullets(delta: float) -> void:
                                 b["pos"] += (b["vel"] as Vector2) * delta
                                 (b["spr"] as Sprite2D).position = b["pos"]
                                 b["life"] = float(b["life"]) - delta
+                                # THE SHOT DIES AT ITS TARGET: the flight ends at
+                                # the aimed point (a missed shot never floats on)
+                                b["travel"] = float(b.get("travel", 0.0)) + (b["vel"] as Vector2).length() * delta
+                                if float(b["travel"]) >= float(b.get("max_d", 1e6)):
+                                        b["life"] = 0.0
                                 for blo in _grid_near(b["pos"], 0.4 * CELL):
                                         var bid: int = blo["id"]
                                         if (b["hit_ids"] as Dictionary).has(bid):
@@ -2456,6 +2483,13 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
                 var dn_btn := Arc.button(String(pair[0]), Vector2(76, 38), _fs(15),
                         Arc.ACCENT if want_night == nite else Color(0.72, 0.67, 0.58), func():
                         meta.set_night(m["id"], want_night)
+                        # v0.3.5-6 THE LIVE NIGHT LAW (the owner: "if I opened
+                        # map menu and selected night at the map I play on, it
+                        # does not switch it dynamically which is bad"): the
+                        # chip re-themes the LIVE field the moment it flips
+                        if String(m["id"]) == String(map["id"]) and night != want_night:
+                                night = want_night
+                                _build_night()
                         Jukebox.sfx("ps_click", -10.0)
                         _maps_refresh())
                 row.add_child(dn_btn)

@@ -397,12 +397,18 @@ static func fatigue_for(wave: int) -> float:
 ## the art truth v2 (MEASURED from the drawn heads - the owner's round):
 ## the rotation that points a head's muzzle AT the aim. darty's crossbow tip
 ## points RIGHT (offset 0 - the old PI/2 aimed 90 degrees off the shot),
-## longeye's tip points LEFT (PI), boomba's shell nose points LEFT (PI).
+## longeye's tip points LEFT (PI). v0.3.5-6: boomba joins the muzzle-right
+## crowd (0) - the g3 cannon's firing opening is plainly on its right end.
 ## The radial heads (pyra/boomo/kolda/zappy) and the static ones (kaching/
 ## marshal) carry 0.
 static func head_offset(fid: String) -> float:
+        # v0.3.5-6 THE FACE-IT LAW (the owner: "bomber looks with it's butt
+        # and not the face"): the atlas mortars are drawn muzzle-RIGHT (the
+        # g3 cannon wears its firing opening on the right end) - the old PI
+        # spun every aim 180 degrees and marched the bomb-thrower
+        # butt-first into every fight. The muzzle-right art aims with 0.
         match fid:
-                "longeye", "boomba": return PI
+                "longeye": return PI
         return 0.0
 
 ## THE MUZZLE LAW: how far from the gadget's center the shot LEAVES, in CELL

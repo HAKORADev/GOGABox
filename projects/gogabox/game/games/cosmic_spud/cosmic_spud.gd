@@ -2185,6 +2185,15 @@ func _contact_hit(e: Dictionary) -> void:
         _shake = maxf(_shake, 3.0)
 
 # ================================================================ pickups
+## v0.3.5-6 THE EXPIRE LAW (the owner: "dropped stuff do not expire, I
+## mean XP, CC, LP and more, they never vanish, giving them a time to
+## fade out if not collected will make the game more better"): every
+## world drop lives PICKUP_LIFE seconds, blinks through its last
+## PICKUP_FADE seconds and vanishes. The GOGACoin is the exception - it
+## waits forever like the trophy it is.
+const PICKUP_LIFE := 14.0
+const PICKUP_FADE := 3.5
+
 func _drop_pickup(kind: String, pos: Vector2, v: int) -> void:
         var spr := Sprite2D.new()
         spr.texture = _t(kind)
@@ -2196,7 +2205,9 @@ func _drop_pickup(kind: String, pos: Vector2, v: int) -> void:
                 spr.scale = Vector2.ONE * 0.16
         spr.z_index = 4
         world.add_child(spr)
-        pickups.append({"kind": kind, "v": v, "pos": pos, "node": spr, "bob": randf() * TAU})
+        pickups.append({"kind": kind, "v": v, "pos": pos, "node": spr,
+                        "bob": randf() * TAU,
+                        "life": PICKUP_LIFE if kind != "gogacoin" else -1.0})
 
 func _tick_pickups(delta: float) -> void:
         var dead := []
@@ -2206,6 +2217,19 @@ func _tick_pickups(delta: float) -> void:
         for pk in pickups:
                 pk["bob"] += delta * 4.0
                 pk["node"].position = pk["pos"] + Vector2(0, sin(pk["bob"]) * 3.0)
+                # v0.3.5-6 THE EXPIRE LAW: the drop's own clock - blink and
+                # fade through the last window, then vanish un-collected
+                if float(pk.get("life", -1.0)) > 0.0:
+                        pk["life"] = float(pk["life"]) - delta
+                        var lf := float(pk["life"])
+                        if lf <= 0.0:
+                                dead.append(pk)
+                                continue
+                        if lf < PICKUP_FADE:
+                                var fk := lf / PICKUP_FADE
+                                (pk["node"] as Sprite2D).modulate.a = clampf(
+                                                fk * (0.55 + 0.45 * absf(sin(lf * 9.0))),
+                                                0.0, 1.0)
                 var to_p: Vector2 = p_pos - pk["pos"]
                 var d := to_p.length()
                 if String(pk["kind"]) == "gogacoin":
@@ -3325,16 +3349,22 @@ func _shop_theme_row(tid: String) -> Control:
 
 func _shop_buy_theme(tid: String, price: int) -> void:
         # idempotent-safe: an already-Box-owned place never pays twice - it
-        # just syncs the game's own ownership and wears
+        # just syncs the game's own ownership
+        # v0.3.5-6 THE BUY-ONLY LAW (the owner: "when I buy a place, it's
+        # auto-playing it replacing the one I am currently in which is bad,
+        # it should just buy it without applying it"): the shop only OWNS
+        # the place - the worn one stays on; equipping happens in the
+        # armory (tap the owned place there to wear it).
         if not Box.item_owned(game_id, "theme", tid) \
                         and not Box.buy_item(game_id, "theme", tid, price):
                 Jukebox.sfx("cs_error", -6.0)
                 _toast_show("need %d more GOGACoins" % maxi(0, price - Box.coins()))
                 return
         meta.own_theme(tid)
-        _retheme(tid, night)
         Jukebox.sfx("cs_buy", -4.0)
         Arc.confetti(_overlay_root_ref(), get_viewport_rect().size / 2.0, 30)
+        _toast_show("%s owned - equip it from the ARMORY" \
+                        % String(CSData.THEMES[tid]["name"]).to_upper())
         _shop_rebuild()
 
 func _shop_gun_row(wid: String) -> Control:
@@ -3547,10 +3577,13 @@ func _armory_themes(shelf: VBoxContainer) -> void:
             var lines := ["day + night variants"]
             if on:
                     lines.append("WORN NOW")
-            var can := not owned and Box.coins() >= price
+            # v0.3.5-6 THE BUY-ONLY LAW: the shop no longer wears - an
+            # OWNED place equips here for free (tap = wear), only an
+            # unowned one needs the wallet
+            var can := owned or Box.coins() >= price
             rows.append(_shop_card(String(th["name"]), CS_YELLOW if on else (CS_GREEN if owned else CS_WHITE),
                             lines, CS_YELLOW if on else (CS_GREEN if owned else CS_EDGE),
-                            "WORN" if on else ("OWNED" if owned else "BUY %d" % price),
+                            "WORN" if on else ("WEAR" if owned else "BUY %d" % price),
                             CS_GREEN if on else CS_YELLOW, func():
                             _armory_buy_theme(tid_s, price), not on and can, "", Callable(), CS_BLUE,
                             not on and not owned))
@@ -3661,6 +3694,13 @@ func _info_open() -> void:
 
 ## the pure model (the probe reads it): one block per stat, the owner's
 ## exact shape - line 0 the name, then base / up / down / result.
+## v0.3.5-6 THE CLEAR MATH LAW (the owner: "the info menu shows weird
+## stuff in the decrease line, shows -nn% ... and with (+nn%) that is
+## written with red color, I am not sure what is the thing in the () but
+## make the math clearer"): the contradictory percent-of-base notes are
+## DEAD. The stat is a straight ledger - result = base + up - down - and
+## the result line now SHOWS that exact equation in the stat's own unit:
+##   result: 137%  (130% + 30% - 23%)
 func _info_stat_rows() -> Array:
         var rows := []
         for def in INFO_STATS:
@@ -3674,16 +3714,16 @@ func _info_stat_rows() -> Array:
                         if is_pct:
                                 return "%d%%" % int(round(v * 100.0))
                         return String.num(v, 1)
-                var pct_of := func(v: float) -> String:
-                        if absf(base) < 0.0001:
-                                return ""
-                        return " (%+d%%)" % int(round(v / absf(base) * 100.0))
+                var eq := ""
+                if absf(up) > 0.0001 or absf(down) > 0.0001:
+                        eq = "  (%s + %s - %s)" % [fmt.call(base),
+                                        fmt.call(up), fmt.call(down)]
                 rows.append({
                         "key": k,
                         "name": String(def[1]),
                         "base": fmt.call(base), "up": fmt.call(up),
                         "down": fmt.call(down), "result": fmt.call(live_v),
-                        "up_pct": pct_of.call(up), "down_pct": pct_of.call(down),
+                        "eq": eq,
                 })
         return rows
 
@@ -3722,9 +3762,9 @@ func _build_info(box: VBoxContainer) -> void:
                 var lines: Array = [
                         "%s:" % String(r["name"]),
                         "base: %s" % String(r["base"]),
-                        "up: +%s%s" % [String(r["up"]), String(r["up_pct"])],
-                        "down: -%s%s" % [String(r["down"]), String(r["down_pct"])],
-                        "result: %s" % String(r["result"]),
+                        "up: +%s" % String(r["up"]),
+                        "down: -%s" % String(r["down"]),
+                        "result: %s%s" % [String(r["result"]), String(r["eq"])],
                 ]
                 var first := true
                 for ln in lines:

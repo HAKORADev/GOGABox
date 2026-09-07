@@ -1011,34 +1011,52 @@ func _run() -> void:
         ck(G.drop_limit_kind in ["moves", "time", "both"],
                 "DROP: the round rolled one of the THREE limits (%s)" % G.drop_limit_kind)
         var items0: int = G._count_items()
-        ck(items0 >= 1 and items0 <= 4, "DROP: the round opens with 2..4 parcels on the top line (%d)" % items0)
+        ck(items0 >= 2 and items0 <= 4, "DROP: the round opens with 2..4 parcels (%d)" % items0)
         ck(G.drop_total >= 4 and G.drop_total <= G.DROP_QUOTA_MAX,
                 "DROP: the quota rolled inside the stream law (%d, cap %d)" % [G.drop_total, G.DROP_QUOTA_MAX])
         ck(G.drop_delivered == 0 and G.drop_spawned >= items0,
                 "DROP: the stream bookkeeping woke up (spawned %d)" % G.drop_spawned)
-        ck(G.drop_gap >= G.DROP_GAP_MIN and G.drop_clock > 0.0,
-                "DROP: the hatch beat is live (%.2fs, floor %.2fs)" % [G.drop_gap, G.DROP_GAP_MIN])
-        var top_ok := true
+        ck(G.drop_queue == 0, "DROP: the entry queue wakes empty (%d)" % G.drop_queue)
+        # v0.3.5-6 THE OPENING LAW: each parcel sits on its OWN row (the
+        # owner's "each row should have one at a time")
+        var open_rows := {}
+        var own_row_ok := true
         for r in 8:
                 for c2 in 8:
-                        if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]) and r != 0:
-                                top_ok = false
-        ck(top_ok, "DROP: every starting parcel sits on the TOP line")
+                        if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
+                                if open_rows.has(r):
+                                        own_row_ok = false
+                                open_rows[r] = true
+        ck(own_row_ok and open_rows.size() == items0,
+                "DROP: every starting parcel sits on its OWN row (%d rows, %d parcels)" % [open_rows.size(), items0])
+        # v0.3.5-6 THE FULL-BOARD LAW: the deal leaves NO empty seat - the
+        # old build's no-parcel top seats stayed empty until a match (the
+        # owner: "the grids with no items takes no gems and I have to do one
+        # match so it fill them")
+        var empties := 0
+        for r in 8:
+                for c2 in 8:
+                        if G.grid[r][c2].is_empty():
+                                empties += 1
+        ck(empties == 0, "DROP: the opened board is FULL - no seat waits for a match (%d empties)" % empties)
         # v0.3.3-p4 THE GRAVITY-ONLY LAW (the owner: "the item goes down in
         # each move instead of going up, going down is like saying hey
         # player don't worry we got this, which is stupid"): a parcel NEVER
         # steps on its own - it only rides the gravity waves
         var item_col := -1
-        for c2 in 8:
-                if not G.grid[0][c2].is_empty() and G._is_item(G.grid[0][c2]):
-                        item_col = c2
-        ck(item_col >= 0, "DROP: a starting parcel found on the top line")
+        var item_row := -1
+        for r in 8:
+                for c2 in 8:
+                        if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
+                                item_row = r
+                                item_col = c2
+                                break
+                if item_col >= 0:
+                        break
+        ck(item_col >= 0, "DROP: a starting parcel found on the board")
         if item_col >= 0:
-                # find the parcel's row
-                var prow := -1
-                for r in 8:
-                        if not G.grid[r][item_col].is_empty() and G._is_item(G.grid[r][item_col]):
-                                prow = r
+                # the parcel's row (found above)
+                var prow := item_row
                 # open a hole right under it (a match did its work)
                 if prow >= 0 and prow + 1 < 8 and not G.grid[prow + 1][item_col].is_empty():
                         if is_instance_valid(G.grid[prow + 1][item_col].get("node")):
@@ -1091,50 +1109,87 @@ func _run() -> void:
                 ck(G.drop_level >= 2, "DROP: delivering everything rolls the NEXT round")
                 ck(not G.grid[7][2].is_empty() and not G._is_item(G.grid[7][2]),
                         "DROP: the delivered seat REFILLED (no hanging empty grid)")
-        # v0.3.3-8 THE DROP STREAM LAW: the parcels pour in on their OWN
-        # hatch clock - the old spawn-after-match feed is dead. The battery
-        # clears the top line (gems AND parcels - the hatch needs empty
-        # top seats) and calls the hatch by hand.
-        for c2 in 8:
-                if not G.grid[0][c2].is_empty() \
-                                and is_instance_valid(G.grid[0][c2].get("node")):
-                        G.grid[0][c2]["node"].queue_free()
-                G.grid[0][c2] = {}
-        for r in range(1, 8):
-                for c2 in 8:
-                        if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
-                                if is_instance_valid(G.grid[r][c2].get("node")):
-                                        (G.grid[r][c2]["node"] as Sprite2D).queue_free()
-                                G.grid[r][c2] = {}
+        # v0.3.5-6 THE MATCH SPAWN LAW: the match-pay table - a 3-match
+        # pays 3, a 5-match pays 5, and a 6+ wave (the full 8-line
+        # included) rolls INSIDE the 3..6 band instead of paying its size
+        var payband_ok := true
+        for trial in 60:
+                if G._drop_match_spawn(3) != 3 or G._drop_match_spawn(4) != 4 \
+                                or G._drop_match_spawn(5) != 5:
+                        payband_ok = false
+                var big: int = G._drop_match_spawn(8)
+                if big < 3 or big > 6:
+                        payband_ok = false
+                if G._drop_match_spawn(6) < 3 or G._drop_match_spawn(7) > 6:
+                        payband_ok = false
+        ck(payband_ok, "DROP MATCH PAY: 3/4/5 pay their size, 6+ rolls random 3..6 (a full line NEVER dumps 8)")
+        # THE QUEUE RIDE: a match pays parcels into the queue and the very
+        # next gravity wave drips the FIRST one in through the top line -
+        # ONE at a time (the owner: "once one dropped, it will drop the
+        # next one from top")
+        await _boot("drop")
+        G.phase = "play"
+        for r in 8:
+                for c3 in 8:
+                        if not G.grid[r][c3].is_empty() and G._is_item(G.grid[r][c3]):
+                                if is_instance_valid(G.grid[r][c3].get("node")):
+                                        (G.grid[r][c3]["node"] as Sprite2D).queue_free()
+                                G.grid[r][c3] = {}
         G.drop_spawned = 0
-        G.drop_total = 20         # room to hatch
-        G.drop_clock = 0.0
-        G.busy = false
+        G.drop_total = 20
+        G.drop_queue = 3          # three parcels waiting
         G.over = false
-        var stream_n0: int = G._count_items()
-        G._drop_hatch()
-        var stream_n1: int = G._count_items()
-        ck(stream_n1 > stream_n0,
-                "DROP STREAM: the hatch poured parcels in WITHOUT a move (%d -> %d)" % [stream_n0, stream_n1])
-        ck(G.drop_spawned == stream_n1,
-                "DROP STREAM: the bookkeeping counts every spawned parcel")
-        ck(G.drop_clock >= G.DROP_GAP_MIN,
-                "DROP STREAM: the beat re-armed itself (%.2fs)" % G.drop_clock)
-        # THE STREAM CEILING: the hatch never exceeds the round quota
-        G.drop_spawned = G.drop_total
-        var ceiling_n: int = G._count_items()
-        G._drop_hatch()
-        ck(G._count_items() == ceiling_n,
-                "DROP STREAM: the quota ceiling holds (no parcel beyond the round roll)")
-        # THE CLEAN ENTRANCE: a spawn never deletes the gem under it
-        G.drop_spawned = 0
-        G.drop_total = 40
-        if not G.grid[0][1].is_empty() and is_instance_valid(G.grid[0][1].get("node")):
-                G.grid[0][1]["node"].queue_free()
-        _mk_cell(0, 1, 3)         # a live gem squats the seat
-        var spawned_ok: bool = G._drop_spawn(1)
-        ck(not spawned_ok and G._color_at(0, 1) == 3,
-                "DROP STREAM: the clean entrance never deletes a gem")
+        G.coin_queued = false     # the coin must not steal the refill seat
+        G.coin_clock = 999.0
+        # open a hole in the top row so a refill reaches row 0 (the cleared
+        # parcel seats hole their own columns too - the queue takes the
+        # FIRST sky refill it meets, so the test tracks the real seat)
+        if not G.grid[0][5].is_empty() and is_instance_valid(G.grid[0][5].get("node")):
+                G.grid[0][5]["node"].queue_free()
+        G.grid[0][5] = {}
+        await G._gravity()
+        var qcol := -1
+        for c3 in 8:
+                if not G.grid[0][c3].is_empty() and G._is_item(G.grid[0][c3]):
+                        qcol = c3
+        ck(qcol >= 0 and G.drop_queue == 2 and G.drop_spawned == 1,
+                "DROP QUEUE: the first queued parcel rode the refill in (col %d, queue %d, spawned %d)" \
+                                % [qcol, G.drop_queue, G.drop_spawned])
+        # ONE AT A TIME: the parcel now owns the top line - another wave
+        # must NOT bring the next one in while it stands there (the extra
+        # hole opens AWAY from the parcel's column: a hole UNDER it would
+        # drop it and free the line in the same wave - which is the NEXT
+        # test's business)
+        var c_far: int = (qcol + 3) % 8
+        if not G.grid[2][c_far].is_empty() and is_instance_valid(G.grid[2][c_far].get("node")):
+                G.grid[2][c_far]["node"].queue_free()
+        G.grid[2][c_far] = {}
+        await G._gravity()
+        ck(G.drop_queue == 2 and G.drop_spawned == 1,
+                "DROP QUEUE: the next parcel WAITS while the top line is owned (queue %d)" % G.drop_queue)
+        # the parcel drops out of the top line -> the next one enters
+        if not G.grid[1][qcol].is_empty() and is_instance_valid(G.grid[1][qcol].get("node")):
+                G.grid[1][qcol]["node"].queue_free()
+        G.grid[1][qcol] = {}
+        await G._gravity()
+        var dropped_row := -1
+        for r in range(1, 8):
+                if not G.grid[r][qcol].is_empty() and G._is_item(G.grid[r][qcol]):
+                        dropped_row = r
+        ck(dropped_row > 0 and G.drop_spawned == 2,
+                "DROP QUEUE: the parcel dropped out of the top line and the NEXT one entered (row %d, spawned %d)" \
+                                % [dropped_row, G.drop_spawned])
+        # THE QUOTA CEILING: the queue can never outgrow the round's quota
+        G.drop_spawned = G.drop_total - 1
+        G.drop_queue = 1
+        for g in [{"cells": {0: true, 1: true, 2: true}}]:
+                var room: int = G.drop_total - G.drop_spawned - G.drop_queue
+                if room > 0:
+                        G.drop_queue += mini(G._drop_match_spawn(
+                                        int((g["cells"] as Dictionary).size())), room)
+        ck(G.drop_spawned + G.drop_queue == G.drop_total,
+                "DROP QUEUE: the quota ceiling holds (spawned %d + queue %d = total %d)" \
+                                % [G.drop_spawned, G.drop_queue, G.drop_total])
 
         # ---------------------------------------- v0.3.3-p4 THE NOVA LAW
         # (the owner: "a color remover + color remover = grid clear with 1
@@ -1601,12 +1656,13 @@ func _run() -> void:
         # down, it has to go to the top line and stay at it, the next up
         # when it is already on top is an end, not by just going to the top
         # from first moment I mean"): a strike climbs the parcel and PARKS
-        # it on the top line - the climb NEVER ends the run; only the next
-        # parcel's arrival with every top seat parked (THE ENTRANCE JAM)
-        # does, and that lives in _drop_hatch (covered above).
+        # it on the top line - the climb NEVER ends the run; v0.3.5-6: the
+        # parked parcel HOLDS the entry queue (THE ONE-AT-A-TIME LAW,
+        # _drop_queue_enter) until a match lowers it.
         await _boot("drop")
         G.phase = "hold"
         G.drop_left = 0          # no spawns - the battery owns the parcels
+        G.drop_spawned = G.drop_total   # v0.3.5-6: the stream is out of quota
         for r in 8:
                 for c2 in 8:
                         if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
@@ -2064,12 +2120,34 @@ func _run() -> void:
         await _boot("drop")
         G.phase = "hold"
         G.drop_left = 0          # no spawns - the battery owns the parcels
+        G.drop_spawned = G.drop_total   # v0.3.5-6: the match-pay stream is
+                                        # out of quota - no queue rides the
+                                        # battery's own matches
         for r in 8:
                 for c2 in 8:
                         if not G.grid[r][c2].is_empty() and G._is_item(G.grid[r][c2]):
                                 if is_instance_valid(G.grid[r][c2].get("node")):
                                         (G.grid[r][c2]["node"] as Sprite2D).queue_free()
                                 G.grid[r][c2] = {}
+        # v0.3.5-6 THE DETERMINISTIC STAGE: the cleared parcel seats left
+        # holes - settle them NOW (a hole UNDER the planted parcel would
+        # drop it during the move's gravity and flip the law's verdict) and
+        # de-match the board so the battery's two moves pop EXACTLY the
+        # planted matches (cascades stay in columns 0..2, the parcel's
+        # column 6 never moves)
+        await G._gravity()
+        var rmg := 0
+        while not G._find_matches().is_empty() and rmg < 200:
+                rmg += 1
+                for g in G._find_matches():
+                        for key in g["cells"]:
+                                var rrr := int(key) / 8
+                                var ccc := int(key) % 8
+                                var rcell: Dictionary = G.grid[rrr][ccc]
+                                rcell["color"] = G._roll_color()
+                                if is_instance_valid(rcell.get("node")):
+                                        (rcell["node"] as Sprite2D).texture = \
+                                                        G.tex_gem[int(rcell["color"]) % G.tex_gem.size()]
         var ps2 := Sprite2D.new()
         ps2.texture = G._t("parcel")
         ps2.position = G._cell_pos(3, 6)

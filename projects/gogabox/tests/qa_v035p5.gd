@@ -40,9 +40,17 @@ func _ready() -> void:
                         G._pick_close()
                         G._start_mode("drop")
                         await _wait(0.5)
-                        # the stream pours on its own clock - let two hatches pass
-                        G.drop_clock = 0.3
-                        await _wait(2.5)
+                        # v0.3.5-6: the stream is MATCH-DRIVEN now - the
+                        # opening lay already parked 2..4 parcels on the
+                        # board; a hand-fed queue shows the drip
+                        G.drop_total = 20
+                        G.drop_spawned = 0
+                        G.drop_queue = 2
+                        if not G.grid[0][3].is_empty() and \
+                                        is_instance_valid(G.grid[0][3].get("node")):
+                                G.grid[0][3]["node"].queue_free()
+                        G.grid[0][3] = {}
+                        await _wait(1.2)
                 "jelly":
                         G._pick_close()
                         G._start_mode("jelly")

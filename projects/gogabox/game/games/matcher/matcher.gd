@@ -7,18 +7,19 @@ extends GogaGame
 ##    gravity NEVER ran: the collected coin's seat stayed a hole until the
 ##    player's next move, and the refill's legal matches sat waiting. Now
 ##    the refill IS gravity + re-scan, whatever the board feels like.
-##  - THE DROP STREAM LAW: the parcels pour like the butterflies hatch -
-##    a clock brings 1..3 of them in from the top line on its own beat,
-##    the gap shrinks as the round digs in. A round is a REAL exam: it
-##    rolls time / moves / BOTH as its limit and a delivery quota up to
-##    100; beat the quota before the limit eats you and the next round
-##    rolls harder. The spawn-after-match feed is dead - the stream never
-##    waits for the player.
+##  - THE MATCH SPAWN LAW (v0.3.5-6, drop): the round opens with 2..4
+##    parcels, each on its OWN row, and the stream is MATCH-DRIVEN - every
+##    match pays its size in parcels into the entry queue (a 6+ wave, the
+##    full 8-line included, rolls random 3..6 instead of paying 8) and the
+##    queue drips ONE parcel at a time through the top-line refill: the
+##    next parcel only enters once the previous one dropped out of the
+##    top line. The autonomous hatch clock is dead - the matches ARE the
+##    stream.
 ##  - THE TOP-LINE STAY LAW (drop): a parcel that cannot descend climbs
 ##    one row per strike and PARKS on the top line - it stays there, it
-##    does not end anything. The run ends when the NEXT parcel arrives
-##    and every top seat is a parked parcel (THE ENTRANCE JAM) - never
-##    from a parcel merely sitting at the top from its first moment.
+##    does not end anything. A parked parcel HOLDS the queue: the next
+##    parcel cannot enter until it drops (THE ONE-AT-A-TIME LAW) - never
+##    a sudden run-end from a parcel merely sitting at the top.
 ##  - THE SHAPE LAW (jelly + ice crash): the levels are never one flat
 ##    line anymore - every lay rolls a SHAPE: a blob, twin blobs, a
 ##    pyramid, side columns, a plus, a checker patch, a band. Connected,
@@ -348,22 +349,26 @@ const FALL_G := 4300.0          # px/s^2
 const FALL_REST := 0.17         # the landing bounce restitution
 const FALL_BOUNCE_V := 430.0    # below this impact speed the fall settles
 
-## the DROP laws v2 (v0.3.3-8 THE DROP STREAM LAW - the owner: "the
-## drop-down mode should work in a similar way like butterflies in the
-## logic of endless spawning ... it also has to get more dynamic random
-## rounds like be time based and moves based or both at the same round
-## with tweaked algorithm that makes it hard but not impossible and
-## numbers of items up to 100 and like that with tweaked spawn rate"):
-## every round rolls a DELIVERY QUOTA (climbs to 100) and a limit -
-## time, moves or BOTH; the parcels pour in on their own hatch clock
-## (the gap shrinks as the round digs in, 1..3 at a beat) and the run
-## ends when the quota is beaten (next round) or the limit / the top
-## jam eats you.
+## the DROP laws v3 (v0.3.5-6 THE MATCH SPAWN LAW - the owner: "drop-down
+## mode still does not spawn more items ... each row should have one at a
+## time and once one dropped, it will drop the next one from top and
+## starts with 2-4 items first and spawning be like 3-6 items from a
+## match ... if match somehow managed to hit full horizontal line, instead
+## of dropping 8, make it random between 3-6 so it not be too easy"):
+## the round opens with 2..4 parcels already on the board (each on its OWN
+## row - one per row), and from then on the stream is MATCH-DRIVEN - every
+## match pays its size in parcels into the ENTRY QUEUE (a 6+ wave, the
+## full 8-line included, rolls random 3..6 instead of paying 8), and the
+## queue drips ONE parcel at a time through the top-line refill: the next
+## parcel only enters once the previous one dropped out of the top line.
+## The autonomous hatch clock is dead - the player's matches ARE the
+## stream. The quota (climbs to 100) and the limit (time / moves / both)
+## laws ride unchanged.
 const DROP_QUOTA_MAX := 100      # the owner's "numbers of items up to 100"
-const DROP_GAP0 := 6.5           # the hatch beat at round 1
-const DROP_GAP_MIN := 1.6        # the beat's floor
-const DROP_GAP_STEP := 0.12      # every hatch quickens the next a bit
-const DROP_BATCH_MAX := 3        # a hatch brings up to 3 parcels
+const DROP_OPEN_MIN := 2         # the opening lay's floor
+const DROP_OPEN_MAX := 4         # the opening lay's ceiling
+const DROP_SPAWN_MIN := 3        # the match-pay band (the owner's 3-6)
+const DROP_SPAWN_MAX := 6
 # DIAMOND MINE - the owner's Bejeweled-Classic spec: "each specific like 25
 # seconds it makes another row and clearing a row gives extra 25 seconds and
 # the round starts with 60 seconds and some times it make two rows" - v0.3.3-8:
@@ -402,6 +407,11 @@ var pace := 1                   # butterflies: rows per move - ALWAYS 1 now
                                 # (v0.3.3-p4 THE ONE-STEP LAW: the owner saw
                                 # "one move makes butterflies goes up by 4
                                 # grid areas??? WTF is that")
+var butter_saved := 0           # v0.3.5-6: butterflies saved THIS round only
+                                # (the owner: "the widget 'saved nn' shows
+                                # total number between rounds which is wrong,
+                                # it should reflect the number of current
+                                # round saves only")
 var frost := [0, 0, 0, 0, 0, 0, 0, 0]  # ice v4: SOLID segments per column
 var fronts := []                # ice v4: the live fronts [{col, f, speed}]
 var front_clock := 3.0          # the first front spawns fast
@@ -447,8 +457,9 @@ var drop_spawned := 0           # entered the board this round
 var drop_limit_kind := "moves"  # moves | time | both
 var drop_moves := 22
 var drop_time := 75.0
-var drop_clock := DROP_GAP0     # the hatch beat (the stream's own pulse)
-var drop_gap := DROP_GAP0       # the beat's current length (it shrinks)
+var drop_queue := 0             # parcels waiting to enter through the top line
+                                # (v0.3.5-6 THE MATCH SPAWN LAW - matches fill
+                                # it, the refill drips it one by one)
 var drop_items := []            # [{r, c}] live parcels (the grid holds color -2 cells)
 var drop_seq := 0               # the parcel id issuer (the rise tracking)
 var drop_prev := {}             # drop_id -> row at the move's start
@@ -1249,8 +1260,7 @@ func _start_mode(id: String) -> void:
         drop_limit_kind = "moves"
         drop_moves = 22
         drop_time = 75.0
-        drop_clock = DROP_GAP0
-        drop_gap = DROP_GAP0
+        drop_queue = 0
         drop_items = []
         drop_level = 1
         _drop_settling = false
@@ -1337,6 +1347,32 @@ func _new_cell(r: int, c: int, hold := 0.0, k := 0) -> Dictionary:
         tw.tween_property(n, "position:y", spawn_y, 0.13) \
                         .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
         return {"color": col, "special": "", "wing": false, "node": n}
+
+
+## v0.3.5-6 the drop parcel's birth - the SAME spawn choreography as a gem
+## (the coin's law rides again): born behind the line, fades in, falls.
+## `direct` skips the choreography - the opening lay parks the parcel on
+## its seat at once (the pour around it is still falling).
+func _new_item_cell(r: int, c: int, hold := 0.0, k := 0, direct := false) -> Dictionary:
+        var n := Sprite2D.new()
+        n.texture = _t("parcel")
+        n.scale = Vector2.ONE * cell_px * 0.92 / 120.0
+        var target := _cell_pos(r, c)
+        n.z_index = 3
+        world.add_child(n)
+        if direct:
+                n.position = target
+                return {"color": -2, "item": true, "node": n, "drop_id": drop_seq}
+        var spawn_y := board_o.y - cell_px * (0.62 + 0.38 * float(k))
+        n.position = Vector2(target.x, spawn_y + cell_px * 0.34)
+        n.modulate.a = 0.0
+        var tw := n.create_tween()
+        tw.tween_interval(maxf(hold, 0.01))
+        tw.set_parallel(true)
+        tw.tween_property(n, "modulate:a", 1.0, 0.13)
+        tw.tween_property(n, "position:y", spawn_y, 0.13) \
+                        .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+        return {"color": -2, "item": true, "node": n, "drop_id": drop_seq}
 
 
 ## the coin's birth - the SAME spawn choreography as a gem (the owner: "it
@@ -1426,16 +1462,20 @@ func _deal_board() -> void:
                 front_clock = 2.5
         if mode == "icecrash":
                 _icr_lay_level()
+        if mode == "butterflies":
+                butter_saved = 0          # v0.3.5-6: the saved chip counts
+                                          # THIS round only (the owner: "it
+                                          # shows total number between rounds
+                                          # which is wrong")
         if mode == "drop":
-                # the round's first parcels take the top line: the not-yet-
-                # seen pour gems there go back quietly (the player never saw
-                # them - the CLEAN ENTRANCE law only governs the mid-round
-                # stream, which never deletes a live gem)
-                for c in COLS:
-                        if not grid[0][c].is_empty() \
-                                        and is_instance_valid(grid[0][c].get("node")):
-                                grid[0][c]["node"].queue_free()
-                        grid[0][c] = {}
+                # v0.3.5-6 THE OPENING LAW: 2..4 parcels park on the board
+                # BEFORE the first move, each on its OWN row - the top line
+                # is never cleared, the pour fills every cell with gems, and
+                # the parcels replace a few of the not-yet-seen gems (the
+                # old build left the no-parcel top seats PERMANENTLY empty
+                # until a match filled them - the owner's "the grids with no
+                # items takes no gems and I have to do one match so it fill
+                # them")
                 _drop_roll_round()
         if mode == "butterflies":
                 for c in [1, 4, 6]:
@@ -2007,6 +2047,18 @@ func _resolve_loop(swap_a := Vector2i(-1, -1), swap_b := Vector2i(-1, -1),
                         for g in groups:
                                 for key in g["cells"]:
                                         pop[key] = true
+                        if mode == "drop":
+                                # v0.3.5-6 THE MATCH SPAWN LAW: every match
+                                # pays its size in parcels into the entry
+                                # queue (a 6+ wave rolls random 3..6); the
+                                # queue never outgrows the round's quota
+                                for g in groups:
+                                        var room: int = drop_total - drop_spawned \
+                                                        - drop_queue
+                                        if room > 0:
+                                                drop_queue += mini(_drop_match_spawn(
+                                                                int((g["cells"] as Dictionary).size())),
+                                                                room)
                         for b in born:
                                 pop.erase(int(b["r"]) * COLS + int(b["c"]))
                         swap_a = Vector2i(-1, -1)
@@ -2300,6 +2352,7 @@ func _pop_cells(pop: Dictionary, born: Array, stagger := {}, blast_keys := {}) -
                         # a butterfly collected: +2 mode bonus on top of its gem point
                         if mode == "butterflies":
                                 add_score(2)
+                                butter_saved += 1      # the round's own count
                                 achievement_count("butterflies", 1)
                                 Jukebox.sfx("m_flutter", -6.0, randf_range(0.9, 1.15))
                 if rush:
@@ -2884,6 +2937,7 @@ func _gravity() -> void:
         # no sand in same row, it should let the gems fit in"), while a
         # pocket sealed under dirt or a jelly plug stays sealed.
         var guard := 0
+        var item_entered := false   # v0.3.5-6: ONE queued parcel per wave
         while guard < 40:
                 guard += 1
                 var moved := false
@@ -2926,6 +2980,17 @@ func _gravity() -> void:
                                                                         float(k) * 0.085, k)
                                                         coin_queued = false
                                                         coin_cell = Vector2i(rr, c)
+                                                elif mode == "drop" and not item_entered \
+                                                                and _drop_queue_enter(rr, c):
+                                                        # v0.3.5-6 THE ONE-AT-A-TIME
+                                                        # LAW: the next queued parcel
+                                                        # rides this refill in (one per
+                                                        # wave, only into a parcel-free
+                                                        # top line - the previous parcel
+                                                        # had to drop out of the line
+                                                        # first)
+                                                        fresh = grid[rr][c]
+                                                        item_entered = true
                                                 else:
                                                         fresh = _new_cell(rr, c,
                                                                         float(k) * 0.085, k)
@@ -3284,8 +3349,9 @@ func _after_move() -> void:
                         # THE RISKY CLIMB (v0.3.3-p5) under THE TOP-LINE STAY
                         # LAW (v0.3.3-8): a parcel that did not descend climbs
                         # one row and PARKS on the top line - the climb never
-                        # ends the run; the NEXT parcel's arrival judges the
-                        # jam (see _drop_hatch)
+                        # ends the run; a parked parcel HOLDS THE QUEUE (the
+                        # next parcel cannot enter until it drops - see
+                        # _drop_queue_enter)
                         await _drop_rise_check()
                         if over:
                                 return
@@ -3330,9 +3396,9 @@ func _drop_capture_rows() -> void:
 ## going to the top from first moment I mean"): a parcel that did not
 ## descend on this move CLIMBS one row with a red warning - the climb
 ## carries it up TO the top line and it STAYS there (the patch-7
-## two-climbs game-over is dead). Nothing about parking ends a run: the
-## only judge is the NEXT parcel's arrival (THE ENTRANCE JAM, in
-## _drop_hatch).
+## two-climbs game-over is dead). Nothing about parking ends a run: a
+## parked parcel holds the entry queue (THE ONE-AT-A-TIME LAW, see
+## _drop_queue_enter) until a match lowers it.
 func _drop_rise_check() -> void:
         if mode != "drop" or over or grid.size() < ROWS:
                 return
@@ -4188,14 +4254,11 @@ func _icr_mark_stone(pop: Dictionary) -> void:
 
 
 # ================================================================ DROP DOWN
-## v0.3.3-8 THE DROP STREAM LAW (the owner: "the drop-down mode should
-## work in a similar way like butterflies in the logic of endless
-## spawning ... more dynamic random rounds like be time based and moves
-## based or both at the same round ... hard but not impossible and
-## numbers of items up to 100 ... tweaked spawn rate"): a round rolls a
-## quota + a limit, the stream pours the parcels on its own clock, and
-## delivering every parcel before the limit ends the round. The old
-## spawn-only-after-a-match feed is dead - the stream never waits.
+## v0.3.5-6 THE MATCH SPAWN LAW (the owner's drop-down v3): a round rolls
+## a quota + a limit, opens with 2..4 parcels (each on its own row), and
+## the stream is MATCH-DRIVEN - every match pays parcels into the entry
+## queue and the queue drips one at a time through the top-line refill.
+## Delivering every parcel before the limit ends the round.
 func _drop_roll_round() -> void:
         # THE QUOTA: climbs to the owner's 100 ceiling; the limit kind rolls
         # time / moves / both EVERY round (the three possibilities live)
@@ -4204,6 +4267,7 @@ func _drop_roll_round() -> void:
         drop_left = drop_total
         drop_delivered = 0
         drop_spawned = 0
+        drop_queue = 0
         var kinds := ["moves", "time", "both"]
         drop_limit_kind = kinds[randi() % 3]
         # THE BUDGETS: a steady hand delivers a parcel in ~1.6 moves or
@@ -4214,89 +4278,82 @@ func _drop_roll_round() -> void:
         drop_moves = clampi(int(round(float(drop_total) * per_mv)) + 6, 12, 130)
         var per_s := clampf(7.2 - 0.18 * float(drop_level - 1), 4.2, 7.2)
         drop_time = clampf(float(drop_total) * per_s + 15.0, 30.0, 240.0)
-        # THE STREAM: the hatch beat shrinks every level and quickens with
-        # every hatch inside the round
-        drop_gap = clampf(DROP_GAP0 - 0.45 * float(drop_level - 1), 2.2, DROP_GAP0)
-        drop_clock = drop_gap
         _drop_lay()
 
 
 var drop_level := 1
 
+## v0.3.5-6 THE OPENING LAW: 2..4 parcels park on the board before the
+## first move - each on its OWN row (the owner's "each row should have one
+## at a time"), replacing gems the player never saw.
 func _drop_lay() -> void:
-        # the round opens with a few parcels already parked on the top line
-        var starting := mini(2 + randi() % 3, drop_total)
-        var cols_free := []
-        for c in COLS:
-                if grid.size() >= ROWS and grid[0][c].is_empty() \
-                                and not _jelly_at(0, c):
-                        cols_free.append(c)
-        cols_free.shuffle()
-        for i in mini(starting, cols_free.size()):
-                _drop_spawn(cols_free[i])
+        var starting := clampi(DROP_OPEN_MIN + randi() % \
+                        (DROP_OPEN_MAX - DROP_OPEN_MIN + 1), 1, drop_total)
+        var rows := range(ROWS)
+        rows.shuffle()
+        var placed := 0
+        for r in rows:
+                if placed >= starting:
+                        break
+                var cols := range(COLS)
+                cols.shuffle()
+                for c in cols:
+                        if grid.size() < ROWS or grid[r][c].is_empty() \
+                                        or _is_item(grid[r][c]) or _is_coin(grid[r][c]):
+                                continue
+                        # the quiet replace: the pour gem here was never seen
+                        if is_instance_valid(grid[r][c].get("node")):
+                                (grid[r][c]["node"] as Sprite2D).queue_free()
+                        grid[r][c] = _new_item_cell(r, c, 0.0, 0, true)
+                        drop_seq += 1
+                        drop_spawned += 1
+                        placed += 1
+                        break
+        # a soft fade so a MID-ROUND lay (the next round's parcels after a
+        # clear) never pops in hard over live gems
+        for r in ROWS:
+                for c in COLS:
+                        if not grid[r][c].is_empty() and _is_item(grid[r][c]) \
+                                        and is_instance_valid(grid[r][c].get("node")) \
+                                        and not bool(grid[r][c].get("laid", false)):
+                                grid[r][c]["laid"] = true
+                                var ln: Sprite2D = grid[r][c]["node"]
+                                ln.modulate.a = 0.0
+                                var ltw := ln.create_tween()
+                                ltw.tween_property(ln, "modulate:a", 1.0, 0.22)
 
 
-## the CLEAN ENTRANCE: a parcel takes an EMPTY top seat - it never
-## deletes the gem that lived there (the old lay killed it outright)
-func _drop_spawn(c: int) -> bool:
-        if grid.size() < ROWS or drop_spawned >= drop_total \
-                        or not grid[0][c].is_empty() or _jelly_at(0, c):
+## v0.3.5-6 THE MATCH SPAWN LAW: a match pays its size in parcels - a
+## 3-match pays 3, a 5-match pays 5, and a 6+ wave (the full 8-line
+## included) rolls RANDOM 3..6 so a full line can never dump 8 (the owner:
+## "instead of dropping 8, make it random between 3-6 so it not be too
+## easy to spawn extra stuff").
+func _drop_match_spawn(n: int) -> int:
+        if n >= DROP_SPAWN_MIN and n <= DROP_SPAWN_MAX - 1:
+                return n
+        return DROP_SPAWN_MIN + randi() % \
+                        (DROP_SPAWN_MAX - DROP_SPAWN_MIN + 1)
+
+
+## v0.3.5-6 THE ONE-AT-A-TIME LAW: the top line owns AT MOST one parcel -
+## while a parcel stands there, the queue waits; the moment it drops out
+## of the top line (gravity pulls it down), the next queued parcel rides
+## the very refill that opens (the owner: "once one dropped, it will drop
+## the next one from top"). Returns true when a parcel entered.
+func _drop_queue_enter(r: int, c: int) -> bool:
+        if mode != "drop" or drop_queue <= 0 or drop_spawned >= drop_total:
                 return false
-        var n := Sprite2D.new()
-        n.texture = _t("parcel")
-        n.scale = Vector2.ONE * cell_px * 0.92 / 120.0
-        var target := _cell_pos(0, c)
-        n.position = Vector2(target.x, board_o.y - cell_px * 0.7)
-        n.z_index = 3
-        world.add_child(n)
-        var tw := n.create_tween()
-        tw.tween_property(n, "position", target, 0.28) \
-                        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-        grid[0][c] = {"color": -2, "item": true, "node": n, "drop_id": drop_seq}
+        if r != 0 or grid.size() < ROWS:
+                return false
+        for cc in COLS:
+                if not grid[0][cc].is_empty() and _is_item(grid[0][cc]):
+                        return false    # the previous parcel still owns the top
+        grid[r][c] = _new_item_cell(r, c, 0.0, 0)
         drop_seq += 1
+        drop_queue -= 1
         drop_spawned += 1
         Jukebox.sfx("m_itemspawn", -6.0)
         return true
-
-
-## THE HATCH: the stream's own beat - 1..3 parcels enter from the top
-## line without waiting for the player. The jam check lives here: the
-## next parcel's arrival with every top seat a parked parcel ends the
-## run (THE TOP-LINE STAY LAW's other face).
-func _drop_hatch() -> void:
-        if over or busy or drop_spawned >= drop_total:
-                return
-        var free := []
-        var all_parked := true
-        for c in COLS:
-                var cell: Dictionary = grid[0][c]
-                if cell.is_empty() and not _jelly_at(0, c):
-                        free.append(c)
-                        all_parked = false
-                elif not cell.is_empty() and not _is_item(cell):
-                        all_parked = false     # a gem squats the seat - it moves
-        if free.is_empty():
-                if all_parked:
-                        # THE ENTRANCE JAM (the owner: "the next up when it
-                        # is already on top is an end, not by just going to
-                        # the top from first moment") - the parcels never
-                        # ended the run by PARKING; the run ends when the
-                        # next parcel has nowhere to land
-                        _banner("THE ENTRANCE JAMMED!", false)
-                        _finish_run("the entrance jammed - round %d, %d/%d delivered" \
-                                        % [drop_level, drop_delivered, drop_total])
-                else:
-                        drop_clock = 0.8       # the gems will move - retry
-                return
-        var bmax := mini(DROP_BATCH_MAX, 1 + (drop_level - 1) / 3)
-        var batch: int = mini(1 + randi() % bmax, free.size())
-        batch = mini(batch, drop_total - drop_spawned)
-        var landed := 0
-        for i in batch:
-                if _drop_spawn(free[i]):
-                        landed += 1
-        drop_gap = maxf(DROP_GAP_MIN, drop_gap - DROP_GAP_STEP * float(landed))
-        drop_clock = drop_gap
 
 
 ## v0.3.3-p4 THE GRAVITY-ONLY DELIVERY: the parcels ride the gravity waves
@@ -4339,7 +4396,7 @@ func _drop_settle() -> void:
         _drop_settling = false
         if over:
                 return
-        if drop_left <= 0 and _count_items() == 0:
+        if drop_left <= 0 and drop_queue == 0 and _count_items() == 0:
                 # THE ROUND CLEAR: the quota is beaten before the limit
                 drop_level += 1
                 Jukebox.sfx("m_levelup", -3.0)
@@ -4381,18 +4438,12 @@ func _drop_limits_check() -> void:
 
 
 func _tick_drop(delta: float) -> void:
+        # v0.3.5-6: the ONLY clock left is the limit - the stream itself is
+        # match-driven now (matches pay the queue, the refill drips it)
         if drop_limit_kind == "time" or drop_limit_kind == "both":
                 drop_time -= delta
                 if drop_time <= 0.0:
                         _drop_limits_check()
-                        return
-        # THE STREAM: the hatch beats only on a quiet board - a resolve
-        # owns the grid while it runs, the next beat waits for it
-        if busy:
-                return
-        drop_clock -= delta
-        if drop_clock <= 0.0:
-                _drop_hatch()
 
 
 func _tick_butterflies(delta: float) -> void:
@@ -5795,7 +5846,9 @@ func _refresh_hud() -> void:
                         chip_info.text = "breathe"
                         chip_info2.text = "%ds" % int(peace_secs)
                 "butterflies":
-                        chip_info.text = "saved %d" % int(Box.counter(game_id, "butterflies"))
+                        # v0.3.5-6: the SAVED chip counts THIS round only -
+                        # the lifetime number lives in the achievements
+                        chip_info.text = "saved %d" % butter_saved
                         var wings_n := 0
                         if grid.size() >= ROWS:
                                 for r in ROWS:
@@ -5848,10 +5901,12 @@ func _refresh_hud() -> void:
                                 "both":
                                         lim = "mv %d - %ds" % [maxi(0, drop_moves),
                                                         int(ceilf(maxf(0.0, drop_time)))]
-                        # v0.3.3-8 THE STREAM HUD: the quota, the beat and
+                        # v0.3.5-6 THE STREAM HUD: the quota, the queue and
                         # the climb warnings live on the two chips
                         chip_info.text = "parcels %d/%d - live %d" % \
                                         [drop_delivered, drop_total, _count_items()]
+                        if drop_queue > 0:
+                                chip_info.text += " - due %d" % drop_queue
                         var any_rose := false
                         if grid.size() >= ROWS:
                                 for r in ROWS:

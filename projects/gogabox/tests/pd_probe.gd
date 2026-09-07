@@ -136,6 +136,18 @@ func _run() -> void:
                                 var gap: float = Vector2(float(pts[i][0]), float(pts[i][1])).distance_to(Vector2(float(pts[i - 1][0]), float(pts[i - 1][1])))
                                 ck(gap <= 0.55, m["id"] + " THE SAMPLE DENSITY: no gaps the eye can bridge (%.2f)" % gap)
                 ck(worst <= 0.51, m["id"] + " THE FILLET LAW: the march rides the centers (worst %.2f)" % worst)
+                # v0.3.5-6 THE CENTERLINE TRUTH: path coords are CELL-CENTER
+                # coords - every path's walk-in point IS the house's seat
+                # (the old runtime's extra +0.5 marched every bloon half a
+                # cell off the painted road - the owner's "visualized out of
+                # the center, each direction shifts weirder")
+                var housec: Vector2 = Vector2(float(m["heart"][0]) + 0.5, float(m["heart"][1]) + 0.5)
+                var house_ok := true
+                for pts2 in m["paths"]:
+                        var lp: Array = (pts2 as Array)[-1]
+                        if absf(float(lp[0]) - housec.x) > 0.01 or absf(float(lp[1]) - housec.y) > 0.01:
+                                house_ok = false
+                ck(house_ok, m["id"] + " THE CENTERLINE TRUTH: every walk-in lands ON the house")
         ck(multi >= 6, "THE DOORS ROSTER: at least six multi-start maps (got %d)" % multi)
         # THE SCORE ICON LAW: the drawing fills its canvas (the clipped look is dead)
         var ic_img: Image = (load("res://assets/games/pop_siege/ui/ic_pops.png") as Texture2D).get_image()
@@ -211,7 +223,10 @@ func _run() -> void:
         # the darty cross aimed 90 degrees off its own darts)
         ck(absf(PDData.head_offset("darty")) < 0.01, "darty's crossbow points RIGHT (offset 0) - the 90-degree lie is dead")
         ck(absf(PDData.head_offset("longeye") - PI) < 0.01, "longeye's tip points LEFT (offset PI)")
-        ck(absf(PDData.head_offset("boomba") - PI) < 0.01, "boomba's shell nose points LEFT (offset PI)")
+        # v0.3.5-6 THE FACE-IT LAW (the owner: "bomber looks with it's butt"):
+        # the atlas mortars are muzzle-RIGHT - the g3 cannon's firing opening
+        # is plainly on its right end, so the aim offset is 0
+        ck(absf(PDData.head_offset("boomba")) < 0.01, "boomba's muzzle points RIGHT at the aim (offset 0 - the butt-first round is dead)")
         ck(PDData.head_static("kaching") and PDData.head_static("marshal"), "the bank and the drum never spin")
         for fid2 in ["darty", "boomba", "pyra", "boomo", "gloop", "kolda", "longeye", "zappy"]:
                 ck(PDData.muzzle(fid2) > 0.1, fid2 + " THE MUZZLE LAW: the shot leaves from the business end")
