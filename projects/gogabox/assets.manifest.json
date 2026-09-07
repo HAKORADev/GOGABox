@@ -328,7 +328,7 @@
    "notes": "spudnik.png deleted (the 6 hero_<start>_f<k>.png walk sets replaced it). The cosmic coin (pickups/coin.png) is a NEW design: a gold coin with a potato embossed in the middle - deliberately NOT the box's gogacoin (assets/ui/coin.png)."
   },
   "assets/games/geometry": {
-   "provenance": "v0.3.6 GEOMETRY FLASH: 100% original neon-filled redesigns by tools/v036_gf_art.py (study-informed anatomy per docs/goga_docs/gogames_ideas/geometry.md + docs/DECOMPILATION.md). Re-derive: python3 tools/v036_gf_art.py && python3 tools/v036_gf_sfx.py. The owner's laws live in the game header (game/games/geometry/geometry.gd).",
+   "provenance": "v0.3.6 GEOMETRY FLASH: 100% original neon-filled redesigns by tools/v036_gf_art.py (study-informed anatomy per docs/goga_docs/gogames_ideas/geometry.md + docs/DECOMPILATION.md). Re-derive: python3 tools/v036_gf_art.py && python3 tools/v036_gf_sfx.py. The owner's laws live in the game header (game/games/geometry/geometry.gd). | v0.3.6-1: the p1 pass is 100% original too - tools/v036p1_gf_art.py (the p_soft/p_streak/p_puff/p_star particle vocabulary, the shield_core mark, the pow_* capsule icons, and the re-filled block/line/strip/pusher surfaces) + tools/v036p1_gf_sfx.py (gf_pow/gf_pow_end/gf_save/gf_reentry, all synthesized).",
    "notes": "edges/glow drawn near-white so the THEMES recolor the world by modulate; skins carry their own identity colors and are never theme-tinted; no faces on the square (owner law)"
   }
  }

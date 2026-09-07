@@ -119,3 +119,48 @@ STICKY you can, always).
 - Thumbnail 960x640 composed from the real assets; guide = controls lines.
 - version 0.3.6 / code base 30670. NO release (the law). Probes + QA rigs
   green, APKs built, pushed, CI watched.
+
+## 9. PATCH 1 - v0.3.6-1 (the owner's 8-item test report)
+
+- THE /50 LAW: the speed step fires every 50 points now (was /10).
+- THE COIN LAWS: the world coin shrinks to a 44px core (was 64 - "very
+  big"); the FIRST coin waits the full 30-50s window from the run start
+  (the timer started at 0 = an instant coin).
+- THE STICK TRUTH (the big fix): STICK was a FLIP copy (it toggled gravity
+  on the jump). Now: the tap is JUST a hop; gravity changes ONLY when the
+  square TOUCHES another floor - ground <-> roof (the two lines are not
+  floors). The climb path is real: ground -> line 1 -> 2 -> 3 -> roof, and
+  back down the undersides. FLIP stays the tap-flip.
+- SPIKES FROM LEVEL 0 + the LADDER chunk (a climbing rung path with orbit
+  marks and a floor threat under it) + the FLOATERS chunk (spike threats
+  floating BETWEEN the lines - they only threaten line-hoppers, the ground
+  route never has a forced jump under them). Surfaces re-filled: block /
+  line / strip / pusher carry denser inner structure (double bevels, stud
+  glows, block-joint seams).
+- THE VFX OVERHAUL: tails are TWO additive emitters BEHIND the square
+  (rotation-aware back face, world-speed launch - never a puddle below);
+  the NONE bug is dead (none kills both emitters, the probe asserts it);
+  the jump burst moved ONTO the collision (landing dust ring scaled by
+  impact + bonk star flashes); the orbit collect is a golden implosion
+  (inward ring + star flash + diving streaks); death = double shockwave +
+  the ghost square + shard storm + lingering embers. Every effect layered,
+  additive, skin-colored - no more repeated small shapes.
+- THE REPLAY GROUND-FALL BUG (found + killed by the repro): the ready-phase
+  idle bob could BURY the square inside the ground at tap time; the old 2px
+  support window dropped the support and the square fell through the world
+  forever (replays tap fast = always buried). THE READY GROUND LAW: the
+  bob breathes UP only, the run start snaps the stance, and the support
+  check carries a 6px SNAP band. Also killed the p["y"]*us double-scale
+  (sprite/burst positions) - the SCREEN-px TRUTH part 2.
+- THE POWER LAW: 3 power-ups, bought STANDALONE (jump 240 / slow 320 /
+  shield 520 - the extra life is the most expensive), spawning in-run every
+  30/40/50/60s (never at the start), 10 GAME-seconds each. ROCKET JUMP =
+  x1.5 hops + a skin-colored burn under the square. SLOW WORLD = every core
+  clock runs at half (its own 10s = 20 real seconds). EXTRA LIFE = pits
+  bounce (a 1.4x rescue hop), off-screen re-enters through a light beam,
+  hazards pass through with a spark. The chips sit next to the mechanic
+  chip with countdowns.
+- SFX: gf_pow / gf_pow_end / gf_save / gf_reentry (all synthesized).
+- Tests: gf_probe 73 checks 0 fails (the new stick/power/coin//50/none
+  laws); gf_replay_repro CLEAN; flow_test + every game probe green.
+- version 0.3.6-1 / code base 30680. NO release (the law).

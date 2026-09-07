@@ -1,5 +1,5 @@
 extends Node
-## GEOMETRY FLASH probe (v0.3.6) - the deterministic battery.
+## GEOMETRY FLASH probe (v0.3.6-1) - the deterministic battery.
 ## Runs headless: godot --headless --path . res://tests/gf_probe.tscn
 ## Exit 0 = every owner law holds.
 
@@ -76,12 +76,62 @@ func _run() -> void:
         var g_before: int = G.player["g"]
         G._do_action()
         ck(G.player["g"] == g_before,
-                "THE STICKY LAW: a mid-air tap is ignored")
+                "THE STICK TRUTH: a mid-air tap is ignored")
         G.player["ground"] = true
         G.player["vy"] = 0.0
         G._do_action()
-        ck(G.player["g"] == -g_before and G.player["vy"] == G.JUMP_V * G.us,
-                "THE STICKY LAW: the surface tap jumps AND flips with the leap")
+        ck(G.player["g"] == g_before \
+                and absf(G.player["vy"] - (-G.JUMP_V * G.us * float(g_before))) < 0.5,
+                "THE STICK TRUTH: the surface tap is JUST a hop - no gravity flip on jump")
+        # THE STICK TOUCH: gravity changes ONLY on touching another floor.
+        # (a) climb and bonk the ROOF -> stick up
+        G.probe_reset(61)
+        G.mechanic = "sticky"
+        G.rsegs = [{"x0": -3000.0, "x1": 6000.0, "spr": null}]
+        G.player["ground"] = false
+        G.player["g"] = 1
+        G.player["y"] = (G.L3_Y - G.HALF - 30.0) * G.us
+        G.player["vy"] = -900.0 * G.us
+        var stuck_roof := false
+        for i in 40:
+                G._physics(1.0 / 60.0)
+                if G.player["g"] == -1:
+                        stuck_roof = true
+                        break
+        ck(stuck_roof,
+                "THE STICK TRUTH: touching the ROOF flips the gravity to stick up")
+        # (b) fall from the roof and bonk the GROUND top -> stick down
+        G.probe_reset(63)
+        G.mechanic = "sticky"
+        G.rsegs = [{"x0": -3000.0, "x1": 6000.0, "spr": null}]
+        G.player["ground"] = false
+        G.player["g"] = -1
+        G.player["y"] = (G.GROUND_Y - G.CELL * 2.0 - G.HALF) * G.us
+        G.player["vy"] = 1400.0 * G.us
+        var stuck_ground := false
+        for i in 40:
+                G._physics(1.0 / 60.0)
+                if G.player["g"] == 1:
+                        stuck_ground = true
+                        break
+        ck(stuck_ground,
+                "THE STICK TRUTH: touching the GROUND flips the gravity back down")
+        # (c) a LINE is not a floor: falling onto line 1's TOP never flips
+        G.probe_reset(67)
+        G.mechanic = "sticky"
+        _surgery_line_under_player(G.L1_Y)
+        G.player["ground"] = false
+        G.player["g"] = -1
+        G.player["y"] = (G.L1_Y - G.CELL - 20.0) * G.us
+        G.player["vy"] = 500.0 * G.us
+        var line_flip := false
+        for i in 30:
+                G._physics(1.0 / 60.0)
+                if G.player["g"] == 1:
+                        line_flip = true
+                        break
+        ck(not line_flip,
+                "THE STICK TRUTH: the two lines are NOT floors - no flip from them")
         G.paused = true               # back to the probe clock
         # ------------------------------------------------ the spin law
         G.probe_reset(7)
@@ -290,21 +340,108 @@ func _run() -> void:
         ck(G.score == sc0 + 1, "THE ORBIT LAW: a golden orbit pays exactly +1")
         G.speed_level = 0
         G.speed = G.BASE_SPEED
-        for i in 10:
+        G.next_bonus = G.SPEED_BONUS_AT
+        for i in 48:
                 G._add_orbit(G.world_x + G.stand_x / G.us, oy)
                 G._pickups(1.0 / 60.0)
+        ck(absf(G.speed / G.BASE_SPEED - 1.0) < 0.0001,
+                "THE /50 LAW: 49 points pay NO speed step")
+        G._add_orbit(G.world_x + G.stand_x / G.us, oy)
+        G._pickups(1.0 / 60.0)
         ck(absf(G.speed / G.BASE_SPEED - 1.1) < 0.001,
-                "THE SPEED LAW: 10 points = exactly x1.1")
-        # ------------------------------------------------ the coin law
+                "THE /50 LAW: 50 points = exactly x1.1 (the owner moved /10 -> /50)")
+        # ------------------------------------------------ the coin laws
         ck(G.COIN_DELAYS == [30, 35, 40, 45, 50],
                 "THE COIN LAW table: 30/35/40/45/50 seconds")
         G.probe_reset(103)
+        var roll: float = G._coin_roll()
+        ck(roll >= 30.0 and roll <= 50.0,
+                "THE FIRST-APPEAR LAW: the run start rolls the FULL 30-50s window")
         G.coin_timer = 0.05
         G._coin_clock(0.06)
         ck(not G.coin.is_empty(), "the GOGACoin appears when its clock fires")
         var t_after: float = G.coin_timer
         ck(t_after > 25.0 and t_after <= 50.01,
                 "THE COIN LAW: the next delay rolls from the LAST APPEAR (%.0fs)" % t_after)
+        # ------------------------------------------------ the power-up laws
+        ck(G.POWERS.size() == 3 and G.POW_DELAYS == [30, 40, 50, 60]
+                and G.POW_DUR == 10.0,
+                "THE POWER LAW table: 3 powers, 30-60s spawns, 10 game-seconds")
+        ck(G.POWERS["shield"]["price"] > G.POWERS["jump"]["price"] \
+                and G.POWERS["shield"]["price"] > G.POWERS["slow"]["price"],
+                "THE POWER LAW: the EXTRA LIFE is the most expensive")
+        # the jump power multiplies the hop
+        G.probe_reset(111)
+        G.powers["jump"] = 5.0
+        G.player["ground"] = true
+        G.player["g"] = 1
+        G._jump()
+        ck(absf(G.player["vy"] + G.JUMP_V * G.JUMP_POW_MULT * G.us) < 0.5,
+                "THE ROCKET JUMP: the hop leaves at x1.5 velocity")
+        G.powers["jump"] = 0.0
+        # SLOW WORLD halves every core clock
+        G.probe_reset(113)
+        G.powers["slow"] = 10.0
+        G.paused = false
+        var wx0: float = G.world_x
+        G._goga_tick(1.0 / 60.0)
+        var slow_d: float = G.world_x - wx0
+        G.paused = true
+        G.powers["slow"] = 0.0
+        G.paused = false
+        var wx1: float = G.world_x
+        G._goga_tick(1.0 / 60.0)
+        var fast_d: float = G.world_x - wx1
+        G.paused = true
+        ck(absf(slow_d * 2.0 - fast_d) < 0.5,
+                "THE SLOW WORLD: the world scroll runs 50%% slower (%.2f vs %.2f)" % [slow_d, fast_d])
+        # the power spawn clock: only owned kinds, one at a time
+        G.probe_reset(117)
+        Box.dev_set_cheat("all_owned", 1)
+        G.pow_timer = 0.05
+        G._pow_clock(0.06)
+        ck(G.pow_pickups.size() == 1, "THE POWER SPAWN: exactly one capsule at a time")
+        ck(G.pow_timer > 25.0 and G.pow_timer <= 60.01,
+                "THE POWER SPAWN: the next delay rolls 30/40/50/60 from the LAST spawn")
+        var kind0: String = G.pow_pickups[0]["kind"]
+        G.pow_pickups[0]["x"] = G.world_x + G.stand_x / G.us
+        G.pow_pickups[0]["y"] = G.GROUND_Y - G.HALF
+        G._pickups(1.0 / 60.0)
+        ck(G.pow_pickups.is_empty() and G.powers[kind0] == G.POW_DUR,
+                "THE POWER COLLECT: the capsule activates its 10 game-seconds")
+        Box.dev_set_cheat("all_owned", 0)
+        G.probe_reset(119)
+        G.pow_timer = 0.05
+        G._pow_clock(0.06)
+        ck(G.pow_pickups.is_empty(),
+                "THE POWER SPAWN: nothing spawns when nothing is owned")
+        # the EXTRA LIFE saves: pit -> rescue hop, off-screen -> re-entry
+        G.probe_reset(121)
+        G.powers["shield"] = 10.0
+        G.gsegs = [{"x0": -3000.0, "x1": 100.0, "spr": null}]
+        G.rsegs = [{"x0": -3000.0, "x1": 6000.0, "spr": null}]
+        G.player["ground"] = false
+        G.player["y"] = (G.GROUND_Y + G.CELL) * G.us
+        G.player["vy"] = 800.0 * G.us
+        G._pit_check()
+        ck(not G.over_gate and G.player["vy"] < 0.0,
+                "THE EXTRA LIFE: the pit fall becomes a rescue hop UP")
+        G.player["x"] = -G.HALF * G.us - 60.0
+        G._physics(1.0 / 60.0)
+        ck(not G.over_gate and absf(G.player["x"] - G.stand_x) < 2.0,
+                "THE EXTRA LIFE: pushed off-screen re-enters at the standpoint")
+        G._add_hazard(G.world_x + G.stand_x / G.us, G.GROUND_Y - G.HALF, "spike")
+        G.player["x"] = G.stand_x
+        G.player["y"] = (G.GROUND_Y - G.HALF) * G.us
+        G.player["vy"] = 0.0
+        G.player["ground"] = true
+        G._hazard_check()
+        ck(not G.over_gate,
+                "THE EXTRA LIFE: hazards pass through while the shield lives")
+        G.powers["shield"] = 0.0
+        G._hazard_check()
+        ck(G.over_gate, "THE HAZARD LAW: without the shield the spike ends the run")
+        await _wait(1.0)
         # ------------------------------------------------ the shop economy
         G.probe_reset(107)
         Box.dev_set_cheat("all_owned", 0)      # the honest economy - no cheats
@@ -342,11 +479,23 @@ func _run() -> void:
         ck(wallet1 - Box.coins() == int(G.TAILS["gold"]["price"]),
                 "the wallet: the tail price left exactly (%d)" % (wallet1 - Box.coins()))
         # ------------------------------------------------ the tables
-        ck(G.THEMES.size() == 3 and G.SKINS.size() == 5 and G.TAILS.size() == 6,
-                "the shop stock: 3 themes / 5 skins / 6 tails (the owner's caps)")
+        ck(G.THEMES.size() == 3 and G.SKINS.size() == 5 and G.TAILS.size() == 6
+                and G.POWERS.size() == 3,
+                "the shop stock: 3 themes / 5 skins / 6 tails / 3 powers")
         ck(G.THEMES["midnight"]["price"] == 0 and G.SKINS["classic"]["price"] == 0
                 and G.TAILS["none"]["price"] == 0,
                 "the free defaults: midnight + classic + none")
+        # the tail none law: applying none KILLS the emitters (the none bug)
+        G.probe_reset(131)
+        G.trail_mode = "gold"
+        G._apply_tail()
+        G.phase = "run"
+        G._apply_tail()
+        ck(G.tail.emitting, "the tail law: a live tail emits during the run")
+        G.trail_mode = "none"
+        G._apply_tail()
+        ck(not G.tail.emitting and not G.tail2.emitting,
+                "THE NONE TRUTH: none kills BOTH emitters dead (the toggle bug)")
         print("RESULT: %d checks, %d failures" % [checks, fails])
         print("RESULT: %s" % ("ALL LAWS HOLD" if fails == 0 else "LAWS BROKEN"))
         get_tree().quit(0 if fails == 0 else 1)

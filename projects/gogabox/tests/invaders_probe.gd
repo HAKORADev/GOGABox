@@ -98,8 +98,9 @@ func _run() -> void:
         _check(String(sr["title"]) == "Space Invaders", "the rename law: HEN -> SPACE INVADERS")
         _check(int(sr["coin_div"]) == 500, "run bonus = score/500 (owner)")
         _check(String(sr["orientation"]) == "landscape", "the tour is HORIZONTAL")
-        _check(GameReg.playable().size() == 12 and GameReg.workshop().size() == 3,
-                        "12 playable / 3 teasers (pop siege joined the shelf)")
+        _check(GameReg.playable().size() + GameReg.workshop().size() == 15
+                        and GameReg.playable().size() >= 12,
+                        "the shelf adds up to 15 (playable >= 12 - the reveal state moves with the save)")
 
         # ---- boot ----
         await _boot()

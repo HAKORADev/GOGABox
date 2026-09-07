@@ -52,8 +52,9 @@ Study: Geometry Dash Lite 2.2.147 via tools/study (THE USAGE LAW).
       the orbit arc, spike, pusher, coin, real strip tiles) — 960x640
 - [x] manifest provenance (gf-study-gd-lite / gf-original-art / gf-synth-audio)
       + DECOMPILATION.md production-mission record
-- [ ] version 0.3.6 / 30670, build arm32+arm64, cert unchanged
-- [ ] push, CI green, NO release (the law), worklog
+- [x] version 0.3.6 / 30670, build arm32+arm64 (67.9M + 69.3M), cert
+      6db87aca... unchanged (overwrite-install safe)
+- [x] pushed e2192f8, CI run 34157631148 GREEN, NO release (the law), worklog
 
 ## risks / notes
 
