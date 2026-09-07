@@ -490,7 +490,7 @@ const GAMES := [
                         "TARGET cycles FIRST / LAST / STRONG / CLOSE; SELL pays back 70% of everything invested",
                         "the pink SEND WAVE button calls every wave - wave 1 never runs on a timer; calling mid-roll stacks the next wave",
                         "AUTO / MANUAL owns the between-waves clock (wave 1 is always manual); the speed chip cycles x1 x2 x3",
-                        "multi-door maps split the siege: ROTATE sends each wave from one door (every 4th from all), SLICE splits every wave - the card says N DOORS",
+                        "multi-door maps roll the siege: EVERY WAVE ROLLS ITS OWN RANDOM DOORS - the crew grows with the wave (one door, then two, then three) and every 5th wave bursts from ALL of them",
                         "MAPS opens the 30-map wall (every map wears day and night); the SHOP sells folk and maps for GOGACoins; a buy refreshes the SAME window, both close with X",
                         "bloons wear COLOR LEVELS (each ring takes +1 more), hidden STRIPS (each band hides a bloon) and ARMOR: metal fears fire, rock fears bombs",
                         "bloons march single file, one honest row on the road center; nothing shows before the map line",

@@ -252,7 +252,7 @@ static func toast(t: Dictionary, msg: String) -> void:
                         fit_size(msg, base, avail, l.get_theme_font("font"), true, 14))
         l.modulate.a = 1.0
         var tw := l.create_tween()
-        tw.process_mode = Tween.TWEEN_PROCESS_IDLE
+        tw.set_process_mode(Tween.TWEEN_PROCESS_IDLE)
         t["tw"] = tw
         tw.tween_interval(1.3)
         tw.tween_property(l, "modulate:a", 0.0, 0.4)

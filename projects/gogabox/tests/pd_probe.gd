@@ -94,11 +94,11 @@ func _run() -> void:
                 ck(ResourceLoader.exists("res://assets/games/pop_siege/thumbs/%s.png" % m["id"]), m["id"] + " day thumb")
                 ck(ResourceLoader.exists("res://assets/games/pop_siege/thumbs/%s_n.png" % m["id"]), m["id"] + " night thumb")
 
-        # ------------------------------------------------- the door laws (p3)
+        # ------------------------------------------------- the door laws (p4)
         var multi := 0
         for m in maps:
                 var mode := String(m.get("wave_mode", "solo"))
-                ck(mode in ["solo", "slice", "rotate"], m["id"] + " wears a legal wave_mode")
+                ck(mode in ["solo", "rand"], m["id"] + " wears a legal wave_mode")
                 var n_paths: int = (m["paths"] as Array).size()
                 if mode != "solo":
                         multi += 1
@@ -121,6 +121,21 @@ func _run() -> void:
                                         if not roadset.has(Vector2i(int(floorf(float(c[0]))), int(floorf(float(c[1]))))):
                                                 off_road += 1
                 ck(off_road == 0, m["id"] + " THE ROAD TRUTH: the walk never leaves the painted cells")
+                # THE FILLET LAW (v0.3.5-4): the march line is GRID-PERFECT -
+                # every on-board sample rides within half a cell of a road-cell
+                # center (straight runs sit ON the center lines, corner fillets
+                # stay inside the corner cell). The old chaikin drift reached
+                # ~0.7 - the owner's "the visual pathway is another pathway".
+                var worst := 0.0
+                for pts in m["paths"]:
+                        for c in pts:
+                                if c[0] >= 0.0 and c[0] < 18.0 and c[1] >= 0.0 and c[1] < 10.0:
+                                        var cc := Vector2(floorf(float(c[0])) + 0.5, floorf(float(c[1])) + 0.5)
+                                        worst = maxf(worst, cc.distance_to(Vector2(float(c[0]), float(c[1]))))
+                        for i in range(1, (pts as Array).size()):
+                                var gap: float = Vector2(float(pts[i][0]), float(pts[i][1])).distance_to(Vector2(float(pts[i - 1][0]), float(pts[i - 1][1])))
+                                ck(gap <= 0.55, m["id"] + " THE SAMPLE DENSITY: no gaps the eye can bridge (%.2f)" % gap)
+                ck(worst <= 0.51, m["id"] + " THE FILLET LAW: the march rides the centers (worst %.2f)" % worst)
         ck(multi >= 6, "THE DOORS ROSTER: at least six multi-start maps (got %d)" % multi)
         # THE SCORE ICON LAW: the drawing fills its canvas (the clipped look is dead)
         var ic_img: Image = (load("res://assets/games/pop_siege/ui/ic_pops.png") as Texture2D).get_image()
@@ -536,11 +551,23 @@ func _run() -> void:
         var boom_px := 0.0
         for c in G.fx_layer.get_children():
                 if c is Sprite2D:
-                        boom_px = maxf(boom_px, (c as Sprite2D).scale.x * 56.0)
+                        boom_px = maxf(boom_px, (c as Sprite2D).scale.x * 128.0)
         ck(boom_px > G.CELL * 1.5, "THE BOOM TRUTH: a 1-cell blast paints a %.0fpx fireball" % boom_px)
         for c in G.fx_layer.get_children().slice(fx0):
                 c.queue_free()
         G.fx_layer.queue_redraw()
+        # THE SHELL TRUTH (v0.3.5-4): the bomber's bomb DIES at its blast -
+        # the old shell kept flying past the target for seconds (the owner's
+        # "the ball floats in the sky somehow")
+        for b in G.bullets.duplicate():
+                G.bullets.erase(b)
+        var fake_folk: Dictionary = {"pos": Vector2(200, 200), "fid": "boomba", "gear": 1,
+                "lvl": 1, "buffs": {"blast_f": 1.0}, "flags": {}}
+        G._shell_spawn(fake_folk, Vector2(320, 240), 3.0, 1.7, {"frags": 0, "stun": 0.0, "moab_bonus": 0.0})
+        ck(G.bullets.size() == 1, "the shell flies")
+        for i in 30:
+                G._tick_bullets(0.05)
+        ck(G.bullets.is_empty(), "THE SHELL TRUTH: the bomb is GONE the moment it blasts (nothing floats)")
 
         # the wave flow (spawner): the SEND call + THE STACK LAW
         for b in G.bloons.duplicate():
@@ -567,35 +594,48 @@ func _run() -> void:
         ck(G.phase == "idle", "the stacked waves resolve")
         ck(G.wave_kinds.size() >= 2, "both waves marched")
 
-        # THE DOORS LAW in the flesh: a rotate map sends each wave from ONE
-        # door, and every 4th wave BURSTS across all of them
+        # THE RANDOM DOORS LAW in the flesh: every wave rolls its own crew -
+        # wave 1 from ONE door, the crew GROWS with the wave, every 5th wave
+        # bursts from ALL of them, and the subsets are random
         var rot_map: Dictionary = PDData.map_by_id("mirage_x")
-        ck(rot_map["wave_mode"] == "rotate" and (rot_map["paths"] as Array).size() == 3,
-                "mirage_x wears the 3-door rotate law")
+        ck(rot_map["wave_mode"] == "rand" and (rot_map["paths"] as Array).size() == 3,
+                "mirage_x wears the 3-door random law")
         G.map = rot_map
         G._build_paths()
         G.wave_n = 0
         G.phase = "idle"
         G.spawn_q.clear()
-        G._queue_wave()
+        G._queue_wave()      # wave 1
         var pis := {}
         for s in G.spawn_q:
                 pis[int(s["pi"])] = true
-        ck(pis.size() == 1, "THE ROTATE LAW: wave 1 marches from ONE door")
-        var door1: int = int(pis.keys()[0])
-        G.spawn_q.clear()
-        G._queue_wave()
-        var pis2 := {}
-        for s in G.spawn_q:
-                pis2[int(s["pi"])] = true
-        ck(pis2.size() == 1 and int(pis2.keys()[0]) != door1, "wave 2 marches from the NEXT door")
-        G.spawn_q.clear()
-        G._queue_wave()
-        G._queue_wave()      # wave 4 - the burst
-        var pis4 := {}
-        for s in G.spawn_q:
-                pis4[int(s["pi"])] = true
-        ck(pis4.size() == 3, "THE BURST LAW: every 4th wave splits across ALL the doors")
+        ck(pis.size() == 1, "THE RANDOM DOORS LAW: wave 1 marches from ONE door")
+        ck(int(pis.keys()[0]) in [0, 1, 2], "the door exists")
+        # the crew grows: the picker never lies about its size or its members
+        var w5: Array = G._pick_doors(5, 3)
+        ck(w5.size() == 3, "every 5th wave bursts from ALL the doors")
+        var sizes := {}
+        for trial in 60:
+                G.rng.randomize()
+                var crew: Array = G._pick_doors(2, 3)
+                ck(crew.size() >= 1 and crew.size() <= 3, "the crew respects the door count")
+                var uniq := {}
+                for d in crew:
+                        uniq[int(d)] = true
+                        ck(int(d) in [0, 1, 2], "every door is a real door")
+                ck(uniq.size() == crew.size(), "the crew never repeats a door")
+                sizes[crew.size()] = true
+        ck(sizes.size() >= 2, "THE RANDOM LAW: the wave-2 crew genuinely varies (sizes %s)" % [sizes.keys()])
+        var one_only := true
+        for trial in 40:
+                G.rng.randomize()
+                if G._pick_doors(1, 3).size() != 1:
+                        one_only = false
+        ck(one_only, "the opening wave ALWAYS marches from one door")
+        G.spawn_q.clear()               # the doors test queued mirage spawns -
+        G.phase = "idle"                # they never outlive their map
+        for b in G.bloons.duplicate():
+                G._bloon_free(b)
         G.map = PDData.map_by_id(meta.current_map())
         G._build_paths()
 
@@ -622,6 +662,23 @@ func _run() -> void:
         ck(_count_class(G, "CanvasLayer") == layers_before, "THE TOAST LAW: toasts never spawn new overlays")
         ck(G._toast["label"].text == "SECOND WINS", "THE NEWEST WINS: the old toast died, the newest speaks")
         ck(G._toast["layer"].process_mode == Node.PROCESS_MODE_ALWAYS, "THE TOAST LAW: the toast lives ABOVE the pause (fades inside the shop)")
+        G.sheet_pop()
+        await _wait(0.3)
+        # THE SCROLL TRUTH (v0.3.5-4): a buy down the list keeps the list AT
+        # the buy - the refreshed shop never jumps back to the top
+        G._shop_open()
+        await _wait(0.4)
+        var shop_sc: BoxScroll = G._find_box_scroll((G._sheet_stack.back() as Dictionary)["cc"])
+        ck(shop_sc != null, "THE SCROLL TRUTH: the shop scroll is findable")
+        if shop_sc != null:
+                shop_sc.scroll_vertical = 500
+                await _wait(0.1)
+                G._shop_refresh()
+                await _wait(0.4)
+                ck(G.sheet_open_count() == 1, "THE SCROLL TRUTH: the refresh stays one window")
+                var sc2: BoxScroll = G._find_box_scroll((G._sheet_stack.back() as Dictionary)["cc"])
+                ck(sc2 != null and int(sc2.scroll_vertical) >= 480,
+                        "THE SCROLL TRUTH: the shop reopens AT the buy (scroll %s ~= 500)" % (str(int(sc2.scroll_vertical)) if sc2 != null else "?"))
         G.sheet_pop()
         await _wait(0.3)
 

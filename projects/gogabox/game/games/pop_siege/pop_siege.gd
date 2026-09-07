@@ -1,10 +1,9 @@
 extends GogaGame
-## POP SIEGE (v0.3.5-2) - the wheel patch. Grid roads, bloon COLOR LEVELS
-## (each level cracks for +1 more), hidden STRIPS (10 on balloons, 50 on
-## blimps), ARMOR shells (metal fears fire, rock fears bombs), PopCoins pay
-## PER DAMAGE, tap AND drag placement with honest range rings, the manual
-## first wave (no timer - the SEND button calls every wave the owner wants),
-## and the 60 FPS siege. The laws live in the GDD + PLAN_v035p2.md.
+## POP SIEGE (v0.3.5-4) - the doors-roll patch. Grid-perfect fillet roads
+## (the march line IS the beaten track), chevrons stamped on the march,
+## RANDOM door crews that grow with the wave, the whole viewport sleeps at
+## night, the shop scroll stays put through a buy, and the bomber's shell
+## dies at its own blast (no more floating balls, no lingering wisps).
 
 const COLS := 18
 const ROWS := 10
@@ -196,11 +195,7 @@ func _build_ready() -> void:
         # THE DOORS SPEAK: multi-start maps tell their wave law up front
         var n_paths: int = (map["paths"] as Array).size()
         if n_paths > 1:
-                var door_txt: String
-                if String(map.get("wave_mode", "slice")) == "rotate":
-                        door_txt = "%d DOORS - EACH WAVE FROM ONE - EVERY 4TH FROM ALL" % n_paths
-                else:
-                        door_txt = "%d DOORS - EVERY WAVE SPLITS" % n_paths
+                var door_txt := "%d DOORS - EVERY WAVE ROLLS ITS OWN CREW - IT GROWS" % n_paths
                 var dl := Arc.label(door_txt, _fs(16), Color(0.55, 0.44, 0.28))
                 dl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 vb.add_child(dl)
@@ -362,17 +357,24 @@ func _build_night() -> void:
                 fireflies.visible = night
         if not night:
                 return
-        # THE NIGHT LAW: a cold multiply tint (the ground still reads) +
-        # the heart's warm lamp + the fireflies. Cheap on every phone.
+        # THE NIGHT LAW v2 (v0.3.5-4): the tint covers the WHOLE viewport -
+        # tall trees poking above the board and everything past the frame
+        # sleeps under the same night (the old rect stopped at the board
+        # edge - the owner's "tall things are not affected by the night").
+        # The folk panel and the HUD draw ABOVE this rect (tree order + the
+        # HUD layer), so the UI never sleeps.
         night_rect = ColorRect.new()
-        night_rect.size = Vector2(COLS, ROWS) * CELL
-        night_rect.position = FIELD
+        var vp := get_viewport_rect().size
+        night_rect.size = vp + Vector2(28, 28)     # the shake margin
+        night_rect.position = Vector2(-14, -14)
         night_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
         night_rect.color = PDData.THEMES[map["theme"]]["night"]
         var mm := CanvasItemMaterial.new()
         mm.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
         night_rect.material = mm
         field.add_child(night_rect)
+        if fireflies != null:
+                field.add_child(fireflies)         # the fireflies glow ABOVE the tint
         var lamp := Sprite2D.new()
         lamp.texture = _t("fx/spark.png")
         lamp.position = heart_spr.position
@@ -777,7 +779,7 @@ func _place_folk(fid: String, c: Vector2i) -> void:
         # the FIRST-GLANCE law for multi-door maps
         if (map["paths"] as Array).size() > 1 and not meta.seen_multipath():
                 meta.mark_multipath()
-                game_toast("THE DOORS TAKE TURNS!")
+                game_toast("THE DOORS ROLL AT RANDOM!")
 
 # --------------------------------------------------------------- the laws
 ## THE PIVOT LAW v2 (measured from the art - the owner's round): aiming
@@ -903,25 +905,19 @@ func _queue_wave() -> void:
         wave_kinds.append("wave%d" % wave_n)
         var stars := int(map["stars"])
         var groups := PDData.wave_groups(wave_n, stars)
-        # THE DOORS LAW: multi-start maps slice their waves across the doors.
-        # rotate - each wave marches from ONE door, the next wave from the
-        # next; every 4th wave BURSTS across ALL of them (the double wave).
-        # slice - the wave's groups alternate doors; every 3rd wave bursts.
+        # THE RANDOM DOORS LAW (v0.3.5-4): every wave rolls its OWN door crew
+        # - wave 1 from one random door, then two, then three (the crew grows
+        # with the siege, capped at the map's doors) and every 5th wave
+        # BURSTS from ALL of them. Random subsets - never the same rhythm.
         var n_paths: int = (map["paths"] as Array).size()
-        var wmode := String(map.get("wave_mode", "solo"))
-        var burst := n_paths > 1 and wave_n % (4 if wmode == "rotate" else 3) == 0
+        var doors: Array = _pick_doors(wave_n, n_paths)
         var base := 0.0 if first else spawn_clock + 1.2
         var gi := 0
         for g in groups:
                 for i in int(g["count"]):
                         var pi := 0
                         if n_paths > 1:
-                                if burst:
-                                        pi = (i + gi) % n_paths
-                                elif wmode == "rotate":
-                                        pi = (wave_n - 1) % n_paths
-                                else:
-                                        pi = gi % n_paths
+                                pi = int(doors[(i + gi) % doors.size()])
                         spawn_q.append({
                                 "kind": g["kind"],
                                 "at": base + float(g["delay"]) + i * float(g["spacing"]),
@@ -952,6 +948,26 @@ func _queue_wave() -> void:
         if wave_n == PDData.VICTORY_WAVE or wave_n == 30:
                 Jukebox.sfx("ps_wave_boss", -8.0)
         _refresh_chips()
+
+## THE RANDOM DOORS LAW: the wave's door crew. Grows 1 -> 2 -> 3 with the
+## wave (capped at the map's doors), rolls a RANDOM subset every wave, and
+## every 5th wave bursts from ALL the doors at once.
+func _pick_doors(w: int, n: int) -> Array:
+        if n <= 1:
+                return [0]
+        if w % 5 == 0:
+                return range(n)
+        var k := 1 + int((w - 1) / 3.0)
+        if w > 1 and rng.randf() < 0.3:
+                k += 1                     # the jitter (never on the opening wave)
+        k = clampi(k, 1, n)
+        var pool := range(n)
+        for i in range(pool.size() - 1, 0, -1):
+                var j := rng.randi_range(0, i)
+                var tmp = pool[i]
+                pool[i] = pool[j]
+                pool[j] = tmp
+        return pool.slice(0, k)
 
 func _end_wave() -> void:
         phase = "idle"
@@ -1022,6 +1038,7 @@ func _strip_kind(w: int) -> String:
         return pool[rng.randi() % pool.size()]
 
 func _spawn_bloon(kind: String, pi: int, lv := 1, strips: Array = [], armor := "", armor_hp := 0.0) -> void:
+        pi = clampi(pi, 0, maxi(0, _paths_px.size() - 1))   # a queued spawn never outlives its map
         var def: Dictionary = PDData.BLOONS[kind]
         var spr := Sprite2D.new()
         spr.texture = _bloon_tex(kind, lv)
@@ -1937,6 +1954,13 @@ func _tick_bullets(delta: float) -> void:
                                 (b["spr"] as Sprite2D).rotation += delta * 7.0
                                 if tt >= 1.0:
                                         _explosion(b)
+                                        # THE SHELL TRUTH (v0.3.5-4): the bomb dies AT its
+                                        # blast. The old shell never stopped - t kept counting
+                                        # and from.lerp(to, tt) extrapolated it beyond the
+                                        # target for up to 9 seconds while spinning (the
+                                        # owner's "the ball floats in the sky somehow")
+                                        b["t"] = 9.0
+                                        (b["spr"] as Sprite2D).visible = false
                 if float(b.get("life", 1.0)) <= 0.0 or float(b.get("t", 0.0)) >= 9.0:
                         bullets.erase(b)
                         (b["spr"] as Node2D).queue_free()
@@ -1998,31 +2022,33 @@ func _shock_fx(at: Vector2, tint: Color, size: float) -> void:
         tw.tween_callback(quad.queue_free)
 
 func _boom_fx(at: Vector2, blast_cells: float) -> void:
-        # THE BOOM TRUTH (v0.3.5-3): the size IS the blast in CELL units. The
-        # old blast/52 math multiplied the 56px frames by ~0.018 - the
-        # bomber's explosions drew at one pixel (the owner's "weak VFX")
-        var px: float = blast_cells * 2.4 * CELL
+        # THE BOOM TRUTH v2 (v0.3.5-4): one 128px canvas for every frame, the
+        # fireball swells to the blast then the smoke fades to NOTHING - no
+        # olive ring, no lingering mini-wisps (the owner screenshot the old
+        # latest moments and they were buggy). SHORT: 0.30s frames + 0.34s
+        # ring, and 2.0x the blast (the old 2.4x read over-intense).
+        var px: float = blast_cells * 2.0 * CELL
         if _boom_frames.size() > 0:
                 var fspr := Sprite2D.new()
                 fspr.texture = _boom_frames[0]
                 fspr.position = at
-                fspr.scale = Vector2(px / 56.0, px / 56.0)
+                fspr.scale = Vector2(px / 128.0, px / 128.0)
                 fx_layer.add_child(fspr)
                 var last := _boom_frames.size() - 1
                 var ftw := create_tween()
-                ftw.tween_method(func(i: int): _boom_frame(fspr, i), 0, last, 0.42)
+                ftw.tween_method(func(i: int): _boom_frame(fspr, i), 0, last, 0.30)
                 ftw.tween_callback(fspr.queue_free)
         var quad := Sprite2D.new()
         quad.texture = _t("fx/ring.png")
         quad.position = at
-        quad.scale = Vector2(px / 64.0, px / 64.0)
+        quad.scale = Vector2(px / 128.0, px / 128.0)
         fx_layer.add_child(quad)
         var m := ShaderMaterial.new()
         m.shader = load("res://game/games/pop_siege/fx/ps_boom.gdshader")
         m.set_shader_parameter("tint", Color(1.0, 0.8, 0.35))
         quad.material = m
         var tw := create_tween()
-        tw.tween_method(func(v: float): m.set_shader_parameter("progress", v), 0.0, 1.0, 0.5)
+        tw.tween_method(func(v: float): m.set_shader_parameter("progress", v), 0.0, 1.0, 0.34)
         tw.tween_callback(quad.queue_free)
 
 func _boom_frame(fspr: Sprite2D, i: int) -> void:
@@ -2299,10 +2325,41 @@ func _sheet_open(sheet_height: float, id: String, sheet_width: float, build: Cal
 ## THE REFRESH LAW (the owner's round: "each new buy opens another shop
 ## window"): one window - the SAME sheet dies and rebuilds in place. A buy
 ## refreshes the rows, never stacks a new window.
+## THE SCROLL TRUTH (v0.3.5-4): the refresh keeps the scroll - the owner
+## buys down at row 50, the refreshed list opens AT row 50, never at the
+## top again (shop AND maps ride the same law).
+var _sheet_scroll := {}      # sheet id -> the scroll offset to restore
+
 func _sheet_refresh(sheet_height: float, id: String, sheet_width: float, build: Callable) -> void:
         if not _sheet_stack.is_empty() and String((_sheet_stack.back() as Dictionary).get("id", "")) == id:
+                var old_sc := _find_box_scroll((_sheet_stack.back() as Dictionary)["cc"])
+                if old_sc != null:
+                        _sheet_scroll[id] = old_sc.scroll_vertical
                 sheet_pop()
         _sheet_open(sheet_height, id, sheet_width, build)
+        if _sheet_scroll.has(id):
+                var want: int = int(_sheet_scroll[id])
+                _sheet_scroll.erase(id)
+                _restore_scroll_later(want)
+
+func _find_box_scroll(root: Node) -> BoxScroll:
+        if root is BoxScroll:
+                return root
+        for c in root.get_children():
+                var f := _find_box_scroll(c)
+                if f != null:
+                        return f
+        return null
+
+func _restore_scroll_later(want: int) -> void:
+        # the offset only sticks once the rebuilt sheet has laid out twice
+        await get_tree().process_frame
+        await get_tree().process_frame
+        if _sheet_stack.is_empty():
+                return
+        var sc := _find_box_scroll((_sheet_stack.back() as Dictionary)["cc"])
+        if sc != null:
+                sc.scroll_vertical = want
 
 func _goga_sheet_popped(_id: String) -> void:
         if _sheet_stack.is_empty() and not over:

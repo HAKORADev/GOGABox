@@ -278,3 +278,43 @@ sheets of every folk head, every projectile, every bake) and then by law.
     hits, brown-noise boom bodies, clean squeak pops, soft whooshes.
 14. THE RICH BAKE LAW - mottled ground, road ruts + pebbles + worn
     shoulders, water banks, vignette, bolder decor.
+
+## 19. PATCH 4 - THE GRID-PERFECT TRUTH (v0.3.5-4)
+
+The owner's 6-item round, tested while he plans the next game's GDD; his
+meta-demand was honored literally - every fix was SCREENSHOTTED and eyeballed
+(the boom's latest moments, the night world, the doors, the scroll).
+
+1. THE FILLET LAW - the march line is GRID-PERFECT: straight runs lie exactly
+   on the cell center lines, every 90-degree turn is a quarter-circle fillet
+   (radius 0.5 cell, tangent, inside the corner cell). The chaikin drift that
+   let the walk wander off the painted road is dead by construction - ONE
+   polyline feeds the paint AND the march. THE BEATEN TRACK: the bake strokes
+   that line with a soft worn center. THE CHEVRON TRUTH: door arrows stamp ON
+   the polyline, oriented by the local direction - they sit where the bloons
+   ride and point the way the road bends.
+2. THE BOOM TRUTH v2 + THE SHELL TRUTH - the bomber's bomb dies AT its blast
+   (the old shell extrapolated past the target for up to nine seconds - the
+   "ball floating in the sky"); the new 7-frame explosion lives on ONE 128px
+   canvas: flash, fireball swell, smoke that fades to NOTHING (the old frames
+   shrank into lingering mini-wisps with an olive ring). 0.30s + a 0.34s ring
+   at 2.0x the blast; ps_boom re-synthesized tight. The six-shot Xvfb
+   timeline proves the latest moments are clean.
+3. THE NIGHT LAW v2 - the multiply tint covers the WHOLE viewport: tall trees
+   poking above the board and everything past the frame sleep too. The panel
+   and the HUD draw above it; the heart lamp and the fireflies glow over it.
+4. THE SCROLL TRUTH - a buy keeps the list where the buy happened: the
+   refresh remembers the dying sheet's scroll and restores it after two
+   layout frames. The shop and the maps wall ride the same law.
+5. THE RANDOM DOORS LAW - every wave rolls its OWN random door crew: wave 1
+   from exactly one door, the crew GROWS with the wave (1 + (wave-1)/3, +30%
+   jitter, capped), every 5th wave bursts from ALL of them. Rotate/slice are
+   dead; the gate says "EVERY WAVE ROLLS ITS OWN CREW - IT GROWS".
+6. THE LOOP LAW + THE GROVE LAW - the map redesign: heart rings (the road
+   circles the house before it strikes), detour loops, horseshoes, double
+   loops, deep switchbacks, long S bends, claw/trident splits with separate
+   looped doors. Interiors wear family prop groves and one auto-placed pond -
+   the vast empty fields are dead.
+7. THE CARRIED FIXES - the toast tween's process_mode assignment (removed in
+   Godot 4.7.2) now uses set_process_mode; a queued spawn never outlives its
+   map (pi clamped into the live paths).
