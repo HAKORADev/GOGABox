@@ -78,8 +78,18 @@ func _ready() -> void:
         tk = TouchKit.new()
         add_child(tk)
         _build_hud()
-        _toast = Arc.toast_overlay(_overlay_root)
+        # THE TOAST LAW (v0.3.5-3): the game owns ONE overlay forever and it
+        # lives ABOVE the pause - a buy inside a paused shop must still fade.
+        # It is a SIBLING of the HUD (top level, layer 100) - a layer nested
+        # under the HUD's own canvas let the shop's sheet paint over it.
+        _toast = Arc.toast_overlay(self)
+        _toast["layer"].process_mode = Node.PROCESS_MODE_ALWAYS
         _goga_setup()
+
+## THE TOAST LAW: every game toast goes through HERE - one layer, one label,
+## the newest toast kills the old tween (no hanging stacks, no overlap).
+func game_toast(msg: String) -> void:
+        Arc.toast(_toast, msg)
 
 # --------------------------------------------------- override these 3
 

@@ -45,6 +45,7 @@ var rider_index := -1        # spawn index carrying the GOGACoin
 var spawn_count := 0
 
 var field: Node2D
+var world: Node2D                      # THE WORLD SORT LAW (y-sorted props/heart/folk)
 var ready_box: Control                 # the READY gate (the start law)
 var next_btn: Button                   # the field NEXT WAVE button
 var ghost_draw: Node2D
@@ -192,6 +193,17 @@ func _build_ready() -> void:
         var title := Arc.label("%s  %s" % [String(map["name"]).to_upper(), dn], _fs(30), Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
+        # THE DOORS SPEAK: multi-start maps tell their wave law up front
+        var n_paths: int = (map["paths"] as Array).size()
+        if n_paths > 1:
+                var door_txt: String
+                if String(map.get("wave_mode", "slice")) == "rotate":
+                        door_txt = "%d DOORS - EACH WAVE FROM ONE - EVERY 4TH FROM ALL" % n_paths
+                else:
+                        door_txt = "%d DOORS - EVERY WAVE SPLITS" % n_paths
+                var dl := Arc.label(door_txt, _fs(16), Color(0.55, 0.44, 0.28))
+                dl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                vb.add_child(dl)
         var go := Arc.button("START", Vector2(340, 74), _fs(30), Arc.GOOD, func():
                 _start_ready())
         vb.add_child(go)
@@ -252,23 +264,31 @@ func _build_field() -> void:
                         m.set_shader_parameter("is_lava", 1.0 if map.get("water_kind", "") == "lava" else 0.0)
                         wr.material = m
                         field.add_child(wr)
-        # blocked props (real sprites, gently dropped onto the board)
+        # THE WORLD SORT LAW: props + the heart + the folk live in ONE
+        # y-sorted layer seated at their BASE - a big tree finally covers the
+        # small one behind it (the owner's z-order round)
+        world = Node2D.new()
+        world.y_sort_enabled = true
+        field.add_child(world)
         var pscale := CELL / 62.0
         for bcell in map["blocked"]:
                 var spr := Sprite2D.new()
                 spr.texture = _t("props/%s.png" % bcell[2])
-                spr.position = _cell_pos(bcell[0], bcell[1]) + Vector2(0, -CELL * 0.12)
+                # seated at the cell's BASE line; the texture draws up from it
+                spr.position = _cell_pos(bcell[0], bcell[1]) + Vector2(0, CELL * 0.34)
+                spr.offset = Vector2(0, -spr.texture.get_height() * 0.5 + 6.0)
                 spr.scale = Vector2(pscale, pscale)
-                field.add_child(spr)
+                world.add_child(spr)
         # the heart house at every path's end
         heart_spr = Sprite2D.new()
         heart_spr.texture = _t("props/house.png")
         var hs := CELL * 1.9 / float(heart_spr.texture.get_height())
-        heart_spr.position = _cell_pos(map["heart"][0], map["heart"][1]) + Vector2(0, -CELL * 0.42)
+        heart_spr.position = _cell_pos(map["heart"][0], map["heart"][1]) + Vector2(0, CELL * 0.5)
+        heart_spr.offset = Vector2(0, -heart_spr.texture.get_height() * 0.5 + 8.0)
         heart_spr.scale = Vector2(hs, hs)
-        field.add_child(heart_spr)
-        # layers
-        folk_layer = Node2D.new(); field.add_child(folk_layer)
+        world.add_child(heart_spr)
+        # layers (the folk join the world sort; bloons/bullets/fx fly above)
+        folk_layer = Node2D.new(); folk_layer.y_sort_enabled = true; world.add_child(folk_layer)
         bloon_layer = Node2D.new(); field.add_child(bloon_layer)
         bullet_layer = Node2D.new(); field.add_child(bullet_layer)
         fx_layer = Node2D.new(); field.add_child(fx_layer)
@@ -519,21 +539,41 @@ func _rebuild_cards() -> void:
                 cost_row.add_child(Arc.label(str(f["place"]), _fs(21), Color(1, 0.85, 0.4)))
                 var fid_c: String = fid
                 card.gui_input.connect(func(ev: InputEvent):
+                        # THE DRAG LAW v2: the card OWNS its touch stream. Godot
+                        # routes the press's drags AND release back to THIS
+                        # control (gui.touch_focus) - they never reach the raw
+                        # stream, so the ghost and the placement live here.
                         if ev is InputEventScreenTouch:
                                 var t := ev as InputEventScreenTouch
+                                var gp: Vector2 = card.get_global_transform() * t.position
                                 if t.pressed:
                                         _card_press = fid_c
                                         _card_drag = false
-                                        _card_press_pos = t.position
+                                        _card_press_pos = gp
                                 elif _card_press == fid_c:
-                                        # a clean press-and-release ON the card = the tap toggle
                                         _card_press = ""
-                                        if not _card_drag:
+                                        if _card_drag:
+                                                _card_drag = false
+                                                _placing_drag = false
+                                                if _in_field(gp):
+                                                        _try_place_at(gp)
+                                                else:
+                                                        _cancel_place()
+                                        else:
                                                 _card_tapped(fid_c)
                         elif ev is InputEventScreenDrag and _card_press == fid_c:
-                                var p := (ev as InputEventScreenDrag).position
-                                if not _card_drag and p.distance_to(_card_press_pos) > 26.0:
-                                        _begin_card_drag())
+                                var gd: Vector2 = card.get_global_transform() * ev.position
+                                if not _card_drag and gd.distance_to(_card_press_pos) > 26.0:
+                                        _begin_card_drag()
+                                if _card_drag:
+                                        _ghost_follow(gd)
+                        elif ev is InputEventMouseMotion and _card_press == fid_c \
+                                        and (ev as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:
+                                var gm: Vector2 = card.get_global_transform() * ev.position
+                                if not _card_drag and gm.distance_to(_card_press_pos) > 26.0:
+                                        _begin_card_drag()
+                                if _card_drag:
+                                        _ghost_follow(gm))
                 cards_box.add_child(card)
                 card_panels[fid] = {"panel": card, "style": style}
         _paint_cards()
@@ -606,26 +646,29 @@ func _goga_input(event: InputEvent) -> void:
         # the ghost breathes with the finger/mouse even before a drag starts
         if event is InputEventMouseMotion and selected_place != "" and ghost != null and not tk.busy():
                 _ghost_follow(get_global_mouse_position())
-        # THE DRAG LAW part 2: a drag that STARTED on a folk card keeps coming
-        # through the raw stream once the finger leaves the card's Control
-        if event is InputEventScreenDrag and _card_press != "":
+        # THE DRAG LAW part 2: drags that DO escape to the raw stream (mouse
+        # emulation paths) still carry the placement - the card handler owns
+        # the touch stream, this is the escape hatch
+        if event is InputEventScreenDrag and _card_press != "" and not _card_drag:
                 var p := (event as InputEventScreenDrag).position
-                if not _card_drag and p.distance_to(_card_press_pos) > 26.0:
+                if p.distance_to(_card_press_pos) > 26.0:
                         _begin_card_drag()
-                if _card_drag:
+                        if _card_drag:
+                                _ghost_follow(p)
+                elif _card_drag:
                         _ghost_follow(p)
         elif event is InputEventScreenTouch and not (event as InputEventScreenTouch).pressed \
-                        and _card_press != "":
+                        and _card_press != "" and _card_drag:
+                # a release that escaped the card's gui (rare) still places
                 var p2 := (event as InputEventScreenTouch).position
                 var fid := _card_press
                 _card_press = ""
-                if _card_drag:
-                        _card_drag = false
-                        _placing_drag = false
-                        if _in_field(p2):
-                                _try_place_at(p2)
-                        else:
-                                _cancel_place()
+                _card_drag = false
+                _placing_drag = false
+                if _in_field(p2):
+                        _try_place_at(p2)
+                else:
+                        _cancel_place()
 
 var _card_press_pos := Vector2.ZERO
 
@@ -713,12 +756,7 @@ func _place_folk(fid: String, c: Vector2i) -> void:
         node.add_child(spr)
         var head := Sprite2D.new()
         head.texture = _t("folk/%s_head_g1.png" % fid)
-        # THE PIVOT LAW: the head rotates around its MOUNT (the top of the
-        # base) - the texture draws ABOVE the pivot through its offset, so
-        # the body never fights the aim again (the steering glitch is dead)
-        head.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.34)
-        head.offset = Vector2(0, -head.texture.get_height() * 0.42)
-        head.scale = Vector2(CELL / 62.0, CELL / 62.0)
+        _mount_head(head, spr, fid)
         node.add_child(head)
         var puff := _fx_spawn("smoke", pos + Vector2(0, 14), 0.5)
         puff.scale = Vector2(1.4, 1.4)
@@ -736,14 +774,29 @@ func _place_folk(fid: String, c: Vector2i) -> void:
         _cancel_place()
         _select_folk(f)
         _refresh_chips()
-        # the FIRST-GLANCE law for multi-path maps
+        # the FIRST-GLANCE law for multi-door maps
         if (map["paths"] as Array).size() > 1 and not meta.seen_multipath():
                 meta.mark_multipath()
-                Arc.toast(Arc.toast_overlay(self), "TWO ROADS!")
+                game_toast("THE DOORS TAKE TURNS!")
 
 # --------------------------------------------------------------- the laws
+## THE PIVOT LAW v2 (measured from the art - the owner's round): aiming
+## heads rotate around their OWN CENTER seated on the mount - a turret that
+## spins in place, never the orbiting crossbow that detached from the body.
+## Static heads (the bank, the drum) stay objects seated on the base.
+func _mount_head(head: Sprite2D, spr: Sprite2D, fid: String) -> void:
+        var sc := CELL / 62.0
+        head.scale = Vector2(sc, sc)
+        if PDData.head_static(fid):
+                head.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.36)
+                head.offset = Vector2(0, -head.texture.get_height() * 0.30)
+        else:
+                head.position = Vector2(0, -spr.texture.get_height() * spr.scale.y * 0.30)
+                head.offset = Vector2.ZERO
+
+# --------------------------------------------------------------- the laws
+## THE SYNERGY ENGINE: pairs earn their pacts; badges speak.
 func _recompute_auras() -> void:
-        # THE SYNERGY ENGINE: pairs earn their pacts; badges speak.
         for f in folk:
                 f["buffs"] = {"rate_f": 1.0, "rng_f": 1.0, "dmg_f": 0.0, "pierce_f": 0, "blast_f": 1.0, "coin_pop": 0}
                 for b in (f["badges"] as Array):
@@ -850,15 +903,29 @@ func _queue_wave() -> void:
         wave_kinds.append("wave%d" % wave_n)
         var stars := int(map["stars"])
         var groups := PDData.wave_groups(wave_n, stars)
+        # THE DOORS LAW: multi-start maps slice their waves across the doors.
+        # rotate - each wave marches from ONE door, the next wave from the
+        # next; every 4th wave BURSTS across ALL of them (the double wave).
+        # slice - the wave's groups alternate doors; every 3rd wave bursts.
         var n_paths: int = (map["paths"] as Array).size()
+        var wmode := String(map.get("wave_mode", "solo"))
+        var burst := n_paths > 1 and wave_n % (4 if wmode == "rotate" else 3) == 0
         var base := 0.0 if first else spawn_clock + 1.2
         var gi := 0
         for g in groups:
                 for i in int(g["count"]):
+                        var pi := 0
+                        if n_paths > 1:
+                                if burst:
+                                        pi = (i + gi) % n_paths
+                                elif wmode == "rotate":
+                                        pi = (wave_n - 1) % n_paths
+                                else:
+                                        pi = gi % n_paths
                         spawn_q.append({
                                 "kind": g["kind"],
                                 "at": base + float(g["delay"]) + i * float(g["spacing"]),
-                                "pi": (gi % n_paths) if n_paths > 1 else 0,   # multi-path alternation
+                                "pi": pi,
                                 "w": wave_n,                                  # the wave's OWN difficulty bands
                         })
                 gi += 1
@@ -895,7 +962,7 @@ func _end_wave() -> void:
         if wave_n >= PDData.VICTORY_WAVE and not victory_done:
                 victory_done = true
                 Jukebox.sfx("ps_victory", -4.0)
-                Arc.toast(Arc.toast_overlay(self), "THE SIEGE BREAKS!")
+                game_toast("THE SIEGE BREAKS!")
         # endless fatigue is applied in the movement law
         _next_wave_countdown(12.0)
         check_achievements()
@@ -958,15 +1025,18 @@ func _spawn_bloon(kind: String, pi: int, lv := 1, strips: Array = [], armor := "
         var def: Dictionary = PDData.BLOONS[kind]
         var spr := Sprite2D.new()
         spr.texture = _bloon_tex(kind, lv)
+        spr.visible = false     # THE OFF-STAGE LAW: born behind the map line
         bloon_layer.add_child(spr)
-        var lane := rng.randf_range(-CELL * 0.26, CELL * 0.26)
+        # THE SINGLE FILE LAW: lane is dead - every bloon marches ON the path
+        # center, one honest row (the owner's 4 + 11)
+        var lane := 0.0
         _bloon_seq += 1
         var crack := PDData.crack_hp(kind, lv)
         var b := {
                 "id": _bloon_seq, "kind": kind, "lv": lv, "strips": strips, "armor": armor,
                 "armor_hp": armor_hp,
                 "hp": crack, "max_hp": crack,
-                "pi": pi, "dist": -rng.randf_range(0.0, 8.0), "lane": lane, "seg": 1,
+                "pi": pi, "dist": -CELL * 0.5, "lane": lane, "seg": 1,
                 "slow_f": 0.0, "slow_t": 0.0, "glue_t": 0.0, "glue_dps": 0.0, "burn_dps": 0.0, "burn_t": 0.0,
                 "stun_t": 0.0, "rider": false, "depth": 0, "spr": spr, "frozen": false,
                 "pay_f": 0.0, "paid": 0,
@@ -985,7 +1055,7 @@ func _spawn_bloon(kind: String, pi: int, lv := 1, strips: Array = [], armor := "
                 b["strip_draw"] = sd
         if def.get("blimp", false) and not meta.seen_blimp():
                 meta.mark_blimp()
-                Arc.toast(Arc.toast_overlay(self), "A BLIMP!")
+                game_toast("A BLIMP!")
         bloons.append(b)
         _paint_bloon(b)
 
@@ -1097,10 +1167,12 @@ func _move_bloons(delta: float) -> void:
                         _burn_paint(b)
                 b["dist"] += spd * delta
                 var at: Dictionary = _pos_on_cached(b)
-                var dir: Vector2 = at["dir"]
-                var nrm := Vector2(-dir.y, dir.x)
-                var p: Vector2 = at["p"] + nrm * b["lane"]
-                (b["spr"] as Sprite2D).position = p
+                var p: Vector2 = at["p"]
+                var spr: Sprite2D = b["spr"]
+                spr.position = p
+                # THE OFF-STAGE LAW: the march starts one grid behind the map
+                # line - nothing exists to the eye until it is IN the field
+                spr.visible = _in_field(p)
                 if b["dist"] >= float(_paths_px[b["pi"]]["total"]):
                         dead.append(b)
         for b in dead:
@@ -1233,7 +1305,7 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
                 col = Color(0.5, 0.6, 0.95)
                 Jukebox.sfx("ps_moab_pop", -4.0)
                 shake_t = 0.5
-                _boom_fx(b["spr"].position, 1.6)
+                _boom_fx(b["spr"].position, 1.7)
                 _moabs_run += 1
                 achievement_max("moab_kills", _moabs_run)
         # the splash frames (modulate speaks the bloon's color)
@@ -1256,7 +1328,7 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
                 add_run_coins(1)
                 Jukebox.sfx("ps_gogacoin", -4.0)
                 _fx_spawn("spark", b["spr"].position, 0.8, Color(1.0, 0.85, 0.3))
-                Arc.toast(Arc.toast_overlay(self), "GOGACOIN!")
+                game_toast("GOGACOIN!")
         # the children carry on (same path, spread)
         var off := 2.0
         for k in def["kids"]:
@@ -1333,7 +1405,7 @@ func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips:
                 "armor_hp": 0.0,
                 "hp": crack, "max_hp": crack,
                 "pi": parent["pi"], "dist": maxf(0.0, float(parent["dist"]) - off),
-                "lane": clampf(float(parent["lane"]) + randf_range(-8, 8), -CELL * 0.28, CELL * 0.28),
+                "lane": 0.0,      # THE SINGLE FILE LAW: children spread in TIME, not sideways
                 "seg": 1,
                 "slow_f": parent["slow_f"], "slow_t": parent["slow_t"], "glue_t": parent["glue_t"],
                 "glue_dps": parent["glue_dps"], "burn_dps": parent["burn_dps"], "burn_t": parent["burn_t"],
@@ -1433,9 +1505,10 @@ func _tick_folk(delta: float) -> void:
                 var rng_px: float = float(f.get("eff_rng", PDData.stat(fid, f["gear"], f["lvl"], "rng") * CELL))
                 # the aim decays: the head holds its last shot's bearing for a
                 # beat, then rests (no more firing at nothing - the wave-start
-                # misfire glitch is dead WITH the endless range)
+                # misfire glitch is dead WITH the endless range). THE PIVOT
+                # LAW v2: static heads (bank/drum) never spin.
                 f["aim_t"] = float(f.get("aim_t", 0.0)) - delta
-                if float(f["aim_t"]) > 0.0 and f.get("head") != null and is_instance_valid(f["head"]):
+                if float(f["aim_t"]) > 0.0 and f.get("head") != null and is_instance_valid(f["head"]) and not PDData.head_static(fid):
                         var head: Sprite2D = f["head"]
                         var want := ((f["aim_at"] as Vector2) - (f["pos"] as Vector2)).angle() + PDData.head_offset(fid)
                         head.rotation = lerp_angle(head.rotation, want, minf(1.0, delta * 12.0))
@@ -1461,8 +1534,12 @@ func _fire_folk(f: Dictionary, target: Dictionary, g: Dictionary) -> void:
         var rng_px: float = float(f.get("eff_rng", PDData.stat(fid, int(f["gear"]), int(f["lvl"]), "rng") * CELL))
         var dmg: float = PDData.stat(fid, f["gear"], f["lvl"], "dmg") + float(f["buffs"]["dmg_f"])
         var cls: String = PDData.FOLK[fid]["cls"]
-        var from: Vector2 = f["pos"]
         var to: Vector2 = (target["spr"] as Sprite2D).position
+        # THE MUZZLE LAW: the shot LEAVES from the head's business end along
+        # the aim - the darts never crawl out of the base belly again
+        var from: Vector2 = f["pos"] + (to - f["pos"]).normalized() * PDData.muzzle(fid) * CELL
+        if not PDData.head_static(fid) and fid != "kolda":
+                _fx_spawn("muzzle", from, 0.09, Color(1.0, 0.96, 0.8))
         match fid:
                 "darty":
                         var shots: int = int(g.get("shots", 1))
@@ -1476,7 +1553,8 @@ func _fire_folk(f: Dictionary, target: Dictionary, g: Dictionary) -> void:
                         _rang_spawn(f, to, dmg, int(g.get("pierce", 3)) + int(f["buffs"]["pierce_f"]))
                         Jukebox.sfx("ps_shoot_rang", -12.0)
                 "boomba":
-                        _shell_spawn(f, to, dmg, float(g["blast"]) * float(f["buffs"]["blast_f"]), g)
+                        var bomb_tex := "fx/p_bomb_g3.png" if int(f["gear"]) >= 3 else "fx/p_bomb.png"
+                        _shell_spawn(f, to, dmg, float(g["blast"]) * float(f["buffs"]["blast_f"]), g, bomb_tex)
                         Jukebox.sfx("ps_shoot_bomb", -10.0)
                 "pyra":
                         _bullet_spawn(from, to, "fx/p_flame.png", dmg, cls, 2 + int(f["buffs"]["pierce_f"]), 5.4 * CELL, f,
@@ -1666,6 +1744,8 @@ func _bullet_spawn(from: Vector2, to: Vector2, tex: String, dmg: float, cls: Str
         var spr := Sprite2D.new()
         spr.texture = _t(tex)
         spr.position = from
+        if tex.contains("dart"):
+                _trail_child(spr, Color(1, 1, 0.9, 0.5))
         bullet_layer.add_child(spr)
         var dir := (to - from).normalized()
         # the art truth: the dart arrows face UP in the atlas, the shells right
@@ -1680,28 +1760,39 @@ func _bullet_spawn(from: Vector2, to: Vector2, tex: String, dmg: float, cls: Str
         })
 
 func _rang_spawn(f: Dictionary, to: Vector2, dmg: float, pierce: int) -> void:
+        var from: Vector2 = f["pos"] + (to - f["pos"]).normalized() * PDData.muzzle(f["fid"]) * CELL
         var spr := Sprite2D.new()
         spr.texture = _t("fx/p_boomerang.png")
-        spr.position = f["pos"]
+        spr.position = from
         bullet_layer.add_child(spr)
         bullets.append({
-                "kind": "rang", "spr": spr, "pos": f["pos"], "target": to, "t": 0.0,
+                "kind": "rang", "spr": spr, "pos": from, "target": to, "t": 0.0,
                 "dur": 1.1, "dmg": dmg, "cls": PDData.SHARP, "pierce": pierce, "hit_ids": {},
                 "src": f, "out": true,
         })
 
-func _shell_spawn(f: Dictionary, to: Vector2, dmg: float, blast: float, g: Dictionary) -> void:
+func _shell_spawn(f: Dictionary, to: Vector2, dmg: float, blast: float, g: Dictionary, tex := "fx/p_bomb.png") -> void:
+        var from: Vector2 = f["pos"] + (to - f["pos"]).normalized() * PDData.muzzle(f["fid"]) * CELL
         var spr := Sprite2D.new()
-        spr.texture = _t("fx/p_bomb.png")
-        spr.position = f["pos"]
+        spr.texture = _t(tex)
+        spr.position = from
+        _trail_child(spr, Color(0.8, 0.78, 0.72, 0.6))
         bullet_layer.add_child(spr)
         bullets.append({
-                "kind": "shell", "spr": spr, "pos": f["pos"], "from": f["pos"], "target": to,
+                "kind": "shell", "spr": spr, "pos": from, "from": from, "target": to,
                 "t": 0.0, "dur": maxf(0.28, f["pos"].distance_to(to) / (6.8 * CELL)), "dmg": dmg,
                 "blast": blast, "src": f,
                 "frags": int(g.get("frags", 0)), "stun": float(g.get("stun", 0.0)),
                 "moab_bonus": float(g.get("moab_bonus", 0.0)),
         })
+
+## the trail: a soft streak child that rides the bullet (darts + shells)
+func _trail_child(spr: Sprite2D, tint: Color) -> void:
+        var tr := Sprite2D.new()
+        tr.texture = _t("fx/p_trail.png")
+        tr.position = Vector2(-spr.texture.get_width() * 0.32, 0)
+        tr.modulate = tint
+        spr.add_child(tr)
 
 func _hitscan(from: Vector2, to: Vector2, dmg: float, cls: String, f: Dictionary, fmj: bool, splash: float) -> void:
         # the sniper speaks instantly; a tracer whispers where it went
@@ -1852,7 +1943,7 @@ func _tick_bullets(delta: float) -> void:
 
 func _explosion(b: Dictionary) -> void:
         var at: Vector2 = b["target"]
-        _boom_fx(at, float(b["blast"]) / 52.0)
+        _boom_fx(at, float(b["blast"]))
         Jukebox.sfx("ps_boom", -6.0, randf_range(0.9, 1.1))
         var dmg: float = float(b["dmg"])
         var cls := PDData.EXPLOSION
@@ -1906,13 +1997,16 @@ func _shock_fx(at: Vector2, tint: Color, size: float) -> void:
         tw.tween_method(func(v: float): m.set_shader_parameter("progress", v), 0.0, 1.0, 0.34)
         tw.tween_callback(quad.queue_free)
 
-func _boom_fx(at: Vector2, size: float) -> void:
-        # the ES explosion frames + the shock ring
+func _boom_fx(at: Vector2, blast_cells: float) -> void:
+        # THE BOOM TRUTH (v0.3.5-3): the size IS the blast in CELL units. The
+        # old blast/52 math multiplied the 56px frames by ~0.018 - the
+        # bomber's explosions drew at one pixel (the owner's "weak VFX")
+        var px: float = blast_cells * 2.4 * CELL
         if _boom_frames.size() > 0:
                 var fspr := Sprite2D.new()
                 fspr.texture = _boom_frames[0]
                 fspr.position = at
-                fspr.scale = Vector2(size, size) * (CELL / 56.0)
+                fspr.scale = Vector2(px / 56.0, px / 56.0)
                 fx_layer.add_child(fspr)
                 var last := _boom_frames.size() - 1
                 var ftw := create_tween()
@@ -1921,7 +2015,7 @@ func _boom_fx(at: Vector2, size: float) -> void:
         var quad := Sprite2D.new()
         quad.texture = _t("fx/ring.png")
         quad.position = at
-        quad.scale = Vector2(size * 2.0, size * 2.0)
+        quad.scale = Vector2(px / 64.0, px / 64.0)
         fx_layer.add_child(quad)
         var m := ShaderMaterial.new()
         m.shader = load("res://game/games/pop_siege/fx/ps_boom.gdshader")
@@ -2135,12 +2229,13 @@ func _do_gearup(f: Dictionary) -> void:
                 meta.d["gears3"] = int(meta.d["gears3"]) + 1
                 achievement_max("gears3", int(meta.d["gears3"]))
         # THE GEAR LAW: the folk REPAINTS - base AND head wear the new gear
+        # (the head re-mounts through THE PIVOT LAW v2)
         var sc := CELL / 62.0
         (f["spr"] as Sprite2D).texture = _t("folk/%s_base.png" % f["fid"])
         (f["spr"] as Sprite2D).scale = Vector2(sc, sc)
         if f.get("head") != null and is_instance_valid(f["head"]):
                 (f["head"] as Sprite2D).texture = _t("folk/%s_head_g%d.png" % [f["fid"], f["gear"]])
-                (f["head"] as Sprite2D).scale = Vector2(sc, sc)
+                _mount_head(f["head"], f["spr"], f["fid"])
         # the golden pillar (the gear-up shader)
         var pillar := Sprite2D.new()
         pillar.texture = _t("fx/spark.png")
@@ -2201,6 +2296,14 @@ func _sheet_open(sheet_height: float, id: String, sheet_width: float, build: Cal
         var vb := sheet_push(sheet_height, id, sheet_width)
         build.call(vb)
 
+## THE REFRESH LAW (the owner's round: "each new buy opens another shop
+## window"): one window - the SAME sheet dies and rebuilds in place. A buy
+## refreshes the rows, never stacks a new window.
+func _sheet_refresh(sheet_height: float, id: String, sheet_width: float, build: Callable) -> void:
+        if not _sheet_stack.is_empty() and String((_sheet_stack.back() as Dictionary).get("id", "")) == id:
+                sheet_pop()
+        _sheet_open(sheet_height, id, sheet_width, build)
+
 func _goga_sheet_popped(_id: String) -> void:
         if _sheet_stack.is_empty() and not over:
                 get_tree().paused = false
@@ -2208,6 +2311,10 @@ func _goga_sheet_popped(_id: String) -> void:
 
 func _maps_open() -> void:
         _sheet_open(get_viewport_rect().size.y * 0.90, "maps", minf(1600.0, get_viewport_rect().size.x * 0.62), func(vb: VBoxContainer):
+                _build_maps(vb))
+
+func _maps_refresh() -> void:
+        _sheet_refresh(get_viewport_rect().size.y * 0.90, "maps", minf(1600.0, get_viewport_rect().size.x * 0.62), func(vb: VBoxContainer):
                 _build_maps(vb))
 
 func _build_maps(vb: VBoxContainer) -> void:
@@ -2278,6 +2385,9 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
         vb.add_child(state_row)
         var state_txt := "FREE" if int(m["price"]) == 0 else ("OWNED" if owned else "LOCKED")
         state_row.add_child(Arc.label(state_txt, _fs(15), Color(0.4, 0.35, 0.28)))
+        var m_paths: int = (m["paths"] as Array).size()
+        if m_paths > 1:
+                state_row.add_child(Arc.label("%d DOORS" % m_paths, _fs(15), Color(0.75, 0.45, 0.12)))
         if bw > 0:
                 state_row.add_child(Arc.label("BEST %d" % bw, _fs(15), Color(0.55, 0.4, 0.16)))
         var row := HBoxContainer.new()
@@ -2290,7 +2400,7 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
                         Arc.ACCENT if want_night == nite else Color(0.72, 0.67, 0.58), func():
                         meta.set_night(m["id"], want_night)
                         Jukebox.sfx("ps_click", -10.0)
-                        _maps_open())
+                        _maps_refresh())
                 row.add_child(dn_btn)
         var action := Arc.button("PLAY", Vector2(0, 46), _fs(18), Arc.GOOD, func(): pass)
         if owned:
@@ -2307,11 +2417,11 @@ func _map_card(m: Dictionary, sc: BoxScroll) -> Control:
                         if Box.spend(price):
                                 meta.gogabuy_map(m["id"])
                                 Jukebox.sfx("ps_gogacoin", -4.0)
-                                Arc.toast(Arc.toast_overlay(self), "%s IS YOURS" % String(m["name"]).to_upper())
-                                _maps_open()
+                                game_toast("%s IS YOURS" % String(m["name"]).to_upper())
+                                _maps_refresh()
                         else:
                                 Jukebox.sfx("ps_tick_bad", -6.0)
-                                Arc.toast(Arc.toast_overlay(self), "NOT ENOUGH GOGACOINS"))
+                                game_toast("NOT ENOUGH GOGACOINS"))
                 row.add_child(_coin_price(str(int(m["price"]))))
         action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         row.add_child(action)
@@ -2410,12 +2520,12 @@ func _shop_folk_row(fid: String) -> Control:
                         if Box.spend(int(fdef["goga"])):
                                 meta.gogabuy_folk(fid)
                                 Jukebox.sfx("ps_gogacoin", -4.0)
-                                Arc.toast(Arc.toast_overlay(self), "%s JOINS THE SIEGE" % String(fdef["name"]).to_upper())
+                                game_toast("%s JOINS THE SIEGE" % String(fdef["name"]).to_upper())
                                 _rebuild_cards()
-                                _shop_open()
+                                _shop_refresh()
                         else:
                                 Jukebox.sfx("ps_tick_bad", -6.0)
-                                Arc.toast(Arc.toast_overlay(self), "NOT ENOUGH GOGACOINS"))
+                                game_toast("NOT ENOUGH GOGACOINS"))
                 h.add_child(buy)
         return box
 
@@ -2453,12 +2563,17 @@ func _shop_map_row(m: Dictionary) -> Control:
                         if Box.spend(int(m["price"])):
                                 meta.gogabuy_map(m["id"])
                                 Jukebox.sfx("ps_gogacoin", -4.0)
-                                Arc.toast(Arc.toast_overlay(self), "%s IS YOURS" % String(m["name"]).to_upper())
-                                _shop_open()
+                                game_toast("%s IS YOURS" % String(m["name"]).to_upper())
+                                _shop_refresh()
                         else:
-                                Jukebox.sfx("ps_tick_bad", -6.0))
+                                Jukebox.sfx("ps_tick_bad", -6.0)
+                                game_toast("NOT ENOUGH GOGACOINS"))
                 h.add_child(buy)
         return box
+
+func _shop_refresh() -> void:
+        _sheet_refresh(get_viewport_rect().size.y * 0.90, "shop", minf(1500.0, get_viewport_rect().size.x * 0.55), func(vb: VBoxContainer):
+                _build_shop(vb))
 
 # ============================================================ DRAW CLASSES
 class GhostDraw extends Node2D:

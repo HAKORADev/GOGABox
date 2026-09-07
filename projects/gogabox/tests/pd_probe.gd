@@ -94,6 +94,41 @@ func _run() -> void:
                 ck(ResourceLoader.exists("res://assets/games/pop_siege/thumbs/%s.png" % m["id"]), m["id"] + " day thumb")
                 ck(ResourceLoader.exists("res://assets/games/pop_siege/thumbs/%s_n.png" % m["id"]), m["id"] + " night thumb")
 
+        # ------------------------------------------------- the door laws (p3)
+        var multi := 0
+        for m in maps:
+                var mode := String(m.get("wave_mode", "solo"))
+                ck(mode in ["solo", "slice", "rotate"], m["id"] + " wears a legal wave_mode")
+                var n_paths: int = (m["paths"] as Array).size()
+                if mode != "solo":
+                        multi += 1
+                        ck(n_paths >= 2, m["id"] + " THE DOORS LAW: multi-mode means multiple doors")
+                # THE ONE-GRID LAW: the spawn head sits EXACTLY one cell out
+                for pts in m["paths"]:
+                        var x0 := float(pts[0][0])
+                        var y0 := float(pts[0][1])
+                        var overshoot: float = maxf(maxf(-x0, x0 - 18.0), maxf(-y0, y0 - 10.0))
+                        ck(overshoot > 0.0 and overshoot <= 1.1,
+                                m["id"] + " THE ONE-GRID LAW: the door is one grid away (%.2f)" % overshoot)
+                # THE PAINT TRUTH: every on-board walk point rounds INTO a road cell
+                var roadset := {}
+                for rc in m["road_cells"]:
+                        roadset[Vector2i(int(rc[0]), int(rc[1]))] = true
+                var off_road := 0
+                for pts in m["paths"]:
+                        for c in pts:
+                                if c[0] >= 0.0 and c[0] < 18.0 and c[1] >= 0.0 and c[1] < 10.0:
+                                        if not roadset.has(Vector2i(int(floorf(float(c[0]))), int(floorf(float(c[1]))))):
+                                                off_road += 1
+                ck(off_road == 0, m["id"] + " THE ROAD TRUTH: the walk never leaves the painted cells")
+        ck(multi >= 6, "THE DOORS ROSTER: at least six multi-start maps (got %d)" % multi)
+        # THE SCORE ICON LAW: the drawing fills its canvas (the clipped look is dead)
+        var ic_img: Image = (load("res://assets/games/pop_siege/ui/ic_pops.png") as Texture2D).get_image()
+        ic_img.convert(Image.FORMAT_RGBA8)
+        var ic_bb := ic_img.get_used_rect()
+        ck(ic_bb.size.x >= ic_img.get_width() * 0.72 and ic_bb.size.y >= ic_img.get_height() * 0.72,
+                "THE SCORE ICON LAW: the bloon fills the canvas (%dx%d of %dx%d)" % [ic_bb.size.x, ic_bb.size.y, ic_img.get_width(), ic_img.get_height()])
+
         # ----------------------------------------------------- the bloon laws
         ck(PDData.rbe("red") == 1, "red rbe 1")
         ck(PDData.rbe("blue") == 2, "blue rbe 2")
@@ -155,6 +190,16 @@ func _run() -> void:
                 var first_key: String = PDData.rows_for(fid)[0][1]
                 ck(PDData.next_stat(fid, 1, 10, first_key) == 0.0, fid + " THE >> LAW: max level shows no next")
                 ck(PDData.next_stat(fid, 1, 5, first_key) > 0.0, fid + " THE >> LAW: mid level has a next")
+
+        # ------------------------------------------- the head truth (p3)
+        # THE ART TRUTH v2: MEASURED from the drawn heads (the owner's round:
+        # the darty cross aimed 90 degrees off its own darts)
+        ck(absf(PDData.head_offset("darty")) < 0.01, "darty's crossbow points RIGHT (offset 0) - the 90-degree lie is dead")
+        ck(absf(PDData.head_offset("longeye") - PI) < 0.01, "longeye's tip points LEFT (offset PI)")
+        ck(absf(PDData.head_offset("boomba") - PI) < 0.01, "boomba's shell nose points LEFT (offset PI)")
+        ck(PDData.head_static("kaching") and PDData.head_static("marshal"), "the bank and the drum never spin")
+        for fid2 in ["darty", "boomba", "pyra", "boomo", "gloop", "kolda", "longeye", "zappy"]:
+                ck(PDData.muzzle(fid2) > 0.1, fid2 + " THE MUZZLE LAW: the shot leaves from the business end")
 
         # -------------------------------------------------- the synergy laws
         ck(PDData.SYNERGIES.size() == 8, "THE EIGHT PACTS")
@@ -302,6 +347,18 @@ func _run() -> void:
         G._place_folk("kolda", ok_cell + Vector2i(1, 1))
         G._place_folk("marshal", ok_cell + Vector2i(2, 0))
         ck(G.folk.size() == 5, "five folk on the field")
+        # THE PIVOT LAW v2: aiming heads spin IN PLACE on the mount (the
+        # orbiting crossbow is dead) - offset ZERO, seated above the base
+        var darty_head: Sprite2D = darty["head"]
+        ck(darty_head.offset == Vector2.ZERO, "THE PIVOT LAW v2: darty's crossbow rotates around its own center")
+        ck(darty_head.position.y < 0.0, "the head seats on the mount above the base")
+        var marshal_f: Dictionary = G.folk[4]
+        var marshal_head: Sprite2D = marshal_f["head"]
+        var rot0: float = marshal_head.rotation
+        marshal_f["aim_t"] = 1.0
+        marshal_f["aim_at"] = Vector2(0, 0)
+        G._tick_folk(0.016)
+        ck(absf(marshal_head.rotation - rot0) < 0.001, "the drum NEVER spins (the static head law)")
         for f in G.folk:
                 var lim: float = 9.0 * G.CELL
                 if String(f["fid"]) == "kaching":
@@ -362,6 +419,12 @@ func _run() -> void:
         G._spawn_bloon("red", 0)
         var red: Dictionary = G.bloons[-1]
         ck(G.bloons.size() == 1, "a red spawns")
+        # THE SINGLE FILE LAW + THE OFF-STAGE LAW (p3)
+        ck(absf(float(red["lane"])) < 0.01, "THE SINGLE FILE LAW: no side lane - one honest row")
+        ck(not red["spr"].visible, "THE OFF-STAGE LAW: the spawn waits INVISIBLE behind the map line")
+        red["dist"] = 2.5 * G.CELL
+        G._move_bloons(0.016)
+        ck(red["spr"].visible, "the march carries it INTO the field - it appears")
         G._hurt_bloon(red, 1.0, PDData.SHARP, null)
         ck(G.bloons.is_empty(), "the red pops")
         ck(G.score == score0 + 1, "THE DAMAGE LAW: one damage = one point")
@@ -441,6 +504,44 @@ func _run() -> void:
         G._move_bloons(0.5)
         ck(float(rb["hp"]) < rb_hp or G.bloons.has(rb) == false, "the burn ticks")
 
+        # THE MUZZLE LAW in the flesh: darty's dart LEAVES from the bow tip
+        G.coins = 5000
+        for b2 in G.bloons.duplicate():
+                G._bloon_free(b2)
+        G._spawn_bloon("red", 0)
+        var tgt: Dictionary = G.bloons[-1]
+        tgt["dist"] = 0.5
+        G._move_bloons(0.016)
+        var n_bullets0: int = G.bullets.size()
+        darty["cd"] = 0.0
+        darty["aim_t"] = 0.0
+        G._tick_folk(0.016)
+        ck(G.bullets.size() > n_bullets0, "the darty fired")
+        var shot: Dictionary = {}
+        for b2 in G.bullets:
+                if (b2 as Dictionary).get("src", null) == darty:
+                        shot = b2
+        ck(not shot.is_empty(), "the dart is in the air")
+        if not shot.is_empty():
+                var muzzle_dist: float = (shot["pos"] as Vector2).distance_to(darty["pos"])
+                var want_m: float = PDData.muzzle("darty") * G.CELL
+                ck(absf(muzzle_dist - want_m) < G.CELL * 0.2,
+                        "THE MUZZLE LAW: the dart spawns at the bow tip (%.0fpx ~= %.0fpx)" % [muzzle_dist, want_m])
+        for b2 in G.bullets.duplicate():
+                G.bullets.erase(b2)
+        # THE BOOM TRUTH: the bomber's explosion draws at blast scale (the
+        # old math drew it at one pixel - the owner's "weak VFX")
+        var fx0: int = G.fx_layer.get_child_count()
+        G._boom_fx(Vector2.ZERO, 1.0)
+        var boom_px := 0.0
+        for c in G.fx_layer.get_children():
+                if c is Sprite2D:
+                        boom_px = maxf(boom_px, (c as Sprite2D).scale.x * 56.0)
+        ck(boom_px > G.CELL * 1.5, "THE BOOM TRUTH: a 1-cell blast paints a %.0fpx fireball" % boom_px)
+        for c in G.fx_layer.get_children().slice(fx0):
+                c.queue_free()
+        G.fx_layer.queue_redraw()
+
         # the wave flow (spawner): the SEND call + THE STACK LAW
         for b in G.bloons.duplicate():
                 G._bloon_free(b)
@@ -465,6 +566,64 @@ func _run() -> void:
                         break
         ck(G.phase == "idle", "the stacked waves resolve")
         ck(G.wave_kinds.size() >= 2, "both waves marched")
+
+        # THE DOORS LAW in the flesh: a rotate map sends each wave from ONE
+        # door, and every 4th wave BURSTS across all of them
+        var rot_map: Dictionary = PDData.map_by_id("mirage_x")
+        ck(rot_map["wave_mode"] == "rotate" and (rot_map["paths"] as Array).size() == 3,
+                "mirage_x wears the 3-door rotate law")
+        G.map = rot_map
+        G._build_paths()
+        G.wave_n = 0
+        G.phase = "idle"
+        G.spawn_q.clear()
+        G._queue_wave()
+        var pis := {}
+        for s in G.spawn_q:
+                pis[int(s["pi"])] = true
+        ck(pis.size() == 1, "THE ROTATE LAW: wave 1 marches from ONE door")
+        var door1: int = int(pis.keys()[0])
+        G.spawn_q.clear()
+        G._queue_wave()
+        var pis2 := {}
+        for s in G.spawn_q:
+                pis2[int(s["pi"])] = true
+        ck(pis2.size() == 1 and int(pis2.keys()[0]) != door1, "wave 2 marches from the NEXT door")
+        G.spawn_q.clear()
+        G._queue_wave()
+        G._queue_wave()      # wave 4 - the burst
+        var pis4 := {}
+        for s in G.spawn_q:
+                pis4[int(s["pi"])] = true
+        ck(pis4.size() == 3, "THE BURST LAW: every 4th wave splits across ALL the doors")
+        G.map = PDData.map_by_id(meta.current_map())
+        G._build_paths()
+
+        # THE REFRESH LAW: a buy refreshes the SAME window (the stacking
+        # shop-windows disease is dead)
+        G._shop_open()
+        await _wait(0.3)
+        ck(G.sheet_open_count() == 1, "the shop opens as one window")
+        G._shop_refresh()
+        await _wait(0.3)
+        ck(G.sheet_open_count() == 1, "THE REFRESH LAW: the refresh never stacks a second window")
+        G.sheet_pop()
+        await _wait(0.3)
+        G._maps_open()
+        await _wait(0.3)
+        G._maps_refresh()
+        await _wait(0.3)
+        ck(G.sheet_open_count() == 1, "THE REFRESH LAW: maps rides the same law")
+        # THE TOAST LAW: ONE overlay, newest wins, alive above the pause
+        var layers_before: int = _count_class(G, "CanvasLayer")
+        G.game_toast("FIRST!")
+        G.game_toast("SECOND WINS")
+        await _wait(0.1)
+        ck(_count_class(G, "CanvasLayer") == layers_before, "THE TOAST LAW: toasts never spawn new overlays")
+        ck(G._toast["label"].text == "SECOND WINS", "THE NEWEST WINS: the old toast died, the newest speaks")
+        ck(G._toast["layer"].process_mode == Node.PROCESS_MODE_ALWAYS, "THE TOAST LAW: the toast lives ABOVE the pause (fades inside the shop)")
+        G.sheet_pop()
+        await _wait(0.3)
 
         # THE MAPS WALL + THE CLOSE LAW + THE SHEET PAUSE LAW
         G._maps_open()

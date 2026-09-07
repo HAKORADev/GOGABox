@@ -232,3 +232,49 @@ ritual, matcher-style. Achievements: pop_1000, moab_1, wave_25, gear3_any.
     thousands of bloons at a real 60 (run/max_fps).
 22. THE GEAR DOOR - gear-ups cost 2800..15000; upgrades climb at 1.22;
     sell pays 70% of everything invested; broke doors gray live.
+
+## 18. PATCH 3 - THE DOORS TRUTH (v0.3.5-3)
+
+The owner's 14-item round; every fix was audited by eye first (contact
+sheets of every folk head, every projectile, every bake) and then by law.
+
+1. THE ART TRUTH v2 - the head offsets were MEASURED from the drawn heads:
+   darty's crossbow tip points RIGHT (offset 0 - the old PI/2 aimed the bow
+   90 degrees off its own darts), longeye's tip LEFT (PI), boomba's shell
+   nose LEFT (PI). THE PIVOT LAW v2: aiming heads rotate around their OWN
+   center seated on the mount - the crossbow that orbited and detached from
+   the body is dead. THE MUZZLE LAW: every shot leaves from the head's
+   business end (per-family distances in cells), never the base belly.
+2. THE SCORE ICON LAW - ic_pops redrawn full-canvas (the old drawing lived
+   in the top 38% of its box and read clipped).
+3. THE ONE-GRID LAW - every entry head sits EXACTLY one cell off-board.
+   THE OFF-STAGE LAW: bloons are born invisible and appear only once the
+   march carries them into the field - nothing spawns out of nowhere.
+4. THE PAINT TRUTH - road_cells now include every cell the DENSE walk
+   touches; the smoothed curve can never cross unpainted grass at a turn.
+5. THE DOORS LAW - multi-start maps carry SEPARATE doors and a wave_mode:
+   ROTATE (each wave from one door, every 4th from ALL of them) and SLICE
+   (the groups alternate, every 3rd bursts). Nine maps wear doors; the
+   ready gate and the map cards speak them.
+6. THE DRAG LAW v2 - the card OWNS its touch stream (Godot routes the
+   press's drags and release back to the control, they never reach the raw
+   stream): the ghost and the placement live in the card's gui_input now.
+7. THE REFRESH LAW - a buy pops and rebuilds the SAME sheet; the shop never
+   stacks windows again.
+8. THE PURE ARROW LAW - the three-circle worn trail is dead; doors wear
+   chevron arrows only, drawn for every side.
+9. THE TOAST LAW - one overlay per game, PROCESS_MODE_ALWAYS (it fades
+   inside the paused shop), the newest toast kills the old tween, and the
+   dark outline keeps it readable over the cream panel.
+10. THE BOOM TRUTH - the old blast/52 math drew the bomber's explosions at
+    one pixel; the boom now scales WITH the blast in cells. Real bomb art,
+    muzzle flashes, dart and shell trails.
+11. THE WORLD SORT LAW - props + heart + folk live in one y-sorted layer
+    seated at their base; big trees finally cover the small ones behind
+    them, and the generator bans big props at the door corridors.
+12. THE SINGLE FILE LAW - lane offsets are dead; every bloon marches ON the
+    road center, one honest row. Blimps face the march (nose right).
+13. THE SFX v2 - the raw white-noise static is dead: one-pole lowpassed
+    hits, brown-noise boom bodies, clean squeak pops, soft whooshes.
+14. THE RICH BAKE LAW - mottled ground, road ruts + pebbles + worn
+    shoulders, water banks, vignette, bolder decor.

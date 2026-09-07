@@ -394,12 +394,36 @@ static func wave_groups(w: int, stars: int) -> Array:
 static func fatigue_for(wave: int) -> float:
         return 1.0 + FATIGUE * maxf(0.0, float(wave - VICTORY_WAVE))
 
-## the art truth: the rotation that points a head's muzzle RIGHT at 0 deg
-## (the drawn crossbow heads face up, the cannon heads face right)
+## the art truth v2 (MEASURED from the drawn heads - the owner's round):
+## the rotation that points a head's muzzle AT the aim. darty's crossbow tip
+## points RIGHT (offset 0 - the old PI/2 aimed 90 degrees off the shot),
+## longeye's tip points LEFT (PI), boomba's shell nose points LEFT (PI).
+## The radial heads (pyra/boomo/kolda/zappy) and the static ones (kaching/
+## marshal) carry 0.
 static func head_offset(fid: String) -> float:
         match fid:
-                "darty", "longeye": return PI / 2.0
+                "longeye", "boomba": return PI
         return 0.0
+
+## THE MUZZLE LAW: how far from the gadget's center the shot LEAVES, in CELL
+## units (measured to each head's business end - the darts no longer crawl
+## out of the base belly).
+static func muzzle(fid: String) -> float:
+        match fid:
+                "darty": return 0.56
+                "longeye": return 0.74
+                "boomba": return 0.40
+                "pyra": return 0.36
+                "boomo": return 0.50
+                "gloop": return 0.36
+                "kolda": return 0.30
+                "zappy": return 0.44
+                "marshal": return 0.42
+        return 0.0
+
+## heads that never rotate (they are objects on the base, not turrets)
+static func head_static(fid: String) -> bool:
+        return fid == "kaching" or fid == "marshal"
 
 # ------------------------------------------------------------------ helpers
 static func imm_allows(kind: String, cls: String) -> bool:

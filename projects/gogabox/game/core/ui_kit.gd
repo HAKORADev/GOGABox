@@ -213,6 +213,10 @@ static func toast_overlay(parent: Node) -> Dictionary:
         t.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
         offset_bottom_safe(t)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        # THE READABLE LAW (v0.3.5-3): the toast wears a dark outline so it
+        # speaks over the cream shop panel, the night field, ANY background
+        t.add_theme_constant_override("outline_size", 10)
+        t.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.04, 0.9))
         t.modulate.a = 0.0
         root.add_child(t)
         parent.add_child(cl)
@@ -228,6 +232,10 @@ static func offset_bottom_safe(t: Label) -> void:
 
 static func toast(t: Dictionary, msg: String) -> void:
         var l: Label = t["label"]
+        # THE NEWEST WINS LAW (v0.3.5-3): a toast that fires while the old
+        # one still hangs kills its tween - one message, never a stack
+        if t.has("tw") and is_instance_valid(t["tw"]):
+                (t["tw"] as Tween).kill()
         l.text = msg
         # v0.1.5 OWNER RULE ("hardcoded text size"): the popup measures the
         # REAL line against the LIVE canvas every time it fires - the font
@@ -244,6 +252,8 @@ static func toast(t: Dictionary, msg: String) -> void:
                         fit_size(msg, base, avail, l.get_theme_font("font"), true, 14))
         l.modulate.a = 1.0
         var tw := l.create_tween()
+        tw.process_mode = Tween.TWEEN_PROCESS_IDLE
+        t["tw"] = tw
         tw.tween_interval(1.3)
         tw.tween_property(l, "modulate:a", 0.0, 0.4)
 
