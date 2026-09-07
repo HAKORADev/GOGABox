@@ -37,27 +37,41 @@ python3 tools/sync-assets.py gogabox
 - Thumbnails: 480x320 per game, drawn from the actual game sprites so menu
   tiles always match the real art. SOON tiles are generated from the registry.
 
-## Store trials — one asset downloaded per store (checked 2026-08-30)
+## Store trials — one asset downloaded per store (checked 2026-08-30, re-verified 2026-09-07)
 
 Owner asked to try each candidate asset store once and record what works.
 Download samples were pulled to a scratch dir (NOT vendored — they are
-trials, not project assets). Script: sandbox `scripts/asset_trials.py`.
+trials, not project assets). Script: sandbox `scripts/asset_trials.py`;
+re-verification + the scriptable path for the tricky ones:
+`tools/study/fetch_asset.py` (see docs/DECOMPILATION.md §3).
 
 | store | verdict | what worked / what blocked |
 |---|---|---|
-| **ambientCG** | ✅ WORKS (scriptable) | API v2 `full_json` search → direct zip `ambientcg.com/get?file=<id>_1K-JPG.zip`. Got CC0 `Wood095` 1K JPG (3.8 MB). Best-in-class: stable URLs, CC0, no account. |
+| **ambientCG** | ✅ WORKS (scriptable) | API v2 `full_json` search → direct zip `ambientcg.com/get?file=<id>_1K-JPG.zip`. Got CC0 `Wood095` 1K JPG (3.8 MB). Re-verified 2026-09-07 via `fetch_asset.py ambientcg Wood095`. Best-in-class: stable URLs, CC0, no account. |
 | **GameArt2D.com** | ✅ WORKS (scriptable) | Free pack pages expose direct `.zip` links. Got the free platformer tileset (16 MB). Free section is CC0-like; check each pack's license note. |
 | **Google Fonts** | ✅ WORKS (scriptable) | `raw.githubusercontent.com/google/fonts/main/ofl/<family>/...ttf`. Got Pacifico Regular (321 KB, OFL — attribution-in-file, fine for an app). Thousands of families, stable GitHub mirror. |
-| **Poly Haven** | ⚠️ PARTIAL | API `assets` + `info` reachable, but `info` no longer exposes `files` and the old `dl.polyhaven.org` paths 404 — direct file URLs are gone from the public API. Thumbnail CDN (`cdn.polyhaven.com`) downloads fine. Real texture/model downloads currently need the website (browser) or their Blender addon. CC0 throughout. |
-| **Quaternius** | ❌ browser-only | Pack pages load, but the download button is a JS modal (`href="#inline"`) routing through itch.io — no direct zip URL to script. Manual download in a browser works; packs are CC0. |
+| **Quaternius** | ✅ WORKS (scriptable — UPGRADED from browser-only) | 2026-09-07: the pack page's "Just give me the Download" button opens a **Google Drive folder**; folders list without a key via `drive.google.com/embeddedfolderview` and files download from `drive.usercontent.google.com`. `python3 tools/study/fetch_asset.py quaternius <pack page url>` walks Blends/ FBX/ OBJ/ and fetches all (proven: animated fish pack, 29 files incl. .fbx/.obj/.blend, CC0). |
+| **Poly Haven** | ⚠️ browser-only (root cause found 2026-09-07) | API `files` still empty and `dl.polyhaven.org` still 404 — but the real blocker is that **the site builds the zip client-side with zip.js**; there is no direct file URL to script at all. Browser once → vendor → manifest. CC0 throughout. |
 | **Shadertoy** | ❌ needs key | API (`/api/v1/shaders`) and even the media CDN answer 403 without an API key. A free key exists in your Shadertoy profile settings — with it, shader sources are fetchable (`/api/v1/shaders/<id>?key=...`). |
-| **Godot Shaders** | ❌ blocked from bots | Site/WAF answers HTTP 454/455 to non-browser agents. The shader source is printed on each page in a browser; copy it manually. Licenses per-shader (mostly MIT/CC0 — check the page). |
+| **Godot Shaders** | ❌ blocked from bots | Site/WAF answers HTTP 454/455 to non-browser agents (re-verified). The shader source is printed on each page in a browser; copy it manually. Licenses per-shader (mostly MIT/CC0 — check the page). |
 
-Practical takeaway for GOGABox: **ambientCG + GameArt2D + Google Fonts** can
-be piped straight into `tools/sync-assets.py`-style vendoring. **Poly Haven /
-Quaternius / Godot Shaders / Shadertoy** assets can still be used — fetch
-them in a browser once, commit them, record them in the manifest (the vendored
-build never needs the network anyway).
+Practical takeaway for GOGABox: **ambientCG + GameArt2D + Google Fonts +
+Quaternius** can be piped straight into `tools/sync-assets.py`-style vendoring
+(Quaternius via `tools/study/fetch_asset.py`). **Poly Haven / Godot Shaders /
+Shadertoy** assets can still be used — fetch them in a browser once, commit
+them, record them in the manifest (the vendored build never needs the network
+anyway).
+
+## Game-source study (web portals + APKs) — see docs/DECOMPILATION.md
+
+Beyond public asset stores, GOGABox games are built by studying shipped
+games. The full pipeline — portal scrapers (GameSnacks / CrazyGames / Poki /
+MSN), the APKPure downloader trick, the APK decompile line
+(apktool → jadx → Il2CppDumper → ilspycmd → UnityPy), Godot .pck extraction
+and the study-only usage law — lives in **docs/DECOMPILATION.md** with the
+tools under `tools/study/`. The law from that doc applies here too: study
+copies stay outside the repo, everything entering GOGABox is redesigned and
+recorded in `assets.manifest.json`.
 
 ## Other proven catalogs
 

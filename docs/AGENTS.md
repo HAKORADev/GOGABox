@@ -86,6 +86,7 @@ belongs in `docs/goga_docs/`.
 | `tools/bootstrap.sh` | installs exactly the locked toolchain into `.cache/` (same on CI and local) |
 | `tools/ci.sh [watch]` | list / watch GitHub Actions runs from the terminal |
 | `tools/sync-assets.py` | re-vendor assets from `assets.manifest.json` |
+| `tools/study/` | the game-study pipeline: web-portal scrapers, APKPure downloader, APK decompiler line, Godot .pck extractor, Quaternius/ambientCG fetcher — see docs/DECOMPILATION.md (study copies stay OUT of the repo) |
 | `plugins/<name>/` | GOGABox android plugins (`unity_ads`, `notify`) |
 | `docs/` | guides + `docs/goga_docs/` planning home (GDDs · ideas · plans · brainstorms) |
 
@@ -192,6 +193,23 @@ before). Details: `plugins/unity_ads/README.md`.
 3. `javap` the new AAR; re-verify every signature the plugin uses.
 4. `tools/test.sh` + full both-ABI build before pushing. CI cache keys hash
    the lock file, so runners re-fetch exactly once.
+
+### 4.6 Studying other games (the decompilation pipeline)
+
+When the owner asks to study a shipped game (web or android), do NOT
+re-derive the scraping/decompiling from scratch — the pipeline exists and is
+tested: `tools/study/fetch_webgame.py` (GameSnacks/CrazyGames/Poki/generic),
+`tools/study/fetch_apkpure.py` (APK/XAPK via the AEGON app endpoint),
+`tools/study/decompile_apk.py` (apktool + jadx + Il2CppDumper + ilspycmd +
+UnityPy in one command), `tools/study/godot_pck.py`,
+`tools/study/fetch_asset.py`. Full site matrix, per-engine playbook, install
+commands and the proven-results table: **docs/DECOMPILATION.md**.
+
+THE LAW (owner directive): study copies live in `study_out/` OUTSIDE the repo
+and are never committed or shared. Assets crafted from studied games are
+modified/redesigned before they enter GOGABox, and decompiled logic is
+studied, then rewritten — provenance gets recorded in docs/ASSETS.md and the
+manifest, like the Pop Siege art pipeline did.
 
 ## 5. Developing & building
 
@@ -300,5 +318,6 @@ subjects (`git log` is the real history).
 | add a new game | inside the box: one registry entry + one GogaGame script + one thumbnail — read `docs/goga_docs/plans/BOX_CORE_DESIGN.md` and docs/ADDING_A_GAME.md |
 | ads architecture and config | docs/ADS.md + plugins/unity_ads/README.md |
 | assets policy, manifest, source catalogs, store trials | docs/ASSETS.md |
+| studying other games: portals, APKs, engines, the usage law | docs/DECOMPILATION.md |
 | CI, caching, releases, signing | docs/CI.md |
 | what happened so far | `git log` + the sandbox session journal (§8) |
