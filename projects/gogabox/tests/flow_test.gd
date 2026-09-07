@@ -305,11 +305,11 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 12,
-                "12 playable games (pop siege joined)")
-        # v0.3.5: the POPTD teaser graduated into POP SIEGE (the rename law)
-        ok += _check(GameReg.workshop().size() == 3,
-                "3 workshop teasers (poptd graduated)")
+        var ok := _check(GameReg.playable().size() == 13,
+                "13 playable games (geometry flash joined)")
+        # v0.3.6: the GEOMETRY teaser graduated into the REAL GEOMETRY FLASH
+        ok += _check(GameReg.workshop().size() == 2,
+                "2 workshop teasers (geometry graduated)")
         ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
                 "the hen teaser ships as SPACE INVADERS (rename law)")
         ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
@@ -350,7 +350,7 @@ func _t_registry() -> int:
                 "the shop re-priced for real (cheapest priced item = %d)" % cheapest)
         ok += _check(String(GameReg.get_game("geometry")["title"]) \
                         == "Geometry Flash",
-                "the REAL Geometry Flash waits as its own teaser")
+                "Geometry Flash is its own game (graduated v0.3.6)")
         # v0.2.5: SNOWY TOWER grew up (the owner's GDD + the PGB reference)
         var hop: Dictionary = GameReg.get_game("hopper")
         ok += _check(int(hop["coin_div"]) == 10, "snowy tower score / 10")
@@ -399,9 +399,12 @@ func _t_registry() -> int:
         ok += _check(int(xg["coin_div"]) == 2, "xo score bonus / 2 (owner)")
         ok += _check(xg["ach"].size() == 3, "xo wears three fresh achievements")
         var geo: Dictionary = GameReg.get_game("geometry")
-        ok += _check(bool(geo.get("coming_soon", false)) \
-                        and int(geo["reveal"]["appear_after"]) == 0,
-                "geometry flash is a SOON tile visible from the start")
+        ok += _check(not bool(geo.get("coming_soon", false)) \
+                        and String(geo["orientation"]) == "landscape" \
+                        and int(geo["coin_div"]) == 4,
+                "geometry flash is PLAYABLE now: landscape, score / 4 (v0.3.6)")
+        var geo_ach_ok: bool = geo["ach"].size() == 5
+        ok += _check(geo_ach_ok, "geometry wears five achievements")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -555,7 +558,7 @@ func _t_roadmap() -> int:
         var geo_in := false
         for p in cheat_picks:
                 geo_in = geo_in or String(p["id"]) == "geometry"
-        ok += _check(not geo_in, "the geometry SOON teaser never picks")
+        ok += _check(geo_in, "geometry flash PICKS like every playable game now")
         Box.dev_set_cheat("all_owned", 0)
         # v0.0.7 two-level badges: a freshly visible tile wears NEW!
         # v0.3.4: the spud teaser GRADUATED into the real COSMIC SPUD - its

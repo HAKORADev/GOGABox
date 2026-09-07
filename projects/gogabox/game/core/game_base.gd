@@ -255,6 +255,10 @@ func check_achievements() -> int:
                         "moab_1": ok = Box.counter(game_id, "moab_kills") >= 1
                         "wave_25": ok = Box.counter(game_id, "wave_best") >= 25
                         "gear3_any": ok = Box.counter(game_id, "gears3") >= 1
+                        # v0.3.6 - geometry flash (the neon run)
+                        "orbit_500": ok = Box.counter(game_id, "orbits") >= 500
+                        "flips_250": ok = Box.counter(game_id, "flips") >= 250
+                        "gf_triple": ok = Box.counter(game_id, "triple") >= 1
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)

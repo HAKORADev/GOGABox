@@ -985,6 +985,58 @@ def scene_spud():
     return sc.render()
 
 
+# ------------------------------------------------------------------ v0.3.6
+# GEOMETRY FLASH: the neon world mid-run - the classic square mid-spin over
+# a spike, an orbit arc rising to a platform line, the pusher waiting, the
+# GOGACoin floating under the roof.
+def scene_geometry():
+    sc = Scene()
+    # the midnight gradient + a soft pulse band (the shader's language)
+    sc.backdrop((8, 11, 28), (4, 6, 15))
+    sc.glow(W * 0.5, H * 0.48, 330, (36, 52, 110), 46)
+    import random as _r
+    rng = _r.Random(3607)
+    for i in range(70):                       # the faint grid dust
+        gx, gy = rng.randint(0, W), rng.randint(0, H)
+        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(70, 100, 190, 70))
+    G = "games/geometry/"
+    # ground + roof bands: the real strip texture, tiled to the canvas
+    strip = load_sprite(G + "strip.png")
+    ground = strip.crop((0, 0, 512, 380)).resize((W, 190), Image.LANCZOS)
+    sc.work.alpha_composite(ground, (0, H - 190))
+    roof = strip.crop((0, 0, 512, 300)).resize((W, 150), Image.LANCZOS) \
+        .transpose(Image.FLIP_TOP_BOTTOM)
+    sc.work.alpha_composite(roof, (0, 0))
+    # the platform line mid-air (its bright edge up)
+    line = load_sprite(G + "line.png")
+    sc.work.alpha_composite(line.resize((380, 64), Image.LANCZOS),
+                            (int(W * 0.50), int(H * 0.335)))
+    # the spike (the wrong timing) + the pusher (the shove)
+    sc.glow(W * 0.265, H - 205, 36, (255, 120, 130), 60)
+    sc.stamp(load_sprite(G + "spike.png"), W * 0.265, H - 205, scale=0.95)
+    sc.glow(W * 0.74, H - 200, 40, (150, 190, 255), 60)
+    sc.stamp(load_sprite(G + "pusher.png"), W * 0.74, H - 200, scale=0.95)
+    # the golden orbit arc climbing to the platform line
+    for i, (fx, fy) in enumerate([(0.40, 0.68), (0.455, 0.565), (0.52, 0.475),
+                                  (0.585, 0.415)]):
+        sc.glow(fx * W, fy * H, 30, (255, 208, 84), 90)
+        sc.stamp(load_sprite(G + "orbit.png"), fx * W, fy * H, scale=0.62)
+        sc.stamp(load_sprite(G + "tw_%d.png" % (i % 4)),
+                 fx * W + 20, fy * H - 20, scale=0.62)
+    # the GOGACoin floating under the roof
+    sc.glow(W * 0.875, H * 0.26, 34, (255, 214, 100), 110)
+    sc.stamp(load_sprite("ui/coin.png"), W * 0.875, H * 0.26, scale=1.05)
+    # THE SQUARE: mid-spin over the arc, trail breathing behind it
+    hx, hy = W * 0.335, H * 0.50
+    sc.glow(hx - 52, hy + 34, 22, (96, 226, 255), 55)
+    sc.stamp(load_sprite(G + "p_dot.png"), hx - 60, hy + 40, scale=0.34, alpha=110)
+    sc.stamp(load_sprite(G + "p_dot.png"), hx - 30, hy + 20, scale=0.28, alpha=160)
+    sc.glow(hx, hy, 62, (96, 226, 255), 80)
+    sc.stamp(load_sprite(G + "skin_classic.png"), hx, hy, scale=0.92, rot=30)
+    sc.vignette(80)
+    return sc.render()
+
+
 # ----------------------------------------------------------- registry/CLI
 
 # Real-game scenes (composed, 960x640, no baked text - rule R2).
@@ -999,6 +1051,7 @@ SCENES = {
     "dario": scene_dario,
     "xo": scene_xo,
     "spud": scene_spud,
+    "geometry": scene_geometry,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

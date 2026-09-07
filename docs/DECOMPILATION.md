@@ -221,6 +221,7 @@ directory at `dir_offset`, always REL_FILEBASE).
 | **Astrosonic** (godot web export, index.pck 38MB) | godot 4.6.1 fmt3 | **260 files** (scenes/scripts/images/imports/project.binary) + strings decoded from **34 compiled .gdc** scripts |
 | **Endless Siege** (gamesnacks) | phaser | complete game: 6 texture atlases (1024² each), audio, fonts, config |
 | **Moto X3M** (poki + crazygames) | phaser/construct | full atlases (bikes, terrain, explosions, MAD PUFFERS logo), all sounds + level jsons via the browser-assisted pass |
+| **Geometry Dash Lite 2.2.147** (com.robtopx.geometryjumplite, XAPK 198MB — **the first PRODUCTION mission**, v0.3.6) | cocos2d-x format-3 plists | fetched in ~15s via the AEGON edge · 1,038 assets extracted straight from the base apk (no decompile needed — cocos keeps assets flat) · atlas study: GJ_GameSheet-hd (blocks/spikes/rings anatomy), GameSheet03 (playerSquare = white mask + runtime colors; starAnim twinkle), the GLOW sheet (white overlays = GD's glow trick), ParticleSheet · THE USAGE LAW honored end-to-end: every GEOMETRY FLASH texture is an original neon-filled redesign (tools/v036_gf_art.py), every sound synthesized (tools/v036_gf_sfx.py), zero APK bytes shipped |
 
 ### 2.5 Troubleshooting (the ones that actually bit)
 

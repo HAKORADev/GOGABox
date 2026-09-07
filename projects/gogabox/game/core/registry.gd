@@ -508,19 +508,37 @@ const GAMES := [
 
         # (the old "Pop TD" teaser graduated into POP SIEGE above - the PGB
         # port is real now)
-        # v0.2.3 patch (owner: "add a game called geometry flash put it as
-        # 'soon' because the current one will be a new game instead of the
-        # geometry flash game i planned for"): the REAL Geometry Flash takes
-        # its name back and waits in the workshop as a SOON tile - direct
-        # reveal, visible right away, never a mystery. Its dodge-game
-        # namesake grew up and is SPACE DASH now (v0.2.4).
-        {"id": "geometry", "title": "Geometry Flash", "tag": "the real one", "coming_soon": true,
-                "thumb": "res://assets/thumbs/soon.png",
-                "desc": "The owner's own Geometry Flash - the name the lane-dodger borrowed until it grew into Space Dash. The real thing is still to come.",
-                "genres": {"main": ["action", "arcade"], "sub": ["rhythm", "singleplayer"]},
-                "age": "everyone",
+        # v0.2.3 patch: the teaser waited in the workshop; v0.3.6 THE
+        # GRADUATION: the REAL Geometry Flash ships - the endless neon
+        # side-scroller (the PGB v1.3.8 sketch reborn, the GD Lite study
+        # recast into original filled-neon art). Its dodge-game namesake
+        # grew up and is SPACE DASH (v0.2.4).
+        {"id": "geometry", "title": "Geometry Flash", "tag": "the real one",
+                "script": "res://game/games/geometry/geometry.gd",
+                "thumb": "res://assets/thumbs/geometry.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 4, "price": 350, "fee": 10, "shop": true,
+                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
-                        "needs_games": 2}},
+                        "needs_games": 2},
+                "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP sails you to the roof, STICKY leaps stick you to the far side - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 10 speeds the world x1.1, blocks shove (they never kill), pits and wrong timing do. The SFX sing.",
+                "controls": ["TAP ANYWHERE TO START - then touch = jump, the square spins its 90 degrees over the real flight",
+                        "golden orbits = +1 score each; every 10 the world runs x1.1 faster - watch the x1.00 chip",
+                        "the chip next to the score is the LIVE MECHANIC: circle+arrow = jump, split arrows = tap ANYTIME flips gravity to the roof and back, linked arrows = jump FROM a surface and stick to the far side",
+                        "blocks in the road SHOVE you back (jump over them or ride and escape); pushed off-screen ends the run",
+                        "holes open in the ground AND the roof - fall in one and the run ends; floating spikes and saws end it too",
+                        "the GOGACoin appears every 30-50s - catch it for real coins",
+                        "the shop wears 5 skins, 3 world themes and TAILS (neon/fire/rainbow/gold/match) - buy once, toggle forever"],
+                "genres": {"main": ["action", "arcade"], "sub": ["rhythm", "singleplayer", "endless"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "score_100", "title": "Flash 100", "desc": "Score 100 in one run"},
+                        {"id": "score_300", "title": "Speed Demon", "desc": "Score 300 in one run"},
+                        {"id": "orbit_500", "title": "Orbit Hunter", "desc": "Collect 500 golden orbits total"},
+                        {"id": "flips_250", "title": "Gravity Adept", "desc": "Flip gravity 250 times total"},
+                        {"id": "gf_triple", "title": "Triple Threat", "desc": "Survive all 3 mechanics in one run"},
+                ],
+        },
 ]
 
 static func get_game(id: String) -> Dictionary:
