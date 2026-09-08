@@ -517,15 +517,19 @@ const GAMES := [
                 "script": "res://game/games/geometry/geometry.gd",
                 "thumb": "res://assets/thumbs/geometry.png",
                 "orientation": "landscape", "dim": "2d",
-                "coin_div": 4, "price": 350, "fee": 10, "shop": true,
+                # v0.3.6-3 THE /50 TRUTH (the owner's patch-1 ask, finally
+                # landed): score bonus /50 = coin_div 50. The patch-1 round
+                # misread it as the in-game speed step - that is back to /10.
+                "coin_div": 50, "price": 350, "fee": 10, "shop": true,
                 "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
                         "needs_games": 2},
-                "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP taps gravity to the roof and back, STICK changes gravity only when you TOUCH the other floor - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 50 speeds the world x1.1, spikes and saws and climbing ladders fill the lanes, blocks shove (they never kill), pits and wrong timing do. Buy POWER-UPS and they spawn in your runs: rocket jumps, a slower world, an extra life. The SFX sing.",
+                "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP taps gravity to the roof and back, STICK changes gravity only when you TOUCH the other floor - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 10 speeds the world x1.1, and the world is FULL: block staircases up and down, pyramids, twin towers, small triple spikes, saws and floating threats fill the lanes. Blocks shove (they never kill), pits and wrong timing do. Buy POWER-UPS and they spawn in your runs: rocket jumps, a slower world, an extra life. The SFX sing.",
                 "controls": ["TAP ANYWHERE TO START - then touch = jump, the square spins its 90 degrees over the real flight",
-                        "golden orbits = +1 score each; every 50 the world runs x1.1 faster - watch the x1.00 chip",
+                        "golden orbits = +1 score each; every 10 the world runs x1.1 faster - watch the x1.00 chip",
                         "the chip next to the score is the LIVE MECHANIC: circle+arrow = jump, split arrows = tap ANYTIME flips gravity to the roof and back, linked arrows = gravity changes only when you TOUCH the ground or the roof (climb the lines to reach the roof!)",
-                        "spikes live on the ground, the lines, the roof and FLOAT between the lanes - time every hop",
+                        "spikes live on the ground, the lines, the roof and FLOAT between the lanes - most are small triple rows you hop, the big triangle is a rare wall",
+                        "the world is BUILT: block staircases climb up and down, pyramids, twin towers and bridges fill the lanes - every block top is a real surface (the square lands its 90 and jumps again)",
                         "blocks in the road SHOVE you back (jump over them or ride and escape); pushed off-screen ends the run",
                         "holes open in the ground AND the roof - fall in one and the run ends",
                         "the GOGACoin appears every 30-50s (never at the start) - catch it for real coins",

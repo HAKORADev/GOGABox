@@ -75,9 +75,20 @@ func _run() -> void:
         print("run1 over: ", G.over, " score=", G.score)
 
         # ---- RUN 2 (the host's PLAY AGAIN: fresh instance, same session)
+        # THE WHITE-TAIL LAW (v0.3.6-3): the owner wears a tail in run 1,
+        # dies, hits PLAY AGAIN - the fresh instance must boot THE SAME tail
+        # (the old build streamed a white stranger: _apply_tail ran before
+        # the meta load and the stale "none" reset config went live).
+        Box.equip_item("geometry", "tail", "gold")
         await _new_game()
-        print("run2: phase=", G.phase, " y=", G.player["y"], " us=", G.us)
+        ck(G.trail_mode == "gold",
+                "THE WHITE-TAIL LAW: the replay boots the equipped tail")
+        ck(G.tail.color.r > 0.9 and G.tail.color.g > 0.7 and G.tail.color.b < 0.5,
+                "THE WHITE-TAIL LAW: the emitter wears GOLD, never the white reset")
         G._ready_start()
+        ck(G.tail.emitting and G.tail2.emitting,
+                "THE WHITE-TAIL LAW: the tail STREAMS through the replay run")
+        print("run2: phase=", G.phase, " y=", G.player["y"], " us=", G.us)
         await _watch("run2", 8.0)
         print("run2 alive: ", not G.over_gate, " y=", G.player["y"], " ground=", G.player["ground"])
 

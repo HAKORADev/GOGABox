@@ -16,9 +16,10 @@ extends GogaGame
 ##     pushed off-screen = the end ("out-of-screen from a block").
 ##   - THE PIT LAW: the ground AND the roof have opened stretches - fall
 ##     into one and the run ends (the roof pits matter in flip modes).
-##   - THE ORBIT LAW: golden orbits = +1 score each; every 50 = speed x1.1
-##     (v0.3.6-1: the owner moved the bonus step from /10 to /50); both wear
-##     widgets; the mechanic chip sits next to them.
+##   - THE ORBIT LAW: golden orbits = +1 score each; every 10 = speed x1.1
+##     (v0.3.6-3: the patch-1 "/50" was the BOX score bonus (registry
+##     coin_div), never the speed step - the speed cadence is /10 again);
+##     both wear widgets; the mechanic chip sits next to them.
 ##   - THE COIN LAW: the GOGACoin appears 30-50s after the LAST APPEAR
 ##     (the next delay rolls from 30/35/40/45/50) - and the FIRST one waits
 ##     the same 30-50s from the run start (v0.3.6-1: never at t=0).
@@ -72,17 +73,28 @@ const JUMP_V := 1180.0       # apex = 1180^2/(2*3400) = 204.7 design px
 const MAX_FALL := 2500.0
 const BASE_SPEED := 430.0
 const SPEED_STEP := 1.1      # x1.1 per bonus step (the owner's law)
-const SPEED_BONUS_AT := 50   # v0.3.6-1 THE /50 LAW: the step fires every 50
+const SPEED_BONUS_AT := 10   # v0.3.6-3 THE /10 TRUTH: the step fires every 10
+                             # (the patch-1 /50 was the box score bonus -
+                             # registry coin_div - never the speed step)
 const DRIFT_BACK := 250.0    # px/s homing to the standpoint after a shove
 const PUSH_EXTRA := 90.0     # extra px/s the pusher carries you back
 const FLIP_MIN_GAP := 0.09   # s - flip debounce
 const SNAP := 6.0            # THE SUPPORT SNAP LAW band (design px)
+const CLIMB_BAND := 30.0     # v0.3.6-3 THE CLIMB SNAP band (design px)
 const COIN_PX := 44.0        # v0.3.6-1 the coin core (was 64 - too big)
 const POW_DUR := 10.0        # every power-up lasts 10 GAME-seconds
 const POW_DELAYS := [30, 40, 50, 60]   # from the LAST spawn
 const JUMP_POW_MULT := 1.5   # "jumps are x1.5 longer"
 const SLOW_SCALE := 0.5      # "the whole game runs 50% slower"
 const SHIELD_HOP := 1.4      # the pit rescue hop strength (x base jump)
+
+# v0.3.6-3 THE STREAK RESET LAW: the collect-blip pitch ladder decays after
+# a quiet spell - 2.0s with no collect starts dropping one level per 1.0s,
+# and the final rung falls to 0.0 after 0.5s (then the ladder is from the
+# start). A collect freezes the decay and keeps the current rung.
+const STREAK_IDLE := 2.0
+const STREAK_STEP := 1.0
+const STREAK_LAST := 0.5
 
 # ---------------- content tables -------------------------------------------
 const THEMES := {
@@ -165,6 +177,8 @@ var player := {"x": 0.0, "y": GROUND_Y - HALF, "vy": 0.0, "g": 1, "ground": true
 var stand_x := 0.0              # screen px standpoint
 var orbit_streak := 0
 var orbit_cool := 0.0
+var streak_idle := 0.0       # v0.3.6-3: seconds since the last collect
+var streak_decay := 0.0      # the decay clock between rung drops
 var run_t := 0.0
 var mech_seen := {"normal": true, "flip": false, "sticky": false}
 var trail_mode := "none"
@@ -176,7 +190,7 @@ var last_death := ""            # the probe/soak reads the cause
 var powers := {"jump": 0.0, "slow": 0.0, "shield": 0.0}   # game-secs left
 var pow_timer := 0.0            # the spawn clock (rolls 30/40/50/60)
 var pow_pickups := []           # [{x, y, kind, spr, halo, t}]
-var next_bonus := SPEED_BONUS_AT   # THE /50 LAW cursor
+var next_bonus := SPEED_BONUS_AT   # THE /10 speed-step cursor
 var shield_cd := 0.0            # the save VFX debounce
 var bg_time := 0.0              # the shader clock (runs on game-time)
 var twinkle_t := 0.0            # the orbit twinkle clock (game-time)
@@ -244,6 +258,12 @@ func _load_meta() -> void:
         if tid == "" or not TAILS.has(tid):
                 tid = "none"
         trail_mode = tid
+        # THE WHITE-TAIL LAW (v0.3.6-3): the meta load RE-APPLIES the tail.
+        # _build_world ran _apply_tail() BEFORE the meta existed (trail_mode
+        # was still the default "none" -> the emitters held the plain WHITE
+        # reset config) - so every replay streamed a white stranger tail
+        # until a shop visit healed it. The load is the apply now.
+        _apply_tail()
 
 func pspr_set_skin() -> void:
         var sid: String = player.get("skin", "classic")
@@ -322,22 +342,25 @@ func _build_world() -> void:
         tail2.scale_amount_max = 0.7
         add_child(tail2)
 
-        # the rocket-jump plume (the ROCKET LAW: a burn UNDER the square in
-        # the skin color while the jump power is live)
+        # the rocket-jump burn (THE ROCKET SIMPLICITY LAW v0.3.6-3: a simple
+        # ONE-SHOT burst that fires only on the jump, side-aware - never a
+        # constant plume)
         rocket = CPUParticles2D.new()
         rocket.emitting = false
-        rocket.amount = 46
-        rocket.lifetime = 0.34
+        rocket.one_shot = true
+        rocket.explosiveness = 1.0
+        rocket.amount = 18
+        rocket.lifetime = 0.32
         rocket.local_coords = false
         rocket.texture = _tex("p_puff.png")
         rocket.material = add_mat
-        rocket.gravity = Vector2(0, 320.0 * us)
+        rocket.gravity = Vector2.ZERO
         rocket.direction = Vector2(0, 1)
-        rocket.spread = 26.0
+        rocket.spread = 24.0
         rocket.initial_velocity_min = 260.0 * us
         rocket.initial_velocity_max = 520.0 * us
         rocket.scale_amount_min = 0.5
-        rocket.scale_amount_max = 1.1
+        rocket.scale_amount_max = 1.05
         add_child(rocket)
 
         # the square (NOT under the world modulate - skins keep their color)
@@ -612,18 +635,42 @@ func _jump() -> void:
         player["ground"] = false
         Jukebox.sfx("gf_jump", -2.0)
         _plan_spin()
-        # THE JUMP VFX LAW (v0.3.6-1): the takeoff is silent in VFX - the
-        # burst happens WHEN THE SQUARE MEETS SOMETHING (landing, bonk).
+        # THE ROCKET SIMPLICITY LAW (v0.3.6-3): the burn fires ONLY here, on
+        # the jump, and knows its SIDE (the owner's words) - it pours from
+        # the face being left: under the square off the ground, above it off
+        # the roof.
+        if powers["jump"] > 0.0:
+                _rocket_burst()
+        # THE JUMP VFX LAW (v0.3.6-1): the takeoff is otherwise silent in
+        # VFX - the burst happens WHEN THE SQUARE MEETS SOMETHING (landing,
+        # bonk).
+
+## THE ROCKET BURST - one short skin-colored burn from the face being left,
+## gone in a third of a second. No plume, no puddle - a whoosh.
+func _rocket_burst() -> void:
+        var p := player
+        var col: Color = SKINS[player.get("skin", "classic")]["col"]
+        var side := 1.0 if p["g"] == 1 else -1.0   # +1 = the burn sits BELOW
+        rocket.position = Vector2(p["x"], p["y"] + side * HALF * us * 0.85)
+        rocket.direction = Vector2(0, side)         # pours AWAY from the square
+        rocket.color = Color(col.r, col.g, col.b, 0.9)
+        rocket.restart()
 
 ## THE FLIP - gravity inverts; a soft damp keeps the sail readable.
+## THE FLIP PUSH LAW (v0.3.6-3): the switch reads as a simple push from the
+## side being LEFT - a puff under the square when it leaves the ground, above
+## it when it leaves the roof (the old radial burst looked broken).
 func _flip_gravity(damp: float, from_sticky := false) -> void:
-        player["g"] = -int(player["g"])
-        player["vy"] *= damp
-        player["ground"] = false
+        var p := player
+        var old_g := int(p["g"])
+        p["g"] = -old_g
+        p["vy"] *= damp
+        p["ground"] = false
         flip_total += 1
         if not from_sticky:
                 Jukebox.sfx("gf_flip", -3.0)
-                _burst_at(Vector2(player["x"], player["y"]), 10, 0.8)
+                _push_puff(Vector2(p["x"], p["y"]), old_g,
+                        SKINS[p.get("skin", "classic")]["col"], 0.9)
         _plan_spin()
 
 # =================================================================== tick
@@ -759,8 +806,14 @@ func _support_check() -> void:
                                         break
                 if not has:
                         for pu in pushers:
-                                var rx0: float = float(pu["x"]) - world_x
-                                if rx0 <= wx1 and rx0 + CELL >= wx0 \
+                                # v0.3.6-3 THE SPACE TRUTH part 3: the pusher span
+                                # is WORLD px here - the old (pu.x - world_x) was
+                                # SCREEN px compared against the player's WORLD
+                                # span, so support held only while world_x ~ 0 and
+                                # silently dropped mid-run (the square slid off
+                                # every block it had landed, unable to jump)
+                                var pux: float = float(pu["x"])
+                                if pux <= wx1 and pux + CELL >= wx0 \
                                                 and absf(feet_y - float(pu["y0"]) * us) <= band:
                                         has = true
                                         surf = float(pu["y0"]) * us
@@ -782,8 +835,8 @@ func _support_check() -> void:
                                         break
                 if not has:
                         for pu in pushers:
-                                var rx0: float = float(pu["x"]) - world_x
-                                if rx0 <= wx1 and rx0 + CELL >= wx0 \
+                                var pux2: float = float(pu["x"])
+                                if pux2 <= wx1 and pux2 + CELL >= wx0 \
                                                 and absf(feet_y - float(pu["y1"]) * us) <= band:
                                         has = true
                                         surf = float(pu["y1"]) * us
@@ -797,6 +850,11 @@ func _support_check() -> void:
                 _plan_spin()
 
 ## THE PUSHER LAW: overlap rides you back (speed + extra); top landing is safe.
+## THE CLIMB SNAP (v0.3.6-3): feet rising JUST under a block top snap onto
+## it instead of eating the shove - the old build shoved the square along
+## the face mid-rise ("it slides on the block without letting me able to do
+## a jump"). Real face-hits (deep body overlap, grounded runs into a wall)
+## still shove - walls push, they never kill.
 func _pusher_push(dt: float) -> bool:
         var p := player
         var pl := Rect2(p["x"] - HALF * us, p["y"] - HALF * us, CELL * us, CELL * us)
@@ -808,6 +866,57 @@ func _pusher_push(dt: float) -> bool:
                     var on_top: bool = p["g"] == 1 and absf(p["y"] + HALF * us - pu["y0"] * us) < 6.0
                     var on_bot: bool = p["g"] == -1 and absf(p["y"] - HALF * us - pu["y1"] * us) < 6.0
                     if not on_top and not on_bot:
+                            # THE CLIMB SNAP - a rising near-miss becomes the landing
+                            if p["g"] == 1 and p["vy"] < 0.0:
+                                    var feet: float = p["y"] + HALF * us
+                                    var top := float(pu["y0"]) * us
+                                    if feet > top and feet <= top + CLIMB_BAND * us:
+                                            _land_at(top, p["y"])
+                                            return false
+                                    # THE UNDER-BONK (v0.3.6-3): a rising head that
+                                    # just clips a floating slab's underside bonks
+                                    # honestly - never a sideways shove in mid-air
+                                    var head: float = p["y"] - HALF * us
+                                    var bot := float(pu["y1"]) * us
+                                    if head < bot and head >= bot - CLIMB_BAND * us:
+                                            p["y"] = bot + HALF * us
+                                            p["vy"] = 0.0
+                                            _bonk_fx(Vector2(p["x"], bot))
+                                            return false
+                            # THE LANDING BAND (v0.3.6-3 THE CLIMB TRUTH part 2):
+                            # a falling crossing that landed INSIDE this very
+                            # frame lands ON the block - a fast frame crosses up
+                            # to ~40px past the top, and the old 6px window read
+                            # that honest touchdown as a side hit and SHOVED the
+                            # landing away ("it slides on the block without
+                            # letting me able to do a jump")
+                            elif p["g"] == 1 and p["vy"] > 0.0:
+                                    var feet3: float = p["y"] + HALF * us
+                                    var top3 := float(pu["y0"]) * us
+                                    if feet3 >= top3 and feet3 <= top3 + 48.0 * us:
+                                            _land_at(top3, p["y"])
+                                            return false
+                            elif p["g"] == -1 and p["vy"] > 0.0:
+                                    # THE DOWN BONK: jumping off the roof, a head
+                                    # that just clips a slab's TOP bonks honestly
+                                    var head2: float = p["y"] + HALF * us
+                                    var top4 := float(pu["y0"]) * us
+                                    if head2 > top4 and head2 <= top4 + CLIMB_BAND * us:
+                                            p["y"] = top4 - HALF * us
+                                            p["vy"] = 0.0
+                                            _bonk_fx(Vector2(p["x"], top4))
+                                            return false
+                            elif p["g"] == -1 and p["vy"] < 0.0:
+                                    # the flipped rise: feet just under a pad's
+                                    # bottom snap onto it (THE CLIMB SNAP mirrored)
+                                    var feet2: float = p["y"] - HALF * us
+                                    var bot2 := float(pu["y1"]) * us
+                                    if feet2 > bot2 and feet2 <= bot2 + CLIMB_BAND * us:
+                                            _land_at(bot2, p["y"])
+                                            return false
+                                    if feet2 <= bot2 and feet2 >= bot2 - 48.0 * us:
+                                            _land_at(bot2, p["y"])
+                                            return false
                             p["x"] -= (speed + PUSH_EXTRA) * us * dt
                             _spin_settle_pause()
                             return true
@@ -990,8 +1099,16 @@ func _hazard_check() -> void:
                 var hx: float = (h["x"] - world_x) * us
                 if absf(hx - p["x"]) > 140.0 * us:
                         continue
-                var hr: float = h["r"] * us
-                var hbox := Rect2(hx - hr, h["y"] * us - hr, hr * 2.0, hr * 2.0)
+                # v0.3.6-3: spike3 wears its own WIDE-LOW box (the calculated
+                # dodge-able shape) - the round r box stays for the others
+                var hbox: Rect2
+                if h.has("hw"):
+                        var hw: float = float(h["hw"]) * us
+                        var hh: float = float(h["hh"]) * us
+                        hbox = Rect2(hx - hw, float(h["y"]) * us - hh, hw * 2.0, hh * 2.0)
+                else:
+                        var hr: float = h["r"] * us
+                        hbox = Rect2(hx - hr, float(h["y"]) * us - hr, hr * 2.0, hr * 2.0)
                 if box.intersects(hbox):
                         _die("hazard")
                         return
@@ -1032,12 +1149,28 @@ func _flight_lands(y_feet_base: float, wx: float, g: float) -> bool:
                 for l in lines:
                         if wx >= l["x0"] and wx <= l["x1"] and feet >= l["y"] and feet <= l["y"] + LINE_TH * 2.0:
                                 return true
+                # THE CLIMB TRUTH (v0.3.6-3): block tops are landing surfaces
+                # too - the 90 now completes exactly at the touchdown on a
+                # block (the old build spun for the full fall and landed the
+                # square at a broken mid-rotation angle on every block)
+                for pu in pushers:
+                        if wx >= float(pu["x"]) - HALF * 0.5 \
+                                        and wx <= float(pu["x"]) + CELL + HALF * 0.5 \
+                                        and feet >= float(pu["y0"]) \
+                                        and feet <= float(pu["y0"]) + CELL * 0.9:
+                                return true
         else:
                 if feet <= ROOF_Y and _roof_under(wx):
                         return true
                 for l in lines:
                         var uy: float = l["y"] + LINE_TH
                         if wx >= l["x0"] and wx <= l["x1"] and feet <= uy and feet >= uy - LINE_TH * 2.0:
+                                return true
+                for pu in pushers:
+                        if wx >= float(pu["x"]) - HALF * 0.5 \
+                                        and wx <= float(pu["x"]) + CELL + HALF * 0.5 \
+                                        and feet <= float(pu["y1"]) \
+                                        and feet >= float(pu["y1"]) - CELL * 0.9:
                                 return true
         return false
 
@@ -1066,6 +1199,21 @@ func _settle_rot() -> void:
 func _pickups(dt: float) -> void:
         var p := player
         orbit_cool = maxf(0.0, orbit_cool - dt)
+        # THE STREAK RESET LAW (v0.3.6-3): the pitch ladder never got stuck
+        # on "always up" any more - 2s of silence drops it back to 0.
+        streak_idle += dt
+        if orbit_streak > 0 and streak_idle >= STREAK_IDLE:
+                if orbit_streak > 9:
+                        orbit_streak = 9   # the audible ladder has 9 rungs
+                streak_decay += dt
+                var step := STREAK_LAST if orbit_streak <= 1 else STREAK_STEP
+                if streak_decay >= step:
+                        streak_decay = 0.0
+                        orbit_streak -= 1
+                        if orbit_streak <= 0:
+                                orbit_streak = 0
+                                streak_idle = 0.0
+                                streak_decay = 0.0
         var collected: Array = []
         for o in orbits:
                 if o.get("taken", false):
@@ -1081,12 +1229,14 @@ func _pickups(dt: float) -> void:
                         collected.append(o)
                         orbit_streak += 1
                         orbit_cool = 1.1
+                        streak_idle = 0.0     # THE STREAK RESET LAW: a collect
+                        streak_decay = 0.0    # freezes the decay, keeps the rung
                         var pitch := 0.92 + 0.055 * minf(float(orbit_streak), 9.0)
                         Jukebox.sfx("gf_orbit", -4.0, pitch)
                         add_score(1)
-                        # THE COLLECT LAW: a golden implosion - the ring
-                        # snaps INWARD, the star flashes, streaks dive at the
-                        # square (never the old repeated small dots)
+                        # THE COLLECT LAW (v0.3.6-3): a proper COLORED
+                        # particle burst - the golden glow pop + star
+                        # flashes (the implosion read badly)
                         _orbit_collect_fx(Vector2(ox, oy), Vector2(p["x"], p["y"]))
                         if score >= next_bonus:
                                 next_bonus += SPEED_BONUS_AT
@@ -1113,6 +1263,8 @@ func _coin_clock(dt: float) -> void:
         coin_timer -= dt
         if coin_timer <= 0.0 and coin.is_empty():
                 _coin_spawn()
+                if coin.is_empty():
+                        return   # THE DEFER: the spawn set its own retry clock
                 coin_timer = float(COIN_DELAYS[rng.randi_range(0, COIN_DELAYS.size() - 1)])
         if not coin.is_empty():
                 coin["t"] = float(coin["t"]) + dt
@@ -1195,9 +1347,46 @@ func _pow_end(kind: String) -> void:
 
 func _coin_spawn() -> void:
         var vp := _vp()
-        # a reachable lane: just over a line, or mid-air in a wide gap
+        # THE COIN SPACE LAW (v0.3.6-3): the coin never spawns inside the
+        # world any more - every candidate (lane x offset) is validated
+        # against blocks, lines, hazards and orbits; blocked rolls re-roll;
+        # a fully crowded horizon DEFERS the spawn instead of forcing a bad
+        # coin into a block.
         var lanes := [L1_Y - 150.0, L2_Y - 150.0, L3_Y - 150.0, GROUND_Y - 190.0]
-        var y: float = lanes[rng.randi_range(0, lanes.size() - 1)]
+        var base_x := world_x + vp.x / us + 80.0 / us
+        for attempt in 8:
+                var y: float = lanes[rng.randi_range(0, lanes.size() - 1)]
+                var x := base_x + CELL * float(rng.randi_range(0, 4))
+                if _coin_spot_clear(x, y):
+                        _coin_place(x, y)
+                        return
+        coin_timer = 2.0   # the horizon is crowded - try again shortly
+
+## THE COIN SPACE TRUTH: the keep-clear box (the coin core + halo) must be
+## empty world - no block, no line band, no hazard, no orbit crowding.
+func _coin_spot_clear(x: float, y: float) -> bool:
+        var r := COIN_PX * 0.5 + 26.0
+        for pu in pushers:
+                if x + r > float(pu["x"]) and x - r < float(pu["x"]) + CELL \
+                                and y + r > float(pu["y0"]) and y - r < float(pu["y1"]):
+                        return false
+        for l in lines:
+                if x + r > float(l["x0"]) and x - r < float(l["x1"]) \
+                                and y + r > float(l["y"]) - LINE_TH \
+                                and y - r < float(l["y"]) + LINE_TH * 2.0:
+                        return false
+        for h in hazards:
+                var hr: float = float(h["r"])
+                if absf(float(h["x"]) - x) < r + hr + 10.0 \
+                                and absf(float(h["y"]) - y) < r + hr + 10.0:
+                        return false
+        for o in orbits:
+                if absf(float(o["x"]) - x) < r + 34.0 \
+                                and absf(float(o["y"]) - y) < r + 34.0:
+                        return false
+        return true
+
+func _coin_place(x: float, y: float) -> void:
         var spr := Sprite2D.new()
         spr.texture = load("res://assets/ui/coin.png")
         var halo := Sprite2D.new()
@@ -1208,9 +1397,9 @@ func _coin_spawn() -> void:
         # v0.3.6-1 THE COIN SCALE LAW: 44 design px core - a pickup, not a
         # second sun (the owner: "very big, scale it accurately")
         spr.scale = Vector2.ONE * (COIN_PX / 96.0) * us
-        spr.position = Vector2(vp.x + 80.0, y * us)
+        spr.position = Vector2(_vp().x + 80.0, y * us)
         world.add_child(spr)
-        coin = {"x": world_x + vp.x / us + 80.0 / us, "y": y, "spr": spr, "t": 0.0}
+        coin = {"x": x, "y": y, "spr": spr, "t": 0.0}
 
 # ------------------------------------------------------------- death
 func _die(_why: String) -> void:
@@ -1358,17 +1547,63 @@ func _add_pusher(x: float, surface: float, tall := false, up := true) -> void:
         var h := (CELL * 2.0) if tall else CELL
         var y0 := surface - h if up else surface
         var y1 := surface if up else surface + h
-        var spr := Sprite2D.new()
-        spr.texture = _tex("pusher.png")
-        spr.scale = Vector2.ONE * 0.5 * us
+        var root := Node2D.new()
+        var b := Sprite2D.new()
+        b.texture = _tex("pusher.png")
+        b.scale = Vector2.ONE * 0.5 * us
+        root.add_child(b)
         if tall:
+                # v0.3.6-3 render fix: the second block sits EXACTLY one cell
+                # below the root (the old -0.5C offset floated it a cell
+                # above the column top)
                 var s2 := Sprite2D.new()
                 s2.texture = _tex("pusher.png")
                 s2.scale = Vector2.ONE * 0.5 * us
-                s2.position = Vector2(0, (-CELL * 0.5) if up else (CELL * 0.5)) * us
-                spr.add_child(s2)
+                s2.position = Vector2(0, CELL * us)
+                root.add_child(s2)
+        world.add_child(root)
+        pushers.append({"x": x, "y0": y0, "y1": y1, "spr": root})
+
+## THE BLOCK COLUMN (v0.3.6-3 THE WORLD LAW) - the structure cell: a stack
+## of n solid blocks one cell wide. Tops are REAL surfaces (the square
+## lands its 90 and jumps again - THE CLIMB TRUTH), faces shove (never
+## kill), undersides hang for the flip modes. The world builds its shapes
+## from these columns now.
+func _add_block(x: float, y0: float, rows: int, deco := false) -> void:
+        if rows <= 0:
+                return
+        var root := Node2D.new()
+        for i in rows:
+                var b := Sprite2D.new()
+                b.texture = _tex("pusher.png" if deco else "block.png")
+                b.scale = Vector2.ONE * 0.5 * us
+                b.position = Vector2(0, float(i) * CELL * us)
+                root.add_child(b)
+        world.add_child(root)
+        pushers.append({"x": x, "y0": y0, "y1": y0 + float(rows) * CELL, "spr": root})
+
+## A ground-anchored column of n blocks standing ON a surface.
+func _add_col(x: float, n: int, surface: float) -> void:
+        _add_block(x, surface - float(n) * CELL, n)
+
+## A roof-anchored column of n blocks hanging UNDER the roof line.
+func _add_hang(x: float, n: int, surface: float) -> void:
+        _add_block(x, surface, n)
+
+## v0.3.6-3 THE SPIKE3 - the owner's spike: THREE SMALL triangles on a
+## surface base, a calculated WIDE-LOW box (120 x 48 design px) a normal
+## hop clears from anywhere - dodge-able by construction. The old big
+## triangle stays as a rare high-level wall threat.
+func _add_spike3(x: float, surface: float, inverted := false) -> void:
+        var spr := Sprite2D.new()
+        spr.texture = _tex("spike3.png")
+        spr.scale = Vector2.ONE * 0.5 * us
+        if inverted:
+                spr.rotation = PI
         world.add_child(spr)
-        pushers.append({"x": x, "y0": y0, "y1": y1, "spr": spr})
+        var off := 30.0 if inverted else -30.0
+        hazards.append({"x": x, "y": surface + off, "kind": "spike3",
+                "spr": spr, "r": 30.0, "hw": 58.0, "hh": 24.0})
 
 func _add_hazard(x: float, y: float, kind: String) -> void:
         var spr := Sprite2D.new()
@@ -1392,24 +1627,40 @@ func _gen_calm(x: float) -> float:
         return w
 
 ## One chunk at the cursor; returns its width. THE WEIGHTS: the level
-## tightens the mix; flip/sticky unlock the roof play; SPIKES LIVE FROM THE
-## FIRST LEVEL (v0.3.6-1: the owner missed them - they were gated on level).
+## tightens the mix; flip/sticky unlock the roof play; THE WORLD LAW
+## (v0.3.6-3): the block structures (stairs, gardens, pyramids, descents,
+## towers, bridges) live from the FIRST level - the world is built, not
+## empty; spikes are the small triple rows mostly, the big triangle a rare
+## high-level wall.
 func _gen_chunk(x: float) -> float:
         if world_x < calm_until and gen_x < calm_until:
                 return _gen_calm(x)
         var lvl := _level()
         var pool: Array = []
-        var w_flat := maxi(6, 14 - lvl)
+        var w_flat := maxi(4, 10 - lvl)
         for i in w_flat:
                 pool.append("flat")
-        for i in mini(8, 2 + lvl):
+        for i in mini(7, 2 + lvl):
                 pool.append("pit")
-        for i in mini(7, 1 + lvl):
+        for i in mini(6, 1 + lvl):
                 pool.append("push")
-        for i in maxi(4, mini(8, 2 + lvl)):
+        for i in mini(7, 2 + lvl):
                 pool.append("spikes")
-        for i in mini(8, 2 + lvl):
+        for i in mini(6, 2 + lvl):
                 pool.append("lines")
+        for i in mini(6, 2 + lvl):
+                pool.append("stairs")
+        for i in mini(5, 2 + lvl):
+                pool.append("garden")
+        for i in mini(4, 1 + lvl):
+                pool.append("pyramid")
+        for i in mini(4, 1 + lvl):
+                pool.append("descent")
+        if lvl >= 1:
+                for i in mini(4, 1 + lvl):
+                        pool.append("twin")
+                for i in maxi(1, mini(3, lvl)):
+                        pool.append("bridge")
         for i in maxi(2, mini(5, 1 + lvl)):
                 pool.append("ladder")
         if lvl >= 2:
@@ -1423,6 +1674,8 @@ func _gen_chunk(x: float) -> float:
         if mechanic != "normal":
                 for i in mini(6, 2 + lvl):
                         pool.append("roof")
+                for i in mini(4, 1 + lvl):
+                        pool.append("roof_stairs")
         var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
         match pick:
                 "pit":
@@ -1433,6 +1686,18 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_spikes(x)
                 "lines":
                         return _chunk_lines(x)
+                "stairs":
+                        return _chunk_stairs(x)
+                "garden":
+                        return _chunk_garden(x)
+                "pyramid":
+                        return _chunk_pyramid(x)
+                "descent":
+                        return _chunk_descent(x)
+                "twin":
+                        return _chunk_twin(x)
+                "bridge":
+                        return _chunk_bridge(x)
                 "ladder":
                         return _chunk_ladder(x)
                 "weave":
@@ -1443,6 +1708,8 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_saw(x)
                 "roof":
                         return _chunk_roof(x)
+                "roof_stairs":
+                        return _chunk_roof_stairs(x)
                 _:
                         return _chunk_flat(x)
 
@@ -1490,8 +1757,13 @@ func _chunk_spikes(x: float) -> float:
         _add_gseg(x, cx + n * step + CELL * 4.0)
         _add_rseg(x, cx + n * step + CELL * 4.0)
         for i in n:
-                _add_hazard(cx + i * step, GROUND_Y - CELL * 0.5, "spike")
-                _add_orbit(cx + i * step - CELL * 0.2, GROUND_Y - 250.0)
+                # v0.3.6-3: the small triple row is the spike now; the big
+                # triangle is a rare wall from level 3
+                if _level() >= 3 and rng.randf() < 0.25:
+                        _add_hazard(cx + i * step, GROUND_Y - CELL * 0.5, "spike")
+                else:
+                        _add_spike3(cx + i * step, GROUND_Y)
+                _add_orbit(cx + i * step - CELL * 0.2, GROUND_Y - 240.0)
                 _add_orbit(cx + i * step + CELL * 0.8, GROUND_Y - 240.0)
         return cx + n * step + CELL * 4.0 - x
 
@@ -1503,11 +1775,11 @@ func _chunk_lines(x: float) -> float:
         _add_rseg(x, x + w)
         _add_line(x0, x0 + w - CELL * 2.0, y)
         _orbit_line(x0 + CELL, y - 120.0, maxi(2, int(w / CELL) - 3), CELL * 1.5)
-        # THE SPIKE TRUTH: line spikes live from level 0 now (the owner's
-        # report - the world felt empty because spikes barely spawned)
+        # the line spike: the small triple row (the big triangle retired to
+        # the ground walls at level 3+)
         if rng.randf() < 0.45:
                 var hx := x0 + w - CELL * 2.6
-                _add_hazard(hx, y - CELL * 0.5, "spike")
+                _add_spike3(hx, y)
         return w
 
 ## THE LADDER (v0.3.6-1) - "proper obstacles to climb them up": a rising
@@ -1533,8 +1805,8 @@ func _chunk_ladder(x: float) -> float:
         # the floor threat under the climb at higher levels: the ladder is
         # the clean way past it (the owner: "obstacles to climb them up")
         if _level() >= 2 and rng.randf() < 0.6:
-                _add_hazard(r2x + CELL * 1.2, GROUND_Y - CELL * 0.5, "spike")
-                _add_hazard(r2x + CELL * 2.1, GROUND_Y - CELL * 0.5, "spike")
+                _add_spike3(r2x + CELL * 1.2, GROUND_Y)
+                _add_spike3(r2x + CELL * 2.1, GROUND_Y)
         return w
 
 ## THE FLOATERS (v0.3.6-1) - floating spike threats BETWEEN the lines (the
@@ -1546,10 +1818,10 @@ func _chunk_floaters(x: float) -> float:
         _add_gseg(x, x + w)
         _add_rseg(x, x + w)
         var y: float = [L1_Y - 66.0, L2_Y + 45.0, L2_Y - 66.0][rng.randi_range(0, 2)]
-        var n := rng.randi_range(1, 2)
+        var n := 1 if rng.randf() < 0.6 else 2
         var fx := x + CELL * rng.randf_range(2.5, 3.5)
         for i in n:
-                _add_hazard(fx + i * CELL * 2.4, y, "spike")
+                _add_spike3(fx + i * CELL * 2.6, y)
         # the safe lane is marked with orbits (read the path, then commit)
         var oy := y + 150.0 if y < L2_Y else y - 150.0
         _orbit_line(fx - CELL * 0.6, clampf(oy, L3_Y + 60.0, L1_Y - 60.0), n + 1, CELL * 1.8)
@@ -1571,7 +1843,7 @@ func _chunk_weave(x: float) -> float:
                 var oy: float = lerpf(y_a - 130.0, y_b - 130.0, snappedf(t, 0.5))
                 _add_orbit(ox, oy)
         if rng.randf() < 0.6:
-                _add_hazard(x + w * 0.5, GROUND_Y - CELL * 0.5, "spike")
+                _add_spike3(x + w * 0.5, GROUND_Y)
         return w
 
 func _chunk_saw(x: float) -> float:
@@ -1602,7 +1874,144 @@ func _chunk_roof(x: float) -> float:
                 _add_pusher(px, ROOF_Y, false, false)
                 _orbit_line(px - CELL * 2.2, ROOF_Y + 200.0, 3)
                 if rng.randf() < 0.5:
-                        _add_hazard(px + CELL * 2.4, ROOF_Y + CELL * 0.5, "spike_down")
+                        _add_spike3(px + CELL * 2.4, ROOF_Y, true)
+        return w
+
+## ============================================================ THE WORLD LAW
+## v0.3.6-3 - THE BUILT WORLD: block structures everywhere (the owner:
+## "populate the world with blocks that make you climb them up or down and
+## make cool shapes - not the simple thing that currently exists"). Every
+## shape is self-contained fair: tops are real surfaces (THE CLIMB TRUTH),
+## every step is +1 cell so the apex always clears it, the ground route
+## climbs over or walks a marked lane, and threats never share a window
+## with a forced jump.
+
+## THE STAIRS - 2-3 rising steps (2-wide pads, 1-cell gaps): the pure climb.
+## From level 2 a small triple-spike row waits under the far side - the tops
+## are the safe road, the floor is the risky one.
+func _chunk_stairs(x: float) -> float:
+        var steps := rng.randi_range(2, 3)
+        _add_gseg(x, x + CELL * 14.0)
+        _add_rseg(x, x + CELL * 14.0)
+        var cx := x + CELL * 1.6
+        for i in steps:
+                _add_col(cx, i + 1, GROUND_Y)
+                _add_col(cx + CELL, i + 1, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(i + 1) * CELL - 115.0)
+                cx += CELL * 3.0
+        if _level() >= 2 and rng.randf() < 0.65:
+                _add_spike3(cx + CELL * 1.1, GROUND_Y)
+                _add_orbit(cx + CELL * 1.1, GROUND_Y - 250.0)
+        return CELL * 14.0
+
+## THE GARDEN - rhythm singles: 3-4 pads (1-2 tall) spaced for hop-by-hop
+## play, an orbit over each. The world's open dance floor.
+func _chunk_garden(x: float) -> float:
+        var n := rng.randi_range(3, 4)
+        _add_gseg(x, x + CELL * 16.0)
+        _add_rseg(x, x + CELL * 16.0)
+        var cx := x + CELL * 2.0
+        for i in n:
+                var h := 1 + (1 if (i % 2 == 1 and _level() >= 2) else 0)
+                _add_col(cx, h, GROUND_Y)
+                _add_col(cx + CELL, h, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(h) * CELL - 110.0)
+                cx += CELL * rng.randf_range(3.0, 3.6)
+        return CELL * 16.0
+
+## THE PYRAMID - the climb-over with a peak: up 2-3 steps, then DOWN the
+## other side (the climb-down taught in one shape). An orbit crowns it.
+func _chunk_pyramid(x: float) -> float:
+        var h := rng.randi_range(2, 3)
+        _add_gseg(x, x + CELL * 18.0)
+        _add_rseg(x, x + CELL * 18.0)
+        var cx := x + CELL * 2.0
+        for i in h:
+                _add_col(cx, i + 1, GROUND_Y)
+                _add_col(cx + CELL, i + 1, GROUND_Y)
+                cx += CELL * 3.0
+        _add_orbit(cx - CELL * 2.0, GROUND_Y - float(h + 1) * CELL - 115.0)
+        for i in range(h - 1, 0, -1):
+                _add_col(cx, i, GROUND_Y)
+                _add_col(cx + CELL, i, GROUND_Y)
+                cx += CELL * 3.0
+        return CELL * 18.0
+
+## THE DESCENT - the climb-down the owner missed: a raised line ride that
+## steps DOWN to the ground on block pads (2-tall ~ the line's height, then
+## 1-tall, then the floor). It climbs UP the very same path.
+func _chunk_descent(x: float) -> float:
+        var w := CELL * 15.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var lx := x + CELL * 1.5
+        _add_line(lx, lx + CELL * 4.0, L1_Y)
+        _orbit_line(lx + CELL * 0.5, L1_Y - 110.0, 3)
+        var px := lx + CELL * 4.8
+        _add_col(px, 2, GROUND_Y)
+        _add_col(px + CELL, 2, GROUND_Y)
+        var px2 := px + CELL * 3.2
+        _add_col(px2, 1, GROUND_Y)
+        _add_col(px2 + CELL, 1, GROUND_Y)
+        _add_orbit(px + CELL, GROUND_Y - CELL * 2.0 - 115.0)
+        _add_orbit(px2 + CELL, GROUND_Y - CELL - 115.0)
+        if _level() >= 2 and rng.randf() < 0.5:
+                _add_spike3(px2 + CELL * 3.4, GROUND_Y)
+        return w
+
+## THE TWIN TOWERS - two 2-cell towers with a hop valley between (the gap
+## obeys the same math as the pits: the hop clears it at the live speed).
+## From level 2 a small triple spike sits in the valley - the pads are the
+## road, the hop is marked with orbits.
+func _chunk_twin(x: float) -> float:
+        var w := CELL * 14.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var t1 := x + CELL * 2.5
+        var t2 := t1 + CELL * 4.5
+        for i in 2:
+                _add_col(t1 + float(i) * CELL, 2, GROUND_Y)
+                _add_col(t2 + float(i) * CELL, 2, GROUND_Y)
+        _add_orbit(t1 + CELL, GROUND_Y - CELL * 2.0 - 115.0)
+        _add_orbit((t1 + t2) * 0.5 + CELL * 0.5, GROUND_Y - CELL * 2.6)
+        _add_orbit(t2 + CELL, GROUND_Y - CELL * 2.0 - 115.0)
+        if _level() >= 2:
+                _add_spike3((t1 + t2) * 0.5 + CELL * 0.5, GROUND_Y)
+        return w
+
+## THE BRIDGE - a floating slab deck across a pit: the honest jump still
+## clears it (the pit obeys the max-pit law), but the slab is the mid-air
+## island - land, breathe, hop off. A low jump that clips the slab's
+## underside bonks honestly (THE UNDER-BONK).
+func _chunk_bridge(x: float) -> float:
+        var lead := CELL * rng.randf_range(2.5, 3.5)
+        var pit := CELL * rng.randf_range(1.8, _max_pit_cells())   # the honest jump still clears it
+        var tail_run := CELL * rng.randf_range(3.0, 4.5)
+        _add_gseg(x, x + lead)
+        _add_gseg(x + lead + pit, x + lead + pit + tail_run)
+        _add_rseg(x, x + lead + pit + tail_run)
+        var sx := x + lead + (pit - CELL) * 0.5
+        _add_block(sx, GROUND_Y - CELL * 1.6, 1)
+        _add_block(sx + CELL, GROUND_Y - CELL * 1.6, 1)
+        _add_orbit(sx + CELL * 0.5, GROUND_Y - CELL * 2.6)
+        _add_orbit(sx + CELL * 1.5, GROUND_Y - CELL * 2.6)
+        return lead + pit + tail_run
+
+## THE ROOF STAIRS - the flip-mode climb-down: block pads hang from the roof
+## stepping deeper into the screen (1-2-3 cells), each with a ONE-CELL gap
+## under the roof so the roof-riding lane stays clear. The ride hops DOWN
+## the chain pad to pad (catching their undersides); the ground lane runs
+## clear under every hang. Orbits mark every pad.
+func _chunk_roof_stairs(x: float) -> float:
+        var w := CELL * 14.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var cx := x + CELL * 2.2
+        for i in 3:
+                _add_hang(cx, i + 1, ROOF_Y + CELL)
+                _add_hang(cx + CELL, i + 1, ROOF_Y + CELL)
+                _add_orbit(cx + CELL * 0.5, ROOF_Y + float(i + 2) * CELL + 105.0)
+                cx += CELL * 3.0
         return w
 
 # =================================================================== render
@@ -1666,10 +2075,11 @@ func _layout_world() -> void:
         pspr.rotation_degrees = p["rot"]
         var base_s: float = (CELL * us) / (160.0 * 0.72)
         pspr.scale = Vector2(base_s * (2.0 - p["sq"]), base_s * p["sq"])
-        # THE TAIL LAW: the emitters sit BEHIND the square (the back face,
-        # rotation-aware) and launch at the world's own speed so the ribbon
-        # streams backwards honestly - never a puddle below the square
-        var back := Vector2(-HALF * us * 0.85, 0).rotated(deg_to_rad(p["rot"]))
+        # THE TAIL LAW: the emitters sit BEHIND the square - ALWAYS the
+        # screen-left, world-scroll side (v0.3.6-3: the offset never rides
+        # the square's rotation any more; a flip must not swing the trail
+        # overhead or underfoot - the back is the back, always)
+        var back := Vector2(-HALF * us * 0.85, 0)
         var tpos: Vector2 = pspr.position + back
         tail.position = tpos
         tail2.position = tpos + Vector2(-HALF * us * 0.4, 0)
@@ -1778,6 +2188,33 @@ func _burst_at(pos: Vector2, n: int, power: float) -> void:
                 if is_instance_valid(streak):
                         streak.queue_free())
 
+## THE FLIP PUSH (v0.3.6-3) - the simple directional push: one puff of soft
+## shapes leaving the face the square jumped OFF of, plus a faint ring.
+func _push_puff(at: Vector2, from_g: int, col: Color, power := 1.0) -> void:
+        var side := 1.0 if from_g == 1 else -1.0   # +1 = the puff sits BELOW
+        var puff := CPUParticles2D.new()
+        puff.texture = _tex("p_puff.png")
+        puff.amount = 10
+        puff.one_shot = true
+        puff.explosiveness = 1.0
+        puff.lifetime = 0.3
+        puff.direction = Vector2(0, -side)          # travels AWAY from the square
+        puff.spread = 26.0
+        puff.initial_velocity_min = 240.0 * power * us
+        puff.initial_velocity_max = 520.0 * power * us
+        puff.gravity = Vector2.ZERO
+        puff.scale_amount_min = 0.45
+        puff.scale_amount_max = 0.95
+        puff.color = Color(col.r, col.g, col.b, 0.85)
+        puff.material = _add_mat()
+        puff.position = at + Vector2(0, side * HALF * us * 0.8)
+        puff.emitting = true
+        add_child(puff)
+        get_tree().create_timer(0.7).timeout.connect(func():
+                if is_instance_valid(puff):
+                        puff.queue_free())
+        _ring_fx(at + Vector2(0, side * HALF * us * 0.5), col, 0.5 * power)
+
 ## The shockwave ring - the shared ceremony layer (saves, collects, death).
 func _ring_fx(pos: Vector2, col: Color, power := 1.0) -> void:
         var r := Sprite2D.new()
@@ -1841,44 +2278,53 @@ func _bonk_fx(pos: Vector2) -> void:
         tw.chain().tween_callback(func(): if is_instance_valid(s): s.queue_free())
         _ring_fx(pos, col, 0.45)
 
-## THE COLLECT LAW - the golden implosion: the ring snaps INWARD toward the
-## square, a 4-point star flashes at the pickup, streak sparks dive home.
+## THE COLLECT LAW (v0.3.6-3) - a proper COLORED particle burst: a golden
+## glow pop + white star flashes + a light ring. Readable, juicy, done.
 func _orbit_collect_fx(at: Vector2, to: Vector2) -> void:
-        var star := Sprite2D.new()
-        star.texture = _tex("p_star.png")
-        star.position = at
-        star.scale = Vector2.ONE * 0.55 * us
-        star.modulate = Color(1.0, 0.9, 0.45, 1.0)
-        star.material = _add_mat()
-        add_child(star)
-        var tw := star.create_tween()
-        tw.set_parallel(true)
-        tw.tween_property(star, "scale", Vector2.ONE * 0.05 * us, 0.18) \
-                .set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
-        tw.tween_property(star, "modulate:a", 0.0, 0.18)
-        tw.chain().tween_callback(func(): if is_instance_valid(star): star.queue_free())
-        var dive := CPUParticles2D.new()
-        dive.texture = _tex("p_streak.png")
-        dive.amount = 6
-        dive.one_shot = true
-        dive.explosiveness = 1.0
-        dive.lifetime = 0.22
-        dive.direction = (to - at).normalized()
-        dive.spread = 24.0
-        dive.initial_velocity_min = 420.0 * us
-        dive.initial_velocity_max = 760.0 * us
-        dive.gravity = Vector2.ZERO
-        dive.scale_amount_min = 0.4
-        dive.scale_amount_max = 0.8
-        dive.color = Color(1.0, 0.88, 0.5, 1.0)
-        dive.material = _add_mat()
-        dive.position = at
-        dive.emitting = true
-        add_child(dive)
-        get_tree().create_timer(0.6).timeout.connect(func():
-                if is_instance_valid(dive):
-                        dive.queue_free())
-        _ring_fx(at, Color(1.0, 0.85, 0.4), 0.8)
+        var burst := CPUParticles2D.new()
+        burst.texture = _tex("p_soft.png")
+        burst.amount = 16
+        burst.one_shot = true
+        burst.explosiveness = 1.0
+        burst.lifetime = 0.42
+        burst.direction = Vector2(0, -1)
+        burst.spread = 180.0
+        burst.initial_velocity_min = 170.0 * us
+        burst.initial_velocity_max = 520.0 * us
+        burst.gravity = Vector2(0, -130.0 * us)
+        burst.scale_amount_min = 0.4
+        burst.scale_amount_max = 1.05
+        burst.color = Color(1.0, 0.84, 0.38, 0.95)
+        burst.material = _add_mat()
+        burst.position = at
+        burst.emitting = true
+        add_child(burst)
+        var stars := CPUParticles2D.new()
+        stars.texture = _tex("p_star.png")
+        stars.amount = 5
+        stars.one_shot = true
+        stars.explosiveness = 1.0
+        stars.lifetime = 0.3
+        stars.direction = Vector2(0, -1)
+        stars.spread = 180.0
+        stars.initial_velocity_min = 260.0 * us
+        stars.initial_velocity_max = 640.0 * us
+        stars.gravity = Vector2.ZERO
+        stars.angular_velocity_min = -220.0
+        stars.angular_velocity_max = 220.0
+        stars.scale_amount_min = 0.35
+        stars.scale_amount_max = 0.7
+        stars.color = Color(1.0, 0.97, 0.86, 1.0)
+        stars.material = _add_mat()
+        stars.position = at
+        stars.emitting = true
+        add_child(stars)
+        get_tree().create_timer(0.8).timeout.connect(func():
+                if is_instance_valid(burst):
+                        burst.queue_free()
+                if is_instance_valid(stars):
+                        stars.queue_free())
+        _ring_fx(at, Color(1.0, 0.85, 0.4), 0.75)
 
 func _coin_collect_fx(at: Vector2, to: Vector2) -> void:
         _orbit_collect_fx(at, to)
@@ -1970,12 +2416,7 @@ func _fx_tick(dt: float) -> void:
         tail.speed_scale = ts
         tail2.speed_scale = ts
         var skin: Color = SKINS[player.get("skin", "classic")]["col"]
-        # the rocket plume under the square while ROCKET JUMP lives
-        rocket.emitting = powers["jump"] > 0.0 and not over_gate
-        if rocket.emitting:
-                rocket.position = Vector2(player["x"],
-                        player["y"] + HALF * us * 0.75)
-                rocket.color = Color(skin.r, skin.g, skin.b, 0.9)
+        # (v0.3.6-3: the rocket burn is a one-shot ON the jump - no plume here)
         # the extra-life mark: dark core + breathing aura
         var shielded: bool = powers["shield"] > 0.0
         shield_spr.visible = shielded
@@ -2130,8 +2571,12 @@ func _tail_row(id: String) -> Control:
                         var l0 := Arc.fit_label("%s  (ON)" % c["name"], 22, Color("58c470"), 560)
                         l0.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                         return l0
+                # THE NONE COLOR TRUTH (v0.3.6-3): with a tail worn, this row
+                # is the REMOVE action - but brown reads "currently in use",
+                # which none is not. It wears the VIOLET of every other
+                # not-worn item; tapping it still strips the tail.
                 return Arc.button("%s - TRAIL OFF" % c["name"], Vector2(560, 60), 22,
-                        Color("7a5a3a"), func():
+                        Color("8a4ab8"), func():
                                 Box.equip_item(game_id, "tail", "none")
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())

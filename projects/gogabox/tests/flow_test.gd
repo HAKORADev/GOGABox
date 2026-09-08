@@ -401,8 +401,8 @@ func _t_registry() -> int:
         var geo: Dictionary = GameReg.get_game("geometry")
         ok += _check(not bool(geo.get("coming_soon", false)) \
                         and String(geo["orientation"]) == "landscape" \
-                        and int(geo["coin_div"]) == 4,
-                "geometry flash is PLAYABLE now: landscape, score / 4 (v0.3.6)")
+                        and int(geo["coin_div"]) == 50,
+                "geometry flash is PLAYABLE now: landscape, score / 50 (v0.3.6-3)")
         var geo_ach_ok: bool = geo["ach"].size() == 5
         ok += _check(geo_ach_ok, "geometry wears five achievements")
         var ok2 := true

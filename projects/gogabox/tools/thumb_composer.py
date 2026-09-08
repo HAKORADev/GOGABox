@@ -985,55 +985,89 @@ def scene_spud():
     return sc.render()
 
 
-# ------------------------------------------------------------------ v0.3.6
-# GEOMETRY FLASH: the neon world mid-run - the classic square mid-spin over
-# a spike, an orbit arc rising to a platform line, the pusher waiting, the
-# GOGACoin floating under the roof.
+# ------------------------------------------------------------------ v0.3.6-3
+# GEOMETRY FLASH: THE BUILT WORLD (the owner reworked the thumb with the
+# world law round). The composition now shows the GAME ITSELF: the block
+# staircase the square just climbed, its tail streaming BEHIND it, the small
+# triple spike (the new spike), the golden orbit arc into a floating line,
+# and the GOGACoin - smaller, honest to the in-game scale. Brighter, fuller,
+# zero empty space.
 def scene_geometry():
     sc = Scene()
-    # the midnight gradient + a soft pulse band (the shader's language)
-    sc.backdrop((8, 11, 28), (4, 6, 15))
-    sc.glow(W * 0.5, H * 0.48, 330, (36, 52, 110), 46)
+    # the midnight gradient, a touch brighter than v0.3.6 + the pulse glow
+    sc.backdrop((14, 20, 46), (6, 8, 20))
+    sc.glow(W * 0.5, H * 0.46, 360, (44, 64, 140), 58)
     import random as _r
     rng = _r.Random(3607)
-    for i in range(70):                       # the faint grid dust
+    for i in range(80):                       # the faint grid dust
         gx, gy = rng.randint(0, W), rng.randint(0, H)
-        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(70, 100, 190, 70))
+        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(80, 112, 200, 75))
     G = "games/geometry/"
     # ground + roof bands: the real strip texture, tiled to the canvas
     strip = load_sprite(G + "strip.png")
     ground = strip.crop((0, 0, 512, 380)).resize((W, 190), Image.LANCZOS)
     sc.work.alpha_composite(ground, (0, H - 190))
-    roof = strip.crop((0, 0, 512, 300)).resize((W, 150), Image.LANCZOS) \
+    roof = strip.crop((0, 0, 512, 300)).resize((W, 140), Image.LANCZOS) \
         .transpose(Image.FLIP_TOP_BOTTOM)
     sc.work.alpha_composite(roof, (0, 0))
-    # the platform line mid-air (its bright edge up)
+    gy = H - 190                              # the ground line
+    # THE BLOCK STAIRCASE (the world law): 1-2-3 rising steps, the pads the
+    # square just hopped up - every block is the real block texture
+    blk = load_sprite(G + "block.png")
+    bs = 0.42                                  # one cell ~ 70px on the canvas
+    bpix = int(168 * bs)
+    cols = [(0.285, 1), (0.365, 2), (0.445, 3)]
+    for fx, n in cols:
+        cx = fx * W
+        for k in range(n):
+            cy = gy - bpix // 2 - k * bpix
+            sc.glow(cx, cy, 26, (150, 190, 255), 34)
+            sc.stamp(blk, cx, cy, scale=bs)
+    # the small triple spike on the ground past the staircase (the new spike)
+    sp_w = 126 * 0.9
+    sc.glow(W * 0.615, gy - 26, 30, (255, 130, 140), 62)
+    sc.stamp(load_sprite(G + "spike3.png"), W * 0.615, gy - 26, scale=0.9)
+    # the road shover waiting far right (the pusher law, balancing the floor)
+    sc.glow(W * 0.875, gy - 42, 26, (150, 190, 255), 40)
+    sc.stamp(load_sprite(G + "pusher.png"), W * 0.875, gy - 42, scale=0.5)
+    # the platform line mid-air right (its bright edge up) + its orbit
     line = load_sprite(G + "line.png")
-    sc.work.alpha_composite(line.resize((380, 64), Image.LANCZOS),
-                            (int(W * 0.50), int(H * 0.335)))
-    # the spike (the wrong timing) + the pusher (the shove)
-    sc.glow(W * 0.265, H - 205, 36, (255, 120, 130), 60)
-    sc.stamp(load_sprite(G + "spike.png"), W * 0.265, H - 205, scale=0.95)
-    sc.glow(W * 0.74, H - 200, 40, (150, 190, 255), 60)
-    sc.stamp(load_sprite(G + "pusher.png"), W * 0.74, H - 200, scale=0.95)
-    # the golden orbit arc climbing to the platform line
-    for i, (fx, fy) in enumerate([(0.40, 0.68), (0.455, 0.565), (0.52, 0.475),
-                                  (0.585, 0.415)]):
-        sc.glow(fx * W, fy * H, 30, (255, 208, 84), 90)
-        sc.stamp(load_sprite(G + "orbit.png"), fx * W, fy * H, scale=0.62)
+    sc.work.alpha_composite(line.resize((300, 52), Image.LANCZOS),
+                            (int(W * 0.66), int(H * 0.285)))
+    # the golden orbit arc: off the staircase top toward the line
+    arc = [(0.565, 0.455), (0.635, 0.385), (0.715, 0.335), (0.81, 0.315)]
+    for i, (fx, fy) in enumerate(arc):
+        sc.glow(fx * W, fy * H, 30, (255, 208, 84), 95)
+        sc.stamp(load_sprite(G + "orbit.png"), fx * W, fy * H, scale=0.56)
         sc.stamp(load_sprite(G + "tw_%d.png" % (i % 4)),
-                 fx * W + 20, fy * H - 20, scale=0.62)
-    # the GOGACoin floating under the roof
-    sc.glow(W * 0.875, H * 0.26, 34, (255, 214, 100), 110)
-    sc.stamp(load_sprite("ui/coin.png"), W * 0.875, H * 0.26, scale=1.05)
-    # THE SQUARE: mid-spin over the arc, trail breathing behind it
-    hx, hy = W * 0.335, H * 0.50
-    sc.glow(hx - 52, hy + 34, 22, (96, 226, 255), 55)
-    sc.stamp(load_sprite(G + "p_dot.png"), hx - 60, hy + 40, scale=0.34, alpha=110)
-    sc.stamp(load_sprite(G + "p_dot.png"), hx - 30, hy + 20, scale=0.28, alpha=160)
-    sc.glow(hx, hy, 62, (96, 226, 255), 80)
-    sc.stamp(load_sprite(G + "skin_classic.png"), hx, hy, scale=0.92, rot=30)
-    sc.vignette(80)
+                 fx * W + 18, fy * H - 17, scale=0.58)
+    # the GOGACoin - the honest 44px-core pickup read, top right
+    sc.glow(W * 0.895, H * 0.115, 30, (255, 214, 100), 105)
+    sc.stamp(load_sprite("ui/coin.png"), W * 0.895, H * 0.115, scale=0.72)
+    # THE SQUARE: mid-jump past the staircase top, FIRE tail streaming
+    # BEHIND it (the tail law: always screen-behind, never below)
+    hx, hy = W * 0.525, H * 0.335
+    puff = load_sprite(G + "p_puff.png")
+
+    def tint(img, rgb):
+        a = img.getchannel("A")
+        solid = Image.new("RGBA", img.size, rgb + (0,))
+        solid.putalpha(a)
+        return solid
+
+    ember = tint(puff, (255, 148, 56))
+    amber = tint(puff, (255, 208, 96))
+    trail = [(0.462, 0.375, 0.34, 215), (0.415, 0.405, 0.29, 175),
+             (0.372, 0.428, 0.25, 135), (0.335, 0.445, 0.21, 100),
+             (0.302, 0.458, 0.17, 70)]
+    for i, (fx, fy, s, a) in enumerate(trail):
+        sc.glow(fx * W, fy * H, 16 + i * 3, (255, 140, 50), 55 - i * 8)
+        sc.stamp(ember if i < 3 else amber, fx * W, fy * H, scale=s, alpha=a)
+    sc.glow(hx, hy, 64, (96, 226, 255), 85)
+    sc.stamp(load_sprite(G + "skin_classic.png"), hx, hy, scale=0.82, rot=-12)
+    # the landing ring waiting on the next pad (the climb truth whisper)
+    sc.glow(W * 0.445, gy - bpix * 3, 24, (96, 226, 255), 40)
+    sc.vignette(78)
     return sc.render()
 
 

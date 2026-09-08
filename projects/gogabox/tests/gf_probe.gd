@@ -263,8 +263,12 @@ func _run() -> void:
                                 fair_pits = false
                         if float(gpair[1]["x1"]) - float(gpair[1]["x0"]) < G.CELL * 2.0:
                                 fair_land = false
-                # pushers never share their window with a pit or a hazard
+                # road-level pushers never share their window with a pit or a
+                # hazard - v0.3.6-3: FLOATING slabs are exempt (the bridge is
+                # the helping island over the pit, never a road blocker)
                 for pu in G.pushers:
+                        if float(pu["y1"]) < G.GROUND_Y - 40.0:
+                                continue
                         for gg in gaps:
                                 if float(pu["x"]) + G.CELL > float(gg[1]["x0"]) - 8.0 and float(pu["x"]) < float(gg[1]["x1"]) + 8.0:
                                         fair_push = false
@@ -287,16 +291,28 @@ func _run() -> void:
         G.probe_reset(77)
         G.mechanic = "normal"
         G.calm_until = 0.0
-        var gen_before: float = G.gen_x
+        # v0.3.6-3 FIX: the old check compared two probe_reset horizons (a
+        # coin flip - different seeds roll different horizons). The honest
+        # ride is the real stitching contract: gen_x += _gen_chunk(gen_x).
+        var stitched := true
         for i in 30:
-                G._gen_chunk(G.gen_x)
-        var last_x: float = G.gen_x
+                var step_w: float = G._gen_chunk(G.gen_x)
+                if step_w <= 0.0:
+                        stitched = false
+                G.gen_x += step_w
+        ck(stitched and G.gen_x > 0.0, "the generator stitches chunks in normal mode")
+        var normal_x: float = G.gen_x
         G.probe_reset(78)
         G.mechanic = "flip"
         G.calm_until = 0.0
+        var stitched_flip := true
         for i in 60:
-                G._gen_chunk(G.gen_x)
-        ck(G.gen_x > last_x, "the generator stitches chunks in both modes")
+                var step_w2: float = G._gen_chunk(G.gen_x)
+                if step_w2 <= 0.0:
+                        stitched_flip = false
+                G.gen_x += step_w2
+        ck(stitched_flip and G.gen_x > normal_x,
+                "the generator stitches chunks in flip mode (roof + roof stairs)")
         # the roof-pit check: in normal mode rsegs must be gapless
         var roof_gaps := true
         G.probe_reset(81)
@@ -341,15 +357,15 @@ func _run() -> void:
         G.speed_level = 0
         G.speed = G.BASE_SPEED
         G.next_bonus = G.SPEED_BONUS_AT
-        for i in 48:
+        for i in 8:
                 G._add_orbit(G.world_x + G.stand_x / G.us, oy)
                 G._pickups(1.0 / 60.0)
         ck(absf(G.speed / G.BASE_SPEED - 1.0) < 0.0001,
-                "THE /50 LAW: 49 points pay NO speed step")
+                "THE /10 TRUTH: 9 points pay NO speed step")
         G._add_orbit(G.world_x + G.stand_x / G.us, oy)
         G._pickups(1.0 / 60.0)
         ck(absf(G.speed / G.BASE_SPEED - 1.1) < 0.001,
-                "THE /50 LAW: 50 points = exactly x1.1 (the owner moved /10 -> /50)")
+                "THE /10 TRUTH: 10 points = exactly x1.1 (the patch-1 /50 was the BOX score bonus)")
         # ------------------------------------------------ the coin laws
         ck(G.COIN_DELAYS == [30, 35, 40, 45, 50],
                 "THE COIN LAW table: 30/35/40/45/50 seconds")
@@ -496,6 +512,268 @@ func _run() -> void:
         G._apply_tail()
         ck(not G.tail.emitting and not G.tail2.emitting,
                 "THE NONE TRUTH: none kills BOTH emitters dead (the toggle bug)")
+
+        # ================================================== v0.3.6-3 LAWS
+        # THE /10 TRUTH constant + THE WHITE-TAIL LAW (the replay stranger)
+        ck(G.SPEED_BONUS_AT == 10,
+                "THE /10 TRUTH: the step constant is 10 (the /50 was the box bonus)")
+        G.probe_reset(141)
+        Box.dev_set_cheat("all_owned", 0)
+        Box.unequip_item("geometry", "tail")
+        Box.buy_item("geometry", "tail", "fire", int(G.TAILS["fire"]["price"]))
+        G.trail_mode = "none"
+        G._apply_tail()                      # the stale pre-meta state (the bug)
+        G._load_meta()                       # what EVERY fresh run executes
+        ck(G.trail_mode == "fire" and G.tail.emitting,
+                "THE WHITE-TAIL LAW: _load_meta re-applies the equipped tail")
+        ck(G.tail.texture != null \
+                and (G.tail.texture as Texture2D).resource_path.ends_with("p_puff.png") \
+                and G.tail.color.g > 0.5 and G.tail.color.b < 0.4,
+                "THE WHITE-TAIL LAW: the tail wears FIRE, never the white reset")
+        # THE TAIL BACK LAW: the emitters never ride the rotation
+        G.probe_reset(142)
+        G.trail_mode = "gold"
+        G.phase = "run"
+        G._apply_tail()
+        G.player["rot"] = 137.0
+        G._layout_world()
+        var back_dx: float = (G.tail.position.x - G.pspr.position.x) / G.us
+        ck(back_dx < -10.0,
+                "THE TAIL BACK LAW: at 137 degrees the trail is STILL screen-behind")
+        # THE NONE COLOR LAW: violet while a real tail is worn
+        var none_row: Control = G._tail_row("none")
+        var none_sb := none_row.get_theme_stylebox("normal") as StyleBoxFlat
+        ck(none_row is Button and none_sb != null \
+                and none_sb.bg_color == Color("8a4ab8"),
+                "THE NONE COLOR LAW: none wears the violet of the not-worn items")
+        # THE STREAK RESET LAW: 2s silence walks the ladder home
+        G.probe_reset(143)
+        G.orbit_streak = 6
+        G.streak_idle = 0.0
+        G.streak_decay = 0.0
+        G._pickups(0.5)
+        ck(G.orbit_streak == 6, "THE STREAK RESET LAW: under 2s of silence keeps the rung")
+        G._pickups(1.6)
+        ck(G.orbit_streak == 5, "THE STREAK RESET LAW: the decay drops one rung per step")
+        G._pickups(1.1)
+        G._pickups(0.6)
+        G._pickups(0.6)
+        ck(G.orbit_streak == 3, "THE STREAK RESET LAW: the ladder walks down rung by rung")
+        G._pickups(1.1)
+        G._pickups(0.6)
+        G._pickups(0.6)
+        ck(G.orbit_streak == 1, "THE STREAK RESET LAW: the walk reaches the last rung")
+        G._pickups(0.6)
+        ck(G.orbit_streak == 0 and G.streak_idle == 0.0,
+                "THE STREAK RESET LAW: the last rung falls after 0.5s - from the start")
+        G.orbit_streak = 4
+        G.streak_idle = 3.0
+        G._add_orbit(G.world_x + G.stand_x / G.us, oy)
+        G._pickups(1.0 / 60.0)
+        ck(G.orbit_streak == 5 and G.streak_idle == 0.0,
+                "THE STREAK RESET LAW: a collect freezes the decay and climbs")
+        # THE ROCKET LAW: one-shot on the jump, side-aware
+        G.probe_reset(151)
+        G.powers["jump"] = 5.0
+        G.player["g"] = 1
+        G.player["ground"] = true
+        G.player["y"] = (G.GROUND_Y - G.HALF) * G.us
+        G._jump()
+        ck(G.rocket.emitting and G.rocket.one_shot \
+                and G.rocket.position.y > G.player["y"],
+                "THE ROCKET LAW: the burn fires ON the jump, from BELOW on the ground")
+        G.player["g"] = -1
+        G.player["ground"] = true
+        G.player["y"] = (G.ROOF_Y + G.HALF) * G.us
+        G._jump()
+        ck(G.rocket.position.y < G.player["y"],
+                "THE ROCKET LAW: off the roof the burn pours from ABOVE")
+        G.powers["jump"] = 0.0
+        # THE FLIP PUSH LAW: the switch puffs from the side being left
+        G.probe_reset(152)
+        G.mechanic = "flip"
+        G.flip_cd = 0.0
+        G.paused = false
+        G.player["g"] = 1
+        G.player["ground"] = true
+        G.player["y"] = (G.GROUND_Y - G.HALF) * G.us
+        G._do_action()
+        var puff_below := false
+        for c in G.get_children():
+                if c is CPUParticles2D and c != G.tail and c != G.tail2 \
+                                and c != G.rocket and c.position.y > G.player["y"]:
+                        puff_below = true
+        ck(puff_below and G.player["g"] == -1,
+                "THE FLIP PUSH LAW: leaving the ground puffs from BELOW")
+        # THE COIN SPACE LAW: spawns sit in clear world; a crowd defers
+        G.probe_reset(161)
+        var coin_ok := true
+        var coin_seen := 0
+        for i in 40:
+                G.coin_timer = 0.0
+                if not G.coin.is_empty():
+                        if is_instance_valid(G.coin["spr"]):
+                                G.coin["spr"].queue_free()
+                        G.coin = {}
+                G._coin_clock(1.0 / 60.0)
+                if G.coin.is_empty():
+                        continue
+                coin_seen += 1
+                if not G._coin_spot_clear(float(G.coin["x"]), float(G.coin["y"])):
+                        coin_ok = false
+        ck(coin_seen > 25 and coin_ok,
+                "THE COIN SPACE LAW: every spawn sits in clear world (%d spawns)" % coin_seen)
+        G.probe_reset(162)
+        var wall_x: float = G.world_x + G._vp().x / G.us + 80.0 / G.us
+        for lx in 5:
+                for ly in [G.L3_Y - 150.0, G.L2_Y - 150.0, G.L1_Y - 150.0,
+                        G.GROUND_Y - 190.0]:
+                        G._add_hazard(wall_x + float(lx) * G.CELL, ly, "saw")
+        G.coin_timer = 0.0
+        G._coin_clock(1.0 / 60.0)
+        ck(G.coin.is_empty() and absf(G.coin_timer - 2.0) < 0.01,
+                "THE COIN SPACE LAW: a crowded horizon DEFERS the spawn")
+        # THE WORLD LAW battery: each shape, built and measured
+        var air_len: float = G.BASE_SPEED * 2.0 * G.JUMP_V / G.GRAV
+        G.probe_reset(211)
+        G.pushers.clear()
+        G._chunk_stairs(0.0)
+        var st := _col_tops(G)
+        var pxs: Array = []
+        for pu in G.pushers:
+                pxs.append(float(pu["x"]))
+        pxs.sort()
+        var first_pad: float = _top_at(G, float(pxs.front()))
+        var last_pad: float = _top_at(G, float(pxs.back()))
+        ck(st.size() >= 2 and _steps_by(st, G.CELL) \
+                and absf(first_pad - (G.GROUND_Y - G.CELL)) < 1.0 \
+                and last_pad < first_pad,
+                "THE WORLD LAW: the stairs rise from 1 cell, one cell at a time")
+        G.probe_reset(212)
+        G.pushers.clear()
+        G._chunk_pyramid(0.0)
+        var py := _col_tops(G)
+        var pyxs: Array = []
+        for pu in G.pushers:
+                pyxs.append([float(pu["x"]), float(pu["y0"])])
+        pyxs.sort_custom(func(a, b): return a[0] < b[0])
+        var mid_top: float = float(pyxs[pyxs.size() / 2][1])
+        ck(py.size() >= 2 and _steps_by(py, G.CELL) \
+                and absf(float(pyxs.front()[1]) - (G.GROUND_Y - G.CELL)) < 1.0 \
+                and absf(float(pyxs.back()[1]) - (G.GROUND_Y - G.CELL)) < 1.0 \
+                and mid_top < G.GROUND_Y - G.CELL * 1.5,
+                "THE WORLD LAW: the pyramid climbs up AND back down by single cells")
+        G.probe_reset(213)
+        G.pushers.clear()
+        G.lines.clear()
+        G._chunk_descent(0.0)
+        var de := _col_tops(G)
+        var has_line := false
+        for l in G.lines:
+                if absf(float(l["y"]) - G.L1_Y) < 1.0:
+                        has_line = true
+        ck(de.size() >= 2 and _steps_by(de, G.CELL) and has_line \
+                and absf(float(de.front()) - (G.GROUND_Y - G.CELL)) < 1.0,
+                "THE WORLD LAW: the descent steps from the line height down to the floor")
+        G.probe_reset(214)
+        G.pushers.clear()
+        G._chunk_twin(0.0)
+        var tw := _col_tops(G)
+        var twxs: Array = []
+        for pu in G.pushers:
+                twxs.append(float(pu["x"]))
+        twxs.sort()
+        var valley: float = float(twxs[2]) - (float(twxs[1]) + G.CELL)
+        ck(tw.size() == 1 and valley > G.CELL \
+                and valley <= air_len - G.CELL,
+                "THE WORLD LAW: the twin towers share one top; the valley is a clearable hop")
+        G.probe_reset(215)
+        G.pushers.clear()
+        G.gsegs.clear()
+        G.rsegs.clear()
+        G._chunk_bridge(0.0)
+        var slabs := 0
+        var pit_w := 0.0
+        var gs: Array = G.gsegs.duplicate()
+        gs.sort_custom(func(a, b): return a["x0"] < b["x0"])
+        if gs.size() >= 2:
+                pit_w = float(gs[1]["x0"]) - float(gs[0]["x1"])
+        for pu in G.pushers:
+                if float(pu["y1"]) < G.GROUND_Y - 40.0:
+                        slabs += 1
+        ck(slabs == 2 and pit_w > 0.0 and pit_w <= G._max_pit_cells() * G.CELL + 8.0,
+                "THE WORLD LAW: the bridge slab floats over an honest (jumpable) pit")
+        G.probe_reset(216)
+        G.pushers.clear()
+        G._chunk_roof_stairs(0.0)
+        var hset := {}
+        var hang_ok := true
+        for pu in G.pushers:
+                hset[int(roundf((float(pu["y1"]) - G.ROOF_Y) / G.CELL))] = true
+                if absf(float(pu["y0"]) - (G.ROOF_Y + G.CELL)) > 1.0:
+                        hang_ok = false
+                if float(pu["y1"]) >= G.GROUND_Y - G.CELL:
+                        hang_ok = false
+        ck(hang_ok and hset == {2: true, 3: true, 4: true},
+                "THE WORLD LAW: the roof stairs hang one cell under the ride, stepping 1-2-3")
+        # THE CLIMB TRUTH: a block top lands the full 90 and jumps again
+        G.probe_reset(221)
+        var blk_x: float = G.world_x + G.stand_x / G.us + G.CELL * 2.2
+        G._add_col(blk_x, 1, G.GROUND_Y)
+        G.player["x"] = G.stand_x
+        G.player["y"] = (G.GROUND_Y - G.HALF) * G.us
+        G.player["vy"] = 0.0
+        G.player["g"] = 1
+        G.player["ground"] = true
+        G.player["rot"] = 0.0
+        G.paused = false
+        G._do_action()
+        var landed_block := false
+        for i in 240:
+                G.probe_step(1.0 / 60.0)
+                if G.player["ground"] \
+                                and absf(G.player["y"] - (G.GROUND_Y - G.CELL - G.HALF) * G.us) < 3.0:
+                        landed_block = true
+                        break
+        var rot_mod: float = absf(fmod(G.player["rot"], 90.0))
+        ck(landed_block, "THE CLIMB TRUTH: the square lands ON the block top")
+        ck(rot_mod < 14.0 or rot_mod > 76.0,
+                "THE CLIMB TRUTH: the 90 completes at the block touchdown (rot %.1f)" % G.player["rot"])
+        var was_ground: bool = G.player["ground"]
+        G._do_action()
+        ck(was_ground and not G.player["ground"],
+                "THE CLIMB TRUTH: jumping OFF the block works at once")
+        # THE CLIMB SNAP: a rising near-miss lands instead of shoving
+        G.probe_reset(222)
+        var blk2: float = G.world_x + G.stand_x / G.us + G.CELL * 1.2
+        G._add_col(blk2, 1, G.GROUND_Y)
+        G.player["x"] = G.stand_x + G.CELL * 1.2 * G.us + 10.0 * G.us
+        G.player["y"] = (G.GROUND_Y - G.CELL - G.HALF + 22.0) * G.us
+        G.player["vy"] = -400.0 * G.us
+        G.player["ground"] = false
+        G._pusher_push(1.0 / 60.0)
+        ck(G.player["ground"] \
+                and absf(G.player["y"] - (G.GROUND_Y - G.CELL - G.HALF) * G.us) < 1.0,
+                "THE CLIMB SNAP: rising feet 22px under the top land ON the block")
+        G.player["y"] = (G.GROUND_Y - G.HALF) * G.us
+        G.player["vy"] = 0.0
+        G.player["ground"] = true
+        var x0s: float = G.player["x"]
+        G._pusher_push(1.0 / 60.0)
+        ck(G.player["x"] < x0s,
+                "THE PUSHER LAW kept: a grounded face-hit still shoves")
+        # THE SPIKE3 LAW: wide-low, calculated dodge-able
+        G.probe_reset(231)
+        G._add_spike3(G.world_x + 1000.0, G.GROUND_Y)
+        var found3 := false
+        for h in G.hazards:
+                if h["kind"] == "spike3":
+                        found3 = true
+                        ck(float(h["hw"]) * 2.0 <= 130.0 and float(h["hh"]) * 2.0 <= 48.0,
+                                "THE SPIKE3 LAW: the box stays wide-low (%.0f x %.0f)" % [float(h["hw"]) * 2.0, float(h["hh"]) * 2.0])
+        ck(found3, "THE SPIKE3 LAW: the spike3 builder lives")
+        ck(air_len > 130.0 + G.CELL,
+                "THE SPIKE3 LAW: the base hop clears the whole row + the square (%.0fpx air)" % air_len)
         print("RESULT: %d checks, %d failures" % [checks, fails])
         print("RESULT: %s" % ("ALL LAWS HOLD" if fails == 0 else "LAWS BROKEN"))
         get_tree().quit(0 if fails == 0 else 1)
@@ -508,6 +786,34 @@ func _surgery_line_under_player(y: float) -> void:
         G.lines = []
         var px: float = G.world_x + G.stand_x / G.us
         G._add_line(px - 500.0, px + 500.0, y)
+
+## ---- v0.3.6-3 structure helpers -----------------------------------------
+## Distinct column tops, highest (smallest y) first.
+func _col_tops(g: Node) -> Array:
+        var tops: Array = []
+        for pu in g.pushers:
+                var y0: float = float(pu["y0"])
+                if not tops.has(y0):
+                        tops.append(y0)
+        tops.sort()
+        tops.reverse()
+        return tops
+
+## The top of the column seated at world x (or -1).
+func _top_at(g: Node, wx: float) -> float:
+        for pu in g.pushers:
+                if absf(float(pu["x"]) - wx) < 2.0:
+                        return float(pu["y0"])
+        return -1.0
+
+## True when every neighbouring distinct top differs by exactly one cell.
+func _steps_by(tops: Array, cell: float) -> bool:
+        if tops.size() < 2:
+                return false
+        for i in tops.size() - 1:
+                if absf(absf(float(tops[i + 1]) - float(tops[i])) - cell) > 1.0:
+                        return false
+        return true
 
 func _ready() -> void:
         _run()

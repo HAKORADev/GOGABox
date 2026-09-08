@@ -164,3 +164,63 @@ STICKY you can, always).
 - Tests: gf_probe 73 checks 0 fails (the new stick/power/coin//50/none
   laws); gf_replay_repro CLEAN; flow_test + every game probe green.
 - version 0.3.6-1 / code base 30680. NO release (the law).
+
+## 9. THE PATCH LAWS (amendments, binding)
+
+### v0.3.6-1 (patch 1)
+- THE STICK TRUTH: STICK is not a FLIP copy - the tap is JUST a hop; gravity
+  changes ONLY when the square TOUCHES another floor (ground <-> roof; the
+  three lines are not floors). The climb ground -> line -> roof is real.
+- THE COIN LAWS: 44px core (not a second sun); the FIRST coin waits the full
+  30-50s from the run start.
+- Spikes from level 0; the surfaces re-filled with inner detail.
+- THE VFX OVERHAUL: layered additive bursts (never "repeated small shapes"),
+  the landing VFX fires ON the collision, tails are emitters behind the
+  square, death = shockwaves + ghost + shards.
+- THE READY GROUND LAW: the idle bob can never bury the square at tap time
+  (the replay ground-fall bug).
+- THE POWER LAW: rocket jump / slow world / extra life - bought standalone,
+  30/40/50/60s spawner, 10 game-seconds each (slow world's own clock is
+  game-time, so it lasts 20 real seconds).
+
+### v0.3.6-3 (patch 3) - the owner's 11-item round
+- THE /50 + /10 TRUTH: "score bonus /50" was the BOX score bonus (registry
+  coin_div 4 -> 50, the dead-menu line) - NEVER the speed step; the speed
+  step is x1.1 every 10 again.
+- THE WHITE-TAIL LAW: _load_meta() re-applies the tail - a replay boots THE
+  tail the player wore (the old build streamed a white stranger: the apply
+  ran before the meta existed and the stale none-reset config went live).
+- THE TAIL BACK LAW: the tail emitters sit ALWAYS at the screen-back side -
+  the offset never rides the square's rotation; a flip cannot swing it.
+- THE NONE COLOR LAW: with a tail worn, the NONE row wears the VIOLET of
+  every not-worn item (brown means "currently in use"); tapping it still
+  removes the tail.
+- THE STREAK RESET LAW: the collect-blip pitch ladder decays after 2.0s of
+  silence - one rung per 1.0s, the last rung to 0.0 after 0.5s; a collect
+  freezes the decay.
+- THE ROCKET SIMPLICITY LAW: the jump-power burn is a ONE-SHOT on the jump,
+  SIDE-AWARE (under the square off the ground, above it off the roof) - no
+  constant plume.
+- THE FLIP PUSH LAW: the flip's switch reads as a simple push from the side
+  being LEFT (a puff below when leaving the ground, above off the roof).
+- THE COLLECT BURST: the orbit collect is a golden colored particle burst
+  (glow pop + star flashes + a light ring) - the implosion is dead.
+- THE COIN SPACE LAW: every coin spawn validates against blocks/lines/
+  hazards/orbits and DEFERS 2s when the horizon is crowded - no coin ever
+  inside the world.
+- THE WORLD LAW: the spike is THREE SMALL triangles on a base (spike3,
+  a calculated 120x48 box a base hop always clears; the big triangle is a
+  rare level-3 wall) + the BLOCK STRUCTURES: stairs up, gardens, pyramids
+  (up AND down), descents (line -> pads -> floor), twin towers with a hop
+  valley, floating slab bridges, hanging roof stairs for the flip modes -
+  common from level 0, the world is BUILT, not empty.
+- THE CLIMB TRUTH: block tops are landing surfaces in the spin predictor
+  (the 90 completes at the touchdown); THE CLIMB SNAP catches rising
+  near-misses; THE LANDING BAND turns a same-frame touchdown into a landing
+  (the old 6px window shoved honest landings away - "it slides on the block
+  without letting me able to do a jump"); THE SPACE TRUTH part 3: the
+  support check compared the pusher's SCREEN x against the player's WORLD
+  span - support silently dropped at world_x > 0 (the deep mid-run block
+  bug); the under-bonk makes a clipped slab underside bonk honestly.
+- THE THUMB REDO: the thumbnail is the built world (the staircase, the
+  mid-jump square with its fire tail, the spike3 row, the orbit arc).
