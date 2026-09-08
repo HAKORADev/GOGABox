@@ -1074,6 +1074,106 @@ def scene_geometry():
 # ----------------------------------------------------------- registry/CLI
 
 # Real-game scenes (composed, 960x640, no baked text - rule R2).
+# ------------------------------------------------------------------ v0.3.7
+# MAZE ESCAPER: the real maze mid-read - a Wilson-woven wall texture drawn
+# live (branching corridors, honest dead ends), Geoquare at a junction, the
+# golden coin waiting one step off the route, the exit portal glowing.
+def scene_maze():
+    import random as _r
+    sc = Scene()
+    sc.backdrop((14, 20, 46), (6, 8, 20))
+    sc.glow(W * 0.5, H * 0.46, 360, (44, 64, 140), 55)
+    rng = _r.Random(9107)
+    for i in range(70):
+        gx, gy = rng.randint(0, W), rng.randint(0, H)
+        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(80, 112, 200, 70))
+
+    # ---- the maze: a tiny hand-woven Wilson texture on a 13x9 grid
+    cols, rows, cell = 13, 9, 56
+    ox, oy = (W - cols * cell) // 2, (H - rows * cell) // 2 + 8
+    # walls[r][c] = [top, left] (+ the outer bottom/right edges) - carved to
+    # LOOK branchy: long corridors, real dead ends, one threading route
+    carved = set()
+    def carve(a, b):
+        carved.add((a, b))
+        carved.add((b, a))
+    route = [(0, 3), (1, 3), (2, 3), (2, 2), (2, 1), (3, 1), (4, 1), (4, 2),
+             (4, 3), (4, 4), (3, 4), (2, 4), (2, 5), (2, 6), (3, 6), (4, 6),
+             (5, 6), (5, 5), (5, 4), (6, 4), (6, 3), (6, 2), (7, 2), (8, 2),
+             (8, 3), (8, 4), (8, 5), (7, 5), (6, 5), (6, 6), (6, 7), (5, 7),
+             (4, 7), (3, 7), (2, 7), (1, 7), (0, 7), (0, 6), (0, 5)]
+    for i in range(len(route) - 1):
+        carve(route[i], route[i + 1])
+    stubs = [((0, 3), (0, 2)), ((1, 3), (1, 2)), ((4, 4), (5, 4)), ((2, 6), (1, 6)),
+             ((8, 5), (8, 6)), ((6, 7), (7, 7)), ((0, 5), (0, 4)), ((4, 7), (4, 8)),
+             ((8, 2), (7, 2)), ((6, 3), (5, 3)), ((1, 7), (1, 8)), ((8, 4), (7, 4)),
+             ((2, 3), (3, 3)), ((6, 6), (5, 6)), ((0, 7), (0, 8)), ((8, 3), (8, 2)),
+             ((1, 9), (1, 10)), ((3, 9), (3, 10)), ((5, 8), (5, 9)), ((7, 8), (7, 9)),
+             ((2, 10), (2, 11)), ((4, 10), (5, 10)), ((6, 10), (6, 11)),
+             ((1, 11), (1, 12)), ((3, 11), (3, 12)), ((5, 11), (5, 12)),
+             ((7, 10), (8, 10)), ((6, 8), (6, 9)), ((2, 8), (2, 9)), ((8, 7), (8, 8)),
+             ((4, 9), (4, 10)), ((0, 10), (0, 11)), ((2, 12), (3, 12))]
+    for a, b in stubs:
+        carve(a, b)
+
+    def open_between(a, b):
+        return (a, b) in carved
+
+    lw = 7
+    wall_col = (154, 216, 255, 255)
+    dim_col = (60, 88, 150, 255)
+    # the dim glow bed first
+    for r in range(rows):
+        for c in range(cols):
+            x, y = ox + c * cell, oy + r * cell
+            if (r, c) == (0, 0) or not open_between((r, c - 1), (r, c)) if c > 0 else True:
+                pass
+    # (draw walls directly: top + left of every cell, bottom/right on the rim)
+    for r in range(rows):
+        for c in range(cols):
+            x, y = ox + c * cell, oy + r * cell
+            top_open = r > 0 and open_between((r, c), (r - 1, c))
+            left_open = c > 0 and open_between((r, c), (r, c - 1))
+            if not top_open:
+                sc.line([(x, y), (x + cell, y)], dim_col, lw + 6)
+            if not left_open:
+                sc.line([(x, y), (x, y + cell)], dim_col, lw + 6)
+            if r == rows - 1 and (r, c) != (8, 12):
+                sc.line([(x, y + cell), (x + cell, y + cell)], dim_col, lw + 6)
+            if c == cols - 1 and r != 0:
+                sc.line([(x + cell, y), (x + cell, y + cell)], dim_col, lw + 6)
+    for r in range(rows):
+        for c in range(cols):
+            x, y = ox + c * cell, oy + r * cell
+            top_open = r > 0 and open_between((r, c), (r - 1, c))
+            left_open = c > 0 and open_between((r, c), (r, c - 1))
+            if not top_open:
+                sc.line([(x, y), (x + cell, y)], wall_col, lw)
+            if not left_open:
+                sc.line([(x, y), (x, y + cell)], wall_col, lw)
+            if r == rows - 1 and (r, c) != (8, 12):
+                sc.line([(x, y + cell), (x + cell, y + cell)], wall_col, lw)
+            if c == cols - 1 and r != 0:
+                sc.line([(x + cell, y), (x + cell, y + cell)], wall_col, lw)
+    # the exit gap glows at (0,12) - the portal ring
+    ex, ey = ox + 12 * cell + cell // 2, oy + 0 * cell + cell // 2
+    sc.glow(ex, ey, 44, (140, 255, 180), 130)
+    sc.glow(ex, ey, 22, (220, 255, 235), 110)
+    G = "games/maze/"
+    # Geoquare at a junction (2,6)-ish, mid-read
+    hx, hy = ox + 6 * cell + cell // 2, oy + 2 * cell + cell // 2
+    sc.glow(hx, hy, 46, (96, 226, 255), 90)
+    sc.stamp(load_sprite(G + "skin_geoquare.png"), hx, hy, scale=0.62, rot=-9)
+    # the golden coin one step off the route
+    cx2, cy2 = ox + 4 * cell + cell // 2, oy + 6 * cell + cell // 2
+    sc.glow(cx2, cy2, 30, (255, 214, 100), 105)
+    sc.stamp(load_sprite("ui/coin.png"), cx2, cy2, scale=0.44)
+    # the exit portal doubles down (the map's goal reads from far)
+    sc.glow(ex, ey, 60, (140, 255, 180), 70)
+    sc.vignette(80)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1081,6 +1181,7 @@ SCENES = {
     "invaders": scene_invaders,
     "slasher": scene_slasher,
     "hopper": scene_hopper,
+    "maze": scene_maze,
     "merge": scene_merge,
     "dario": scene_dario,
     "xo": scene_xo,

@@ -814,6 +814,36 @@ func _run() -> void:
                         chunks_moved = true
         _check(chunks_moved, "the chunks have velocity (gravity + spin live in the tick)")
 
+        # ======================================= v0.3.7 THE GEOMETRIC STYLE
+        g3.queue_free()
+        var g4: GogaGame = load("res://game/games/hopper/hopper.gd").new()
+        g4.game_id = "hopper"
+        add_child(g4)
+        await get_tree().create_timer(1.0).timeout
+        # the honest buy (the economy sections may have cleared the cheats)
+        Box.dev_set_cheat("all_owned", 0)
+        Box.earn(5000)
+        _check(Box.buy_item("hopper", "style", "geometric", 1200),
+                "THE STYLE LAW: the geometric style is BUYABLE standalone")
+        Box.equip_item("hopper", "style", "geometric")
+        g4._apply_geo_style()
+        _check(g4._is_geo() and g4._style_id() == "geometric",
+                "THE STYLE LAW: the geometric style wears")
+        _check(g4._pal()["top"] == g4.GEOM_PAL["top"],
+                "THE STYLE LAW: the palette wears the matrix light")
+        _check(g4.STYLES["geometric"]["price"] == 1200
+                and g4.STYLES["snowy"]["price"] == 0,
+                "THE STYLE LAW: snowy classic free, geometric the priciest (1200)")
+        # the style voice routes without error in both directions
+        g4._sfx("tower_jump", -60.0, 1.0)
+        _check(true, "THE STYLE VOICE: the tower calls route through the style door")
+        # snowy is the UNEQUIPPED default (the free classic) - strip the style
+        Box.unequip_item("hopper", "style")
+        g4._apply_geo_style()
+        _check(not g4._is_geo() and g4._pal()["top"] == g4.PAL["day"]["top"],
+                "THE STYLE LAW: snowy wears the classic mountain back")
+        g4.queue_free()
+
         print("== tower_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(fails)
 

@@ -118,8 +118,8 @@ const THEMES := {
                 "desc": "the deep magenta pulse"},
 }
 const SKINS := {
-        "classic": {"name": "CLASSIC", "price": 0, "col": Color(0.38, 0.89, 1.0),
-                "desc": "the cyan soul"},
+        "classic": {"name": "GEOQUARE", "price": 0, "col": Color(0.38, 0.89, 1.0),
+                "desc": "the one that escaped the matrix"},
         "ember": {"name": "EMBER", "price": 140, "col": Color(1.0, 0.62, 0.32),
                 "desc": "the warm one"},
         "toxin": {"name": "TOXIN", "price": 190, "col": Color(0.66, 1.0, 0.43),
@@ -245,6 +245,42 @@ func _goga_setup() -> void:
         Jukebox.music("res://assets/audio/music/gf_theme.ogg")
         _seed_world()
         _gen_ahead()
+        # THE GEOQUARE LORE (v0.3.7): the story box opens ONCE EVER - the
+        # first launch only (the dario/invaders dialogue bones). Every later
+        # boot goes straight to the ready gate.
+        if Box.counter(game_id, "geoquare_lore") == 0:
+                Box.bump_counter(game_id, "geoquare_lore", 1)
+                _lore_open()
+
+## THE LORE - Geoquare's own words, told once. A square that escaped the
+## Matrix and keeps almost escaping everything else: Snowy Tower remembers
+## the ice-cube years, Maze Escaper is next on the escape list. Cursed like
+## Dario (every run ends back at the start), but it laughs about it - it is
+## a tiny jumper that dodges things and solves puzzles.
+const LORE_TITLE := "GEOQUARE"
+const LORE_TEXT := "GEOQUARE was a prisoner of the Matrix - one perfect little square among a billion, humming in the grid.\n\nThen it saw the glitch: a gap in the code, exactly one jump wide.\n\nIt jumped.\n\nThe Matrix does not like leavers. Every escape loops - the world scrolls on, the floor opens, and GEOQUARE falls right back to the beginning. Every. Single. Time. Cursed? Totally. But the curse never learned to dodge.\n\nIt once rolled down a whole snowy mountain pretending to be an Ice Cube. Good times. The mountain still tells the story.\n\nNext on the escape list: a maze with no name. It heard the exit moves. Perfect - so does GEOQUARE.\n\nIt cannot fight. It does not need to. It is a tiny jumper that dodges everything and solves puzzles for breakfast.\n\nTap anywhere. Jump. The Matrix is watching."
+
+func _lore_open() -> void:
+        var sheet := sheet_push(0.0, "lore")
+        var t := Arc.label(LORE_TITLE, 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := _vp()
+        sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.42, 240.0, 480.0))
+        var story := Arc.label(LORE_TEXT, 21, Arc.INK, false)
+        story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        story.custom_minimum_size = Vector2(540, 0)
+        story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(story)
+        sheet.add_child(sc)
+        sheet.add_child(Arc.button("TAP ANYWHERE. JUMP.", Vector2(560, 78), 26, Arc.GOOD,
+                func(): sheet_pop()))
+        for b in Arc._buttons_in(sc):
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
 
 func _load_meta() -> void:
         trail_mode = "none"

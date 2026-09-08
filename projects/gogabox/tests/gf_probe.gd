@@ -34,9 +34,20 @@ func _wait(t: float) -> void:
         await get_tree().create_timer(t, true).timeout
 
 func _run() -> void:
-        print("=== gf_probe (v0.3.6) ===")
+        print("=== gf_probe (v0.3.7) ===")
         # ------------------------------------------------ boot first
         await _boot()
+        # -------------------------------------- THE GEOQUARE LORE (v0.3.7)
+        # the first launch EVER opens the story box (Box.reset_all wiped the
+        # counter -> the boot above told the tale); every later boot is silent
+        ck(Box.counter("geometry", "geoquare_lore") == 1,
+                "THE LORE LAW: the first launch told the tale exactly once")
+        ck(G.sheet_open_count() > 0, "THE LORE LAW: the story sheet is up over the ready gate")
+        G.sheet_pop()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 0, "THE LORE LAW: DONE closes the story")
+        ck(G.SKINS["classic"]["name"] == "GEOQUARE",
+                "THE LORE LAW: the square wears its name - GEOQUARE")
         # ------------------------------------------------ the layout law
         ck(G.ROOF_Y == 300.0 and G.L3_Y == 460.0 and G.L2_Y == 620.0
                 and G.L1_Y == 780.0 and G.GROUND_Y == 940.0,

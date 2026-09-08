@@ -218,9 +218,9 @@ const CHARS := {
         "ball":   {"name": "Snowball", "price": 0, "g": 1.0, "accel": 1.0,
                         "fric": 1.0, "jump": 1.0, "snow_in": 1.0, "shed_roll": 1.0,
                         "shed_land": 0.35, "desc": "the classic roller"},
-        "square": {"name": "Ice Cube", "price": 400, "g": 1.05, "accel": 0.82,
+        "square": {"name": "Geoquare", "price": 400, "g": 1.05, "accel": 0.82,
                         "fric": 1.6, "jump": 0.94, "snow_in": 1.15, "shed_roll": 0.35,
-                        "shed_land": 0.6, "desc": "tumbles corner over corner"},
+                        "shed_land": 0.6, "desc": "the matrix escapee, slumming it in the snow"},
         "shard":  {"name": "Shard", "price": 600, "g": 0.82, "accel": 1.18,
                         "fric": 0.55, "jump": 1.06, "snow_in": 0.45, "shed_roll": 2.2,
                         "shed_land": 0.5, "desc": "glass-light, snow barely sticks"},
@@ -241,6 +241,30 @@ const PLATS := {
 const PLACES := {
         "day":   {"name": "Morning Slope", "price": 0},
         "night": {"name": "Night Slope", "price": 400},
+}
+
+# ---------------- THE STYLES (v0.3.7 - the Geoquare update) ----------------
+## snowy = the classic mountain. geometric = GEOQUARE'S home turf: the
+## whole audiovisual layer wears the Geometry Flash identity - neon block
+## platforms, the faceless matrix cube for every character, neon dust
+## instead of snow, the golden-orbit coins, its own theme + SFX set.
+## The most expensive thing on the shelf - the owner's call.
+const STYLES := {
+        "snowy":     {"name": "SNOWY", "price": 0,
+                "desc": "the classic mountain"},
+        "geometric": {"name": "GEOMETRIC", "price": 1200,
+                "desc": "geoquare's home turf - the matrix neon"},
+}
+
+## the geometric palette - the Geometry Flash midnight world, tuned for the
+## slope: deep navy sky, a cyan ring orb, dark blue ridges, neon dust.
+const GEOM_PAL := {
+        "top": Color("0a0f26"), "hor": Color("1a2450"),
+        "orb": Color("61d9ff"), "mountain": Color("141d3e"),
+        "mountain2": Color("0e1530"), "tree": Color("101a38"),
+        "cloud": Color(0.45, 0.75, 1.0, 0.10), "wall": Color("121b3a"),
+        "wall_hi": Color("2a3a6e"), "modulate": Color(1, 1, 1),
+        "snow": Color(0.72, 0.92, 1.0, 0.95),
 }
 
 # ---------------- THE DESIGNED PALETTE (owner: no random colors) ----------
@@ -423,18 +447,22 @@ func _goga_setup() -> void:
         set_hud_score_prefix("TOWER")
         set_score(0)
         _day_night()
-        Jukebox.music("res://assets/audio/music/tower_theme.wav")
+        # THE STYLE LAW: the geometric style wears Geoquare's own theme
+        if _is_geo():
+                Jukebox.music("res://assets/audio/music/tower_geo_theme.ogg")
+        else:
+                Jukebox.music("res://assets/audio/music/tower_theme.wav")
         _show_ready_card()
 
 func _apply_place(mat: ShaderMaterial) -> void:
-        var pid := _place_id()
-        var p: Dictionary = PAL[pid]
+        var p: Dictionary = _pal()
         var vp := _vp()
         mat.set_shader_parameter("top_col", p["top"])
         mat.set_shader_parameter("hor_col", p["hor"])
         mat.set_shader_parameter("orb_col", p["orb"])
-        mat.set_shader_parameter("orb_kind", 1.0 if pid == "day" else 2.0)
-        mat.set_shader_parameter("star_amt", 0.0 if pid == "day" else 1.0)
+        mat.set_shader_parameter("orb_kind", 2.0 if _is_geo() \
+                else (1.0 if _place_id() == "day" else 2.0))
+        mat.set_shader_parameter("star_amt", 1.0 if (_is_geo() or _place_id() == "night") else 0.0)
         # v0.2.6 THE SMALL ORB LAW (the owner: "make them smaller like the
         # ones in the snake game"): a ~34 logical px core + a tight halo,
         # computed from the REAL viewport - the old UV-space orb stretched
@@ -449,6 +477,14 @@ func _place_id() -> String:
         var on := Box.item_on(game_id, "place")
         return on if PLACES.has(on) else "day"
 
+## THE STYLE LAW (v0.3.7): the worn style re-skins the whole mountain.
+func _style_id() -> String:
+        var on := Box.item_on(game_id, "style")
+        return on if STYLES.has(on) else "snowy"
+
+func _is_geo() -> bool:
+        return _style_id() == "geometric"
+
 func _char_id() -> String:
         var on := Box.skin_on(game_id)
         return on if CHARS.has(on) else "ball"
@@ -458,6 +494,8 @@ func _plat_id() -> String:
         return on if PLATS.has(on) else "sand"
 
 func _pal() -> Dictionary:
+        if _is_geo():
+                return GEOM_PAL   # the style owns the light
         return PAL[_place_id()]
 
 ## The day/night FEELING (owner: "make day and night really give different
@@ -671,7 +709,7 @@ func _goga_tick(delta: float) -> void:
                 pw["t"] -= delta
                 if pw["t"] <= 0.0:
                         pw = {"id": "", "t": 0.0}
-                        Jukebox.sfx("tower_pw_end", -10.0)
+                        _sfx("tower_pw_end", -10.0)
                         _fx_ring(Vector2(px, py), Color(0.7, 0.75, 0.9, 0.5), 30.0)
 
         # ---- player physics (per-character modifiers) ----
@@ -706,7 +744,7 @@ func _goga_tick(delta: float) -> void:
                         vx = -vx * WALL_BOUNCE
                         wall_flash["l"] = 0.22
                         if absf(vx) > 40.0 * U:
-                                Jukebox.sfx("tower_wall", -14.0)
+                                _sfx("tower_wall", -14.0)
                                 _fx_poof(Vector2(px - _pr() * 0.7, py), 4, 0.6)
         if px > vp.x - wl:
                 px = vp.x - wl
@@ -714,7 +752,7 @@ func _goga_tick(delta: float) -> void:
                         vx = -vx * WALL_BOUNCE
                         wall_flash["r"] = 0.22
                         if absf(vx) > 40.0 * U:
-                                Jukebox.sfx("tower_wall", -14.0)
+                                _sfx("tower_wall", -14.0)
                                 _fx_poof(Vector2(px + _pr() * 0.7, py), 4, 0.6)
         wall_flash["l"] = maxf(0.0, float(wall_flash["l"]) - delta)
         wall_flash["r"] = maxf(0.0, float(wall_flash["r"]) - delta)
@@ -900,7 +938,7 @@ func _shatter_platform(p: Dictionary) -> void:
                                 "h": PLAT_H * U * rng.randf_range(0.45, 0.95),
                                 "rot": 0.0, "vrot": rng.randf_range(-8.0, 8.0),
                                 "col": _plat_chip_col(), "kind": "chunk"})
-        Jukebox.sfx("tower_break", -6.0, 1.0 + rng.randf() * 0.1)
+        _sfx("tower_break", -6.0, 1.0 + rng.randf() * 0.1)
         shake = maxf(shake, 0.4)
 
 ## the chip color follows the equipped platform skin (the break belongs to
@@ -953,7 +991,7 @@ func _land(p: Dictionary) -> void:
         ground_plat = p
         if was_air:
                 vx *= 0.55
-                Jukebox.sfx("tower_land", -13.0, 1.0 + rng.randf() * 0.12)
+                _sfx("tower_land", -13.0, 1.0 + rng.randf() * 0.12)
                 # v0.3.5-5 THE x2 RELANDING LAW: the double jump refunds on
                 # EVERY landing - the old refund only rode a fresh ground
                 # jump, so "double-jump, land, walk off a ledge, press jump"
@@ -970,13 +1008,13 @@ func _land(p: Dictionary) -> void:
                         p["ghost"] = true
                         p["clock"] = 0.0
                         p["visible"] = true
-                        Jukebox.sfx("tower_crack", -10.0)
+                        _sfx("tower_crack", -10.0)
                 # v0.2.7 THE DROPPER: landing triggers the drop (the owner:
                 # "they go down when the character lands on them")
                 if String(p["type"]) == "dropper" and String(p["drop_state"]) == "idle":
                         p["drop_state"] = "down"
                         p["drop_v"] = 40.0 * U
-                        Jukebox.sfx("tower_crack", -12.0, 0.85)
+                        _sfx("tower_crack", -12.0, 0.85)
                         _fx_poof(Vector2(px, py + _pr() * 0.6), 6, 0.9)
         if int(p["idx"]) > highest_idx:
                 highest_idx = int(p["idx"])
@@ -1000,7 +1038,7 @@ func _do_jump() -> void:
                 air_jumped = false
                 hops += 1
                 achievement_count("hops", 1)
-                Jukebox.sfx("tower_jump", -8.0, 1.0 + rng.randf() * 0.08)
+                _sfx("tower_jump", -8.0, 1.0 + rng.randf() * 0.08)
                 _fx_poof(Vector2(px, py + _pr() * 0.7), 7, 1.0)
         elif pw["id"] == "x2" and not air_jumped:
                 # THE x2: one extra jump in the air (owner powerup)
@@ -1008,7 +1046,7 @@ func _do_jump() -> void:
                 vy = JUMP_V * U * float(c["jump"]) * 0.92
                 hops += 1
                 achievement_count("hops", 1)
-                Jukebox.sfx("tower_jump", -8.0, 1.22)
+                _sfx("tower_jump", -8.0, 1.22)
                 _fx_ring(Vector2(px, py + _pr()), Color(1, 1, 1, 0.7), 26.0)
                 _fx_poof(Vector2(px, py + _pr()), 6, 1.0)
 
@@ -1039,7 +1077,7 @@ func _update_pickables(delta: float) -> void:
                                 and absf(py - cy) < _pr() + 26.0 * U:
                         coins.erase(c)
                         add_run_coins(1)
-                        Jukebox.sfx("tower_coin", -6.0, 1.0 + rng.randf() * 0.1)
+                        _sfx("tower_coin", -6.0, 1.0 + rng.randf() * 0.1)
                         _fx_ring(Vector2(float(c["x"]), cy), Color(1.0, 0.85, 0.3, 0.9), 34.0)
                         _fx_poof(Vector2(float(c["x"]), cy), 6, 1.0)
         # pickups: touch = the powerup goes live (a second one replaces it)
@@ -1052,7 +1090,7 @@ func _update_pickables(delta: float) -> void:
                         var replaced := String(pw["id"]) != "" and String(pw["id"]) != kind
                         pw = {"id": kind, "t": PW_TIME}
                         air_jumped = false
-                        Jukebox.sfx("tower_pw", -4.0)
+                        _sfx("tower_pw", -4.0)
                         _fx_ring(Vector2(float(k["x"]), float(k["y"])), Color(0.6, 0.9, 1.0, 0.9), 46.0)
                         _fx_pop(Vector2(float(k["x"]), float(k["y"]) - 50.0 * U),
                                         POWERUPS[kind]["glyph"] if kind != "x2" else "x2!")
@@ -1085,10 +1123,10 @@ func _die(reason := "fall") -> void:
         move_touch = -1
         jump_touches.clear()
         if reason == "melted":
-                Jukebox.sfx("tower_puff", -4.0)
+                _sfx("tower_puff", -4.0)
                 _fx_pop(Vector2(px, py - 50.0 * U), "MELTED")
         else:
-                Jukebox.sfx("tower_fall", -3.0)
+                _sfx("tower_fall", -3.0)
         shake = 1.0
         _fx_burst(Vector2(px, minf(py, cam_y + _vp().y - 40.0 * U)))
         achievement_max("max_tower", score)
@@ -1177,7 +1215,7 @@ func _tumble_settle(delta: float) -> void:
         if not settle_hit and absf(tumble_rot - target) < 0.035 \
                         and absf(prev - target) >= 0.035:
                 settle_hit = true
-                Jukebox.sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
+                _sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
                 _fx_poof(Vector2(px + signf(target - prev + 0.001) * _pr() * 0.7,
                                 py + _pr() * 0.7), 3, 0.55)
 
@@ -1415,11 +1453,22 @@ func _update_fx(delta: float) -> void:
 
 # ============================================================ painting
 
+## THE STYLE VOICE (v0.3.7): in the geometric style every tower sound wears
+## its synthesized matrix twin (geo_jump / geo_land / geo_coin / ...) - one
+## door, every call site keeps its name.
+func _sfx(name_: String, volume_db := 0.0, pitch := 1.0) -> void:
+        if _is_geo() and name_.begins_with("tower_"):
+                Jukebox.sfx("geo_" + name_.substr(6), volume_db, pitch)
+        else:
+                Jukebox.sfx(name_, volume_db, pitch)
+
 func _hashf(n: int, salt: float = 0.0) -> float:
         return fmod(absf(sin(float(n) * 127.1 + salt * 311.7)) * 43758.5453, 1.0)
 
 func _draw_platforms() -> void:
-        var skin := _plat_id()
+        # THE STYLE LAW: geometric re-skins every ledge as a Geometry Flash
+        # neon block, whatever plat skin is owned
+        var skin := "geometric" if _is_geo() else _plat_id()
         for p in platforms:
                 var sy: float = float(p["y"]) - 0.0   # plat_layer lives IN world
                 var sx: float = float(p["x"])
@@ -1435,52 +1484,65 @@ func _draw_platforms() -> void:
                 var left := sx - w / 2.0
                 var top := sy - h / 2.0
                 var body := Rect2(left, top, w, h)
-                match skin:
-                        "sand":
-                                plat_layer.draw_rect(body, Color("c9a86a"))
-                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.42), Color("e3c98d"))
-                                plat_layer.draw_rect(Rect2(left, top + h * 0.8, w, h * 0.2), Color("a8874f"))
-                                # deterministic grains (owner: no random look)
-                                var grains := int(w / (16.0 * U))
-                                for i in grains:
-                                        var gx := left + _hashf(idx, float(i)) * w
-                                        var gy := top + (0.2 + _hashf(idx, float(i) + 7.3) * 0.7) * h
-                                        plat_layer.draw_rect(Rect2(gx, gy, 2.2 * U, 2.2 * U), Color("8f6f3e"))
-                        "rock":
-                                plat_layer.draw_rect(body, Color("8a93a8"))
-                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.34), Color("a8b2c4"))
-                                plat_layer.draw_rect(Rect2(left, top + h * 0.75, w, h * 0.25), Color("6a7386"))
-                                # facets + a crack
-                                var facets := maxi(2, int(w / (70.0 * U)))
-                                for i in facets:
-                                        var fx0 := left + (float(i) + _hashf(idx, float(i)) * 0.5) * w / float(facets)
-                                        var fy := top + h * (0.3 + _hashf(idx, float(i) + 3.1) * 0.4)
-                                        var pts := PackedVector2Array([Vector2(fx0, fy), Vector2(fx0 + 16.0 * U, fy + 5.0 * U), Vector2(fx0 + 8.0 * U, fy + h * 0.5)])
-                                        plat_layer.draw_colored_polygon(pts, Color("767f94"))
-                                plat_layer.draw_line(Vector2(left + w * 0.3, top + 2.0 * U), Vector2(left + w * 0.42, top + h - 2.0 * U), Color("5d6578"), 1.6 * U)
-                        "grass":
-                                plat_layer.draw_rect(body, Color("8a6a46"))                       # soil
-                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.45), Color("6fae5c"))
-                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.16), Color("8cc975"))
-                                var blades := int(w / (12.0 * U))
-                                for i in blades:
-                                        var bx := left + (float(i) + 0.3) * w / float(blades)
-                                        var bh := (4.0 + _hashf(idx, float(i)) * 6.0) * U
-                                        var pts := PackedVector2Array([Vector2(bx, top + 1.0), Vector2(bx + 2.6 * U, top - bh), Vector2(bx + 5.2 * U, top + 1.0)])
-                                        plat_layer.draw_colored_polygon(pts, Color("8cc975"))
-                                if _hashf(idx, 9.1) > 0.55:   # one deterministic flower
-                                        var flx := left + w * (0.2 + _hashf(idx, 4.4) * 0.6)
-                                        plat_layer.draw_circle(Vector2(flx, top - 2.0 * U), 3.4 * U, Color("f0d0e0"))
-                        "metal":
-                                plat_layer.draw_rect(body, Color("9aa4b2"))
-                                plat_layer.draw_rect(Rect2(left, top, w, h * 0.3), Color("c8d2de"))
-                                plat_layer.draw_rect(Rect2(left, top + h * 0.55, w, h * 0.45), Color("707a8a"))
-                                plat_layer.draw_rect(Rect2(left + 6.0 * U, top + h * 0.46, w - 12.0 * U, 1.6 * U), Color("b8c2ce"))
-                                var rivets := maxi(2, int(w / (64.0 * U)))
-                                for i in rivets:
-                                        var rx := left + (float(i) + 0.5) * w / float(rivets)
-                                        plat_layer.draw_circle(Vector2(rx, top + h * 0.28), 3.0 * U, Color("5d6575"))
-                                        plat_layer.draw_circle(Vector2(rx, top + h * 0.78), 3.0 * U, Color("5d6575"))
+                if skin == "geometric":
+                        # THE GEO BLOCK (the Geometry Flash block anatomy,
+                        # drawn live): dark filled body, the near-white neon
+                        # edge, the inner square motif, a lit top seam
+                        plat_layer.draw_rect(body, Color("10162c"))
+                        plat_layer.draw_rect(Rect2(left, top, w, 2.6 * U), Color("eafcff"))
+                        plat_layer.draw_rect(Rect2(left, top + 3.0 * U, w, 2.2 * U), Color(0.42, 0.85, 1.0, 0.5))
+                        plat_layer.draw_rect(body, Color("e8f6ff"), false, 2.4 * U)
+                        var cells := maxi(1, int(w / (46.0 * U)))
+                        for i in cells:
+                                var cx0: float = left + (float(i) + 0.5) * w / float(cells)
+                                var k: float = minf(11.0 * U, w / float(cells) * 0.22)
+                                plat_layer.draw_rect(Rect2(cx0 - k, top + h * 0.42, k * 2.0, k * 2.0),
+                                                Color(0.30, 0.62, 0.88, 0.5), false, 1.6 * U)
+                elif skin == "sand":
+                        plat_layer.draw_rect(body, Color("c9a86a"))
+                        plat_layer.draw_rect(Rect2(left, top, w, h * 0.42), Color("e3c98d"))
+                        plat_layer.draw_rect(Rect2(left, top + h * 0.8, w, h * 0.2), Color("a8874f"))
+                        # deterministic grains (owner: no random look)
+                        var grains := int(w / (16.0 * U))
+                        for i in grains:
+                                var gx := left + _hashf(idx, float(i)) * w
+                                var gy := top + (0.2 + _hashf(idx, float(i) + 7.3) * 0.7) * h
+                                plat_layer.draw_rect(Rect2(gx, gy, 2.2 * U, 2.2 * U), Color("8f6f3e"))
+                elif skin == "rock":
+                        plat_layer.draw_rect(body, Color("8a93a8"))
+                        plat_layer.draw_rect(Rect2(left, top, w, h * 0.34), Color("a8b2c4"))
+                        plat_layer.draw_rect(Rect2(left, top + h * 0.75, w, h * 0.25), Color("6a7386"))
+                        # facets + a crack
+                        var facets := maxi(2, int(w / (70.0 * U)))
+                        for i in facets:
+                                var fx0 := left + (float(i) + _hashf(idx, float(i)) * 0.5) * w / float(facets)
+                                var fy := top + h * (0.3 + _hashf(idx, float(i) + 3.1) * 0.4)
+                                var pts := PackedVector2Array([Vector2(fx0, fy), Vector2(fx0 + 16.0 * U, fy + 5.0 * U), Vector2(fx0 + 8.0 * U, fy + h * 0.5)])
+                                plat_layer.draw_colored_polygon(pts, Color("767f94"))
+                        plat_layer.draw_line(Vector2(left + w * 0.3, top + 2.0 * U), Vector2(left + w * 0.42, top + h - 2.0 * U), Color("5d6578"), 1.6 * U)
+                elif skin == "grass":
+                        plat_layer.draw_rect(body, Color("8a6a46"))                       # soil
+                        plat_layer.draw_rect(Rect2(left, top, w, h * 0.45), Color("6fae5c"))
+                        plat_layer.draw_rect(Rect2(left, top, w, h * 0.16), Color("8cc975"))
+                        var blades := int(w / (12.0 * U))
+                        for i in blades:
+                                var bx := left + (float(i) + 0.3) * w / float(blades)
+                                var bh := (4.0 + _hashf(idx, float(i)) * 6.0) * U
+                                var pts := PackedVector2Array([Vector2(bx, top + 1.0), Vector2(bx + 2.6 * U, top - bh), Vector2(bx + 5.2 * U, top + 1.0)])
+                                plat_layer.draw_colored_polygon(pts, Color("8cc975"))
+                        if _hashf(idx, 9.1) > 0.55:   # one deterministic flower
+                                var flx := left + w * (0.2 + _hashf(idx, 4.4) * 0.6)
+                                plat_layer.draw_circle(Vector2(flx, top - 2.0 * U), 3.4 * U, Color("f0d0e0"))
+                elif skin == "metal":
+                        plat_layer.draw_rect(body, Color("9aa4b2"))
+                        plat_layer.draw_rect(Rect2(left, top, w, h * 0.3), Color("c8d2de"))
+                        plat_layer.draw_rect(Rect2(left, top + h * 0.55, w, h * 0.45), Color("707a8a"))
+                        plat_layer.draw_rect(Rect2(left + 6.0 * U, top + h * 0.46, w - 12.0 * U, 1.6 * U), Color("b8c2ce"))
+                        var rivets := maxi(2, int(w / (64.0 * U)))
+                        for i in rivets:
+                                var rx := left + (float(i) + 0.5) * w / float(rivets)
+                                plat_layer.draw_circle(Vector2(rx, top + h * 0.28), 3.0 * U, Color("5d6575"))
+                                plat_layer.draw_circle(Vector2(rx, top + h * 0.78), 3.0 * U, Color("5d6575"))
                 # THE SNOW CAP (v0.2.6: real ACCUMULATION, not a flat slab) -
                 # a chain of deterministic lumps that grows with what landed;
                 # a fresh platform is BARE and earns every lump
@@ -1606,7 +1668,36 @@ func _draw_sparks() -> void:
 
 func _draw_snow() -> void:
         var p := _pal()
+        # THE NEON DUST LAW (v0.3.7): in the geometric style the snowfall is
+        # Geoquare's particle vocabulary - small rotated neon diamonds and a
+        # few golden 4-point stars, drifting like data
         for f in flakes:
+                var pos := Vector2(float(f["x"]), float(f["y"]))
+                var sz: float = float(f["sz"])
+                if _is_geo():
+                        var gold: bool = _hashf(int(float(f["ph"]) * 100.0), 9.0) > 0.86
+                        var col := Color(1.0, 0.85, 0.45, 0.9) if gold \
+                                        else Color(0.55, 0.88, 1.0, 0.75)
+                        if bool(f["fore"]):
+                                col.a = 0.55
+                        if gold:
+                                snow_layer.draw_set_transform(pos,
+                                                _time * 1.4 + float(f["ph"]), Vector2.ONE)
+                                snow_layer.draw_colored_polygon(PackedVector2Array([
+                                                Vector2(0, -sz * 2.1), Vector2(sz * 0.62, 0),
+                                                Vector2(0, sz * 2.1), Vector2(-sz * 0.62, 0)]), col)
+                                snow_layer.draw_colored_polygon(PackedVector2Array([
+                                                Vector2(-sz * 2.1, 0), Vector2(0, sz * 0.62),
+                                                Vector2(sz * 2.1, 0), Vector2(0, -sz * 0.62)]), col)
+                                snow_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                        else:
+                                snow_layer.draw_set_transform(pos,
+                                                PI / 4.0 + _time * 0.5 + float(f["ph"]), Vector2.ONE)
+                                snow_layer.draw_rect(Rect2(-sz, -sz, sz * 2.0, sz * 2.0), col)
+                                snow_layer.draw_rect(Rect2(-sz, -sz, sz * 2.0, sz * 2.0),
+                                                Color(0.85, 0.97, 1.0, col.a), false, 1.2 * U)
+                                snow_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                        continue
                 var col: Color = p["snow"]
                 if bool(f["fore"]):
                         col.a = 0.55
@@ -1626,6 +1717,16 @@ func _draw_pickups() -> void:
                 var fade: float = clampf(t / 0.35, 0.0, 1.0)          # THE FADE LAW
                 var cy: float = float(c["y"]) + sin(t * 3.2) * 7.0 * U   # = the collect law
                 var pos := Vector2(float(c["x"]), cy)
+                if _is_geo():
+                        # THE ORBIT COIN (v0.3.7): in Geoquare's style the coin
+                        # is the golden orbit - the filled core + the white ring
+                        var pop: float = 1.0 + 0.07 * sin(t * 4.4)
+                        var rr: float = 21.0 * U * pop * fade
+                        pick_layer.draw_circle(pos, rr * 2.1, Color(1.0, 0.85, 0.3, 0.12 * fade))
+                        pick_layer.draw_circle(pos, rr, Color(1.0, 0.78, 0.25, 0.95 * fade))
+                        pick_layer.draw_circle(pos, rr * 0.55, Color(1.0, 0.92, 0.55, fade))
+                        pick_layer.draw_arc(pos, rr, 0.0, TAU, 26, Color(1, 1, 1, 0.95 * fade), 2.6 * U)
+                        continue
                 pick_layer.draw_circle(pos, 30.0 * U, Color(1.0, 0.85, 0.3, 0.14 * fade))
                 if _coin_tex != null:
                         var s: float = 46.0 * U / float(_coin_tex.get_width())
@@ -1693,6 +1794,27 @@ func _draw_player() -> void:
         var R := PLAYER_R * U
         var load_f := snow_load
         var body: Color = _pal()["snow"]
+        # THE GEOQUARE LOOK (v0.3.7): in the geometric style EVERY character
+        # wears the matrix cube - the Geometry Flash anatomy (filled body,
+        # the inner square motif, the near-white edge) and NO eyes (the no-
+        # faces law travels with the skin)
+        if _is_geo():
+                var r := Rect2(-R * 0.92, -R * 0.92, R * 1.84, R * 1.84)
+                player.draw_rect(r, Color("123a5e"))
+                player.draw_rect(Rect2(r.position + Vector2(3, 3) * U,
+                                r.size - Vector2(6, 6) * U), Color("1c5a8c"))
+                player.draw_rect(Rect2(r.position + Vector2(5, 5) * U,
+                                r.size - Vector2(10, 10) * U), Color("2f8ed6"))
+                var k := R * 0.38
+                player.draw_rect(Rect2(-k, -k, k * 2.0, k * 2.0), Color("7fdcff"))
+                player.draw_rect(Rect2(-k, -k, k * 2.0, k * 2.0), Color("eafcff"), false, 2.0 * U)
+                player.draw_rect(r, Color("eafcff"), false, 2.6 * U)
+                if load_f > 0.03:
+                        player.draw_rect(Rect2(-R * 0.98, -R * 0.98 - (2.0 + 5.0 * load_f) * U,
+                                        R * 1.96, (3.0 + 5.0 * load_f) * U), _pal()["snow"])
+                        player.draw_arc(Vector2.ZERO, R * (0.98 + 0.10 * load_f), 0.0, TAU, 30,
+                                        Color(0.4, 0.9, 1.0, 0.7), (1.2 + 4.0 * load_f) * U)
+                return
         # every character keeps its EYES and loses the mouth (owner rule)
         match char_id:
                 "ball":
@@ -1974,6 +2096,9 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
+        box.add_child(_shop_label("STYLES - the whole mountain wears it"))
+        for id in STYLES:
+                box.add_child(_style_row(id))
         box.add_child(_shop_label("CHARACTERS - each its own physics + spin"))
         for id in CHARS:
                 box.add_child(_char_row(id))
@@ -2051,6 +2176,49 @@ func _plat_row(id: String) -> Control:
                                         Jukebox.sfx("buy")
                                         plat_layer.queue_redraw()
                         _shop_open())
+
+## THE STYLE ROWS (v0.3.7): snowy = the classic, geometric = the matrix
+## neon (the priciest thing on the shelf). A wear re-lights the LIVE world
+## in place - palette, platforms, character, dust, coin, music all swap.
+func _style_row(id: String) -> Control:
+        var st: Dictionary = STYLES[id]
+        var owned := Box.item_owned(game_id, "style", id) or int(st["price"]) == 0
+        var on := _style_id() == id \
+                        or (int(st["price"]) == 0 and Box.item_on(game_id, "style") == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON) - %s" % [st["name"], st["desc"]], 22,
+                                Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button("%s - WEAR" % st["name"], Vector2(560, 60), 22,
+                                Color("2a7a68"), func():
+                                                Box.equip_item(game_id, "style", id)
+                                                Jukebox.sfx("confirm", -4.0)
+                                                _apply_geo_style()
+                                                _shop_open())
+        return _price_btn("%s - %s" % [st["name"], st["desc"]], int(st["price"]),
+                        Color("8a4ab8"), func():
+                                        if Box.buy_item(game_id, "style", id, int(st["price"])):
+                                                Jukebox.sfx("buy")
+                                        _apply_geo_style()
+                                        _shop_open())
+
+## THE STYLE SWAP, live: the palette, the platforms, the dust, the coin and
+## the music all re-skin in place (the buy-only law: the box layer auto-
+## equips on buy; the worn look is the style's job)
+func _apply_geo_style() -> void:
+        _apply_place(sky.material as ShaderMaterial)
+        _day_night()
+        plat_layer.queue_redraw()
+        pick_layer.queue_redraw()
+        snow_layer.queue_redraw()
+        spark_layer.queue_redraw()
+        player.queue_redraw()
+        if _is_geo():
+                Jukebox.music("res://assets/audio/music/tower_geo_theme.ogg")
+        else:
+                Jukebox.music("res://assets/audio/music/tower_theme.wav")
 
 func _place_row(id: String) -> Control:
         var pl: Dictionary = PLACES[id]

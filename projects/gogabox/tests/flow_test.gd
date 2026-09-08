@@ -305,11 +305,16 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 13,
-                "13 playable games (geometry flash joined)")
-        # v0.3.6: the GEOMETRY teaser graduated into the REAL GEOMETRY FLASH
-        ok += _check(GameReg.workshop().size() == 2,
-                "2 workshop teasers (geometry graduated)")
+        var ok := _check(GameReg.playable().size() == 14,
+                "14 playable games (maze escaper joined)")
+        # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
+        ok += _check(GameReg.workshop().size() == 1,
+                "1 workshop teaser (keys alone - maze graduated)")
+        ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
+                "the maze teaser ships as MAZE ESCAPER (graduation law)")
+        ok += _check(int(GameReg.get_game("maze")["coin_div"]) == 3
+                and String(GameReg.get_game("maze")["orientation"]) == "landscape",
+                "maze wears the owner's economy (bonus /3, landscape)")
         ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
                 "the hen teaser ships as SPACE INVADERS (rename law)")
         ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
@@ -528,7 +533,8 @@ func _t_roadmap() -> int:
         # by playing the previous catalog game (merge -> dario -> xo)
         ok += _check(Roadmap.state("dario") == "HIDDEN", "dario hidden (chain: merge unplayed)")
         ok += _check(Roadmap.state("xo") == "HIDDEN", "xo hidden (chain: dario unplayed)")
-        ok += _check(Roadmap.state("maze") == "HIDDEN", "maze hidden (appear_after 2)")
+        ok += _check(Roadmap.state("maze") == "GATED",
+                "maze GATED from the start (direct reveal, needs 2 games)")
         # daily picks: deterministic per day, OWNED games only (v0.0.9 owner
         # rule - mystery boxes in picks were "kind of funny but wrong"), <= 5
         var picks := Roadmap.daily_picks()
@@ -555,10 +561,16 @@ func _t_roadmap() -> int:
                 no_soon = no_soon and not bool(p.get("coming_soon", false))
         ok += _check(no_soon and not cheat_picks.is_empty(),
                 "picks stay playable-only under all_owned (%d)" % cheat_picks.size())
-        var geo_in := false
-        for p in cheat_picks:
-                geo_in = geo_in or String(p["id"]) == "geometry"
-        ok += _check(geo_in, "geometry flash PICKS like every playable game now")
+        # v0.3.7: the graduated games (geometry + maze) pick like everyone -
+        # the roll is day-seeded over the whole playable pool, so the stable
+        # law is: every pick is a REAL playable game (covered above) drawn
+        # from a pool that holds both graduates
+        var pool_has_graduates := false
+        for g in GameReg.playable():
+                if String(g["id"]) == "geometry" or String(g["id"]) == "maze":
+                        pool_has_graduates = true
+        ok += _check(pool_has_graduates,
+                "the graduates (geometry + maze) live in the picks pool")
         Box.dev_set_cheat("all_owned", 0)
         # v0.0.7 two-level badges: a freshly visible tile wears NEW!
         # v0.3.4: the spud teaser GRADUATED into the real COSMIC SPUD - its
@@ -583,17 +595,16 @@ func _t_roadmap() -> int:
         ok += _check(Roadmap.state("xo") == "HIDDEN", "xo still hidden (dario owned, unplayed)")
         Box.record_started("dario")
         ok += _check(Roadmap.state("xo") == "LOCKED", "xo LOCKED after dario played")
-        # maze keeps the orders vocabulary alive (beat_best/earn_in/charges)
-        var lines := Roadmap.order_lines("maze")
-        ok += _check(lines.size() == 3, "maze has 3 orders (incl. GOGACharges order)")
-        ok += _check(not Roadmap._condition_done("maze", GameReg.get_game("maze")["reveal"]),
-                "maze orders incomplete")
+        # v0.3.7: the maze GRADUATED - no teaser wears orders any more; the
+        # vocabulary (beat_best/earn_in/charges) lives on in the code
+        ok += _check(Roadmap.order_lines("maze").is_empty(),
+                "the graduated maze carries no order lines")
         # ach_exact stays supported in the vocabulary (unworn right now)
         ok += _check(Roadmap.order_lines("dario").is_empty(),
                 "chain games carry no order lines")
-        # gated: maze needs 2 owned games (snake + rally = 2 -> teaser appears)
+        # gated: maze needs 2 owned games (snake + rally = 2 -> BUYABLE)
         Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze mystery at 2 owned")
+        ok += _check(Roadmap.state("maze") == "LOCKED", "maze LOCKED at 2 owned")
         # v0.0.9 badge rules: GATED/SOON never wear UNLOCKED! - that badge is
         # for BUYABLE (LOCKED) tiles only; fresh appearances wear NEW!
         # v0.1.4: matcher carries a charge_unlock meter -> CHARGING, not GATED
@@ -604,9 +615,9 @@ func _t_roadmap() -> int:
         ok += _check(Box.badge("matcher") == "new",
                 "CHARGING wears NEW! (%s)" % Box.badge("matcher"))
         Box.unlock_game("lanes", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze still mystery (orders pending)")
-        ok += _check(Box.badge("maze") == "new" or Box.is_seen("maze"),
-                "mystery teasers keep NEW! semantics")
+        ok += _check(Roadmap.state("maze") == "LOCKED", "maze still LOCKED (3 owned)")
+        ok += _check(Box.badge("maze") == "unlocked" or Box.is_seen("maze"),
+                "the buyable maze wears the LOCKED badge rule")
         # v0.3.4: the ONLY real-hours teaser retired with the graduation
         ok += _check(GameReg.get_game("spud").is_empty(),
                 "the spud teaser retired (cosmic spud is a REAL game now)")
@@ -619,30 +630,29 @@ func _t_roadmap() -> int:
 
 ## THE MYSTERY QUEUE (owner brainstorm): at most 4 mysteries exist at once;
 ## the rest are INEXISTENT (HIDDEN, untracked) until a queue slot frees.
-## v0.3.4: spud graduated into COSMIC SPUD, so the queue is maze/poptd -
-## maze joins at 2 owned, poptd at 4; under the 4 cap, never overflowed.
+## v0.3.7: the maze GRADUATED - the mystery queue is empty for the first
+## time (no teaser wears orders); the suite guards the states that remain.
 func _t_mystery_queue() -> int:
         Box.reset_all()
-        var ok := _check(Roadmap.state("maze") == "HIDDEN",
-                "queue: empty right after the graduation (1 owned, maze waits)")
-        ok += _check(Roadmap.state("poptd") == "HIDDEN", "poptd waits (appear_after 4)")
+        var ok := _check(Roadmap.state("maze") == "GATED",
+                "the graduated maze is a GATED real game, never a mystery")
         ok += _check(Roadmap.state("matcher") == "CHARGING",
                 "matcher is NO mystery (direct): visible CHARGING tile")
         ok += _check(Roadmap.state("dario") == "HIDDEN" and Roadmap.state("xo") == "HIDDEN"
                 and Roadmap.state("invaders") == "HIDDEN",
                 "dario/xo/invaders are chain games, never queue members")
-        # own 2 -> maze joins (and keys' direct meter shows up CHARGING)
+        # 2 owned -> maze turns BUYABLE, keys' direct meter shows up CHARGING
         Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "maze takes slot 1 at 2 owned")
+        ok += _check(Roadmap.state("maze") == "LOCKED", "maze LOCKED at 2 owned")
         ok += _check(Roadmap.state("keys") == "CHARGING",
                 "keys CHARGING at 2 owned (direct + 200-charge meter)")
-        # own 3 -> nothing new (keys needs 4, geometry resolved at 2)
+        # 3 owned -> nothing new (keys resolves at 4)
         Box.unlock_game("lanes", 0)
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "the queue holds at 3 owned")
-        # own 4 -> keys joins the workshop, the queue stays under MYSTERY_CAP
+        ok += _check(Roadmap.state("keys") == "CHARGING", "keys still charging at 3 owned")
+        # 4 owned -> keys resolves, the queue stays empty and lawful
         Box.unlock_game("slasher", 0)
         ok += _check(Roadmap.state("keys") != "HIDDEN", "keys resolves at 4 owned")
-        ok += _check(Roadmap.state("maze") == "MYSTERY", "rest of the queue intact")
+        ok += _check(Roadmap.state("maze") == "LOCKED", "maze stays LOCKED (4 owned)")
         Box.reset_all()
         return ok
 
@@ -809,8 +819,8 @@ func _t_time_fmt() -> int:
 ## both the feed chip and the pre-play button read.
 func _t_feed_order() -> int:
         Box.reset_all()
-        Box.record_started("snake")   # reveals rally (chain) + the mysteries
-        Box.unlock_game("rally", 0)   # 2 owned: maze's appear_after opens
+        Box.record_started("snake")   # reveals rally (chain)
+        Box.unlock_game("rally", 0)   # 2 owned: the maze turns buyable
         Roadmap.tick()
         var rows := Roadmap.feed_rows()
         var ids: Array = []
@@ -823,8 +833,8 @@ func _t_feed_order() -> int:
         var sorted_b := buckets.duplicate()
         sorted_b.sort()
         ok += _check(buckets == sorted_b, "buckets ascend owned->locked->mystery %s" % [buckets])
-        ok += _check(buckets.has(0) and buckets.has(1) and buckets.has(2),
-                "all three buckets present %s" % [buckets])
+        ok += _check(buckets.has(0) and buckets.has(1),
+                "owned + locked buckets present %s" % [buckets])
         # within the owned block: acquisition order (owned[] append order)
         Box.unlock_game("rally", 0)
         rows = Roadmap.feed_rows()
@@ -1164,7 +1174,7 @@ func _t_menu() -> int:
         menu._open_trophies()
         await get_tree().process_frame
         menu._close_sheet()
-        menu._open_mystery_page(GameReg.get_game("maze"))
+        menu._open_mystery_page(GameReg.get_game("keys"))
         await get_tree().process_frame
         menu._close_sheet()
         menu._open_game_page(GameReg.get_game("snake"))

@@ -445,17 +445,6 @@ const GAMES := [
         },
 
 
-        {"id": "maze", "title": "Escape The Maze", "tag": "procedural maze port", "coming_soon": true,
-                "thumb": "res://assets/thumbs/maze.png",
-                "desc": "Every maze is generated fresh. Find the exit before you lose your mind.",
-                "genres": {"main": ["puzzle", "adventure"], "sub": ["procedural", "minimal"]},
-                "age": "everyone",
-                "reveal": {"kind": "orders", "appear_after": 2, "price": 400, "needs_games": 2,
-                        "orders": [
-                                {"type": "beat_best", "game": "rally"},
-                                {"type": "earn_in", "game": "lanes", "amount": 150},
-                                {"type": "spend_charges", "amount": 50},   # v0.1.4 GOGACharges order
-                        ]}},
         # (matcher graduated into a REAL game above - its v0.1.4 direct tile
         # + 100-charge meter ride along with it)
         {"id": "keys", "title": "Key Singer", "tag": "rhythm rework", "coming_soon": true,
@@ -543,6 +532,34 @@ const GAMES := [
                         {"id": "orbit_500", "title": "Orbit Hunter", "desc": "Collect 500 golden orbits total"},
                         {"id": "flips_250", "title": "Gravity Adept", "desc": "Flip gravity 250 times total"},
                         {"id": "gf_triple", "title": "Triple Threat", "desc": "Survive all 3 mechanics in one run"},
+                ],
+        },
+        {"id": "maze", "title": "Maze Escaper", "tag": "the matrix escapee",
+                "script": "res://game/games/maze/maze.gd",
+                "thumb": "res://assets/thumbs/maze.png",
+                "orientation": "landscape", "dim": "2d",
+                # v0.3.7 THE OWNED LAW: the score bonus is /3 (the owner's
+                # number for the escaper). The old "Escape The Maze" SOON
+                # teaser graduated into the real thing (the ritual honored).
+                "coin_div": 3, "price": 350, "fee": 10, "shop": true,
+                "banner": true,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
+                        "needs_games": 2},
+                "desc": "Geoquare's own puzzle: an endless neon maze woven fresh every map - a REAL labyrinth (branching corridors, honest dead ends - never one path with noise). The start and the exit roll EVERY map, so there is nothing to memorize: read the walls, pick the route, swipe grid by grid. The queue animates and SPEEDS UP as your inputs pile up. Time and scale are the only enemies - the clock is tight, the mazes grow, the cell shrinks. A GOGACoin waits one step off the route every 5th map, and the PATH FINDER earns one charge every 2 maps to light the way when the walls win. One map = one point.",
+                "controls": ["TAP ANYWHERE TO START - then SWIPE: one swipe moves one cell, keep swiping and the square flows",
+                        "reach the glowing portal before the clock runs out - every map solved = +1 score",
+                        "the start and the exit move every map - read the maze fresh each time",
+                        "a GOGACoin waits just off the route every 5th map - a small detour for real coins",
+                        "the PATH FINDER (shop) earns one charge every 2 maps - tap its button next to the score to light the next 8 cells",
+                        "the mazes grow as you escape - the cell shrinks to fit until the limit"],
+                "genres": {"main": ["puzzle", "arcade"], "sub": ["maze", "singleplayer", "endless"]},
+                "age": "everyone",
+                "ach": [
+                        {"id": "maps_10", "title": "Escape Artist", "desc": "Escape 10 mazes in one run"},
+                        {"id": "maps_30", "title": "Wall Reader", "desc": "Escape 30 mazes in one run"},
+                        {"id": "escapes_100", "title": "Loop Breaker", "desc": "Escape 100 mazes total"},
+                        {"id": "escapes_300", "title": "Matrix Free", "desc": "Escape 300 mazes total"},
+                        {"id": "finder_25", "title": "Cheater", "desc": "Use the path finder 25 times"},
                 ],
         },
 ]
