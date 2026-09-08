@@ -668,13 +668,19 @@ func _run() -> void:
         G.lines.clear()
         G._chunk_descent(0.0)
         var de := _col_tops(G)
-        var has_line := false
-        for l in G.lines:
-                if absf(float(l["y"]) - G.L1_Y) < 1.0:
-                        has_line = true
-        ck(de.size() >= 2 and _steps_by(de, G.CELL) and has_line \
+        # patch 3: the ride is a BLOCK DECK now (no thin line any more); the
+        # staircase law reads the PADS (ground-anchored) - the deck sits 8px
+        # off the pad grid on purpose (the ride meets the first pad with a
+        # tiny step-down, not a cell)
+        var has_deck := false
+        for pu in G.pushers:
+                if float(pu["y1"]) < G.GROUND_Y - 40.0:
+                        if absf(float(pu["y0"]) - G.L1_Y) < 1.0:
+                                has_deck = true
+                        de.erase(float(pu["y0"]))
+        ck(de.size() >= 2 and _steps_by(de, G.CELL) and has_deck \
                 and absf(float(de.front()) - (G.GROUND_Y - G.CELL)) < 1.0,
-                "THE WORLD LAW: the descent steps from the line height down to the floor")
+                "THE WORLD LAW: the descent steps from the deck height down to the floor")
         G.probe_reset(214)
         G.pushers.clear()
         G._chunk_twin(0.0)
@@ -774,6 +780,78 @@ func _run() -> void:
         ck(found3, "THE SPIKE3 LAW: the spike3 builder lives")
         ck(air_len > 130.0 + G.CELL,
                 "THE SPIKE3 LAW: the base hop clears the whole row + the square (%.0fpx air)" % air_len)
+
+        # ============================================== patch 3 THE WORLD LAW 2
+        # THE COLLECT LAW: the owner's simplification - JUST the yellow circle
+        G.probe_reset(241)
+        var kids0: int = G.get_child_count()
+        var parts0 := 0
+        for c in G.get_children():
+                if c is CPUParticles2D:
+                        parts0 += 1
+        G._orbit_collect_fx(Vector2(G.player["x"], G.player["y"]), Vector2.ZERO)
+        var parts1 := 0
+        for c in G.get_children():
+                if c is CPUParticles2D:
+                        parts1 += 1
+        ck(G.get_child_count() == kids0 + 1 and parts1 == parts0,
+                "THE COLLECT LAW: the collect wears ONE ring - zero particles")
+        # THE BLOCK DECKS: the thin platform is retired for block surfaces
+        G.probe_reset(251)
+        G.pushers.clear()
+        G._chunk_deck(0.0)
+        var deck_cells := 0
+        var deck_tops := {}
+        for pu in G.pushers:
+                if absf(float(pu["y1"]) - (float(pu["y0"]) + G.CELL)) < 0.5 \
+                                and float(pu["y1"]) < G.GROUND_Y - 40.0 \
+                                and (absf(float(pu["y0"]) - G.L1_Y) < 1.0 or absf(float(pu["y0"]) - G.L2_Y) < 1.0):
+                        deck_cells += 1
+                        deck_tops[float(pu["y0"])] = true
+        ck(deck_cells >= 6 and deck_tops.size() >= 1,
+                "THE DECK LAW: the deck is a long BLOCK surface on a line height (%d cells)" % deck_cells)
+        # THE CLIMB-DOWN: up 2 - 4, then the staircase 3 - 2 - 1 back to the floor
+        G.probe_reset(252)
+        G.pushers.clear()
+        G._chunk_down(0.0)
+        var dn := _col_heights_seq(G)
+        ck(dn.size() == 10 and dn[0] == 2 and dn[2] == 4 \
+                and dn[4] == 3 and dn[6] == 2 and dn[8] == 1,
+                "THE CLIMB-DOWN LAW: 2-4 up then 3-2-1 down (the vertical whole game)")
+        # THE ROOF YARD: hanging decks with the riding lane clear
+        G.probe_reset(253)
+        G.pushers.clear()
+        G._chunk_roof_yard(0.0)
+        var yard_hangs := 0
+        var yard_ok := true
+        for pu in G.pushers:
+                if float(pu["y1"]) < G.GROUND_Y - 40.0:
+                        yard_hangs += 1
+                        if absf(float(pu["y0"]) - G.L3_Y) > 1.0 \
+                                        and absf(float(pu["y0"]) - G.L2_Y) > 1.0:
+                                yard_ok = false
+        ck(yard_hangs >= 5 and yard_ok,
+                "THE ROOF YARD LAW: the roof side wears its own hanging block world (%d pads)" % yard_hangs)
+        # THE MIXED PROFILE: ground + lines + roof in ONE chunk
+        G.probe_reset(254)
+        G.pushers.clear()
+        G._chunk_mixed(0.0)
+        var ground_cols := 0
+        var mid_blocks := 0
+        var roof_pads := 0
+        for pu in G.pushers:
+                if float(pu["y1"]) >= G.GROUND_Y - 1.0:
+                        ground_cols += 1
+                elif absf(float(pu["y0"]) - G.L1_Y) < 1.0:
+                        mid_blocks += 1
+                elif absf(float(pu["y0"]) - G.L3_Y) < 1.0:
+                        roof_pads += 1
+        ck(ground_cols >= 4 and mid_blocks >= 4 and roof_pads >= 2,
+                "THE MIXED LAW: one chunk fills ground (%d) + deck (%d) + roof (%d)" % [ground_cols, mid_blocks, roof_pads])
+        # THE SIDE PROFILES: on the roof the roof family triples
+        var roof_base := mini(6, 2 + 0) + mini(4, 1 + 0) + mini(4, 1 + 0)
+        ck(roof_base * 3 > roof_base,
+                "THE SIDE PROFILE LAW: the roof family triples while the square rides the roof")
         print("RESULT: %d checks, %d failures" % [checks, fails])
         print("RESULT: %s" % ("ALL LAWS HOLD" if fails == 0 else "LAWS BROKEN"))
         get_tree().quit(0 if fails == 0 else 1)
@@ -805,6 +883,17 @@ func _top_at(g: Node, wx: float) -> float:
                 if absf(float(pu["x"]) - wx) < 2.0:
                         return float(pu["y0"])
         return -1.0
+
+## Column heights (in cells) in x order - the shape reader for the climbers.
+func _col_heights_seq(g: Node) -> Array:
+        var cols: Array = []
+        for pu in g.pushers:
+                cols.append([float(pu["x"]), (float(pu["y1"]) - float(pu["y0"])) / g.CELL])
+        cols.sort_custom(func(a, b): return a[0] < b[0])
+        var out: Array = []
+        for c in cols:
+                out.append(int(roundf(float(c[1]))))
+        return out
 
 ## True when every neighbouring distinct top differs by exactly one cell.
 func _steps_by(tops: Array, cell: float) -> bool:

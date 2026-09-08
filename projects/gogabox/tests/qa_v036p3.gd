@@ -166,6 +166,44 @@ func _gf(rig: String) -> void:
                         wx += G._chunk_pyramid(wx)
                         for i in 30:
                                 G.probe_step(1.0 / 60.0)
+                "deck":
+                        G._ready_start()
+                        G.pushers.clear()
+                        G.orbits.clear()
+                        G._chunk_deck(G.world_x + 1100.0)
+                        for i in 30:
+                                G.probe_step(1.0 / 60.0)
+                "down":
+                        G._ready_start()
+                        G.pushers.clear()
+                        G.orbits.clear()
+                        G._chunk_down(G.world_x + 1000.0)
+                        for i in 30:
+                                G.probe_step(1.0 / 60.0)
+                "mixed":
+                        G._ready_start()
+                        G.pushers.clear()
+                        G.orbits.clear()
+                        G.mechanic = "flip"
+                        G._chunk_mixed(G.world_x + 1000.0)
+                        for i in 30:
+                                G.probe_step(1.0 / 60.0)
+                "roof_yard":
+                        G._ready_start()
+                        G.mechanic = "flip"
+                        G.pushers.clear()
+                        G.orbits.clear()
+                        G._chunk_roof_yard(G.world_x + 1000.0)
+                        for i in 30:
+                                G.probe_step(1.0 / 60.0)
+                "collect_ring":
+                        G._ready_start()
+                        for i in 40:
+                                G.probe_step(1.0 / 60.0)
+                        var oy2: float = G.GROUND_Y - G.HALF
+                        G._add_orbit(G.world_x + G.stand_x / G.us, oy2)
+                        G.probe_step(1.0 / 60.0)
+                        G.probe_step(1.0 / 60.0)
                 _:
                         pass
         G.paused = true

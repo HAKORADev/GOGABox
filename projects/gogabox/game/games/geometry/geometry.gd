@@ -1636,6 +1636,12 @@ func _gen_chunk(x: float) -> float:
         if world_x < calm_until and gen_x < calm_until:
                 return _gen_calm(x)
         var lvl := _level()
+        # THE SIDE PROFILES (patch 3): the generator READS the square - when
+        # it rides the roof the roof family triples and roof-only yards open
+        # up; on the ground the built world plays as shipped; MIXED chunks
+        # (both sides filled at once) always live in the pool.
+        var on_roof: bool = player["g"] == -1
+        var roof_mul := 3 if on_roof else 1
         var pool: Array = []
         var w_flat := maxi(4, 10 - lvl)
         for i in w_flat:
@@ -1646,8 +1652,11 @@ func _gen_chunk(x: float) -> float:
                 pool.append("push")
         for i in mini(7, 2 + lvl):
                 pool.append("spikes")
-        for i in mini(6, 2 + lvl):
-                pool.append("lines")
+        # THE BLOCK DECKS (patch 3): long structured BLOCK surfaces - blocks
+        # instead of the thin platforms (the owner: "the blocks are good
+        # surfaces too")
+        for i in mini(8, 3 + lvl):
+                pool.append("deck")
         for i in mini(6, 2 + lvl):
                 pool.append("stairs")
         for i in mini(5, 2 + lvl):
@@ -1656,6 +1665,11 @@ func _gen_chunk(x: float) -> float:
                 pool.append("pyramid")
         for i in mini(4, 1 + lvl):
                 pool.append("descent")
+        # THE CLIMB-DOWN (patch 3): the dedicated tower-and-descend chunk
+        for i in mini(4, 1 + lvl):
+                pool.append("down")
+        for i in mini(3, 1 + int(lvl / 2.0) + 1):
+                pool.append("mixed")
         if lvl >= 1:
                 for i in mini(4, 1 + lvl):
                         pool.append("twin")
@@ -1672,10 +1686,13 @@ func _gen_chunk(x: float) -> float:
                 for i in mini(3, lvl - 2):
                         pool.append("saw")
         if mechanic != "normal":
-                for i in mini(6, 2 + lvl):
+                for i in mini(6, 2 + lvl) * roof_mul:
                         pool.append("roof")
-                for i in mini(4, 1 + lvl):
+                for i in mini(4, 1 + lvl) * roof_mul:
                         pool.append("roof_stairs")
+                # the roof-side yard only matters when the square can be there
+                for i in mini(4, 1 + lvl) * roof_mul:
+                        pool.append("roof_yard")
         var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
         match pick:
                 "pit":
@@ -1684,8 +1701,8 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_push(x)
                 "spikes":
                         return _chunk_spikes(x)
-                "lines":
-                        return _chunk_lines(x)
+                "deck":
+                        return _chunk_deck(x)
                 "stairs":
                         return _chunk_stairs(x)
                 "garden":
@@ -1694,6 +1711,10 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_pyramid(x)
                 "descent":
                         return _chunk_descent(x)
+                "down":
+                        return _chunk_down(x)
+                "mixed":
+                        return _chunk_mixed(x)
                 "twin":
                         return _chunk_twin(x)
                 "bridge":
@@ -1710,6 +1731,8 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_roof(x)
                 "roof_stairs":
                         return _chunk_roof_stairs(x)
+                "roof_yard":
+                        return _chunk_roof_yard(x)
                 _:
                         return _chunk_flat(x)
 
@@ -1767,19 +1790,139 @@ func _chunk_spikes(x: float) -> float:
                 _add_orbit(cx + i * step + CELL * 0.8, GROUND_Y - 240.0)
         return cx + n * step + CELL * 4.0 - x
 
-func _chunk_lines(x: float) -> float:
-        var w := CELL * rng.randf_range(5.0, 8.0)
-        var y: float = [L1_Y, L2_Y, L3_Y][rng.randi_range(0, 2)]
-        var x0 := x + CELL * 1.5
+## THE BLOCK DECKS (patch 3) - the thin platforms are retired: long
+## structured surfaces BUILT FROM BLOCKS in different shapes and ways (the
+## owner: "I want blocks to appear instead of just the platforms, the blocks
+## are good surfaces too"). Every deck carries its own climb: the approach
+## end steps up (a 1-cell step the apex always clears), the far end steps
+## down - so decks teach the climb-up AND the climb-down.
+func _chunk_deck(x: float) -> float:
+        var w := CELL * rng.randf_range(11.0, 14.0)
         _add_gseg(x, x + w)
         _add_rseg(x, x + w)
-        _add_line(x0, x0 + w - CELL * 2.0, y)
-        _orbit_line(x0 + CELL, y - 120.0, maxi(2, int(w / CELL) - 3), CELL * 1.5)
-        # the line spike: the small triple row (the big triangle retired to
-        # the ground walls at level 3+)
-        if rng.randf() < 0.45:
-                var hx := x0 + w - CELL * 2.6
-                _add_spike3(hx, y)
+        var y: float = [L1_Y, L2_Y, L2_Y][rng.randi_range(0, 2)]
+        var deck_h := 1 if y == L1_Y else 2   # L2 decks stand on a 2-cell leg
+        var dx := x + CELL * 1.6
+        var shape := rng.randi_range(0, 2)
+        match shape:
+                0:
+                        # THE PLAIN DECK: approach step, the long run, the
+                        # step-down at the far end
+                        _add_col(dx, deck_h, GROUND_Y)
+                        _add_col(dx + CELL, deck_h, GROUND_Y)
+                        dx += CELL * 2.2
+                        var run := rng.randi_range(4, 6)
+                        for i in run:
+                                _add_block(dx + float(i) * CELL, y, 1)
+                                if i % 2 == 0:
+                                        _add_orbit(dx + float(i) * CELL + CELL * 0.5, y - 115.0)
+                        dx += float(run) * CELL
+                        if deck_h > 1:
+                                _add_col(dx, deck_h - 1, GROUND_Y)   # the step-down
+                        _add_orbit(dx + CELL, y - 130.0)
+                1:
+                        # THE NOTCHED DECK: the long run with a tower bump in
+                        # the middle - the hop-over keeps the ride honest
+                        var run := rng.randi_range(5, 7)
+                        var notch := int(run / 2.0)
+                        for i in run:
+                                var yy := y - (CELL if i == notch else 0.0)
+                                _add_block(dx + float(i) * CELL, yy, 2 if i == notch else 1)
+                                _add_orbit(dx + float(i) * CELL + CELL * 0.5,
+                                        yy - (CELL + 115.0) if i == notch else y - 115.0)
+                        dx += float(run) * CELL
+                        _add_col(dx, 1, GROUND_Y)
+                _:
+                        # THE TWIN DECKS: two block decks at both line heights
+                        # with a hop between them (the climb-up to the high
+                        # one rides the low one first)
+                        var run := rng.randi_range(3, 4)
+                        for i in run:
+                                _add_block(dx + float(i) * CELL, L1_Y, 1)
+                        _add_orbit(dx + CELL, L1_Y - 115.0)
+                        dx += float(run + 1) * CELL
+                        for i in run:
+                                _add_block(dx + float(i) * CELL, L2_Y, 1)
+                                _add_orbit(dx + float(i) * CELL + CELL * 0.5, L2_Y - 115.0)
+                        dx += float(run) * CELL
+                        _add_col(dx, 1, GROUND_Y)
+        if _level() >= 2 and rng.randf() < 0.4:
+                _add_spike3(x + w - CELL * 1.6, GROUND_Y)
+        return w
+
+## THE CLIMB-DOWN (patch 3) - the dedicated descent the owner kept asking
+## for: two-cell steps UP to a 4-cell tower, then a real staircase DOWN
+## (4-3-2-1) back to the floor. One shape teaches the whole vertical game.
+func _chunk_down(x: float) -> float:
+        var w := CELL * 20.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var cx := x + CELL * 1.6
+        # the climb-up: 2-tall then 4-tall (every hop +2 cells, inside the apex)
+        for h: int in [2, 4]:
+                _add_col(cx, h, GROUND_Y)
+                _add_col(cx + CELL, h, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(h) * CELL - 115.0)
+                cx += CELL * 3.0
+        # the plateau breathes, then the LONG descent: 3 - 2 - 1 - floor
+        cx += CELL
+        for h: int in [3, 2, 1]:
+                _add_col(cx, h, GROUND_Y)
+                _add_col(cx + CELL, h, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(h) * CELL - 115.0)
+                cx += CELL * 3.0
+        if _level() >= 2 and rng.randf() < 0.5:
+                _add_spike3(cx + CELL * 1.4, GROUND_Y)
+                _add_orbit(cx + CELL * 1.4, GROUND_Y - 250.0)
+        return w
+
+## THE ROOF YARD (patch 3) - the roof side gets its OWN built world: hanging
+## block decks the flipped square hops across on their undersides, hanging
+## spike rows and a marked lane. Rides the same reachability gate as the
+## roof play (flip/sticky only), and THE SIDE PROFILES triple it while the
+## square is actually up there.
+func _chunk_roof_yard(x: float) -> float:
+        var w := CELL * 14.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var dx := x + CELL * 1.8
+        var run := rng.randi_range(3, 4)
+        for i in run:
+                _add_hang(dx + float(i) * CELL, 1, L3_Y)
+                _add_orbit(dx + float(i) * CELL + CELL * 0.5, L3_Y + 135.0)
+        dx += float(run + 1) * CELL
+        var run2 := rng.randi_range(2, 3)
+        for i in run2:
+                _add_hang(dx + float(i) * CELL, 1, L2_Y)
+        _add_orbit(dx + float(run2) * CELL * 0.5, L2_Y + 135.0)
+        if rng.randf() < 0.6:
+                _add_spike3(dx + float(run2) * CELL + CELL, L3_Y + 160.0)
+        return w
+
+## THE MIXED PROFILE (patch 3) - one chunk that fills EVERY lane at once:
+## a ground stair, a block deck on the middle line and a hanging roof pad -
+## both sides alive at the same time (the owner: "no mixed profiles").
+func _chunk_mixed(x: float) -> float:
+        var w := CELL * 16.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        # the ground: a 2-step stair over a floor threat
+        var gx := x + CELL * 1.6
+        _add_col(gx, 1, GROUND_Y)
+        _add_col(gx + CELL, 1, GROUND_Y)
+        _add_col(gx + CELL * 4.0, 2, GROUND_Y)
+        _add_col(gx + CELL * 5.0, 2, GROUND_Y)
+        _add_orbit(gx + CELL * 2.5, GROUND_Y - 250.0)
+        # the middle: a block deck on L1 with orbits
+        var mx := x + CELL * 3.0
+        for i in 4:
+                _add_block(mx + float(i) * CELL, L1_Y, 1)
+        _add_orbit(mx + CELL * 2.0, L1_Y - 115.0)
+        # the roof: a hanging pad cluster (reachable only in flip/sticky)
+        var hx := x + CELL * 8.0
+        for i in 2:
+                _add_hang(hx + float(i) * CELL, 1, L3_Y)
+        _add_orbit(hx + CELL, L3_Y + 135.0)
         return w
 
 ## THE LADDER (v0.3.6-1) - "proper obstacles to climb them up": a rising
@@ -1795,9 +1938,11 @@ func _chunk_ladder(x: float) -> float:
         var r1x := bx + CELL * 2.2
         var r2x := r1x + CELL * 2.9
         var r3x := r2x + CELL * 2.9
-        _add_line(r1x, r1x + CELL * 3.2, L1_Y)
-        _add_line(r2x, r2x + CELL * 3.2, L2_Y)
-        _add_line(r3x, r3x + CELL * 3.2, L3_Y)
+        # patch 3: the rungs are BLOCK ROWS now (the blocks are good surfaces)
+        for i in 3:
+                _add_block(r1x + float(i) * CELL, L1_Y, 1)
+                _add_block(r2x + float(i) * CELL, L2_Y, 1)
+                _add_block(r3x + float(i) * CELL, L3_Y, 1)
         _add_orbit(bx, GROUND_Y - CELL * 1.9)
         _add_orbit(r1x + CELL * 1.4, L1_Y - 110.0)
         _add_orbit(r2x + CELL * 1.4, L2_Y - 110.0)
@@ -1945,7 +2090,9 @@ func _chunk_descent(x: float) -> float:
         _add_gseg(x, x + w)
         _add_rseg(x, x + w)
         var lx := x + CELL * 1.5
-        _add_line(lx, lx + CELL * 4.0, L1_Y)
+        # patch 3: the ride is a BLOCK DECK now (not a thin platform)
+        for i in 4:
+                _add_block(lx + float(i) * CELL, L1_Y, 1)
         _orbit_line(lx + CELL * 0.5, L1_Y - 110.0, 3)
         var px := lx + CELL * 4.8
         _add_col(px, 2, GROUND_Y)
@@ -2278,56 +2425,14 @@ func _bonk_fx(pos: Vector2) -> void:
         tw.chain().tween_callback(func(): if is_instance_valid(s): s.queue_free())
         _ring_fx(pos, col, 0.45)
 
-## THE COLLECT LAW (v0.3.6-3) - a proper COLORED particle burst: a golden
-## glow pop + white star flashes + a light ring. Readable, juicy, done.
+## THE COLLECT LAW (patch 3): the owner's own words - simplify it to be
+## JUST the yellow circle. One expanding ring, nothing else (the old glow
+## pop + star flashes + streaks was too much). The GOGACoin wears the same.
 func _orbit_collect_fx(at: Vector2, to: Vector2) -> void:
-        var burst := CPUParticles2D.new()
-        burst.texture = _tex("p_soft.png")
-        burst.amount = 16
-        burst.one_shot = true
-        burst.explosiveness = 1.0
-        burst.lifetime = 0.42
-        burst.direction = Vector2(0, -1)
-        burst.spread = 180.0
-        burst.initial_velocity_min = 170.0 * us
-        burst.initial_velocity_max = 520.0 * us
-        burst.gravity = Vector2(0, -130.0 * us)
-        burst.scale_amount_min = 0.4
-        burst.scale_amount_max = 1.05
-        burst.color = Color(1.0, 0.84, 0.38, 0.95)
-        burst.material = _add_mat()
-        burst.position = at
-        burst.emitting = true
-        add_child(burst)
-        var stars := CPUParticles2D.new()
-        stars.texture = _tex("p_star.png")
-        stars.amount = 5
-        stars.one_shot = true
-        stars.explosiveness = 1.0
-        stars.lifetime = 0.3
-        stars.direction = Vector2(0, -1)
-        stars.spread = 180.0
-        stars.initial_velocity_min = 260.0 * us
-        stars.initial_velocity_max = 640.0 * us
-        stars.gravity = Vector2.ZERO
-        stars.angular_velocity_min = -220.0
-        stars.angular_velocity_max = 220.0
-        stars.scale_amount_min = 0.35
-        stars.scale_amount_max = 0.7
-        stars.color = Color(1.0, 0.97, 0.86, 1.0)
-        stars.material = _add_mat()
-        stars.position = at
-        stars.emitting = true
-        add_child(stars)
-        get_tree().create_timer(0.8).timeout.connect(func():
-                if is_instance_valid(burst):
-                        burst.queue_free()
-                if is_instance_valid(stars):
-                        stars.queue_free())
-        _ring_fx(at, Color(1.0, 0.85, 0.4), 0.75)
+        _ring_fx(at, Color(1.0, 0.85, 0.4), 0.8)
 
 func _coin_collect_fx(at: Vector2, to: Vector2) -> void:
-        _orbit_collect_fx(at, to)
+        _ring_fx(at, Color(1.0, 0.85, 0.4), 1.0)
         _ring_fx(to, Color(1.0, 0.85, 0.4), 1.1)
 
 func _death_burst() -> void:
