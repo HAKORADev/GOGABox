@@ -451,7 +451,16 @@ static func feed_rows() -> Array:
                 var st := state(id)
                 if st == "HIDDEN":
                         continue
-                var bucket := 0 if st == "OWNED" else (2 if st == "MYSTERY" else 1)
+                # v0.3.8-1 THE OWNER'S OLD SORT, restored for real this time:
+                # owned (acquisition order) -> locked/gated/charging (catalog
+                # order) -> mysteries (catalog order) -> SOON teasers LAST.
+                # v0.3.7-2 unwound the wrong half of the ladder (the
+                # requirements came back as chains while the sort stayed) -
+                # the registry ladder is restored in this patch and the SOON
+                # teasers finally leave the locked area for the end of the
+                # feed where the owner always wanted them.
+                var bucket := 0 if st == "OWNED" \
+                        else (3 if st == "SOON" else (2 if st == "MYSTERY" else 1))
                 var ord := int(owned_idx.get(id, 100000)) if bucket == 0 \
                                 else int(reg_idx.get(id, 100000))
                 rows.append({"g": g, "st": st, "bucket": bucket, "ord": ord})

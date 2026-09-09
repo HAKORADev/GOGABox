@@ -123,7 +123,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 50, "price": 200, "fee": 20, "shop": true,
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "orders", "appear_after": 0,
+        "orders": [{"type": "plays", "game": "rally", "count": 3},
+                {"type": "beat_best", "game": "rally"}],
+        "needs_games": 2},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "blocked_hours": {"from": 1, "to": 8},
@@ -164,7 +167,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "auto", "dim": "2d",
                 "coin_div": 15, "price": 250, "fee": 15, "shop": true,
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "orders", "appear_after": 1,
+        "orders": [{"type": "spend_in", "game": "lanes", "amount": 120},
+                {"type": "plays", "game": "rally", "count": 5}],
+        "needs_games": 3},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
@@ -263,7 +269,10 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 20, "price": 400, "fee": 15, "shop": true,
                 "banner": true,   # turn-based: banner is safe here
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "orders", "appear_after": 2,
+        "orders": [{"type": "earn_in", "game": "hopper", "amount": 120},
+                {"type": "spend_in", "game": "slasher", "amount": 150}],
+        "needs_games": 5},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "daily_rounds": 8,   # v0.1.4: 8 rounds a day
                 "desc": "The classic brain cooker, rebuilt: a big centered board on warm paper, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. The OPTIONS sell bigger boards (6x6 and 8x8) and three themes: Classic, Minecraft and a Deep Sea whose water answers every real move.",
@@ -294,7 +303,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/dario.png",
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 10, "price": 350, "fee": 100, "shop": true,
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "orders", "appear_after": 3,
+        "orders": [{"type": "plays", "game": "merge", "count": 4},
+                {"type": "ach_in", "game": "merge", "count": 2}],
+        "needs_games": 6},
                 "banner": true,   # the ground rises above the strip
                 "desc": "Dario fell into this world through a Witcher's curse. Ten TALL levels of stomp, dodge and deja vu to the end line - where SHE waits. Crush the Witcher (20 stomps, dodge her curses) and escape... probably. A mario-like with ? crates (the GOGACoins live inside them), timed ghost platforms, hunting bats, a charging rhino, a shop (the night sky, three powerups), 3 lives and a story that remembers you.",
                 "controls": [
@@ -331,7 +343,8 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 2, "price": 450, "fee": 10, "shop": false,
                 "banner": true,   # turn-based: banner is safe here
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "inbox", "minutes": 45,
+        "appear_after": 4, "needs_games": 7},
                 "desc": "Sketchbook tic-tac-toe: paper, ink and one adaptive opponent. It wears four profiles (The Wall, The Trickster, The Rusher, The Sage), remembers your last two rounds and stops falling for your patterns. Every win pays +1, every loss costs -1, a GOGACoin lands on the board after every 3 rounds - mark its cell first to take it.",
                 "controls": [
                         "tap a cell to draw your X - the red pencil",
@@ -364,8 +377,11 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 300, "price": 400, "fee": 10, "shop": true,
                 "banner": true,   # the rail seats itself above the strip
-                "charge_unlock": 100,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
+                "charge_unlock": 150,
+                "reveal": {"kind": "orders", "appear_after": 6,
+        "orders": [{"type": "plays", "game": "invaders", "count": 5},
+                {"type": "spend_charges", "amount": 60}],
+        "needs_games": 9},
                 "desc": "The happy one - an endless gem wall with EIGHT moods: CHALLENGE (rounds derived from a real pre-solve of the grid, lives and wins/losses on the HUD), PEACE (zen, nothing can hurt you), BUTTERFLIES (they rise AFTER your move - one grace at the top, then the spider dines), ICE STORM (frosted blocks rise behind the gems), DIAMOND MINE (pure dirt, clay and rock layers, dig deep), JELLY (the sweet virus - eat it before it spreads), ICE CRASH (layered ice 1-5 plus the rock only specials crack) and DROP DOWN (the parcels pour in on their own stream - out-deliver the quota before moves, time or both eat you). THE SPECIALS: an L or T makes the BOMB, a vertical 4 makes the ROW SWEEPER, a horizontal 4 makes the COLUMN SWEEPER and 5 in a line makes the COLOR REMOVER - swap it with anything and its color wipes out bottom-to-up, and special + special fires the COMBOS (double sweeps, the plus, the 4x4, triple sweeps, the color armies). Powers buy with the GLOBAL GOGACoins; escort the GOGACoin to the bottom row and it is yours.",
                 "controls": [
                         "tap two adjacent gems to swap, or drag a gem toward its neighbor - 3+ of a kind pops, everything = 1 score point",
@@ -415,7 +431,10 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 500, "price": 350, "fee": 100, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "chain"},
+                "reveal": {"kind": "orders", "appear_after": 5,
+        "orders": [{"type": "spend_in", "game": "dario", "amount": 200},
+                {"type": "plays", "game": "xo", "count": 6}],
+        "needs_games": 8},
                 "desc": "The aliens reached our solar system. Fly the Protector from Neptune inward to the Sun and into their Hideout: ten worlds, ten waves each, a named boss over every one - and three of them will run and come back for the finale. Rent the SSDS crew with DEFEND, buy Thunder or the Bomb Launcher, chase THE INVADER down. Small scores, a big war, and a line that never breaks while you hold it.",
                 "controls": [
                         "left half of the screen: slide to fly - the ship steers with you",
@@ -474,8 +493,9 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 200, "price": 500, "fee": 50, "shop": true,
                 "banner": true,
-                "charge_unlock": 200,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 500, "needs_games": 3},
+                "charge_unlock": 400,
+                "reveal": {"kind": "direct", "appear_after": 10,
+        "needs_games": 13},
                 "desc": "THE BROTATO-COMPETITOR: SPUDNIK the potato cosmonaut drops into a ground bigger than the screen - the camera follows, the world keeps going. SIX starts (Soldier/Ranger/Brawler/Engineer/Pyro/Frostbite), TWELVE enemies with real teeth (the aura wraith burns a zone, the mender heals the horde, the TRI-SHIELD wears three rotating crackable rings), elites with affixes and a boss every 10 waves (THE HEAP, THE PRISM MATRIARCH, SPUD REAPER). Waves end into a choose-one-of-three draft that GIVES and TAKES; XP levels open pure tree picks. The GogaShop sells 12 weapons (start with 3, merge copies into higher tiers for half the next price), 6 allies (the highest prices, they deploy in the wave shop) and two themes - DECAYED DESERT and ABANDONED PARK - each with a day and a night face. Everything is bought and sold for COSMIC COINS; kills are the score; XP banks into SPUDNIK's level and gates the tiers. Endless. The swarm never stops growing.",
                 "controls": [
                         "touch ANYWHERE and drag: the invisible analog stick is born under your finger - SPUDNIK walks where you pull",
@@ -521,8 +541,9 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 1000, "price": 400, "fee": 10, "shop": true,
                 "banner": true,   # the field ends above the strip
-                "charge_unlock": 100,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
+                "charge_unlock": 250,
+                "reveal": {"kind": "direct", "appear_after": 7,
+        "needs_games": 10},
                 "desc": "The bloons march the winding roads and the gadgets hold the line. 30 handcrafted maps (each with its own day and night), 10 gadgets with 3 gears and 10 upgrades each, pacts between neighbors, fire traps, eternal flames, THE FLUX that teleports bloons back, and every 10 waves a GOGACoin hides inside a bloon. Every hit is a point; the run bonus is score /1000.",
                 "controls": [
                         "tap START, then pick a folk card by tap or DRAG it onto green grass (red cells are road, water or blocked) - press the card, pull, release: the ghost rides the finger",
@@ -569,8 +590,10 @@ const GAMES := [
                 # misread it as the in-game speed step - that is back to /10.
                 "coin_div": 50, "price": 350, "fee": 10, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
-                        "needs_games": 2},
+                "reveal": {"kind": "orders", "appear_after": 8,
+        "orders": [{"type": "ach_in", "game": "pop_siege", "count": 2},
+                {"type": "spend_in", "game": "matcher", "amount": 200}],
+        "needs_games": 11},
                 "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP taps gravity to the roof and back, STICK changes gravity only when you TOUCH the other floor - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 10 speeds the world x1.1, and the world is FULL: block staircases up and down, pyramids, twin towers, small triple spikes, saws and floating threats fill the lanes. Blocks shove (they never kill), pits and wrong timing do. Buy POWER-UPS and they spawn in your runs: rocket jumps, a slower world, an extra life. The SFX sing.",
                 "controls": ["TAP ANYWHERE TO START - then touch = jump, the square spins its 90 degrees over the real flight",
                         "golden orbits = +1 score each; every 10 the world runs x1.1 faster - watch the x1.00 chip",
@@ -606,8 +629,10 @@ const GAMES := [
                 # teaser graduated into the real thing (the ritual honored).
                 "coin_div": 3, "price": 350, "fee": 10, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
-                        "needs_games": 2},
+                "reveal": {"kind": "orders", "appear_after": 9,
+        "orders": [{"type": "earn_in", "game": "geometry", "amount": 200},
+                {"type": "plays", "game": "pop_siege", "count": 4}],
+        "needs_games": 12},
                 "desc": "Geoquare's own puzzle: an endless neon maze woven fresh every map - a REAL labyrinth (branching corridors, honest dead ends - never one path with noise). The start and the exit roll EVERY map, so there is nothing to memorize: read the walls, pick the route, swipe grid by grid. The queue animates and SPEEDS UP as your inputs pile up. Time and scale are the only enemies - the clock is tight, the mazes grow, the cell shrinks. A GOGACoin waits one step off the route every 5th map, and the PATH FINDER earns one charge every 2 maps to light the way when the walls win. One map = one point.",
                 "controls": ["TAP ANYWHERE TO START - then SWIPE: one swipe moves one cell, keep swiping and the square flows",
                         "reach the glowing portal before the clock runs out - every map solved = +1 score",
@@ -644,7 +669,7 @@ const GAMES := [
                 "controls": ["TAP ANYWHERE TO START - the deal flies 7 tiles to you, 7 to the CPU, 14 wait in the boneyard",
                         "the highest double OPENS (no doubles = the heaviest tile) - the glowing tile plays on touch",
                         "tap a tile to lift it, then tap a glowing end - or DRAG it there; ends glow green only where the tile truly fits, no fit = no glow",
-                        "a second tap on a selected tile plays it when only ONE end fits; stuck? the DRAW button feeds you until something fits, an empty boneyard means PASS",
+                        "a second tap on a selected tile plays it when only ONE end fits; stuck? the BONEYARD SPREADS face-down across the felt - TAP the tile you take (the fan re-fans until something fits), a dry yard means PASS",
                         "both players stuck = BLOCKED - the lighter hand (fewer pips) wins, even pips draw",
                         "a GOGACoin appears after every 3rd round on a play spot - the next domino placed THERE takes it, the CPU included",
                         "the shop wears 5 tile sets and 4 table felts - everything past BONE and TAVERN is bought"],
@@ -675,7 +700,7 @@ const GAMES := [
                 "reveal": {"kind": "direct", "appear_after": 8, "price": 700,
                         "needs_games": 9},
                 "desc": "the old war, played by the book: every piece moves by the law, castling, en passant, promotion, check, checkmate, stalemate, the 50-move rule, repetition and bare kings are all real. The CPU wears SIX hidden personalities - each with its own opening book (the Jobava London lives here) and its own honest mistakes - and it adapts to your openings for two rounds. Highlights show every legal move, the last move and every check. Win +1, lose -1, a draw pays nothing.",
-                "controls": ["TAP ANYWHERE TO START - you take WHITE first; the loser of a round takes WHITE next, a draw swaps colors",
+                "controls": ["TAP ANYWHERE TO START - the OPTIONALS shelf opens: pick WHITE or BLACK for the first war (white by default); after that the loser takes WHITE next, a draw swaps colors; a mid-play pick from the OPTIONALS button rides the next opener",
                         "tap a piece to see its legal moves - dots walk there, rings take; tap again to play, or DRAG the piece",
                         "castling moves the king two squares (all the real conditions hold), pawns promote through the picker - underpromotion included",
                         "a checked king glows red; checkmate, stalemate, the 50-move rule, threefold repetition and bare kings all end the round by the book",

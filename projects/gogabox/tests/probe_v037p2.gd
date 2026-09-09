@@ -323,25 +323,65 @@ func _flat_wait() -> void:
 # ========================================================== THE FEED RESTORE
 func _feed_restore() -> void:
         Box.reset_all()
-        # the old reveal map: chains are chains
-        for gid in ["lanes", "slasher", "merge", "dario", "xo", "invaders"]:
-                ck(String(GameReg.get_game(gid).get("reveal", {}).get("kind", "")) == "chain",
-                                "THE FEED RESTORE: %s is a plain chain again" % gid)
-        # the direct reveals + the honest meters
+        # v0.3.8-1 THE FEED TRUTH: the v0.3.7-1 LADDER is back whole - the
+        # owner wanted the requirements + visibility kept and only the SORT
+        # reverted; v0.3.7-2 unwound the wrong half (chains). Certify the
+        # ladder rung by rung.
+        var ladder := {
+                "lanes": ["orders", 0, 2], "slasher": ["orders", 1, 3],
+                "merge": ["orders", 2, 5], "dario": ["orders", 3, 6],
+                "xo": ["inbox", 4, 7], "invaders": ["orders", 5, 8],
+                "matcher": ["orders", 6, 9], "pop_siege": ["direct", 7, 10],
+                "geometry": ["orders", 8, 11], "maze": ["orders", 9, 12],
+                "cosmic_spud": ["direct", 10, 13],
+        }
+        for gid in ladder:
+                var rv: Dictionary = GameReg.get_game(gid).get("reveal", {})
+                var kind := String(rv.get("kind", ""))
+                var after := int(rv.get("appear_after", -1))
+                var needs := int(rv.get("needs_games", -1))
+                ck(kind == ladder[gid][0] and after == int(ladder[gid][1]) \
+                                and needs == int(ladder[gid][2]),
+                                "THE LADDER: %s = %s after %d needs %d" % [gid, kind, after, needs])
+        ck(String(GameReg.get_game("rally").get("reveal", {}).get("kind", "")) == "chain"
+                and String(GameReg.get_game("hopper").get("reveal", {}).get("kind", "")) == "chain",
+                "THE LADDER: rally + hopper stay the plain chains")
+        # the honest meters (the v0.3.7-1 tiers)
         var m: Dictionary = GameReg.get_game("matcher")
-        ck(int(m.get("charge_unlock", 0)) == 100
-                        and String(m.get("reveal", {}).get("kind", "")) == "direct",
-                        "THE FEED RESTORE: matcher = direct + the 100 meter")
+        ck(int(m.get("charge_unlock", 0)) == 150,
+                        "THE LADDER: matcher wears the 150 meter")
         var ps: Dictionary = GameReg.get_game("pop_siege")
-        ck(int(ps.get("charge_unlock", 0)) == 100, "THE FEED RESTORE: pop siege meter 100")
+        ck(int(ps.get("charge_unlock", 0)) == 250, "THE LADDER: pop siege wears the 250 meter")
         var cs: Dictionary = GameReg.get_game("cosmic_spud")
-        ck(int(cs.get("charge_unlock", 0)) == 200
-                        and String(cs.get("reveal", {}).get("kind", "")) == "direct",
-                        "THE FEED RESTORE: cosmic spud = direct + the 200 meter")
-        for gid in ["geometry", "maze"]:
-                var g: Dictionary = GameReg.get_game(gid)
-                ck(int(g.get("reveal", {}).get("appear_after", -1)) == 0,
-                                "THE FEED RESTORE: %s reveals direct from the start" % gid)
+        ck(int(cs.get("charge_unlock", 0)) == 400,
+                        "THE LADDER: cosmic spud wears the 400 meter")
+        # the orders are real cross-game demands
+        var orders: Array = GameReg.get_game("lanes").get("reveal", {}).get("orders", [])
+        ck(orders.size() == 2 and String(orders[0].get("game", "")) == "rally",
+                "THE LADDER: lanes demands real cross-game orders")
+        # THE OLD SORT: owned -> locked -> mysteries -> SOON last (feed_rows)
+        Box.record_started("snake")
+        Box.unlock_game("rally", 0)
+        Box.unlock_game("lanes", 0)
+        Box.unlock_game("slasher", 0)
+        Box.unlock_game("hopper", 0)
+        Box.unlock_game("merge", 0)
+        Box.unlock_game("dario", 0)
+        Box.unlock_game("xo", 0)
+        Box.unlock_game("invaders", 0)
+        Box.unlock_game("matcher", 0)   # owned -> 10
+        var rows: Array = Roadmap.feed_rows()
+        var buckets: Array = []
+        var last_id := ""
+        for r in rows:
+                buckets.append(int(r["bucket"]))
+                last_id = String(r["g"]["id"])
+        var sorted_b: Array = buckets.duplicate()
+        sorted_b.sort()
+        ck(buckets == sorted_b, "THE OLD SORT: buckets ascend (%s)" % [buckets])
+        ck(last_id == "fourline" and int(buckets[buckets.size() - 1]) == 3,
+                "THE OLD SORT: the SOON teaser is the feed's LAST tile (%s)" % last_id)
+        Box.reset_all()
         # no age keys anywhere, no gogads anywhere
         var age_free := true
         var ads_free := true

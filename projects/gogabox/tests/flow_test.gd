@@ -560,17 +560,21 @@ func _t_roadmap() -> int:
         Box.reset_all()
         var ok := _check(Roadmap.state("snake") == "OWNED", "snake owned from start")
         ok += _check(Roadmap.state("rally") == "HIDDEN", "rally hidden before first play")
-        # v0.1.7: dario/xo LEFT the workshop - real chain games now, revealed
-        # by playing the previous catalog game (merge -> dario -> xo)
-        # v0.3.7-2 THE FEED RESTORE: the ladder re-sort is GONE - the chains
-        # are chains again, the meters sit at 100/100/200, geometry + maze
-        # are direct reveals. The feed lists like v0.3.7.
-        ok += _check(Roadmap.state("dario") == "HIDDEN", "dario hidden (chain: merge unplayed)")
-        ok += _check(Roadmap.state("xo") == "HIDDEN", "xo hidden (chain: dario unplayed)")
-        ok += _check(Roadmap.state("maze") == "GATED",
-                "maze GATED from the start (direct reveal, needs 2 games)")
-        ok += _check(Roadmap.state("matcher") == "CHARGING",
-                "matcher CHARGING from the start (direct + 100-charge meter)")
+        # v0.3.8-1 THE FEED TRUTH: the v0.3.7-1 LADDER is back whole - the
+        # owner wanted the early mysteries + the cross-game orders, and the
+        # v0.3.7-2 unwind took the wrong half (chains). The registry wears
+        # the ladder again: lanes surfaces first, matcher/xo/geometry/maze
+        # ride it far out, and the meters sit at 150/250/400.
+        ok += _check(Roadmap.state("dario") == "HIDDEN", "dario hidden (ladder: appear_after 3, 1 owned)")
+        ok += _check(Roadmap.state("xo") == "HIDDEN", "xo hidden (ladder: appear_after 4)")
+        ok += _check(Roadmap.state("lanes") == "MYSTERY",
+                "lanes MYSTERY from the start (the ladder's first rung)")
+        ok += _check(Roadmap.state("slasher") == "MYSTERY",
+                "slasher MYSTERY (the second rung)")
+        ok += _check(Roadmap.state("maze") == "HIDDEN",
+                "maze rides the ladder far out (orders, appear_after 9)")
+        ok += _check(Roadmap.state("matcher") == "HIDDEN",
+                "matcher rides the ladder (orders, appear_after 6)")
         # daily picks: deterministic per day, OWNED games only (v0.0.9 owner
         # rule - mystery boxes in picks were "kind of funny but wrong"), <= 5
         var picks := Roadmap.daily_picks()
@@ -602,7 +606,7 @@ func _t_roadmap() -> int:
         # QUIETLY - a tile that was never hidden is furniture, not news.
         Roadmap.tick()
         var smeared := false
-        for gid in ["cosmic_spud", "matcher", "geometry", "maze"]:
+        for gid in ["cosmic_spud", "matcher", "geometry", "maze", "lanes", "slasher"]:
                 if Box.badge(gid) != "":
                         smeared = true
         ok += _check(not smeared, "a fresh save badges nothing (furniture, not news)")
@@ -613,30 +617,42 @@ func _t_roadmap() -> int:
         ok += _check(Box.badge("rally") == "unlocked", "resolved tile badge UNLOCKED! (%s)" % Box.badge("rally"))
         Box.mark_seen("rally")
         ok += _check(Box.badge("rally") == "", "tap clears the badge")
-        # v0.1.7 THE EXTENDED CHAIN: merge played -> dario becomes buyable;
-        # dario played -> xo becomes buyable
+        # v0.3.8-1 THE LADDER ORDERS: owning merge puts dario ONE rung from
+        # surfacing (appear_after 3) - the ladder is patient, then the
+        # mystery appears; its orders demand 4 merge plays + 2 merge
+        # trophies before the tile resolves.
         Box.unlock_game("merge", 0)
-        ok += _check(Roadmap.state("dario") == "HIDDEN", "dario still hidden (merge owned, unplayed)")
-        Box.record_started("merge")
-        ok += _check(Roadmap.state("dario") == "LOCKED", "dario LOCKED after merge played")
-        Box.unlock_game("dario", 0)
-        ok += _check(Roadmap.state("xo") == "HIDDEN", "xo still hidden (dario owned, unplayed)")
-        Box.record_started("dario")
-        ok += _check(Roadmap.state("xo") == "LOCKED", "xo LOCKED after dario played")
-        ok += _check(Roadmap.order_lines("maze").is_empty(),
-                "the graduated maze carries no order lines")
-        ok += _check(Roadmap.order_lines("dario").is_empty(),
-                "chain games carry no order lines")
-        # gated: maze needs 2 owned games (snake + rally = 2 -> BUYABLE)
+        ok += _check(Roadmap.state("dario") == "HIDDEN",
+                "dario still hidden at 2 owned (appear_after 3 - the ladder is patient)")
         Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "LOCKED", "maze LOCKED at 2 owned")
-        ok += _check(Box.badge("maze") == "unlocked" or Box.is_seen("maze"),
-                "the buyable maze wears the LOCKED badge rule")
+        ok += _check(Roadmap.state("dario") == "MYSTERY",
+                "dario MYSTERY at 3 owned (surfaced early - the owner's law)")
+        Box.record_started("merge")
+        Box.record_started("merge")
+        Box.record_started("merge")
+        Box.record_started("merge")
+        Box.grant_achievement("merge", "tile_t1")
+        Box.grant_achievement("merge", "tile_t2")
+        ok += _check(Roadmap.state("dario") == "GATED",
+                "dario GATED once its orders are done (needs 6 games, 3 owned)")
+        ok += _check(Roadmap.order_lines("dario").size() == 2,
+                "dario wears two cross-game order lines")
+        ok += _check(Roadmap.order_lines("maze").size() == 2,
+                "the graduated maze rides the ladder with two order lines")
+        ok += _check(Roadmap.order_lines("rally").is_empty(),
+                "chain games carry no order lines")
+        # xo: the inbox teaser - 45 total minutes before the box resolves it;
+        # it surfaces at 4 owned (appear_after 4)
+        Box.unlock_game("hopper", 0)
+        ok += _check(Roadmap.state("xo") == "MYSTERY",
+                "xo MYSTERY (the inbox teaser surfaced at 4 owned)")
+        ok += _check(Roadmap.state("maze") == "HIDDEN",
+                "maze still hidden at 4 owned (appear_after 9) - the ladder is patient")
         # v0.3.4: the ONLY real-hours teaser retired with the graduation
         ok += _check(GameReg.get_game("spud").is_empty(),
                 "the spud teaser retired (cosmic spud is a REAL game now)")
         ok += _check(Roadmap.state("invaders") == "HIDDEN",
-                "invaders still hidden (xo owned, unplayed - the chain grew a link)")
+                "invaders still hidden (appear_after 5, 4 owned - the ladder is patient)")
         Box.reset_all()
         return ok
 
@@ -644,65 +660,106 @@ func _t_roadmap() -> int:
 
 ## THE MYSTERY QUEUE (owner brainstorm): at most 4 mysteries exist at once;
 ## the rest are INEXISTENT (HIDDEN, untracked) until a queue slot frees.
-## v0.3.7-2: the queue is EMPTY again (no teaser wears orders - the old
-## reveal map is back); the suite guards the states that remain.
+## v0.3.8-1: the v0.3.7-1 ladder is back - the queue is ALIVE again (lanes
+## and slasher surface from the first minute) and the suite walks it: the
+## cap holds, slots slide, and the far rungs stay hidden.
 func _t_mystery_queue() -> int:
         Box.reset_all()
-        var ok := _check(Roadmap.state("maze") == "GATED",
-                "the graduated maze is a GATED real game, never a mystery")
-        ok += _check(Roadmap.state("matcher") == "CHARGING",
-                "matcher is NO mystery (direct): visible CHARGING tile")
+        var ok := _check(Roadmap.state("maze") == "HIDDEN",
+                "the graduated maze rides the ladder far out (appear_after 9)")
+        ok += _check(Roadmap.state("matcher") == "HIDDEN",
+                "matcher rides the ladder too (appear_after 6)")
+        ok += _check(Roadmap.state("lanes") == "MYSTERY"
+                and Roadmap.state("slasher") == "MYSTERY",
+                "lanes + slasher are the two live mysteries on a fresh save")
         ok += _check(Roadmap.state("dario") == "HIDDEN" and Roadmap.state("xo") == "HIDDEN"
                 and Roadmap.state("invaders") == "HIDDEN",
-                "dario/xo/invaders are chain games, never queue members")
-        # 2 owned -> maze turns BUYABLE
-        Box.unlock_game("rally", 0)
-        ok += _check(Roadmap.state("maze") == "LOCKED", "maze LOCKED at 2 owned")
-        # the soon teasers (the FUTURE_GAMES front) are direct reveals parked
-        # far out - they surface GATED/SOON by owned count, never as mysteries
-        var n := 0
+                "dario/xo/invaders stay hidden below their appear_after rungs")
+        # the queue slide: unlock up to the cap -> xo + invaders wait past it
+        Box.unlock_game("rally", 0)     # 2 owned: merge joins the queue
+        Box.unlock_game("merge", 0)     # 3: dario joins
+        Box.unlock_game("hopper", 0)    # 4: xo joins - the cap is FULL
+        ok += _check(Roadmap.state("merge") == "OWNED"
+                and Roadmap.state("dario") == "MYSTERY" and Roadmap.state("xo") == "MYSTERY",
+                "dario + xo MYSTERY at 4 owned (queue: lanes, slasher, dario, xo - full)")
+        ok += _check(Roadmap.state("invaders") == "HIDDEN",
+                "invaders past the cap at 4 owned - inexistent (appear_after 5 not met)")
+        # unlock lanes -> a queue slot frees -> invaders still gated by its
+        # rung; the slide is honest
+        Box.unlock_game("lanes", 0)
+        ok += _check(Roadmap.state("lanes") == "OWNED", "lanes owned")
+        var queue: Array = []
         for g in GameReg.playable():
                 if Roadmap.state(String(g["id"])) == "MYSTERY":
-                        n += 1
-        ok += _check(n == 0, "the mystery queue is EMPTY (no orders teasers: %d live)" % n)
-        ok += _check(Roadmap.state("cosmic_spud") == "CHARGING",
-                "cosmic spud CHARGING (direct + the 200 meter, needs 3 games)")
+                        queue.append(String(g["id"]))
+        ok += _check(queue == ["slasher", "dario", "xo", "invaders"],
+                "the queue slides up, invaders joins at 5 owned %s" % [queue])
+        # the soon teasers (the FUTURE_GAMES front) are direct reveals parked
+        # far out - they surface GATED/SOON by owned count, never as mysteries
+        var soon_mystery := false
+        for gid in ["domino", "chess", "fourline", "bovo", "dots"]:
+                if Roadmap.state(gid) == "MYSTERY":
+                        soon_mystery = true
+        ok += _check(not soon_mystery, "the teasers never wear the mystery box")
+        ok += _check(Roadmap.state("cosmic_spud") == "HIDDEN",
+                "cosmic spud waits at the ladder's far end (appear_after 10)")
         Box.reset_all()
         return ok
 
 ## GOGACharges: pour from the box bank into a game's unlock meter; when the
 ## meter reaches charge_unlock the tile resolves (CHARGING -> next state).
+## v0.3.8-1: matcher wears the ladder (appear_after 6, orders: invaders 5
+## plays + 60 charges spent) and the meter is 150 - the suite drives all of
+## it: hidden below the rung, CHARGING past the orders, GATED, then LOCKED.
 func _t_charging() -> int:
         Box.reset_all()
         var ok := _check(Box.charges_in("matcher") == 0, "meter starts at 0")
-        Box.set_box_batteries(50)
-        var moved := Box.give_charges("matcher", 60)   # bank caps the pour at 50
+        Box.set_box_batteries(50)   # the bank cap IS 50
+        var moved := Box.give_charges("matcher", 60)
         ok += _check(moved == 50, "pour capped by the bank (50 of 60 asked)")
         ok += _check(Box.charges_in("matcher") == 50 and Box.charges_spent() == 50,
-                "meter 50/100, charges_spent tracked")
+                "meter 50/150, charges_spent tracked")
         ok += _check(Box.box_batteries() == 0, "the bank really drained")
-        ok += _check(Roadmap.state("matcher") == "CHARGING", "meter half: still CHARGING")
+        ok += _check(Roadmap.state("matcher") == "HIDDEN",
+                "matcher still HIDDEN at 1 owned (appear_after 6 - the ladder hides it)")
+        # surface it: 6 owned + the orders (invaders played 5x + 60 spent).
+        # at 50 spent the orders still starve - matcher stays a MYSTERY box
+        for gid in ["rally", "lanes", "slasher", "hopper", "merge"]:
+                Box.unlock_game(gid, 0)   # owned -> 6
+        Box.record_started("invaders")
+        Box.record_started("invaders")
+        Box.record_started("invaders")
+        Box.record_started("invaders")
+        Box.record_started("invaders")
+        ok += _check(Roadmap.state("matcher") == "MYSTERY",
+                "matcher MYSTERY at 6 owned (spend_charges order still hungry)")
         Box.set_box_batteries(50)
-        moved = Box.give_charges("matcher", 60)   # meter room caps the pour at 50
-        ok += _check(moved == 50, "pour capped by the meter room")
-        ok += _check(Box.charges_in("matcher") == 100, "matcher meter FULL (100)")
+        moved = Box.give_charges("matcher", 60)   # +50: the 60 order is fed
+        ok += _check(moved == 50, "second pour honored (bank cap again)")
+        ok += _check(Roadmap.state("matcher") == "CHARGING",
+                "orders done + meter 100/150: matcher CHARGING at 6 owned")
+        Box.set_box_batteries(50)
+        moved = Box.give_charges("matcher", 120)   # room 50, bank 50
+        ok += _check(moved == 50, "pour capped by the meter room (50 of 120)")
+        ok += _check(Box.charges_in("matcher") == 150, "matcher meter FULL (150)")
         ok += _check(Roadmap.state("matcher") == "GATED",
-                "meter full -> GATED (needs 3 games, owns 1)")
+                "meter full -> GATED (needs 9 games, owns 6)")
         ok += _check(Box.give_charges("matcher", 10) == 0, "full meter takes no more")
-        Box.unlock_game("rally", 0)
-        Box.unlock_game("lanes", 0)
+        Box.unlock_game("dario", 0)
+        Box.unlock_game("xo", 0)
+        Box.unlock_game("geometry", 0)
         ok += _check(Roadmap.state("matcher") == "LOCKED",
-                        "3 owned + meter full: matcher LOCKED (buyable - it is REAL now)")
-        ok += _check(Box.charges_spent() == 100, "charges_spent total 100 (%d)" % Box.charges_spent())
+                        "9 owned + meter full: matcher LOCKED (buyable - it is REAL now)")
+        ok += _check(Box.charges_spent() == 150, "charges_spent total 150 (%d)" % Box.charges_spent())
         # refills also count as spending charges (any box-bank pour does)
         Box.set_box_batteries(10)
         Box.game_battery("rally")   # materialize the pool first
         Box.data["game_batteries"]["rally"]["count"] = 5   # room for 2 in the pool
         var rmove := Box.refill_game_from_box("rally")
-        ok += _check(rmove == 2 and Box.charges_spent() == 102, "refill pours count too (+2)")
+        ok += _check(rmove == 2 and Box.charges_spent() == 152, "refill pours count too (+2)")
         # a progress wipe keeps the meter (spent economy is not progress)
         Box.reset_game("matcher")
-        ok += _check(Box.charges_in("matcher") == 100, "reset_game keeps the charges meter")
+        ok += _check(Box.charges_in("matcher") == 150, "reset_game keeps the charges meter")
         Box.reset_all()
         return ok
 
@@ -820,11 +877,14 @@ func _t_time_fmt() -> int:
 ## v0.1.1 OWNER FEED ORDER: owned (oldest unlock first) -> locked/soon ->
 ## mysteries, each block oldest->newest. Plus the can_play_now oracle that
 ## both the feed chip and the pre-play button read.
+## v0.3.8-1 THE OWNER'S OLD SORT, written down at last: owned -> locked ->
+## mysteries -> SOON teasers LAST. The walk drives 8 games owned so the
+## domino teaser surfaces and must land at the very end of the feed.
 func _t_feed_order() -> int:
         Box.reset_all()
         Roadmap.tick()   # stamp the fresh shelf first (the honest badge law)
         Box.record_started("snake")   # reveals rally (chain)
-        Box.unlock_game("rally", 0)   # 2 owned: the maze turns buyable
+        Box.unlock_game("rally", 0)   # 2 owned
         Roadmap.tick()
         var rows := Roadmap.feed_rows()
         var ids: Array = []
@@ -837,10 +897,9 @@ func _t_feed_order() -> int:
         var sorted_b := buckets.duplicate()
         sorted_b.sort()
         ok += _check(buckets == sorted_b, "buckets ascend owned->locked->mystery %s" % [buckets])
-        ok += _check(buckets.has(0) and buckets.has(1),
-                "owned + locked buckets present %s" % [buckets])
+        ok += _check(buckets.has(0) and buckets.has(2),
+                "owned + mystery buckets present %s" % [buckets])
         # within the owned block: acquisition order (owned[] append order)
-        Box.unlock_game("rally", 0)
         rows = Roadmap.feed_rows()
         var owned_ids: Array = []
         for r in rows:
@@ -851,6 +910,24 @@ func _t_feed_order() -> int:
         ok += _check(Roadmap.can_play_now("snake"), "oracle: snake always playable")
         ok += _check(Roadmap.can_play_now("dario") == false, "oracle: unowned dario not playable")
         ok += _check(Roadmap.can_play_now("xo") == false, "oracle: unowned xo not playable")
+        # THE SOON TRUTH: drive to 10 owned - the fourline teaser surfaces
+        # SOON and must sit at the VERY END, after the mysteries.
+        for gid in ["lanes", "slasher", "hopper", "merge", "dario", "xo", "invaders", "matcher"]:
+                Box.unlock_game(gid, 0)   # owned -> 10
+        ok += _check(Roadmap.state("fourline") == "SOON",
+                "fourline surfaces SOON at 10 owned (%s)" % Roadmap.state("fourline"))
+        rows = Roadmap.feed_rows()
+        ids = []
+        buckets = []
+        for r in rows:
+                ids.append(String(r["g"]["id"]))
+                buckets.append(int(r["bucket"]))
+        ok += _check(String(ids[ids.size() - 1]) == "fourline" and int(buckets[buckets.size() - 1]) == 3,
+                "SOON is the feed's last block (last: %s bucket %s)" % [ids[ids.size() - 1], buckets[buckets.size() - 1]])
+        var soon_first_at := buckets.find(3)
+        ok += _check(soon_first_at > buckets.find(2),
+                "SOON comes AFTER the mysteries (buckets %s)" % [buckets])
+        ok += _check(Roadmap.can_play_now("fourline") == false, "oracle: a SOON teaser is not playable")
         Box.reset_all()
         return ok
 

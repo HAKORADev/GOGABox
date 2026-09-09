@@ -781,6 +781,16 @@ var drag_sq := -1
 var drag_pos := Vector2.ZERO
 var pending_promo = null       # the move awaiting the promo pick
 
+# v0.3.8-1 THE DEAD TRAY: every piece that left the war, split by captor
+var cap_w: Array = []
+var cap_b: Array = []
+
+# v0.3.8-1 THE OPTIONALS: the color shelf (the matcher design) - the color
+# the user starts the first round with; later rounds obey the opener law
+var pick_open := false
+var first_moment := true
+var color_override := ""       # a mid-session pick rides the next opener
+
 # the coin
 var coin_sq := -1
 var coin_t := 0.0
@@ -795,15 +805,12 @@ var world: Node2D
 var board_l: Node2D
 var piece_l: Node2D
 var fx_l: Node2D
+var strip_l: Node2D
 var ready_ui: Control = null
-var turn_lbl: Label
+var verdict_lbl: Label         # the round-end verdict ONLY (no turn text)
 var you_lbl: Label
 var draw_lbl: Label
 var cpu_lbl: Label
-var you_t: Label
-var draw_t: Label
-var cpu_t: Label
-var log_lbl: Label
 var verdict := ""
 
 var _time := 0.0
@@ -829,10 +836,11 @@ func _goga_setup() -> void:
         fx_l.draw.connect(_draw_fx)
         fx_l.z_index = 5
         world.add_child(fx_l)
-        _build_widgets(vp)
         _layout(vp)
+        _build_widgets(vp)
         _load_meta()
         add_hud_button("SHOP", func(): _shop_open())
+        add_hud_button("OPTIONALS", func(): _pick_open(false))
         _build_ready()
 
 func _set_skin() -> void:
@@ -869,80 +877,94 @@ func _build_ready() -> void:
                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_widgets(vp: Vector2) -> void:
-        # THE SCORE WIDGET (the xo shape) sits right of the board - the
-        # whole 412px row must FIT the right column (the overflow law)
-        var wx := vp.x - 460.0
-        var widget := Node2D.new()
-        widget.position = Vector2(wx + 230.0, 128.0)
-        widget.draw.connect(func():
-                var bwid := 128.0
-                var bh := 70.0
-                var gapw := 14.0
-                var x0 := -(bwid * 3.0 + gapw * 2.0) * 0.5
-                var boxes := [
-                        [x0, Color("58c470"), Color("2f7a44")],
-                        [x0 + bwid + gapw, Color("6b7280"), Color("4b5563")],
-                        [x0 + (bwid + gapw) * 2.0, Color("e8574a"),
-                                Color("9c3a32")],
-                ]
-                for b in boxes:
-                        var bx: float = b[0]
-                        var col: Color = b[1]
-                        widget.draw_rect(Rect2(bx + 5, -bh / 2.0 + 5, bwid, bh),
-                                Color(0.09, 0.05, 0.02, 0.85))
-                        widget.draw_rect(Rect2(bx, -bh / 2.0, bwid, bh),
-                                Color(1, 1, 1, 0.95))
-                        widget.draw_rect(Rect2(bx, -bh / 2.0, bwid, bh),
-                                col, false, 4.0)
-                        widget.draw_rect(Rect2(bx + 40, -bh / 2.0 + 25,
-                                bwid - 80, 3), col))
-        world.add_child(widget)
-        you_t = Arc.label("YOU", 17, Color("2f7a44"))
-        draw_t = Arc.label("DRAWS", 17, Color("4b5563"))
-        cpu_t = Arc.label("CPU", 17, Color("9c3a32"))
+        # v0.3.8-1 THE NEW FRAME: the old horizontal 3-box row, the turn text
+        # and the moves logger are gone. The score lives in a small VERTICAL
+        # strip cut on the LEFT of the board; the dead pieces live in a
+        # vertical tray cut on the RIGHT (two lines - one per color); the
+        # turn speaks through the side-to-move's KING alone (drawn in fx).
+        var strip := Node2D.new()
+        strip_l = strip
+        strip.draw.connect(_draw_strip)
+        world.add_child(strip)
         you_lbl = Arc.label("0", 30, Color("2f7a44"))
         draw_lbl = Arc.label("0", 30, Color("4b5563"))
         cpu_lbl = Arc.label("0", 30, Color("9c3a32"))
-        for l in [you_t, draw_t, cpu_t, you_lbl, draw_lbl, cpu_lbl]:
+        for l in [you_lbl, draw_lbl, cpu_lbl]:
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 world.add_child(l)
+        verdict_lbl = Arc.label("", 30, Color(1, 1, 1, 0.95))
+        verdict_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        verdict_lbl.visible = false
+        world.add_child(verdict_lbl)
         _refresh_widget()
-        turn_lbl = Arc.label("", 26, Color(1, 1, 1, 0.92))
-        turn_lbl.position = Vector2(wx, 210.0)
-        turn_lbl.custom_minimum_size = Vector2(440.0, 36)
-        turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        world.add_child(turn_lbl)
-        log_lbl = Arc.label("", 22, Color(1, 1, 1, 0.65))
-        log_lbl.position = Vector2(wx, 258.0)
-        log_lbl.custom_minimum_size = Vector2(440.0, 150.0)
-        log_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-        world.add_child(log_lbl)
+
+## the score strip geometry: three stacked boxes in the LEFT cut
+func _strip_rects() -> Array:
+        var vp := get_viewport_rect().size
+        var mid := Vector2(board_origin.x * 0.5,
+                board_origin.y + sq_px * 4.0)
+        var bw := minf(128.0, board_origin.x - 24.0)
+        var bh := 74.0
+        var gap := 18.0
+        return [mid, bw, bh, gap]
+
+func _draw_strip() -> void:
+        if board_origin == Vector2.ZERO or strip_l == null:
+                return
+        var geo := _strip_rects()
+        var mid: Vector2 = geo[0]
+        var bw: float = geo[1]
+        var bh: float = geo[2]
+        var gap: float = geo[3]
+        var boxes := [
+                [-(bh + gap) - bh / 2.0, Color("58c470"), Color("2f7a44")],
+                [-bh / 2.0, Color("6b7280"), Color("4b5563")],
+                [(bh + gap) - bh / 2.0, Color("e8574a"), Color("9c3a32")],
+        ]
+        for b in boxes:
+                var cy: float = b[0]
+                var col: Color = b[1]
+                var r := Rect2(mid.x - bw / 2.0, mid.y + cy, bw, bh)
+                strip_l.draw_rect(Rect2(r.position + Vector2(5, 5), r.size),
+                        Color(0.09, 0.05, 0.02, 0.85))
+                strip_l.draw_rect(r, Color(1, 1, 1, 0.95))
+                strip_l.draw_rect(r, col, false, 4.0)
 
 func _refresh_widget() -> void:
-        you_lbl.text = str(wins)
-        draw_lbl.text = str(draws)
-        cpu_lbl.text = str(losses)
-        var vp := get_viewport_rect().size
-        var wx := vp.x - 460.0
-        var w := 128.0
-        var gapw := 14.0
-        var x0 := wx + 230.0 - (w * 3.0 + gapw * 2.0) * 0.5
-        var cols := [x0, x0 + w + gapw, x0 + (w + gapw) * 2.0]
+        if board_origin == Vector2.ZERO:
+                return
+        var geo := _strip_rects()
+        var mid: Vector2 = geo[0]
+        var bw: float = geo[1]
+        var bh: float = geo[2]
+        var gap: float = geo[3]
+        var ys := [-(bh + gap) - bh / 2.0, -bh / 2.0, (bh + gap) - bh / 2.0]
+        var labels := [you_lbl, draw_lbl, cpu_lbl]
+        var texts := ["YOU\n%d" % wins, "DRAWS\n%d" % draws, "CPU\n%d" % losses]
         for i in 3:
-                var t: Label = [you_t, draw_t, cpu_t][i]
-                var v: Label = [you_lbl, draw_lbl, cpu_lbl][i]
-                t.position = Vector2(cols[i], 128.0 - 34.0)
-                t.custom_minimum_size = Vector2(w, 22)
-                v.position = Vector2(cols[i], 128.0 - 12.0)
-                v.custom_minimum_size = Vector2(w, 38)
+                var t: Label = labels[i]
+                t.text = texts[i]
+                t.add_theme_font_size_override("font_size", 22)
+                t.position = Vector2(mid.x - bw / 2.0, mid.y + ys[i] + 8.0)
+                t.custom_minimum_size = Vector2(bw, bh - 16.0)
+        # the verdict sits under the board's bottom edge, board-wide
+        verdict_lbl.position = Vector2(board_origin.x,
+                board_origin.y + sq_px * 8.0 + 14.0)
+        verdict_lbl.custom_minimum_size = Vector2(sq_px * 8.0, 44.0)
 
 func _layout(vp: Vector2) -> void:
+        # v0.3.8-1 THE WHOLE-RESOLUTION LAW: the board eats the FULL height
+        # (the old 560px widget column reservation is dead) and centers;
+        # whatever width is left becomes the two vertical cuts (the score
+        # strip left, the dead tray right).
         var top := 120.0
         var bot := banner_bottom() + 24.0
-        sq_px = minf((vp.y - top - bot) / 8.0, (vp.x - 560.0) / 8.0)
+        sq_px = (vp.y - top - bot) / 8.0
+        var min_side := 330.0   # both cuts must exist
+        sq_px = minf(sq_px, (vp.x - min_side) / 8.0)
         sq_px = maxf(40.0, sq_px)
         var bside := sq_px * 8.0
-        board_origin = Vector2(36.0 + maxf(0.0, (vp.x - 560.0 - bside) * 0.25),
+        board_origin = Vector2((vp.x - bside) * 0.5,
                 top + maxf(0.0, (vp.y - top - bot - bside) * 0.5))
 
 # ============================================================ the drawing
@@ -950,8 +972,12 @@ func _layout(vp: Vector2) -> void:
 func _sq_rect(i: int) -> Rect2:
         var f := i % 8
         var r := i / 8
-        var row := r if player_white else 7 - r
-        var col := f if player_white else 7 - f
+        # v0.3.8-1 THE OWNER'S SEAT LAW: the USER is ALWAYS at the bottom.
+        # As white: rank r renders at row 7-r (a1 bottom-left - the classic
+        # view). As black: the whole view rotates 180 (rank r stays row r,
+        # the file mirrors) - the black army sits at the bottom again.
+        var row := (7 - r) if player_white else r
+        var col := f if player_white else (7 - f)
         return Rect2(board_origin + Vector2(col * sq_px, row * sq_px),
                 Vector2(sq_px, sq_px))
 
@@ -960,9 +986,10 @@ func _sq_at(pos: Vector2) -> int:
         var row := int((pos.y - board_origin.y) / sq_px)
         if col < 0 or col > 7 or row < 0 or row > 7:
                 return -1
-        if not player_white:
-                col = 7 - col
+        if player_white:
                 row = 7 - row
+        else:
+                col = 7 - col
         return row * 8 + col
 
 func _tex(set_id: String, color: String, piece: int) -> Texture2D:
@@ -1084,6 +1111,87 @@ func _draw_fx() -> void:
                         var ga := coin_t * 2.6
                         fx_l.draw_arc(pos, sq_px * 0.36, ga, ga + 1.2, 26,
                                 Color(1, 1, 1, 0.5 * fade), 2.2)
+        _draw_tray()
+        _draw_turn_king()
+
+## v0.3.8-1 THE DEAD TRAY: the vertical cut on the right - two lines, one
+## per color, each carrying the pieces THAT color took off the board.
+func _tray_rects() -> Array:
+        var vp := get_viewport_rect().size
+        var x0 := board_origin.x + sq_px * 8.0 + 14.0
+        var x1 := vp.x - 14.0
+        var y0 := board_origin.y
+        var y1 := board_origin.y + sq_px * 8.0
+        var mid_y := (y0 + y1) * 0.5
+        return [Rect2(x0, y0 + 6.0, x1 - x0, mid_y - y0 - 12.0),
+                Rect2(x0, mid_y + 6.0, x1 - x0, y1 - mid_y - 12.0)]
+
+func _draw_tray() -> void:
+        if board_origin == Vector2.ZERO:
+                return
+        var trays := _tray_rects()
+        var caps := [cap_w, cap_b]
+        var cols := [Color(0.92, 0.9, 0.84, 0.9), Color(0.25, 0.22, 0.2, 0.9)]
+        var kings := ["w", "b"]
+        for side in 2:
+                var r: Rect2 = trays[side]
+                fx_l.draw_rect(Rect2(r.position + Vector2(4, 4), r.size),
+                        Color(0.09, 0.05, 0.02, 0.6))
+                fx_l.draw_rect(r, Color(0.14, 0.09, 0.05, 0.72))
+                fx_l.draw_rect(r, cols[side], false, 3.0)
+                # the line's own king sits left - whose dead pile this is
+                var ktex := _tex(Box.skin_on(game_id) if SETS.has(Box.skin_on(game_id)) else "classic",
+                        kings[side], 6)
+                var kis := minf(r.size.y - 18.0, 58.0)
+                fx_l.draw_texture_rect(ktex, Rect2(
+                        Vector2(r.position.x + 10.0,
+                                r.get_center().y - kis * 0.5),
+                        Vector2(kis, kis)), false)
+                # the dead pieces, wrapped rows starting right of the king
+                var dead: Array = caps[side]
+                if dead.is_empty():
+                        continue
+                var ic := minf(44.0, (r.size.x - kis - 26.0) / 4.0)
+                var per_row := maxi(1, int((r.size.x - kis - 24.0) / ic))
+                var row := Rect2(r.position.x + kis + 14.0, 0.0, ic, ic)
+                for i in dead.size():
+                        var di := i / per_row
+                        var dc := i % per_row
+                        var dtex := _piece_tex(int(dead[i]))
+                        var dr := Rect2(
+                                row.position.x + dc * (ic + 2.0),
+                                r.get_center().y - (ic + 3.0) * 0.5
+                                        + di * (ic + 3.0), ic, ic)
+                        fx_l.draw_texture_rect(dtex, dr, false,
+                                Color(1, 1, 1, 0.92))
+
+## THE TURN KING (the owner: no more YOUR MOVE / CPU IS THINKING text - the
+## side-to-move's own king says it, glowing under the board's top edge)
+func _draw_turn_king() -> void:
+        if board_origin == Vector2.ZERO or st.is_empty() or state == "ready":
+                return
+        var white_turn: bool = st["w"]
+        var sid := Box.skin_on(game_id)
+        if not SETS.has(sid):
+                sid = "classic"
+        var ktex := _tex(sid, "w" if white_turn else "b", 6)
+        var cx := board_origin.x + sq_px * 4.0
+        var cy := board_origin.y - 30.0
+        var pulse := 0.5 + 0.5 * sin(_time * 4.0)
+        var ks := sq_px * (0.50 + 0.03 * pulse)
+        # the glow: green when the user holds the move, warm when the CPU
+        # does, RED when that king stands in check
+        var glow := Color(0.35, 0.85, 0.5, 0.28 + 0.14 * pulse)
+        if not white_turn:
+                glow = Color(0.95, 0.55, 0.3, 0.28 + 0.14 * pulse)
+        if in_check(st):
+                glow = Color(1.0, 0.3, 0.25, 0.34 + 0.2 * pulse)
+        fx_l.draw_circle(Vector2(cx, cy), ks * 0.85, Color(glow.r, glow.g,
+                glow.b, glow.a * 0.5))
+        fx_l.draw_arc(Vector2(cx, cy), ks * 0.72, 0.0, TAU, 40,
+                Color(glow.r, glow.g, glow.b, glow.a + 0.25), 3.0)
+        fx_l.draw_texture_rect(ktex, Rect2(Vector2(cx - ks * 0.5,
+                cy - ks * 0.5), Vector2(ks, ks)), false)
 
 # ============================================================ the flow
 
@@ -1094,11 +1202,10 @@ func _goga_input(event: InputEvent) -> void:
                 var t := event as InputEventScreenTouch
                 if t.pressed:
                         if state == "ready":
-                                state = "deal_start"
-                                if ready_ui != null:
-                                        ready_ui.queue_free()
-                                        ready_ui = null
-                                _new_round()
+                                # v0.3.8-1 THE MATCHER BOOT LAW: the first
+                                # tap owns the optionals - the color shelf
+                                # leads into the first round
+                                _pick_open(true)
                                 return
                         _press(t.position)
                 else:
@@ -1201,6 +1308,11 @@ func _apply_move(m: Dictionary, by_player: bool) -> void:
         var nm := move_name(st, m)
         var captured: bool = int(st["b"][m["t"]]) != 0 or m["flag"] == "ep"
         var moved_v: int = st["b"][m["f"]]
+        # v0.3.8-1 THE DEAD TRAY: remember who lost what (before the state
+        # flips) - en passant always takes a pawn of the opposite color
+        var cap_v := int(st["b"][m["t"]])
+        if m["flag"] == "ep":
+                cap_v = -1 if st["w"] else 1
         if by_player:
                 if captured:
                         player_aggr += 1
@@ -1231,6 +1343,11 @@ func _apply_move(m: Dictionary, by_player: bool) -> void:
         st = make_move(st, m)
         history.append(coord_of(m))
         names_log.append(nm)
+        if cap_v != 0:
+                if cap_v < 0:
+                        cap_w.append(cap_v)   # white took a black piece
+                else:
+                        cap_b.append(cap_v)   # black took a white piece
         last_move = {"f": int(m["f"]), "t": int(m["t"])}
         sel = -1
         legal_cache = []
@@ -1265,54 +1382,15 @@ func _apply_move(m: Dictionary, by_player: bool) -> void:
                 return
         if in_check(st):
                 Jukebox.sfx("c_check", -5.0)
-        # hand the turn over
+        # hand the turn over (the TURN KING reads the state live - no text)
         if by_player:
                 state = "cpu_wait"
                 clock = 0.0
                 think_beat = _rng.randf_range(0.6, 1.0)
-                _banner()
         else:
                 state = "play"
-                _banner()
         board_l.queue_redraw()
         piece_l.queue_redraw()
-        _refresh_log()
-
-func _banner() -> void:
-        if state == "round_over":
-                return
-        var my_turn: bool = st["w"] == player_white
-        if my_turn:
-                var line := "YOUR MOVE"
-                if in_check(st):
-                        line = "YOUR MOVE - CHECK!"
-                turn_lbl.text = line
-                turn_lbl.add_theme_color_override("font_color",
-                        Color(0.45, 0.9, 0.6) if not in_check(st)
-                        else Color(1.0, 0.45, 0.4))
-        else:
-                var n := int(_time * 2.5) % 3 + 1
-                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(n)
-                turn_lbl.add_theme_color_override("font_color",
-                        Color(1.0, 0.6, 0.5))
-
-func _refresh_log() -> void:
-        var parts: Array = []
-        var start := maxi(0, names_log.size() - 12)
-        if start % 2 == 1:
-                start += 1
-        var n := 0
-        var i := start
-        while i < names_log.size() and n < 12:
-                if i % 2 == 0:
-                        parts.append("%d.%s %s" % [i / 2 + 1, names_log[i],
-                                names_log[i + 1] if i + 1 < names_log.size()
-                                else ""])
-                        n += 1
-                        i += 2
-                else:
-                        i += 1
-        log_lbl.text = "  ".join(parts)
 
 func _resolve(outcome: String) -> void:
         state = "round_over"
@@ -1327,7 +1405,7 @@ func _resolve(outcome: String) -> void:
                 achievement_count("wins", 1)
                 achievement_max("max_score", score)
                 verdict = "CHECKMATE - YOU WIN  +1"
-                turn_lbl.add_theme_color_override("font_color",
+                verdict_lbl.add_theme_color_override("font_color",
                         Color(0.45, 0.9, 0.6))
                 Jukebox.sfx("c_win", -2.0)
         elif outcome == "lose":
@@ -1335,16 +1413,17 @@ func _resolve(outcome: String) -> void:
                 if score > 0:
                         add_score(-1)
                 verdict = "CHECKMATE - THE CPU WINS  -1"
-                turn_lbl.add_theme_color_override("font_color",
+                verdict_lbl.add_theme_color_override("font_color",
                         Color(1.0, 0.6, 0.5))
                 Jukebox.sfx("c_lose", -3.0)
         else:
                 draws += 1
                 verdict = "DRAW - %s" % _draw_reason()
-                turn_lbl.add_theme_color_override("font_color",
+                verdict_lbl.add_theme_color_override("font_color",
                         Color(0.8, 0.8, 0.85))
                 Jukebox.sfx("c_draw", -4.0)
-        turn_lbl.text = verdict
+        verdict_lbl.text = verdict
+        verdict_lbl.visible = true
         _refresh_widget()
         check_achievements()
 
@@ -1368,15 +1447,23 @@ func _draw_reason() -> String:
                 return "BARE KINGS"
         return "REPETITION"
 
-## THE OPENER LAW (the xo shape): the loser takes WHITE next; a draw flips
+## THE OPENER LAW (the xo shape): the first round wears the color the user
+## picked in the optionals (white by default); after that the LOSER takes
+## WHITE next and a draw flips - unless the user queued a color override.
 func _new_round() -> void:
         rounds += 1
         if rounds == 1:
-                player_white = true
+                player_white = String(Box.get_progress(game_id,
+                        "start_color", "white")) != "black"
+        elif color_override != "":
+                player_white = color_override == "white"
+                color_override = ""
         st = start_state()
         key_counts = {}
         history = []
         names_log = []
+        cap_w = []
+        cap_b = []
         last_move = {"f": -1, "t": -1}
         sel = -1
         legal_cache = []
@@ -1388,8 +1475,13 @@ func _new_round() -> void:
         profile = String(profile_next(profile_i)[0])
         profile_i = int(profile_next(profile_i)[1])
         state = "play"
-        _banner()
-        _refresh_log()
+        verdict_lbl.visible = false
+        verdict = ""
+        if st["w"] != player_white:
+                # the user took black: the CPU (white) opens the war
+                state = "cpu_wait"
+                clock = 0.0
+                think_beat = _rng.randf_range(0.6, 1.0)
         board_l.queue_redraw()
         piece_l.queue_redraw()
 
@@ -1419,7 +1511,6 @@ func _goga_tick(delta: float) -> void:
                         _spawn_coin()
         if state == "cpu_wait":
                 clock += delta
-                _banner()
                 if clock >= think_beat:
                         _cpu_turn()
         elif state == "round_over":
@@ -1471,6 +1562,128 @@ func _cpu_turn() -> void:
                 return
         _apply_move(m, false)
 
+# ======================================================== the optionals
+## v0.3.8-1 THE COLOR SHELF (the matcher optionals design, word for word):
+## one scrollable sheet, one IMAGE card per color, NO shop row (the shop is
+## the HUD button - the owner's law). It pauses like the shop sheet does,
+## the back button closes it via _goga_sheet_popped. At boot the first tap
+## opens it (the matcher first-moment law); picking a color STARTS the
+## round with it (the START law). Mid-session a pick queues the color for
+## the next opener.
+
+func _pick_open(first := false) -> void:
+        if pick_open:
+                return
+        pick_open = true
+        first_moment = first
+        if ready_ui != null and is_instance_valid(ready_ui):
+                ready_ui.visible = false
+        paused = true
+        get_tree().paused = true
+        var sheet := sheet_push(0.0, "pick")
+        var title := Arc.fit_label("OPTIONALS - THE COLOR SHELF", 34,
+                Arc.HOT, 560)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(title)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.5, 340.0, 620.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 10)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        sheet.add_child(sc)
+        var grid := GridContainer.new()
+        grid.columns = 2
+        grid.add_theme_constant_override("h_separation", 12)
+        grid.add_theme_constant_override("v_separation", 12)
+        grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        box.add_child(grid)
+        grid.add_child(_color_card(true))
+        grid.add_child(_color_card(false))
+        var note := Arc.fit_label("the color YOU hold - the loser of a round"
+                + " takes WHITE next, a draw swaps them", 18,
+                Color("8a6a40"), 560, false)
+        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        box.add_child(note)
+        var cb := Arc.button("TO THE BOARD" if state == "ready" else "CLOSE",
+                Vector2(0, 78), 26, Arc.GOOD, func(): _pick_down())
+        cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        box.add_child(cb)
+        # THE TAPPABLE LAW: BoxScroll owns taps inside scrolls
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+func _color_card(white: bool) -> Button:
+        var picked := String(Box.get_progress(game_id, "start_color", "white"))
+        var on := (picked == "white") == white
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(292, 214)
+        var sb := Arc.panel_style(Arc.CARD, 20, 6)
+        if on:
+                sb.set_border_width_all(4)
+                sb.border_color = Arc.GOOD
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.05)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var v := VBoxContainer.new()
+        v.set_anchors_preset(Control.PRESET_FULL_RECT)
+        v.offset_left = 10
+        v.offset_right = -10
+        v.offset_top = 10
+        v.offset_bottom = -8
+        v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        v.add_theme_constant_override("separation", 4)
+        b.add_child(v)
+        var sid := Box.skin_on(game_id)
+        if not SETS.has(sid):
+                sid = "classic"
+        var art := TextureRect.new()
+        art.texture = _tex(sid, "w" if white else "b", 6)
+        art.custom_minimum_size = Vector2(260, 118)
+        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        v.add_child(art)
+        var l := Arc.fit_label("WHITE - you open the war" if white
+                else "BLACK - the CPU opens", 21, Arc.INK, 272)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        v.add_child(l)
+        b.pressed.connect(func():
+                Jukebox.sfx("confirm", -4.0)
+                Box.set_progress(game_id, "start_color",
+                        "white" if white else "black")
+                if state == "ready":
+                        # THE START LAW: the pick leads straight into the war
+                        _pick_down()
+                        if ready_ui != null and is_instance_valid(ready_ui):
+                                ready_ui.queue_free()
+                                ready_ui = null
+                        _new_round()
+                else:
+                        # mid-session: the pick rides the NEXT opener
+                        color_override = "white" if white else "black"
+                        game_toast("NEXT ROUND: you take %s"
+                                % ("WHITE" if white else "BLACK"))
+                        _pick_down())
+        return b
+
+func _pick_down() -> void:
+        if not pick_open:
+                return
+        sheet_pop()
+
 # ============================================================ the shop
 ## DIRECT: piece sets + boards, everything but the defaults bought
 
@@ -1520,6 +1733,15 @@ func _goga_sheet_popped(id: String) -> void:
                 pending_promo = null
                 get_tree().paused = false
                 paused = false
+        elif id == "pick":
+                # v0.3.8-1 the color shelf closed (a pick, the close button
+                # or the back door) - the flags stay honest
+                pick_open = false
+                get_tree().paused = false
+                paused = false
+                if state == "ready" and ready_ui != null \
+                                and is_instance_valid(ready_ui):
+                        ready_ui.visible = true
         elif id == "shop":
                 shop_id = ""
                 get_tree().paused = false
@@ -1609,6 +1831,10 @@ func probe_reset(seed_v: int) -> void:
         mem = []
         profile_i = 0
         player_white = true
+        cap_w = []
+        cap_b = []
+        color_override = ""
+        pick_open = false
         paused = true
         _new_round()
 

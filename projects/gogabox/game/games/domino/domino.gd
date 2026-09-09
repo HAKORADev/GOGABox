@@ -153,8 +153,8 @@ var shake_t := 0.0
 var shake_i := -1
 
 # layout (recomputed per draw - immediate mode)
-var bw := 84.0                 # board tile long side
-var hw := 112.0                # hand tile long side
+var bw := 150.0                # board tile long side (the 1080 design law)
+var hw := 200.0                # hand tile long side (the 1080 design law)
 var board_rect := Rect2()
 var chain_rects: Array = []    # [{rect: Rect2, vertical: bool}]
 var end_l := Rect2()           # the open play slots
@@ -180,12 +180,11 @@ var turn_lbl: Label
 var you_lbl: Label
 var draw_lbl: Label
 var cpu_lbl: Label
-var you_t: Label
-var draw_t: Label
-var cpu_t: Label
-var draw_btn: Button = null    # DRAW / PASS (lives only when stuck)
+var draw_btn: Button = null    # PASS (lives only when the yard is dry)
 var hand_c_lbl: Label
 var pile_lbl: Label
+var spread := false            # v0.3.8-1: the yard fanned out for a manual draw
+var spread_rects: Array = []   # face-down rects, one per boneyard tile
 
 # ============================================================ STATIC CORE
 
@@ -422,44 +421,34 @@ func _build_ready() -> void:
                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_widgets(vp: Vector2) -> void:
-        # THE SCORE WIDGET (the xo shape): YOU / DRAWS / CPU
+        # v0.3.8-1 THE OWNER'S SEAT: the score leaves the middle of the top
+        # bar for the RIGHT side - a compact vertical stack (YOU / DRAWS /
+        # CPU), the domino mirror of the chess strip
         var widget := Node2D.new()
-        widget.position = Vector2(vp.x * 0.5, 128.0)
+        widget.position = Vector2(vp.x - 76.0, 186.0)
         widget.draw.connect(func():
-                var bwid := 128.0
-                var bh := 70.0
-                var gapw := 16.0
-                var x0 := -(bwid * 3.0 + gapw * 2.0) * 0.5
-                var boxes := [
-                        [x0, Color("58c470"), Color("2f7a44")],
-                        [x0 + bwid + gapw, Color("6b7280"), Color("4b5563")],
-                        [x0 + (bwid + gapw) * 2.0, Color("e8574a"),
-                                Color("9c3a32")],
-                ]
-                for b in boxes:
-                        var bx: float = b[0]
-                        var col: Color = b[1]
-                        widget.draw_rect(Rect2(bx + 5, -bh / 2.0 + 5, bwid, bh),
-                                Color(0.09, 0.05, 0.02, 0.85))
-                        widget.draw_rect(Rect2(bx, -bh / 2.0, bwid, bh),
-                                Color(1, 1, 1, 0.95))
-                        widget.draw_rect(Rect2(bx, -bh / 2.0, bwid, bh),
-                                col, false, 4.0)
-                        widget.draw_rect(Rect2(bx + 40, -bh / 2.0 + 25,
-                                bwid - 80, 3), col))
+                var bwid := 124.0
+                var bh := 58.0
+                var gapw := 12.0
+                var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5,
+                        (bh + gapw) - bh * 0.5]
+                var cols := [Color("58c470"), Color("6b7280"), Color("e8574a")]
+                for i in 3:
+                        var r := Rect2(-bwid * 0.5, ys[i], bwid, bh)
+                        widget.draw_rect(Rect2(r.position + Vector2(4, 4),
+                                r.size), Color(0.09, 0.05, 0.02, 0.85))
+                        widget.draw_rect(r, Color(1, 1, 1, 0.95))
+                        widget.draw_rect(r, cols[i], false, 4.0))
         world.add_child(widget)
-        you_t = Arc.label("YOU", 17, Color("2f7a44"))
-        draw_t = Arc.label("DRAWS", 17, Color("4b5563"))
-        cpu_t = Arc.label("CPU", 17, Color("9c3a32"))
-        you_lbl = Arc.label("0", 30, Color("2f7a44"))
-        draw_lbl = Arc.label("0", 30, Color("4b5563"))
-        cpu_lbl = Arc.label("0", 30, Color("9c3a32"))
-        for l in [you_t, draw_t, cpu_t, you_lbl, draw_lbl, cpu_lbl]:
+        you_lbl = Arc.label("YOU 0", 24, Color("2f7a44"))
+        draw_lbl = Arc.label("DRAWS 0", 24, Color("4b5563"))
+        cpu_lbl = Arc.label("CPU 0", 24, Color("9c3a32"))
+        for l in [you_lbl, draw_lbl, cpu_lbl]:
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 world.add_child(l)
         _refresh_widget()
         turn_lbl = Arc.label("", 28, Color(1, 1, 1, 0.92))
-        turn_lbl.position = Vector2(0, 200)
+        turn_lbl.position = Vector2(0, 242)
         turn_lbl.custom_minimum_size = Vector2(vp.x, 38)
         turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         world.add_child(turn_lbl)
@@ -469,58 +458,64 @@ func _build_widgets(vp: Vector2) -> void:
         world.add_child(hand_c_lbl)
 
 func _refresh_widget() -> void:
-        you_lbl.text = str(wins)
-        draw_lbl.text = str(draws)
-        cpu_lbl.text = str(losses)
         var vp := get_viewport_rect().size
-        var w := 128.0
-        var gapw := 16.0
-        var x0 := vp.x * 0.5 - (w * 3.0 + gapw * 2.0) * 0.5
-        var cols := [x0, x0 + w + gapw, x0 + (w + gapw) * 2.0]
+        var w := 124.0
+        var bh := 58.0
+        var gapw := 12.0
+        var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5, (bh + gapw) - bh * 0.5]
+        var labels := [you_lbl, draw_lbl, cpu_lbl]
+        var texts := ["YOU %d" % wins, "DRAWS %d" % draws, "CPU %d" % losses]
         for i in 3:
-                var t: Label = [you_t, draw_t, cpu_t][i]
-                var v: Label = [you_lbl, draw_lbl, cpu_lbl][i]
-                t.position = Vector2(cols[i], 128.0 - 34.0)
-                t.custom_minimum_size = Vector2(w, 22)
-                v.position = Vector2(cols[i], 128.0 - 12.0)
-                v.custom_minimum_size = Vector2(w, 38)
+                var v: Label = labels[i]
+                v.text = texts[i]
+                v.position = Vector2(vp.x - 76.0 - w * 0.5,
+                        186.0 + ys[i] + 14.0)
+                v.custom_minimum_size = Vector2(w, bh - 20.0)
 
 # ============================================================ the layout
 ## Recomputed every draw - the chain snake wraps in rows, the board scale
 ## steps DOWN as the chain grows (the owner's "a scale for big grounds").
 
 func _board_scale() -> float:
-        if chain.size() <= 11:
+        if chain.size() <= 12:
                 return 1.0
-        if chain.size() <= 17:
-                return 0.86
-        if chain.size() <= 23:
-                return 0.74
-        return 0.64
+        if chain.size() <= 18:
+                return 0.85
+        if chain.size() <= 24:
+                return 0.72
+        return 0.6
 
 func _relayout() -> void:
         var vp := get_viewport_rect().size
-        var top := 248.0
+        # v0.3.8-1 THE GROUND LAW: the score strip moved to the RIGHT cut
+        # and the CPU hand row lives top-center - the ground starts just
+        # under it and runs to the hand fan, much taller than before.
+        var top := 236.0
         var bot := vp.y - banner_bottom() - hw - 78.0
         board_rect = Rect2(18.0, top, vp.x - 36.0, maxf(200.0, bot - top))
-        bw = 86.0 * _board_scale()
+        bw = 150.0 * _board_scale()
         chain_rects = []
-        pile_pos = Vector2(board_rect.position.x + 40.0,
-                board_rect.position.y + 34.0)
-        cpu_pos = Vector2(board_rect.position.x + board_rect.size.x - 40.0,
-                board_rect.position.y + 34.0)
+        # the resting yard: a neat stack on the ground's LEFT edge, mid-height
+        pile_pos = Vector2(board_rect.position.x + 46.0,
+                board_rect.position.y + board_rect.size.y * 0.5)
+        # the CPU hand: top-center of the ground (the mirror of the owner's
+        # fan - see _draw_cpu_hand)
+        cpu_pos = Vector2(vp.x * 0.5, 140.0)
         if chain.is_empty():
                 end_l = Rect2()
                 end_r = Rect2()
         else:
                 var th := bw * 0.5
                 var gap := 3.0
+                # v0.3.8-1 THE CENTER LAW: the snake starts at the CENTER of
+                # the ground (the old start hugged the top edge - "this is
+                # not a real game", the owner)
                 var cursor := Vector2(board_rect.position.x
                         + board_rect.size.x * 0.5,
-                        board_rect.position.y + 52.0)
+                        board_rect.position.y + board_rect.size.y * 0.5)
                 var dir := 1
-                var margin_r := board_rect.position.x + board_rect.size.x - 30.0
-                var margin_l := board_rect.position.x + 30.0
+                var margin_r := board_rect.position.x + board_rect.size.x - 44.0
+                var margin_l := board_rect.position.x + 44.0
                 var rects: Array = []
                 for i in chain.size():
                         var t: Dictionary = chain[i]
@@ -572,6 +567,24 @@ func _relayout() -> void:
                         hand_rects.append(Rect2(Vector2(
                                 x0 + i * (tw2 - overlap), hy),
                                 Vector2(tw2, hw)))
+        # v0.3.8-1 THE YARD SPREAD: when the player must draw, the boneyard
+        # fans out face-down across the ground's middle - one rect per tile
+        spread_rects = []
+        if spread and deck.size() > 0:
+                var sw := bw * 0.52
+                var sh := bw * 0.92
+                var cnt := deck.size()
+                var gapw := 6.0
+                var row_w := cnt * sw + (cnt - 1) * gapw
+                var maxw2 := board_rect.size.x - 40.0
+                var step := sw + gapw
+                if row_w > maxw2:
+                        step = (maxw2 - sw) / float(cnt - 1)
+                var sx := board_rect.get_center().x - (step * (cnt - 1) + sw) * 0.5
+                var sy := board_rect.get_center().y - sh * 0.5
+                for i in cnt:
+                        spread_rects.append(Rect2(Vector2(
+                                sx + i * step, sy), Vector2(sw, sh)))
 
 # ============================================================ the drawing
 
@@ -627,24 +640,26 @@ func _draw_tile_body(onto: Node2D, r: Rect2, a: int, b: int, vertical: bool,
         else:
                 onto.draw_line(Vector2(mid.x, r.position.y + 6.0),
                         Vector2(mid.x, r.end.y - 6.0), line, 3.0)
-        var half_h: float = ((mid.y - r.position.y) if vertical
-                else (mid.x - r.position.x))
-        var rad := maxf(2.6, half_h * 0.11)
+        # v0.3.8-1 THE PIP TRUTH: a domino half is a SQUARE (the long side
+        # is exactly 2x the short one). The old spread read the long side on
+        # BOTH axes, so the narrow axis overflowed - the dots sat on the
+        # edge or outside the body. Each axis now reads its own extent.
+        var hx: float = (r.size.x * 0.5 if vertical else r.size.x * 0.25) * 0.72
+        var hy: float = (r.size.y * 0.25 if vertical else r.size.y * 0.5) * 0.72
+        var rad := maxf(2.6, minf(r.size.x, r.size.y) * 0.105)
         for half in 2:
                 var v := a if half == 0 else b
                 var c0: Vector2
                 if vertical:
                         c0 = Vector2(r.position.x + r.size.x * 0.5,
-                                r.position.y + (mid.y - r.position.y) * (0.5 + half))
+                                r.position.y + r.size.y * (0.25 + 0.5 * half))
                 else:
-                        c0 = Vector2(r.position.x + (mid.x - r.position.x) * (0.5 + half),
+                        c0 = Vector2(r.position.x + r.size.x * (0.25 + 0.5 * half),
                                 r.position.y + r.size.y * 0.5)
                 for pp in _pip_spots(v):
-                        var off := Vector2(pp[0] * half_h * 0.52,
-                                pp[1] * half_h * 0.52)
+                        var off := Vector2(pp[0] * hx, pp[1] * hy)
                         if not vertical:
-                                off = Vector2(pp[1] * half_h * 0.52,
-                                        pp[0] * half_h * 0.52)
+                                off = Vector2(pp[1] * hx, pp[0] * hy)
                         onto.draw_circle(c0 + off, rad, pip)
 
 ## the classic pip grid: positions in half-halfspace units
@@ -708,8 +723,11 @@ func _draw_chain() -> void:
                         f["to"] as Vector2, ease)
                 var sz := Vector2(bw, bw * 0.5)
                 chain_l.draw_set_transform(at, 0.0, Vector2.ONE)
-                _draw_tile_body(chain_l, Rect2(-sz * 0.5, sz),
-                        int(ft[0]), int(ft[1]), true)
+                if bool(f.get("back", false)):
+                        _draw_tile_back(chain_l, Rect2(-sz * 0.5, sz))
+                else:
+                        _draw_tile_body(chain_l, Rect2(-sz * 0.5, sz),
+                                int(ft[0]), int(ft[1]), true)
                 chain_l.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_hand() -> void:
@@ -744,6 +762,8 @@ func _draw_fx() -> void:
                 var r := Rect2(at - sz * 0.5, sz)
                 fx_l.draw_rect(r.grow(5.0), Color(0, 0, 0, 0.35))
                 _draw_tile_body(fx_l, r, int(t[0]), int(t[1]), true, 1.0)
+        # v0.3.8-1: the spread fan lives above the felt
+        _draw_spread()
         # the coin, bobbing on its end slot
         if coin_side != 0:
                 var slot := end_l if coin_side == 1 else end_r
@@ -768,32 +788,87 @@ func _draw_fx() -> void:
 
 func _draw_pile() -> void:
         var n := deck.size()
-        var s := Vector2(bw * 0.5, bw * 0.30)
-        for k in mini(3, n):
+        if spread:
+                # the fan IS the yard now - the resting stack steps aside
+                pile_lbl.text = ""
+                return
+        if n <= 0:
+                pile_lbl.text = "THE YARD IS DRY"
+                pile_lbl.position = pile_pos + Vector2(-70.0, -14.0)
+                pile_lbl.custom_minimum_size = Vector2(160.0, 24)
+                return
+        # a taller honest stack: up to 6 backs with real depth
+        var s := Vector2(bw * 0.44, bw * 0.88)
+        for k in mini(6, n):
                 var r := Rect2(pile_pos - s * 0.5
-                        + Vector2(k * 2.0, -k * 3.0), s)
-                table_l.draw_rect(r.grow(1.5), Color(0, 0, 0, 0.3))
-                table_l.draw_rect(r, _skin()["edge"].darkened(0.2))
-                table_l.draw_rect(r.grow(-2.0), _skin()["body"].darkened(0.12))
+                        + Vector2(k * 2.5, -k * 4.0), s)
+                _draw_tile_back(table_l, r)
         pile_lbl.text = "BONEYARD %d" % n
-        pile_lbl.position = pile_pos + Vector2(-40.0, s.y * 0.5 + 8.0)
+        pile_lbl.position = pile_pos + Vector2(-70.0, s.y * 0.5 + 12.0)
         pile_lbl.custom_minimum_size = Vector2(160.0, 24)
 
+## the spread fan (fx layer): the face-down yard the user picks from
+func _draw_spread() -> void:
+        if not spread or spread_rects.is_empty():
+                return
+        var pulse := 0.5 + 0.5 * sin(_time * 4.0)
+        for i in spread_rects.size():
+                var r: Rect2 = spread_rects[i]
+                _draw_tile_back(fx_l, r)
+                fx_l.draw_rect(r.grow(-1.0),
+                        Color(1, 1, 1, 0.05 + 0.05 * pulse), false, 2.0)
+        var hint := "TAP A TILE TO DRAW"
+        var f := ThemeDB.fallback_font
+        fx_l.draw_string(f, Vector2(
+                board_rect.get_center().x - 130.0,
+                spread_rects[0].position.y - 18.0 + 8.0),
+                hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 26,
+                Color(1, 1, 1, 0.55 + 0.3 * pulse))
+
 func _draw_cpu_hand() -> void:
+        # v0.3.8-1 THE MIRROR LAW: the CPU's fan is set the SAME way as the
+        # owner's (a centered row of vertical tiles), riding top-center -
+        # the old right-edge mini-slabs made no sense. The tiles show their
+        # BACKS: the numbers stay secret.
         var n := hand_c.size()
-        var s := Vector2(bw * 0.30, bw * 0.20)
-        var x0 := cpu_pos.x - (n * (s.x + 4.0)) * 0.5
+        if n <= 0:
+                hand_c_lbl.text = ""
+                return
+        var tw := hw * 0.36
+        var th := hw * 0.7
+        var overlap := 0.0
+        var maxw := get_viewport_rect().size.x - 56.0
+        var total := tw * n
+        if total > maxw:
+                overlap = (total - maxw) / float(n - 1)
+        var x0 := cpu_pos.x - (total - overlap * (n - 1)) * 0.5
         for k in n:
-                var r := Rect2(Vector2(x0 + k * (s.x + 4.0),
-                        cpu_pos.y - s.y * 0.5), s)
-                table_l.draw_rect(r.grow(1.5), Color(0, 0, 0, 0.3))
-                table_l.draw_rect(r, Color("3a3430"))
-                table_l.draw_rect(r.grow(-2.0), Color("544c44"))
-        hand_c_lbl.text = "CPU %d" % n
-        hand_c_lbl.position = Vector2(
-                minf(x0 - 10.0, get_viewport_rect().size.x - 150.0),
-                cpu_pos.y + s.y * 0.5 + 8.0)
-        hand_c_lbl.custom_minimum_size = Vector2(150.0, 24)
+                var r := Rect2(Vector2(x0 + k * (tw - overlap),
+                        cpu_pos.y - th * 0.5), Vector2(tw, th))
+                _draw_tile_back(table_l, r)
+        hand_c_lbl.text = "CPU - %d" % n
+        hand_c_lbl.add_theme_font_size_override("font_size", 22)
+        hand_c_lbl.position = Vector2(cpu_pos.x - 80.0,
+                cpu_pos.y + th * 0.5 + 4.0)
+        hand_c_lbl.custom_minimum_size = Vector2(160.0, 26)
+
+## v0.3.8-1 THE BACK: the tile's reverse - the skin's dark body, a neat
+## edge, and the house spinner motif dead center. No pips, no leaks.
+func _draw_tile_back(onto: Node2D, r: Rect2) -> void:
+        var s := _skin()
+        onto.draw_rect(r.grow(2.0), Color(0, 0, 0, 0.30))
+        onto.draw_rect(r, s["edge"].darkened(0.45))
+        var inner := r.grow(-3.0)
+        onto.draw_rect(inner, s["body"].darkened(0.55))
+        onto.draw_rect(inner.grow(-4.0), Color(1, 1, 1, 0.06))
+        var c := r.get_center()
+        var u := minf(r.size.x, r.size.y) * 0.5
+        onto.draw_circle(c, u * 0.30, s["edge"].darkened(0.3))
+        onto.draw_circle(c, u * 0.16, s["pip"].darkened(0.2))
+        for k in 4:
+                var ang := k * PI * 0.5 + PI * 0.25
+                var d := c + Vector2(cos(ang), sin(ang)) * u * 0.46
+                onto.draw_circle(d, u * 0.07, Color(1, 1, 1, 0.30))
 
 # ============================================================ the input
 
@@ -818,6 +893,14 @@ func _goga_input(event: InputEvent) -> void:
 
 func _press(at: Vector2) -> void:
         if state != "play" or turn != P:
+                return
+        # v0.3.8-1 THE YARD PICK: the fan is up - a tap on a face-down tile
+        # takes THAT tile (the honest manual draw, the owner's design)
+        if spread:
+                for i in spread_rects.size():
+                        if spread_rects[i].grow(6.0).has_point(at):
+                                _player_take(i)
+                                return
                 return
         # the opener: the glowing tile opens on touch
         if opening:
@@ -1024,35 +1107,66 @@ func _banner() -> void:
                 turn_lbl.add_theme_color_override("font_color",
                         Color(1.0, 0.6, 0.5))
 
-## the stuck door: the player with no legal move draws or passes
+## the stuck door: v0.3.8-1 THE MANUAL YARD - no more an instant DRAW
+## button while tiles remain. Stuck with a live yard = the yard SPREADS and
+## the player taps the tile they take. Only a DRY yard earns the PASS.
 func _sync_draw_btn() -> void:
         var stuck := false
         if state == "play" and turn == P and not opening:
                 stuck = playable(hand_p, ends(chain).x, ends(chain).y) \
                         .is_empty()
+        spread = stuck and deck.size() > 0
         if not stuck:
                 if draw_btn != null and is_instance_valid(draw_btn):
                         draw_btn.queue_free()
                         draw_btn = null
+                _relayout()
+                return
+        if spread:
+                # the fan is the door now (the relayout owns its geometry)
+                if draw_btn != null and is_instance_valid(draw_btn):
+                        draw_btn.queue_free()
+                        draw_btn = null
+                _relayout()
+                game_toast("THE YARD SPREADS - TAP A TILE TO DRAW")
                 return
         if draw_btn != null and is_instance_valid(draw_btn):
-                draw_btn.text = "DRAW (%d)" % deck.size() if deck.size() > 0 \
-                        else "PASS"
+                draw_btn.text = "PASS"
                 return
         var vp := get_viewport_rect().size
-        var label := "DRAW (%d)" % deck.size() if deck.size() > 0 else "PASS"
         var by: float = hand_rects[0].position.y if not hand_rects.is_empty() \
                 else vp.y - 240.0
-        draw_btn = Arc.button(label, Vector2(280, 70), 26, Arc.ACCENT, func():
-                if deck.size() > 0:
-                        _draw_tile(P)
-                else:
-                        _pass(P))
+        draw_btn = Arc.button("PASS", Vector2(280, 70), 26, Arc.ACCENT, func():
+                _pass(P))
         draw_btn.position = Vector2((vp.x - 280.0) * 0.5, by - 88.0)
         _hud.add_child(draw_btn)
         var tw := draw_btn.create_tween().set_loops()
         tw.tween_property(draw_btn, "modulate:a", 0.6, 0.5)
         tw.tween_property(draw_btn, "modulate:a", 1.0, 0.5)
+
+## THE TAKE: the player picked a face-down tile from the spread fan - it
+## flies to the hand, the fan re-fans if the stuck door demands more
+func _player_take(i: int) -> void:
+        if not spread or i >= deck.size():
+                return
+        var t: Array = deck[i]
+        var from: Vector2 = spread_rects[i].get_center() \
+                if i < spread_rects.size() else pile_pos
+        deck.remove_at(i)
+        hand_p.append(t)
+        cur["drew"] = int(cur.get("drew", 0)) + 1
+        Jukebox.sfx("d_draw", -6.0)
+        _relayout()
+        var to: Vector2 = hand_rects[hand_rects.size() - 1].get_center() \
+                if not hand_rects.is_empty() \
+                else Vector2(get_viewport_rect().size.x * 0.5,
+                get_viewport_rect().size.y - hw)
+        flies.append({"tile": t, "from": from, "to": to,
+                "back": true, "t": 0.0, "dur": 0.26})
+        _sync_draw_btn()
+        chain_l.queue_redraw()
+        hand_l.queue_redraw()
+        fx_l.queue_redraw()
 
 func _draw_tile(who: int) -> void:
         if deck.is_empty():
@@ -1068,6 +1182,11 @@ func _draw_tile(who: int) -> void:
                 _sync_draw_btn()
         else:
                 Jukebox.sfx("d_draw", -9.0, 0.9)
+                # v0.3.8-1: the CPU's diet is VISIBLE - a back flies from
+                # the yard into its fan
+                flies.append({"tile": t, "from": pile_pos,
+                        "to": Vector2(cpu_pos.x, cpu_pos.y), "back": true,
+                        "t": 0.0, "dur": 0.26})
         hand_l.queue_redraw()
 
 func _pass(who: int) -> void:
@@ -1415,6 +1534,8 @@ func probe_reset(seed_v: int) -> void:
         mem = []
         profile_i = 0
         state = "play"
+        spread = false
+        spread_rects = []
         paused = true             # the probe steps the world itself
         _new_round()
         state = "deal"

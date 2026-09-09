@@ -511,7 +511,13 @@ func _place_coin_spr() -> void:
         if coin.is_empty():
                 coin_spr.visible = false
                 return
+        # v0.3.8-1 THE COIN FITS THE CELL: the coin used to keep its map-1
+        # size forever - on the grown maps it dwarfed the corridors. It wears
+        # the exit glow's fit law now: the scale reads the CURRENT cell_px
+        # (~half the cell, the map-1 look preserved), so it shrinks with the
+        # maze and floors with the MIN CELL cap.
         coin_spr.visible = true
+        coin_spr.scale = Vector2.ONE * (cell_px * 0.48 / 96.0)
         coin_spr.position = _cell_center(coin["cell"])
 
 ## THE COIN PLACE: cells at BFS distance 1-2 from the solution (near it, so
