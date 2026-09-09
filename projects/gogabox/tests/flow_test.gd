@@ -306,13 +306,14 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 14,
-                "14 playable games (maze escaper joined)")
+        var ok := _check(GameReg.playable().size() == 16,
+                "16 playable games (domino + chess joined)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
-        ok += _check(GameReg.workshop().size() == 5,
-                "5 workshop teasers (the FUTURE_GAMES front of the line)")
+        # v0.3.8: DOMINO + CHECKMATE graduated - three teasers left
+        ok += _check(GameReg.workshop().size() == 3,
+                "3 workshop teasers (fourline / bovo / dots)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -386,7 +387,7 @@ func _t_registry() -> int:
         # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
         # the banner now, the tower included; MELTING stays
         var banner_ok := true
-        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders"]:
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess"]:
                 banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
@@ -415,6 +416,31 @@ func _t_registry() -> int:
                 "geometry flash is PLAYABLE now: landscape, score / 50 (v0.3.6-3)")
         var geo_ach_ok: bool = geo["ach"].size() == 11
         ok += _check(geo_ach_ok, "geometry wears the tiered ladder (11)")
+        # v0.3.8: DOMINO + CHECKMATE graduate (the owner's economy laws)
+        var dg: Dictionary = GameReg.get_game("domino")
+        ok += _check(not bool(dg.get("coming_soon", false)) \
+                        and String(dg["orientation"]) == "portrait",
+                "domino is PLAYABLE now: portrait (the owner's layout law)")
+        ok += _check(int(dg["coin_div"]) == 2 and int(dg["fee"]) == 10,
+                "domino wears the owner's economy (bonus /2, fee 10)")
+        ok += _check(bool(dg["shop"]) and bool(dg["banner"]),
+                "domino wears the shop + the banner")
+        ok += _check(dg["ach"].size() == 10, "domino wears the tiered ladder (10)")
+        var cg: Dictionary = GameReg.get_game("chess")
+        ok += _check(not bool(cg.get("coming_soon", false)) \
+                        and String(cg["orientation"]) == "landscape",
+                "chess is PLAYABLE now: landscape (the owner's layout law)")
+        ok += _check(int(cg["coin_div"]) == 1 and int(cg["fee"]) == 10,
+                "chess wears the owner's economy (bonus /1, fee 10)")
+        ok += _check(bool(cg["shop"]) and bool(cg["banner"]),
+                "chess wears the shop + the banner")
+        ok += _check(cg["ach"].size() == 11, "chess wears the tiered ladder (11)")
+        # the maze v0.3.8 tight clock (the owner: "much stricter but not
+        # impossible") lives in the game consts
+        var MZ := load("res://game/games/maze/maze.gd")
+        ok += _check(float(MZ.TIME_BASE) == 4.5 and float(MZ.TIME_PER_CELL) == 0.42 \
+                        and float(MZ.TIME_MIN) == 13.0 and float(MZ.TIME_MAX) == 62.0,
+                "maze wears the tight clock (4.5 + 0.42/cell, 13..62)")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -1152,7 +1178,7 @@ func _t_menu() -> int:
         menu._open_trophies()
         await get_tree().process_frame
         menu._close_sheet()
-        menu._open_mystery_page(GameReg.get_game("domino"))
+        menu._open_mystery_page(GameReg.get_game("fourline"))
         await get_tree().process_frame
         menu._close_sheet()
         menu._open_game_page(GameReg.get_game("snake"))

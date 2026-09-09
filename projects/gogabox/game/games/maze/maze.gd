@@ -16,9 +16,13 @@ extends GogaGame
 ##     the cell shrinks to fit - but never below the MIN CELL, and the grid
 ##     caps there (the owner: "putting a limit"); every pixel of the board
 ##     area is used, centered.
-##   - THE TIME LAW: time and scale are the enemies. Each map carries its
-##     own budget = 10s + 0.8s per solution cell (clamped) - generous at
-##     first, a real clock later. The timeout ends the run.
+##   - THE TIME LAW (v0.3.8 TIGHTENED, the owner: "the time is too much
+##     there is no way someone could lose this way, make it much stricter
+##     but ensure it is not impossible"): each map carries its own budget
+##     = 4.5s + 0.42s per solution cell (clamped 13..62). The flow speed
+##     tops at 12 cells/s, so an expert needs ~0.083s/cell of pure travel;
+##     the budget gives ~0.42s/cell - reading and planning eat the rest.
+##     The timeout ends the run.
 ##   - THE SWIPE LAW: one swipe = one queued step (TouchKit). The queue
 ##     animates grid by grid and the animation SPEEDS UP as the queue
 ##     grows - fast fingers flow, the square never teleports.
@@ -49,10 +53,10 @@ const BASE_COLS := 11
 const BASE_ROWS := 7
 
 # ---------------- the clock -------------------------------------------------
-const TIME_BASE := 10.0         # the flat part of every map's budget
-const TIME_PER_CELL := 0.8      # + per solution cell (the map's real length)
-const TIME_MIN := 24.0
-const TIME_MAX := 99.0
+const TIME_BASE := 4.5          # the flat part of every map's budget
+const TIME_PER_CELL := 0.42     # + per solution cell (the map's real length)
+const TIME_MIN := 13.0
+const TIME_MAX := 62.0
 
 # ---------------- the movement ---------------------------------------------
 const MOVE_BASE := 5.5          # cells/s with an empty queue
@@ -722,7 +726,11 @@ func _escape() -> void:
         add_score(1)
         achievement_max("max_maps", score)
         achievement_count("escapes", 1)
-        Jukebox.sfx("m_win", -3.0)
+        # v0.3.8 THE SOLVE TRUTH: the old m_win was a 3-note bell rise - the
+        # same shape as the box's end-of-run jingle (the owner: "the solved
+        # maze SFX is same as end game"). The map escape now wears its own
+        # portal-warp timbre; the run end keeps its jingle.
+        Jukebox.sfx("m_solve", -3.0)
         _ring_at(Vector2(player["x"], player["y"]), _theme()["exit"], 1.3)
         _ring_at(Vector2(player["x"], player["y"]), Color(1, 1, 1), 0.7)
         map_i += 1

@@ -352,8 +352,10 @@ func _feed_restore() -> void:
                         ads_free = false
         ck(age_free, "THE AGE EXTINCTION: the registry carries no age keys")
         ck(ads_free, "THE GOGADS NUKE: the registry carries no ad breaks")
-        ck(GameReg.playable().size() == 14, "THE SHELF: 14 playable games")
-        ck(GameReg.workshop().size() == 5, "THE SHELF: 5 SOON teasers wait")
+        # v0.3.8: domino + chess graduate from the SOON row - 16 playable,
+        # 3 teasers still waiting (fourline / bovo / dots)
+        ck(GameReg.playable().size() == 16, "THE SHELF: 16 playable games")
+        ck(GameReg.workshop().size() == 3, "THE SHELF: 3 SOON teasers wait")
         ck(get_node_or_null("/root/GOGAds") == null, "THE GOGADS NUKE: the autoload is gone")
 
 func _ready() -> void:

@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://dp5e11owd07r2"
-path="res://.godot/imported/m_win.wav-a3f3a5d37b84d6f3224f3c14040d5e12.sample"
+uid="uid://c215ctpp3hh0y"
+path="res://.godot/imported/c_capture.wav-54f7c595fb1c1c218f322a432def7b2a.sample"
 
 [deps]
 
-source_file="res://assets/audio/sfx/m_win.wav"
-dest_files=["res://.godot/imported/m_win.wav-a3f3a5d37b84d6f3224f3c14040d5e12.sample"]
+source_file="res://assets/audio/sfx/c_capture.wav"
+dest_files=["res://.godot/imported/c_capture.wav-54f7c595fb1c1c218f322a432def7b2a.sample"]
 
 [params]
 

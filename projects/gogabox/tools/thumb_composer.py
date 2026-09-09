@@ -1174,6 +1174,142 @@ def scene_maze():
     return sc.render()
 
 
+def scene_domino():
+    """DOMINO (v0.3.8): the tavern table, a snake of ivory tiles mid-game,
+    a lifted tile glowing in the hand, the coin waiting on the open end."""
+    sc = Scene()
+    sc.backdrop((46, 107, 70), (24, 62, 40))
+    rng = __import__("random").Random(3808)
+    # the felt's soft quilt
+    for i in range(-40, W + 80, 96):
+        sc.line([(i, 0), (i + 240, H)], (255, 255, 255, 9), 3)
+        sc.line([(i + 240, 0), (i, H)], (255, 255, 255, 9), 3)
+    # the rail frame
+    sc.rect([36, 60, W - 36, H - 90], r=26,
+            outline=(90, 61, 36, 255), width=14)
+
+    def tile(x, y, a, b=None, vertical=True, w=76, body=(242, 236, 218),
+             edge=(185, 172, 140), pip=(42, 38, 32), rot=0.0, lift=0):
+        if b is None:
+            b = a
+        h = w * 2
+        box = [x - w // 2, y - h // 2 - lift, x + w // 2, y + h // 2 - lift]
+        sc.rect(box, r=12, fill=body + (255,),
+                outline=edge + (255,), width=4)
+        if not vertical:
+            pass  # thumbs keep the standing read
+        mid = (box[1] + box[3]) // 2
+        sc.line([(box[0] + 9, mid), (box[2] - 9, mid)], edge + (255,), 4)
+        rad = max(5, w // 7)
+        spots = {0: [], 1: [(0, 0)], 2: [(-1, -1), (1, 1)],
+                 3: [(-1, -1), (0, 0), (1, 1)],
+                 4: [(-1, -1), (1, -1), (-1, 1), (1, 1)],
+                 5: [(-1, -1), (1, -1), (0, 0), (-1, 1), (1, 1)],
+                 6: [(-1, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)]}
+        for half, v in enumerate((a, b)):
+            cy = (box[1] + (mid - box[1]) * (0.5 + half)) if half == 0 else \
+                 (mid + (box[3] - mid) * (half - 0.5))
+            for sx, sy in spots[v]:
+                px = x + sx * w * 0.26
+                py = cy + sy * (mid - box[1]) * 0.42
+                sc.ellipse([px - rad, py - rad, px + rad, py + rad],
+                           fill=pip + (255,))
+        return box
+
+    # ---- the chain: 6-4 | 4-2 | 2-2 | 2-5 | 5-3, with the doubles proud
+    cells = [((W * 0.30, H * 0.34), (6, 4), 0),
+             ((W * 0.44, H * 0.34), (4, 2), 0),
+             ((W * 0.565, H * 0.34), (2, 2), 1),
+             ((W * 0.68, H * 0.36), (2, 5), 0),
+             ((W * 0.79, H * 0.42), (5, 3), 0)]
+    for (x, y), (a, b), dbl in cells:
+        if dbl:
+            sc.glow(x, y, 60, (255, 226, 140), 40)
+        tile(x, y, a, b, w=64 if not dbl else 52)
+    # the glowing end slot past the 3
+    ex, ey = W * 0.875, H * 0.47
+    sc.glow(ex, ey, 40, (120, 240, 160), 120)
+    sc.rect([ex - 34, ey - 34, ex + 34, ey + 34], r=10,
+            outline=(120, 240, 160, 200), width=4)
+    # the coin ON the slot (the race)
+    sc.glow(ex, ey + 92, 34, (255, 214, 100), 130)
+    sc.stamp(load_sprite("ui/coin.png"), ex, ey + 92, scale=0.5)
+    # ---- the hand: two tiles + the LIFTED one glowing (the drag)
+    tile(W * 0.36, H * 0.82, 1, 4, w=66)
+    tile(W * 0.52, H * 0.82, 0, 6, w=66)
+    sc.glow(W * 0.68, H * 0.78, 84, (255, 226, 120), 90)
+    tile(W * 0.68, H * 0.78, 3, 3, w=72, lift=26)
+    # a couple of felt dust specks for life
+    for i in range(26):
+        gx, gy = rng.randint(60, W - 60), rng.randint(90, H - 110)
+        sc.ellipse([gx, gy, gx + 3, gy + 3], fill=(255, 255, 255, 16))
+    sc.vignette(90)
+    return sc.render()
+
+
+def scene_chess():
+    """CHECKMATE (v0.3.8): the walnut board mid-raid - the classic set, a
+    knight landing a fork with the last-move glow, the coin waiting."""
+    sc = Scene()
+    sc.backdrop((38, 30, 24), (16, 12, 9))
+    # ---- the board
+    cell = 62
+    bw = cell * 8
+    ox, oy = W // 2 - bw // 2 - 60, (H - bw) // 2 + 6
+    light = (240, 217, 181)
+    dark = (181, 136, 99)
+    hl = (246, 246, 130, 130)
+    last = [(4, 6), (4, 4)]      # e2 -> e4, the last move
+    for r in range(8):
+        for c in range(8):
+            x, y = ox + c * cell, oy + r * cell
+            col = light if (r + c) % 2 == 1 else dark
+            sc.rect([x, y, x + cell, y + cell], fill=col + (255,))
+            if (c, r) in last:
+                sc.rect([x, y, x + cell, y + cell], fill=hl)
+    sc.rect([ox - 12, oy - 12, ox + bw + 12, oy + bw + 12], r=10,
+            outline=(107, 74, 46, 255), width=12)
+    # ---- the pieces (the real CLASSIC set) on a Queen's Gambit tabiya
+    G = "games/chess/classic/"
+    back_w = ["rook", "knight", "bishop", "queen", "king", "bishop",
+              "knight", "rook"]
+    order = ["rook", "knight", "bishop", "queen", "king", "bishop",
+             "knight", "rook"]
+    for c in range(8):
+        sc.stamp(load_sprite(G + "w_%s.png" % back_w[c]),
+                 ox + c * cell + cell // 2, oy + 7 * cell + cell // 2,
+                 scale=cell / 150.0)
+        sc.stamp(load_sprite(G + "w_pawn.png"),
+                 ox + c * cell + cell // 2, oy + 6 * cell + cell // 2,
+                 scale=cell / 150.0)
+        sc.stamp(load_sprite(G + "b_%s.png" % order[c]),
+                 ox + c * cell + cell // 2, oy + 0 * cell + cell // 2,
+                 scale=cell / 150.0)
+        sc.stamp(load_sprite(G + "b_pawn.png"),
+                 ox + c * cell + cell // 2, oy + 1 * cell + cell // 2,
+                 scale=cell / 150.0)
+    # the developed start: white Nf3 + pawn e4, black pawn d5 ex-capture
+    sc.stamp(load_sprite(G + "w_knight.png"),
+             ox + 5 * cell + cell // 2, oy + 5 * cell + cell // 2,
+             scale=cell / 150.0)
+    sc.stamp(load_sprite(G + "b_pawn.png"),
+             ox + 3 * cell + cell // 2, oy + 4 * cell + cell // 2,
+             scale=cell / 150.0)
+    # ---- the fork moment: the knight glows on e5 - the story of the thumb
+    fx, fy = ox + 4 * cell + cell // 2, oy + 3 * cell + cell // 2
+    sc.glow(fx, fy, 66, (255, 220, 120), 120)
+    sc.stamp(load_sprite(G + "w_knight.png"), fx, fy, scale=cell / 142.0)
+    # the checked black king wears the red ring
+    kx, ky = ox + 4 * cell + cell // 2, oy + 0 * cell + cell // 2
+    sc.glow(kx, ky, 44, (255, 80, 60), 120)
+    # the coin waits on d4 - the race square
+    cx2, cy2 = ox + 3 * cell + cell // 2, oy + 3 * cell + cell // 2
+    sc.glow(cx2, cy2, 30, (255, 214, 100), 130)
+    sc.stamp(load_sprite("ui/coin.png"), cx2, cy2, scale=0.44)
+    sc.vignette(90)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1187,6 +1323,8 @@ SCENES = {
     "xo": scene_xo,
     "spud": scene_spud,
     "geometry": scene_geometry,
+    "domino": scene_domino,
+    "chess": scene_chess,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

@@ -113,13 +113,30 @@ func _run() -> void:
         G._new_map()
 
         # ---------------------------------------------------- the time law
+        # v0.3.8 THE TIGHT CLOCK: the budget = 4.5 + 0.42/cell, clamped
+        # 13..62 (the owner: "much stricter but ensure it is not impossible").
+        # THE FAIRNESS LAWS ride with it:
+        #   expert  - the flow tops at 12 cells/s + a 1.5s read: the budget
+        #             must ALWAYS clear it (never impossible)
+        #   casual  - ~6.5 cells/s + a 4.0s read: the budget must clear it
+        #             on the opening maps and stay within reach (stricter,
+        #             still winnable)
         var time_ok := true
+        var expert_ok := true
+        var casual_ok := true
         for s in range(8):
                 G.probe_reset(4000 + s)
-                var want: float = clampf(10.0 + G.solution.size() * 0.8, 24.0, 99.0)
+                var want: float = clampf(4.5 + G.solution.size() * 0.42, 13.0, 62.0)
                 if absf(G.round_time - want) > 0.01:
                         time_ok = false
-        ck(time_ok, "THE TIME LAW: the budget reads the map's real length (10 + 0.8/cell)")
+                var n := float(G.solution.size())
+                if G.round_time < n / 12.0 + 1.5:
+                        expert_ok = false
+                if s < 4 and G.round_time < n / 6.5 + 4.0:
+                        casual_ok = false
+        ck(time_ok, "THE TIME LAW: the budget reads the map's real length (4.5 + 0.42/cell, 13..62)")
+        ck(expert_ok, "THE TIME LAW: an expert flow (12 cells/s + 1.5s read) always fits - not impossible")
+        ck(casual_ok, "THE TIME LAW: the opening maps stay casual-winnable (6.5 cells/s + 4s read)")
         G.probe_reset(55)
         G.time_left = 0.005
         G.paused = false

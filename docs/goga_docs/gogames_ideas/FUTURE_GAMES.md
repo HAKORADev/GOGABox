@@ -81,8 +81,12 @@ feels like the game alien shooter".)
 
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
-  "because why not"; 3D dominoes is also fine.
-- **chess** — owner: maybe 2D or 3D, or two versions.
+  "because why not"; 3D dominoes is also fine. **SHIPPED v0.3.8** as
+  DOMINO, 2D portrait classic draw (the 3D variant stays a maybe) —
+  gogames_ideas/domino.md.
+- **chess** — owner: maybe 2D or 3D, or two versions. **SHIPPED v0.3.8**
+  as CHECKMATE, 2D landscape full-legal chess with the six personalities
+  — gogames_ideas/chess.md.
 - **four-in-line** — connect-four-like: drop discs, make four.
 - **bovo-like** — five-in-a-row / gomoku-style line maker (KDE Bovo vibes).
 - **ksquares-like** - KDE KSquares: dots and boxes - take turns drawing lines

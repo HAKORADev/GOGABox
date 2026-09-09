@@ -122,6 +122,14 @@
    "name": "numpy-synthesized audio - the GEOMETRY FLASH set (this repo, tools/v036_gf_sfx.py)",
    "license": "CC0 (project-authored)",
    "used_for": "assets/audio/sfx/gf_{jump,land,orbit,coin,flip,sticky,swap,death,speed,start}.wav + assets/audio/music/gf_theme.ogg (124 BPM A-minor synthwave loop, 16 bars, ffmpeg -> vorbis). Nothing from the studied APK ships"
+  },
+  {
+   "id": "study-domino-chess-v038",
+   "name": "APKPure studies: Loop Games Dominoes 2.6.0 (com.LoopGames.Domino) + Chess.com Play & Learn 4.10.13 (com.chess)",
+   "url": "https://apkpure.com/dominoes/com.LoopGames.Domino + https://apkpure.com/chess-play-and-learn-online/com.chess",
+   "license": "STUDY-ONLY (docs/DECOMPILATION.md THE USAGE LAW) - zero bytes ship",
+   "pulled": "2026-09-09 via tools/study/fetch_apkpure.py + decompile_apk.py",
+   "used_for": "v0.3.8 study lessons only: the dominoes tile anatomy (ivory rounded body, center divider, separate colored pips - our tiles are drawn in-game by domino.gd, our own body/pip/edge colors per skin); the dominoes table felt/wood theme vocabulary (ours are procedurally quilted felts); the chess.com sound LENGTHS (move 0.26s / capture 0.19s - our knock family is synthesized fresh by tools/v038_domino_chess_sfx.py); the chess.com PERSONALITY ARCHITECTURE (14 polyglot opening books, one per bot - our six profiles carry their own public-theory books written in chess.gd, the Jobava London included per the owner). Nothing from either APK is committed or shipped."
   }
  ],
  "audit": {
@@ -330,6 +338,14 @@
   "assets/games/geometry": {
    "provenance": "v0.3.6 GEOMETRY FLASH: 100% original neon-filled redesigns by tools/v036_gf_art.py (study-informed anatomy per docs/goga_docs/gogames_ideas/geometry.md + docs/DECOMPILATION.md). Re-derive: python3 tools/v036_gf_art.py && python3 tools/v036_gf_sfx.py. The owner's laws live in the game header (game/games/geometry/geometry.gd). | v0.3.6-1: the p1 pass is 100% original too - tools/v036p1_gf_art.py (the p_soft/p_streak/p_puff/p_star particle vocabulary, the shield_core mark, the pow_* capsule icons, and the re-filled block/line/strip/pusher surfaces) + tools/v036p1_gf_sfx.py (gf_pow/gf_pow_end/gf_save/gf_reentry, all synthesized).",
    "notes": "edges/glow drawn near-white so the THEMES recolor the world by modulate; skins carry their own identity colors and are never theme-tinted; no faces on the square (owner law)"
+  }
+ },
+ "assets": {
+  "assets/games/chess": {
+   "provenance": "v0.3.8 CHECKMATE: 48 piece pngs (4 sets x 6 pieces x 2 colors), 100% original hand-placed polygon silhouettes by tools/v038_chess_art.py (five symmetric profiles + the one side-view knight). The studied app's wood sheet was never copied - our sets are classic/minimal/bold/royal with the box's own palettes. Re-derive: python3 tools/v038_chess_art.py"
+  },
+  "assets/audio/sfx (d_* c_* m_solve)": {
+   "provenance": "v0.3.8: 21 synthesized sounds by tools/v038_domino_chess_sfx.py (the domino clack family d_*, the chess knock family c_*) + the maze portal-warp solve sound by tools/v038_maze_fix.py (the owner: the old m_win read like the end-of-run jingle - the solve wears its own timbre now, m_win.wav REMOVED). Re-derive: python3 tools/v038_domino_chess_sfx.py && python3 tools/v038_maze_fix.py"
   }
  }
 }
