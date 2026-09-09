@@ -307,6 +307,31 @@ func _run() -> void:
         g._resolve("draw")
         _check(int(g.score) == 0 and g.draws >= 1, "a draw pays nothing")
 
+        # ---- v0.3.8-3 THE TAP TRUTH (the owner: a small finger movement
+        # should just tap it without carrying it) ----
+        # a press arms the carry ONLY past the threshold; under it the piece
+        # never lifts (the drag render + the hidden-source both wait)
+        g.probe_reset(5)
+        var arm_px: float = g._drag_arm_px()
+        _check(arm_px >= 14.0, "THE TAP TRUTH: the arm distance is a real finger-width (%.0fpx)" % arm_px)
+        # simulate: press on the e2 pawn (square 12), wobble under the line
+        var sq: int = 12
+        var sqc: Vector2 = g._sq_rect(sq).get_center()
+        g._press(sqc)
+        _check(g.drag and g.drag_sq == sq and not g.drag_armed,
+                "THE TAP TRUTH: a press selects WITHOUT carrying")
+        g.drag_pos = sqc + Vector2(arm_px * 0.4, 0)
+        _check(not g.drag_armed,
+                "THE TAP TRUTH: a small wobble never arms the carry")
+        g.drag_pos = sqc + Vector2(arm_px * 1.6, 0)
+        if g.drag_pos.distance_to(g.drag_origin) > arm_px:
+                g.drag_armed = true
+        _check(g.drag_armed,
+                "THE TAP TRUTH: a real drag arms the carry")
+        g.drag = false
+        g.drag_armed = false
+        g.drag_sq = -1
+
         print("== chess_probe: %s (%d fails) ==" % ["ALL PASS" if fails == 0
                 else "FAILED", fails])
         get_tree().quit(0 if fails == 0 else 1)

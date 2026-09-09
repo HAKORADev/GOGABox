@@ -137,8 +137,8 @@ const ENEMIES := {
         "brood":    {"name": "BROODMOTHER", "hp": 50.0, "spd": 45.0, "dmg": 10.0, "size": 26.0,
                 "xp": 3, "score": 3, "tex": "brood", "from": 6, "split": ["minion", "minion"]},
         "trishield": {"name": "TRI-SHIELD", "hp": 300.0, "spd": 50.0, "dmg": 20.0, "size": 30.0,
-                "xp": 6, "score": 6, "tex": "trishield", "from": 7, "rings": true,
-                "hint": "THE TRI-SHIELD - its blue rings are a shield: shoot through the gaps!"},
+                "xp": 6, "score": 6, "tex": "trishield", "from": 7, "shield": true,
+                "hint": "THE TRI-SHIELD - its spinning shards never break: slip the gaps! The blue shell breaks AREA by AREA - the deeper the color, the tougher the cut!"},
         "mender":   {"name": "MENDER", "hp": 1000.0, "spd": 35.0, "dmg": 10.0, "size": 30.0,
                 "xp": 8, "score": 8, "tex": "mender", "from": 8, "heal": 500.0,
                 "hint": "THE MENDER heals its friends inside the green ring - end it first!"},
@@ -167,6 +167,39 @@ const ELITE_AFFIX := {
 }
 const ELITE_SCORE := 3
 
+# ========================================================== THE SHIELD TRUTH
+## v0.3.8-3 (the owner's report: "the shield is impossible to break... the
+## logic was taken from an older game i made"). TWO shields, both orbits:
+##
+## THE SHATTER ORBIT - unbreakable FRAGMENTS spinning around the body:
+## up to 3, each its own radius (a different size), its own arc span and
+## its own speed (some spin backwards). THE ALWAYS-A-WAY LAW: no orbit's
+## spans ever cover the full circle - a gap is always opening somewhere.
+##
+## THE LAYER SHELL - the COMPLETE shield: up to 5 layers, each layer cut
+## into AREAS. An area's LEVEL (1..5) is the amount of damage that breaks
+## it: every hit lowers the level until the area is GONE - a window in
+## that layer. A level wears a DEEPER color, so the toughness reads at a
+## glance.
+const TRISHIELD_SHARDS := [
+        {"r": 92.0, "span": 1.75, "spd": 1.7},
+        {"r": 76.0, "span": 1.2, "spd": -2.3},
+        {"r": 62.0, "span": 1.5, "spd": 1.15},
+]
+const TRISHIELD_LAYERS := [
+        {"r": 50.0, "lv": 1}, {"r": 41.0, "lv": 2}, {"r": 33.0, "lv": 3},
+]
+const TRISHIELD_AREAS := 5
+const PRISM_SHARDS := [
+        {"r": 124.0, "span": 1.4, "spd": 2.0},
+        {"r": 135.0, "span": 1.0, "spd": -1.4},
+]
+const PRISM_LAYERS := [
+        {"r": 108.0, "lv": 1}, {"r": 96.0, "lv": 2}, {"r": 84.0, "lv": 3},
+        {"r": 72.0, "lv": 4}, {"r": 60.0, "lv": 5},
+]
+const PRISM_AREAS := 6
+
 # =================================================================== BOSSES
 const BOSSES := {
         "heap": {"name": "THE HEAP", "hp": 2600.0, "spd": 42.0, "dmg": 30.0,
@@ -174,7 +207,7 @@ const BOSSES := {
                 "slam": true, "summon": "brood", "summon_n": 4, "charge": true},
         "prism": {"name": "THE PRISM MATRIARCH", "hp": 5200.0, "spd": 34.0, "dmg": 26.0,
                 "size": 56.0, "score": 100, "xp": 80, "coins": 55, "tex": "boss_prism",
-                "rings": [110.0, 90.0, 70.0, 50.0], "burst": true, "self_mend": 12.0},
+                "shield": true, "burst": true, "self_mend": 12.0},
         "reaper": {"name": "SPUD REAPER", "hp": 7400.0, "spd": 105.0, "dmg": 34.0,
                 "size": 56.0, "score": 80, "xp": 60, "coins": 45, "tex": "boss_reaper",
                 "triple_charge": true, "aura": 160.0, "aura_dps": 18.0, "teleport": 4},
@@ -194,32 +227,32 @@ const ALLY_MAX_LEVEL := 5
 const ALLY_ORDER := ["drone", "turret", "guard", "medic", "bomber", "scout"]
 
 const ALLIES := {
-        "drone":  {"name": "DRONE BUDDY", "price": 1200, "tex": "orbiter",
+        "drone":  {"name": "DRONE BUDDY", "price": 1200, "tex": "ally_drone",
                 "desc": "orbits you, shoots 2/s (damage grows with level)",
                 "lvs": ["orbits you, shoots 2/s", "TWIN SHOT - a second barrel joins",
                         "the rounds PIERCE one body", "faster spin - 0.4s cadence",
                         "TRIPLE VOLLEY - a third barrel joins"]},
-        "turret": {"name": "TATER TURRET", "price": 1500, "tex": "boomling",
+        "turret": {"name": "TATER TURRET", "price": 1500, "tex": "ally_turret",
                 "desc": "plants near you, sweeps 360",
                 "lvs": ["plants near you, sweeps 360", "faster sweep - 0.28s",
                         "EXPLOSIVE SHELLS - every hit booms", "hunger - 0.22s cadence",
                         "bigger booms - the shells blast 64px wide"]},
-        "guard":  {"name": "GUARD SPUD", "price": 1800, "tex": "chunk",
+        "guard":  {"name": "GUARD SPUD", "price": 1800, "tex": "ally_guard",
                 "desc": "bodyblocks - its AURA cuts the damage you take inside",
                 "lvs": ["the aura cuts 12% of the damage inside",
                         "WIDER AURA - 15% bigger", "DREAD - the aura slows the swarm",
                         "the cut deepens - 24%", "the deepest cut - 28% and a huge ring"]},
-        "medic":  {"name": "MEDIC SPROUT", "price": 2000, "tex": "mender",
+        "medic":  {"name": "MEDIC SPROUT", "price": 2000, "tex": "ally_medic",
                 "desc": "heals you 2 HP/s (+1 per level), the care pulses",
                 "lvs": ["heals 2 HP/s, the care pulses", "stronger care - 4.5 HP/s",
                         "SEARING CARE - the pulse burns the crowd", "stronger care still - 7 HP/s",
                         "the care ring WIDENS - 150px of flame"]},
-        "bomber": {"name": "BOMBER CHIP", "price": 2300, "tex": "boomling",
+        "bomber": {"name": "BOMBER CHIP", "price": 2300, "tex": "ally_bomber",
                 "desc": "kamikaze dives every 8s, respawns in 5s",
                 "lvs": ["kamikaze dives every 8s", "BIGGER BLAST - 96px",
                         "SCORCHED DIVE - the crash leaves fire", "eager - dives every 6.5s",
                         "quick rebuild - respawn 3s, the biggest blast"]},
-        "scout":  {"name": "SCOUT FRY", "price": 2600, "tex": "orbiter",
+        "scout":  {"name": "SCOUT FRY", "price": 2600, "tex": "ally_scout",
                 "desc": "marks enemies in 300px: +15% taken, plinks a pea dart",
                 "lvs": ["marks +15% taken, plinks a dart", "DEEPER MARKS - +30% taken",
                         "TRIPLE BURST - three darts a volley", "the deepest marks - +40% taken",
@@ -427,6 +460,7 @@ const STAT_TRACKS := [
 ## THE TEN (v0.3.4-3, the owner: "skills should be unique... a real high
 ## cool-factor skills that feels amazing"). ONE point per 100 kills,
 ## LIFETIME - they never reset with a round. cost = SKILL POINTS.
+const SKILL_PT_KILLS := 100
 const SKILLS := {
         "shattered_shield": {"name": "SHATTERED SHIELD", "cost": 2,
                 "desc": "a shield blocks ONE hit whole, reforms 12s later"},

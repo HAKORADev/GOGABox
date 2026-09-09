@@ -92,6 +92,52 @@ func _run() -> void:
         _check(g.state == "play" or g.state == "cpu_wait",
                 "the opener's holder owns the first move")
 
+        # ---- v0.3.8-3 THE SNAKE LAWS (the layout, certified) ----
+        # a heavy mixed chain with doubles everywhere: the snake may wrap,
+        # but it may NEVER overlap itself and NEVER leave the ground
+        var sim_chain := [[6, 6], [6, 4], [4, 4], [4, 2], [2, 3], [3, 5],
+                [5, 5], [5, 0], [0, 1], [1, 1], [1, 4], [4, 6], [6, 2],
+                [2, 2], [2, 0], [0, 0], [0, 3], [3, 3], [3, 6], [6, 6]]
+        g.chain.clear()
+        for c in sim_chain:
+                g.chain.append({"a": c[0], "b": c[1], "fl": false,
+                        "who": 1, "landed": true})
+        g._relayout()
+        var overlap := false
+        var outside := false
+        for i in g.chain_rects.size():
+                var ri: Rect2 = g.chain_rects[i]["rect"]
+                if not g.board_rect.grow(2.0).encloses(ri):
+                        outside = true
+                for j in range(i + 1, g.chain_rects.size()):
+                        if ri.intersects(g.chain_rects[j]["rect"] as Rect2):
+                                overlap = true
+        _check(not overlap, "THE SNAKE LAW: a 21-tile chain (5 doubles) never overlaps itself")
+        _check(not outside, "THE FIT LAW: the wrapped snake lives inside the ground")
+        _check(float(g._board_scale()) < 1.0,
+                "THE FIT LAW: the scale walked down to fit (%.2f)" % float(g._board_scale()))
+        # the full 28-tile worst case still holds the laws
+        g.chain.clear()
+        for c in DOM.full_deck():
+                g.chain.append({"a": int(c[0]), "b": int(c[1]), "fl": false,
+                        "who": 1, "landed": true})
+        g._relayout()
+        var worst := false
+        for i in g.chain_rects.size():
+                var rw: Rect2 = g.chain_rects[i]["rect"]
+                if not g.board_rect.grow(2.0).encloses(rw):
+                        worst = true
+                        break
+                for j in range(i + 1, g.chain_rects.size()):
+                        if rw.intersects(g.chain_rects[j]["rect"] as Rect2):
+                                worst = true
+                                break
+                if worst:
+                        break
+        _check(not worst, "THE SNAKE LAW: even the FULL 28-tile deck never overlaps or leaves the ground")
+        g.chain.clear()
+        g._relayout()
+
         # ---- FULL SEEDED ROUNDS through the live scene ----
         var rounds_ok := true
         var cons_ok := true

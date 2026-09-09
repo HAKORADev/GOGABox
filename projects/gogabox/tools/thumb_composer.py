@@ -1175,8 +1175,11 @@ def scene_maze():
 
 
 def scene_domino():
-    """DOMINO (v0.3.8): the tavern table, a snake of ivory tiles mid-game,
-    a lifted tile glowing in the hand, the coin waiting on the open end."""
+    """DOMINO (v0.3.8-3): the real table footage - the tavern felt, the
+    snake with TRUE pips (the 6 wears 3+3 columns), the doubles standing
+    perpendicular, the CPU fan of backs top-center, the goals stack on the
+    right cut, the yard stack on the left, the coin waiting on the end
+    slot, and the lifted tile glowing in the hand."""
     sc = Scene()
     sc.backdrop((46, 107, 70), (24, 62, 40))
     rng = __import__("random").Random(3808)
@@ -1185,127 +1188,241 @@ def scene_domino():
         sc.line([(i, 0), (i + 240, H)], (255, 255, 255, 9), 3)
         sc.line([(i + 240, 0), (i, H)], (255, 255, 255, 9), 3)
     # the rail frame
-    sc.rect([36, 60, W - 36, H - 90], r=26,
+    sc.rect([36, 126, W - 36, H - 116], r=26,
             outline=(90, 61, 36, 255), width=14)
 
     def tile(x, y, a, b=None, vertical=True, w=76, body=(242, 236, 218),
              edge=(185, 172, 140), pip=(42, 38, 32), rot=0.0, lift=0):
+        """THE PIP TRUTH (v0.3.8-3): a half is a SQUARE - the spots read
+        the half's own extent, so the 6 wears 3+3 columns in BOTH
+        orientations (2 cols x 3 rows standing, 3 cols x 2 rows lying)."""
         if b is None:
             b = a
+        # draw into a sub-layer so a rotation stays honest
         h = w * 2
-        box = [x - w // 2, y - h // 2 - lift, x + w // 2, y + h // 2 - lift]
-        sc.rect(box, r=12, fill=body + (255,),
-                outline=edge + (255,), width=4)
-        if not vertical:
-            pass  # thumbs keep the standing read
-        mid = (box[1] + box[3]) // 2
-        sc.line([(box[0] + 9, mid), (box[2] - 9, mid)], edge + (255,), 4)
-        rad = max(5, w // 7)
+        bw_, bh_ = (w, h) if vertical else (h, w)
+        img = Image.new("RGBA", (bw_ + 24, bh_ + 24), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        bx0, by0 = 12, 12
+        bx1, by1 = 12 + bw_, 12 + bh_
+        dr.rounded_rectangle([bx0, by0, bx1, by1], 12, fill=body + (255,),
+                             outline=edge + (255,), width=4)
+        dr.rounded_rectangle([bx0 + 3, by0 + 3, bx1 - 3, by1 - 3], 9,
+                             outline=(255, 255, 255, 26), width=3)
         spots = {0: [], 1: [(0, 0)], 2: [(-1, -1), (1, 1)],
                  3: [(-1, -1), (0, 0), (1, 1)],
                  4: [(-1, -1), (1, -1), (-1, 1), (1, 1)],
                  5: [(-1, -1), (1, -1), (0, 0), (-1, 1), (1, 1)],
                  6: [(-1, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)]}
+        rad = max(5, w // 7)
+        half_w = bw_ / 2.0
+        half_h = bh_ / 2.0
         for half, v in enumerate((a, b)):
-            cy = (box[1] + (mid - box[1]) * (0.5 + half)) if half == 0 else \
-                 (mid + (box[3] - mid) * (half - 0.5))
+            if vertical:
+                cx = bx0 + bw_ / 2.0
+                cy = by0 + half_h * (0.5 + half)
+                ux, uy = half_w * 0.30, half_h * 0.30
+                swap = False
+            else:
+                cx = bx0 + half_w * (0.5 + half)
+                cy = by0 + half_h / 2.0
+                ux, uy = half_w * 0.30, half_h * 0.30
+                swap = True   # the 6's columns run ALONG the length
             for sx, sy in spots[v]:
-                px = x + sx * w * 0.26
-                py = cy + sy * (mid - box[1]) * 0.42
-                sc.ellipse([px - rad, py - rad, px + rad, py + rad],
+                ox_, oy_ = (sy * ux, sx * uy) if swap else (sx * ux, sy * uy)
+                px, py = cx + ox_, cy + oy_
+                dr.ellipse([px - rad, py - rad, px + rad, py + rad],
                            fill=pip + (255,))
-        return box
+        # the divider
+        if vertical:
+            dr.line([(bx0 + 8, by0 + half_h), (bx1 - 8, by0 + half_h)],
+                    edge + (255,), 4)
+        else:
+            dr.line([(bx0 + half_w, by0 + 8), (bx0 + half_w, by1 - 8)],
+                    edge + (255,), 4)
+        if rot:
+            img = img.rotate(rot, resample=Image.BICUBIC,
+                             expand=True)
+        # the drop shadow
+        sh = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        alpha = img.split()[3].point(lambda a: 70 if a > 40 else 0)
+        sh.putalpha(alpha)
+        sc.work.alpha_composite(sh, (int(x - img.width / 2) + 5,
+                          int(y - img.height / 2) - lift + 7))
+        sc.work.alpha_composite(img, (int(x - img.width / 2),
+                           int(y - img.height / 2) - lift))
+        return img
 
-    # ---- the chain: 6-4 | 4-2 | 2-2 | 2-5 | 5-3, with the doubles proud
-    cells = [((W * 0.30, H * 0.34), (6, 4), 0),
-             ((W * 0.44, H * 0.34), (4, 2), 0),
-             ((W * 0.565, H * 0.34), (2, 2), 1),
-             ((W * 0.68, H * 0.36), (2, 5), 0),
-             ((W * 0.79, H * 0.42), (5, 3), 0)]
-    for (x, y), (a, b), dbl in cells:
-        if dbl:
-            sc.glow(x, y, 60, (255, 226, 140), 40)
-        tile(x, y, a, b, w=64 if not dbl else 52)
-    # the glowing end slot past the 3
-    ex, ey = W * 0.875, H * 0.47
-    sc.glow(ex, ey, 40, (120, 240, 160), 120)
+    # ---- the CPU fan: a row of BACKS top-center (the v0.3.8-1 mirror law)
+    for k in range(7):
+        bx = W * 0.5 + (k - 3) * 52
+        img = Image.new("RGBA", (58, 96), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.rounded_rectangle([4, 4, 54, 92], 7,
+                             fill=(96, 86, 72, 255),
+                             outline=(58, 48, 38, 255), width=3)
+        cx, cy = 29, 48
+        dr.ellipse([cx - 9, cy - 9, cx + 9, cy + 9],
+                   fill=(58, 48, 38, 255))
+        dr.ellipse([cx - 4, cy - 4, cx + 4, cy + 4],
+                   fill=(185, 172, 140, 255))
+        for ang in range(4):
+            a = ang * 3.14159 / 2 + 0.785
+            dx, dy = cx + 16 * math.cos(a), cy + 16 * math.sin(a)
+            dr.ellipse([dx - 3, dy - 3, dx + 3, dy + 3],
+                       fill=(220, 210, 190, 200))
+        sc.work.alpha_composite(img, (int(bx - 29), int(16)))
+    sc.text("CPU - 7", 26, W * 0.5, 122, (255, 255, 255, 190))
+
+    # ---- the chain: 6-6 | 6-4 | 4-2 | 2-3, then the elbow 3-5 down,
+    # back left 5-5 | 5-0 - the real wrap, doubles standing perpendicular
+    tile(W * 0.315, H * 0.46, 6, 6, w=54)                     # standing 6-6
+    tile(W * 0.425, H * 0.475, 6, 4, vertical=False, w=48)    # lying 6-4
+    tile(W * 0.535, H * 0.475, 4, 2, vertical=False, w=48)
+    tile(W * 0.645, H * 0.475, 2, 3, vertical=False, w=48)
+    tile(W * 0.76, H * 0.50, 3, 5, w=50)                      # the elbow drop
+    tile(W * 0.655, H * 0.585, 5, 5, vertical=False, w=48)    # row 2 <- back
+    tile(W * 0.545, H * 0.585, 5, 0, vertical=False, w=48)
+    # the glowing end slot past the 5-5... on the left of row 2
+    ex, ey = W * 0.40, H * 0.585
+    sc.glow(ex, ey, 44, (120, 240, 160), 120)
     sc.rect([ex - 34, ey - 34, ex + 34, ey + 34], r=10,
             outline=(120, 240, 160, 200), width=4)
     # the coin ON the slot (the race)
-    sc.glow(ex, ey + 92, 34, (255, 214, 100), 130)
-    sc.stamp(load_sprite("ui/coin.png"), ex, ey + 92, scale=0.5)
-    # ---- the hand: two tiles + the LIFTED one glowing (the drag)
-    tile(W * 0.36, H * 0.82, 1, 4, w=66)
-    tile(W * 0.52, H * 0.82, 0, 6, w=66)
-    sc.glow(W * 0.68, H * 0.78, 84, (255, 226, 120), 90)
-    tile(W * 0.68, H * 0.78, 3, 3, w=72, lift=26)
+    sc.glow(ex, ey, 30, (255, 214, 100), 140)
+    sc.stamp(load_sprite("ui/coin.png"), ex, ey, scale=0.44)
+    # ---- the yard stack on the left rail (the resting boneyard)
+    for k in range(5):
+        bx = 96 + k * 5
+        by = H * 0.50 - k * 7
+        img = Image.new("RGBA", (76, 130), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.rounded_rectangle([4, 4, 72, 126], 9, fill=(84, 74, 62, 255),
+                             outline=(52, 44, 36, 255), width=3)
+        dr.ellipse([30, 56, 46, 72], fill=(52, 44, 36, 255))
+        sc.work.alpha_composite(img, (int(bx), int(by)))
+    # ---- the goals stack, the RIGHT cut (the owner's seat) - ABOVE the rail
+    for i, (lab, col) in enumerate([("YOU 2", (88, 196, 112)),
+                                    ("DRAWS 0", (107, 114, 128)),
+                                    ("CPU 1", (232, 87, 74))]):
+        by = 10 + i * 38
+        sc.rect([W - 132, by, W - 40, by + 30], r=6,
+                fill=(255, 255, 255, 245), outline=col + (255,), width=4)
+        sc.text(lab, 20, W - 86, by + 15, (34, 30, 26, 255), big=False)
+    # ---- the hand: two tiles + the LIFTED one glowing (the carry)
+    tile(W * 0.38, H * 0.855, 1, 4, w=66)
+    tile(W * 0.54, H * 0.855, 0, 6, w=66)
+    sc.glow(W * 0.70, H * 0.80, 90, (255, 226, 120), 90)
+    tile(W * 0.70, H * 0.80, 3, 3, w=74, lift=30)
     # a couple of felt dust specks for life
     for i in range(26):
-        gx, gy = rng.randint(60, W - 60), rng.randint(90, H - 110)
+        gx, gy = rng.randint(60, W - 60), rng.randint(120, H - 140)
         sc.ellipse([gx, gy, gx + 3, gy + 3], fill=(255, 255, 255, 16))
     sc.vignette(90)
     return sc.render()
 
 
 def scene_chess():
-    """CHECKMATE (v0.3.8): the walnut board mid-raid - the classic set, a
-    knight landing a fork with the last-move glow, the coin waiting."""
+    """CHECKMATE (v0.3.8-3): IN-GAME FOOTAGE - the owner asked for
+    "programmed positions and modifications". The v0.3.8-1 frame: the board
+    eats the full height, the score strip rides the LEFT cut, the dead tray
+    hangs on the RIGHT (each line led by its king), the side-to-move king
+    glows green up top, the checked black king pulses red, and a GOGACoin
+    waits on d5. The position is programmed: a Sicilian ambush where the
+    white queen just landed on d5 - the last-move gold tint, mate in 2."""
     sc = Scene()
     sc.backdrop((38, 30, 24), (16, 12, 9))
-    # ---- the board
-    cell = 62
+    # ---- the board: full-height center (the whole-resolution law)
+    cell = 66
     bw = cell * 8
-    ox, oy = W // 2 - bw // 2 - 60, (H - bw) // 2 + 6
+    ox = W // 2 - bw // 2 + 8
+    oy = (H - bw) // 2 + 16
     light = (240, 217, 181)
     dark = (181, 136, 99)
-    hl = (246, 246, 130, 130)
-    last = [(4, 6), (4, 4)]      # e2 -> e4, the last move
+    # a programmed Sicilian ambush after 13 plies:
+    # white: Ke1 Rf1 Bc4 Nc3 Qd5 pawns a2 b2 c2 d2 f2 g2 h2 + e4, Nf3
+    # black: Ke8 Rh8 Bc5 Nc6 Qb6 pawns a7 b7 c7 d6 f7 g7 h7 + e7, Nf6
+    wk = "games/chess/classic/w_%s.png"
+    bk = "games/chess/classic/b_%s.png"
+    sc.rect([ox - 14, oy - 14, ox + bw + 14, oy + bw + 14], r=10,
+            outline=(107, 74, 46, 255), width=14)
+    last_move = (3, 4)          # d5, where the queen just landed (file, rank)
     for r in range(8):
         for c in range(8):
-            x, y = ox + c * cell, oy + r * cell
+            x, y = ox + c * cell, oy + (7 - r) * cell   # white at the bottom
             col = light if (r + c) % 2 == 1 else dark
             sc.rect([x, y, x + cell, y + cell], fill=col + (255,))
-            if (c, r) in last:
-                sc.rect([x, y, x + cell, y + cell], fill=hl)
-    sc.rect([ox - 12, oy - 12, ox + bw + 12, oy + bw + 12], r=10,
-            outline=(107, 74, 46, 255), width=12)
-    # ---- the pieces (the real CLASSIC set) on a Queen's Gambit tabiya
-    G = "games/chess/classic/"
-    back_w = ["rook", "knight", "bishop", "queen", "king", "bishop",
-              "knight", "rook"]
-    order = ["rook", "knight", "bishop", "queen", "king", "bishop",
-             "knight", "rook"]
-    for c in range(8):
-        sc.stamp(load_sprite(G + "w_%s.png" % back_w[c]),
-                 ox + c * cell + cell // 2, oy + 7 * cell + cell // 2,
-                 scale=cell / 150.0)
-        sc.stamp(load_sprite(G + "w_pawn.png"),
-                 ox + c * cell + cell // 2, oy + 6 * cell + cell // 2,
-                 scale=cell / 150.0)
-        sc.stamp(load_sprite(G + "b_%s.png" % order[c]),
-                 ox + c * cell + cell // 2, oy + 0 * cell + cell // 2,
-                 scale=cell / 150.0)
-        sc.stamp(load_sprite(G + "b_pawn.png"),
-                 ox + c * cell + cell // 2, oy + 1 * cell + cell // 2,
-                 scale=cell / 150.0)
-    # the developed start: white Nf3 + pawn e4, black pawn d5 ex-capture
-    sc.stamp(load_sprite(G + "w_knight.png"),
-             ox + 5 * cell + cell // 2, oy + 5 * cell + cell // 2,
-             scale=cell / 150.0)
-    sc.stamp(load_sprite(G + "b_pawn.png"),
-             ox + 3 * cell + cell // 2, oy + 4 * cell + cell // 2,
-             scale=cell / 150.0)
-    # ---- the fork moment: the knight glows on e5 - the story of the thumb
-    fx, fy = ox + 4 * cell + cell // 2, oy + 3 * cell + cell // 2
-    sc.glow(fx, fy, 66, (255, 220, 120), 120)
-    sc.stamp(load_sprite(G + "w_knight.png"), fx, fy, scale=cell / 142.0)
-    # the checked black king wears the red ring
+    # the last-move tint (the queen's landing + her origin d2)
+    for (c, r) in [(3, 4), (3, 1)]:
+        x, y = ox + c * cell, oy + (7 - r) * cell
+        sc.rect([x, y, x + cell, y + cell], fill=(246, 246, 130, 120))
+    # ---- the armies (programmed, no rules engine - just the truth)
+    def put(img_key, sq, scale=None):
+        c, r = sq
+        sc.stamp(img_key, ox + c * cell + cell // 2,
+                 oy + (7 - r) * cell + cell // 2,
+                 scale=scale or cell / 150.0)
+    # white (bottom)
+    for c, pc in enumerate(["rook", "", "bishop", "", "king", "rook", "",
+                            ""]):
+        if pc:
+            put(wk % pc, (c, 0))
+    put(wk % "pawn", (0, 1)); put(wk % "pawn", (1, 1))
+    put(wk % "pawn", (2, 1)); put(wk % "pawn", (3, 1))
+    put(wk % "pawn", (5, 1)); put(wk % "pawn", (6, 1))
+    put(wk % "pawn", (7, 1)); put(wk % "pawn", (4, 3))       # e4
+    put(wk % "knight", (5, 2))                                # Nf3
+    put(wk % "knight", (2, 2))                                # Nc3
+    put(wk % "bishop", (2, 4))                                # Bc4
+    put(wk % "queen", (3, 4), scale=cell / 138.0)             # Qd5 THE RAID
+    # black (top)
+    for c, pc in enumerate(["rook", "knight", "bishop", "queen", "king", "",
+                            "", "rook"]):
+        if pc:
+            put(bk % pc, (c, 7))
+    put(bk % "pawn", (0, 6)); put(bk % "pawn", (1, 6))
+    put(bk % "pawn", (2, 6)); put(bk % "pawn", (3, 5))
+    put(bk % "pawn", (4, 6)); put(bk % "pawn", (5, 6))
+    put(bk % "pawn", (6, 6)); put(bk % "pawn", (7, 6))
+    put(bk % "knight", (5, 5))                                # Nf6
+    put(bk % "knight", (2, 5))                                # Nc6
+    put(bk % "bishop", (3, 6) if False else (2, 7) if False else (3, 5))
+    # ---- the story marks: the checked black king pulses red, the white
+    # queen wears the last-move glow, the coin waits on d5's neighbor
     kx, ky = ox + 4 * cell + cell // 2, oy + 0 * cell + cell // 2
-    sc.glow(kx, ky, 44, (255, 80, 60), 120)
-    # the coin waits on d4 - the race square
-    cx2, cy2 = ox + 3 * cell + cell // 2, oy + 3 * cell + cell // 2
-    sc.glow(cx2, cy2, 30, (255, 214, 100), 130)
-    sc.stamp(load_sprite("ui/coin.png"), cx2, cy2, scale=0.44)
+    sc.glow(kx, ky, 42, (255, 70, 50), 150)
+    qx, qy = ox + 3 * cell + cell // 2, oy + 3 * cell + cell // 2
+    sc.glow(qx, qy, 58, (255, 226, 130), 90)
+    cx2, cy2 = ox + 5 * cell + cell // 2, oy + 2 * cell + cell // 2
+    sc.stamp(load_sprite("ui/coin.png"), cx2, cy2, scale=0.4)
+    sc.glow(cx2, cy2, 28, (255, 214, 100), 120)
+    # ---- THE LEFT CUT: the vertical score strip (two lines, kings lead)
+    sx = ox - 14
+    for i, (lab, col) in enumerate([("YOU 3", (146, 220, 160)),
+                                    ("CPU 5", (232, 178, 140))]):
+        by = oy + i * 118
+        sc.rect([sx - 118, by, sx - 10, by + 104], r=8,
+                fill=(20, 14, 9, 235), outline=col + (255,), width=4)
+        sc.stamp(load_sprite(wk % "king") if i == 0
+                 else load_sprite(bk % "king"),
+                 sx - 92, by + 34, scale=0.30)
+        sc.text(lab, 22, sx - 64, by + 86, col, big=False)
+    # ---- THE RIGHT CUT: the dead tray - the captures, king-led
+    tx = ox + bw + 14
+    dead_rows = [(bk, ["pawn", "knight", "bishop", "pawn"]),
+                 (wk, ["pawn", "pawn", "bishop"])]
+    for i, (setk, caps) in enumerate(dead_rows):
+        by = oy + 8 + i * 158
+        sc.rect([tx + 10, by, W - 22, by + 142], r=8,
+                fill=(20, 14, 9, 225), outline=(150, 120, 80, 220), width=4)
+        sc.stamp(load_sprite(setk % "king"), tx + 44, by + 71, scale=0.34)
+        for k, cap in enumerate(caps):
+            sc.stamp(load_sprite(setk % cap),
+                     tx + 92 + k * 54, by + 71, scale=0.30)
+    # ---- the turn king: the side to move glows green, top-center
+    tkx = ox + bw // 2
+    sc.glow(tkx, 34, 34, (110, 230, 140), 150)
+    sc.stamp(load_sprite(wk % "king"), tkx, 34, scale=0.30)
     sc.vignette(90)
     return sc.render()
 

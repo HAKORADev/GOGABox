@@ -475,36 +475,68 @@ func _chip_label(pc: PanelContainer) -> Label:
 func _refresh_chips() -> void:
         if chips.is_empty():
                 return
-        var sig := "%d|%d|%d|%d|%s" % [lives, int(coins), wave_n, int(countdown), phase]
-        if sig == _chip_sig:
-                return
-        _chip_sig = sig
-        _chip_label(chips["lives"]).text = str(maxi(0, lives))     # the lives floor: 0, never negative
-        _chip_label(chips["coins"]).text = str(int(coins))
-        _chip_label(chips["wave"]).text = "WAVE %d" % wave_n
-        if wave_lbl == null:
-                return
-        if phase == "ready":
-                wave_lbl.text = "PRESS START"
-        elif phase == "idle":
-                if wave_n == 0:
-                        wave_lbl.text = "SEND THE FIRST WAVE"
-                elif auto_waves:
-                        wave_lbl.text = "NEXT WAVE IN %ds" % int(ceil(countdown))
+        # v0.3.8-3 THE CHIP BUDGET (the lag law): per-damage pay means the
+        # purse moves almost every frame - the old sig repainted EVERY chip,
+        # the wave line, the button text AND every folk card + menu button
+        # on each coin point. Each piece now moves only when ITS OWN value
+        # moves; the afford paint runs on a flip, not on a heartbeat.
+        var lc := int(coins)
+        if lc != _chip_coins:
+                _chip_coins = lc
+                _chip_label(chips["coins"]).text = str(maxi(0, lc))
+        var ll := maxi(0, lives)
+        if ll != _chip_lives:
+                _chip_lives = ll
+                _chip_label(chips["lives"]).text = str(ll)
+        if wave_n != _chip_wave:
+                _chip_wave = wave_n
+                _chip_label(chips["wave"]).text = "WAVE %d" % wave_n
+        if wave_lbl != null:
+                var line := ""
+                if phase == "ready":
+                        line = "PRESS START"
+                elif phase == "idle":
+                        if wave_n == 0:
+                                line = "SEND THE FIRST WAVE"
+                        elif auto_waves:
+                                line = "NEXT WAVE IN %ds" % int(ceil(countdown))
+                        else:
+                                line = "WAVE %d READY" % (wave_n + 1)
                 else:
-                        wave_lbl.text = "WAVE %d READY" % (wave_n + 1)
-        else:
-                wave_lbl.text = "WAVE %d ROLLING" % wave_n
+                        line = "WAVE %d ROLLING" % wave_n
+                if line != _chip_line:
+                        _chip_line = line
+                        wave_lbl.text = line
         if next_btn != null and is_instance_valid(next_btn):
+                var btxt := ""
                 if phase == "idle":
-                        next_btn.text = "SEND WAVE %d" % (wave_n + 1)
+                        btxt = "SEND WAVE %d" % (wave_n + 1)
                 elif phase == "spawn" or phase == "clear":
-                        next_btn.text = "NEXT WAVE"
-                next_btn.visible = phase != "ready"
-        _paint_cards()
-        _paint_menu_afford()
+                        btxt = "NEXT WAVE"
+                if btxt != _chip_btxt:
+                        _chip_btxt = btxt
+                        next_btn.text = btxt
+                var bvis := phase != "ready"
+                if bvis != next_btn.visible:
+                        next_btn.visible = bvis
+        # the afford paint: only when a card's affordability or the selection
+        # actually flipped (a string of booleans - the cheapest honest sig)
+        var asig := str(selected_place) + "|"
+        for fid in card_panels:
+                asig += "1" if coins >= int(PDData.FOLK[fid]["place"]) else "0"
+        asig += "|" + str(int(menu_box != null and is_instance_valid(menu_box)))
+        if asig != _afford_sig:
+                _afford_sig = asig
+                _paint_cards()
+                _paint_menu_afford()
 
 var _chip_sig := ""
+var _chip_coins := -1
+var _chip_lives := -1
+var _chip_wave := -1
+var _chip_line := ""
+var _chip_btxt := ""
+var _afford_sig := ""
 
 # ------------------------------------------------------------ the folk cards
 func _rebuild_cards() -> void:
@@ -1260,7 +1292,15 @@ func _heart_flash() -> void:
         tw.tween_property(heart_spr, "modulate", Color.WHITE, 0.5)
 
 # ------------------------------------------------------------ damage + pop
-var _score_f := 0.0            # the fractional damage ledger (score = damage)
+## v0.3.8-3 THE POPS LAW (the owner: "the damage here is counting money per
+## thing, the damage here should mean layers popped or amount of damage
+## given, the money relationship here is each single 1 damage points worth
+## 1 money"): the two ledgers SPLIT -
+##   the POPCOINS: 1 coin per 1 damage point dealt (the pay law v2 stands);
+##   the SCORE: 1 per LAYER popped - a ring crack +1, a body pop +1. The
+##   POPS chip finally counts POPS (it wore the damage total before -
+##   money and score were the same number climbing in lockstep).
+var _score_f := 0.0            # (retired with the split - kept for save compat)
 
 func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent := false) -> bool:
         # THE ARMOR LAW: the shell eats the hit FIRST - and only its feared
@@ -1272,8 +1312,12 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
                                 _fx_spawn("spark", b["spr"].position, 0.18, Color(0.8, 0.8, 0.8))
                         return false
                 var a_real: float = maxf(0.0, dmg)
-                b["armor_hp"] = float(b["armor_hp"]) - a_real
-                _pay_damage(b, a_real, src)
+                var a_before := float(b["armor_hp"])
+                b["armor_hp"] = a_before - a_real
+                # THE PAY TRUTH: the shell earns what it ATE - the old code
+                # paid the full hit even when 1 armor point met a 10-dmg shell
+                # (money for damage that never happened)
+                _pay_damage(b, minf(a_real, a_before), src)
                 if float(b["armor_hp"]) <= 0.0:
                         b["armor_hp"] = 0.0
                         _paint_bloon(b)
@@ -1298,12 +1342,14 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         _paint_bloon(b)
         if float(b["hp"]) <= 0.0:
                 # THE WHEEL LADDER: the level cracks down (each level cost +1
-                # more - the over-damage spills into the next ring)
+                # more - the over-damage spills into the next ring).
+                # v0.3.8-3 THE POPS LAW: every ring cracked is ONE pop.
                 while float(b["hp"]) <= 0.0 and int(b["lv"]) > 1:
                         var over := -float(b["hp"])
                         b["lv"] = int(b["lv"]) - 1
                         b["max_hp"] = PDData.crack_hp(b["kind"], int(b["lv"]))
                         b["hp"] = float(b["max_hp"]) - over
+                        add_score(1)
                 if float(b["hp"]) <= 0.0:
                         _pop_bloon(b, src)
         if not selected_folk.is_empty() and src == selected_folk:
@@ -1311,6 +1357,8 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         return true
 
 ## THE POP PAY LAW v2: a popcoin per DAMAGE dealt (the owner's ladder).
+## v0.3.8-3: the ledger SPLIT - the score is NOT fed here anymore (the
+## score counts layers popped; the coins count damage points).
 func _pay_damage(b: Dictionary, real: float, src: Variant) -> void:
         if real <= 0.0:
                 return
@@ -1320,11 +1368,6 @@ func _pay_damage(b: Dictionary, real: float, src: Variant) -> void:
                 b["pay_f"] = float(b["pay_f"]) - float(n)
                 coins += n
                 b["paid"] = int(b.get("paid", 0)) + n
-        _score_f += real
-        var s := int(_score_f)
-        if s > 0:
-                _score_f -= float(s)
-                add_score(s)
         if src != null:
                 src["inflicted"] = float(src.get("inflicted", 0.0)) + real
 
@@ -1345,6 +1388,9 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
         _splash_fx(b["spr"].position, col)
         # the shockwave shader
         _shock_fx(b["spr"].position, col, 0.9 if def.get("blimp", false) else 0.5)
+        # v0.3.8-3 THE POPS LAW: the body's final break is ONE pop (the ring
+        # cracks each scored their own on the way down)
+        add_score(1)
         # THE POP PAY LAW: the body's damage already paid per point - the
         # pop speaks the total + the kaching gold-wing bonus
         var pay := int(b.get("paid", 0))

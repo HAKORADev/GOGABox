@@ -457,7 +457,7 @@ func _run() -> void:
         ck(red["spr"].visible, "the march carries it INTO the field - it appears")
         G._hurt_bloon(red, 1.0, PDData.SHARP, null)
         ck(G.bloons.is_empty(), "the red pops")
-        ck(G.score == score0 + 1, "THE DAMAGE LAW: one damage = one point")
+        ck(G.score == score0 + 1, "THE POPS LAW (v0.3.8-3): one pop = one point - the POPS chip counts pops, not money")
         ck(int(G.coins) == coins_c0 + 1, "THE POP PAY LAW v2: one damage = one popcoin (no more free 2s)")
         # THE WHEEL LADDER: a black 003 eats 1+2+3
         G._spawn_bloon("black", 0, 3)
@@ -478,6 +478,14 @@ func _run() -> void:
         var met_ok: bool = G._hurt_bloon(met, 5.0, PDData.SHARP, null, true)
         ck((not met_ok) and absf(float(met["hp"]) - met_hp) < 0.01 and float(met["armor_hp"]) > 2.0,
                 "sharp CLINKS off the metal (the body never felt it)")
+        # THE PAY TRUTH (v0.3.8-3): the shell earns what it ATE - a 10-dmg
+        # fire shell meeting 1.5 armor points pays 1.5, never 10
+        G._spawn_bloon("red", 0, 1, [], PDData.ARMOR_METAL, 1.5)
+        var met2: Dictionary = G.bloons[-1]
+        var pay_c0: int = int(G.coins)
+        G._hurt_bloon(met2, 10.0, PDData.FIRE, null, true)
+        ck(int(G.coins) == pay_c0 + 1,   # 1.5 armor eaten -> 1 whole coin
+                "THE PAY TRUTH: the armor pays only the damage it actually ate")
         G._hurt_bloon(met, 3.0, PDData.FIRE, null, true)
         ck(float(met["armor_hp"]) <= 0.01, "fire strips the metal shell")
         var met_body := float(met["hp"])

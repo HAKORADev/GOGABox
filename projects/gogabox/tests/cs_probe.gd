@@ -185,9 +185,10 @@ func _run() -> void:
         ck(taken > 0.0 and absf(taken - (float(c0["dmg"]) * float(G.stats["contact_cut"])
                         - float(G.stats["armor"]))) < 1.5,
                         "THE CONTACT LAW: the chunk's ATTACK hits (armor applies)")
-        ck(rammed > 0.0 and absf(rammed - (float(c0["max_hp"]) * 0.08 + 3.0
+        ck(rammed > 0.0 and absf(rammed - (maxf(float(c0["max_hp"]) * 0.08,
+                        18.0 + float(G.run_wave) * 1.6) + 3.0
                         + float(G.stats["armor"]))) < 1.0,
-                        "THE CONTACT LAW: the potato RAMS back (8% max hp + 3 + armor)")
+                        "THE CONTACT LAW: the potato RAMS back (the wave floor or 8% max hp + 3 + armor)")
         ck(float(c0.get("touch_cd", 0.0)) > 0.0,
                         "THE CONTACT LAW: the per-enemy cooldown armed")
         var hp1: float = G.p_hp
@@ -215,25 +216,74 @@ func _run() -> void:
         z["hp"] = 10.0
         G._tick_enemies(1.2)
         ck(z["hp"] > 10.0, "THE MENDER LAW: the horde out-sustains (+10/0.5s)")
-        # ------------------------------------------------ THE TRI-SHIELD RINGS
+        # --------------------------------------- THE SHIELD TRUTH (v0.3.8-3)
+        # the tri-shield wears TWO orbits: the unbreakable shatter fragments
+        # (always a way through) + the layer shell (areas break by LEVEL,
+        # deeper color = higher level)
         G.enemies.clear()
         var t: Dictionary = G._spawn_enemy("trishield", G.p_pos + Vector2(400, 400))
-        t["rings"] = G._mk_rings([90.0, 70.0, 50.0])
-        t["rings"][0]["rot"] = 0.0
-        var rb := {"pos": t["pos"] + Vector2(90, 0), "a": 0.0, "spd": 0.0,
-                "dmg": 10.0, "pierce": 0, "hit": {}, "range_left": 10.0, "aoe": 0.0,
-                "burn": false, "chill": 0.0, "kind": "bolt",
-                "node": Sprite2D.new(), "turn": false, "tier": 1}
-        G.world.add_child(rb["node"])
-        var res1: int = G._ring_bullet(t, rb)
-        ck(res1 == 1, "THE RING LAW: an unbroken band CARVES and eats the bullet")
-        ck((t["rings"][0]["cracks"] as Array).size() >= 1,
-                        "THE RING LAW: the crack lives in the ring's local frame")
-        # a bullet through the carved window passes
-        rb["pos"] = t["pos"] + Vector2.from_angle(t["rings"][0]["cracks"][0][0] + 0.01) * 90.0
-        var res2: int = G._ring_bullet(t, rb)
-        ck(res2 == 0 or res2 == 2,
-                        "THE RING LAW: the carved window lets the next bullet inward")
+        var tsh: Dictionary = t["shield"]
+        ck((tsh["shards"] as Array).size() == 3
+                        and (tsh["layers"] as Array).size() == 3,
+                        "THE SHIELD TRUTH: the tri-shield wears 3 shards + 3 shell layers")
+        # THE ALWAYS-A-WAY LAW: no shard arc covers its own circle
+        var spans_ok := true
+        for sd in tsh["shards"]:
+                if float(sd["span"]) >= TAU:
+                        spans_ok = false
+        ck(spans_ok, "THE ALWAYS-A-WAY LAW: every shard arc leaves its orbit open")
+        var speeds := {}
+        for sd in tsh["shards"]:
+                speeds[float(sd["spd"])] = true
+        ck((speeds as Dictionary).size() == 3,
+                        "THE SHATTER ORBIT: the three fragments spin at different speeds")
+        # a shard BLOCKS: park a bullet in a shard arc at its own radius
+        var block_e := {"pos": t["pos"], "shield": tsh}
+        var shard0: Dictionary = tsh["shards"][0]
+        var bb := {"pos": t["pos"] + Vector2.from_angle(float(shard0["rot"]) + 0.05) \
+                        * float(shard0["r"]), "dmg": 10.0}
+        ck(G._shield_block(block_e, bb, 10.0) == 1,
+                        "THE SHIELD TRUTH: a shard arc BLOCKS the bullet (unbreakable)")
+        # a shell area CHIPS: aim between the shards at the outer shell ring,
+        # in a window between shard arcs
+        var chip_done := false
+        for probe_i in 24:
+                var probe_a := TAU * float(probe_i) / 24.0
+                var in_shard := false
+                for sd in tsh["shards"]:
+                        var local := fposmod(probe_a - float(sd["rot"]), TAU)
+                        if local <= float(sd["span"]):
+                                in_shard = true
+                if in_shard:
+                        continue
+                bb["pos"] = t["pos"] + Vector2.from_angle(probe_a) * 50.0
+                if G._shield_block(block_e, bb, 10.0) == 2:
+                        chip_done = true
+                        break
+        ck(chip_done, "THE LAYER SHELL: a gap between shards feeds the shell area")
+        # the chip DROPPED a level (unit-scaled damage lowers the level)
+        var outer: Dictionary = tsh["layers"][0]
+        var chipped := 0
+        for area in outer["areas"]:
+                if float(area["hp"]) < float(area["max"]):
+                        chipped += 1
+        ck(chipped >= 1,
+                        "THE LAYER SHELL: the hit LOWERED the area's level (deeper color fades)")
+        # a WINDOW passes: zero out one outer area, the same spot feeds inward
+        (outer["areas"] as Array)[0]["hp"] = 0.0
+        var w5: float = TAU / float((outer["areas"] as Array).size())
+        var win_a: float = 0.5 * w5
+        bb["pos"] = t["pos"] + Vector2.from_angle(win_a) * 50.0
+        var res3: int = G._shield_block(block_e, bb, 10.0)
+        ck(res3 == 2 or res3 == 0,
+                        "THE WINDOW LAW: the broken area feeds the bullet to the next layer")
+        # the MELEE CHEW: the swing eats an alive area; a second swing at the
+        # same spot meets the window it just opened - the body takes it
+        var chew_a: float = 1.5 * w5
+        ck(G._melee_chew_shield(block_e, chew_a, 100.0) == true,
+                        "THE MELEE CHEW: the cleaver bites an alive shell area")
+        ck(G._melee_chew_shield(block_e, chew_a, 100.0) == false,
+                        "THE MELEE CHEW: a windowed arc reaches the body")
         # ------------------------------------------------ the kill score law
         G.enemies.clear()
         var score1: int = G.score
@@ -304,8 +354,10 @@ func _run() -> void:
         G.boss_alive = false
         G._spawn_boss(20)
         ck(String(G.enemies[0]["name"]) == "THE PRISM MATRIARCH"
-                        and (G.enemies[0]["rings"] as Array).size() == 4,
-                        "THE BOSS LAW: cycle 1 = THE PRISM MATRIARCH (4 rings)")
+                        and (G.enemies[0]["shield"] as Dictionary).has("layers")
+                        and ((G.enemies[0]["shield"]["layers"] as Array).size() == 5)
+                        and ((G.enemies[0]["shield"]["shards"] as Array).size() == 2),
+                        "THE BOSS LAW: cycle 1 = THE PRISM MATRIARCH (the full 5-layer shell + 2 shards)")
         G.enemies.clear()
         G.boss_alive = false
         G._spawn_boss(30)
@@ -512,17 +564,18 @@ func _run() -> void:
         var boxc: Texture2D = load("res://assets/ui/coin.png")
         ck(cosmic.get_image().get_data() != boxc.get_image().get_data(),
                         "THE COIN LAW: the cosmic coin's pixels are NOT the gogacoin's")
-        # THE TREE LOCK LAW: the reason speaks
+        # THE TREE RETIREMENT LAW (v0.3.8-3): the tree SHEET is gone - the
+        # buttons and the lock reasons died with it. The tree FLAGS remain
+        # data the run reads (slots/second-wind/lab), and meta.tree_can_buy
+        # still speaks the chain for anything that ever needs it.
         meta.d["tree"] = {}
         meta.d["char_level"] = 1
         meta.d["coins"] = 20
         meta.save()
-        ck(G._tree_lock_reason("o2") == "needs SHARP PEEL",
-                        "THE TREE LAW: o2's lock names the missing chain node")
-        ck(G._tree_lock_reason("l3").contains("LV") or G._tree_lock_reason("l3").contains("needs"),
-                        "THE TREE LAW: the LAB's lock speaks its reason (%s)" % G._tree_lock_reason("l3"))
-        ck(G._tree_lock_reason("o1") != "" and G._tree_lock_reason("o1").contains("CC"),
-                        "THE TREE LAW: a poor node's lock names the coins")
+        ck(not meta.tree_can_buy("o2"),
+                        "THE TREE LAW: o2 locks behind its chain (the flags live on as data)")
+        ck(G.has_method("_tree_open") == false,
+                        "THE TREE RETIREMENT: the tree sheet is gone from the game")
         # THE DAY/NIGHT LAW: two real faces + the tint finally applied
         var th: Dictionary = CSData.THEMES["desert"]
         ck(String(th["day"]) != String(th["night"]),
@@ -648,9 +701,9 @@ func _run() -> void:
         var dc: Button = G._draft_card(CSData.WAVE_DRAFTS[0])
         ck(dc.custom_minimum_size.y >= 130.0,
                         "THE TEXT-FIT LAW: the draft card keeps its floor and grows past it")
-        var tn: Button = G._tree_node("o2", null)
-        ck(tn.custom_minimum_size.y >= 68.0,
-                        "THE TEXT-FIT LAW: the tree node keeps its floor and grows past it")
+        var stc: Button = G._start_card("engineer")
+        ck(stc.custom_minimum_size.y >= 120.0,
+                        "THE TEXT-FIT LAW: the start card keeps its floor (the tree node's seat is retired)")
         # ============================== v0.3.4-3 - THE SKILLS + THE CHAIN
         # ============================== v0.3.8-2 - THE SKILL DEPTHS
         # THE SKILL POINTS LAW: 1 per 100 kills, LIFETIME, spent subtracts
@@ -1109,8 +1162,9 @@ func _run() -> void:
         await _boot()
         # THE SCROLL TRUTH: the sheets scroll on the raw-touch BoxScroll and
         # every button inside is a registered tappable - a drag that STARTS on
-        # a button scrolls the shelf instead of dying (the other-games law)
-        G._tree_open()
+        # a button scrolls the shelf instead of dying (the other-games law).
+        # v0.3.8-3: the tree shelf is retired - the OPTIONALS door stands in.
+        G._optionals_open()
         await _wait(0.2)
         var tsc: BoxScroll = null
         var tbtns := 0
@@ -1121,7 +1175,7 @@ func _run() -> void:
                                         == Control.MOUSE_FILTER_IGNORE:
                         tbtns += 1
         ck(tsc != null and bool(tsc.game_safe),
-                        "THE SCROLL TRUTH: the tree shelf scrolls on a game-safe BoxScroll")
+                        "THE SCROLL TRUTH: the door shelf scrolls on a game-safe BoxScroll")
         ck(tbtns > 0 and tsc._tappables.size() > 0,
                         "THE SCROLL TRUTH: the shelf's buttons went IGNORE + tappable")
         G._close_all_sheets()

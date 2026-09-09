@@ -270,7 +270,8 @@ func shop_discount() -> float:
 ## live run's kills, one point per 100, minus the spent ones. They NEVER
 ## reset with a round.
 func skill_points_free(live_kills := 0) -> int:
-        var earned := int(floor(float(int(d["kills"]) + int(live_kills)) / 100.0))
+        var earned := int(floor(float(int(d["kills"]) + int(live_kills))
+                        / float(CSData.SKILL_PT_KILLS)))
         return earned - int(d.get("skill_spent", 0))
 
 ## v0.3.8-2 THE SKILL DEPTHS: a skill's save wears its LEVEL (int 1..5).

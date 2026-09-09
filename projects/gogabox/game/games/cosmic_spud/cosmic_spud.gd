@@ -41,6 +41,8 @@ const STICK_DEAD := 8.0
 const STICK_MAX := 70.0
 const IFRAME := 0.6
 const MAGNET_BASE := 150.0
+const CONTACT_KNOCK := 190.0    # v0.3.8-3: the ram shoves the body away
+                                # (px/s, decays - the stalemate killer)
 
 # ===================================================== THE GAME'S OWN COLORS
 ## the owner's design language: a gray field, BLACK inner boxes, text in
@@ -134,6 +136,11 @@ var hp_meter: Control
 var hp_txt: Label
 var arm_txt: Label
 var xp_meter: Control
+var sp_meter: Control        # v0.3.8-3 THE SKILL POINT METER (the owner's
+                             # item 2: "there is no skill points meter... do
+                             # another meter for the skill points so user
+                             # knows when the point will come")
+var sp_txt: Label
 var lvl_txt: Label
 var wave_txt: Label
 var wave_meter: Control
@@ -148,6 +155,7 @@ var boss_txt: Label
 # the displayed (animated) ratios - the meters MOVE toward their truth
 var _hp_disp := 1.0
 var _xp_disp := 0.0
+var _sp_disp := 0.0
 var _wave_disp := 0.0
 var _boss_disp := 1.0
 var slot_row: HBoxContainer
@@ -213,7 +221,7 @@ func _t(key: String) -> Texture2D:
                 # sheets it was recomposed from.
                 for aid in CSData.ALLY_ORDER:
                         paths[String(CSData.ALLIES[aid]["tex"])] = \
-                                        base + "enemies/" + String(CSData.ALLIES[aid]["tex"]) + ".png"
+                                        base + "allies/" + String(CSData.ALLIES[aid]["tex"]) + ".png"
                 _tex[key] = load(paths[key])
         return _tex[key]
 
@@ -583,7 +591,11 @@ func _goga_setup() -> void:
         _build_hud()
         add_hud_button("INFO", func(): _info_open())
         add_hud_button("SHOP", func(): _shop_button())
-        add_hud_button("TREE", func(): _tree_open())
+        # v0.3.8-3 THE TREE RETIRES: the top-bar TREE button is dead (the
+        # owner: "remove the tree button, it's useless, it was from old
+        # system but now it is the skills system anyway"). The SKILLS menu
+        # owns the meta upgrades now; the old tree flags stay as data the
+        # run still reads (slots, second wind, the lab) - bought in the shop.
         var theme: Dictionary = CSData.THEMES[theme_id]
         Jukebox.music(theme["night_music"] if night else theme["day_music"])
         _optionals_open()
@@ -934,6 +946,14 @@ func _build_hud() -> void:
         # the XP bar (blue, honest: run_xp / xp needed for the next level)
         xp_meter = _cs_meter(300, 14, CS_BLUE)
         left.add_child(xp_meter)
+        # v0.3.8-3 THE SKILL POINT METER: the twin of the XP bar - it fills
+        # with the KILLS that feed the next SKILL POINT (one per 100 kills,
+        # lifetime + this run), and its label reads the points you hold
+        # right now. Gold, because a point is a promise.
+        sp_meter = _cs_meter(300, 10, CS_YELLOW)
+        left.add_child(sp_meter)
+        sp_txt = _cs_label("", 10, CS_YELLOW)
+        sp_meter.add_child(sp_txt)
         # the wave box with its time bar
         var wave_box := _cs_black_box(left, Vector2(300, 42))
         var wv := VBoxContainer.new()
@@ -1107,6 +1127,20 @@ func _refresh_hud() -> void:
                 if absf(_xp_disp - xr) < 0.004:
                         _xp_disp = xr
                 xp_meter.get_meta("set_ratio").call(_xp_disp)
+        if sp_meter != null and is_instance_valid(sp_meter):
+                # THE SKILL POINT METER: the true distance to the NEXT point
+                # (the lifetime kills + this run's kills, one point per 100)
+                var live: int = int(meta.d["kills"]) + run_kills
+                var into := live % CSData.SKILL_PT_KILLS
+                var spr := clampf(float(into) / float(CSData.SKILL_PT_KILLS), 0.0, 1.0)
+                _sp_disp = lerpf(_sp_disp, spr, _step)
+                if absf(_sp_disp - spr) < 0.004:
+                        _sp_disp = spr
+                sp_meter.get_meta("set_ratio").call(_sp_disp)
+                var free := meta.skill_points_free(run_kills)
+                sp_txt.text = "SKILL PTS %d  -  next in %d kills" \
+                                % [free, CSData.SKILL_PT_KILLS - into]
+                sp_txt.position = Vector2(4.0, (10.0 - sp_txt.size.y) * 0.5)
         if arm_txt != null:
                 arm_txt.text = "ARM %d" % int(stats.get("armor", 0))
                 lvl_txt.text = "LV %d" % run_level
@@ -1179,15 +1213,15 @@ func _aim_angle() -> float:
         var best_score := -1.0
         for e in enemies:
                 var d: Vector2 = e["pos"] - p_pos
-                var dist := d.length()
-                if dist > 900.0:
+                var dist2 := d.length_squared()
+                if dist2 > 810000.0:      # 900^2 - the aim's horizon
                         continue
                 var pr := 1.0
                 if e.get("boss", false):
                         pr = 3.0
                 elif e.get("elite", false):
                         pr = 2.0
-                var sc := pr * 1000.0 - dist
+                var sc := pr * 810000.0 - dist2
                 if sc > best_score:
                         best_score = sc
                         best = d.angle()
@@ -1228,6 +1262,14 @@ func _fire_weapon(w: Dictionary) -> bool:
                                 continue
                         if absf(angle_difference(base_a, dv.angle())) > arc * 0.5:
                                 continue
+                        # v0.3.8-3 THE SHIELD TRUTH: the cleaver CHEWS the
+                        # shell - the swing bites the outermost alive layer
+                        # area at the swing's own angle; a fully-open path
+                        # (no alive area on the outermost layer there)
+                        # reaches the body.
+                        if e.get("shield", null) != null \
+                                        and _melee_chew_shield(e, base_a, base_dmg):
+                                continue
                         _hurt_enemy(e, base_dmg, false)
                 _slash_fx(base_a, rng, arc)
                 Jukebox.sfx(shot_name, -6.0, randf_range(0.94, 1.06))
@@ -1264,17 +1306,18 @@ func _fire_weapon(w: Dictionary) -> bool:
 func _pick_target(rng: float) -> Variant:
         var best: Variant = null
         var best_score := -1.0
+        var rng2 := rng * rng
         for e in enemies:
                 var d: Vector2 = e["pos"] - p_pos
-                var dist := d.length()
-                if dist > rng:
+                var dist2 := d.length_squared()
+                if dist2 > rng2:
                         continue
                 var pr := 1.0
                 if e.get("boss", false):
                         pr = 3.0
                 elif e.get("elite", false):
                         pr = 2.0
-                var sc := pr * 1000.0 - dist
+                var sc := pr * 810000.0 - dist2
                 if sc > best_score:
                         best_score = sc
                         best = e
@@ -1315,15 +1358,21 @@ func _orbital_strike(at: Vector2, dmg: float, aoe: float) -> void:
 ## allies are differ, like some with the character, some go fight around,
 ## some have auras? some have cool weapons ... make sure they are not too
 ## cool from the start because there is upgrades and allies usually do
-## not die"): every ally wears its own tint and its own job - the drone
-## orbits and shoots, the turret plants and sweeps, the guard carries a
-## PROTECTIVE AURA (the damage you take inside its ring shrinks), the
-## medic heals with a visible pulse, the bomber kamikaze-dives, the
-## scout marks AND plinks a weak pea-shooter dart. Level 1 stays humble.
+## not die"): every ally has its own job - the drone orbits and shoots,
+## the turret plants and sweeps, the guard carries a PROTECTIVE AURA (the
+## damage you take inside its ring shrinks), the medic heals with a
+## visible pulse, the bomber kamikaze-dives, the scout marks AND plinks a
+## weak pea-shooter dart. Level 1 stays humble.
+## v0.3.8-3 THE ROSTER FACES (the owner: "all are same visual thing, no
+## single different color at all"): the tint trick is DEAD - it reused
+## ENEMY textures under near-white modulates, so six jobs shared four
+## faces. Every ally owns its DRAWN face now (tools/v038p3_allies.py):
+## the teal rotor drone, the orange hard-hat turret, the shield guard,
+## the red-cross medic, the fuse bomber, the goggled scout.
 const ALLY_TINTS := {
-        "drone": Color(0.82, 1.0, 0.9), "turret": Color(1.0, 0.9, 0.72),
-        "guard": Color(0.8, 1.0, 0.78), "medic": Color(0.85, 0.95, 1.0),
-        "bomber": Color(1.0, 0.8, 0.68), "scout": Color(0.95, 1.0, 0.72),
+        "drone": Color(1.0, 1.0, 1.0), "turret": Color(1.0, 1.0, 1.0),
+        "guard": Color(1.0, 1.0, 1.0), "medic": Color(1.0, 1.0, 1.0),
+        "bomber": Color(1.0, 1.0, 1.0), "scout": Color(1.0, 1.0, 1.0),
 }
 const GUARD_AURA := 130.0       # the guard's protective ring, px
 
@@ -1525,11 +1574,11 @@ func _tick_allies(delta: float) -> void:
 
 func _nearest_enemy(from: Vector2, rng: float) -> Variant:
         var best: Variant = null
-        var bd := rng
+        var bd := rng * rng           # v0.3.8-3: squared - no sqrt per body
         for e in enemies:
-                var d: float = e["pos"].distance_to(from)
-                if d < bd:
-                        bd = d
+                var d2: float = (e["pos"] as Vector2).distance_squared_to(from)
+                if d2 < bd:
+                        bd = d2
                         best = e
         return best
 
@@ -1576,16 +1625,25 @@ func _tick_bullets(delta: float) -> void:
                         if b["hit"].has(key):
                                 continue
                         var hit_r: float = float(e["size"]) * 0.5 * float(e.get("scale_m", 1.0)) + 6.0
-                        if e["pos"].distance_to(b["pos"]) > hit_r:
+                        # v0.3.8-3 THE SHIELD TRUTH: the shield eats the bullet
+                        # FIRST, at the shield's own radii - the old code only
+                        # checked the rings inside the body's hit radius, so
+                        # the carve never ran and the shield could never break
+                        # (the owner: "the shield is impossible to break").
+                        var reach: float = hit_r
+                        if e.get("shield", null) != null:
+                                reach = _shield_reach(e)
+                        var d2: float = (e["pos"] as Vector2).distance_squared_to(b["pos"])
+                        if d2 > reach * reach:
                                 continue
-                        # THE TRI-SHIELD LAW: the rings eat the bullet first
-                        if e.get("rings", null) != null:
-                                var res: int = _ring_bullet(e, b)
-                                if res == 1:
+                        if e.get("shield", null) != null:
+                                var res: int = _shield_block(e, b, float(b["dmg"]))
+                                if res == 1 or res == 2:
                                         b["hit"][key] = true
-                                        continue          # carved a ring - the bullet died
-                                elif res == 2:
-                                        continue          # passed a window - no hit yet
+                                        continue     # the orbit kept the bullet
+                                # res 0 / 3: past the shield or not there yet
+                        if d2 > hit_r * hit_r:
+                                continue
                         b["hit"][key] = true
                         var dmg: float = float(b["dmg"])
                         if e.get("marked", false):
@@ -1686,10 +1744,17 @@ func _spawn_enemy(kind: String, pos: Vector2, elite := false) -> Dictionary:
                 "shoot_cd": randf_range(0.0, 1.0), "state": "walk", "st": 0.0,
                 "boss": false, "gen": 0, "anim": randf() * TAU, "goga": false,
         }
+        if kind == "warden":
+                _wardens_alive += 1
         if affix == "armored":
                 e["hurt_m"] = CSData.ELITE_AFFIX["armored"]["hurt"]
+        # v0.3.8-3 THE SHIELD TRUTH: the trishield wears the shatter orbit
+        # (unbreakable spinning fragments) + the layer shell (damageable
+        # areas, deeper color = higher level)
         if kind == "trishield":
-                e["rings"] = _mk_rings([90.0, 70.0, 50.0])
+                e["shield"] = _mk_shield(CSData.TRISHIELD_SHARDS,
+                                _trishield_layers(run_wave), CSData.TRISHIELD_AREAS,
+                                run_wave)
         # THE SPECIAL-KEY LAW (v0.3.4-5 root-cause fix): the enemy dict carries
         # its OWN aura/ward/heal numbers - v0.3.4 left them only in the data
         # table, so the wraith's aura NEVER drew (e.get("aura", 0.0) was
@@ -1727,81 +1792,144 @@ func _plant_goga_carrier() -> void:
         # THE SILENCE LAW: the coin never announces itself - the glint only
 
 func _mk_rings(radii: Array) -> Array:
-        # the python law: radii, thickness 8, counter-rotating rad/frame speeds,
-        # cracks stored as angle intervals in each ring's LOCAL rotating frame
-        var arr := []
-        var speeds := [0.05, 0.03, 0.01, 0.008]
-        for i in radii.size():
-                arr.append({"r": float(radii[i]), "rot": randf() * TAU,
-                        "spd": float(speeds[i % speeds.size()]) * (1.0 if i % 2 == 0 else -1.0),
-                        "cracks": []})
-        return arr
+        # (retired v0.3.8-3 - THE SHIELD TRUTH owns the orbit now)
+        return []
 
-## returns 0 = no ring contact, 1 = carved a ring (bullet dies),
-## 2 = passed through a window (bullet continues inward)
-func _ring_bullet(e: Dictionary, b: Dictionary) -> int:
-        var d: float = b["pos"].distance_to(e["pos"])
-        var rings: Array = e["rings"]
-        for ring in rings:
-                var band: float = absf(d - float(ring["r"]))
-                if band > 4.0 + 4.0:
-                        continue
-                var world_a: float = (b["pos"] - e["pos"]).angle()
-                var local_a: float = world_a - float(ring["rot"])
-                local_a = fposmod(local_a, TAU)
-                if _in_crack(ring["cracks"], local_a):
-                        continue    # the window is open - the bullet flies inward
-                var halfw := atan(6.0 / maxf(10.0, float(ring["r"])))
-                ring["cracks"] = _carve(ring["cracks"], local_a - halfw, local_a + halfw)
-                Jukebox.sfx("cs_shield_crack", -6.0, randf_range(0.9, 1.2))
-                return 1
-        if d < float(rings[rings.size() - 1]["r"]) - 4.0:
-                return 2    # inside the innermost ring: the core is exposed
-        return 0
+# ============================================ THE SHIELD TRUTH (v0.3.8-3)
+## THE ALWAYS-A-WAY LAW: the shards are UNBREAKABLE but never cover the
+## circle - their spans never fill their own orbit, and the three spin at
+## different speeds (some backwards), so a way through is always opening.
+## The layer shell is the COMPLETE shield: each layer cut into AREAS; a
+## hit lowers the area's LEVEL by the damage taken (in shield units)
+## until the area is GONE - a window in that layer. Deeper color = a
+## higher level (the owner's own law, from the older game).
+const SHIELD_BAND := 7.0          # a shield orbit's hit thickness (+/-)
+const SHELL_LV_COLS := [
+        Color(0.62, 0.86, 1.0),          # level 1 - pale ice
+        Color(0.45, 0.76, 1.0),          # level 2
+        Color(0.30, 0.64, 0.98),         # level 3
+        Color(0.20, 0.52, 0.95),         # level 4
+        Color(0.12, 0.40, 0.88),         # level 5 - the deep cut
+]
 
-func _in_crack(cracks: Array, a: float) -> bool:
-        for c in cracks:
-                if float(c[0]) <= a and a <= float(c[1]):
-                        return true
-                if float(c[0]) > float(c[1]) and (a >= float(c[0]) or a <= float(c[1])):
-                        return true
-        return false
+func _mk_shield(shards: Array, layers: Array, areas_n: int, wave: int) -> Dictionary:
+        var arr_shards := []
+        for sd in shards:
+                arr_shards.append({"r": float(sd["r"]), "span": float(sd["span"]),
+                                "spd": float(sd["spd"]), "rot": randf() * TAU})
+        # the shield unit scales with the wave so the shell stays a real
+        # wall late (one unit = one LEVEL of an area)
+        var unit: float = clampf(8.0 * CSData.hp_scale(wave) / CSData.hp_scale(7),
+                        8.0, 30.0)
+        var arr_layers := []
+        for ld in layers:
+                var lv: int = mini(5, int(ld["lv"]))
+                var areas := []
+                for i in areas_n:
+                        areas.append({"hp": float(lv), "max": float(lv)})
+                arr_layers.append({"r": float(ld["r"]), "areas": areas, "lv": lv})
+        return {"shards": arr_shards, "layers": arr_layers, "unit": unit}
 
-func _carve(cracks: Array, a0: float, a1: float) -> Array:
-        # add [a0,a1] (wrapped into 0..TAU) and merge overlaps - the python's
-        # interval-subtraction law, inverted
-        var ivs := []
-        for c in cracks:
-                ivs.append([float(c[0]), float(c[1])])
-        if a0 < 0.0:
-                ivs.append([fposmod(a0, TAU), TAU])
-                ivs.append([0.0, a1])
-        elif a1 > TAU:
-                ivs.append([a0, TAU])
-                ivs.append([0.0, fposmod(a1, TAU)])
-        else:
-                ivs.append([a0, a1])
-        ivs.sort_custom(func(x, y): return float(x[0]) < float(y[0]))
+## the trishield's shell deepens with the waves (the PRISM wears the full
+## five - the PRISM_LAYERS table IS levels 1..5)
+func _trishield_layers(wave: int) -> Array:
+        var deep: int = mini(2, int(maxi(0, wave - 7) / 10))
         var out: Array = []
-        for iv in ivs:
-                if not out.is_empty() and float(iv[0]) <= float(out[out.size() - 1][1]) + 0.001:
-                        out[out.size() - 1][1] = maxf(float(out[out.size() - 1][1]), float(iv[1]))
-                else:
-                        out.append(iv)
+        for ld in CSData.TRISHIELD_LAYERS:
+                out.append({"r": ld["r"], "lv": mini(5, int(ld["lv"]) + deep)})
         return out
 
-func _tick_rings(e: Dictionary, delta: float) -> void:
-        for ring in e["rings"]:
-                ring["rot"] = fposmod(float(ring["rot"]) + float(ring["spd"]) * 60.0
-                                * delta, TAU)
-        # THE PUSH-OUT LAW: the player cannot stand inside a ring
-        var d: float = p_pos.distance_to(e["pos"])
-        for ring in e["rings"]:
-                var r: float = float(ring["r"])
-                if absf(d - r) < 10.0 + PLAYER_R:
-                        var away: Vector2 = (p_pos - e["pos"]).normalized()
-                        p_pos = e["pos"] + away * (r + 10.0 + PLAYER_R)
-                        d = p_pos.distance_to(e["pos"])
+## the farthest orbit this shield owns (+ the band) - a bullet only needs
+## the shield's opinion once it crosses this line
+func _shield_reach(e: Dictionary) -> float:
+        var sh: Dictionary = e["shield"]
+        var reach: float = 0.0
+        for sd in sh["shards"]:
+                reach = maxf(reach, float(sd["r"]))
+        for ld in sh["layers"]:
+                reach = maxf(reach, float(ld["r"]))
+        return reach + SHIELD_BAND
+
+## THE SHIELD READ: what stands between this bullet and the body?
+##   0 = nothing at this distance, 1 = a shard blocked it (unbreakable),
+##   2 = a shell area ate the hit (its level dropped),
+##   3 = through every window - the body is naked from here.
+func _shield_block(e: Dictionary, b: Dictionary, dmg: float) -> int:
+        var sh: Dictionary = e["shield"]
+        var d: float = b["pos"].distance_to(e["pos"])
+        var ang: float = (b["pos"] - e["pos"]).angle()
+        for sd in sh["shards"]:
+                if absf(d - float(sd["r"])) > SHIELD_BAND:
+                        continue
+                # the shard's arc runs [0, span] in its own rotating frame
+                var local := fposmod(ang - float(sd["rot"]), TAU)
+                if local <= float(sd["span"]):
+                        return 1
+        for ld in sh["layers"]:
+                if absf(d - float(ld["r"])) > SHIELD_BAND:
+                        continue
+                var areas: Array = ld["areas"]
+                var n := areas.size()
+                var w: float = TAU / float(n)
+                var idx: int = int(fposmod(ang, TAU) / w) % n
+                var area: Dictionary = areas[idx]
+                if float(area["hp"]) > 0.0:
+                        _chip_shield_area(e, ld, idx, dmg, b["pos"])
+                        return 2
+                # a window - the bullet flies inward to the next layer
+        var layers: Array = sh["layers"]
+        var inner_r: float = float(layers[layers.size() - 1]["r"])
+        if d < inner_r - SHIELD_BAND:
+                return 3
+        return 0
+
+## one hit on a shell area: the damage (in shield units) lowers the
+## area's level; at zero the cut is REMOVED - the window is open.
+func _chip_shield_area(e: Dictionary, ld: Dictionary, idx: int, dmg: float,
+                at: Vector2) -> void:
+        var sh: Dictionary = e["shield"]
+        var area: Dictionary = ld["areas"][idx]
+        var was := ceili(float(area["hp"]))
+        area["hp"] = maxf(0.0, float(area["hp"]) - maxf(1.0,
+                        dmg / float(sh["unit"])))
+        var now := ceili(float(area["hp"]))
+        Jukebox.sfx("cs_shield_crack", -9.0, 1.05 + 0.1 * float(now))
+        _burst(at, [Color(0.62, 0.88, 1.0), Color(0.88, 0.97, 1.0)], 3)
+        if now < was:
+                _rings.append({"pos": e["pos"], "r": float(ld["r"]),
+                                "t": 0.25, "max": 0.25,
+                                "col": Color(0.55, 0.85, 1.0), "w": 2.5})
+        if now <= 0:
+                # THE WINDOW LAW: the cut is gone - the layer has a hole
+                Jukebox.sfx("cs_shield_crack", -5.0, 0.72)
+                _rings.append({"pos": e["pos"], "r": float(ld["r"]) + 8.0,
+                                "t": 0.4, "max": 0.4,
+                                "col": Color(0.75, 0.95, 1.0), "w": 4.0})
+
+func _tick_shield(e: Dictionary, delta: float) -> void:
+        for sd in e["shield"]["shards"]:
+                sd["rot"] = fposmod(float(sd["rot"]) + float(sd["spd"]) * delta,
+                                TAU)
+
+## THE MELEE CHEW: the swing bites the outermost alive shell area at the
+## swing's angle. Returns true when the shell ATE the swing (no body hit);
+## false when the path to the body stands open (every layer windowed there
+## - the shards never block the cleaver, the gaps are everywhere).
+func _melee_chew_shield(e: Dictionary, swing_a: float, dmg: float) -> bool:
+        var sh: Dictionary = e["shield"]
+        var layers: Array = sh["layers"]
+        if layers.is_empty():
+                return false
+        var outer: Dictionary = layers[0]   # the data is outer-first
+        var areas: Array = outer["areas"]
+        var n := areas.size()
+        var w: float = TAU / float(n)
+        var idx: int = int(fposmod(swing_a, TAU) / w) % n
+        if float(areas[idx]["hp"]) <= 0.0:
+                return false    # the window is here - the body takes it
+        var at: Vector2 = e["pos"] + Vector2.from_angle(swing_a) * float(outer["r"])
+        _chip_shield_area(e, outer, idx, dmg, at)
+        return true
 
 func _tick_enemies(delta: float) -> void:
         var to_kill := []
@@ -1839,6 +1967,12 @@ func _tick_enemies(delta: float) -> void:
                 var kind: String = e["kind"]
                 var moved := false
                 # ===== the per-kind AI =====
+                # v0.3.8-3 THE KNOCK DECAY: a contact ram SHOVES the body
+                # away - the shove rides out here (before the node sync)
+                if e.get("knock", Vector2.ZERO) != Vector2.ZERO:
+                        e["pos"] += (e["knock"] as Vector2) * delta
+                        e["knock"] = (e["knock"] as Vector2).move_toward(
+                                        Vector2.ZERO, 1100.0 * delta)
                 if e.get("boss", false):
                         _boss_ai(e, delta, to_p, dist)
                         moved = true
@@ -1946,18 +2080,31 @@ func _tick_enemies(delta: float) -> void:
                                         if o["pos"].distance_to(e["pos"]) < 500.0:
                                                 o["hp"] = minf(float(o["max_hp"]), float(o["hp"]) + 10.0)
                                                 _heal_flash(o)
-                if e.get("rings", null) != null:
-                        _tick_rings(e, delta)
+                if e.get("shield", null) != null:
+                        _tick_shield(e, delta)
                 # ===== THE SHARED CONTACT LAW (v0.3.4-3): colliding damages
                 # BOTH sides and EVERY tick speaks - the old splatter law
                 # (remaining HP as damage, then silent iframes) is DEAD.
+                # v0.3.8-3 THE STALEMATE LAW (the owner: "some enemies when
+                # collide... the enemy stays stuck following me in a weird
+                # way... at least it should have been already died"): the
+                # collision is a FIGHT now - the ram bites harder every
+                # wave, the body that survives gets KNOCKED back so it can
+                # never grind at the player's heels, and no body overlaps
+                # the potato: they press on the rim, never inside it.
                 var touch_r: float = float(e["size"]) * 0.5 * float(e.get("scale_m", 1.0)) + PLAYER_R - 6.0
                 if e.get("boss", false):
                         touch_r = float(e["size"]) * 0.5 + PLAYER_R - 10.0
                 if dist < touch_r:
+                        # THE RIM TRUTH: the enemy presses against the
+                        # potato's rim - never inside it (the walk-through
+                        # and the weird heel-hugging are the same bug)
+                        var away: Vector2 = to_p.normalized()
+                        e["pos"] = e["pos"] - away * (touch_r - dist)
                         e["touch_cd"] = float(e.get("touch_cd", 0.0)) - delta
                         if e["touch_cd"] <= 0.0:
                                 e["touch_cd"] = 0.55
+                                e["knock"] = away * CONTACT_KNOCK
                                 _contact_hit(e)
                                 # the ram may have splattered the enemy -
                                 # never touch the corpse again this tick
@@ -1980,24 +2127,30 @@ func _tick_enemies(delta: float) -> void:
                 if e.get("goga", false) and e["flash"] <= 0.0:
                         nd.modulate = Color(1.25, 1.2, 0.8)
         # the flocking separation (the python law: 100px, force (1-d/100)*0.5)
+        # v0.3.8-3 THE SQUARED GUARD: the far pairs pay length_squared only -
+        # the sqrt runs for the close pairs alone (the 80x80 walk drops its
+        # 6400 sqrts to ~the near-neighbour count)
         if enemies.size() <= 80:
                 for i in enemies.size():
                         var a: Dictionary = enemies[i]
                         if a.get("dead", false) or a.get("boss", false):
                                 continue
                         var push := Vector2.ZERO
+                        var apos: Vector2 = a["pos"]
                         for j in enemies.size():
                                 if i == j:
                                         continue
                                 var b: Dictionary = enemies[j]
-                                var dd: Vector2 = a["pos"] - b["pos"]
-                                var dl := dd.length()
-                                if dl < 100.0 and dl > 0.01:
-                                        push += dd / dl * (100.0 - dl) / 100.0
-                        a["pos"] += push * 0.5 * 60.0 * delta
-                        a["pos"] += Vector2(randf_range(-0.3, 0.3), randf_range(-0.3, 0.3)) * 60.0 * delta
+                                var dd: Vector2 = apos - (b["pos"] as Vector2)
+                                var dl2 := dd.length_squared()
+                                if dl2 < 10000.0 and dl2 > 0.01:
+                                        var dl := sqrt(dl2)
+                                        push += dd * ((100.0 - dl) / (100.0 * dl))
+                        apos += push * 0.5 * 60.0 * delta
+                        apos += Vector2(randf_range(-0.3, 0.3), randf_range(-0.3, 0.3)) * 60.0 * delta
+                        a["pos"] = apos
                         # THE NODE-SYNC LAW holds even after the flock nudge
-                        (a["node"] as Sprite2D).position = a["pos"]
+                        (a["node"] as Sprite2D).position = apos
         for e2 in to_kill:
                 # a contact-splattered carrier still coughs up its coin
                 if e2.get("goga", false):
@@ -2208,8 +2361,9 @@ func _spawn_boss(wave: int) -> void:
         e["node"].texture = _t(String(bd["tex"]))
         e["node"].scale = Vector2.ONE * 1.6
         e["scale_m"] = 1.6
-        if bd.get("rings", null) != null:
-                e["rings"] = _mk_rings(bd["rings"])
+        if bd.get("shield", false):
+                e["shield"] = _mk_shield(CSData.PRISM_SHARDS, CSData.PRISM_LAYERS,
+                                CSData.PRISM_AREAS, wave)
         boss_alive = true
         Jukebox.sfx("cs_boss_roar", -2.0)
         Jukebox.music("res://assets/audio/music/cs_boss.ogg")
@@ -2217,7 +2371,14 @@ func _spawn_boss(wave: int) -> void:
 
 ## THE WARDEN's guard (v0.3.4-5): 0.5 while `e` stands inside a living
 ## warden's gold ring - the warden never wards itself.
+## v0.3.8-3 THE WARDEN CACHE: the scan only runs while a warden LIVES -
+## the count rides the spawn/kill paths, so the common case is one int
+## compare instead of an O(n) walk per hit.
+var _wardens_alive := 0
+
 func _ward_cut(e: Dictionary) -> float:
+        if _wardens_alive <= 0:
+                return 1.0
         for w in enemies:
                 if w == e or w.get("dead", false):
                         continue
@@ -2250,6 +2411,8 @@ func _kill_enemy(e: Dictionary, drops: bool) -> void:
         if e.get("dead", false):
                 return
         e["dead"] = true
+        if String(e.get("kind", "")) == "warden":
+                _wardens_alive = maxi(0, _wardens_alive - 1)
         run_kills += 1
         var sc := int(e["score"])
         if e.get("elite", false):
@@ -2385,15 +2548,21 @@ func _hurt_player(dmg: float, src: Variant, contact := false) -> void:
 ## THE SHARED CONTACT LAW (v0.3.4-3): one tick of an ongoing collision.
 ## The enemy ATTACKS the potato; the potato RAMS back. Both sides wear
 ## their numbers, the thud speaks, the dust flies - every single tick.
+## v0.3.8-3 THE RAM TRUTH (the owner: "at least it should have been
+## already died"): the ram scales with the waves now - trash bodies
+## splatter on the rim in a tick or two, tanks feel the grind but the
+## knock never lets them pin the potato.
 func _contact_hit(e: Dictionary) -> void:
         var hit_at: Vector2 = (p_pos + e["pos"]) * 0.5
         # ---- the enemy's attack (armor + dodge + contact_cut apply)
         _hurt_player(float(e["dmg"]) * float(stats["contact_cut"]), e, true)
         if p_hp <= 0.0 or over:
                 return
-        # ---- THE RAM: the potato shoves back (8% of the enemy's max HP,
-        # +3 flat, +1 per armor point; bosses take half)
-        var ram: float = float(e["max_hp"]) * 0.08 + 3.0 + float(stats["armor"])
+        # ---- THE RAM: the potato shoves back (the wave-scaled floor or
+        # 8% of the enemy's max HP, +3 flat, +1 per armor point; bosses
+        # take half)
+        var ram: float = maxf(float(e["max_hp"]) * 0.08,
+                        18.0 + float(run_wave) * 1.6) + 3.0 + float(stats["armor"])
         if e.get("boss", false):
                 ram *= 0.5
         _hurt_enemy(e, ram)
@@ -4270,7 +4439,6 @@ func _build_optionals(box: VBoxContainer) -> void:
         # upgrades are reachable outside the break chain too
         actions.add_child(_cs_button("STATS", 15, CS_BLUE, func(): _stats_menu_open()))
         actions.add_child(_cs_button("SKILLS", 15, CS_GREEN, func(): _skills_menu_open()))
-        actions.add_child(_cs_button("TREE", 15, CS_BLUE, func(): _tree_open()))
         actions.add_child(_cs_button("DROP IN", 18, CS_GREEN, func(): _start_run()))
 
 func _start_card(sid: String) -> Button:
@@ -4462,133 +4630,13 @@ func _start_id_persist() -> void:
         meta.save()
 
 # =================================================================== tree
-## THE TREE REBORN: four branch columns joined by drawn connectors, every
-## node a black box speaking its state: OWNED (green), CAN BUY (yellow),
-## LOCKED (a red padlock + the reason - the chain or the level gate).
-func _tree_open() -> void:
-        _cs_open("THE SKILL TREE", func(box: VBoxContainer): _build_tree(box), CS_BLUE,
-                        true, "tree")
-
-func _build_tree(box: VBoxContainer) -> void:
-        var sub := _cs_label("SPUDNIK LV %d  -  %d CC  -  everything starts locked, unlock one by one" \
-                        % [meta.char_level(), meta.coins()], 12, CS_YELLOW)
-        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        box.add_child(sub)
-        var scroll := _cs_scroll()
-        scroll.custom_minimum_size = Vector2(0, get_viewport_rect().size.y * 0.48)
-        box.add_child(scroll)
-        var shelf := _cs_shelf(scroll)
-        var branches := {"OFFENSE": [], "DEFENSE": [], "UTILITY": [], "LAB": []}
-        for nid in CSData.TREE_ORDER:
-                var n: Dictionary = CSData.TREE[nid]
-                branches[n["branch"]].append(nid)
-        var cols := HBoxContainer.new()
-        cols.alignment = BoxContainer.ALIGNMENT_CENTER
-        cols.add_theme_constant_override("separation", 10)
-        shelf.add_child(cols)
-        for bname in ["OFFENSE", "DEFENSE", "UTILITY", "LAB"]:
-                var col := VBoxContainer.new()
-                col.add_theme_constant_override("separation", 2)
-                var bt := _cs_label(bname, 13, CS_YELLOW)
-                bt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                col.add_child(bt)
-                var prev: Button = null
-                for nid in branches[bname]:
-                        var nb: Button = _tree_node(nid, prev)
-                        col.add_child(nb)
-                        prev = nb
-                cols.add_child(col)
-        _cs_scroll_taps(scroll)
-        _fit_scroll(scroll, shelf, 0.48)
-        var actions := HBoxContainer.new()
-        actions.alignment = BoxContainer.ALIGNMENT_CENTER
-        box.add_child(actions)
-        actions.add_child(_cs_button("BACK", 14, CS_WHITE, func(): _cs_close_top()))
-
-func _tree_lock_reason(nid: String) -> String:
-        var n: Dictionary = CSData.TREE[nid]
-        if n["need"] != "" and not meta.tree_has(String(n["need"])):
-                return "needs " + String(CSData.TREE[String(n["need"])]["name"])
-        if meta.char_level() < int(n["clv"]):
-                return "needs SPUDNIK LV %d" % int(n["clv"])
-        if meta.coins() < int(n["cost"]):
-                return "needs %d CC" % int(n["cost"])
-        return ""
-
-func _tree_node(nid: String, prev: Button) -> Button:
-        var n: Dictionary = CSData.TREE[nid]
-        var owned := meta.tree_has(nid)
-        var chain_ok: bool = String(n["need"]) == "" or meta.tree_has(String(n["need"]))
-        var lv_ok: bool = meta.char_level() >= int(n["clv"])
-        var can: bool = chain_ok and lv_ok and meta.coins() >= int(n["cost"])
-        var b := Button.new()
-        var st := _cs_box_style(
-                        CS_GREEN if owned else (CS_YELLOW if can else CS_EDGE), CS_BOX)
-        b.add_theme_stylebox_override("normal", st)
-        var hov := _cs_box_style(
-                        CS_GREEN if owned else (CS_YELLOW if can else CS_RED), CS_BOX2)
-        b.add_theme_stylebox_override("hover", hov)
-        var vb := VBoxContainer.new()
-        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
-        vb.offset_left = 5
-        vb.offset_top = 4
-        vb.offset_right = -5
-        b.add_child(vb)
-        var head := HBoxContainer.new()
-        head.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_child(head)
-        var tag_txt := ""
-        if owned:
-                tag_txt = "[OWNED] "
-                head.add_child(_cs_label("[OWNED]", 10, CS_GREEN))
-        elif not (chain_ok and lv_ok):
-                tag_txt = "[LOCKED] "
-                head.add_child(_cs_label("[LOCKED]", 10, CS_RED))
-        var nm_txt := tag_txt + String(n["name"])
-        head.add_child(_cs_fit_label(nm_txt, 11,
-                        CS_GREEN if owned else (CS_WHITE if chain_ok and lv_ok else Color(0.55, 0.55, 0.6)),
-                        150.0))
-        var ds_txt := String(n["desc"])
-        var ds := _cs_label(ds_txt, 9, CS_WHITE)
-        ds.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        vb.add_child(ds)
-        var foot := HBoxContainer.new()
-        foot.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_child(foot)
-        var foot_txt := ""
-        if owned:
-                foot_txt = "learned"
-                foot.add_child(_cs_label(foot_txt, 9, CS_GREEN))
-        elif chain_ok and lv_ok:
-                foot_txt = "%d CC" % int(n["cost"])
-                foot.add_child(_cs_label(foot_txt, 10,
-                                CS_YELLOW if can else CS_RED))
-        else:
-                foot_txt = _tree_lock_reason(nid)
-                foot.add_child(_cs_label(foot_txt, 9, CS_RED))
-        ## THE TEXT-FIT LAW: desc + reason wrap, the node grows to fit them
-        var ds_h := _cs_text_h(ds_txt, 9, 160.0)
-        var foot_h := _cs_text_h(foot_txt, 9, 160.0)
-        b.custom_minimum_size = Vector2(180,
-                        maxf(68.0, 4.0 + 16.0 + 2.0 + ds_h + 2.0 + maxf(14.0, foot_h) + 6.0))
-        b.pressed.connect(func():
-                if owned:
-                        _toast_show("already learned")
-                        return
-                if not (chain_ok and lv_ok):
-                        Jukebox.sfx("cs_error", -6.0)
-                        _toast_show("LOCKED: " + _tree_lock_reason(nid))
-                        return
-                if meta.tree_buy(nid):
-                        _cc_pull()   # the tree spent meta-side - the purse follows
-                        Jukebox.sfx("cs_levelup", -3.0)
-                        _cs_reopen(func(): _tree_open())
-                else:
-                        Jukebox.sfx("cs_error", -6.0)
-                        _toast_show("LOCKED: " + _tree_lock_reason(nid)))
-        return b
+## v0.3.8-3 THE TREE RETIRES WHOLE: the sheet and its buttons are dead.
+## The SKILLS system (the 5-level skill depths) is the meta upgrade home
+## now, and the wave market + the armory own the cosmic-coin spending.
+## The tree's OWNED FLAGS remain the run's data (weapon slots o3/l5, the
+## second wind d4, the free reroll u3, the discounts, the lab l1-l5) -
+## they read through meta.tree_node exactly as before and they are bought
+## through THE SHOP's lab rows (gogabuy_node) as they always were.
 
 # =================================================================== death
 func _die() -> void:
@@ -4666,40 +4714,60 @@ var _parts: Array = []       # {pos, vel, t, max, col, size, tex}
 var _stains: Array = []      # [{pos, r, t, max}]
 var _slashes: Array = []     # THE MELEE LAW: {pos, a, rng, arc, t, max}
 
+# the auras (under everything)
+## v0.3.8-3 THE SHAPED-ONCE LAW: the elite affix tag pre-shapes its TextLine
+## once per affix - the old draw_string re-shaped the same word every frame
+## for every elite (text shaping is the most expensive 2D call there is).
+var _affix_lines := {}
+
+func _affix_line(affix: String) -> TextLine:
+        if not _affix_lines.has(affix):
+                var tl := TextLine.new()
+                tl.text = String(affix).to_upper()
+                tl.font = ThemeDB.fallback_font
+                tl.font_size = _fs(7)
+                tl.width = 80.0
+                tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                _affix_lines[affix] = tl
+        return _affix_lines[affix]
+
 func _draw_fx(L: CanvasItem) -> void:
+        # v0.3.8-3: ONE clock read per frame (the breathe pulses used to call
+        # Time.get_ticks_msec() per enemy - now the whole draw shares it)
+        var now_ms := Time.get_ticks_msec()
         # the auras (under everything)
         for e in enemies:
                 if e.get("dead", false):
                         continue
                 if e.get("aura", 0.0) > 0.0:
-                        var breathe := 0.5 + 0.14 * sin(Time.get_ticks_msec() / 260.0)
+                        var breathe := 0.5 + 0.14 * sin(now_ms / 260.0)
                         # THE WRAITH TRUTH LAW (v0.3.4-5): the ring READS - a fat
                         # breathing violet field, never a whisper
                         L.draw_circle(e["pos"], float(e["aura"]),
                                         Color(0.72, 0.42, 1.0, 0.15 * breathe))
-                        L.draw_arc(e["pos"], float(e["aura"]), 0, TAU, 48,
+                        L.draw_arc(e["pos"], float(e["aura"]), 0, TAU, 32,
                                         Color(0.78, 0.45, 1.0, 0.6), 3.5)
-                        L.draw_arc(e["pos"], float(e["aura"]) - 8.0, 0, TAU, 48,
+                        L.draw_arc(e["pos"], float(e["aura"]) - 8.0, 0, TAU, 24,
                                         Color(0.78, 0.45, 1.0, 0.25), 2.0)
                 # THE HEALER IN THE OPEN LAW (v0.3.4-5): the mender's 500px
                 # heal field draws - green cross care, visible care
                 if String(e.get("kind", "")) == "mender":
-                        var hb := 0.5 + 0.12 * sin(Time.get_ticks_msec() / 320.0)
+                        var hb := 0.5 + 0.12 * sin(now_ms / 320.0)
                         L.draw_circle(e["pos"], float(e.get("heal", 500.0)),
                                         Color(0.35, 1.0, 0.5, 0.07 * hb))
-                        L.draw_arc(e["pos"], float(e.get("heal", 500.0)), 0, TAU, 56,
+                        L.draw_arc(e["pos"], float(e.get("heal", 500.0)), 0, TAU, 36,
                                         Color(0.4, 1.0, 0.55, 0.5), 3.0)
                 # THE WARDEN LAW (v0.3.4-5): the gold half-damage field draws
                 if float(e.get("ward", 0.0)) > 0.0:
-                        var wb := 0.5 + 0.13 * sin(Time.get_ticks_msec() / 280.0)
+                        var wb := 0.5 + 0.13 * sin(now_ms / 280.0)
                         L.draw_circle(e["pos"], float(e["ward"]),
                                         Color(1.0, 0.78, 0.2, 0.09 * wb))
-                        L.draw_arc(e["pos"], float(e["ward"]), 0, TAU, 48,
+                        L.draw_arc(e["pos"], float(e["ward"]), 0, TAU, 32,
                                         Color(1.0, 0.8, 0.25, 0.55), 3.0)
-                        L.draw_arc(e["pos"], float(e["ward"]) - 9.0, 0, TAU, 48,
+                        L.draw_arc(e["pos"], float(e["ward"]) - 9.0, 0, TAU, 24,
                                         Color(1.0, 0.85, 0.35, 0.28), 5.0)
                 if e.get("marked", false):
-                        L.draw_arc(e["pos"], float(e["size"]) * 0.7, 0, TAU, 24,
+                        L.draw_arc(e["pos"], float(e["size"]) * 0.7, 0, TAU, 16,
                                         Color(1, 0.9, 0.3, 0.5), 2.0)
                 # the HP bar under a damaged enemy
                 if e["hp"] < e["max_hp"]:
@@ -4708,20 +4776,21 @@ func _draw_fx(L: CanvasItem) -> void:
                         L.draw_rect(Rect2(e["pos"].x - w * 0.5, yy, w, 4), Color(0, 0, 0, 0.55))
                         L.draw_rect(Rect2(e["pos"].x - w * 0.5, yy, w * clampf(float(e["hp"]) / float(e["max_hp"]), 0, 1), 4),
                                         CS_RED)
-                # the tri-shield rings (the signature)
-                if e.get("rings", null) != null:
-                        _draw_rings(e, L)
-                # the elite ring + tag
+                # the shield orbits (the signature: shards + the shell)
+                if e.get("shield", null) != null:
+                        _draw_shield(e, L)
+                # the elite ring + tag (v0.3.8-3: the tag rides a pre-shaped
+                # TextLine - draw_string re-shaped its text every frame)
                 if e.get("elite", false):
                         L.draw_arc(e["pos"], float(e["size"]) * 0.62 * float(e.get("scale_m", 1.0)),
-                                        0, TAU, 32, Color(0.8, 0.4, 1.0, 0.8), 2.5)
-                        L.draw_string(ThemeDB.fallback_font, e["pos"] + Vector2(-40, -float(e["size"]) - 18),
-                                        String(e["affix"]).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 80, _fs(7),
+                                        0, TAU, 20, Color(0.8, 0.4, 1.0, 0.8), 2.5)
+                        var tl := _affix_line(String(e["affix"]))
+                        tl.draw(L, e["pos"] + Vector2(-40, -float(e["size"]) - 18),
                                         Color(0.9, 0.6, 1.0))
                 # THE CARRIER'S GLINT (the gogacoin rider marks its host)
                 if e.get("goga", false):
-                        var g := 0.5 + 0.5 * absf(sin(Time.get_ticks_msec() / 200.0))
-                        L.draw_arc(e["pos"], float(e["size"]) * 0.7 * (1.0 + 0.08 * g), 0, TAU, 24,
+                        var g := 0.5 + 0.5 * absf(sin(now_ms / 200.0))
+                        L.draw_arc(e["pos"], float(e["size"]) * 0.7 * (1.0 + 0.08 * g), 0, TAU, 16,
                                         Color(1.0, 0.85, 0.3, 0.5 + 0.3 * g), 2.0)
                 # the charger telegraph
                 if e.get("state", "") == "wind" and e.get("dash_dir", null) != null:
@@ -4745,7 +4814,7 @@ func _draw_fx(L: CanvasItem) -> void:
                 var f := 1.0 - float(z["t"]) / float(z["max"])
                 if String(z.get("kind", "")) == "pool":
                         # v0.3.7-1 THE FIRE POOL: the molotov's burning ground
-                        var flicker := 0.8 + 0.2 * sin(Time.get_ticks_msec() / 70.0
+                        var flicker := 0.8 + 0.2 * sin(now_ms / 70.0
                                         + z["pos"].x * 0.1)
                         L.draw_circle(z["pos"], float(z["aoe"]),
                                         Color(0.95, 0.35, 0.08, 0.16 * flicker))
@@ -4768,7 +4837,7 @@ func _draw_fx(L: CanvasItem) -> void:
         # own rotation already says where the bullets go.
         # THE WOW PASS: the low-HP pulse (a red edge breathing on the screen)
         if phase == "play" and p_hp < p_max_hp * 0.3:
-                var pulse := 0.5 + 0.5 * absf(sin(Time.get_ticks_msec() / 260.0))
+                var pulse := 0.5 + 0.5 * absf(sin(now_ms / 260.0))
                 var ctr: Vector2 = cam.get_screen_center_position()
                 var rad: float = _cam_half().length() * 1.05
                 L.draw_arc(ctr, rad, 0, TAU, 64,
@@ -4831,38 +4900,54 @@ func _draw_fx(L: CanvasItem) -> void:
                                 HORIZONTAL_ALIGNMENT_CENTER, -1, int(f2["size"]),
                                 Color(f2["col"], fa))
 
-func _draw_rings(e: Dictionary, L: CanvasItem) -> void:
-        # each ring draws its REMAINING arcs (the carved windows stay open)
-        for ring in e["rings"]:
-                var cracks: Array = ring["cracks"]
-                var arcs := []
-                if cracks.is_empty():
-                        arcs.append([0.0, TAU])
-                else:
-                        var sorted := cracks.duplicate()
-                        sorted.sort_custom(func(x, y): return float(x[0]) < float(y[0]))
-                        var cursor := 0.0
-                        for c in sorted:
-                                var a0 := fposmod(float(c[0]), TAU)
-                                var a1 := float(c[1])
-                                if a0 >= cursor:
-                                        arcs.append([cursor, a0])
-                                cursor = maxf(cursor, a1)
-                        if cursor < TAU:
-                                arcs.append([cursor, TAU])
-                var col := Color(0.35, 0.85, 1.0, 0.85)
-                for arc in arcs:
-                        var span: float = float(arc[1]) - float(arc[0])
-                        if span <= 0.01:
+func _draw_shield(e: Dictionary, L: CanvasItem) -> void:
+        var sh: Dictionary = e["shield"]
+        # ---- THE LAYER SHELL: each alive area draws its arc in its LEVEL's
+        # color (deeper = higher); a broken area draws only a faint ghost so
+        # the window reads as an open door. The CUT ticks mark the areas.
+        for ld in sh["layers"]:
+                var areas: Array = ld["areas"]
+                var n := areas.size()
+                var w: float = TAU / float(n)
+                var r: float = float(ld["r"])
+                for i in n:
+                        var area: Dictionary = areas[i]
+                        var a0: float = float(i) * w
+                        var a1: float = a0 + w
+                        if float(area["hp"]) <= 0.0:
+                                # the window: a whisper of where the cut was
+                                L.draw_arc(e["pos"], r, a0 + 0.03, a1 - 0.03, 8,
+                                                Color(0.7, 0.9, 1.0, 0.10), 2.0)
                                 continue
-                        var segs := maxi(2, int(span / 0.12))
-                        var prev := Vector2.ZERO
-                        for i in segs + 1:
-                                var a: float = float(arc[0]) + span * float(i) / float(segs)
-                                var wp: Vector2 = e["pos"] + Vector2.from_angle(a + float(ring["rot"])) * float(ring["r"])
-                                if i > 0:
-                                        L.draw_line(prev, wp, col, 6.0)
-                                prev = wp
+                        var lv: int = clampi(ceili(float(area["hp"])), 1, 5)
+                        var col: Color = SHELL_LV_COLS[clampi(lv - 1, 0, 4)]
+                        L.draw_arc(e["pos"], r, a0 + 0.035, a1 - 0.035,
+                                        maxi(4, int(w / 0.09)), col, 5.0)
+                        # the level's inner echo (a second rim, one shade in)
+                        L.draw_arc(e["pos"], r - 3.5, a0 + 0.06, a1 - 0.06,
+                                        maxi(4, int(w / 0.12)),
+                                        Color(col.r, col.g, col.b, 0.4), 2.0)
+                # the cut ticks: the specified cuts between the areas
+                for i in n:
+                        var ca: float = float(i) * w
+                        var p0: Vector2 = e["pos"] + Vector2.from_angle(ca) * (r - 5.0)
+                        var p1: Vector2 = e["pos"] + Vector2.from_angle(ca) * (r + 5.0)
+                        L.draw_line(p0, p1, Color(1, 1, 1, 0.4), 2.0)
+        # ---- THE SHATTER ORBIT: the unbreakable fragments - fat cold arcs
+        # with a bright core, each spinning its own way
+        for sd in sh["shards"]:
+                var r2: float = float(sd["r"])
+                var rot: float = float(sd["rot"])
+                var span: float = float(sd["span"])
+                var segs := maxi(6, int(span / 0.09))
+                L.draw_arc(e["pos"], r2, rot, rot + span, segs,
+                                Color(0.36, 0.78, 1.0, 0.9), 7.0)
+                L.draw_arc(e["pos"], r2 - 2.5, rot + 0.03, rot + span - 0.03, segs,
+                                Color(0.85, 0.97, 1.0, 0.75), 2.0)
+                # the fragment's end teeth (the shattered edge reads)
+                for te in [rot, rot + span]:
+                        var tp: Vector2 = e["pos"] + Vector2.from_angle(te) * r2
+                        L.draw_circle(tp, 3.4, Color(0.55, 0.88, 1.0, 0.95))
 
 # ------------------------------------------------------------ fx helpers
 func _dmg_number(pos: Vector2, v: float, crit: bool, col := Color(1, 1, 1)) -> void:
@@ -4908,6 +4993,18 @@ func _slash_fx(a: float, rng: float, arc: float) -> void:
                 "t": 0.22, "max": 0.22})
 
 func _tick_fx(delta: float) -> void:
+        # v0.3.8-3 THE FLOOD CAPS: a packed screen used to grow the fx arrays
+        # unbounded (every hit sprays, every crit floats) - the draw cost
+        # climbed with the swarm. Hard caps, oldest dies first: the show
+        # stays identical in the calm and holds the line in the flood.
+        while _parts.size() > 260:
+                _parts.pop_front()
+        while _floaters.size() > 30:
+                _floaters.pop_front()
+        while _rings.size() > 50:
+                _rings.pop_front()
+        while _stains.size() > 70:
+                _stains.pop_front()
         var dead := []
         for p in _parts:
                 p["t"] -= delta

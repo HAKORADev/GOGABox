@@ -779,6 +779,13 @@ var legal_cache: Array = []    # legal moves for the selected piece
 var drag := false
 var drag_sq := -1
 var drag_pos := Vector2.ZERO
+# v0.3.8-3 THE TAP TRUTH (the owner: "when tapped always moves to the finger
+# as drag-and-drop mode, this is too much, a small finger movement should
+# just tap it without carrying it because now it feels somehow glitchy"):
+# a press only PICKS UP the piece after the finger proves it is a drag -
+# a small wobble stays a tap (the piece sits still, the rings show).
+var drag_origin := Vector2.ZERO
+var drag_armed := false
 var pending_promo = null       # the move awaiting the promo pick
 
 # v0.3.8-1 THE DEAD TRAY: every piece that left the war, split by captor
@@ -1061,7 +1068,7 @@ func _draw_pieces() -> void:
                                 break
                 if skip:
                         continue
-                if drag and drag_sq == i:
+                if drag and drag_armed and drag_sq == i:
                         continue
                 var tex := _piece_tex(v)
                 var r := _sq_rect(i)
@@ -1085,8 +1092,9 @@ func _draw_fx() -> void:
                         at - Vector2(sq_px, sq_px) * 0.5
                                 + Vector2(pad, pad),
                         Vector2(sq_px - pad * 2, sq_px - pad * 2)), false)
-        # the dragged piece follows the finger
-        if drag and drag_sq >= 0 and int(st["b"][drag_sq]) != 0:
+        # the dragged piece follows the finger (only after the arm threshold
+        # - a small finger wobble is a TAP, the piece stays standing)
+        if drag and drag_armed and drag_sq >= 0 and int(st["b"][drag_sq]) != 0:
                 var v2: int = st["b"][drag_sq]
                 var tex2 := _piece_tex(v2)
                 var pad2 := sq_px * 0.08
@@ -1212,6 +1220,12 @@ func _goga_input(event: InputEvent) -> void:
                         _release(t.position)
         elif event is InputEventScreenDrag and drag:
                 drag_pos = event.position
+                if not drag_armed and drag_pos.distance_to(drag_origin) > _drag_arm_px():
+                        drag_armed = true      # the finger means CARRY now
+
+## the arm distance: a real finger-width of travel, scaled to the board
+func _drag_arm_px() -> float:
+        return maxf(14.0, sq_px * 0.20)
 
 func _press(at: Vector2) -> void:
     if state != "play" or st.is_empty():
@@ -1236,6 +1250,8 @@ func _press(at: Vector2) -> void:
             if int(m["f"]) == i:
                 legal_cache.append(m)
         drag = true
+        drag_armed = false
+        drag_origin = at
         drag_sq = i
         drag_pos = at
         if not legal_cache.is_empty():

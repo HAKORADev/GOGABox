@@ -149,6 +149,11 @@ var sel := -1                  # selected hand index
 var drag := false
 var drag_i := -1
 var drag_pos := Vector2.ZERO
+# v0.3.8-3 THE TAP TRUTH: a press only LIFTS a tile after the finger proves
+# it is a drag - a small wobble stays a tap (the tile keeps its seat in the
+# fan, the glow shows). The owner's chess law travels here.
+var drag_origin := Vector2.ZERO
+var drag_armed := false
 var shake_t := 0.0
 var shake_i := -1
 
@@ -162,9 +167,14 @@ var end_r := Rect2()
 var hand_rects: Array = []
 var pile_pos := Vector2.ZERO
 var cpu_pos := Vector2.ZERO
+var _fit_scale := 1.0          # v0.3.8-3: the CONTINUOUS fit scale (the old
+                               # 4-step jump counted tiles, not pixels - the
+                               # snake overflowed long before it shrank)
 
 # fly animations [{tile, from, to, r0, r1, t, dur}]
-var flies: Array = []
+var flies: Array = []          # every flight: deal_p / deal_c / place / ""
+var _deal_p := 0               # the deal's launched-per-side counters
+var _deal_c := 0
 var verdict_txt := ""          # the round-over banner line
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -423,13 +433,17 @@ func _build_ready() -> void:
 func _build_widgets(vp: Vector2) -> void:
         # v0.3.8-1 THE OWNER'S SEAT: the score leaves the middle of the top
         # bar for the RIGHT side - a compact vertical stack (YOU / DRAWS /
-        # CPU), the domino mirror of the chess strip
+        # CPU), the domino mirror of the chess strip.
+        # v0.3.8-3 THE GOALS SEAT: the stack ends ABOVE the table rail - the
+        # old CPU row hung INSIDE the felt (the owner: "the goals widgets
+        # are misplaced, the cpu is already in the table area"). The boxes
+        # slimmed to fit the strip between the top bar and the ground.
         var widget := Node2D.new()
-        widget.position = Vector2(vp.x - 76.0, 186.0)
+        widget.position = Vector2(vp.x - 76.0, 158.0)
         widget.draw.connect(func():
-                var bwid := 124.0
-                var bh := 58.0
-                var gapw := 12.0
+                var bwid := 118.0
+                var bh := 42.0
+                var gapw := 8.0
                 var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5,
                         (bh + gapw) - bh * 0.5]
                 var cols := [Color("58c470"), Color("6b7280"), Color("e8574a")]
@@ -440,9 +454,9 @@ func _build_widgets(vp: Vector2) -> void:
                         widget.draw_rect(r, Color(1, 1, 1, 0.95))
                         widget.draw_rect(r, cols[i], false, 4.0))
         world.add_child(widget)
-        you_lbl = Arc.label("YOU 0", 24, Color("2f7a44"))
-        draw_lbl = Arc.label("DRAWS 0", 24, Color("4b5563"))
-        cpu_lbl = Arc.label("CPU 0", 24, Color("9c3a32"))
+        you_lbl = Arc.label("YOU 0", 21, Color("2f7a44"))
+        draw_lbl = Arc.label("DRAWS 0", 21, Color("4b5563"))
+        cpu_lbl = Arc.label("CPU 0", 21, Color("9c3a32"))
         for l in [you_lbl, draw_lbl, cpu_lbl]:
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 world.add_child(l)
@@ -459,9 +473,9 @@ func _build_widgets(vp: Vector2) -> void:
 
 func _refresh_widget() -> void:
         var vp := get_viewport_rect().size
-        var w := 124.0
-        var bh := 58.0
-        var gapw := 12.0
+        var w := 118.0
+        var bh := 42.0
+        var gapw := 8.0
         var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5, (bh + gapw) - bh * 0.5]
         var labels := [you_lbl, draw_lbl, cpu_lbl]
         var texts := ["YOU %d" % wins, "DRAWS %d" % draws, "CPU %d" % losses]
@@ -469,21 +483,95 @@ func _refresh_widget() -> void:
                 var v: Label = labels[i]
                 v.text = texts[i]
                 v.position = Vector2(vp.x - 76.0 - w * 0.5,
-                        186.0 + ys[i] + 14.0)
-                v.custom_minimum_size = Vector2(w, bh - 20.0)
+                        158.0 + ys[i] + 9.0)
+                v.custom_minimum_size = Vector2(w, bh - 16.0)
 
 # ============================================================ the layout
-## Recomputed every draw - the chain snake wraps in rows, the board scale
-## steps DOWN as the chain grows (the owner's "a scale for big grounds").
+## Recomputed on every structural change - the chain snake wraps in rows.
+## v0.3.8-3 THE FIT LAW (the owner: "the ground scaling thing is very
+## shitty and wrong as fuck, the distance between each domino, or the zoom
+## out to fit more or the placing, all are very wrong"): the scale is no
+## longer a 4-step jump keyed on tile COUNT - the snake is SIMULATED at
+## full size, and the scale walks down in small honest steps until the
+## WHOLE snake (wrapped rows and all) fits the ground. Continuous, real,
+## no jumps.
 
 func _board_scale() -> float:
-        if chain.size() <= 12:
+        return _fit_scale
+
+## one full wrap simulation at `scale` - the layout IS the simulation.
+## v0.3.8-3 THE EDGE CURSOR: the cursor walks the chain's open END (not a
+## chain of centers) - every tile's near edge lands a gap past the last
+## extent, so a double (half-width) and a tile (full-length) both seat
+## exactly one gap apart. The old center math stepped doubles by their
+## WIDTH and overlapped every neighbor by 34px (the rig's messy snake).
+func _chain_sim(scale: float) -> Dictionary:
+        var b := 150.0 * scale
+        var th := b * 0.5
+        var gap := 3.0
+        var min_x: float = board_rect.position.x + 44.0
+        var max_x: float = board_rect.end.x - 44.0
+        var cy: float = board_rect.get_center().y
+        var dir := 1
+        var edge: float = board_rect.get_center().x
+        var rects: Array = []
+        var min_y := cy
+        var max_y := cy
+        var min_rx := cy
+        var max_rx := cy
+        for i in chain.size():
+                var t: Dictionary = chain[i]
+                var dbl: bool = int(t["a"]) == int(t["b"])
+                var size := Vector2(th, b) if dbl else Vector2(b, th)
+                var vertical := dbl
+                var elbowed := false
+                if not vertical:
+                        if (dir > 0 and edge + size.x > max_x and i > 0) \
+                                        or (dir < 0 and edge - size.x < min_x \
+                                        and i > 0):
+                                vertical = true
+                                elbowed = true
+                                size = Vector2(th, b)
+                var cx: float = edge + dir * size.x * 0.5
+                var r := Rect2(Vector2(cx - size.x * 0.5,
+                        cy - size.y * 0.5), size)
+                rects.append({"rect": r, "vertical": vertical})
+                min_y = minf(min_y, r.position.y)
+                max_y = maxf(max_y, r.end.y)
+                min_rx = minf(min_rx, r.position.x)
+                max_rx = maxf(max_rx, r.end.x)
+                # THE DOUBLE TRUTH: a double stands PERPENDICULAR in the
+                # line but the snake FLOWS STRAIGHT THROUGH it. Only a
+                # margin-converted tile is an elbow: it drops a row, flips,
+                # and the new row clears it by exactly the gap.
+                # THE ROW PITCH TRUTH: the drop clears a FULL tile height
+                # (b + gap), not a half - the new row may carry its own
+                # standing doubles (150 tall); a half-tile drop made two
+                # stacked doubles intersect by 34px on the portrait board.
+                if elbowed:
+                        cy += b + gap
+                        dir = -dir
+                        edge = cx + dir * (th * 0.5 + gap)
+                else:
+                        edge += dir * (size.x + gap)
+        # v0.3.8-3: the fit is HONEST on BOTH axes - the old test read the
+        # vertical band alone, so an elbow could poke past the board's edge
+        # at full scale and the walk never shrank
+        var fits: bool = max_y <= board_rect.end.y - 6.0 \
+                and min_y >= board_rect.position.y + 6.0 \
+                and max_rx <= board_rect.end.x - 2.0 \
+                and min_rx >= board_rect.position.x + 2.0
+        return {"rects": rects, "fits": fits, "min_y": min_y, "max_y": max_y}
+
+func _fit_chain() -> float:
+        if chain.size() <= 1:
                 return 1.0
-        if chain.size() <= 18:
-                return 0.85
-        if chain.size() <= 24:
-                return 0.72
-        return 0.6
+        var s := 1.0
+        while s > 0.40:
+                if bool(_chain_sim(s)["fits"]):
+                        return s
+                s -= 0.04
+        return 0.40
 
 func _relayout() -> void:
         var vp := get_viewport_rect().size
@@ -493,80 +581,44 @@ func _relayout() -> void:
         var top := 236.0
         var bot := vp.y - banner_bottom() - hw - 78.0
         board_rect = Rect2(18.0, top, vp.x - 36.0, maxf(200.0, bot - top))
-        bw = 150.0 * _board_scale()
-        chain_rects = []
+        # v0.3.8-3 THE FIT LAW: simulate, shrink until it fits, then CENTER
+        # the snake vertically (the old layout grew down-only and hugged
+        # whatever row it started on)
+        _fit_scale = _fit_chain()
+        bw = 150.0 * _fit_scale
+        var sim: Dictionary = _chain_sim(_fit_scale)
+        chain_rects = sim["rects"]
+        if not chain_rects.is_empty():
+                var mid_y: float = (float(sim["min_y"]) + float(sim["max_y"])) * 0.5
+                var dy: float = board_rect.get_center().y - mid_y
+                for cr in chain_rects:
+                        var r: Rect2 = cr["rect"]
+                        cr["rect"] = Rect2(r.position + Vector2(0, dy), r.size)
         # the resting yard: a neat stack on the ground's LEFT edge, mid-height
         pile_pos = Vector2(board_rect.position.x + 46.0,
                 board_rect.position.y + board_rect.size.y * 0.5)
         # the CPU hand: top-center of the ground (the mirror of the owner's
         # fan - see _draw_cpu_hand)
         cpu_pos = Vector2(vp.x * 0.5, 140.0)
-        if chain.is_empty():
+        var margin_r := board_rect.position.x + board_rect.size.x - 44.0
+        var margin_l := board_rect.position.x + 44.0
+        if chain.is_empty() or chain_rects.is_empty():
                 end_l = Rect2()
                 end_r = Rect2()
         else:
-                var th := bw * 0.5
-                var gap := 3.0
-                # v0.3.8-1 THE CENTER LAW: the snake starts at the CENTER of
-                # the ground (the old start hugged the top edge - "this is
-                # not a real game", the owner)
-                var cursor := Vector2(board_rect.position.x
-                        + board_rect.size.x * 0.5,
-                        board_rect.position.y + board_rect.size.y * 0.5)
-                var dir := 1
-                var margin_r := board_rect.position.x + board_rect.size.x - 44.0
-                var margin_l := board_rect.position.x + 44.0
-                var rects: Array = []
-                for i in chain.size():
-                        var t: Dictionary = chain[i]
-                        var dbl: bool = int(t["a"]) == int(t["b"])
-                        var size := Vector2(th, bw) if dbl else Vector2(bw, th)
-                        var vertical := dbl
-                        if not vertical:
-                                if dir > 0 and cursor.x + size.x * 0.5 > margin_r \
-                                                and i > 0:
-                                        vertical = true
-                                        size = Vector2(th, bw)
-                                elif dir < 0 and cursor.x - size.x * 0.5 < margin_l \
-                                                and i > 0:
-                                        vertical = true
-                                        size = Vector2(th, bw)
-                        var r := Rect2(Vector2(cursor.x - size.x * 0.5,
-                                cursor.y - size.y * 0.5), size)
-                        rects.append({"rect": r, "vertical": vertical})
-                        if vertical and i > 0:
-                                # the elbow: step past it, drop a row, flip
-                                cursor.x += dir * (th + gap + bw * 0.5)
-                                cursor.y += bw * 0.5 + 14.0
-                                dir = -dir
-                        else:
-                                cursor.x += dir * (size.x + gap)
-                chain_rects = rects
-                var lr: Rect2 = rects[0]["rect"]
-                var rr: Rect2 = rects[rects.size() - 1]["rect"]
+                var lr: Rect2 = chain_rects[0]["rect"]
+                var rr: Rect2 = chain_rects[chain_rects.size() - 1]["rect"]
                 end_l = Rect2(lr.position.x - bw - 6.0, lr.position.y
-                        + (lr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
-                        if lr.position.x - bw - 6.0 > margin_l - 14.0 else Rect2()
+                                + (lr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
+                                if lr.position.x - bw - 6.0 > margin_l - 14.0 else Rect2()
                 end_r = Rect2(rr.position.x + rr.size.x + 6.0, rr.position.y
-                        + (rr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
-                        if rr.position.x + rr.size.x + 6.0 < margin_r + 14.0 \
-                        else Rect2()
+                                + (rr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
+                                if rr.position.x + rr.size.x + 6.0 < margin_r + 14.0 \
+                                else Rect2()
         # the hand fan
         hand_rects = []
-        var n := hand_p.size()
-        if n > 0:
-                var tw2 := hw * 0.5
-                var overlap := 0.0
-                var maxw := vp.x - 48.0
-                var total := tw2 * n
-                if total > maxw:
-                        overlap = (total - maxw) / float(n - 1)
-                var x0 := (vp.x - (total - overlap * (n - 1))) * 0.5
-                var hy := vp.y - banner_bottom() - hw - 44.0
-                for i in n:
-                        hand_rects.append(Rect2(Vector2(
-                                x0 + i * (tw2 - overlap), hy),
-                                Vector2(tw2, hw)))
+        for i in hand_p.size():
+                hand_rects.append(_hand_slot(hand_p.size(), i))
         # v0.3.8-1 THE YARD SPREAD: when the player must draw, the boneyard
         # fans out face-down across the ground's middle - one rect per tile
         spread_rects = []
@@ -585,6 +637,34 @@ func _relayout() -> void:
                 for i in cnt:
                         spread_rects.append(Rect2(Vector2(
                                 sx + i * step, sy), Vector2(sw, sh)))
+
+## the fan slot for a hand of `n` tiles, tile `i` - ONE truth for the
+## layout AND the deal flies (a landing tile always knows its seat)
+func _hand_slot(n: int, i: int) -> Rect2:
+        var vp := get_viewport_rect().size
+        var tw2 := hw * 0.5
+        var overlap := 0.0
+        var maxw := vp.x - 48.0
+        var total := tw2 * n
+        if total > maxw and n > 1:
+                overlap = (total - maxw) / float(n - 1)
+        var x0 := (vp.x - (total - overlap * (n - 1))) * 0.5
+        var hy := vp.y - banner_bottom() - hw - 44.0
+        return Rect2(Vector2(x0 + i * (tw2 - overlap), hy),
+                Vector2(tw2, hw))
+
+## the CPU's mirror slot (backs)
+func _cpu_slot(n: int, i: int) -> Rect2:
+        var tw := hw * 0.36
+        var th := hw * 0.56
+        var overlap := 0.0
+        var maxw := get_viewport_rect().size.x - 56.0
+        var total := tw * n
+        if total > maxw and n > 1:
+                overlap = (total - maxw) / float(n - 1)
+        var x0 := cpu_pos.x - (total - overlap * (n - 1)) * 0.5
+        return Rect2(Vector2(x0 + i * (tw - overlap),
+                cpu_pos.y - th * 0.5), Vector2(tw, th))
 
 # ============================================================ the drawing
 
@@ -702,10 +782,12 @@ func _draw_chain() -> void:
                 if can_r:
                         chain_l.draw_rect(end_r.grow(-8.0),
                                 Color(0.35, 0.9, 0.5, 0.10 + 0.08 * pulse))
-        # the chain
+        # the chain (v0.3.8-3: a tile that is still FLYING does not paint -\n        # the old ghost pre-place drew the landed domino first and then the\n        # flight arrived on top of its own body: \"a fever dream situation\")
         for i in chain.size():
                 var info: Dictionary = chain_rects[i]
                 var t: Dictionary = chain[i]
+                if not bool(t.get("landed", true)):
+                        continue
                 var a := int(t["a"])
                 var b := int(t["b"])
                 if bool(t["fl"]):
@@ -714,21 +796,6 @@ func _draw_chain() -> void:
                         b = tmp
                 _draw_tile_body(chain_l, info["rect"], a, b,
                         bool(info["vertical"]))
-        # the flying tiles ride above
-        for f in flies:
-                var ft: Array = f["tile"]
-                var k: float = clampf(float(f["t"]) / float(f["dur"]), 0.0, 1.0)
-                var ease := 1.0 - pow(1.0 - k, 3.0)
-                var at: Vector2 = (f["from"] as Vector2).lerp(
-                        f["to"] as Vector2, ease)
-                var sz := Vector2(bw, bw * 0.5)
-                chain_l.draw_set_transform(at, 0.0, Vector2.ONE)
-                if bool(f.get("back", false)):
-                        _draw_tile_back(chain_l, Rect2(-sz * 0.5, sz))
-                else:
-                        _draw_tile_body(chain_l, Rect2(-sz * 0.5, sz),
-                                int(ft[0]), int(ft[1]), true)
-                chain_l.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_hand() -> void:
         var e := ends(chain)
@@ -744,7 +811,9 @@ func _draw_hand() -> void:
                 var rr := Rect2(r.position + Vector2(0, lift), r.size)
                 if shake_i == i and shake_t > 0.0:
                         rr.position.x += sin(shake_t * 60.0) * 4.0
-                if drag_i == i and drag:
+                # v0.3.8-3: only an ARMED drag hides the fan tile - a mere
+                # tap keeps the tile standing in its seat (the glow speaks)
+                if drag_i == i and drag and drag_armed:
                         continue
                 _draw_tile_body(hand_l, rr, int(t[0]), int(t[1]), true, glow)
                 if turn == P and state == "play" and sel < 0 and not opening \
@@ -753,13 +822,70 @@ func _draw_hand() -> void:
                                 false, 2.5, true)
 
 func _draw_fx() -> void:
-        # the dragged tile renders at BOARD scale under the finger (the
-        # owner's scale law)
-        if drag and drag_i >= 0 and drag_i < hand_p.size():
+        # v0.3.8-3 EVERY FLIGHT RIDES THE FX LAYER (above hand and chain):
+        # the deal flights, the take flights and the place flights - one
+        # truth for the air traffic.
+        for f in flies:
+                var ft: Array = f["tile"]
+                var k: float = clampf(float(f["t"]) / float(f["dur"]), 0.0, 1.0)
+                var ease := 1.0 - pow(1.0 - k, 3.0)
+                var at: Vector2 = (f["from"] as Vector2).lerp(
+                        f["to"] as Vector2, ease)
+                match String(f.get("kind", "place")):
+                        "deal_p":
+                                # a face-up tile, hand size, standing - it
+                                # lands in its fan seat with a clack
+                                var psz := Vector2(hw * 0.5, hw)
+                                fx_l.draw_set_transform(at, 0.0, Vector2.ONE)
+                                _draw_tile_body(fx_l,
+                                        Rect2(-psz * 0.5, psz),
+                                        int(ft[0]), int(ft[1]), true)
+                                fx_l.draw_set_transform(Vector2.ZERO, 0.0,
+                                        Vector2.ONE)
+                        "deal_c":
+                                # a back flies to the CPU's fan (the diet is
+                                # visible, the numbers stay secret)
+                                var csz := Vector2(hw * 0.36, hw * 0.56)
+                                fx_l.draw_set_transform(at, 0.0, Vector2.ONE)
+                                _draw_tile_back(fx_l, Rect2(-csz * 0.5, csz))
+                                fx_l.draw_set_transform(Vector2.ZERO, 0.0,
+                                        Vector2.ONE)
+                        "place":
+                                # THE SMOOTH FALL: the tile leaves the finger
+                                # STANDING (rot 90deg over its long side) and
+                                # tips over to the horizontal pose as it lands
+                                # - the real domino fall. Doubles stand: no tip.
+                                var pr: Rect2 = f["rect"]
+                                var rot: float = lerpf(float(f["r0"]),
+                                        float(f["r1"]), ease)
+                                fx_l.draw_set_transform(at, rot, Vector2.ONE)
+                                _draw_tile_body(fx_l,
+                                        Rect2(-pr.size * 0.5, pr.size),
+                                        int(ft[0]), int(ft[1]),
+                                        bool(f["vert"]))
+                                fx_l.draw_set_transform(Vector2.ZERO, 0.0,
+                                        Vector2.ONE)
+                        _:
+                                # the yard-take flight: face-down, board scale
+                                var tsz := Vector2(bw, bw * 0.5)
+                                fx_l.draw_set_transform(at, 0.0, Vector2.ONE)
+                                if bool(f.get("back", false)):
+                                        _draw_tile_back(fx_l,
+                                                Rect2(-tsz * 0.5, tsz))
+                                else:
+                                        _draw_tile_body(fx_l,
+                                                Rect2(-tsz * 0.5, tsz),
+                                                int(ft[0]), int(ft[1]), true)
+                                fx_l.draw_set_transform(Vector2.ZERO, 0.0,
+                                        Vector2.ONE)
+        # the dragged tile: only when the finger ARMED the carry (a small
+        # wobble is a tap - the tile never leaps to the finger), and it
+        # rides STANDING at board scale above the fingertip
+        if drag and drag_armed and drag_i >= 0 and drag_i < hand_p.size():
                 var t: Array = hand_p[drag_i]
-                var sz := Vector2(bw, bw * 0.5)
-                var at := drag_pos - Vector2(0, bw * 0.62)
-                var r := Rect2(at - sz * 0.5, sz)
+                var dsz := Vector2(bw * 0.5, bw)   # carried standing, board scale
+                var at2 := drag_pos - Vector2(0, bw * 0.62)
+                var r := Rect2(at2 - dsz * 0.5, dsz)
                 fx_l.draw_rect(r.grow(5.0), Color(0, 0, 0, 0.35))
                 _draw_tile_body(fx_l, r, int(t[0]), int(t[1]), true, 1.0)
         # v0.3.8-1: the spread fan lives above the felt
@@ -828,28 +954,23 @@ func _draw_spread() -> void:
 func _draw_cpu_hand() -> void:
         # v0.3.8-1 THE MIRROR LAW: the CPU's fan is set the SAME way as the
         # owner's (a centered row of vertical tiles), riding top-center -
-        # the old right-edge mini-slabs made no sense. The tiles show their
-        # BACKS: the numbers stay secret.
+        # the tiles show their BACKS: the numbers stay secret.
+        # v0.3.8-3: the fan rides _cpu_slot (the deal flights aim at the
+        # same truth) and the count label sits BETWEEN the fan and the
+        # table rail - never inside the felt (the owner's "the cpu is
+        # already in the table area which is bad look").
         var n := hand_c.size()
         if n <= 0:
                 hand_c_lbl.text = ""
                 return
-        var tw := hw * 0.36
-        var th := hw * 0.7
-        var overlap := 0.0
-        var maxw := get_viewport_rect().size.x - 56.0
-        var total := tw * n
-        if total > maxw:
-                overlap = (total - maxw) / float(n - 1)
-        var x0 := cpu_pos.x - (total - overlap * (n - 1)) * 0.5
         for k in n:
-                var r := Rect2(Vector2(x0 + k * (tw - overlap),
-                        cpu_pos.y - th * 0.5), Vector2(tw, th))
+                var r: Rect2 = _cpu_slot(n, k)
                 _draw_tile_back(table_l, r)
         hand_c_lbl.text = "CPU - %d" % n
         hand_c_lbl.add_theme_font_size_override("font_size", 22)
+        var th := hw * 0.56
         hand_c_lbl.position = Vector2(cpu_pos.x - 80.0,
-                cpu_pos.y + th * 0.5 + 4.0)
+                cpu_pos.y + th * 0.5 + 6.0)
         hand_c_lbl.custom_minimum_size = Vector2(160.0, 26)
 
 ## v0.3.8-1 THE BACK: the tile's reverse - the skin's dark body, a neat
@@ -890,6 +1011,11 @@ func _goga_input(event: InputEvent) -> void:
                         _release(t.position)
         elif event is InputEventScreenDrag and drag:
                 drag_pos = event.position
+                # THE TAP TRUTH: the carry arms only past a finger-width of
+                # travel - the tile stays standing in the fan under a wobble
+                if not drag_armed and drag_pos.distance_to(drag_origin) > 18.0:
+                        drag_armed = true
+                        Jukebox.sfx("d_pick", -9.0, 1.05)
 
 func _press(at: Vector2) -> void:
         if state != "play" or turn != P:
@@ -924,12 +1050,21 @@ func _press(at: Vector2) -> void:
                                 else:
                                         drag_i = i
                                         drag = true
+                                        drag_armed = false
+                                        drag_origin = at
                                         drag_pos = at
                                         Jukebox.sfx("d_pick", -8.0)
                         else:
                                 sel = i
+                                                                # v0.3.8-3 THE TAP TRUTH: the first tap only
+                                                                # SELECTS - the tile keeps its seat in the fan
+                                                                # (the old code carried it to the finger the
+                                                                # instant it was tapped: glitchy). The carry
+                                                                # arms only when the finger really drags.
                                 drag_i = i
                                 drag = true
+                                drag_armed = false
+                                drag_origin = at
                                 drag_pos = at
                                 Jukebox.sfx("d_pick", -6.0,
                                         1.0 + _rng.randf() * 0.05)
@@ -957,24 +1092,32 @@ func _press(at: Vector2) -> void:
         chain_l.queue_redraw()
 
 func _release(_at: Vector2) -> void:
-        if drag and drag_i >= 0 and sel == drag_i:
+        # v0.3.8-3: only an ARMED drag drops - a tap (never armed) leaves the
+        # tile selected for the tap-tap law, exactly where it stood
+        if drag and drag_armed and drag_i >= 0 and sel == drag_i \
+                                and drag_i < hand_p.size():
                 var dropped := false
                 var e := ends(chain)
                 var cp := can_play(hand_p[drag_i], e.x, e.y)
                 var drop_at := drag_pos - Vector2(0, bw * 0.62)
                 if end_l.size.x > 0.0 and end_l.grow(14.0).has_point(drop_at) \
-                                and (cp & 1) != 0:
-                        _player_play(1)
+                                        and (cp & 1) != 0:
+                        _place(P, drag_i, 1, drag_pos)
                         dropped = true
                 elif end_r.size.x > 0.0 and end_r.grow(14.0).has_point(drop_at) \
-                                and (cp & 2) != 0:
-                        _player_play(2)
+                                        and (cp & 2) != 0:
+                        _place(P, drag_i, 2, drag_pos)
                         dropped = true
                 drag = false
+                drag_armed = false
                 drag_i = -1
                 if not dropped:
                         hand_l.queue_redraw()
                         fx_l.queue_redraw()
+        else:
+                drag = false
+                drag_armed = false
+                drag_i = -1
 
 func _player_play(side: int) -> void:
         if state != "play" or turn != P or sel < 0:
@@ -1005,12 +1148,18 @@ func _is_opener(i: int) -> bool:
 
 # ============================================================ the moves
 
-## THE PLACEMENT: who plays hand[hi] on side (1 left / 2 right)
-func _place(who: int, hi: int, side: int) -> void:
+## THE PLACEMENT (v0.3.8-3): who plays hand[hi] on side (1 left / 2 right).
+## THE NO-GHOST LAW: the chain entry lands as FLYING - it does not paint
+## until its flight touches down (the old ghost pre-place drew the domino
+## on the felt and then the flight arrived on top of its own body).
+## THE SMOOTH FALL: the flight carries the tile STANDING and tips it to
+## the horizontal pose as it lands - the real domino fall (doubles stand).
+func _place(who: int, hi: int, side: int, from_override = null) -> void:
         var hand: Array = hand_p if who == P else hand_c
         var t: Array = hand[hi]
         var e := ends(chain)
         var fl := false
+        var idx := 0
         if side == 1:
                 # the tile's touching half must show the left end
                 var lv := e.x
@@ -1021,7 +1170,8 @@ func _place(who: int, hi: int, side: int) -> void:
                 else:
                         fl = false    # doubles / both-match: any way stands
                 chain.push_front({"a": int(t[0]), "b": int(t[1]),
-                        "fl": fl, "who": who})
+                        "fl": fl, "who": who, "landed": false})
+                idx = 0
         else:
                 var rv := e.y
                 if int(t[1]) == rv and int(t[0]) != rv:
@@ -1029,38 +1179,49 @@ func _place(who: int, hi: int, side: int) -> void:
                 else:
                         fl = false
                 chain.append({"a": int(t[0]), "b": int(t[1]),
-                        "fl": fl, "who": who})
+                        "fl": fl, "who": who, "landed": false})
+                idx = chain.size() - 1
         # the coin spot in WORLD space, captured BEFORE the reflow
         var coin_pos := Vector2.ZERO
         var coin_live := coin_side != 0
         if coin_live:
                 var slot := end_l if coin_side == 1 else end_r
                 coin_pos = slot.get_center() if slot.size.x > 0.0 \
-                        else Vector2.ZERO
+                                else Vector2.ZERO
                 if coin_pos == Vector2.ZERO:
                         coin_live = false
-        # the fly source, captured BEFORE the hand shrinks
-        var from: Vector2 = cpu_pos if who == C else (hand_rects[hi].get_center()
-                if hi < hand_rects.size() else Vector2(
-                get_viewport_rect().size.x * 0.5,
-                get_viewport_rect().size.y - hw))
+        # the fly source: the drag's fingertip, the hand seat, or the CPU fan
+        var from: Vector2
+        if from_override != null:
+                from = from_override
+        elif who == C:
+                from = cpu_pos
+        elif hi < hand_rects.size():
+                from = hand_rects[hi].get_center()
+        else:
+                from = Vector2(get_viewport_rect().size.x * 0.5,
+                        get_viewport_rect().size.y - hw)
         hand.remove_at(hi)
         seen_values[int(t[0])] = int(seen_values.get(int(t[0]), 0)) + 1
         seen_values[int(t[1])] = int(seen_values.get(int(t[1]), 0)) + 1
         pass_streak = 0
         opening = false
+        sel = -1
         _relayout()
-        var to: Vector2
         var ir: Dictionary
         if chain.size() == 1:
                 ir = chain_rects[0]
         else:
                 ir = chain_rects[0] if side == 1 \
                         else chain_rects[chain_rects.size() - 1]
-        to = (ir["rect"] as Rect2).get_center()
-        flies.append({"tile": t, "from": from, "to": to,
-                "r0": 0.0, "r1": 0.0, "t": 0.0, "dur": 0.24})
-        Jukebox.sfx("d_place", -4.0, 0.96 + _rng.randf() * 0.08)
+        var to: Vector2 = (ir["rect"] as Rect2).get_center()
+        # THE FLIGHT: a standing tile tips flat on touchdown (doubles stand)
+        var dbl: bool = int(t[0]) == int(t[1])
+        var vert: bool = bool(ir["vertical"])
+        var r0: float = 0.0 if vert else (PI * 0.5)
+        flies.append({"kind": "place", "tile": t, "from": from, "to": to,
+                "rect": ir["rect"] as Rect2, "vert": vert,
+                "r0": r0, "r1": 0.0, "t": 0.0, "dur": 0.3, "idx": idx})
         # THE COIN RACE: the tile that lands on the coin spot takes it
         if coin_live and (ir["rect"] as Rect2).has_point(coin_pos):
                 _coin_taken(who)
@@ -1284,10 +1445,15 @@ func _new_round() -> void:
                 coin_side = 1 if _rng.randf() < 0.5 else 2
         profile = String(profile_next(profile_i)[0])
         profile_i = int(profile_next(profile_i)[1])
-        # THE DEAL
+        # THE DEAL (v0.3.8-3 THE COLLECT THEATER): the tiles LEAVE THE YARD
+        # one by one - every tile flies from the boneyard stack to its fan
+        # seat (the player's face up, the CPU's face down) and CLACKS as it
+        # lands. The hands grow flight by flight; nothing blinks in.
         if state != "ready":
                 state = "deal"
                 deal_i = 0
+                _deal_p = 0
+                _deal_c = 0
                 deal_beat = 0.0
                 turn_lbl.text = "THE DEAL"
                 turn_lbl.add_theme_color_override("font_color",
@@ -1319,8 +1485,12 @@ func _goga_tick(delta: float) -> void:
                         shake_i = -1
         for f in flies:
                 f["t"] = float(f["t"]) + delta
+        # THE LANDING: a flight that touches down speaks its kind - a deal
+        # tile joins its hand (the fan re-fans around it), a place tile
+        # PAINTS into the chain with its clack
         for f in flies.duplicate():
                 if float(f["t"]) >= float(f["dur"]):
+                        _fly_landed(f)
                         flies.erase(f)
         chain_l.queue_redraw()
         hand_l.queue_redraw()
@@ -1332,17 +1502,29 @@ func _goga_tick(delta: float) -> void:
         table_l.queue_redraw()
         if state == "deal":
                 deal_beat += delta
-                if deal_beat >= 0.09 and deal_i < HAND_N * 2:
+                # v0.3.8-3 THE COLLECT THEATER: each beat LAUNCHES one tile
+                # from the yard - the player's face up, the CPU's back - and
+                # the flight lands it in its seat (see _fly_landed)
+                if deal_beat >= 0.16 and deal_i < HAND_N * 2:
                         deal_beat = 0.0
                         var t: Array = deck.pop_back()
                         if deal_i % 2 == 0:
-                                hand_p.append(t)
+                                flies.append({"kind": "deal_p", "tile": t,
+                                        "from": pile_pos,
+                                        "to": _hand_slot(HAND_N, _deal_p).get_center(),
+                                        "t": 0.0, "dur": 0.3})
+                                _deal_p += 1
                         else:
-                                hand_c.append(t)
+                                flies.append({"kind": "deal_c", "tile": t,
+                                        "from": pile_pos,
+                                        "to": _cpu_slot(HAND_N, _deal_c).get_center(),
+                                        "t": 0.0, "dur": 0.3, "back": true})
+                                _deal_c += 1
                         deal_i += 1
-                        Jukebox.sfx("d_draw", -13.0, 1.1 - 0.015 * deal_i)
+                        Jukebox.sfx("d_draw", -15.0, 1.1 - 0.012 * deal_i)
                         _relayout()
-                if deal_i >= HAND_N * 2 and deck.size() == 14:
+                # the deal is done when every launched tile has LANDED
+                if deal_i >= HAND_N * 2 and flies.is_empty():
                         _finish_deal()
         elif state == "cpu_wait":
                 clock += delta
@@ -1353,6 +1535,30 @@ func _goga_tick(delta: float) -> void:
                 clock += delta
                 if clock >= 1.8:
                         _new_round()
+
+## THE LANDING PAD: a finished flight speaks its kind. Deal tiles JOIN
+## their hands here (with the clack), place tiles PAINT into the chain.
+func _fly_landed(f: Dictionary) -> void:
+        match String(f.get("kind", "")):
+                "deal_p":
+                        hand_p.append(f["tile"])
+                        _relayout()
+                        Jukebox.sfx("d_place", -11.0,
+                                        1.15 + _rng.randf() * 0.1)
+                "deal_c":
+                        hand_c.append(f["tile"])
+                        _relayout()
+                        Jukebox.sfx("d_place", -14.0,
+                                        0.92 + _rng.randf() * 0.08)
+                "place":
+                        var idx: int = int(f.get("idx", -1))
+                        if idx >= 0 and idx < chain.size():
+                                chain[idx]["landed"] = true
+                        Jukebox.sfx("d_place", -4.0,
+                                        0.96 + _rng.randf() * 0.08)
+                        shake_t = maxf(shake_t, 0.12)
+                _:
+                        pass    # the yard-take flight already spoke at take
 
 ## THE CPU TURN: draw until playable (honest boneyard diet), then place
 func _cpu_move() -> void:

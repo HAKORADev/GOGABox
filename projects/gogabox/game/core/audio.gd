@@ -65,13 +65,23 @@ func stop_music() -> void:
         _current_music = ""
         _music.stop()
 
+## v0.3.8-3 THE SAME-FRAME GATE: a magnet hoovering 40 gems in one tick
+## used to thrash the 8-voice pool 40 times in one frame (the same sound
+## 40 times over itself = the Android mixer choke). One voice per sound
+## per 30ms - the ear hears the same thing, the mixer breathes.
+var _sfx_last := {}             # name -> the last msec it played
+
 func sfx(name_: String, volume_db := 0.0, pitch := 1.0) -> void:
         var path := _resolve(name_)
         if path.is_empty():
                 return
+        var now := Time.get_ticks_msec()
+        if _sfx_last.has(name_) and now - int(_sfx_last[name_]) < 30:
+                return
         var stream: AudioStream = load(path)
         if stream == null:
                 return
+        _sfx_last[name_] = now
         for p in _sfx_pool:
                 if not p.playing:
                         p.stream = stream
