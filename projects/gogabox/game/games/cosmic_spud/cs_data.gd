@@ -185,27 +185,58 @@ const BOSS_CYCLE_MULT := 1.25   # per cycle stats
 const BOSS_CYCLE_SCORE := 20
 
 # =================================================================== ALLIES
+## v0.3.8-2 THE ROSTER LAW (the owner: "make allies be persistent with their
+## upgrades like the skills"): an ally's level NEVER resets with a run now.
+## FIVE levels - the first two behaviors the L2/L3 signatures, the last two
+## ride NEW L4/L5 signatures in the tick. `lvs` = what each level MEANS
+## (index = level - 1) - the armory's RAISE rows speak it.
+const ALLY_MAX_LEVEL := 5
+const ALLY_ORDER := ["drone", "turret", "guard", "medic", "bomber", "scout"]
+
 const ALLIES := {
         "drone":  {"name": "DRONE BUDDY", "price": 1200, "tex": "orbiter",
-                "desc": "orbits you, shoots 2/s (damage grows with level)"},
+                "desc": "orbits you, shoots 2/s (damage grows with level)",
+                "lvs": ["orbits you, shoots 2/s", "TWIN SHOT - a second barrel joins",
+                        "the rounds PIERCE one body", "faster spin - 0.4s cadence",
+                        "TRIPLE VOLLEY - a third barrel joins"]},
         "turret": {"name": "TATER TURRET", "price": 1500, "tex": "boomling",
-                "desc": "plants near you, sweeps 360"},
+                "desc": "plants near you, sweeps 360",
+                "lvs": ["plants near you, sweeps 360", "faster sweep - 0.28s",
+                        "EXPLOSIVE SHELLS - every hit booms", "hunger - 0.22s cadence",
+                        "bigger booms - the shells blast 64px wide"]},
         "guard":  {"name": "GUARD SPUD", "price": 1800, "tex": "chunk",
-                "desc": "bodyblocks - its AURA cuts the damage you take inside"},
+                "desc": "bodyblocks - its AURA cuts the damage you take inside",
+                "lvs": ["the aura cuts 12% of the damage inside",
+                        "WIDER AURA - 15% bigger", "DREAD - the aura slows the swarm",
+                        "the cut deepens - 24%", "the deepest cut - 28% and a huge ring"]},
         "medic":  {"name": "MEDIC SPROUT", "price": 2000, "tex": "mender",
-                "desc": "heals you 2 HP/s (+1 per level), the care pulses"},
+                "desc": "heals you 2 HP/s (+1 per level), the care pulses",
+                "lvs": ["heals 2 HP/s, the care pulses", "stronger care - 4.5 HP/s",
+                        "SEARING CARE - the pulse burns the crowd", "stronger care still - 7 HP/s",
+                        "the care ring WIDENS - 150px of flame"]},
         "bomber": {"name": "BOMBER CHIP", "price": 2300, "tex": "boomling",
-                "desc": "kamikaze dives every 8s, respawns in 5s"},
+                "desc": "kamikaze dives every 8s, respawns in 5s",
+                "lvs": ["kamikaze dives every 8s", "BIGGER BLAST - 96px",
+                        "SCORCHED DIVE - the crash leaves fire", "eager - dives every 6.5s",
+                        "quick rebuild - respawn 3s, the biggest blast"]},
         "scout":  {"name": "SCOUT FRY", "price": 2600, "tex": "orbiter",
-                "desc": "marks enemies in 300px: +15% taken, plinks a pea dart"},
+                "desc": "marks enemies in 300px: +15% taken, plinks a pea dart",
+                "lvs": ["marks +15% taken, plinks a dart", "DEEPER MARKS - +30% taken",
+                        "TRIPLE BURST - three darts a volley", "the deepest marks - +40% taken",
+                        "FIVE-DART STORM"]},
 }
-const ALLY_ORDER := ["drone", "turret", "guard", "medic", "bomber", "scout"]
-const ALLY_MAX_LEVEL := 3
 
 static func ally_level_price(aid: String, level: int) -> int:
         # the price to DEPLOY/RAISE an owned ally to `level` in the wave shop
         var base: int = int(ALLIES[aid]["price"])
         return int(round(base * 0.28 * level / 10.0)) * 10
+
+## v0.3.8-2 THE ROSTER LAW: the price to RAISE the PERSISTENT level in the
+## armory (cosmic coins): to 2 = half the base, to 3 = the base, to 4 = 1.5x,
+## to 5 = 2x - every raise costs more, the roster grows like the tree.
+static func ally_raise_price(aid: String, to_lv: int) -> int:
+        return int(round(float(ALLIES[aid]["price"]) * 0.5 * float(maxi(1, to_lv) - 1)
+                        / 10.0)) * 10
 
 static func ally_merge_price(aid: String, level: int) -> int:
         # merging two level `level` allies -> level+1: HALF the next level price
@@ -322,25 +353,74 @@ const WAVE_DRAFTS := [
                 "down": {}, "w": 2},
 ]
 
-# ============================================================ STAT PACKS
-## THE STATS MENU's shelf (v0.3.4-3, the owner: "there is two things, skill
-## points and stats points... some stuff requires more than one point"):
-## every XP level pays ONE stats point, the packs cost 1-3.
-const STAT_PACKS := [
-        {"t": "DAMAGE +10%", "d": "+10% damage on every gun", "k": "dmg", "v": 0.10, "cost": 1},
-        {"t": "MAX HP +20", "d": "+20 max HP, healed in full", "k": "hp", "v": 20, "cost": 1},
-        {"t": "MOVE SPEED +8%", "d": "+8% walk speed", "k": "spd", "v": 0.08, "cost": 1},
-        {"t": "ATTACK SPEED +10%", "d": "+10% on every gun", "k": "aspeed", "v": 0.10, "cost": 1},
-        {"t": "RANGE +10%", "d": "+10% weapon range", "k": "range", "v": 0.10, "cost": 1},
-        {"t": "CRIT +8%", "d": "+8% critical chance", "k": "crit", "v": 0.08, "cost": 1},
-        {"t": "LUCK +15%", "d": "+15% luck (rarer shelves, fatter drops)", "k": "luck", "v": 0.15, "cost": 1},
-        {"t": "MAGNET +30%", "d": "+30% pickup range", "k": "magnet", "v": 0.30, "cost": 1},
-        {"t": "ARMOR +2", "d": "+2 armor - every hit lands softer", "k": "armor", "v": 2, "cost": 2},
-        {"t": "REGEN +1.5 HP/S", "d": "+1.5 HP per second, forever", "k": "regen", "v": 1.5, "cost": 2},
-        {"t": "DODGE +6%", "d": "+6% dodge (cap 60%)", "k": "dodge", "v": 0.06, "cost": 2},
-        {"t": "LIFESTEAL +3%", "d": "3% of damage dealt returns as HP", "k": "lifesteal", "v": 0.03, "cost": 2},
-        {"t": "+1 PROJECTILE", "d": "every gun fires one more shot", "k": "proj", "v": 1, "cost": 3},
-        {"t": "PIERCE ALL", "d": "every shot drills through everything", "k": "pierce_all", "v": 1, "cost": 3},
+# ============================================================ STAT TRACKS
+## v0.3.8-2 THE STAT TRACKS (the owner: "make stats be persistent with their
+## upgrades like the skills... make both skills and stats to have 5 upgrades
+## each one with higher points and gives extra stuff, design that"):
+## every old pack is a LIFETIME track of FIVE upgrades now. `ladder` = the
+## point cost per level (it ONLY climbs); `steps` bundles EXTRA gains onto
+## levels 3 and 5; `final` (the pierce track only) turns the last level into
+## the old god-tier. Every delta rides the same _apply_stat tongue the
+## drafts speak. One STAT POINT is minted per run level-up, LIFETIME - they
+## never reset with a round (the skills' own law).
+const STAT_TRACKS := [
+        {"id": "dmg", "t": "DAMAGE", "d": "+10% damage on every gun",
+                "k": "dmg", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["crit", 0.04, "+4% crit"]],
+                        5: [["aspeed", 0.08, "+8% attack speed"]]}},
+        {"id": "hp", "t": "MAX HP", "d": "+20 max HP, healed in full",
+                "k": "hp", "v": 20.0, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["armor", 2, "+2 armor"]],
+                        5: [["regen", 1.0, "+1 HP/s regen"]]}},
+        {"id": "spd", "t": "MOVE SPEED", "d": "+8% walk speed",
+                "k": "spd", "v": 0.08, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dodge", 0.04, "+4% dodge"]],
+                        5: [["magnet", 0.25, "+25% pickup range"]]}},
+        {"id": "aspeed", "t": "ATTACK SPEED", "d": "+10% on every gun",
+                "k": "aspeed", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["crit", 0.03, "+3% crit"]],
+                        5: [["dmg", 0.08, "+8% damage"]]}},
+        {"id": "range", "t": "RANGE", "d": "+10% weapon range",
+                "k": "range", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dmg", 0.05, "+5% damage"]],
+                        5: [["aspeed", 0.08, "+8% attack speed"]]}},
+        {"id": "crit", "t": "CRIT", "d": "+8% critical chance",
+                "k": "crit", "v": 0.08, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dmg", 0.10, "+10% damage"]],
+                        5: [["luck", 0.15, "+15% luck"]]}},
+        {"id": "luck", "t": "LUCK", "d": "+15% luck (rarer shelves, fatter drops)",
+                "k": "luck", "v": 0.15, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["coin", 0.10, "+10% cosmic coins"]],
+                        5: [["dodge", 0.05, "+5% dodge"]]}},
+        {"id": "magnet", "t": "MAGNET", "d": "+30% pickup range",
+                "k": "magnet", "v": 0.30, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["luck", 0.10, "+10% luck"]],
+                        5: [["spd", 0.05, "+5% move speed"]]}},
+        {"id": "armor", "t": "ARMOR", "d": "+2 armor - every hit lands softer",
+                "k": "armor", "v": 2, "ladder": [1, 2, 4, 6, 9],
+                "steps": {3: [["hp", 20.0, "+20 max HP"]],
+                        5: [["regen", 1.5, "+1.5 HP/s regen"]]}},
+        {"id": "regen", "t": "REGEN", "d": "+1.5 HP per second, forever",
+                "k": "regen", "v": 1.5, "ladder": [1, 2, 4, 6, 9],
+                "steps": {3: [["hp", 20.0, "+20 max HP"]],
+                        5: [["armor", 2, "+2 armor"]]}},
+        {"id": "dodge", "t": "DODGE", "d": "+6% dodge (cap 60%)",
+                "k": "dodge", "v": 0.06, "ladder": [2, 3, 4, 6, 9],
+                "steps": {3: [["spd", 0.08, "+8% move speed"]],
+                        5: [["crit", 0.05, "+5% crit"]]}},
+        {"id": "lifesteal", "t": "LIFESTEAL", "d": "3% of damage dealt returns as HP",
+                "k": "lifesteal", "v": 0.03, "ladder": [2, 3, 4, 6, 9],
+                "steps": {3: [["regen", 1.0, "+1 HP/s regen"]],
+                        5: [["dmg", 0.10, "+10% damage"]]}},
+        {"id": "proj", "t": "PROJECTILE", "d": "every gun fires one more shot",
+                "k": "proj", "v": 1, "ladder": [3, 4, 6, 9, 14],
+                "steps": {3: [["dmg", 0.10, "+10% damage"]],
+                        5: [["aspeed", 0.10, "+10% attack speed"]]}},
+        {"id": "pierce", "t": "PIERCE", "d": "every gun drills +1 body deeper",
+                "k": "pierce", "v": 1, "ladder": [2, 3, 5, 8, 12],
+                "steps": {3: [["dmg", 0.05, "+5% damage"]]},
+                "final": {"k": "pierce_all", "v": 1,
+                        "d": "PIERCE ALL - drills through everything"}},
 ]
 
 # ================================================================ SKILLS
@@ -372,6 +452,106 @@ const SKILLS := {
 const SKILL_ORDER := ["shattered_shield", "leech_aura", "frost_aura",
         "ghost_round", "starch_rage", "static_burst", "twin_tail",
         "adrenaline", "golden_gut", "magnetic_skin"]
+
+## v0.3.8-2 THE SKILL DEPTHS (the owner: "make both skills and stats to have
+## 5 upgrades each one with higher points and gives extra stuff, design
+## that"): every skill wears FIVE levels. `lvs` = what each level SAYS
+## (index = level - 1, level 1 = the base law); the number tables are read
+## by the run through skill_num(). The costs climb through
+## skill_level_cost() - the SKILL's own `cost` is level 1's price.
+const SKILL_LEVELS := {
+        "shattered_shield": {"lvs": ["a shield blocks ONE hit whole, reforms 12s later",
+                        "the reform quickens - 9s", "the reform quickens - 7s",
+                        "the shatter BURSTS - 25 dmg burns the 150px ring",
+                        "TWO charges, the reform quickens - 5s"],
+                "reform": [12.0, 9.0, 7.0, 7.0, 5.0],
+                "burst": [0.0, 0.0, 0.0, 25.0, 25.0],
+                "charges": [1, 1, 1, 1, 2]},
+        "leech_aura": {"lvs": ["enemies within 140px bleed 2 HP/s each to you (3 max)",
+                        "170px, 3 HP/s each (4 max)", "200px, 4 HP/s each (5 max)",
+                        "230px, 5 HP/s each (6 max)", "260px, 6 HP/s each (8 max)"],
+                "radius": [140.0, 170.0, 200.0, 230.0, 260.0],
+                "dps": [2.0, 3.0, 4.0, 5.0, 6.0],
+                "cap": [3, 4, 5, 6, 8]},
+        "frost_aura": {"lvs": ["enemies within 170px crawl 30% slower, always",
+                        "190px, 34% slower", "210px, 38% slower",
+                        "230px, 42% slower", "250px, 46% slower"],
+                "radius": [170.0, 190.0, 210.0, 230.0, 250.0],
+                "slow": [0.70, 0.66, 0.62, 0.58, 0.54]},
+        "ghost_round": {"lvs": ["shots that hit you FLY THROUGH and strike enemies behind for half damage",
+                        "the turned shots answer for 65%",
+                        "the turned shots answer for 80% - and drill one extra body",
+                        "the turned shots answer at FULL damage",
+                        "the turned shots answer for 125% - the swarm's own bullets judge it"],
+                "frac": [0.5, 0.65, 0.8, 1.0, 1.25],
+                "pierce": [0, 0, 1, 1, 2]},
+        "starch_rage": {"lvs": ["below 35% HP: +40% damage - the potato bites back",
+                        "below 38% HP: +50%", "below 41% HP: +60%",
+                        "below 44% HP: +75%", "below HALF HP: +90% - the potato SNAPS"],
+                "thresh": [0.35, 0.38, 0.41, 0.44, 0.50],
+                "rage": [1.40, 1.50, 1.60, 1.75, 1.90]},
+        "static_burst": {"lvs": ["every 6s lightning zaps the 3 nearest enemies",
+                        "every 5.4s, 4 targets", "every 4.8s, 5 targets - the zaps CHILL 0.4s",
+                        "every 4.2s, 6 targets, +30% zap damage",
+                        "every 3.6s, 8 targets, +60% zap damage"],
+                "period": [6.0, 5.4, 4.8, 4.2, 3.6],
+                "targets": [3, 4, 5, 6, 8],
+                "dmg_m": [1.0, 1.0, 1.0, 1.3, 1.6],
+                "chill": [0.0, 0.0, 0.4, 0.4, 0.4]},
+        "twin_tail": {"lvs": ["a ghost gun guards your back - every volley fires backwards at 40%",
+                        "the ghost gun answers at 50%", "the ghost gun answers at 60%",
+                        "the ghost gun answers at 70% - and PIERCES like its twin",
+                        "the ghost gun answers at 85%, pierced"],
+                "frac": [0.4, 0.5, 0.6, 0.7, 0.85],
+                "melee_r": [0.6, 0.65, 0.7, 0.75, 0.8],
+                "pierce": [0, 0, 0, 1, 2]},
+        "adrenaline": {"lvs": ["a dodge revs +80% attack speed for 2s",
+                        "the rev hits +95% for 2.3s", "the rev hits +110% for 2.6s - and heals 3 HP",
+                        "the rev hits +130% for 3s",
+                        "the rev hits +150% for 3.5s - and the legs join (+25% speed)"],
+                "aspeed": [1.80, 1.95, 2.10, 2.30, 2.50],
+                "dur": [2.0, 2.3, 2.6, 3.0, 3.5],
+                "heal": [0.0, 0.0, 3.0, 3.0, 3.0],
+                "spd": [1.0, 1.0, 1.0, 1.0, 1.25]},
+        "golden_gut": {"lvs": ["+25% cosmic coins from every source",
+                        "+35% cosmic coins", "+45% cosmic coins",
+                        "+60% cosmic coins", "+80% cosmic coins - the gut GLOWS"],
+                "coin": [0.25, 0.35, 0.45, 0.60, 0.80]},
+        "magnetic_skin": {"lvs": ["pickups fly to you from 60% farther, hearts heal +50%",
+                        "75% farther, hearts +65%", "90% farther, hearts +80% - and +5% luck",
+                        "110% farther, hearts +100%",
+                        "140% farther, hearts +130% - and +10% luck"],
+                "magnet": [0.6, 0.75, 0.9, 1.1, 1.4],
+                "hearts": [1.5, 1.65, 1.8, 2.0, 2.3],
+                "reach": [1.6, 1.75, 1.9, 2.05, 2.2],
+                "luck": [0.0, 0.0, 0.05, 0.05, 0.10]},
+}
+
+## the number reader: skill_num("leech_aura", "dps", 3, 2.0) -> 4.0
+static func skill_num(sid: String, key: String, level: int, def: Variant) -> Variant:
+        var tabs: Dictionary = SKILL_LEVELS.get(sid, {})
+        var arr: Array = tabs.get(key, [])
+        if arr.is_empty():
+                return def
+        return arr[clampi(level - 1, 0, arr.size() - 1)]
+
+## the level's line for the menus (level 0 -> the base desc of SKILLS)
+static func skill_lv_line(sid: String, level: int) -> String:
+        if level <= 0:
+                return String(SKILLS[sid]["desc"])
+        var lvs: Array = SKILL_LEVELS[sid]["lvs"]
+        return String(lvs[clampi(level - 1, 0, lvs.size() - 1)])
+
+## the cost ladder: level 1 = the SKILL's own cost, then it ONLY climbs
+## (cost 1 -> 1/2/3/5/7, cost 2 -> 2/3/4/6/8)
+static func skill_level_cost(sid: String, level: int) -> int:
+        var base := int(SKILLS[sid]["cost"])
+        match clampi(level, 1, 5):
+                2: return base + 1
+                3: return base + 2
+                4: return base + 4
+                5: return base + 6
+        return base
 
 # ==================================================================== SHOP
 ## the wave shop consumables (in-run coins)

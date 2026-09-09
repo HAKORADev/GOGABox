@@ -37,13 +37,24 @@ func _heal() -> void:
                 "banked_total": 0,
                 "runs": 0,
                 "gogacoins": 0,             # the every-5th-wave riders, lifetime
-                "skills": {},               # THE SKILLS (v0.3.4-3): id -> true
+                "skills": {},               # THE SKILLS (v0.3.4-3): id -> LEVEL
+                                            # (v0.3.8-2: int 1..5; old true = 1)
                 "skill_spent": 0,           # the spent skill points
+                "stat_pts": 0,              # THE STAT POINTS (v0.3.8-2): one per
+                                            # run level-up, LIFETIME, never reset
+                "stat_tracks": {},          # THE STAT TRACKS: id -> level 0..5
+                "ally_lv": {},              # THE ROSTER (v0.3.8-2): aid -> level
+                                            # 1..5, persistent like the skills
                 "seen_kinds": [],           # THE FIRST-GLANCE LAW (v0.3.4-5)
         }
         for k in base:
                 if not d.has(k):
                         d[k] = base[k]
+        # THE ROSTER MIGRATION: every owned ally wears a level (old saves
+        # carried none - they land at LV 1, the deployable truth)
+        for aid in d["owned_allies"]:
+                if ally_level(String(aid)) < 1:
+                        set_ally_level(String(aid), 1)
 
 func save() -> void:
         Box.set_progress("cosmic_spud", KEY, d)
@@ -166,7 +177,11 @@ func set_loadout(arr: Array) -> void:
 func own_ally(aid: String) -> void:
         if not (d["owned_allies"] as Array).has(aid):
                 (d["owned_allies"] as Array).append(aid)
-                save()
+        # THE ROSTER LAW: ownership lands at LV 1 (never overwrite a raise)
+        if ally_level(aid) < 1:
+                set_ally_level(aid, 1)
+                return
+        save()
 
 func has_ally(aid: String) -> bool:
         return (d["owned_allies"] as Array).has(aid)
@@ -258,20 +273,82 @@ func skill_points_free(live_kills := 0) -> int:
         var earned := int(floor(float(int(d["kills"]) + int(live_kills)) / 100.0))
         return earned - int(d.get("skill_spent", 0))
 
-func has_skill(sid: String) -> bool:
-        return bool((d.get("skills", {}) as Dictionary).get(sid, false))
+## v0.3.8-2 THE SKILL DEPTHS: a skill's save wears its LEVEL (int 1..5).
+## Old saves wore `true` - they read as level 1, the law they bought.
+func skill_level(sid: String) -> int:
+        var v: Variant = (d.get("skills", {}) as Dictionary).get(sid, 0)
+        if v is bool:
+                return 1 if bool(v) else 0
+        return int(v)
 
+func has_skill(sid: String) -> bool:
+        return skill_level(sid) > 0
+
+## buying an UNOWNED skill mints level 1; buying an OWNED skill raises it
+## one level up the ladder (max 5). The cost comes from the level ladder.
 func buy_skill(sid: String, live_kills := 0) -> bool:
-        if not CSData.SKILLS.has(sid) or has_skill(sid):
+        if not CSData.SKILLS.has(sid):
                 return false
-        var cost := int(CSData.SKILLS[sid]["cost"])
+        var lv := skill_level(sid)
+        if lv >= 5:
+                return false
+        var cost := CSData.skill_level_cost(sid, lv + 1)
         if skill_points_free(live_kills) < cost:
                 return false
         if not d.has("skills"):
                 d["skills"] = {}
-        (d["skills"] as Dictionary)[sid] = true
+        (d["skills"] as Dictionary)[sid] = lv + 1
         d["skill_spent"] = int(d.get("skill_spent", 0)) + cost
         save()
+        return true
+
+# ------------------------------------------------------- the stat tracks
+## THE STAT POINTS LAW (v0.3.8-2, the owner: "make stats be persistent with
+## their upgrades like the skills"): one point mints per run level-up and
+## banks LIFETIME - a death or a quit never eats an unspent point.
+func stat_pts() -> int:
+        return int(d.get("stat_pts", 0))
+
+func mint_stat_pts(n: int) -> void:
+        if n <= 0:
+                return
+        d["stat_pts"] = stat_pts() + n
+        save()
+
+func spend_stat_pts(n: int) -> bool:
+        if stat_pts() < n:
+                return false
+        d["stat_pts"] = stat_pts() - n
+        save()
+        return true
+
+func track_level(tid: String) -> int:
+        return int((d.get("stat_tracks", {}) as Dictionary).get(tid, 0))
+
+func set_track_level(tid: String, lv: int) -> void:
+        if not d.has("stat_tracks"):
+                d["stat_tracks"] = {}
+        (d["stat_tracks"] as Dictionary)[tid] = clampi(lv, 0, 5)
+        save()
+
+# -------------------------------------------------------- the ally roster
+## THE ROSTER LAW (v0.3.8-2): every owned ally wears a PERSISTENT level
+## 1..5 - the armory raises it for cosmic coins, the wave shop deploys AT
+## it, and no run end ever resets it.
+func ally_level(aid: String) -> int:
+        return int((d.get("ally_lv", {}) as Dictionary).get(aid, 0))
+
+func set_ally_level(aid: String, lv: int) -> void:
+        if not d.has("ally_lv"):
+                d["ally_lv"] = {}
+        (d["ally_lv"] as Dictionary)[aid] = clampi(lv, 1, CSData.ALLY_MAX_LEVEL)
+        save()
+
+func raise_ally(aid: String) -> bool:
+        var lv := ally_level(aid)
+        if lv < 1 or lv >= CSData.ALLY_MAX_LEVEL:
+                return false
+        set_ally_level(aid, lv + 1)
         return true
 
 # ------------------------------------------------------------- run results

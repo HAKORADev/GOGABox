@@ -92,9 +92,36 @@ func _run() -> void:
         var pool12 := CSData.pool_for_wave(12)
         ck(pool1.size() == 3 and pool12.has("orbiter") and pool12.size() > pool1.size(),
                         "the unlock table (w1 = 3 blabs, w12 = everything)")
-        ck(CSData.START_ORDER.size() == 6 and CSData.WEAPON_ORDER.size() == 13
+        ck(CSData.START_ORDER.size() == 6 and CSData.WEAPON_ORDER.size() == 14
                         and CSData.ALLY_ORDER.size() == 6 and CSData.TREE_ORDER.size() == 18,
-                        "the tables: 6 starts, 13 weapons (the cleaver joined), 6 allies, 18 tree nodes")
+                        "the tables: 6 starts, 14 weapons (the cleaver joined), 6 allies, 18 tree nodes")
+        ck(CSData.STAT_TRACKS.size() == 14 and CSData.SKILL_ORDER.size() == 10
+                        and CSData.ALLY_MAX_LEVEL == 5,
+                        "v0.3.8-2: 14 stat tracks, 10 skills, the roster caps at LV 5")
+        # every track: a 5-step climbing ladder + the level lines exist;
+        # every skill: 5 level lines + the number tables are 5 long
+        var tracks_ok := true
+        for t in CSData.STAT_TRACKS:
+                var lad: Array = t["ladder"]
+                if lad.size() != 5 or int(lad[0]) > int(lad[4]):
+                        tracks_ok = false
+        var lv_ok2 := true
+        for sid in CSData.SKILL_ORDER:
+                if (CSData.SKILL_LEVELS[sid]["lvs"] as Array).size() != 5:
+                        lv_ok2 = false
+                for key in CSData.SKILL_LEVELS[sid]:
+                        if key != "lvs" and (CSData.SKILL_LEVELS[sid][key] as Array).size() != 5:
+                                lv_ok2 = false
+        ck(tracks_ok, "every stat track wears a climbing 5-step ladder")
+        ck(lv_ok2, "every skill wears 5 level lines and 5-long number tables")
+        ck(CSData.skill_level_cost("ghost_round", 1) == 2
+                        and CSData.skill_level_cost("ghost_round", 3) == 4
+                        and CSData.skill_level_cost("ghost_round", 5) == 8,
+                        "the skill cost ladder climbs (cost-2 skill: 2/3/4/6/8)")
+        for aid in CSData.ALLY_ORDER:
+                if (CSData.ALLIES[aid]["lvs"] as Array).size() != 5:
+                        tracks_ok = false
+        ck(tracks_ok, "every ally wears 5 roster level lines")
         # tree chains: every non-root need exists and costs climb
         var chain_ok := true
         for nid in CSData.TREE_ORDER:
@@ -284,11 +311,13 @@ func _run() -> void:
         G._spawn_boss(30)
         ck(String(G.enemies[0]["name"]) == "SPUD REAPER",
                         "THE BOSS LAW: cycle 2 = SPUD REAPER")
-        # ------------------------------------------------ the death bank
+        # ------------------------------------------------ the death (the purse)
+        # v0.3.8-2 THE PURSE LAW: the run's coins were home the whole run -
+        # the purse IS the wallet; death only checkpoints the save
         var coins0: int = meta.coins()
         var clv0: int = meta.char_level()
         var cxp0: int = meta.char_xp()
-        G.run_ccoins = 250
+        G.run_ccoins = coins0 + 250
         G.run_kills = 40
         G.over = false
         G.p_iframe = 0.0
@@ -296,7 +325,8 @@ func _run() -> void:
         G.phase = "play"
         G._hurt_player(50.0, null)
         await _wait(0.2)
-        ck(meta.coins() == coins0 + 250, "THE BANK: the run's coins joined the wallet")
+        ck(meta.coins() == coins0 + 250,
+                        "THE PURSE LAW: death keeps the run's coins (banked live all along)")
         ck(meta.char_xp() > cxp0 or meta.char_level() > clv0,
                         "THE BANK: the run's kills banked character XP")
         ck(G.over, "the death hands the run to the box death menu")
@@ -522,14 +552,19 @@ func _run() -> void:
                         "THE WIDGET LAW: the box chrome chips are hidden WHOLE (no empty widget)")
         ck(G.get("stick_ghost") == null,
                         "THE STICK LAW: the ghost node is GONE (truly invisible)")
-        # THE ARMORY LAW: the wallet buy lands in the armory
+        # THE ARMORY LAW: the wallet buy lands in the armory (the purse pulls
+        # the meta truth first - one wallet, two doors)
         meta.d["coins"] = 5000
         meta.save()
+        G._cc_pull()
         G._armory_buy_weapon("laser", CSData.weapon_price("laser", 1))
         ck(meta.has_weapon("laser") and meta.weapon_count("laser") >= 1,
                         "THE ARMORY LAW: the wallet buy lands in the armory")
+        ck(G.run_ccoins == 5000 - CSData.weapon_price("laser", 1),
+                        "THE PURSE LAW: the armory spend drains the run's own purse mirror")
         meta.d["coins"] = 5000
         meta.save()
+        G._cc_pull()
         # ------------------------------------------------ the meta laws
         var m2 := CSMeta.load_meta()
         m2.d["coins"] = 50
@@ -617,22 +652,26 @@ func _run() -> void:
         ck(tn.custom_minimum_size.y >= 68.0,
                         "THE TEXT-FIT LAW: the tree node keeps its floor and grows past it")
         # ============================== v0.3.4-3 - THE SKILLS + THE CHAIN
+        # ============================== v0.3.8-2 - THE SKILL DEPTHS
         # THE SKILL POINTS LAW: 1 per 100 kills, LIFETIME, spent subtracts
-        meta.d["kills"] = 800
+        meta.d["kills"] = 2000
         meta.d["skill_spent"] = 0
         meta.d["skills"] = {}
         meta.save()
-        ck(meta.skill_points_free(0) == 8,
-                        "THE SKILLS LAW: 800 banked kills = 8 points")
-        ck(meta.skill_points_free(60) == 8 and meta.skill_points_free(99) == 8,
+        ck(meta.skill_points_free(0) == 20,
+                        "THE SKILLS LAW: 2000 banked kills = 20 points")
+        ck(meta.skill_points_free(60) == 20 and meta.skill_points_free(99) == 20,
                         "THE SKILLS LAW: 99 live kills short of the next point")
-        ck(meta.skill_points_free(100) == 9,
+        ck(meta.skill_points_free(100) == 21,
                         "THE SKILLS LAW: the 100th live kill mints the point")
-        ck(meta.buy_skill("ghost_round", 0), "THE SKILLS LAW: the buy lands")
-        ck(meta.has_skill("ghost_round") and meta.skill_points_free(0) == 6,
-                        "THE SKILLS LAW: the purchase persists + the ledger drains")
-        ck(not meta.buy_skill("ghost_round", 0),
-                        "THE SKILLS LAW: a skill buys ONCE")
+        ck(meta.buy_skill("ghost_round", 0), "THE SKILLS LAW: the buy lands (L1)")
+        ck(meta.skill_level("ghost_round") == 1 and meta.skill_points_free(0) == 18,
+                        "THE SKILL DEPTHS: the purchase persists + the ledger drains")
+        ck(meta.buy_skill("ghost_round", 0), "THE SKILL DEPTHS: an owned skill RAISES")
+        ck(meta.skill_level("ghost_round") == 2 and meta.skill_points_free(0) == 15,
+                        "THE SKILL DEPTHS: L1+L2 cost 2+3, the level stuck")
+        ck(CSData.skill_level_cost("ghost_round", 3) == 4,
+                        "THE SKILL DEPTHS: the ladder knows L3 costs 4")
         # THE GHOST ROUND: the shot that hits Spudnik flies on and strikes back
         G.phase = "play"
         G.over = false
@@ -651,7 +690,7 @@ func _run() -> void:
                 G._tick_ebullets(0.05)
         ck(G.p_hp < php_g, "THE GHOST ROUND: the shot still hurt Spudnik")
         ck(float(ge["hp"]) < gep,
-                        "THE GHOST ROUND: the passed shot struck the enemy behind (half)")
+                        "THE GHOST ROUND: the passed shot struck the enemy behind (the level's own fraction)")
         G.ebullets.clear()
         # THE SHATTERED SHIELD: one hit eaten whole, the reform clock runs
         ck(meta.buy_skill("shattered_shield", 0), "THE SKILLS LAW: the shield buys (2 pts)")
@@ -676,13 +715,46 @@ func _run() -> void:
         G._tick_skills(0.05)
         ck(float(fe["chill_t"]) > 0.0, "THE FROST AURA: the field chills the enemy")
         G.enemies.clear()
-        # THE STATS LAW: packs cost points, multi-cost holds
+        # ============ v0.3.8-2 THE STAT TRACKS: lifetime points, 5 levels
         G.phase = "break"
-        G.pending_levels = 3
-        var dm1: float = float(G.stats["dmg_m"])
-        G._buy_stat_pack({"t": "T", "d": "d", "k": "dmg", "v": 0.10, "cost": 2})
-        ck(G.pending_levels == 1 and absf(float(G.stats["dmg_m"]) - (dm1 + 0.10)) < 0.001,
-                        "THE STATS LAW: a 2-point pack pays 2 and applies")
+        meta.d["stat_pts"] = 9
+        meta.d["stat_tracks"] = {}
+        meta.save()
+        G._start_run()          # a fresh base bakes NOTHING (no tracks yet)
+        await _wait(0.2)
+        var dm_base: float = float(G.stat_base["dmg_m"])
+        G.phase = "break"
+        G._buy_track(CSData.STAT_TRACKS[0])     # the DAMAGE track, L1: 1 pt
+        ck(meta.track_level("dmg") == 1 and meta.stat_pts() == 8,
+                        "THE TRACKS LAW: a buy spends the ladder's price and banks the level")
+        ck(absf(float(G.stats["dmg_m"]) - (dm_base + 0.10)) < 0.001,
+                        "THE TRACKS LAW: the level applies to the live run")
+        G._start_run()
+        await _wait(0.2)
+        ck(absf(float(G.stat_base["dmg_m"]) - (dm_base + 0.10)) < 0.001,
+                        "THE TRACKS LAW: the owned level BAKES into the next run's base")
+        # the pierce track's final: L5 turns PIERCE ALL on
+        meta.d["stat_pts"] = 100
+        meta.d["stat_tracks"] = {"pierce": 4}
+        meta.save()
+        var tr_pierce: Dictionary = {}
+        for trk in CSData.STAT_TRACKS:
+                if String(trk["id"]) == "pierce":
+                        tr_pierce = trk
+        G._buy_track(tr_pierce)
+        ck(meta.track_level("pierce") == 5 and int(G.stats["pierce_all"]) == 1,
+                        "THE TRACKS LAW: pierce L5 turns PIERCE ALL on")
+        G._start_run()
+        await _wait(0.2)
+        ck(int(G.stats["pierce_add"]) == 5 and int(G.stats["pierce_all"]) == 1,
+                        "THE TRACKS LAW: the pierce bake drills 5 bodies + the ALL flag")
+        # a broke buy refuses
+        meta.d["stat_pts"] = 0
+        meta.save()
+        var tracks_before: int = meta.track_level("dmg")
+        G._buy_track(CSData.STAT_TRACKS[0])
+        ck(meta.track_level("dmg") == tracks_before,
+                        "THE TRACKS LAW: a broke buy refuses (the points are lifetime)")
         # THE CHAIN: draft (no reroll) -> MARKET -> MERGE -> STATS -> SKILLS -> wave
         G._start_run()
         await _wait(0.3)
@@ -719,7 +791,7 @@ func _run() -> void:
                         or G.sheet_open_count() == 1,
                         "THE BREAK LAW: back over the market reopens it (the chain never strands)")
         var bench_b := _find_btn_like(G.cs_sheets[0]["box"], "TO THE MERGE BENCH")
-        G.pending_levels = 1     # a level waits for the STATS step of the chain
+        meta.mint_stat_pts(1)     # v0.3.8-2: a lifetime point waits for the STATS step
         bench_b.pressed.emit()
         await _wait(0.2)
         ck(G.sheet_open_count() == 1,
@@ -729,7 +801,7 @@ func _run() -> void:
                         "THE CHAIN: the bench wears CONTINUE")
         _find_btn_like(merge_box, "CONTINUE").pressed.emit()
         await _wait(0.2)
-        # pending_levels = 1 > 0 -> the STATS menu
+        # meta.stat_pts() = 1 > 0 -> the STATS menu
         ck(G.sheet_open_count() == 1 and _find_btn_like(G.cs_sheets[0]["box"], "DONE") != null,
                         "THE CHAIN: the STATS menu follows the bench (a level waits)")
         ck(_find_btn(G.cs_sheets[0]["box"], "X") == null,
@@ -1032,6 +1104,80 @@ func _run() -> void:
                 "THE SCOUT'S GUN: the pea-shooter cycle re-armed (the dart fired)")
         ck(bool(G.enemies[0].get("marked", false)),
                 "THE SCOUT'S GUN: the spotter marked the enemy in range")
+
+        # ================== v0.3.8-2 THE SCROLL TRUTH + ROSTER + PURSE
+        await _boot()
+        # THE SCROLL TRUTH: the sheets scroll on the raw-touch BoxScroll and
+        # every button inside is a registered tappable - a drag that STARTS on
+        # a button scrolls the shelf instead of dying (the other-games law)
+        G._tree_open()
+        await _wait(0.2)
+        var tsc: BoxScroll = null
+        var tbtns := 0
+        for kid in _all_kids(G.cs_sheets[G.cs_sheets.size() - 1]["box"]):
+                if kid is BoxScroll and tsc == null:
+                        tsc = kid
+                if kid is BaseButton and (kid as BaseButton).mouse_filter \
+                                        == Control.MOUSE_FILTER_IGNORE:
+                        tbtns += 1
+        ck(tsc != null and bool(tsc.game_safe),
+                        "THE SCROLL TRUTH: the tree shelf scrolls on a game-safe BoxScroll")
+        ck(tbtns > 0 and tsc._tappables.size() > 0,
+                        "THE SCROLL TRUTH: the shelf's buttons went IGNORE + tappable")
+        G._close_all_sheets()
+        await _wait(0.2)
+        G._shop_open()
+        await _wait(0.2)
+        var ssc: BoxScroll = null
+        for kid2 in _all_kids(G.cs_sheets[G.cs_sheets.size() - 1]["box"]):
+                if kid2 is BoxScroll:
+                        ssc = kid2
+                        break
+        ck(ssc != null and ssc._tappables.size() > 0,
+                        "THE SCROLL TRUTH: THE SHOP's list scrolls and taps the same way")
+        G._close_all_sheets()
+        await _wait(0.2)
+        # THE ROSTER LAW: the ally level is persistent, bought in the armory
+        meta.d["coins"] = 50000
+        meta.save()
+        G._cc_pull()
+        meta.own_ally("drone")
+        ck(meta.ally_level("drone") == 1,
+                        "THE ROSTER LAW: ownership lands at LV 1")
+        ck(CSData.ally_raise_price("drone", 2) == 600
+                        and CSData.ally_raise_price("drone", 5) == 2400,
+                        "THE ROSTER LAW: the raise ladder climbs (600 -> 2400)")
+        G._armory_raise_ally("drone")
+        G._armory_raise_ally("drone")
+        ck(meta.ally_level("drone") == 3 and meta.coins() == 50000 - 600 - 1200,
+                        "THE ROSTER LAW: the armory raises stuck and charged the purse")
+        G._start_run()
+        await _wait(0.2)
+        G._deploy_ally("drone", maxi(1, meta.ally_level("drone")))
+        ck(int(G.allies[G.allies.size() - 1]["level"]) == 3,
+                        "THE ROSTER LAW: the deploy lands AT the persistent level")
+        # THE PURSE LAW: one wallet, forever - death banks nothing extra
+        meta.d["coins"] = 777
+        meta.save()
+        G._cc_pull()
+        ck(G.run_ccoins == 777,
+                        "THE PURSE LAW: the wallet opens at the saved balance")
+        G._cc_earn(23)
+        ck(G.run_ccoins == 800 and int(meta.d["coins"]) == 800,
+                        "THE PURSE LAW: an earn lands in the same purse")
+        ck(G._cc_spend(100) and G.run_ccoins == 700
+                        and int(meta.d["coins"]) == 700,
+                        "THE PURSE LAW: a spend drains the same purse")
+        ck(not G._cc_spend(100000), "THE PURSE LAW: a broke spend refuses")
+        G._start_run()
+        await _wait(0.2)
+        ck(G.run_ccoins == 700,
+                        "THE PURSE LAW: a fresh run does NOT empty the wallet")
+        G._cc_earn(200)
+        G._die()
+        await _wait(0.2)
+        ck(meta.coins() == 900,
+                        "THE PURSE LAW: death banks NOTHING - the coins were already home")
 
         # fresh probe exit
         Box.reset_all()
