@@ -24,7 +24,6 @@ Box="*res://game/core/store.gd"
 Jukebox="*res://game/core/audio.gd"
 Notify="*res://addons/notify/notify.gd"
 Ads="*res://addons/unity_ads/ads.gd"
-GOGAds="*res://game/core/gogads.gd"
 
 [display]
 

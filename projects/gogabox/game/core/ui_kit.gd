@@ -125,7 +125,7 @@ static func chip(txt: String, icon_path := "", bg := Color(0, 0, 0, 0.35),
         pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return pc
 
-## Chip fed from the Meta tables (genres / subs / ages). Unknown ids degrade
+## Chip fed from the Meta tables (genres / subs). Unknown ids degrade
 ## to a text-only chip - modular by design.
 static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
                 font_size := 18, color := INK) -> PanelContainer:
@@ -133,7 +133,6 @@ static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
         match kind:
                 "genre": txt = Meta.genre_label(id)
                 "sub": txt = Meta.sub_label(id)
-                "age": txt = Meta.age_label(id)
         return chip(txt, Meta.icon_for(kind, id), bg, font_size, color)
 
 ## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so

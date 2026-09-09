@@ -64,7 +64,6 @@ var _last_wide := false
 var router: Node = null
 
 # search filters (id arrays; empty = no filter)
-var _filter_age := ""
 var _filter_genre := ""
 var _filter_sub := ""
 var _filter_state := ""          # "" = all | "favorites" | "mystery" (single-select)
@@ -851,7 +850,7 @@ func _refresh() -> void:
                 _grid.add_child(_tile(g, st))
                 tiles += 1
         if tiles == 0:
-                var filtered := _filter_age != "" or _filter_genre != "" \
+                var filtered := _filter_genre != "" \
                                 or _filter_sub != "" or _filter_state != ""
                 var empty_txt := "play to grow your box..." \
                                 if not filtered else "nothing matches these filters"
@@ -867,8 +866,6 @@ func _passes_filters(g: Dictionary) -> bool:
         # info, and filtering by genre would LEAK what the hidden game is.
         if Roadmap.state(String(g["id"])) == "MYSTERY":
                 return true
-        if _filter_age != "" and String(g.get("age", "everyone")) != _filter_age:
-                return false
         var geo: Dictionary = g.get("genres", {})
         if _filter_genre != "" and not (_filter_genre in (geo.get("main", []) as Array)):
                 return false
@@ -1305,8 +1302,6 @@ func _open_search() -> void:
         v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(v)
 
-        v.add_child(_chip_row(scroll, "AGE", Meta.used_ages(),
-                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
         v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
         v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
@@ -1329,7 +1324,6 @@ func _open_search() -> void:
         apply_holder[0] = apply_btn
         vb.add_child(apply_btn)
         vb.add_child(Arc.button("CLEAR", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16), func():
-                _filter_age = ""
                 _filter_genre = ""
                 _filter_sub = ""
                 _filter_state = ""
@@ -1338,7 +1332,7 @@ func _open_search() -> void:
                 _refresh()))
 
 func _filters_dirty() -> bool:
-        return _filter_age != "" or _filter_genre != "" or _filter_sub != "" \
+        return _filter_genre != "" or _filter_sub != "" \
                         or _filter_state != "" or _filter_text != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
@@ -1357,14 +1351,12 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                 var sid := String(id)
                 var active := false
                 match kind:
-                        "age": active = _filter_age == sid
                         "genre": active = _filter_genre == sid
                         "sub": active = _filter_sub == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
                         "sub": lbl = Meta.sub_label(sid)
-                        "age": lbl = Meta.age_label(sid)
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -1567,7 +1559,7 @@ func _open_guide(g: Dictionary) -> void:
         fk.custom_minimum_size = Vector2(540, 0)
         v.add_child(fk)
 
-        # GENRES / MORE TAGS / AGE each in their OWN labeled section (owner rule:
+        # GENRES / MORE TAGS each in their OWN labeled section (owner rule:
         # never mixed together in one pile)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
@@ -1586,12 +1578,6 @@ func _open_guide(g: Dictionary) -> void:
                 for sid in (geo.get("sub", []) as Array):
                         srow.add_child(Arc.meta_chip("sub", String(sid)))
                 v.add_child(srow)
-        v.add_child(Arc.label("AGE", 24, Arc.HOT))
-        var arow := HFlowContainer.new()
-        arow.add_theme_constant_override("h_separation", 8)
-        arow.add_theme_constant_override("v_separation", 8)
-        arow.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
-        v.add_child(arow)
 
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
                         func():
@@ -1773,89 +1759,11 @@ func _open_settings() -> void:
         var reset := Arc.button("RESET ALL PROGRESS", Vector2(480, 70), 22, Arc.BAD,
                         func(): _confirm_reset_all())
         vb.add_child(reset)
-        # v0.3.7-1 THE "!" DOOR (the owner's extra round): the agreement +
-        # the age rates. First knock = the agreement; after that, the door
-        # opens straight onto the age ladder.
-        vb.add_child(Arc.button("!", Vector2(480, 64), 28, Color("6a4ab8"),
-                        func(): _open_bang_door()))
         var note := Arc.label("that wipes everything, like a fresh install", 19,
                         Color("8a6a40"), false)
         note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(note)
         vb.add_child(Arc.button("CLOSE", Vector2(480, 72), 26, Arc.ACCENT,
-                        func(): _close_sheet()))
-        Arc.fit_sheet(vb)
-
-## v0.3.7-1 THE "!" DOOR: the agreement first (placeholder text - the real
-## one ships later from the owner), then the age rates. DISAGREE does
-## nothing on purpose (the owner: "make disagree just makes nothing
-## because it will remain closed anyway and gated") - the stricter tiers
-## stay hidden from the shipped box no matter what anyone taps.
-func _open_bang_door() -> void:
-        _close_sheet()
-        if int(Box.get_progress("__box__", "agreement_ok", 0)) == 1:
-                _open_age_rates()
-                return
-        var vb := _sheet_base()
-        var t := Arc.label("AGREEMENT", 42, Arc.INK)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(t)
-        var body := Arc.label("GOGABox is a game box for everyone.\n\nBy agreeing you accept the house rules: play fair, spend honestly, and remember that everything above the everyone tier stays behind closed doors - it exists for the platform's future, not for today's shelf.\n\n(The full agreement text arrives with a future update.)",
-                        21, Arc.INK, false)
-        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        body.custom_minimum_size = Vector2(560, 0)
-        body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(body)
-        vb.add_child(Arc.button("AGREE", Vector2(480, 76), 28, Arc.GOOD, func():
-                        Box.set_progress("__box__", "agreement_ok", 1)
-                        Jukebox.sfx("confirm", -4.0)
-                        _open_age_rates()))
-        vb.add_child(Arc.button("DISAGREE", Vector2(480, 64), 24, Arc.BAD, func():
-                        # disagreement closes the door - nothing unlocks,
-                        # nothing breaks (the gate stays closed anyway)
-                        Jukebox.sfx("click", -4.0)
-                        _close_sheet()))
-        Arc.fit_sheet(vb, 2)
-
-## THE AGE RATES SHEET: the whole ladder from the registry comments, the
-## +9 shipping truth, and the ILLEGAL mode row - visible, gated, honest.
-func _open_age_rates() -> void:
-        _close_sheet()
-        var vb := _sheet_base()
-        var t := Arc.label("AGE RATES", 42, Arc.INK)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(t)
-        var note := Arc.label("GOGABox ships as a +9 everyone game box - everything above +9 is hidden from the shelf completely.",
-                        20, Color("8a6a40"), false)
-        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        note.custom_minimum_size = Vector2(560, 0)
-        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(note)
-        var rates := [
-                ["+3 EVERYONE", "no specified age - clean for any human alive"],
-                ["+5", "simple games - one verb, big targets, nothing scary"],
-                ["+7", "moderate puzzles, simple combat, no blood or scares"],
-                ["+9", "little violence, tactical thinking - the box's ceiling"],
-                ["+12 YOUNG TEENS", "intense violence, dead bodies, basic horror - hidden"],
-                ["+16 TEENS", "half nudity, graphical injuries, high-level horror - hidden"],
-                ["+18 MATURE", "gore, soft porn, psychological horror, fantasy crime - hidden"],
-                ["+21 ADULT ONLY", "explicit everything, realistic gambling, real-world politics - hidden"],
-        ]
-        for r in rates:
-                var row := Arc.fit_label("%s  -  %s" % [r[0], r[1]],
-                                19, Color("4a3a20"), 580, false)
-                row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                row.custom_minimum_size = Vector2(580, 0)
-                vb.add_child(row)
-        var gate := Arc.button("ILLEGAL  -  GATED", Vector2(580, 64), 22,
-                        Color(0.6, 0.56, 0.52))
-        gate.disabled = true
-        vb.add_child(gate)
-        var gate_note := Arc.label("the gate stays closed", 17,
-                        Color("8a6a40"), false)
-        gate_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(gate_note)
-        vb.add_child(Arc.button("CLOSE", Vector2(480, 68), 26, Arc.ACCENT,
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
 
@@ -2160,7 +2068,7 @@ func _open_game_page(g: Dictionary) -> void:
         info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         content.add_child(info)
 
-        # GENRES / MORE TAGS / AGE live in the (previously empty) space between
+        # GENRES / MORE TAGS live in the (previously empty) space between
         # RESET and CLOSE - each group in its own labeled spot.
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
@@ -2179,12 +2087,6 @@ func _open_game_page(g: Dictionary) -> void:
                 for sid in (geo.get("sub", []) as Array):
                         srow.add_child(Arc.meta_chip("sub", String(sid)))
                 content.add_child(srow)
-        content.add_child(Arc.label("AGE", 20, Arc.HOT))
-        var arow := HFlowContainer.new()
-        arow.add_theme_constant_override("h_separation", 8)
-        arow.add_theme_constant_override("v_separation", 8)
-        arow.add_child(Arc.meta_chip("age", String(g.get("age", "everyone"))))
-        content.add_child(arow)
 
         var reset_btn := Arc.button("RESET GAME PROGRESS", Vector2(540, 60), 20,
                         Color(0.6, 0.32, 0.24))

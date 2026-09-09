@@ -1,5 +1,13 @@
 # PLAN v0.3.7-1 — THE BIG PATCH (the owner's 22-item round + the extras)
 
+> **v0.3.7-2 TOMBSTONE**: the AGE SYSTEM and GOGAds sections below were
+> REMOVED from the box the day after this patch shipped (the owner's
+> call - see PLAN_v0.3.7-2.md). The specs live on, archived, in
+> `docs/goga_docs/brainstorms/THE_APP_STORE_QUESTION.md` section 7.
+> Everything else in this plan (the game work, the ladder's badge law,
+> the achievements overhaul) SURVIVED - minus the snake endless (rolled
+> back) and the feed re-sort (restored to the old ordering).
+
 The report covered v0.3.6-4 and v0.3.7 at once. One massive patch, the
 owner's own words: "all of these stuff in one patch, feels massive, take
 your time doing everything accurately and test it carefully and manually

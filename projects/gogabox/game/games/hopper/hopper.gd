@@ -338,14 +338,6 @@ var spin := 0.0                      # the rolling spin (radians)
 var tumble_rot := 0.0                # the cube/shard tumble angle (rad)
 var tumble_vel := 0.0                # its angular velocity (rad/s)
 var settle_hit := false              # the face-down slap latch
-# v0.3.7-1 THE REAL FLIP LAW: the square does not roll like a wheel - it
-# PIVOTS over its leading edge in discrete 90-degree flips (a side falls,
-# the next face slaps down). flip_base is the settled stance (a multiple
-# of 90), flip_phase 0..1 is the live flip, flip_dir the lean.
-var flip_base := 0.0                 # the settled rotation (rad, x90 deg)
-var flip_phase := -1.0               # -1 = standing; else the flip progress
-var flip_dir := 1.0                  # the current flip's direction
-var flip_draw_lift := 0.0            # the support lift during a flip (px)
 var wobble_clock := 0.0
 
 var platforms: Array = []            # dicts: see _spawn_platform
@@ -774,9 +766,7 @@ func _goga_tick(delta: float) -> void:
         vy += g * delta
         px += vx * delta
         py += vy * delta
-        # v0.3.7-1: the flip's support lift rides the draw position (the
-        # body arcs over its leading edge; physics never changes)
-        player.position = Vector2(px, py - flip_draw_lift)   # the sprite IS the body (always)
+        player.position = Vector2(px, py)   # the sprite IS the body (always)
         player.scale = Vector2.ONE * char_size   # MELTING lives visibly
 
         # ---- THE WALLS: the player can never leave the screen (owner) ----
@@ -1247,30 +1237,39 @@ func _update_spin(delta: float) -> void:
         var c := _char()
         match char_id:
                 "ball":
-                        # the classic roller: the ball ROLLS - it goes upside down.
-                        # v0.3.7-1: in the GEOMETRIC style the drawn body is the
-                        # matrix CUBE whatever the physics char is - a square
-                        # must never read as rolling like a wheel, so the cube
-                        # wears the flip law instead (see _cube_body).
-                        if _cube_body():
-                                _update_flip(delta)
-                                return
+                        # the classic roller: the ball ROLLS - it goes upside down
                         if grounded and absf(vx) > 12.0 * U:
                                 spin += (vx / _pr()) * delta
                         else:
                                 spin += (vx * 0.3 / _pr()) * delta
                         player.rotation = spin
                 "square":
-                        # v0.2.6 the cube was a continuous tumbler (a wheel in
-                        # disguise). v0.3.7-1 THE REAL FLIP LAW (the owner:
-                        # "it does not flip side by side like the normal square
-                        # do"): the body PIVOTS over its leading bottom edge,
-                        # exactly 90 degrees per flip - a side falls, the next
-                        # face slaps onto the platform with a thud, then the
-                        # next flip starts if you keep moving. The support
-                        # lift below raises the drawn body along the real
-                        # pivot arc (draw space only - physics never changes).
-                        _update_flip(delta)
+                        # v0.2.6 REAL TUMBLING (the owner: "physical movements
+                        # where it flips and the side falls", the cube "flips
+                        # 90 degrees yes but for real"): the body pivots over
+                        # its leading corner/edge - the rotation is CONTINUOUS
+                        # and driven by the walk arc (theta = v / r), never a
+                        # look-snap; _update_support lifts the body so the
+                        # falling side RIDES the platform, and when you stop
+                        # the body eases onto the nearest flat face and SLAPS
+                        # it (a soft thud + a little dust).
+                        # v0.2.7: the owner confirmed the cube - UNTOUCHED.
+                        # v0.3.7-2: the GEOMETRIC square wears the SAME physics
+                        # (the owner: "same physics as the normal square in the
+                        # normal theme" - the patch-1 flip law read as an
+                        # animation and died whole).
+                        var pivot_r: float = _pr() * 1.41
+                        if grounded and absf(vx) > 14.0 * U:
+                                tumble_vel = vx / pivot_r
+                        else:
+                                # inertia: the spin decays in the air / on stop
+                                tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
+                        tumble_rot += tumble_vel * delta
+                        if grounded and absf(vx) <= 14.0 * U and absf(tumble_vel) < 0.6:
+                                _tumble_settle(delta)
+                        else:
+                                settle_hit = false
+                        player.rotation = tumble_rot
                 "shard":
                         # v0.2.7 THE SHARD FIX: same tumble language as the
                         # cube, but the pivot radius is the ACTUAL lowest
@@ -1278,9 +1277,6 @@ func _update_spin(delta: float) -> void:
                         # 1.06R and 1.23R - a fixed radius made it skate), and
                         # the settle targets are the TRUE flat-side stances
                         # (0 and +-2.0471 rad) - it lands ON its sides now.
-                        if _cube_body():
-                                _update_flip(delta)
-                                return
                         var R_l := PLAYER_R * U * char_size
                         var pv := _lowest_shard_vert(R_l)
                         var pivot_r: float = maxf(8.0 * U, float(pv["d"]))
@@ -1296,83 +1292,9 @@ func _update_spin(delta: float) -> void:
                         player.rotation = tumble_rot
                 "egg":
                         # the egg WOBBLES: never a full spin, always lands back up
-                        if _cube_body():
-                                _update_flip(delta)
-                                return
                         wobble_clock += delta * (9.0 if absf(vx) > 20.0 * U else 3.0)
                         player.rotation = sin(wobble_clock) * 0.32 * clampf(absf(vx) / (WALK_MAX * U), 0.15, 1.0) * signf(vx if vx != 0.0 else 1.0)
 
-## The drawn body is the MATRIX CUBE whenever the geometric style is worn
-## (every character) - and always for the square itself.
-func _cube_body() -> bool:
-        return _is_geo() or char_id == "square"
-
-## v0.3.7-1 THE REAL FLIP LAW - the cube walks like a cube:
-##   grounded + moving  -> chain 90-degree pivots over the leading edge
-##   grounded + stopped -> ease onto the nearest flat face (the slap)
-##   in the air         -> free inertia tumble, the landing settles it
-## The flip's angular rate reads the walk speed over the pivot arc; the
-## phase eases in-out (a real tip accelerates, then the face falls).
-func _update_flip(delta: float) -> void:
-        var half := PLAYER_R * U * char_size * 0.92   # the drawn half-height
-        var diag := half * 1.41421356                  # center->corner radius
-        if grounded:
-                if flip_phase < 0.0:
-                        if absf(vx) > 14.0 * U:
-                                flip_phase = 0.0
-                                flip_dir = signf(vx)
-                                settle_hit = false
-                if flip_phase >= 0.0:
-                        # the pivot arc for one flip = diag * PI/2; the rate
-                        # reads the walk speed, eased (slow tip, fast fall)
-                        var rate: float = clampf(absf(vx) / diag, 1.2, 9.0)
-                        flip_phase += rate * delta / (PI * 0.5) * 1.35
-                        if flip_phase >= 1.0:
-                                # THE FACE SLAP: the next side lands flat
-                                flip_base += flip_dir * PI * 0.5
-                                flip_phase = -1.0
-                                tumble_rot = flip_base
-                                flip_draw_lift = 0.0
-                                _sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
-                                _fx_poof(Vector2(px + flip_dir * half * 0.8,
-                                                py + half * 0.7), 3, 0.55)
-                        else:
-                                var e: float = flip_phase * flip_phase \
-                                                * (3.0 - 2.0 * flip_phase)
-                                tumble_rot = flip_base + flip_dir * PI * 0.5 * e
-                                # THE SUPPORT ARC: the center rises along the
-                                # corner pivot (highest at 45 degrees)
-                                var phi := e * PI * 0.5
-                                flip_draw_lift = half * (sin(phi) + cos(phi) - 1.0)
-                else:
-                        # standing: settle any air-tumble onto the flat face
-                        if absf(tumble_vel) > 0.05 or absf(
-                                        wrapf(tumble_rot - flip_base, -PI, PI)) > 0.01:
-                                _flip_settle(delta)
-                        flip_draw_lift = 0.0
-        else:
-                # the air keeps the inertia language (a tossed cube tumbles)
-                tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
-                tumble_rot += tumble_vel * delta
-                flip_draw_lift = 0.0
-        player.rotation = tumble_rot
-
-## Air-tumble landing: ease the body onto the NEAREST 90-degree stance and
-## re-anchor the flip base to it (the next walk flip starts from there).
-func _flip_settle(delta: float) -> void:
-        var target := roundf(tumble_rot / (PI * 0.5)) * (PI * 0.5)
-        var prev := tumble_rot
-        tumble_rot = lerpf(tumble_rot, target, 1.0 - pow(0.0004, delta))
-        tumble_vel = 0.0
-        if absf(tumble_rot - target) < 0.005:
-                tumble_rot = target
-                flip_base = target
-        if not settle_hit and absf(tumble_rot - target) < 0.035 \
-                        and absf(prev - target) >= 0.035:
-                settle_hit = true
-                _sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
-                _fx_poof(Vector2(px + signf(target - prev + 0.001) * _pr() * 0.7,
-                                py + _pr() * 0.7), 3, 0.55)
 
 ## the settle: ease the body onto its nearest FLAT face (the cube: any
 ## 90-degree stance, the shard: one of its three edge-down stances) and
@@ -2205,13 +2127,11 @@ func _show_ready_card() -> void:
                         Arc.panel_style(Color(0.05, 0.10, 0.18, 0.86), 24))
         var v := VBoxContainer.new()
         v.add_theme_constant_override("separation", 6)
+        # v0.3.7-2: the controls line is GONE (the owner: "controls live
+        # in the guide, not here") - the card says one thing only.
         var t := Arc.label("TAP ANYWHERE TO START", 40, Color(0.85, 0.95, 1.0))
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        var s := Arc.label("touch LEFT + slide to move  -  tap RIGHT to jump  -  land HIGHER for +1  -  grab the coins + powerups", 18,
-                        Color(0.85, 0.92, 1.0), false)
-        s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         v.add_child(t)
-        v.add_child(s)
         panel.add_child(v)
         cc.add_child(panel)
         root.add_child(cc)
@@ -2442,11 +2362,8 @@ func _style_row(id: String) -> Control:
 ## the music all re-skin in place (the buy-only law: the box layer auto-
 ## equips on buy; the worn look is the style's job)
 func _apply_geo_style() -> void:
-        # v0.3.7-1: a mid-run style swap re-anchors the flip stance (the
-        # cube body may inherit a stale roll/tumble angle - zero it)
-        flip_base = 0.0
-        flip_phase = -1.0
-        flip_draw_lift = 0.0
+        # a mid-run style swap re-anchors the stance (the body may
+        # inherit a stale roll/tumble angle - zero it)
         tumble_rot = 0.0
         tumble_vel = 0.0
         spin = 0.0

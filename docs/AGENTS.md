@@ -88,7 +88,6 @@ belongs in `docs/goga_docs/`.
 | `tools/sync-assets.py` | re-vendor assets from `assets.manifest.json` |
 | `tools/study/` | the game-study pipeline: web-portal scrapers, APKPure downloader, APK decompiler line, Godot .pck extractor, Quaternius/ambientCG fetcher — see docs/DECOMPILATION.md (study copies stay OUT of the repo) |
 | `plugins/<name>/` | GOGABox android plugins (`unity_ads`, `notify`) |
-| `game/core/gogads.gd` | GOGAds - the in-house ads (baked/dev/link, tags+levels, per-state frequency + daily caps) |
 | `docs/` | guides + `docs/goga_docs/` planning home (GDDs · ideas · plans · brainstorms) |
 
 ## 4. Ads integration playbook
@@ -152,15 +151,12 @@ are staged in at build time from `plugins/<backend>/`, selected by
 5. One-line override without editing config:
    `GDA_FORCE_PLUGINS=<name> ./build.sh <g>`.
 
-### 4.3 GOGAds - the in-house layer (v0.3.7-1)
-The box also carries the owner-managed GOGAds framework (autoload
-`GOGAds`): baked ads in `assets/gogads/index.json`, dev ads registered at
-runtime (the shared system + `only_me`), link ads over the device
-browser. Breaks live in the registry per game (`gogads.start/end` with
-`frequency`/`total`/`tags`/levels); the host fires the start + end breaks.
-Spec + the tag/level taxonomy: `docs/goga_docs/plans/PLAN_v0.3.7-1.md`.
-The AGE SYSTEM (+3..+21, the box ships at +9) lives as code comments in
-`registry.gd`; the "!" settings door shows the agreement + the rates.
+### 4.3 GOGAds - REMOVED (v0.3.7-2)
+The in-house ad framework lived here; the owner nuked it whole
+("nuke GOGAds, that's done"). The spec is archived in
+`docs/goga_docs/brainstorms/THE_APP_STORE_QUESTION.md`. The Unity Ads
+plugin + the house banner below are UNTOUCHED - they are the older,
+shared system.
 
 ### 4.4 Re-enabling LevelPlay (if ever asked)
 

@@ -87,9 +87,6 @@ func _ready() -> void:
         # v0.1.9 OWNER FIX: the play counts at START (quit-mid-turn stays
         # "played"). record_run at finish keeps score/best only.
         Box.record_started(id)
-        # v0.3.7-1 THE GOGAds START BREAK (the spec: "in each death or
-        # each start, he will be able to show an interstitial")
-        GOGAds.maybe_interstitial(id, "start")
         # v0.2.3 CAPACITY HOLD: THIS game's pool stops recharging while its
         # own session is open (menu / other games / closed app = charging)
         Box.set_active_game(id)
@@ -202,9 +199,6 @@ func _exit_tree() -> void:
 
 func _on_finish(final_score: int, earned: int) -> void:
         var id := String(game_def["id"])
-        # v0.3.7-1 THE GOGAds END BREAK: the death state serves its break
-        # (frequency + the daily total live in the registry's gogads entry)
-        GOGAds.maybe_interstitial(id, "end")
         _flush_time()
         var res := Box.record_run(id, final_score)
         var total := earned

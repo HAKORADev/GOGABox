@@ -8,7 +8,6 @@ extends RefCounted
 ##   desc     one-liner shown in the ?-guide list
 ##   controls how to play lines (guide sheet)
 ##   genres   {"main": [<=3], "sub": [<=3]}   (GameBox-compatible limits)
-##   age      "everyone" | "kids" | "teens"
 ##   charges  {"per_round": n, "capacity": n, "regen_minutes": m}  GOGABatteries (omit = free play)
 ##   banner   true -> this game's own view carries the ad banner (opt-in;
 ##            v0.2.6 THE OWNER LAW: every game wears one except the snowy
@@ -47,10 +46,6 @@ const GAMES := [
                 # its coins) at entry AND retry, empty wallet plays free.
                 # Declarative now - any future game just wears the same key.
                 "entry": {"partial_pay": true},
-                # v0.3.7-1 GOGAds breaks (the in-house ads): the death
-                # state every 3rd run, 6 a day - arcade tags
-                "gogads": {"end": {"frequency": 3, "total": 6,
-                        "tags": ["arcade", "casual"], "level_min": 0, "level_max": 1}},
                 "desc": "The classic gone to war - steer a smooth one-part snake with mouse-style swipes, pick your position and place (classic milk, day garden, night garden), choose PEACE or the war, and outsmart AI snakes that hunt, encircle and steal coins. Death folds the whole body into the head.",
                 "controls": ["touch anywhere and SWIPE - the head bends where your finger moves; swipe speed = turn sharpness, resting finger = straight",
                         "each fruit = 1 point, +length (width follows, both ways); the speed grows x1.1 every 10 points - watch the x1.00 chip",
@@ -60,7 +55,6 @@ const GAMES := [
                         "PLACES live in the shop: classic is free, the day garden (sun + shadows) and the night garden (moon, stars and tiny flies) cost GOGACoins",
                         "bugs steal the fruit and bite (never death); obstacles kill everyone; big enemies try to wrap around you - the run only ends when YOU die"],
                 "genres": {"main": ["arcade"], "sub": ["retro", "singleplayer", "survival"]},
-                "age": "5",
                 "ach": [
     {"id": "score_t1", "title": "Snack Time", "desc": "Score 30 in one run", "tier": 1, "rule": {"k": "score", "v": 30}},
     {"id": "score_t2", "title": "Long Boi", "desc": "Score 100 in one run", "tier": 2, "rule": {"k": "score", "v": 100}},
@@ -92,7 +86,6 @@ const GAMES := [
                 "desc": "Real pong now: goals pay points, every hit heats the ball x1.1 until it burns red, coins and powerups ride the court, and the extra walls hunt YOU. The pause menu's END banks the run.",
                 "controls": ["hold anywhere - your platform follows the finger along its axis", "a goal for you +1, a goal on you -1", "every hit heats the ball x1.1 until the next serve", "END in the pause menu banks the earnings"],
                 "genres": {"main": ["arcade", "sports"], "sub": ["retro", "competitive", "singleplayer"]},
-                "age": "3",
                 "ach": [
     {"id": "rally_t1", "title": "Warm-Up", "desc": "Return the ball 15 times in one run", "tier": 1, "rule": {"k": "max", "key": "max_rally", "v": 15}},
     {"id": "rally_t2", "title": "Wall of Paddle", "desc": "Return the ball 40 times in one run", "tier": 2, "rule": {"k": "max", "key": "max_rally", "v": 40}},
@@ -130,10 +123,7 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 50, "price": 200, "fee": 20, "shop": true,
-                "reveal": {"kind": "orders", "appear_after": 0,
-    "orders": [{"type": "plays", "game": "rally", "count": 3},
-        {"type": "beat_best", "game": "rally"}],
-    "needs_games": 2},
+                "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "blocked_hours": {"from": 1, "to": 8},
@@ -150,7 +140,6 @@ const GAMES := [
                         "some ships wear shield bubbles; shatter carriers spin invulnerable shards - shoot the gap that faces you; rare UFO elites fire shotguns",
                         "the shop sells ship skins, the laser/thunder/bomb weapons (they join the loot), the shield power, and 3 spaces - no options menu, just fly"],
                 "genres": {"main": ["action", "arcade", "shooter"], "sub": ["retro", "singleplayer", "survival"]},
-                "age": "7",
                 "ach": [
     {"id": "score_t1", "title": "Blooded Wings", "desc": "Score 500 in one run", "tier": 1, "rule": {"k": "score", "v": 500}},
     {"id": "score_t2", "title": "Sky Reaper", "desc": "Score 1500 in one run", "tier": 2, "rule": {"k": "score", "v": 1500}},
@@ -175,10 +164,7 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "auto", "dim": "2d",
                 "coin_div": 15, "price": 250, "fee": 15, "shop": true,
-                "reveal": {"kind": "orders", "appear_after": 1,
-    "orders": [{"type": "spend_in", "game": "lanes", "amount": 120},
-        {"type": "plays", "game": "rally", "count": 5}],
-    "needs_games": 3},
+                "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
@@ -193,7 +179,6 @@ const GAMES := [
                         "the shop's vegetable basket (1500) adds a fruits/vegetables toggle in the options",
                 ],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
-                "age": "7",
                 "ach": [
     {"id": "score_t1", "title": "Sharp Blade", "desc": "Score 300 in one run", "tier": 1, "rule": {"k": "max", "key": "max_score", "v": 300}},
     {"id": "score_t2", "title": "Juice Storm", "desc": "Score 800 in one run", "tier": 2, "rule": {"k": "max", "key": "max_score", "v": 800}},
@@ -256,7 +241,6 @@ const GAMES := [
                         "vanish platforms crack (jagged, growing cracks) and SHATTER into chunks; blinking platforms take their snow with them when they blink",
                         "the shop sells characters (ball/square/triangle/egg, each its own physics and its own real tumbling), platform skins (sand/rock/metal/grass), the night place, the powerups and MELTING"],
                 "genres": {"main": ["arcade", "adventure"], "sub": ["platformer", "singleplayer"]},
-                "age": "3",
                 "ach": [
     {"id": "tower_t1", "title": "Warming Up", "desc": "Climb 30 platforms in one run", "tier": 1, "rule": {"k": "max", "key": "max_tower", "v": 30}},
     {"id": "tower_t2", "title": "Above the Clouds", "desc": "Climb 80 platforms in one run", "tier": 2, "rule": {"k": "max", "key": "max_tower", "v": 80}},
@@ -279,10 +263,7 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 20, "price": 400, "fee": 15, "shop": true,
                 "banner": true,   # turn-based: banner is safe here
-                "reveal": {"kind": "orders", "appear_after": 2,
-    "orders": [{"type": "earn_in", "game": "hopper", "amount": 120},
-        {"type": "spend_in", "game": "slasher", "amount": 150}],
-    "needs_games": 5},
+                "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "daily_rounds": 8,   # v0.1.4: 8 rounds a day
                 "desc": "The classic brain cooker, rebuilt: a big centered board on warm paper, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. The OPTIONS sell bigger boards (6x6 and 8x8) and three themes: Classic, Minecraft and a Deep Sea whose water answers every real move.",
@@ -296,7 +277,6 @@ const GAMES := [
                         "the run ends when no move is left - plan the corners",
                 ],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["minimal", "turnbased", "singleplayer"]},
-                "age": "5",
                 "ach": [
     {"id": "tile_t1", "title": "Getting Warm", "desc": "Create the 256 tile", "tier": 1, "rule": {"k": "max", "key": "max_tile", "v": 256}},
     {"id": "tile_t2", "title": "Halfway Hero", "desc": "Create the 512 tile", "tier": 2, "rule": {"k": "max", "key": "max_tile", "v": 512}},
@@ -314,10 +294,7 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/dario.png",
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 10, "price": 350, "fee": 100, "shop": true,
-                "reveal": {"kind": "orders", "appear_after": 3,
-    "orders": [{"type": "plays", "game": "merge", "count": 4},
-        {"type": "ach_in", "game": "merge", "count": 2}],
-    "needs_games": 6},
+                "reveal": {"kind": "chain"},
                 "banner": true,   # the ground rises above the strip
                 "desc": "Dario fell into this world through a Witcher's curse. Ten TALL levels of stomp, dodge and deja vu to the end line - where SHE waits. Crush the Witcher (20 stomps, dodge her curses) and escape... probably. A mario-like with ? crates (the GOGACoins live inside them), timed ghost platforms, hunting bats, a charging rhino, a shop (the night sky, three powerups), 3 lives and a story that remembers you.",
                 "controls": [
@@ -332,7 +309,6 @@ const GAMES := [
                         "grab every trophy. Beat the Witcher. Escape. (You won't.)",
                 ],
                 "genres": {"main": ["adventure", "arcade"], "sub": ["platformer", "story", "singleplayer"]},
-                "age": "7",
                 "ach": [
     {"id": "stomp_t1", "title": "Heel of the Hero", "desc": "Stomp 25 enemies total", "tier": 1, "rule": {"k": "cnt", "key": "stomped", "v": 25}},
     {"id": "stomp_t2", "title": "Boot Camp", "desc": "Stomp 100 enemies total", "tier": 2, "rule": {"k": "cnt", "key": "stomped", "v": 100}},
@@ -355,8 +331,7 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 2, "price": 450, "fee": 10, "shop": false,
                 "banner": true,   # turn-based: banner is safe here
-                "reveal": {"kind": "inbox", "minutes": 45, "appear_after": 4,
-    "needs_games": 7},
+                "reveal": {"kind": "chain"},
                 "desc": "Sketchbook tic-tac-toe: paper, ink and one adaptive opponent. It wears four profiles (The Wall, The Trickster, The Rusher, The Sage), remembers your last two rounds and stops falling for your patterns. Every win pays +1, every loss costs -1, a GOGACoin lands on the board after every 3 rounds - mark its cell first to take it.",
                 "controls": [
                         "tap a cell to draw your X - the red pencil",
@@ -366,7 +341,6 @@ const GAMES := [
                         "the bank is in the pause sheet: END ends the run and pays",
                 ],
                 "genres": {"main": ["strategy", "puzzle"], "sub": ["turnbased", "competitive", "singleplayer"]},
-                "age": "3",
                 "ach": [
     {"id": "wins_t1", "title": "Pencil Pusher", "desc": "Win 10 rounds", "tier": 1, "rule": {"k": "cnt", "key": "wins", "v": 10}},
     {"id": "wins_t2", "title": "Sketch Master", "desc": "Win 40 rounds", "tier": 2, "rule": {"k": "cnt", "key": "wins", "v": 40}},
@@ -390,11 +364,8 @@ const GAMES := [
                 "orientation": "portrait", "dim": "2d",
                 "coin_div": 300, "price": 400, "fee": 10, "shop": true,
                 "banner": true,   # the rail seats itself above the strip
-                "charge_unlock": 150,
-"reveal": {"kind": "orders", "appear_after": 6,
-    "orders": [{"type": "plays", "game": "invaders", "count": 5},
-        {"type": "spend_charges", "amount": 60}],
-    "needs_games": 9},
+                "charge_unlock": 100,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
                 "desc": "The happy one - an endless gem wall with EIGHT moods: CHALLENGE (rounds derived from a real pre-solve of the grid, lives and wins/losses on the HUD), PEACE (zen, nothing can hurt you), BUTTERFLIES (they rise AFTER your move - one grace at the top, then the spider dines), ICE STORM (frosted blocks rise behind the gems), DIAMOND MINE (pure dirt, clay and rock layers, dig deep), JELLY (the sweet virus - eat it before it spreads), ICE CRASH (layered ice 1-5 plus the rock only specials crack) and DROP DOWN (the parcels pour in on their own stream - out-deliver the quota before moves, time or both eat you). THE SPECIALS: an L or T makes the BOMB, a vertical 4 makes the ROW SWEEPER, a horizontal 4 makes the COLUMN SWEEPER and 5 in a line makes the COLOR REMOVER - swap it with anything and its color wipes out bottom-to-up, and special + special fires the COMBOS (double sweeps, the plus, the 4x4, triple sweeps, the color armies). Powers buy with the GLOBAL GOGACoins; escort the GOGACoin to the bottom row and it is yours.",
                 "controls": [
                         "tap two adjacent gems to swap, or drag a gem toward its neighbor - 3+ of a kind pops, everything = 1 score point",
@@ -411,7 +382,6 @@ const GAMES := [
                         "DROP DOWN: the parcels pour in on their own hatch clock and ride the gravity waves - deliver the round's quota before the moves, the clock or both run out (each round rolls the limit fresh; a stuck parcel climbs and parks on the top line, and the next parcel with every top seat parked ends the run)",
                 ],
                 "genres": {"main": ["puzzle", "casual"], "sub": ["match3", "singleplayer", "relax"]},
-                "age": "5",
                 "ach": [
     {"id": "match_t1", "title": "Gem Fresh", "desc": "Match 300 gems total", "tier": 1, "rule": {"k": "cnt", "key": "matched", "v": 300}},
     {"id": "match_t2", "title": "Gem Hoard", "desc": "Match 3000 gems total", "tier": 2, "rule": {"k": "cnt", "key": "matched", "v": 3000}},
@@ -445,10 +415,7 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 500, "price": 350, "fee": 100, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "orders", "appear_after": 5,
-    "orders": [{"type": "spend_in", "game": "dario", "amount": 200},
-        {"type": "plays", "game": "xo", "count": 6}],
-    "needs_games": 8},
+                "reveal": {"kind": "chain"},
                 "desc": "The aliens reached our solar system. Fly the Protector from Neptune inward to the Sun and into their Hideout: ten worlds, ten waves each, a named boss over every one - and three of them will run and come back for the finale. Rent the SSDS crew with DEFEND, buy Thunder or the Bomb Launcher, chase THE INVADER down. Small scores, a big war, and a line that never breaks while you hold it.",
                 "controls": [
                         "left half of the screen: slide to fly - the ship steers with you",
@@ -461,7 +428,6 @@ const GAMES := [
                         "bosses 3, 6 and 9 escape at low health and return for the Hideout gauntlet; THE INVADER never truly dies - and neither does the war",
                 ],
                 "genres": {"main": ["shooter", "arcade"], "sub": ["retro", "singleplayer"]},
-                "age": "7",
                 "ach": [
     {"id": "score_t1", "title": "Solar Shield", "desc": "Score 2000 in one run", "tier": 1, "rule": {"k": "max", "key": "max_score", "v": 2000}},
     {"id": "score_t2", "title": "Star Breaker", "desc": "Score 6000 in one run", "tier": 2, "rule": {"k": "max", "key": "max_score", "v": 6000}},
@@ -508,9 +474,8 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 200, "price": 500, "fee": 50, "shop": true,
                 "banner": true,
-                "charge_unlock": 400,
-"reveal": {"kind": "direct", "appear_after": 10,
-    "needs_games": 13},
+                "charge_unlock": 200,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 500, "needs_games": 3},
                 "desc": "THE BROTATO-COMPETITOR: SPUDNIK the potato cosmonaut drops into a ground bigger than the screen - the camera follows, the world keeps going. SIX starts (Soldier/Ranger/Brawler/Engineer/Pyro/Frostbite), TWELVE enemies with real teeth (the aura wraith burns a zone, the mender heals the horde, the TRI-SHIELD wears three rotating crackable rings), elites with affixes and a boss every 10 waves (THE HEAP, THE PRISM MATRIARCH, SPUD REAPER). Waves end into a choose-one-of-three draft that GIVES and TAKES; XP levels open pure tree picks. The GogaShop sells 12 weapons (start with 3, merge copies into higher tiers for half the next price), 6 allies (the highest prices, they deploy in the wave shop) and two themes - DECAYED DESERT and ABANDONED PARK - each with a day and a night face. Everything is bought and sold for COSMIC COINS; kills are the score; XP banks into SPUDNIK's level and gates the tiers. Endless. The swarm never stops growing.",
                 "controls": [
                         "touch ANYWHERE and drag: the invisible analog stick is born under your finger - SPUDNIK walks where you pull",
@@ -524,7 +489,6 @@ const GAMES := [
                         "the tri-shield's rings only break where you crack them - carve a window through all three rings to reach the core",
                 ],
                 "genres": {"main": ["shooter", "roguelite"], "sub": ["survival", "singleplayer"]},
-                "age": "9",
                 "ach": [
     {"id": "kills_t1", "title": "Swatter", "desc": "Defeat 500 enemies total", "tier": 1, "rule": {"k": "max", "key": "kills", "v": 500}},
     {"id": "kills_t2", "title": "Swarm Thinner", "desc": "Defeat 2000 enemies total", "tier": 2, "rule": {"k": "max", "key": "kills", "v": 2000}},
@@ -557,9 +521,8 @@ const GAMES := [
                 "orientation": "landscape", "dim": "2d",
                 "coin_div": 1000, "price": 400, "fee": 10, "shop": true,
                 "banner": true,   # the field ends above the strip
-                "charge_unlock": 250,
-"reveal": {"kind": "direct", "appear_after": 7,
-    "needs_games": 10},
+                "charge_unlock": 100,
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 400, "needs_games": 3},
                 "desc": "The bloons march the winding roads and the gadgets hold the line. 30 handcrafted maps (each with its own day and night), 10 gadgets with 3 gears and 10 upgrades each, pacts between neighbors, fire traps, eternal flames, THE FLUX that teleports bloons back, and every 10 waves a GOGACoin hides inside a bloon. Every hit is a point; the run bonus is score /1000.",
                 "controls": [
                         "tap START, then pick a folk card by tap or DRAG it onto green grass (red cells are road, water or blocked) - press the card, pull, release: the ghost rides the finger",
@@ -576,7 +539,6 @@ const GAMES := [
                         "bloons march single file, one honest row on the road center; nothing shows before the map line",
                 ],
                 "genres": {"main": ["strategy", "action"], "sub": ["tower-defense", "singleplayer"]},
-                "age": "7",
                 "ach": [
     {"id": "pop_t1", "title": "Pop Authority", "desc": "Pop 1000 bloon layers in one run", "tier": 1, "rule": {"k": "max", "key": "pops_run", "v": 1000}},
     {"id": "pop_t2", "title": "The Pop Storm", "desc": "Pop 10000 bloon layers in one run", "tier": 2, "rule": {"k": "max", "key": "pops_run", "v": 10000}},
@@ -607,10 +569,8 @@ const GAMES := [
                 # misread it as the in-game speed step - that is back to /10.
                 "coin_div": 50, "price": 350, "fee": 10, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "orders", "appear_after": 8,
-    "orders": [{"type": "ach_in", "game": "pop_siege", "count": 2},
-        {"type": "spend_in", "game": "matcher", "amount": 200}],
-    "needs_games": 11},
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
+                        "needs_games": 2},
                 "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP taps gravity to the roof and back, STICK changes gravity only when you TOUCH the other floor - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 10 speeds the world x1.1, and the world is FULL: block staircases up and down, pyramids, twin towers, small triple spikes, saws and floating threats fill the lanes. Blocks shove (they never kill), pits and wrong timing do. Buy POWER-UPS and they spawn in your runs: rocket jumps, a slower world, an extra life. The SFX sing.",
                 "controls": ["TAP ANYWHERE TO START - then touch = jump, the square spins its 90 degrees over the real flight",
                         "golden orbits = +1 score each; every 10 the world runs x1.1 faster - watch the x1.00 chip",
@@ -623,7 +583,6 @@ const GAMES := [
                         "POWER-UPS you buy spawn in your runs, 10s each: ROCKET JUMP (x1.5 hops + the burn), SLOW WORLD (everything runs 50% slower), EXTRA LIFE (the most expensive - pits bounce you, off-screen re-enters you, spikes pass through)",
                         "the shop wears 5 skins, 3 world themes, TAILS (neon/fire/rainbow/gold/match - they stream BEHIND you) and the powers"],
                 "genres": {"main": ["action", "arcade"], "sub": ["rhythm", "singleplayer", "endless"]},
-                "age": "3",
                 "ach": [
     {"id": "score_t1", "title": "Flash 100", "desc": "Score 100 in one run", "tier": 1, "rule": {"k": "max", "key": "max_score", "v": 100}},
     {"id": "score_t2", "title": "Speed Demon", "desc": "Score 300 in one run", "tier": 2, "rule": {"k": "max", "key": "max_score", "v": 300}},
@@ -647,10 +606,8 @@ const GAMES := [
                 # teaser graduated into the real thing (the ritual honored).
                 "coin_div": 3, "price": 350, "fee": 10, "shop": true,
                 "banner": true,
-                "reveal": {"kind": "orders", "appear_after": 9,
-    "orders": [{"type": "earn_in", "game": "geometry", "amount": 200},
-        {"type": "plays", "game": "pop_siege", "count": 4}],
-    "needs_games": 12},
+                "reveal": {"kind": "direct", "appear_after": 0, "price": 350,
+                        "needs_games": 2},
                 "desc": "Geoquare's own puzzle: an endless neon maze woven fresh every map - a REAL labyrinth (branching corridors, honest dead ends - never one path with noise). The start and the exit roll EVERY map, so there is nothing to memorize: read the walls, pick the route, swipe grid by grid. The queue animates and SPEEDS UP as your inputs pile up. Time and scale are the only enemies - the clock is tight, the mazes grow, the cell shrinks. A GOGACoin waits one step off the route every 5th map, and the PATH FINDER earns one charge every 2 maps to light the way when the walls win. One map = one point.",
                 "controls": ["TAP ANYWHERE TO START - then SWIPE: one swipe moves one cell, keep swiping and the square flows",
                         "reach the glowing portal before the clock runs out - every map solved = +1 score",
@@ -659,7 +616,6 @@ const GAMES := [
                         "the PATH FINDER (shop) earns one charge every 2 maps - tap its button next to the score to light the next 8 cells",
                         "the mazes grow as you escape - the cell shrinks to fit until the limit"],
                 "genres": {"main": ["puzzle", "arcade"], "sub": ["maze", "singleplayer", "endless"]},
-                "age": "3",
                 "ach": [
     {"id": "maps_t1", "title": "Escape Artist", "desc": "Escape 10 mazes in one run", "tier": 1, "rule": {"k": "max", "key": "max_maps", "v": 10}},
     {"id": "maps_t2", "title": "Wall Reader", "desc": "Escape 30 mazes in one run", "tier": 2, "rule": {"k": "max", "key": "max_maps", "v": 30}},
@@ -675,101 +631,29 @@ const GAMES := [
             "orientation": "auto", "dim": "2d",
             "price": 500, "fee": 10,
             "reveal": {"kind": "direct", "appear_after": 7, "needs_games": 8},
-            "desc": "the tile classic: match the ends, empty your hand first - the workshop version is baking",
-            "age": "3"},
+            "desc": "the tile classic: match the ends, empty your hand first - the workshop version is baking"},
         {"id": "chess", "title": "CHECKMATE", "tag": "the old war", "coming_soon": true,
             "orientation": "auto", "dim": "2d",
             "price": 700, "fee": 10,
             "reveal": {"kind": "direct", "appear_after": 8, "needs_games": 9},
-            "desc": "the old war on a sketch board - the workshop version is baking",
-            "age": "3"},
+            "desc": "the old war on a sketch board - the workshop version is baking"},
         {"id": "fourline", "title": "FOUR IN LINE", "tag": "drop and connect", "coming_soon": true,
             "orientation": "auto", "dim": "2d",
             "price": 450, "fee": 8,
             "reveal": {"kind": "direct", "appear_after": 9, "needs_games": 10},
-            "desc": "drop the discs, make four - the workshop version is baking",
-            "age": "3"},
+            "desc": "drop the discs, make four - the workshop version is baking"},
         {"id": "bovo", "title": "FIVE LINES", "tag": "five in a row", "coming_soon": true,
             "orientation": "auto", "dim": "2d",
             "price": 450, "fee": 8,
             "reveal": {"kind": "direct", "appear_after": 10, "needs_games": 11},
-            "desc": "five in a row on an endless sketch grid - the workshop version is baking",
-            "age": "3"},
+            "desc": "five in a row on an endless sketch grid - the workshop version is baking"},
         {"id": "dots", "title": "DOTS", "tag": "close the boxes", "coming_soon": true,
             "orientation": "auto", "dim": "2d",
             "price": 450, "fee": 8,
             "reveal": {"kind": "direct", "appear_after": 11, "needs_games": 12},
-            "desc": "draw lines between dots, close boxes, take the board - the workshop version is baking",
-            "age": "3"},
+            "desc": "draw lines between dots, close boxes, take the board - the workshop version is baking"},
 
 ]
-
-# ====================================================================== THE
-# ================================================ AGE RATING SYSTEM (extra)
-# v0.3.7-1 - the owner's new age scheme. THE FULL LEGAL DESCRIPTIONS LIVE
-# HERE AS CODE COMMENTS (the owner's own instruction: "write them as code
-# comments, later we may need them if i made the agreement"). The box
-# SHIPS as a +9 everyone game box; every game tagged above +9 is hidden
-# from the app completely (age_allowed() filters the shelf, the feed and
-# the search). The "!" settings door shows these tiers to the player.
-#
-#   +3  EVERYONE - no specified age. Games for any human alive: no
-#       violence beyond cartoon slapstick, no reading walls, no scares,
-#       nothing that needs life experience. (xo, Snowy Tower, Geometry
-#       Flash, Maze Escaper, PONG...)
-#   +5  SIMPLE - designed so a 5-year-old can hold it: big targets, one
-#       verb, no fail spirals, no text puzzles. Still clean for everyone.
-#       (Snake, 2048, Matcher...)
-#   +7  MODERATE - moderate puzzles and simple hitting combats or basic
-#       shooting WITHOUT any graphical content: no blood, no bone sounds,
-#       no weird stuff. Losing is friendly. (Space Dash, Fruit Slasher,
-#       Cursed Dario, Pop Siege...)
-#   +9  LITTLE VIOLENCE / TACTICAL - a bit of hitting that reads as real,
-#       tactical loadouts, consequences on screen - but nothing graphic.
-#       THE BOX'S CEILING: what ships to the store. (Cosmic Spud - the
-#       owner's call: "even shadow fight is +7 and we are just going to
-#       add some effects, make it +9 so it not get removed".)
-#   +12 YOUNG TEENS - sexual innuendo, or intense violence with dead
-#       bodies and some graphical content, or basic horror games. Hidden
-#       in the shipped box.
-#   +16 TEENS - half nudity (topless / back nudity), or intense violence
-#       with graphical injuries and screaming, or high-level horror
-#       games. Hidden.
-#   +18 MATURE - direct gore, direct nudity, soft porn, psychological-
-#       intense horror, virtual gambling, fantasy illegal trading (drugs,
-#       weapons, thievery) and anything that direct. Hidden.
-#   +21 ADULT ONLY - direct hard porn, intense gore with no meaning or
-#       illogical roles, realistic gambling simulations, real illegal
-#       trading, political-sensitive games with real-world scenarios.
-#       Hidden. The "illegal" mode name lives behind the "!" door,
-#       GATED - the gate stays closed (the owner's own rollback of the
-#       drama: "it will remain closed anyway and gated").
-#
-# The agreement itself is NOT here yet (the owner ships its text later);
-# the "!" door carries a placeholder + the age rates sheet.
-
-## THE BOX CEILING: everything above this age tag is hidden from the
-## shipped app (the shelf, the feed, the search - everywhere).
-const BOX_MAX_AGE := 9
-
-## The numeric age of a registry entry ("3".."21"; legacy ids read as
-## their new numbers). An unknown tag reads as 3 (open by default).
-static func age_num(a: String) -> int:
-        match a:
-                "3", "everyone": return 3
-                "5": return 5
-                "7", "kids": return 7
-                "9": return 9
-                "12", "teens": return 12
-                "16": return 16
-                "18": return 18
-                "21": return 21
-        return 3
-
-## The one visibility answer for the shipped box: +9 and under shows,
-## anything stricter does not exist for the player.
-static func age_allowed(a: String) -> bool:
-        return age_num(a) <= BOX_MAX_AGE
 
 static func get_game(id: String) -> Dictionary:
         for g in GAMES:
@@ -782,9 +666,6 @@ static func playable() -> Array:
         for g in GAMES:
                 if g.get("coming_soon", false):
                         continue
-                # v0.3.7-1 THE +9 CEILING: stricter games do not ship
-                if not age_allowed(String(g.get("age", "3"))):
-                        continue
                 out.append(g)
         return out
 
@@ -792,8 +673,6 @@ static func workshop() -> Array:
         var out := []
         for g in GAMES:
                 if not g.get("coming_soon", false):
-                        continue
-                if not age_allowed(String(g.get("age", "3"))):
                         continue
                 out.append(g)
         return out

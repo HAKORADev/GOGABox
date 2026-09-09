@@ -243,8 +243,14 @@ func _goga_setup() -> void:
         _load_meta()
         _build_ready()
         Jukebox.music("res://assets/audio/music/gf_theme.ogg")
+        # v0.3.7-2 THE FLAT WAIT LAW (the owner: "make it while in the
+        # 'tap anywhere' menu to just make the world flat as i said"): the
+        # patch-1 fix did not work because _gen_ahead() still ran HERE -
+        # it prefilled real chunks into the view before the gate showed,
+        # so the wait never saw a flat world. Setup seeds the flat runway
+        # only; the ready tick feeds flat ground + roof forever (zero
+        # structures, zero threats), and the run generates past it.
         _seed_world()
-        _gen_ahead()
         # THE GEOQUARE LORE (v0.3.7): the story box opens ONCE EVER - the
         # first launch only (the dario/invaders dialogue bones). Every later
         # boot goes straight to the ready gate.
@@ -620,6 +626,11 @@ func _ready_start() -> void:
         player["ground"] = true
         player["rot"] = 0.0
         pspr.position = Vector2(player["x"], player["y"])
+        # v0.3.7-2 THE CALM RE-STAMP: the wait can scroll the world as long
+        # as it likes (the flat feed runs forever) - the 6s calm runway is
+        # measured from WHERE THE WAIT ENDED, so the OPENING LAW holds no
+        # matter how long the lore was read.
+        calm_until = world_x + BASE_SPEED * 6.0
         # THE FIRST-APPEAR LAWS: no coin and no power-up at the start -
         # the first of each waits its full random window from NOW.
         coin_timer = _coin_roll()
@@ -1920,8 +1931,15 @@ func _chunk_deck(x: float) -> float:
                         for i in run:
                                 var yy := y - (CELL if i == notch else 0.0)
                                 _add_block(dx + float(i) * CELL, yy, 2 if i == notch else 1)
-                                _add_orbit(dx + float(i) * CELL + CELL * 0.5,
-                                        yy - (CELL + 115.0) if i == notch else y - 115.0)
+                                # v0.3.7-2 THE NOTCH ORBIT LAW (the world audit
+                                # catch): the orbit BEFORE the notch sat at the
+                                # notch block's edge - one cell taller than the
+                                # deck line, the ring grazed the stone. The
+                                # notch's own high orbit marks the hop; the
+                                # approach slot stays empty.
+                                if i != notch - 1:
+                                        _add_orbit(dx + float(i) * CELL + CELL * 0.5,
+                                                yy - (CELL + 115.0) if i == notch else y - 115.0)
                         dx += float(run) * CELL
                         _add_col(dx, 1, GROUND_Y)
                 _:
@@ -2040,7 +2058,13 @@ func _chunk_gate(x: float) -> float:
         var ax := x + CELL * 4.0
         _add_col(ax, 2, GROUND_Y)                 # the ground pillar
         _add_hang(ax, 2, L3_Y - CELL * 2.0)       # the hanging pillar above
-        _add_orbit(ax + CELL * 0.5, GROUND_Y - CELL * 0.5)
+        # v0.3.7-2 THE DOORWAY LAW (the world audit catch): the welcome
+        # orbit used to sit INSIDE the ground pillar (y = GROUND_Y - 0.5C
+        # is deep in the stone) - the owner's "an orbit directly literally
+        # overlapped in a block". It lives in the doorway lane now: between
+        # the pillar top (GROUND_Y - 2C) and the hang bottom, where the
+        # hop through the gate actually flies.
+        _add_orbit(ax + CELL * 0.5, GROUND_Y - CELL * 2.7)
         _add_orbit(ax + CELL * 2.4, GROUND_Y - CELL * 1.6)
         if _level() >= 2 and rng.randf() < 0.4:
                 _add_spike3(x + w - CELL * 1.5, GROUND_Y)
@@ -2059,7 +2083,10 @@ func _chunk_valley(x: float) -> float:
         var pit := CELL * 2.2
         var px := bx + CELL * 2.6
         _add_gseg(px, px + pit)                   # the dip floor (raised edge)
-        _orbit_arc(px, pit, GROUND_Y)
+        # v0.3.7-2 THE ARC MARGIN LAW (the world audit catch): the arc ran
+        # edge to edge - its end orbits sat INSIDE the far bank's blocks.
+        # Both ends pull half a cell inward so every ring keeps its air.
+        _orbit_arc(px + CELL * 0.5, pit - CELL, GROUND_Y)
         var fx := px + pit + CELL * 0.6
         _add_col(fx, 2, GROUND_Y)                 # the far bank, one higher
         _add_col(fx + CELL, 2, GROUND_Y)

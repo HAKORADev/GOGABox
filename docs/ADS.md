@@ -1,15 +1,14 @@
 # ADS
 
-## GOGAds - the in-house layer (v0.3.7-1)
+## GOGAds - REMOVED (v0.3.7-2)
 
-Beyond the Unity Ads integration below, the box now carries **GOGAds** -
-the owner-managed in-house ad framework (`game/core/gogads.gd`, autoload):
-baked ads (`assets/gogads/index.json`), developer-registered ads (the
-shared system, `only_me` loyalty) and link ads (the device browser).
-Breaks configure per game in the registry (`"gogads": {"start"/"end":
-{"frequency", "total", "tags", "level_min/max"}}`), the picker matches
-tags/subs/levels (the WTF-ometer 0..3), the ledger caps each state per
-day (12AM reset). Full spec: `docs/goga_docs/plans/PLAN_v0.3.7-1.md`.
+The in-house ad framework (autoload `game/core/gogads.gd` + the baked
+index + the registry break keys + the host start/end hooks) was REMOVED
+whole by the owner's call ("nuke GOGAds, that's done"). The full spec is
+archived in
+`docs/goga_docs/brainstorms/THE_APP_STORE_QUESTION.md` so a future round
+can resurrect it. The house Unity banner (below) is a different, older
+system - it stays.
  — Unity Ads integration
 
 Monetization is a **shared plugin + per-project config**. Nothing ad-related
