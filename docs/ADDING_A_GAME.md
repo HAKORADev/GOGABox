@@ -9,6 +9,11 @@
 1. **Register the game** — `projects/gogabox/game/core/registry.gd`:
    id, display name, price (GOGACoins), meta tags (age/genre/subs), state
    (PLAYABLE / SOON / GATED), description ("tag" used by the pre-play ? menu).
+   Achievements are DATA now (v0.3.7-1): each `ach` entry carries a
+   `tier` (1-4, colors the popup) and a `rule`
+   (`{"k": "score"|"cnt"|"max"|"stat", "key", "v"}`) that the base
+   evaluates - no per-id code anywhere. Optional GOGAds breaks ride the
+   entry too (`"gogads": {...}`).
 2. **Write the game script** — one file under
    `projects/gogabox/game/games/<id>/<id>.gd` extending `GogaGame`
    (see `docs/goga_docs/plans/BOX_CORE_DESIGN.md` for the contract:

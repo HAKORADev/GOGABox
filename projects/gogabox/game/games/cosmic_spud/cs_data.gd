@@ -72,12 +72,17 @@ const WEAPONS := {
         "gravity":   {"name": "GRAVITY WELL",   "dmg": 18.0, "cad": 2.20, "rng": 420.0,
                 "pspd": 260.0, "count": 1, "spread": 0.0, "pierce": 0, "price": 900,
                 "shot": "cs_boom", "proj": "orb", "aoe": 90.0, "pull": 2.0},
+        "molotov":   {"name": "MOLOTOV PEEL",   "dmg": 12.0, "cad": 2.40,
+                "rng": 400.0, "pspd": 540.0, "count": 1, "spread": 0.04,
+                "pierce": 0, "price": 640, "shot": "cs_burn", "proj": "bottle",
+                "pool": 3.4, "pool_r": 96.0},
         "cleaver":   {"name": "PEEL CLEAVER",    "dmg": 16.0, "cad": 0.55, "rng": 130.0,
                 "pspd": 0.0, "count": 1, "spread": 0.0, "pierce": 99, "price": 350,
                 "shot": "cs_slash", "proj": "melee", "melee": true, "arc": 2.1},
 }
 const WEAPON_ORDER := ["smg", "shotgun", "rifle", "laser", "cannon", "frost",
-        "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "cleaver"]
+        "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "molotov",
+        "cleaver"]
 ## the 3 weapons every new player owns (the owner: "starts with only 3")
 const START_WEAPONS := ["smg", "shotgun", "rifle"]
 ## THE VARIED HOLSTER LAW (v0.3.4-5, the owner: "it is weird how all types of

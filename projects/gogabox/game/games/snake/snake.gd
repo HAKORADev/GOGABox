@@ -62,6 +62,14 @@ const PRICE_OBSTACLES := 300
 const PRICE_ENEMIES := 1200     # THE most expensive thing in the shop
 const PRICE_NIGHT := 250        # the night garden place
 const PRICE_JUMP := 350         # JUMPING FRUITS (owner v0.2.2)
+# v0.3.7-1 THE ENDLESS MODE (the owner, item 18): the third play mode -
+# "bought first for high expensive price". The priciest thing on the shelf.
+const PRICE_ENDLESS := 1500
+# the endless WORLD: board size as a multiple of the live view (snake.io
+# room: the snakes get big space, the food spawns FAR)
+const ENDLESS_WORLD_MULT := 3.2
+const ENDLESS_FRUIT_MIN := 1.5  # fruit distance, in screen diagonals (owner)
+const ENDLESS_FRUIT_MAX := 2.0
 
 # ---------------------------------------------------------- palette (skins)
 const TONGUE_RED := Color("e8402f")
@@ -91,6 +99,9 @@ var board := Rect2(0, 0, 100, 100)
 var banner_on := false
 var orient := "vertical"        # the ASKED play position (overwrites auto)
 var wrap_mode := false          # NO-WALLS mode
+# v0.3.7-1 THE ENDLESS MODE: the big wall-less world + the camera + the
+# far spawns + the fruit compass arrow. needs the pack at 3+ snakes.
+var endless_mode := false
 var peace := false              # PEACE STYLE (owner v0.2.0)
 var place := "day"              # the garden: "day" / "night"
 var _phase := "orient"          # orient -> mode -> ready -> run
@@ -190,6 +201,15 @@ func _goga_setup() -> void:
         var forced := start_orientation
         orient = forced if forced != "" else _auto_orient()
         wrap_mode = bool(Box.get_progress(game_id, "mode_nowalls", false))
+        # v0.3.7-1: the endless pick persists - but the gate re-reads (an
+        # unowned mode or a thin pack falls back to no-walls)
+        endless_mode = bool(Box.get_progress(game_id, "mode_endless", false))
+        if endless_mode and (not Box.unlock_owned(game_id, "endless") \
+                        or int(Box.get_progress(game_id, "enemy_count", 1)) < 3):
+                endless_mode = false
+                wrap_mode = bool(Box.get_progress(game_id, "mode_nowalls", false))
+        if endless_mode:
+                wrap_mode = true
         _build_field()
         player = SnakeBody.new()
         player.base_speed = START_SPEED
@@ -230,16 +250,51 @@ func _build_field() -> void:
                 bottom = _banner_safe_px()
         var w := maxf(100.0, vp.x - 16.0)
         var h := maxf(100.0, vp.y - top - bottom - 8.0)
+        if endless_mode:
+                # v0.3.7-1 THE BIG WORLD: the field becomes a wall-less
+                # world ENDLESS_WORLD_MULT x the live view per side - the
+                # camera follows the head, the food lives far, the snakes
+                # finally get snake.io room to grow
+                w *= ENDLESS_WORLD_MULT
+                h *= ENDLESS_WORLD_MULT
         board = Rect2(Vector2((vp.x - w) / 2.0, top + 4.0), Vector2(w, h))
         _build_garden()
+
+## the live view rect (the screen area the world is watched through) -
+## the camera + the fruit arrow both read this.
+func _view_rect() -> Rect2:
+        var vp := get_viewport_rect().size
+        var top := 108.0
+        var bottom := 14.0
+        if banner_on:
+                bottom = _banner_safe_px()
+        return Rect2(8.0, top + 4.0, vp.x - 16.0, vp.y - top - bottom - 8.0)
+
+## the camera: the world→screen offset so the head stays framed (clamped
+## inside the world; when the view is bigger than a world axis it centers).
+func _cam_offset() -> Vector2:
+        if not endless_mode:
+                return Vector2.ZERO
+        var vr := _view_rect()
+        var head: Vector2 = player.head_pos
+        var half := vr.size * 0.5
+        var lo: Vector2 = board.position + half
+        var hi: Vector2 = board.end - half
+        var cam := Vector2(
+                clampf(head.x, minf(lo.x, hi.x), maxf(lo.x, hi.x)),
+                clampf(head.y, minf(lo.y, hi.y), maxf(lo.y, hi.y)))
+        return vr.get_center() - cam
 
 ## The garden dressing: deco blobs (both places), stars + fireflies (night).
 func _build_garden() -> void:
         var rng := RandomNumberGenerator.new()
         rng.seed = 7
+        # v0.3.7-1: the big endless world wears proportionally more dressing
+        var n_deco := 24 if endless_mode else 6
+        var n_flies := 56 if endless_mode else 20
         # deco blobs live in board space (fractions of the field)
         var deco: Array = []
-        for i in 6:
+        for i in n_deco:
                 deco.append({
                         "fx": rng.randf_range(0.08, 0.92),
                         "fy": rng.randf_range(0.08, 0.92),
@@ -263,7 +318,7 @@ func _build_garden() -> void:
         _stars = stars
         # the tiny flies (the owner's 3D snake, ported): wander + layered blink
         var flies: Array = []
-        for i in 20:
+        for i in n_flies:
                 flies.append({
                         "base": Vector2(rng.randf_range(board.position.x + 30.0,
                                         board.end.x - 30.0),
@@ -325,10 +380,12 @@ func _populate_world() -> void:
         if war and _opt_on("bugs") and Box.unlock_owned(game_id, "bugs"):
                 for i in 2:
                         bugs.append(_new_bug())
-        if war and _opt_on("enemies"):
+        if war and _opt_on("enemies") or (endless_mode and war):
                 var n := 1
                 if Box.unlock_owned(game_id, "pack"):
                         n = clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
+                if endless_mode:
+                        n = maxi(n, 3)   # the endless world IS a pack world
                 for i in n:
                         _add_enemy(i)
         _spawn_fruit(true)
@@ -351,6 +408,15 @@ func _add_enemy(i: int) -> void:
         var ang := randf() * TAU
         var c := board.get_center() + Vector2.from_angle(ang) \
                         * minf(board.size.x, board.size.y) * 0.32
+        if endless_mode:
+                # v0.3.7-1 THE FAR PACK LAW (the owner: "the enemies will
+                # spawn in far distances"): 1.2-1.8 screen diagonals away,
+                # clamped inside the world
+                var vr := _view_rect()
+                var far := vr.size.length() * randf_range(1.2, 1.8)
+                c = player.head_pos + Vector2.from_angle(ang) * far
+                c = Vector2(clampf(c.x, board.position.x + 90.0, board.end.x - 90.0),
+                                clampf(c.y, board.position.y + 90.0, board.end.y - 90.0))
         b.setup(c, ang + PI, col, SnakeFruits.milk_for(col))
         enemies.append({
                 "body": b,
@@ -532,13 +598,18 @@ func _show_mode_select() -> void:
         row.add_child(_mode_card("CLASSIC", "walls end the run", not wrap_mode,
                         func():
                                 wrap_mode = false
+                                endless_mode = false
                                 Box.set_progress(game_id, "mode_nowalls", false)
                                 _show_ready_card()))
-        row.add_child(_mode_card("NO-WALLS", "wrap edge to edge", wrap_mode,
+        row.add_child(_mode_card("NO-WALLS", "wrap edge to edge", wrap_mode and not endless_mode,
                         func():
                                 wrap_mode = true
+                                endless_mode = false
                                 Box.set_progress(game_id, "mode_nowalls", true)
                                 _show_ready_card()))
+        # v0.3.7-1 THE THIRD CARD - ENDLESS: the big world. Owned + a real
+        # pack (3+ selected snakes) are the door; a thin pack stays out.
+        row.add_child(_endless_card())
         var ot := Arc.label("OPTIONALS", 26, Color("6a5ab8"))
         ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(ot)
@@ -646,10 +717,84 @@ func _show_ready_card() -> void:
 
 func _ready_subline() -> String:
         var place_name: String = SnakeFruits.PLACES[place]["name"]
-        var bits := [place_name, "NO-WALLS - wrap walls" if wrap_mode else "CLASSIC walls"]
+        var bits: Array = [place_name]
+        if endless_mode:
+                bits.append("ENDLESS - the big world")
+        else:
+                bits.append("NO-WALLS - wrap walls" if wrap_mode else "CLASSIC walls")
         if peace:
                 bits.append("PEACE")
         return "  ·  ".join(bits)
+
+## v0.3.7-1 THE ENDLESS CARD: the expensive third mode. The gate reads the
+## shop (owned?) and the pack (3+ snakes selected?) - a locked card says
+## WHY it is locked (the grayed-out law: a dry wallet never buys).
+func _endless_card() -> Button:
+        var owned := Box.unlock_owned(game_id, "endless")
+        var enemies := int(Box.get_progress(game_id, "enemy_count", 1))
+        var pack_ok := enemies >= 3
+        var selected := endless_mode
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(280, 110)
+        var sb: StyleBoxFlat
+        if not owned or not pack_ok:
+                sb = Arc.panel_style(Color(0.82, 0.80, 0.76, 0.55), 20, 10)
+                sb.set_border_width_all(3)
+                sb.border_color = Color(0, 0, 0, 0.10)
+        else:
+                sb = Arc.panel_style(Color("b88ae8") if selected else Arc.CARD, 20, 10)
+                if not selected:
+                        sb.set_border_width_all(3)
+                        sb.border_color = Color("b88ae8")
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var vb := VBoxContainer.new()
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_theme_constant_override("separation", 2)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(vb)
+        var ink := Color(0.4, 0.32, 0.22)
+        var sub: String
+        if not owned:
+                sub = "%d in the shop" % PRICE_ENDLESS
+        elif not pack_ok:
+                sub = "needs 3+ snakes (now %d)" % enemies
+        else:
+                sub = "the big world - x%.1f space" % ENDLESS_WORLD_MULT
+                ink = Arc.INK if selected else Color(0.4, 0.32, 0.22)
+        var l := Arc.label("ENDLESS", 30, ink)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(l)
+        var s := Arc.label(sub, 16, Color(0.55, 0.48, 0.38) if not selected else Color(0.35, 0.28, 0.18), false)
+        s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(s)
+        b.pressed.connect(func():
+                        if not owned:
+                                game_toast("ENDLESS lives in the shop - %d coins" % PRICE_ENDLESS)
+                                Jukebox.sfx("error", -6.0)
+                                return
+                        if not pack_ok:
+                                game_toast("the endless world needs 3+ snakes selected")
+                                Jukebox.sfx("error", -6.0)
+                                return
+                        Jukebox.sfx("click", -4.0)
+                        endless_mode = true
+                        wrap_mode = true   # the big world has no walls
+                        Box.set_progress(game_id, "mode_endless", true)
+                        _apply_field_size()
+                        _show_ready_card())
+        return b
+
+## the mode pick re-sizes the world: the field, the dressing and the
+## starting stance all rebuild for the shape the run will actually play.
+func _apply_field_size() -> void:
+        _build_field()
+        _reset_world()
 
 func _card_step(s: float, cc: Control) -> void:
         if not is_instance_valid(cc):
@@ -992,6 +1137,30 @@ func _spawn_fruit(first := false) -> void:
         var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
         edible_id = SnakeFruits.roll_edible(owned, mode)
         var m := apple_r + 20.0
+        if endless_mode:
+                # v0.3.7-1 THE FAR FRUIT LAW (the owner, item 18): "fruit will
+                # spawn in-screen space up to far away from x1.5 to x2 from
+                # current position" - the compass arrow (in _paint) makes the
+                # hunt readable
+                var vr := _view_rect()
+                var diag := vr.size.length()
+                var ang := randf() * TAU
+                var dist := diag * randf_range(ENDLESS_FRUIT_MIN, ENDLESS_FRUIT_MAX)
+                var p := player.head_pos + Vector2.from_angle(ang) * dist
+                apple_pos = Vector2(
+                        clampf(p.x, board.position.x + m, board.end.x - m),
+                        clampf(p.y, board.position.y + m, board.end.y - m))
+                apple_r = clampf(player.width * 0.85, 22.0, 42.0)
+                apple_live = true
+                apple_pop = 0.0
+                jump_t = randf_range(JUMP_WINDOW_MIN, JUMP_WINDOW_MAX)
+                if _apple_tween != null and _apple_tween.is_valid():
+                        _apple_tween.kill()
+                _apple_tween = create_tween()
+                _apple_tween.tween_property(self, "apple_pop", 1.0, 0.24) \
+                                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+                _ring(apple_pos, SnakeFruits.fruit_body(edible_id))
+                return
         var best := Vector2.ZERO
         var best_d := -1.0
         for i in 60:
@@ -1557,6 +1726,13 @@ func _paint(v: Node2D) -> void:
         elif sky == "day":
                 _paint_sun(v, Vector2(vp.x - 88.0, 92.0))
         # the field itself
+        # v0.3.7-1 THE ENDLESS CAMERA: in the big world everything world-
+        # shaped draws through the camera offset (the head stays framed).
+        # The sky/void above stayed screen-space on purpose - the sky does
+        # not scroll with the world.
+        var cam_off := _cam_offset()
+        if endless_mode:
+                v.draw_set_transform(cam_off, 0.0, Vector2.ONE)
         v.draw_rect(board, pl["field"])
         # drifting deco blobs (super subtle, alive) - also OUTSIDE the field
         var deco: Array = get_meta("deco", [])
@@ -1629,6 +1805,51 @@ func _paint(v: Node2D) -> void:
                 var col: Color = m["c"]
                 col.a = a
                 v.draw_circle(m["p"], float(m["r"]) * (0.5 + 0.5 * a), col)
+        if endless_mode:
+                # back to screen space for the HUD-shaped overlay
+                v.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                _paint_fruit_arrow(v, cam_off)
+
+## v0.3.7-1 THE FRUIT COMPASS (the owner, item 18: "when spawn out of
+## screen area some where, it will show an arrow at the top that points at
+## where the fruit currently is and the arrow change its position
+## depending on where the fruit currently is based on where the user's
+## snake is"): the ray from the head through the fruit hits the top strip;
+## the arrow rides that point and aims along the true bearing. Hidden the
+## moment the fruit is on screen.
+func _paint_fruit_arrow(v: Node2D, cam_off: Vector2) -> void:
+        if not apple_live or apple_pop < 0.4:
+                return
+        var vr := _view_rect()
+        var head_s: Vector2 = player.head_pos + cam_off
+        var fruit_s: Vector2 = apple_pos + cam_off
+        var pad := 30.0
+        if vr.grow(-pad).has_point(fruit_s):
+                return   # visible - no compass
+        var dir := fruit_s - head_s
+        if dir.length() < 1.0:
+                return
+        dir = dir.normalized()
+        # the ray to the top strip (falls back to the side clamps)
+        var edge_y := vr.position.y + 52.0
+        var ax: float
+        if dir.y < -0.08:
+                var t := (edge_y - head_s.y) / dir.y
+                ax = head_s.x + dir.x * t
+        else:
+                ax = head_s.x + signf(dir.x) * vr.size.x * 0.5
+        ax = clampf(ax, vr.position.x + 70.0, vr.end.x - 70.0)
+        var at := Vector2(ax, edge_y)
+        var col: Color = SnakeFruits.fruit_body(edible_id)
+        var pulse := 1.0 + 0.10 * sin(_time * 6.0)
+        # the pointer: a slim isoceles triangle aimed at the bearing
+        var tip := at + dir * (26.0 * pulse)
+        var l := at + dir.rotated(2.5) * (16.0 * pulse)
+        var r := at + dir.rotated(-2.5) * (16.0 * pulse)
+        v.draw_colored_polygon(PackedVector2Array([tip, l, r]),
+                        Color(col.r, col.g, col.b, 0.95))
+        v.draw_circle(at, 7.0 * pulse, Color(col.r, col.g, col.b, 0.5))
+        v.draw_circle(at, 3.2, Color(1, 1, 1, 0.9))
 
 ## soft ground shadow (day garden = the sun's; night = faint moon shade)
 func _ground_shadow(v: Node2D, at: Vector2, r: float, scale: float) -> void:
@@ -2109,16 +2330,25 @@ func _shop_fill(v: VBoxContainer) -> void:
                 info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 info.custom_minimum_size = Vector2(596, 0)
                 v.add_child(info)
-                var ebtn := Arc.button("UNLOCKS SNAKE-EATER", Vector2(560, 62), 20,
-                                Color("e8402f"))
-                ebtn.disabled = true
-                v.add_child(ebtn)
         else:
-                var eb := Arc.coin_button("ENEMY PACK x10  %d" % PRICE_ENEMIES,
-                                Vector2(560, 66), 22, Color("3fae5c"),
-                                func(): _buy_pack_action())
-                _gray_if_broke(eb, PRICE_ENEMIES)
-                v.add_child(eb)
+                v.add_child(_unlock_row("THE PACK",
+                                "up to 10 snakes, each its own color - pick the count in the optionals",
+                                "pack", PRICE_ENEMIES))
+        # ---- v0.3.7-1 ENDLESS (the owner, item 18): the third mode - the
+        # big wall-less world, the far spawns, the fruit compass. THE
+        # priciest thing on the shelf; needs the pack at 3+ snakes to use.
+        v.add_child(_section_label("ENDLESS - the big world"))
+        if Box.unlock_owned(game_id, "endless"):
+                var ei := Arc.fit_label("OWNED - pick it from the mode menu (it wants 3+ snakes selected)",
+                                20, Color("6a4a28"), 596, false)
+                ei.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                ei.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                ei.custom_minimum_size = Vector2(596, 0)
+                v.add_child(ei)
+        else:
+                v.add_child(_unlock_row("ENDLESS MODE",
+                                "a x3.2 wall-less world - the snakes roam far, the fruit spawns 1.5-2 screens away and the compass arrow shows the way",
+                                "endless", PRICE_ENDLESS))
 
 func _section_label(txt: String) -> Label:
         # v0.1.5 lesson: Kenney Rocket runs WIDE - long section names blew the

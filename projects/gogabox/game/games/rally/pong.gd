@@ -534,6 +534,9 @@ func _add_pad(id: String, is_user: bool, edge: String, axis: int,
                 "c": c, "len": PAD_NORMAL, "mega_t": 0.0, "mega_len": 0.0,
                 "ai_speed": ai_speed, "ai_target": 0.0, "ai_t": 0.0,
                 "err": 0.0,
+                # v0.3.7-1 THE NO-TELEPORT LAW: the user pad carries a follow
+                # TARGET - the finger writes the target, the pad GLIDES to it
+                "follow": c,
                 # v0.2.3 patch: per-pad brain knobs - the extra walls think
                 # faster and steadier (the owner's "more smarter")
                 "think": 0.10 if extra else AI_THINK,
@@ -694,16 +697,23 @@ func _goga_input(event: InputEvent) -> void:
                 if d.index == _held:
                         _follow_finger(d.position)
 
+## THE NO-TELEPORT LAW (v0.3.7-1, the owner's item 17): "if the platform
+## is at 10 and the finger was removed, then the finger went to 90, the
+## platform will literally teleport to 90 - a proper design can be making
+## it move smoothly and the speed get modified based on the distance".
+## The finger now writes a TARGET; _goga_tick glides the pad toward it at
+## a speed proportional to the gap (a far flick closes fast, a small drag
+## tracks tight) - responsive, never a jump.
 func _follow_finger(at: Vector2) -> void:
         var p: Dictionary = pads_by_id.get("user", null)
         if p == null:
                 return
         var half := _pad_half_len(p)
         if int(p["axis"]) == 0:
-                p["c"] = Vector2(clampf(at.x, field.position.x + half,
-                                field.end.x - half), (p["c"] as Vector2).y)
+                p["follow"] = Vector2(clampf(at.x, field.position.x + half,
+                                field.end.x - half), (p["follow"] as Vector2).y)
         else:
-                p["c"] = Vector2((p["c"] as Vector2).x,
+                p["follow"] = Vector2((p["follow"] as Vector2).x,
                                 clampf(at.y, field.position.y + half,
                                 field.end.y - half))
 
@@ -730,6 +740,19 @@ func _goga_tick(delta: float) -> void:
                 _push_trail()
         _tick_walls_and_goals()
         _tick_pads()
+        # v0.3.7-1 THE GLIDE: the user pad moves toward its follow target -
+        # speed = the gap x rate (distance-proportional, the owner's own
+        # design), clamped to a ceiling so even a full-screen flick reads
+        # as a fast SLIDE, never a teleport. Small gaps track near 1:1.
+        var up: Dictionary = pads_by_id.get("user", {})
+        if not up.is_empty():
+                var fc: Vector2 = up["c"] as Vector2
+                var tg: Vector2 = up["follow"] as Vector2
+                var gap: float = fc.distance_to(tg)
+                if gap > 0.5:
+                        var step: float = clampf(gap * 14.0 * delta, 0.0,
+                                        minf(gap, 4200.0 * delta))
+                        up["c"] = fc.move_toward(tg, step)
         _tick_coins(delta)
         _tick_pus(delta)
         for p in pads:

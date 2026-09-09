@@ -56,6 +56,21 @@ func _next() -> void:
 func _paint_achievement(item: Dictionary) -> void:
         var g := GameReg.get_game(String(item["game"]))
         var ach: Dictionary = item["ach"]
+        # v0.3.7-1 THE TIER COLORS: bronze / silver / gold / platinum ride
+        # the entry's tier - the border wears the medal
+        var tier := int(ach.get("tier", 1))
+        var tier_col := Color("b0783c")
+        var tier_name := "BRONZE"
+        match tier:
+                2:
+                        tier_col = Color("a8b0bc")
+                        tier_name = "SILVER"
+                3:
+                        tier_col = Color("e8b23a")
+                        tier_name = "GOLD"
+                4:
+                        tier_col = Color("7ad8e8")
+                        tier_name = "PLATINUM"
 
         var root := Control.new()
         root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -64,7 +79,7 @@ func _paint_achievement(item: Dictionary) -> void:
 
         var panel := PanelContainer.new()
         var sb := Arc.panel_style(Color(0.14, 0.08, 0.03, 0.94), 24, 14)
-        sb.border_color = Arc.ACCENT
+        sb.border_color = tier_col
         sb.set_border_width_all(3)
         sb.shadow_color = Color(0, 0, 0, 0.5)
         sb.shadow_size = 12
@@ -86,7 +101,7 @@ func _paint_achievement(item: Dictionary) -> void:
         var v := VBoxContainer.new()
         v.add_theme_constant_override("separation", 2)
         h.add_child(v)
-        var head := Arc.label("ACHIEVEMENT UNLOCKED!", 20, Arc.ACCENT)
+        var head := Arc.label("%s UNLOCKED!" % tier_name, 20, tier_col)
         v.add_child(head)
         var name_l := Arc.label("%s  -  %s" % [String(g.get("title", "")), String(ach.get("title", ""))],
                         30, Arc.CARD)

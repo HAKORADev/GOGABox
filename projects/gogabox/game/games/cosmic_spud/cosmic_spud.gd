@@ -200,7 +200,8 @@ func _t(key: String) -> Texture2D:
                         paths["icon_" + wid] = base + "weapons/icon_" + wid + ".png"
                         paths["gun_" + wid] = base + "weapons/gun_" + wid + ".png"
                 for proj in ["bolt", "pellet", "slug", "lance", "bomb", "shard",
-                                "rail", "spit", "orb", "boomerang", "tracer"]:
+                                "rail", "spit", "orb", "boomerang", "tracer",
+                                "bottle"]:
                         paths["proj_" + proj] = base + "bullets/" + proj + ".png"
                 # v0.3.5-5 THE ALLY TRUTH (the crash law): the allies wore tex
                 # keys that were NEVER registered here - the engineer's drop-in
@@ -1184,7 +1185,6 @@ func _fire_weapon(w: Dictionary) -> bool:
                         _orbital_strike(te["pos"], dmg, float(wd.get("aoe", 60.0)))
                         continue
                 _spawn_bullet(p_pos + Vector2.from_angle(a) * 26.0, a, wd, dmg, pierce, tier)
-        Jukebox.sfx(shot_name, -6.0, randf_range(0.94, 1.06))
         # v0.3.4-4 THE NO-SHOOT-VFX LAW (the owner: "remove the shooting
         # flickers/lights or whatever VFX you did, it's ugly anyway"): the
         # muzzle flash is DEAD - the patch-3 FLASH LAW with it. The gun speaks
@@ -1231,6 +1231,9 @@ func _spawn_bullet(pos: Vector2, a: float, wd: Dictionary, dmg: float,
                                 or bool(stats["burn_hit"]),
                 "chill": float(wd.get("chill", 0.0)), "kind": kind,
                 "node": spr, "turn": false, "tier": tier,
+                # v0.3.7-1 THE MOLOTOV: the bottle carries its fire pool spec
+                "pool": float(wd.get("pool", 0.0)),
+                "pool_r": float(wd.get("pool_r", 0.0)),
         }
         if kind == "boomerang":
                 b["home"] = null
@@ -1274,6 +1277,16 @@ func _ally_cap() -> int:
         return meta.ally_slots()
 
 func _tick_allies(delta: float) -> void:
+        # v0.3.7-1 THE LEVEL SIGNATURES (the owner, item 19: "make sure
+        # their abilities really differ and upgrading them is really deep"):
+        # every ally's L2/L3 adds a BEHAVIOR, not just a number -
+        #   drone   L2 twin shot            L3 piercing rounds
+        #   turret  L2 faster sweep         L3 explosive shells
+        #   guard   L2 wider aura           L3 the aura slows the swarm
+        #   medic   L2 stronger care        L3 the pulse turns fiery - it
+        #             also SEARS enemies that crowd you (burn dps)
+        #   bomber  L2 bigger blast         L3 the dive leaves a FIRE POOL
+        #   scout   L2 deeper marks (+30%)  L3 a three-dart burst
         for a in allies:
                 var aid: String = a["id"]
                 var lv: int = int(a["level"])
@@ -1289,7 +1302,12 @@ func _tick_allies(delta: float) -> void:
                                         if tgt != null:
                                                 var dir: Vector2 = tgt["pos"] - a["pos"]
                                                 _ally_bullet(a["pos"], dir.angle(),
-                                                                4.0 + 2.0 * lv * float(stats["ally_dmg"]))
+                                                                4.0 + 2.0 * lv * float(stats["ally_dmg"]),
+                                                                1 if lv >= 3 else 0)
+                                                if lv >= 2:
+                                                        _ally_bullet(a["pos"], dir.angle() + 0.14,
+                                                                        4.0 + 2.0 * lv * float(stats["ally_dmg"]),
+                                                                        1 if lv >= 3 else 0)
                         "turret":
                                 if a["pos"].distance_to(p_pos) > 260.0:
                                         a["state"] = "move"
@@ -1300,19 +1318,32 @@ func _tick_allies(delta: float) -> void:
                                                 a["state"] = ""
                                 a["cd"] -= delta * float(stats["ally_dmg"])
                                 if a["cd"] <= 0.0:
-                                        a["cd"] = 0.42
+                                        a["cd"] = 0.42 if lv < 2 else 0.28
                                         var tgt2: Variant = _nearest_enemy(a["pos"], 440.0)
                                         if tgt2 != null:
                                                 var d2: Vector2 = tgt2["pos"] - a["pos"]
                                                 _ally_bullet(a["pos"], d2.angle(),
-                                                                6.0 + 3.0 * lv * float(stats["ally_dmg"]))
+                                                                6.0 + 3.0 * lv * float(stats["ally_dmg"]),
+                                                                1 if lv >= 3 else 0)
+                                                if lv >= 3:
+                                                        # THE EXPLOSIVE SHELLS: a small
+                                                        # boom on the first body
+                                                        _boom_at(tgt2["pos"], 46.0,
+                                                                        (4.0 + 3.0 * lv) * 0.6
+                                                                        * float(stats["ally_dmg"]), false)
                         "guard":
+                                var aura_r: float = GUARD_AURA * (1.35 if lv >= 2 else 1.0)
                                 var threat := Vector2.ZERO
                                 var tn := 0
                                 for e in enemies:
-                                        if e["pos"].distance_to(p_pos) < 140.0:
+                                        if e["pos"].distance_to(p_pos) < aura_r:
                                                 threat += e["pos"]
                                                 tn += 1
+                                                # L3: THE DREAD AURA - the swarm inside
+                                                # slows (they wade through the guard's
+                                                # presence)
+                                                if lv >= 3:
+                                                        e["chill_t"] = maxf(float(e.get("chill_t", 0.0)), 0.2)
                                 if tn > 0:
                                         a["pos"] = a["pos"].lerp(p_pos + (threat / float(tn) - p_pos).normalized() * 40.0,
                                                         6.0 * delta)
@@ -1323,12 +1354,20 @@ func _tick_allies(delta: float) -> void:
                                 a["cd"] -= delta
                                 if a["cd"] <= 0.0:
                                         a["cd"] = 2.5
-                                        _rings.append({"pos": a["pos"], "r": GUARD_AURA,
+                                        _rings.append({"pos": a["pos"], "r": aura_r,
                                                         "t": 0.55, "max": 0.55,
                                                         "col": Color(0.55, 1.0, 0.7, 0.5), "w": 4.0})
                         "medic":
                                 a["pos"] = a["pos"].lerp(p_pos + Vector2(-40, -40), 4.0 * delta)
-                                p_hp = minf(p_max_hp, p_hp + (2.0 + lv) * delta)
+                                p_hp = minf(p_max_hp, p_hp + (2.0 + lv \
+                                                + (1.5 if lv >= 2 else 0.0)) * delta)
+                                # L3: THE SEARING CARE - enemies crowding the
+                                # patient catch fire (the medic's flame of life)
+                                if lv >= 3:
+                                        for e in enemies:
+                                                if e["pos"].distance_to(p_pos) < 110.0:
+                                                        e["burn_t"] = maxf(float(e.get("burn_t", 0.0)), 1.0)
+                                                        e["burn_dps"] = maxf(float(e.get("burn_dps", 0.0)), 3.0)
                                 # the heal PULSES so the care reads
                                 a["cd"] -= delta
                                 if a["cd"] <= 0.0:
@@ -1347,8 +1386,13 @@ func _tick_allies(delta: float) -> void:
                                         else:
                                                 a["pos"] = a["pos"].move_toward(dtgt["pos"], 420.0 * delta)
                                                 if a["pos"].distance_to(dtgt["pos"]) < 26.0:
-                                                        _boom_at(a["pos"], 70.0, (14.0 + 6.0 * lv)
+                                                        _boom_at(a["pos"], 70.0 if lv < 2 else 96.0,
+                                                                        (14.0 + 6.0 * lv)
                                                                         * float(stats["ally_dmg"]), true)
+                                                        # L3: THE SCORCHED DIVE - the crash
+                                                        # site burns behind the blast
+                                                        if lv >= 3:
+                                                                _fire_pool(a["pos"], 14.0, 80.0, 2.5)
                                                         a["node"].visible = false
                                                         a["state"] = "dead"
                                                         a["t"] = 0.0
@@ -1367,9 +1411,12 @@ func _tick_allies(delta: float) -> void:
                                         a["pos"] = a["pos"].lerp(p_pos + Vector2(50, -50), 3.0 * delta)
                         "scout":
                                 a["pos"] = a["pos"].lerp(p_pos + Vector2(0, 60), 3.0 * delta)
+                                var mark_potency := 0.15 if lv < 2 else 0.30
                                 for e in enemies:
                                         if e["pos"].distance_to(p_pos) < 300.0:
                                                 e["marked"] = true
+                                                e["mark_m"] = maxf(float(e.get("mark_m", 0.15)),
+                                                                mark_potency)
                                 # THE SCOUT'S PEA SHOOTER (v0.3.5-5): the
                                 # spotter fights around with a weak dart gun
                                 a["cd"] -= delta * float(stats["ally_dmg"])
@@ -1378,8 +1425,10 @@ func _tick_allies(delta: float) -> void:
                                         var tgt4: Variant = _nearest_enemy(a["pos"], 360.0)
                                         if tgt4 != null:
                                                 var d4: Vector2 = tgt4["pos"] - a["pos"]
-                                                _ally_bullet(a["pos"], d4.angle(),
-                                                                3.0 + 1.5 * float(lv))
+                                                var shots := 3 if lv >= 3 else 1
+                                                for si in shots:
+                                                        _ally_bullet(a["pos"], d4.angle() + 0.09 * si,
+                                                                        3.0 + 1.5 * float(lv), 0)
                 a["node"].position = a["pos"]
 
 func _nearest_enemy(from: Vector2, rng: float) -> Variant:
@@ -1392,7 +1441,7 @@ func _nearest_enemy(from: Vector2, rng: float) -> Variant:
                         best = e
         return best
 
-func _ally_bullet(pos: Vector2, a: float, dmg: float) -> void:
+func _ally_bullet(pos: Vector2, a: float, dmg: float, pierce := 0) -> void:
         var spr := Sprite2D.new()
         spr.texture = _t("proj_bolt")
         spr.modulate = Color(0.7, 1, 0.85)
@@ -1400,7 +1449,8 @@ func _ally_bullet(pos: Vector2, a: float, dmg: float) -> void:
         spr.rotation = a
         spr.z_index = 6
         world.add_child(spr)
-        bullets.append({"pos": pos, "a": a, "spd": 620.0, "dmg": dmg, "pierce": 0,
+        # v0.3.7-1: the drone's L3 piercing rounds ride the pierce param
+        bullets.append({"pos": pos, "a": a, "spd": 620.0, "dmg": dmg, "pierce": pierce,
                 "hit": {}, "range_left": 420.0, "aoe": 0.0, "burn": false, "chill": 0.0,
                 "kind": "bolt", "node": spr, "turn": false, "tier": 1})
 
@@ -1421,7 +1471,11 @@ func _tick_bullets(delta: float) -> void:
                                 if e["pos"].distance_to(b["pos"]) < 140.0:
                                         e["pos"] = e["pos"].move_toward(b["pos"], 160.0 * delta)
                 if b["range_left"] <= 0.0:
-                        if float(b["aoe"]) > 0.0:
+                        if float(b.get("pool", 0.0)) > 0.0:
+                                # v0.3.7-1: the bottle lands - the fire pool spreads
+                                _fire_pool(b["pos"], float(b["dmg"]),
+                                                float(b["pool_r"]), float(b["pool"]))
+                        elif float(b["aoe"]) > 0.0:
                                 _boom_at(b["pos"], float(b["aoe"]), float(b["dmg"]), false)
                         dead.append(b)
                         continue
@@ -1443,7 +1497,8 @@ func _tick_bullets(delta: float) -> void:
                         b["hit"][key] = true
                         var dmg: float = float(b["dmg"])
                         if e.get("marked", false):
-                                dmg *= 1.15
+                                # v0.3.7-1: the scout's L2 signature deepens the mark
+                                dmg *= 1.0 + float(e.get("mark_m", 0.15))
                         if e.get("chill_t", 0.0) > 0.0:
                                 dmg *= 1.10
                         dmg *= float(e.get("hurt_m", 1.0))
@@ -1453,7 +1508,18 @@ func _tick_bullets(delta: float) -> void:
                                 Jukebox.sfx("cs_crit", -8.0, 1.2)
                         _hurt_enemy(e, dmg, crit)
                         if b["burn"]:
+                                # v0.3.7-1 THE REAL BURN: the DOT scales with the
+                                # hit that lit it (the owner: "continuous damage
+                                # for specified seconds" - the FLAME TATER is a
+                                # flamethrower now, not a match)
                                 e["burn_t"] = 3.0
+                                e["burn_dps"] = maxf(float(e.get("burn_dps", 0.0)),
+                                                float(b["dmg"]) * 0.45)
+                        if float(b.get("pool", 0.0)) > 0.0:
+                                # the bottle SHATTERS on the first body it meets
+                                _fire_pool(b["pos"], float(b["dmg"]),
+                                                float(b["pool_r"]), float(b["pool"]))
+                                b["range_left"] = 0.0   # it dies this frame
                         if float(b["chill"]) > 0.0:
                                 e["chill_t"] = float(b["chill"])
                         if float(b["aoe"]) > 0.0:
@@ -1657,7 +1723,17 @@ func _tick_enemies(delta: float) -> void:
                         e["burn_tick"] -= delta
                         if e["burn_tick"] <= 0.0:
                                 e["burn_tick"] = 0.5
-                                _hurt_enemy(e, 1.0, false, true)
+                                # v0.3.7-1: the DOT reads the burn's own dps now
+                                _hurt_enemy(e, maxf(1.0,
+                                                float(e.get("burn_dps", 2.0)) * 0.5),
+                                                false, true)
+                                # the fire really burns - a flame mote peels off
+                                _parts.append({"pos": e["pos"] \
+                                                + Vector2(randf_range(-8, 8), -6),
+                                                "vel": Vector2(randf_range(-20, 20), -randf_range(60, 140)),
+                                                "t": 0.4, "max": 0.4,
+                                                "col": Color(1.0, 0.55, 0.15),
+                                                "size": randf_range(3.0, 6.0), "tex": ""})
                 if e["chill_t"] > 0.0:
                         e["chill_t"] -= delta
                 var slow := 0.8 if e["chill_t"] > 0.0 else 1.0
@@ -1794,8 +1870,16 @@ func _tick_enemies(delta: float) -> void:
                 # the flash decay
                 if e["flash"] > 0.0:
                         e["flash"] -= delta
-                        nd.modulate = Color(3, 3, 3) if e["flash"] > 0.0 \
-                                        else (Color(1.25, 1.2, 0.8) if e.get("goga", false) else Color(1, 1, 1))
+                # v0.3.7-1 THE CHARRED LAW ("fire really burn their skins"):
+                # a burning enemy wears its char - dark, still smoking
+                if e.get("burn_t", 0.0) > 0.0:
+                        nd.modulate = Color(0.42, 0.30, 0.24)
+                elif e["flash"] > 0.0:
+                        nd.modulate = Color(3, 3, 3)
+                elif e.get("goga", false):
+                        nd.modulate = Color(1.25, 1.2, 0.8)
+                else:
+                        nd.modulate = Color(1, 1, 1)
                     # the gogacoin glint
                 if e.get("goga", false) and e["flash"] <= 0.0:
                         nd.modulate = Color(1.25, 1.2, 0.8)
@@ -2029,6 +2113,11 @@ func _hurt_enemy(e: Dictionary, dmg: float, crit := false, silent := false) -> v
         dmg *= _ward_cut(e)
         e["hp"] = float(e["hp"]) - dmg
         e["flash"] = 0.06
+        # v0.3.7-1 THE BLOOD LAW (the extra round: "if there is blood..."):
+        # every real hit sprays - the DoT ticks stay quiet (silent)
+        if not silent:
+                _burst(e["pos"], [Color(0.62, 0.11, 0.09), Color(0.45, 0.08, 0.07)],
+                                2 + (2 if crit else 0))
         if not silent:
                 _dmg_number(e["pos"], dmg, crit)
         if float(stats["lifesteal"]) > 0.0 and not silent:
@@ -2287,6 +2376,22 @@ func _tick_zones(delta: float) -> void:
         var dead := []
         for z in zones:
                 z["t"] -= delta
+                if String(z.get("kind", "")) == "pool":
+                        # v0.3.7-1 THE FIRE POOL TICK: everything inside burns -
+                        # a tick every 0.4s + the burn DOT keeps smoking after
+                        z["tick"] = float(z.get("tick", 0.0)) - delta
+                        if z["tick"] <= 0.0:
+                                z["tick"] = 0.4
+                                for e in enemies.duplicate():
+                                        if e.get("dead", false):
+                                                continue
+                                        if e["pos"].distance_to(z["pos"]) \
+                                                        < float(z["aoe"]) + float(e["size"]) * 0.5:
+                                                _hurt_enemy(e, float(z["dps"]) * 0.4, false, true)
+                                                e["burn_t"] = maxf(float(e.get("burn_t", 0.0)), 1.2)
+                                                e["burn_dps"] = maxf(float(e.get("burn_dps", 0.0)),
+                                                                float(z["dps"]) * 0.4)
+                        continue
                 if z["t"] <= 0.0:
                         if z["kind"] == "strike":
                                 _boom_at(z["pos"], float(z["aoe"]), float(z["dmg"]), true)
@@ -2298,16 +2403,57 @@ func _tick_zones(delta: float) -> void:
         for z2 in dead:
                 zones.erase(z2)
 
-## the explosion law: damages enemies (and the player when `hits_player`)
+## v0.3.7-1 THE MOLOTOV'S LANDING: the bottle shatters - a fire pool burns
+## where it lands for `dur` seconds, damaging everything that comes close
+## (the owner: "when throwed, leaves fire for specified seconds that deals
+## damage to enemies come close to it").
+func _fire_pool(at: Vector2, dps: float, r: float, dur: float) -> void:
+        zones.append({"kind": "pool", "pos": at, "t": dur, "max": dur,
+                "dps": dps, "aoe": r, "tick": 0.0})
+        Jukebox.sfx("cs_burn", -4.0, 0.9)
+
+## the explosion law: damages enemies (and the player when `hits_player`).
+## v0.3.7-1 THE FALLOFF LAW (the owner, item 19: "a bomb that makes radius
+## damage and the further the radius the lower the damage gets"): the
+## damage scales linearly from 100% at the center to 35% at the rim.
+## v0.3.7-1 THE GIB LAW (the extra round): a bomb kill is a GIB - the
+## enemy bursts into physical skin chunks + a blood stain hits the ground.
 func _boom_at(pos: Vector2, r: float, dmg: float, hits_player: bool) -> void:
         for e in enemies.duplicate():
-                if e["pos"].distance_to(pos) < r + float(e["size"]) * 0.5:
-                        _hurt_enemy(e, dmg)
+                var d: float = e["pos"].distance_to(pos)
+                if d < r + float(e["size"]) * 0.5:
+                        var falloff: float = lerpf(1.0, 0.35,
+                                        clampf(d / maxf(1.0, r), 0.0, 1.0))
+                        var was_alive: bool = not e.get("dead", false)
+                        _hurt_enemy(e, dmg * falloff)
+                        if was_alive and e.get("dead", false):
+                                _gib_enemy(e)
         if hits_player and p_pos.distance_to(pos) < r + PLAYER_R:
                 _hurt_player(dmg * 0.8, null)
         _shockwave(pos, r)
         Jukebox.sfx("cs_boom", -4.0)
         _shake = maxf(_shake, 4.0)
+
+## v0.3.7-1 THE GIB: 5-8 potato-skin chunks with real gravity + spin, a
+## red mist, and a stain where the enemy stood. The teens rating owns it.
+func _gib_enemy(e: Dictionary) -> void:
+        var n := 5 + (3 if e.get("elite", false) else 0)
+        for i in n:
+                var a := randf() * TAU
+                _parts.append({"pos": e["pos"] \
+                                + Vector2.from_angle(a) * randf_range(0.0, float(e["size"]) * 0.4),
+                                "vel": Vector2.from_angle(a) * randf_range(120.0, 340.0) \
+                                                + Vector2(0, -randf_range(80.0, 240.0)),
+                                "t": randf_range(0.55, 0.95), "max": 0.95,
+                                "col": Color(0.86, 0.72, 0.42) if i % 2 == 0 \
+                                                else Color(0.55, 0.10, 0.08),
+                                "size": randf_range(4.0, 9.0), "tex": "", "g": 900.0})
+        _stains.append({"pos": e["pos"] + Vector2(0, float(e["size"]) * 0.3),
+                        "r": float(e["size"]) * randf_range(0.9, 1.4), "t": 7.0,
+                        "max": 7.0})
+        while _stains.size() > 40:
+                _stains.pop_front()
+        _burst(e["pos"], [Color(0.55, 0.10, 0.08), Color(0.72, 0.14, 0.10)], 8)
 
 # ================================================================ waves
 func _tick_waves(delta: float) -> void:
@@ -4230,6 +4376,8 @@ class FxLayer extends Node2D:
 var _floaters: Array = []    # {pos, txt, col, t, max, size}
 var _rings: Array = []       # {pos, r, max, t, col, w}
 var _parts: Array = []       # {pos, vel, t, max, col, size, tex}
+# v0.3.7-1 the gore ledger: blood stains fade on the ground (40 max)
+var _stains: Array = []      # [{pos, r, t, max}]
 var _slashes: Array = []     # THE MELEE LAW: {pos, a, rng, arc, t, max}
 
 func _draw_fx(L: CanvasItem) -> void:
@@ -4309,9 +4457,25 @@ func _draw_fx(L: CanvasItem) -> void:
         # the zones (strike telegraphs / slams)
         for z in zones:
                 var f := 1.0 - float(z["t"]) / float(z["max"])
+                if String(z.get("kind", "")) == "pool":
+                        # v0.3.7-1 THE FIRE POOL: the molotov's burning ground
+                        var flicker := 0.8 + 0.2 * sin(Time.get_ticks_msec() / 70.0
+                                        + z["pos"].x * 0.1)
+                        L.draw_circle(z["pos"], float(z["aoe"]),
+                                        Color(0.95, 0.35, 0.08, 0.16 * flicker))
+                        L.draw_circle(z["pos"], float(z["aoe"]) * 0.6,
+                                        Color(1.0, 0.62, 0.15, 0.20 * flicker))
+                        L.draw_arc(z["pos"], float(z["aoe"]), 0, TAU, 32,
+                                        Color(1.0, 0.45, 0.12, 0.55 * flicker), 3.0)
+                        continue
                 L.draw_arc(z["pos"], float(z["aoe"]) * (0.4 + 0.6 * f), 0, TAU, 40,
-                                Color(1, 0.6, 0.2, 0.7), 3.0)
+                                        Color(1, 0.6, 0.2, 0.7), 3.0)
                 L.draw_circle(z["pos"], float(z["aoe"]) * f, Color(1, 0.6, 0.2, 0.10))
+        # v0.3.7-1: the blood stains (under the auras' noise, over the ground)
+        for s in _stains:
+                var sa := clampf(float(s["t"]) / float(s["max"]), 0.0, 1.0)
+                L.draw_circle(s["pos"], float(s["r"]),
+                                Color(0.42, 0.07, 0.06, 0.30 * sa))
         # the aim line (a subtle laser sight)
         # v0.3.4-4 THE NO-SHOOT-VFX LAW: the wobbly aim laser line is dead
         # too (it flickered every frame - the same ugly family). The gun's
@@ -4425,6 +4589,17 @@ func _shockwave(pos: Vector2, r: float) -> void:
         _rings.append({"pos": pos, "r": r, "t": 0.42, "max": 0.42,
                 "col": Color(1, 0.7, 0.35), "w": 6.0})
 
+## v0.3.7-1 THE MIST: a quick multi-color particle spray (the gore law's
+## blood, the gib's dust). One helper so every hit paints the same way.
+func _burst(pos: Vector2, cols: Array, n: int) -> void:
+        for i in n:
+                var a := randf() * TAU
+                _parts.append({"pos": pos, "vel": Vector2.from_angle(a)
+                                * randf_range(70.0, 230.0),
+                        "t": randf_range(0.25, 0.5), "max": 0.5,
+                        "col": cols[i % cols.size()],
+                        "size": randf_range(2.0, 5.0), "tex": ""})
+
 func _death_burst(e: Dictionary) -> void:
         var n := 12 + (8 if e.get("boss", false) else 0)
         for i in n:
@@ -4454,9 +4629,21 @@ func _tick_fx(delta: float) -> void:
                         dead.append(p)
                         continue
                 p["pos"] += Vector2(p["vel"]) * delta
+                # v0.3.7-1: gibs carry real gravity (the chunk falls and bounces
+                # once - "bombing makes enemies into pieces")
+                if p.has("g"):
+                        p["vel"] = Vector2(p["vel"]) + Vector2(0, float(p["g"]) * delta)
                 p["vel"] = Vector2(p["vel"]) * 0.92
         for p2 in dead:
                 _parts.erase(p2)
+        # v0.3.7-1: the blood stains fade out of the arena
+        var dead_s := []
+        for s in _stains:
+                s["t"] = float(s["t"]) - delta
+                if float(s["t"]) <= 0.0:
+                        dead_s.append(s)
+        for s2 in dead_s:
+                _stains.erase(s2)
         var dead2 := []
         for r in _rings:
                 r["t"] -= delta

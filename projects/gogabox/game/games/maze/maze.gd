@@ -63,9 +63,15 @@ const DENY_SHAKE := 6.0
 
 # ---------------- the finder ------------------------------------------------
 const FINDER := {"name": "PATH FINDER", "price": 450,
-        "desc": "one charge every 2 maps - it lights the next 8 cells, 8s"}
+        "desc": "one charge every 2 maps - it lights the next 4 cells, 8s"}
 const FINDER_DUR := 8.0
-const FINDER_STEPS := 8
+# v0.3.7-1 THE SHY FINDER LAW (the owner, item 14: "the path finder shows
+# too much, make it only 4 steps ahead and make it animated like a smooth
+# path finder that shows the path one by one"): 8 lit cells read like a
+# drawn answer. Four cells now - a nudge, not a solution - and the marks
+# CASCADE in one by one (each cell fades in 0.12s after its predecessor).
+const FINDER_STEPS := 4
+const FINDER_STEP_DELAY := 0.12  # seconds between one mark and the next
 const CHARGES_PER := 2          # +1 charge every 2 maps (the PGB design)
 
 # ---------------- the content ----------------------------------------------
@@ -97,6 +103,18 @@ const SKINS := {
                 "desc": "the pale light"},
         "prism": {"name": "PRISM", "price": 320, "col": Color(1.0, 0.47, 0.92),
                 "desc": "the pink violet"},
+}
+# v0.3.7-1 TAILS (the owner, item 12: "in maze escaper and snowy tower
+# geometric, you can add tails in the shop to be used there, the overall
+# theme makes it really good to have"): the Geometry Flash tail shelf
+# travels here - same ids, same prices, one vocabulary across the box.
+const TAILS := {
+        "none": {"name": "NONE", "price": 0, "desc": "clean - no trail"},
+        "neon": {"name": "NEON", "price": 160, "desc": "a cyan light ribbon"},
+        "fire": {"name": "FIRE", "price": 230, "desc": "you burn backwards"},
+        "rainbow": {"name": "RAINBOW", "price": 330, "desc": "the whole spectrum"},
+        "gold": {"name": "GOLD", "price": 270, "desc": "gold sparks"},
+        "match": {"name": "MATCH", "price": 290, "desc": "your own color"},
 }
 
 # ---------------- state -----------------------------------------------------
@@ -144,6 +162,9 @@ var map_label_t := 0.0
 var finder_btn: Button = null
 var timer_label: Label = null
 var tex := {}
+# v0.3.7-1 the tail: recent positions + ages, painted as a fading ribbon
+var tail_id := "none"
+var trail: Array = []            # [{x, y, t}]
 
 func _tex(p: String) -> Texture2D:
         if not tex.has(p):
@@ -170,6 +191,12 @@ func _goga_setup() -> void:
         _build_hud_extra()
         _load_meta()
         _build_ready()
+        # v0.3.7-1 THE SHOP BUTTON (the owner, item 16: "looks like you have
+        # forgot to do the shop... or just the button is missing? this is
+        # very sussy"): the shop was FULLY BUILT and its opener never wired
+        # - the _shop_open sheet existed with no door to it. The button
+        # takes its seat in the HUD row like every other shop game's.
+        add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/maze_theme.ogg")
         _new_map()
 
@@ -179,6 +206,11 @@ func _load_meta() -> void:
                 sid = "geoquare"
         player["skin"] = sid
         pspr.texture = _tex("skin_%s.png" % sid)
+        # v0.3.7-1: the tail rides the meta load (the geometry law)
+        tail_id = String(Box.item_on(game_id, "tail"))
+        if not TAILS.has(tail_id):
+                tail_id = "none"
+        trail.clear()
 
 func _build_world() -> void:
         # the neon bg (the Geometry Flash shader, the maze themes tint it)
@@ -250,13 +282,11 @@ func _build_ready() -> void:
         l.offset_bottom = _vp().y * 0.42 + 80.0
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         ready_ui.add_child(l)
-        var sub := Arc.label("swipe to move - reach the glow before the clock", 28,
-                        Color(1, 1, 1, 0.55))
-        sub.set_anchors_preset(Control.PRESET_TOP_WIDE)
-        sub.offset_top = _vp().y * 0.42 + 84.0
-        sub.offset_bottom = _vp().y * 0.42 + 130.0
-        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ready_ui.add_child(sub)
+        # v0.3.7-1 THE CLEAN GATE LAW (the owner, item 13: "the tap anywhere
+        # wait screen shows a line under it about controls - remove it, we
+        # never write too helpful stuff in the games, these things should
+        # live in the guide, not here"): the how-to subline is GONE. The
+        # gate speaks three words; the guide sheet owns the teaching.
 
 # ============================================================ the real maze
 ## WILSON'S ALGORITHM - loop-erased random walks build a UNIFORM spanning
@@ -587,6 +617,8 @@ func _goga_tick(delta: float) -> void:
                 _update_finder_btn()
                 mark_layer.queue_redraw()
         _step_move(delta)
+        # v0.3.7-1 THE TAIL RIBBON: the trail breathes with movement
+        _tick_tail(delta)
         # the exit portal breathes
         var pulse := 1.0 + 0.10 * sin(beat_t * 4.0)
         exit_glow.scale = Vector2.ONE * (cell_px * 1.6 / 256.0) * pulse
@@ -597,7 +629,13 @@ func _goga_tick(delta: float) -> void:
 # ---------------------------------------------------------------- movement
 ## THE SWIPE LAW: one swipe = one queued step. THE SPEED LAW: the deeper
 ## the queue, the faster the animation (never instant, never sluggish).
-func _swipe_dir(dir: Vector2i) -> void:
+## v0.3.7-1 THE CONTROLS RESURRECTION (the owner: "the game controls do not
+## even respond at all"): TouchKit's swiped signal carries TWO arguments
+## (dir + position) and this handler declared ONE - every single swipe
+## died inside the signal call ("Method expected 1 argument(s), but called
+## with 2") before the queue ever saw a direction. The instrumented probe
+## caught the ERROR verbatim. One signature - the game comes alive.
+func _swipe_dir(dir: Vector2i, _at: Vector2 = Vector2.ZERO) -> void:
         if phase != "run" or over_gate:
                 return
         if queue.size() >= QUEUE_CAP:
@@ -734,6 +772,9 @@ func _finder_tap() -> void:
                 Jukebox.sfx("m_deny", -10.0)
                 return
         finder_used += 1
+        # v0.3.7-1: the charge feeds its own trophy now (the old finder ach
+        # id never joined the match table - it was a dead trophy)
+        achievement_count("finder_used", 1)
         finder_left = FINDER_DUR
         Jukebox.sfx("m_finder", -4.0)
         _update_finder_btn()
@@ -803,24 +844,79 @@ func _draw_maze() -> void:
                 t["exit"], 3.0 * us)
         maze_layer.draw_arc(ec, cell_px * 0.20 * pulse, 0.0, TAU, 20,
                 Color(t["exit"].r, t["exit"].g, t["exit"].b, 0.6), 2.0 * us)
-        # the deny shake: the square's cell edge flashes
+## the deny shake: the square's cell edge flashes
         if deny_t > 0.0:
                 var pc := Vector2i(player["c"], player["r"])
                 var p0 := board + Vector2(float(pc.x) * cell_px, float(pc.y) * cell_px)
                 maze_layer.draw_rect(Rect2(p0, Vector2(cell_px, cell_px)),
                         Color(1.0, 0.4, 0.4, 0.4 * deny_t), false, 2.0 * us)
 
+## v0.3.7-1 THE TAIL: record while the square travels, paint the fading
+## ribbon under it. Points live 0.55s; the newest sits at the square.
+func _tick_tail(delta: float) -> void:
+        for p in trail:
+                p["t"] = float(p["t"]) + delta
+        while not trail.is_empty() and float(trail[0]["t"]) > 0.55:
+                trail.pop_front()
+        if moving and tail_id != "none":
+                trail.append({"x": player["x"], "y": player["y"], "t": 0.0})
+        mark_layer.queue_redraw()
+
+func _tail_col(frac: float, i: int) -> Color:
+        # frac 0..1 = old..new; i = the point index (the rainbow phase)
+        match tail_id:
+                "neon":
+                        return Color(0.38, 0.89, 1.0, 0.85 * frac)
+                "fire":
+                        return Color(1.0, lerpf(0.25, 0.75, frac), 0.2, 0.9 * frac)
+                "rainbow":
+                        return Color.from_hsv(fmod(float(i) * 0.09 + beat_t * 0.35, 1.0),
+                                        0.85, 1.0, 0.85 * frac)
+                "gold":
+                        return Color(1.0, 0.83, 0.3, 0.9 * frac)
+                "match":
+                        var c: Color = SKINS[String(player.get("skin", "geoquare"))]["col"]
+                        c.a = 0.85 * frac
+                        return c
+        return Color(0, 0, 0, 0)
+
+## the tail paints UNDER the square: newest = widest + brightest
+func _draw_tail() -> void:
+        if tail_id == "none" or trail.size() < 2:
+                return
+        for i in range(trail.size() - 1):
+                var a: Dictionary = trail[i]
+                var b: Dictionary = trail[i + 1]
+                var frac: float = 1.0 - float(a["t"]) / 0.55
+                var col := _tail_col(frac, i)
+                if col.a <= 0.01:
+                        continue
+                mark_layer.draw_line(Vector2(a["x"], a["y"]),
+                                Vector2(b["x"], b["y"]), col,
+                                maxf(1.5, 9.0 * frac) * us)
+
 ## THE FINDER MARKS (only while the window is live).
+## v0.3.7-1 THE SHY FINDER (the owner, item 14): the marks CASCADE - mark i
+## fades in at (i * FINDER_STEP_DELAY) into the window, so the path draws
+## itself one step at a time instead of flashing the whole answer.
 func _draw_marks() -> void:
+        # v0.3.7-1: the tail ribbon paints here too (under the finder marks)
+        _draw_tail()
         if finder_left <= 0.0 or cells.is_empty():
                 return
         var t := _theme()
         var route := _finder_route()
+        var elapsed: float = FINDER_DUR - finder_left
         var frac := clampf(finder_left / FINDER_DUR, 0.0, 1.0)
         for i in route.size():
+                var born := float(i) * FINDER_STEP_DELAY
+                if elapsed < born:
+                        continue
+                var own := clampf((elapsed - born) / 0.18, 0.0, 1.0)
                 var cc: Vector2i = route[i]
                 var c := _cell_center(cc)
-                var a: float = frac * (1.0 - 0.5 * float(i) / float(maxi(1, route.size())))
+                var a: float = frac * (1.0 - 0.5 * float(i) / float(maxi(1, route.size()))) \
+                                * own
                 var rr: float = cell_px * (0.16 + 0.03 * sin(beat_t * 6.0 + float(i)))
                 mark_layer.draw_circle(c, rr * 1.8,
                         Color(t["mark"].r, t["mark"].g, t["mark"].b, 0.10 * a))
@@ -841,6 +937,12 @@ func _shop_open() -> void:
         if shop_id != "":
                 return
         shop_id = "shop"
+        # v0.3.7-1 THE BEHIND LAW (the visual QA catch): the ready gate used
+        # to paint OVER the shop sheet (it lives directly under the HUD,
+        # the sheet under the overlay root). The gate hides while a sheet
+        # speaks - same law as the geometry lore box.
+        if ready_ui != null and is_instance_valid(ready_ui):
+                ready_ui.visible = false
         if phase == "run":
                 paused = true
                 get_tree().paused = true
@@ -864,6 +966,10 @@ func _shop_open() -> void:
         box.add_child(_shop_label("SQUARES - the escapee's skin"))
         for id in SKINS:
                 box.add_child(_skin_row(id))
+        # v0.3.7-1 TAILS: the ribbon shelf (item 12)
+        box.add_child(_shop_label("TAILS - the light you leave behind"))
+        for id in TAILS:
+                box.add_child(_tail_row(id))
         box.add_child(_shop_label("MAZE THEMES - the light of the walls"))
         for id in THEMES:
                 box.add_child(_theme_row(id))
@@ -887,6 +993,10 @@ func _goga_sheet_popped(id: String) -> void:
                 _apply_theme()
                 maze_layer.queue_redraw()
                 _update_finder_btn()
+        # the gate comes back when the last sheet closes
+        if shop_id == "" and sheet_open_count() == 0 \
+                        and ready_ui != null and is_instance_valid(ready_ui):
+                ready_ui.visible = true
 
 func _shop_label(txt: String) -> Label:
         return Arc.fit_label(txt, 24, Arc.HOT, 560)
@@ -922,6 +1032,33 @@ func _skin_row(id: String) -> Control:
                         player["skin"] = id
                         pspr.texture = _tex("skin_%s.png" % id)
                 _shop_reopen())
+
+## v0.3.7-1 THE TAIL ROW: same bones as the theme row - owned wears, unowned
+## buys. The wear refreshes the meta load (the ribbon follows instantly).
+func _tail_row(id: String) -> Control:
+        var c: Dictionary = TAILS[id]
+        var owned := Box.item_owned(game_id, "tail", id) or int(c["price"]) == 0
+        var on: bool = Box.item_on(game_id, "tail") == id \
+                or (int(c["price"]) == 0 and Box.item_on(game_id, "tail") == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
+                                Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button("%s  -  WEAR" % c["name"], Vector2(560, 60), 22,
+                                Color("8a4ab8"), func():
+                                                Box.equip_item(game_id, "tail", id)
+                                                Jukebox.sfx("confirm", -4.0)
+                                                _load_meta()
+                                                _shop_reopen())
+        return _price_btn("%s - %s" % [c["name"], c["desc"]], int(c["price"]),
+                        Color("8a4ab8"), func():
+                                        if Box.buy_item(game_id, "tail", id, int(c["price"])):
+                                                        Jukebox.sfx("buy")
+                                                        Box.equip_item(game_id, "tail", id)
+                                                        _load_meta()
+                                        _shop_reopen())
 
 func _theme_row(id: String) -> Control:
         var c: Dictionary = THEMES[id]

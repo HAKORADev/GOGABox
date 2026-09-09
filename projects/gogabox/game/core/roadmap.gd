@@ -313,22 +313,35 @@ static func tick() -> void:
                         _heal_badge(id, st)     # v0.0.7: self-heal old saves
                         continue
                 Box.meta()[key] = st
-                if prev == "" or (prev == "HIDDEN" and st != "HIDDEN"):
-                        # first time this teaser is visible: stamp time, baseline orders
+                # v0.3.7-1 THE HONEST BADGE LAW (the owner, item 22: "the
+                # word new! should appear for newly appeared games... the
+                # brand-new app have 5 locked games, they should not all
+                # say new new new - this is wrong"): a tile that was NEVER
+                # hidden does not celebrate. On a fresh save the whole
+                # shelf resolves instantly - those tiles are the furniture,
+                # not news. NEW! belongs to a real APPEARANCE: HIDDEN ->
+                # anything. The celebration + the green UNLOCKED badge need
+                # a real transition too.
+                if prev == "HIDDEN" and st != "HIDDEN":
+                        # a teaser just surfaced: stamp time, baseline orders
                         if st == "MYSTERY":
                                 Box.meta()["seen_at_" + id] = now
                                 _stamp_order_baselines(id)
                                 _schedule_reveal_notification(id, g)
-                        # v0.0.7 two-level badge: first appearance = NEW!
-                        # (OWNED games never badge - the starter must not wear
-                        # a permanent ribbon)
                         if st != "OWNED" and not Box.is_seen(id) and Box.badge(id) == "":
                                 Box.set_badge(id, "new")
-                # "" counts as a fresh save seeing the teaser resolve directly
-                # (e.g. save-meta wipe): the upgrade must still land.
-                # v0.1.4: CHARGING -> GATED/SOON/LOCKED also celebrates (the
-                # capacity meter just filled).
-                if (prev == "" or prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED" \
+                elif prev == "":
+                        # fresh save (or a state wipe): record the first
+                        # state QUIETLY. Everything visible marks seen so
+                        # the self-heal below can never re-smear a badge
+                        # onto the furniture; a MYSTERY also stamps its
+                        # clock + order baselines.
+                        if st == "MYSTERY":
+                                Box.meta()["seen_at_" + id] = now
+                                _stamp_order_baselines(id)
+                        if st != "HIDDEN" and st != "OWNED":
+                                Box.mark_seen(id)
+                if (prev == "HIDDEN" or prev == "MYSTERY" or prev == "GATED" \
                                 or prev == "CHARGING") \
                                 and (st == "GATED" or st == "SOON" or st == "LOCKED"):
                         # a teaser just resolved into something tangible -> celebrate

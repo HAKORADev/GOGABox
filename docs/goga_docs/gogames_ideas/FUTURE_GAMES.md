@@ -23,6 +23,8 @@ the shipped lane-dodger that had borrowed the "Geometry Flash" name is now
 **Space Dodge**, and the owner's REAL Geometry Flash waits in the box as a
 SOON workshop tile (registry id `geometry`, direct reveal) until it gets its
 own build.
+(SHIP NOTE, v0.3.7 era: the REAL Geometry Flash shipped as a full game
+in v0.3.6 - the teaser graduated, this entry's waiting is DONE.)
 
 Fifth dump — the v0.2.4 round (2026-09-02, +3 games +1 study app + one
 MULTIPLAYER NOTE from the owner): a Party-Dash-like endless vertical
@@ -64,6 +66,18 @@ catch the bad and it costs you.)
 Tenth dump - the v0.3.3 patch-2 round (2026-09-05): +2, the
 absorb-and-grow family (a slime.io-like in 3D and a hole.io-like in 2D,
 one concept two flavors) and the beyblade battling arena.
+
+Eleventh dump - the v0.3.7-1 round (2026-09-09): +1, the VERTICAL
+rogue-like (the owner, straight toward the build queue's neighborhood): a
+vertical descender inspired by gamesnacks's **Zombie Hunter** - NOT
+horizontal like Cosmic Spud, a different gameplay feel entirely: the
+**alien-shooter** energy (Alien Shooter / Crimsonland: hordes streaming
+in from every side, area weapons, a body that holds a lane while the
+world pours in) played on a VERTICAL corridor map - wave after wave, the
+screen filling with bodies, the weapons doing the talking. (Owner: "a
+vertical rogue-like game that is inspired from gamesnacks's zombie hunter
+game that is not horizontal like cosmic spud with different gameplay that
+feels like the game alien shooter".)
 
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions

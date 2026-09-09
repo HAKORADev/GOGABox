@@ -189,80 +189,38 @@ func achievement_max(key: String, value: int) -> void:
 
 ## Check this game's achievements; awards the SHARED popup (Achiever) with
 ## sound + confetti and returns count of new ones. Safe to call often.
+## v0.3.7-1 THE RULE TABLE (the owner's achievements overhaul): the
+## conditions live IN THE REGISTRY now - each ach entry carries a
+## "rule": {"k": "score"|"cnt"|"max"|"stat", "key": "...", "v": N} and
+## this evaluator reads them all. No more hardcoded id matches (three old
+## trophies - jelly/icecrash/parcels - were DEAD because their ids never
+## joined the old match table; data cannot rot like that). Tiers ride the
+## entry (1-4) and color the popup.
 func check_achievements() -> int:
         var g := GameReg.get_game(game_id)
         var new_count := 0
         for a in g.get("ach", []):
-                var ok := false
-                match String(a["id"]):
-                        "score_30": ok = score >= 30
-                        "score_60": ok = score >= 60
-                        "score_100": ok = score >= 100
-                        "score_50": ok = score >= 50
-                        "score_300": ok = score >= 300
-                        "score_500": ok = score >= 500
-                        "score_1500": ok = score >= 1500
-                        "rally_15": ok = Box.counter(game_id, "max_rally") >= 15
-                        "rally_30": ok = Box.counter(game_id, "max_rally") >= 30
-                        "combo_5": ok = Box.counter(game_id, "best_combo") >= 5
-                        "slash_100": ok = Box.counter(game_id, "slashed") >= 100
-                        "dodge_200": ok = Box.counter(game_id, "dodged") >= 200
-                        "height_500": ok = Box.counter(game_id, "max_height") >= 500
-                        "height_1500": ok = Box.counter(game_id, "max_height") >= 1500
-                        "hops_50": ok = Box.counter(game_id, "hops") >= 50
-                        "coins_100": ok = Box.counter(game_id, "coins_taken") >= 100
-                        "tile_256": ok = Box.counter(game_id, "max_tile") >= 256
-                        "tile_512": ok = Box.counter(game_id, "max_tile") >= 512
-                        "tile_2048": ok = Box.counter(game_id, "max_tile") >= 2048
-                        # v0.3.1 - cursed dario
-                        "stomp_25": ok = Box.counter(game_id, "stomped") >= 25
-                        "stomp_100": ok = Box.counter(game_id, "stomped") >= 100
-                        "witcher_slain": ok = Box.counter(game_id, "witcher") >= 1
-                        "clear_10": ok = Box.counter(game_id, "levels_done") >= 10
-                        # v0.2.8 - xo (the sketch remake: wins + streaks,
-                        # the ladder rungs are gone)
-                        "wins_10": ok = Box.counter(game_id, "wins") >= 10
-                        "wins_40": ok = Box.counter(game_id, "wins") >= 40
-                        "streak_5": ok = Box.counter(game_id, "streak") >= 5
-                        # v0.2.9 - fruit slasher (the hearts law)
-                        "hearts_full": ok = Box.counter(game_id, "hearts_kept") >= 3
-                        # v0.2.4 - space dash (kills + the max power rung)
-                        "kills_100": ok = Box.counter(game_id, "kills") >= 100
-                        "kills_300": ok = Box.counter(game_id, "kills") >= 300
-                        "dash_max": ok = Box.counter(game_id, "max_power") >= 20
-                        # v0.2.5 - snowy tower (platforms climbed in one run)
-                        "tower_30": ok = Box.counter(game_id, "max_tower") >= 30
-                        "tower_80": ok = Box.counter(game_id, "max_tower") >= 80
-                        "tower_150": ok = Box.counter(game_id, "max_tower") >= 150
-                        # v0.3.2 - space invaders (the tour)
-                        "score_2000": ok = score >= 2000
-                        "kill_500": ok = Box.counter(game_id, "kills") >= 500
-                        "clear_tour": ok = Box.counter(game_id, "tour_done") >= 1
-                        "boss_all": ok = Box.counter(game_id, "bosses_met") >= 3
-                        "defend_3": ok = Box.counter(game_id, "defenders_called") >= 3
-                        # v0.3.3 - matcher (the happy wall)
-                        "match_300": ok = Box.counter(game_id, "matched") >= 300
-                        "match_3000": ok = Box.counter(game_id, "matched") >= 3000
-                        "hyper_1": ok = Box.counter(game_id, "hypers") >= 1
-                        "cascade_4": ok = Box.counter(game_id, "best_cascade") >= 4
-                        "butter_100": ok = Box.counter(game_id, "butterflies") >= 100
-                        "ice_25": ok = Box.counter(game_id, "melted") >= 25
-                        "depth_20": ok = Box.counter(game_id, "depth") >= 20
-                        "peace_300": ok = Box.counter(game_id, "peace_secs") >= 300
-                        "challenge_1500": ok = Box.counter(game_id, "challenge_best") >= 1500
-                        # v0.3.5 - pop siege (the bloon siege)
-                        "pop_1000": ok = Box.counter(game_id, "pops_run") >= 1000
-                        "moab_1": ok = Box.counter(game_id, "moab_kills") >= 1
-                        "wave_25": ok = Box.counter(game_id, "wave_best") >= 25
-                        "gear3_any": ok = Box.counter(game_id, "gears3") >= 1
-                        # v0.3.6 - geometry flash (the neon run)
-                        "orbit_500": ok = Box.counter(game_id, "orbits") >= 500
-                        "flips_250": ok = Box.counter(game_id, "flips") >= 250
-                        "gf_triple": ok = Box.counter(game_id, "triple") >= 1
+                var ok := _ach_rule_ok(a.get("rule", {}) as Dictionary)
                 if ok and Box.grant_achievement(game_id, String(a["id"])):
                         new_count += 1
                         Achiever.award(game_id, a)
         return new_count
+
+## The one rule evaluator: score = this run's score, cnt/max = the game's
+## counter store (bump_counter accumulates, max_counter peaks - both read
+## the same value), stat = the box stat block (plays/best/last).
+func _ach_rule_ok(r: Dictionary) -> bool:
+        if r.is_empty():
+                return false
+        var v := int(r.get("v", 0))
+        match String(r.get("k", "")):
+                "score":
+                        return score >= v
+                "cnt", "max":
+                        return Box.counter(game_id, String(r.get("key", ""))) >= v
+                "stat":
+                        return Box.stat(game_id, String(r.get("key", "plays"))) >= v
+        return false
 
 # --------------------------------------------------- toasts
 

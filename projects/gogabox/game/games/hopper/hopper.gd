@@ -247,13 +247,33 @@ const PLACES := {
 ## snowy = the classic mountain. geometric = GEOQUARE'S home turf: the
 ## whole audiovisual layer wears the Geometry Flash identity - neon block
 ## platforms, the faceless matrix cube for every character, neon dust
-## instead of snow, the golden-orbit coins, its own theme + SFX set.
+## instead of snow, its own theme + SFX set.
 ## The most expensive thing on the shelf - the owner's call.
+## v0.3.7-1 THE CUBE-FIRST LAW (the owner): the style stays CLOSED until
+## the Geoquare square itself is owned - the matrix skin belongs to the
+## escapee, not to strangers. And while it is worn, the character shelf
+## is CLOSED (the cube wears every body - take the style off to change).
 const STYLES := {
         "snowy":     {"name": "SNOWY", "price": 0,
                 "desc": "the classic mountain"},
         "geometric": {"name": "GEOMETRIC", "price": 1200,
-                "desc": "geoquare's home turf - the matrix neon"},
+                "desc": "geoquare's home turf - the matrix neon",
+                "needs_skin": "square"},
+}
+
+# ---------------- TAILS (v0.3.7-1 - the owner's item 12) -----------------
+## "in maze escaper and snowy tower geometric, you can add tails in the
+## shop to be used there, the overall theme makes it really good to have".
+## The Geometry Flash shelf travels here - same ids, same prices. The
+## ribbon WEARS in the GEOMETRIC style (the neon world is where a light
+## trail reads); in the classic snow the shelf sits unused.
+const TAILS := {
+        "none": {"name": "NONE", "price": 0, "desc": "clean - no trail"},
+        "neon": {"name": "NEON", "price": 160, "desc": "a cyan light ribbon"},
+        "fire": {"name": "FIRE", "price": 230, "desc": "you burn backwards"},
+        "rainbow": {"name": "RAINBOW", "price": 330, "desc": "the whole spectrum"},
+        "gold": {"name": "GOLD", "price": 270, "desc": "gold sparks"},
+        "match": {"name": "MATCH", "price": 290, "desc": "your own color"},
 }
 
 ## the geometric palette - the Geometry Flash midnight world, tuned for the
@@ -318,6 +338,14 @@ var spin := 0.0                      # the rolling spin (radians)
 var tumble_rot := 0.0                # the cube/shard tumble angle (rad)
 var tumble_vel := 0.0                # its angular velocity (rad/s)
 var settle_hit := false              # the face-down slap latch
+# v0.3.7-1 THE REAL FLIP LAW: the square does not roll like a wheel - it
+# PIVOTS over its leading edge in discrete 90-degree flips (a side falls,
+# the next face slaps down). flip_base is the settled stance (a multiple
+# of 90), flip_phase 0..1 is the live flip, flip_dir the lean.
+var flip_base := 0.0                 # the settled rotation (rad, x90 deg)
+var flip_phase := -1.0               # -1 = standing; else the flip progress
+var flip_dir := 1.0                  # the current flip's direction
+var flip_draw_lift := 0.0            # the support lift during a flip (px)
 var wobble_clock := 0.0
 
 var platforms: Array = []            # dicts: see _spawn_platform
@@ -353,6 +381,10 @@ var _shop_pair: Array = []           # THE PAIR LAW: the shop owns its pair
 var _shop_from := "ready"
 var _ready_card: Control = null
 var _time := 0.0
+# v0.3.7-1 the tail ribbon (GEOMETRIC wear)
+var tail_id := "none"
+var trail: Array = []                # [{x, y, t}]
+var tail_layer: Node2D = null
 
 # ============================================================ setup / build
 
@@ -429,6 +461,15 @@ func _goga_setup() -> void:
         fx.z_index = 8
         fx.draw.connect(_draw_fx)
         world.add_child(fx)
+
+        # v0.3.7-1 the tail ribbon painter (under the player, over pickups)
+        tail_layer = Node2D.new()
+        tail_layer.z_index = 4
+        tail_layer.draw.connect(_draw_tail)
+        world.add_child(tail_layer)
+        tail_id = String(Box.item_on(game_id, "tail"))
+        if not TAILS.has(tail_id):
+                tail_id = "none"
 
         _build_player()
         _build_world_start()
@@ -733,7 +774,9 @@ func _goga_tick(delta: float) -> void:
         vy += g * delta
         px += vx * delta
         py += vy * delta
-        player.position = Vector2(px, py)   # the sprite IS the body (always)
+        # v0.3.7-1: the flip's support lift rides the draw position (the
+        # body arcs over its leading edge; physics never changes)
+        player.position = Vector2(px, py - flip_draw_lift)   # the sprite IS the body (always)
         player.scale = Vector2.ONE * char_size   # MELTING lives visibly
 
         # ---- THE WALLS: the player can never leave the screen (owner) ----
@@ -764,6 +807,9 @@ func _goga_tick(delta: float) -> void:
         # ---- the spin laws per character (owner: each its own way) ----
         _update_spin(delta)
         _update_support(delta)
+
+        # ---- v0.3.7-1 the tail ribbon (GEOMETRIC wear) ----
+        _tick_tail(delta)
 
         # ---- coins + powerup pickups ----
         _update_pickables(delta)
@@ -815,6 +861,56 @@ func queue_redraw_all() -> void:
         cloud_layer.queue_redraw()
         spark_layer.queue_redraw()
         walls_layer.queue_redraw()
+        if tail_layer != null and is_instance_valid(tail_layer):
+                tail_layer.queue_redraw()
+
+# ------------------------------------------------------- the tail ribbon
+
+## v0.3.7-1: the trail records while the body MOVES (the walk speed or a
+## real fall - a standing cube leaves nothing). Points live 0.5s.
+func _tick_tail(delta: float) -> void:
+        for p in trail:
+                p["t"] = float(p["t"]) + delta
+        while not trail.is_empty() and float(trail[0]["t"]) > 0.5:
+                trail.pop_front()
+        var moving_now: bool = _is_geo() and tail_id != "none" \
+                        and phase == "run" \
+                        and (absf(vx) > 26.0 * U or (not grounded and absf(vy) > 60.0 * U))
+        if moving_now:
+                trail.append({"x": px, "y": py, "t": 0.0})
+        tail_layer.queue_redraw()
+
+func _tail_col(frac: float, i: int) -> Color:
+        match tail_id:
+                "neon":
+                        return Color(0.38, 0.89, 1.0, 0.85 * frac)
+                "fire":
+                        return Color(1.0, lerpf(0.25, 0.75, frac), 0.2, 0.9 * frac)
+                "rainbow":
+                        return Color.from_hsv(fmod(float(i) * 0.09 + _time * 0.35, 1.0),
+                                        0.85, 1.0, 0.85 * frac)
+                "gold":
+                        return Color(1.0, 0.83, 0.3, 0.9 * frac)
+                "match":
+                        var c: Color = _pal()["snow"]
+                        c = Color(0.38, 0.89, 1.0) if _is_geo() else c
+                        c.a = 0.85 * frac
+                        return c
+        return Color(0, 0, 0, 0)
+
+func _draw_tail() -> void:
+        if not _is_geo() or tail_id == "none" or trail.size() < 2:
+                return
+        for i in range(trail.size() - 1):
+                var a: Dictionary = trail[i]
+                var b: Dictionary = trail[i + 1]
+                var frac: float = 1.0 - float(a["t"]) / 0.5
+                var col := _tail_col(frac, i)
+                if col.a <= 0.01:
+                        continue
+                tail_layer.draw_line(Vector2(float(a["x"]), float(a["y"])),
+                                Vector2(float(b["x"]), float(b["y"])), col,
+                                maxf(1.5, 11.0 * frac) * U)
 
 # ------------------------------------------------------------- platforms
 
@@ -1041,14 +1137,23 @@ func _do_jump() -> void:
                 _sfx("tower_jump", -8.0, 1.0 + rng.randf() * 0.08)
                 _fx_poof(Vector2(px, py + _pr() * 0.7), 7, 1.0)
         elif pw["id"] == "x2" and not air_jumped:
-                # THE x2: one extra jump in the air (owner powerup)
+                # THE x2: one extra jump in the air (owner powerup).
+                # v0.3.7-1 THE x2 TRUTH LAW (the owner: "still does not really
+                # give the ability to do double jumps"): two fixes. ONE - the
+                # air jump used to launch WEAKER than the ground jump (0.92x
+                # vs 1.0x), so a quick double-tap right off the floor actually
+                # LOWERED the jump and the powerup read as dead; the air jump
+                # now hits FULL strength (+2%), so it always FEELS like a
+                # real second jump. TWO - the widget states the charge
+                # (READY/USED below) so the ability is never invisible.
                 air_jumped = true
-                vy = JUMP_V * U * float(c["jump"]) * 0.92
+                vy = JUMP_V * U * float(c["jump"]) * 1.02
                 hops += 1
                 achievement_count("hops", 1)
                 _sfx("tower_jump", -8.0, 1.22)
                 _fx_ring(Vector2(px, py + _pr()), Color(1, 1, 1, 0.7), 26.0)
                 _fx_poof(Vector2(px, py + _pr()), 6, 1.0)
+                _refresh_pw_ui()
 
 func _set_move(dir: int) -> void:
         move_dir = clampf(float(dir), -1.0, 1.0)
@@ -1142,35 +1247,30 @@ func _update_spin(delta: float) -> void:
         var c := _char()
         match char_id:
                 "ball":
-                        # the classic roller: the ball ROLLS - it goes upside down
+                        # the classic roller: the ball ROLLS - it goes upside down.
+                        # v0.3.7-1: in the GEOMETRIC style the drawn body is the
+                        # matrix CUBE whatever the physics char is - a square
+                        # must never read as rolling like a wheel, so the cube
+                        # wears the flip law instead (see _cube_body).
+                        if _cube_body():
+                                _update_flip(delta)
+                                return
                         if grounded and absf(vx) > 12.0 * U:
                                 spin += (vx / _pr()) * delta
                         else:
                                 spin += (vx * 0.3 / _pr()) * delta
                         player.rotation = spin
                 "square":
-                        # v0.2.6 REAL TUMBLING (the owner: "physical movements
-                        # where it flips and the side falls", the cube "flips
-                        # 90 degrees yes but for real"): the body pivots over
-                        # its leading corner/edge - the rotation is CONTINUOUS
-                        # and driven by the walk arc (theta = v / r), never a
-                        # look-snap; _update_support lifts the body so the
-                        # falling side RIDES the platform, and when you stop
-                        # the body eases onto the nearest flat face and SLAPS
-                        # it (a soft thud + a little dust).
-                        # v0.2.7: the owner confirmed the cube - UNTOUCHED.
-                        var pivot_r: float = _pr() * 1.41
-                        if grounded and absf(vx) > 14.0 * U:
-                                tumble_vel = vx / pivot_r
-                        else:
-                                # inertia: the spin decays in the air / on stop
-                                tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
-                        tumble_rot += tumble_vel * delta
-                        if grounded and absf(vx) <= 14.0 * U and absf(tumble_vel) < 0.6:
-                                _tumble_settle(delta)
-                        else:
-                                settle_hit = false
-                        player.rotation = tumble_rot
+                        # v0.2.6 the cube was a continuous tumbler (a wheel in
+                        # disguise). v0.3.7-1 THE REAL FLIP LAW (the owner:
+                        # "it does not flip side by side like the normal square
+                        # do"): the body PIVOTS over its leading bottom edge,
+                        # exactly 90 degrees per flip - a side falls, the next
+                        # face slaps onto the platform with a thud, then the
+                        # next flip starts if you keep moving. The support
+                        # lift below raises the drawn body along the real
+                        # pivot arc (draw space only - physics never changes).
+                        _update_flip(delta)
                 "shard":
                         # v0.2.7 THE SHARD FIX: same tumble language as the
                         # cube, but the pivot radius is the ACTUAL lowest
@@ -1178,6 +1278,9 @@ func _update_spin(delta: float) -> void:
                         # 1.06R and 1.23R - a fixed radius made it skate), and
                         # the settle targets are the TRUE flat-side stances
                         # (0 and +-2.0471 rad) - it lands ON its sides now.
+                        if _cube_body():
+                                _update_flip(delta)
+                                return
                         var R_l := PLAYER_R * U * char_size
                         var pv := _lowest_shard_vert(R_l)
                         var pivot_r: float = maxf(8.0 * U, float(pv["d"]))
@@ -1193,8 +1296,83 @@ func _update_spin(delta: float) -> void:
                         player.rotation = tumble_rot
                 "egg":
                         # the egg WOBBLES: never a full spin, always lands back up
+                        if _cube_body():
+                                _update_flip(delta)
+                                return
                         wobble_clock += delta * (9.0 if absf(vx) > 20.0 * U else 3.0)
                         player.rotation = sin(wobble_clock) * 0.32 * clampf(absf(vx) / (WALK_MAX * U), 0.15, 1.0) * signf(vx if vx != 0.0 else 1.0)
+
+## The drawn body is the MATRIX CUBE whenever the geometric style is worn
+## (every character) - and always for the square itself.
+func _cube_body() -> bool:
+        return _is_geo() or char_id == "square"
+
+## v0.3.7-1 THE REAL FLIP LAW - the cube walks like a cube:
+##   grounded + moving  -> chain 90-degree pivots over the leading edge
+##   grounded + stopped -> ease onto the nearest flat face (the slap)
+##   in the air         -> free inertia tumble, the landing settles it
+## The flip's angular rate reads the walk speed over the pivot arc; the
+## phase eases in-out (a real tip accelerates, then the face falls).
+func _update_flip(delta: float) -> void:
+        var half := PLAYER_R * U * char_size * 0.92   # the drawn half-height
+        var diag := half * 1.41421356                  # center->corner radius
+        if grounded:
+                if flip_phase < 0.0:
+                        if absf(vx) > 14.0 * U:
+                                flip_phase = 0.0
+                                flip_dir = signf(vx)
+                                settle_hit = false
+                if flip_phase >= 0.0:
+                        # the pivot arc for one flip = diag * PI/2; the rate
+                        # reads the walk speed, eased (slow tip, fast fall)
+                        var rate: float = clampf(absf(vx) / diag, 1.2, 9.0)
+                        flip_phase += rate * delta / (PI * 0.5) * 1.35
+                        if flip_phase >= 1.0:
+                                # THE FACE SLAP: the next side lands flat
+                                flip_base += flip_dir * PI * 0.5
+                                flip_phase = -1.0
+                                tumble_rot = flip_base
+                                flip_draw_lift = 0.0
+                                _sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
+                                _fx_poof(Vector2(px + flip_dir * half * 0.8,
+                                                py + half * 0.7), 3, 0.55)
+                        else:
+                                var e: float = flip_phase * flip_phase \
+                                                * (3.0 - 2.0 * flip_phase)
+                                tumble_rot = flip_base + flip_dir * PI * 0.5 * e
+                                # THE SUPPORT ARC: the center rises along the
+                                # corner pivot (highest at 45 degrees)
+                                var phi := e * PI * 0.5
+                                flip_draw_lift = half * (sin(phi) + cos(phi) - 1.0)
+                else:
+                        # standing: settle any air-tumble onto the flat face
+                        if absf(tumble_vel) > 0.05 or absf(
+                                        wrapf(tumble_rot - flip_base, -PI, PI)) > 0.01:
+                                _flip_settle(delta)
+                        flip_draw_lift = 0.0
+        else:
+                # the air keeps the inertia language (a tossed cube tumbles)
+                tumble_vel = move_toward(tumble_vel, 0.0, 3.2 * delta)
+                tumble_rot += tumble_vel * delta
+                flip_draw_lift = 0.0
+        player.rotation = tumble_rot
+
+## Air-tumble landing: ease the body onto the NEAREST 90-degree stance and
+## re-anchor the flip base to it (the next walk flip starts from there).
+func _flip_settle(delta: float) -> void:
+        var target := roundf(tumble_rot / (PI * 0.5)) * (PI * 0.5)
+        var prev := tumble_rot
+        tumble_rot = lerpf(tumble_rot, target, 1.0 - pow(0.0004, delta))
+        tumble_vel = 0.0
+        if absf(tumble_rot - target) < 0.005:
+                tumble_rot = target
+                flip_base = target
+        if not settle_hit and absf(tumble_rot - target) < 0.035 \
+                        and absf(prev - target) >= 0.035:
+                settle_hit = true
+                _sfx("tower_slap", -16.0, 1.0 + rng.randf() * 0.1)
+                _fx_poof(Vector2(px + signf(target - prev + 0.001) * _pr() * 0.7,
+                                py + _pr() * 0.7), 3, 0.55)
 
 ## the settle: ease the body onto its nearest FLAT face (the cube: any
 ## 90-degree stance, the shard: one of its three edge-down stances) and
@@ -1495,8 +1673,15 @@ func _draw_platforms() -> void:
                         var cells := maxi(1, int(w / (46.0 * U)))
                         for i in cells:
                                 var cx0: float = left + (float(i) + 0.5) * w / float(cells)
-                                var k: float = minf(11.0 * U, w / float(cells) * 0.22)
-                                plat_layer.draw_rect(Rect2(cx0 - k, top + h * 0.42, k * 2.0, k * 2.0),
+                                # v0.3.7-1 THE INNER-SQUARE FIT LAW (the owner:
+                                # the motif squares used to stand TALLER than the
+                                # platform and hang out of it): the square is
+                                # centered in the block now and its half-size is
+                                # capped by the platform height with a 2px margin
+                                var k: float = minf(minf(11.0 * U,
+                                                w / float(cells) * 0.22),
+                                                h * 0.5 - 2.0 * U)
+                                plat_layer.draw_rect(Rect2(cx0 - k, sy - k, k * 2.0, k * 2.0),
                                                 Color(0.30, 0.62, 0.88, 0.5), false, 1.6 * U)
                 elif skin == "sand":
                         plat_layer.draw_rect(body, Color("c9a86a"))
@@ -1717,16 +1902,9 @@ func _draw_pickups() -> void:
                 var fade: float = clampf(t / 0.35, 0.0, 1.0)          # THE FADE LAW
                 var cy: float = float(c["y"]) + sin(t * 3.2) * 7.0 * U   # = the collect law
                 var pos := Vector2(float(c["x"]), cy)
-                if _is_geo():
-                        # THE ORBIT COIN (v0.3.7): in Geoquare's style the coin
-                        # is the golden orbit - the filled core + the white ring
-                        var pop: float = 1.0 + 0.07 * sin(t * 4.4)
-                        var rr: float = 21.0 * U * pop * fade
-                        pick_layer.draw_circle(pos, rr * 2.1, Color(1.0, 0.85, 0.3, 0.12 * fade))
-                        pick_layer.draw_circle(pos, rr, Color(1.0, 0.78, 0.25, 0.95 * fade))
-                        pick_layer.draw_circle(pos, rr * 0.55, Color(1.0, 0.92, 0.55, fade))
-                        pick_layer.draw_arc(pos, rr, 0.0, TAU, 26, Color(1, 1, 1, 0.95 * fade), 2.6 * U)
-                        continue
+                # v0.3.7-1 THE COIN TRUTH LAW (the owner: "gogacoins must stay
+                # a gogacoin"): the v0.3.7 golden-orbit re-skin is DEAD - the
+                # REAL GOGACoin asset collects in every style, no exceptions.
                 pick_layer.draw_circle(pos, 30.0 * U, Color(1.0, 0.85, 0.3, 0.14 * fade))
                 if _coin_tex != null:
                         var s: float = 46.0 * U / float(_coin_tex.get_width())
@@ -1930,7 +2108,14 @@ func _refresh_pw_ui() -> void:
                         col = Color("8a7ae8")
                 _pw_glyph.text = "%s  %s" % [POWERUPS[live]["glyph"], POWERUPS[live]["name"]]
                 _pw_glyph.add_theme_color_override("font_color", col)
-                _pw_time_l.text = "%.1fs" % maxf(0.0, float(pw["t"]))
+                # v0.3.7-1 THE x2 CHARGE TRUTH: the widget states the ability
+                # - READY while the air jump is banked, USED once spent (the
+                # owner could never tell whether the x2 was real)
+                if live == "x2":
+                        _pw_time_l.text = ("%.1fs  READY" if not air_jumped \
+                                        else "%.1fs  USED") % maxf(0.0, float(pw["t"]))
+                else:
+                        _pw_time_l.text = "%.1fs" % maxf(0.0, float(pw["t"]))
                 _pw_bar.color = col
                 var bar_w: float = _pw_bar_w
                 if _pw_bar.get_parent() is Control:
@@ -2102,6 +2287,10 @@ func _shop_open() -> void:
         box.add_child(_shop_label("CHARACTERS - each its own physics + spin"))
         for id in CHARS:
                 box.add_child(_char_row(id))
+        # v0.3.7-1 TAILS: the ribbon shelf (item 12 - it wears in GEOMETRIC)
+        box.add_child(_shop_label("TAILS - the light you leave behind (GEOMETRIC)"))
+        for id in TAILS:
+                box.add_child(_tail_row(id))
         box.add_child(_shop_label("PLATFORM SKINS - real materials"))
         for id in PLATS:
                 box.add_child(_plat_row(id))
@@ -2135,6 +2324,15 @@ func _char_row(id: String) -> Control:
         var owned := Box.skin_owned(game_id, id) or int(c["price"]) == 0
         var on: bool = Box.skin_on(game_id) == id \
                         or (int(c["price"]) == 0 and Box.skin_on(game_id) == "")
+        # v0.3.7-1 THE STYLE OWNS THE BODY (the owner: "close other
+        # characters"): while the GEOMETRIC style is worn the matrix cube
+        # dresses every character - the shelf closes until the style comes
+        # off. No equips, no buys: one honest closed row per character.
+        if _is_geo():
+                var gl := Arc.fit_label("%s  -  CLOSED: the GEOMETRIC cube wears every body" \
+                                % c["name"], 22, Color("7a86a8"), 560)
+                gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return gl
         if on:
                 var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
                                 Color("58c470"), 560)
@@ -2154,6 +2352,33 @@ func _char_row(id: String) -> Control:
                                         Jukebox.sfx("buy")
                                         player.queue_redraw()
                         _shop_open())
+
+## v0.3.7-1 THE TAIL ROW: the ribbon shelf. The wear re-reads the meta and
+## the live painter picks it up on the next frame.
+func _tail_row(id: String) -> Control:
+        var c: Dictionary = TAILS[id]
+        var owned := Box.item_owned(game_id, "tail", id) or int(c["price"]) == 0
+        var on: bool = Box.item_on(game_id, "tail") == id \
+                or (int(c["price"]) == 0 and Box.item_on(game_id, "tail") == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
+                                Color("58c470"), 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button("%s  -  WEAR" % c["name"], Vector2(560, 60), 22,
+                                Color("8a4ab8"), func():
+                                                Box.equip_item(game_id, "tail", id)
+                                                tail_id = id
+                                                Jukebox.sfx("confirm", -4.0)
+                                                _shop_open())
+        return _price_btn("%s - %s" % [c["name"], c["desc"]], int(c["price"]),
+                        Color("8a4ab8"), func():
+                                        if Box.buy_item(game_id, "tail", id, int(c["price"])):
+                                                        Jukebox.sfx("buy")
+                                                        Box.equip_item(game_id, "tail", id)
+                                                        tail_id = id
+                                        _shop_open())
 
 func _plat_row(id: String) -> Control:
         var pl: Dictionary = PLATS[id]
@@ -2180,16 +2405,25 @@ func _plat_row(id: String) -> Control:
 ## THE STYLE ROWS (v0.3.7): snowy = the classic, geometric = the matrix
 ## neon (the priciest thing on the shelf). A wear re-lights the LIVE world
 ## in place - palette, platforms, character, dust, coin, music all swap.
+## v0.3.7-1 THE CUBE-FIRST LAW: GEOMETRIC stays closed until the Geoquare
+## square is OWNED - the style row reads the gate, no buy button before it.
 func _style_row(id: String) -> Control:
         var st: Dictionary = STYLES[id]
         var owned := Box.item_owned(game_id, "style", id) or int(st["price"]) == 0
         var on := _style_id() == id \
                         or (int(st["price"]) == 0 and Box.item_on(game_id, "style") == "")
+        var need := String(st.get("needs_skin", ""))
+        var gated := need != "" and not Box.skin_owned(game_id, need)
         if on:
                 var l := Arc.fit_label("%s  (ON) - %s" % [st["name"], st["desc"]], 22,
                                 Color("58c470"), 560)
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 return l
+        if gated:
+                var g := Arc.fit_label("%s  -  LOCKED: buy the GEOQUARE square first" \
+                                % st["name"], 22, Color("7a86a8"), 560)
+                g.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return g
         if owned:
                 return Arc.button("%s - WEAR" % st["name"], Vector2(560, 60), 22,
                                 Color("2a7a68"), func():
@@ -2208,6 +2442,14 @@ func _style_row(id: String) -> Control:
 ## the music all re-skin in place (the buy-only law: the box layer auto-
 ## equips on buy; the worn look is the style's job)
 func _apply_geo_style() -> void:
+        # v0.3.7-1: a mid-run style swap re-anchors the flip stance (the
+        # cube body may inherit a stale roll/tumble angle - zero it)
+        flip_base = 0.0
+        flip_phase = -1.0
+        flip_draw_lift = 0.0
+        tumble_rot = 0.0
+        tumble_vel = 0.0
+        spin = 0.0
         _apply_place(sky.material as ShaderMaterial)
         _day_night()
         plat_layer.queue_redraw()

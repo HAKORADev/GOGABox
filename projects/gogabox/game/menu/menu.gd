@@ -1773,11 +1773,89 @@ func _open_settings() -> void:
         var reset := Arc.button("RESET ALL PROGRESS", Vector2(480, 70), 22, Arc.BAD,
                         func(): _confirm_reset_all())
         vb.add_child(reset)
+        # v0.3.7-1 THE "!" DOOR (the owner's extra round): the agreement +
+        # the age rates. First knock = the agreement; after that, the door
+        # opens straight onto the age ladder.
+        vb.add_child(Arc.button("!", Vector2(480, 64), 28, Color("6a4ab8"),
+                        func(): _open_bang_door()))
         var note := Arc.label("that wipes everything, like a fresh install", 19,
                         Color("8a6a40"), false)
         note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(note)
         vb.add_child(Arc.button("CLOSE", Vector2(480, 72), 26, Arc.ACCENT,
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb)
+
+## v0.3.7-1 THE "!" DOOR: the agreement first (placeholder text - the real
+## one ships later from the owner), then the age rates. DISAGREE does
+## nothing on purpose (the owner: "make disagree just makes nothing
+## because it will remain closed anyway and gated") - the stricter tiers
+## stay hidden from the shipped box no matter what anyone taps.
+func _open_bang_door() -> void:
+        _close_sheet()
+        if int(Box.get_progress("__box__", "agreement_ok", 0)) == 1:
+                _open_age_rates()
+                return
+        var vb := _sheet_base()
+        var t := Arc.label("AGREEMENT", 42, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var body := Arc.label("GOGABox is a game box for everyone.\n\nBy agreeing you accept the house rules: play fair, spend honestly, and remember that everything above the everyone tier stays behind closed doors - it exists for the platform's future, not for today's shelf.\n\n(The full agreement text arrives with a future update.)",
+                        21, Arc.INK, false)
+        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        body.custom_minimum_size = Vector2(560, 0)
+        body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(body)
+        vb.add_child(Arc.button("AGREE", Vector2(480, 76), 28, Arc.GOOD, func():
+                        Box.set_progress("__box__", "agreement_ok", 1)
+                        Jukebox.sfx("confirm", -4.0)
+                        _open_age_rates()))
+        vb.add_child(Arc.button("DISAGREE", Vector2(480, 64), 24, Arc.BAD, func():
+                        # disagreement closes the door - nothing unlocks,
+                        # nothing breaks (the gate stays closed anyway)
+                        Jukebox.sfx("click", -4.0)
+                        _close_sheet()))
+        Arc.fit_sheet(vb, 2)
+
+## THE AGE RATES SHEET: the whole ladder from the registry comments, the
+## +9 shipping truth, and the ILLEGAL mode row - visible, gated, honest.
+func _open_age_rates() -> void:
+        _close_sheet()
+        var vb := _sheet_base()
+        var t := Arc.label("AGE RATES", 42, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var note := Arc.label("GOGABox ships as a +9 everyone game box - everything above +9 is hidden from the shelf completely.",
+                        20, Color("8a6a40"), false)
+        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        note.custom_minimum_size = Vector2(560, 0)
+        note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(note)
+        var rates := [
+                ["+3 EVERYONE", "no specified age - clean for any human alive"],
+                ["+5", "simple games - one verb, big targets, nothing scary"],
+                ["+7", "moderate puzzles, simple combat, no blood or scares"],
+                ["+9", "little violence, tactical thinking - the box's ceiling"],
+                ["+12 YOUNG TEENS", "intense violence, dead bodies, basic horror - hidden"],
+                ["+16 TEENS", "half nudity, graphical injuries, high-level horror - hidden"],
+                ["+18 MATURE", "gore, soft porn, psychological horror, fantasy crime - hidden"],
+                ["+21 ADULT ONLY", "explicit everything, realistic gambling, real-world politics - hidden"],
+        ]
+        for r in rates:
+                var row := Arc.fit_label("%s  -  %s" % [r[0], r[1]],
+                                19, Color("4a3a20"), 580, false)
+                row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                row.custom_minimum_size = Vector2(580, 0)
+                vb.add_child(row)
+        var gate := Arc.button("ILLEGAL  -  GATED", Vector2(580, 64), 22,
+                        Color(0.6, 0.56, 0.52))
+        gate.disabled = true
+        vb.add_child(gate)
+        var gate_note := Arc.label("the gate stays closed", 17,
+                        Color("8a6a40"), false)
+        gate_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(gate_note)
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 68), 26, Arc.ACCENT,
                         func(): _close_sheet()))
         Arc.fit_sheet(vb)
 

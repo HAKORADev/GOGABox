@@ -210,7 +210,7 @@ var rocket: CPUParticles2D      # the rocket-jump plume
 var tail: CPUParticles2D        # the trail ribbon (behind, not below)
 var tail2: CPUParticles2D       # the trail sparkle overlay
 var ready_ui: Control
-var ready_ring: Sprite2D
+var ready_ring: Sprite2D = null    # v0.3.7-1: RETIRED - the blue tap ring is gone
 var mech_chip: PanelContainer
 var mech_icon: TextureRect
 var speed_label: Label = null
@@ -261,6 +261,14 @@ const LORE_TITLE := "GEOQUARE"
 const LORE_TEXT := "GEOQUARE was a prisoner of the Matrix - one perfect little square among a billion, humming in the grid.\n\nThen it saw the glitch: a gap in the code, exactly one jump wide.\n\nIt jumped.\n\nThe Matrix does not like leavers. Every escape loops - the world scrolls on, the floor opens, and GEOQUARE falls right back to the beginning. Every. Single. Time. Cursed? Totally. But the curse never learned to dodge.\n\nIt once rolled down a whole snowy mountain pretending to be an Ice Cube. Good times. The mountain still tells the story.\n\nNext on the escape list: a maze with no name. It heard the exit moves. Perfect - so does GEOQUARE.\n\nIt cannot fight. It does not need to. It is a tiny jumper that dodges everything and solves puzzles for breakfast.\n\nTap anywhere. Jump. The Matrix is watching."
 
 func _lore_open() -> void:
+        # v0.3.7-1 THE BEHIND LAW (the owner: "the word tap anywhere still
+        # appears on top of the dialogue box - it must be behind it so
+        # reading became easier"): the ready label used to render OVER the
+        # lore sheet (it lives directly under the HUD, the sheet under the
+        # overlay root). The gate hides itself while the story speaks and
+        # returns when the sheet pops.
+        if ready_ui != null and is_instance_valid(ready_ui):
+                ready_ui.visible = false
         var sheet := sheet_push(0.0, "lore")
         var t := Arc.label(LORE_TITLE, 34, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -581,13 +589,9 @@ func _build_ready() -> void:
         ready_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _hud.add_child(ready_ui)
         var y_mid := (GROUND_Y - 260.0) * us
-        ready_ring = Sprite2D.new()
-        ready_ring.texture = _tex("tap_ring.png")
-        ready_ring.position = Vector2(stand_x, y_mid)
-        ready_ring.scale = Vector2.ONE * 1.4 * us
-        ready_ring.modulate = _theme()["flash"]
-        ready_ring.modulate.a = 0.55
-        _hud.add_child(ready_ring)
+        # v0.3.7-1 THE BLUE CIRCLE IS DEAD (the owner: "there is a blue
+        # circle in the tap anywhere waiting menu, remove it because it is
+        # annoying"): the tap_ring sprite is gone - the text alone invites.
         var l := Arc.label("TAP ANYWHERE TO START", 54, Color(1, 1, 1, 0.95))
         l.set_anchors_preset(Control.PRESET_TOP_WIDE)
         l.offset_top = y_mid - 170.0
@@ -607,9 +611,7 @@ func _ready_start() -> void:
         if ready_ui != null:
                 ready_ui.queue_free()
                 ready_ui = null
-        if ready_ring != null:
-                ready_ring.queue_free()
-                ready_ring = null
+        # (the ready_ring member died with the ring itself - v0.3.7-1)
         # THE READY GROUND LAW: the idle bob must never define the starting
         # stance - snap the square ON the surface exactly (the replay
         # ground-fall bug: a buried start fell through the world forever).
@@ -725,6 +727,20 @@ func _goga_tick(delta: float) -> void:
         if phase == "ready":
                 # the world breathes slowly behind the gate
                 world_x += 60.0 * delta
+                # v0.3.7-1 THE ENDLESS WAIT LAW (the owner: "make the wait
+                # screen make the world endless but without populating so
+                # waiting does not hurt or break something"): the wait DOES
+                # scroll the world (the breathe), but the generator used to
+                # stop - after half a minute of lore-reading the ground
+                # ENDED and a start dropped the square into the void. The
+                # wait now feeds its own floor: flat ground + roof extend
+                # forever, ZERO structures, ZERO threats - waiting can
+                # never kill a run before it starts.
+                var horizon := world_x + _vp().x / us + 600.0
+                while gen_x < horizon:
+                        _add_gseg(gen_x, gen_x + CELL * 8.0)
+                        _add_rseg(gen_x, gen_x + CELL * 8.0)
+                        gen_x += CELL * 8.0
                 _layout_world()
                 _idle_pulse(delta)
                 return
@@ -1660,6 +1676,11 @@ func _gen_calm(x: float) -> float:
         _add_gseg(x, x + w)
         _add_rseg(x, x + w)
         _orbit_line(x + CELL * 1.5, GROUND_Y - 190.0, 4)
+        # v0.3.7-1 THE RICH BREATH: even the calm wears a small shape (a
+        # single pedestal the run hops or ignores - never a threat)
+        if rng.randf() < 0.5:
+                _add_col(x + CELL * 5.2, 1, GROUND_Y)
+                _add_orbit(x + CELL * 5.7, GROUND_Y - CELL - 115.0)
         return w
 
 ## One chunk at the cursor; returns its width. THE WEIGHTS: the level
@@ -1706,6 +1727,29 @@ func _gen_chunk(x: float) -> float:
                 pool.append("down")
         for i in mini(3, 1 + int(lvl / 2.0) + 1):
                 pool.append("mixed")
+        # v0.3.7-1 THE RICH WORLD DECKS (the owner: "the in-betweens feel
+        # empty and not that rich... ups and downs and many platforms and
+        # blocks... it feels repeated after less than 30 seconds - there is
+        # a lot of room that you do not use"): six new shapes spread across
+        # the levels - the ARCH (a tunnel you hop through), the VALLEY (a
+        # dip between raised banks), the ISLANDS (hops over water), the
+        # HIGHWAY (a long raised ride over a spiked floor), the WAVE (an
+        # up-down-up-down rhythm) and the TOWERS (full-height vertical play).
+        for i in mini(4, 1 + lvl):
+                pool.append("gate")
+        for i in mini(4, 2 + lvl):
+                pool.append("valley")
+        if lvl >= 1:
+                for i in mini(4, lvl):
+                        pool.append("wave")
+        if lvl >= 2:
+                for i in mini(4, lvl - 1):
+                        pool.append("islands")
+                for i in mini(4, lvl - 1):
+                        pool.append("highway")
+        if lvl >= 3:
+                for i in mini(3, lvl - 2):
+                        pool.append("towers")
         if lvl >= 1:
                 for i in mini(4, 1 + lvl):
                         pool.append("twin")
@@ -1751,6 +1795,18 @@ func _gen_chunk(x: float) -> float:
                         return _chunk_down(x)
                 "mixed":
                         return _chunk_mixed(x)
+                "gate":
+                        return _chunk_gate(x)
+                "valley":
+                        return _chunk_valley(x)
+                "wave":
+                        return _chunk_wave(x)
+                "islands":
+                        return _chunk_islands(x)
+                "highway":
+                        return _chunk_highway(x)
+                "towers":
+                        return _chunk_towers(x)
                 "twin":
                         return _chunk_twin(x)
                 "bridge":
@@ -1939,26 +1995,155 @@ func _chunk_roof_yard(x: float) -> float:
 ## a ground stair, a block deck on the middle line and a hanging roof pad -
 ## both sides alive at the same time (the owner: "no mixed profiles").
 func _chunk_mixed(x: float) -> float:
-        var w := CELL * 16.0
+        # v0.3.7-1 THE OVERLAP FIX (the owner's report: "two blocks at the
+        # grounds then 4 a little up - the last 2 of them are overlapped
+        # with the next 2x2 blocks"): the L1 deck used to start at x+3C and
+        # the ground 2x2 pair stood at x+5.6C..7.6C - the deck's last two
+        # blocks sat INSIDE the 2x2 columns. Every shape now owns its own
+        # lane: ground stair (2 singles + 2x2) -> the L1 deck ABOVE AND
+        # PAST them -> the roof hang. No two structures share x-space.
+        var w := CELL * 18.0
         _add_gseg(x, x + w)
         _add_rseg(x, x + w)
-        # the ground: a 2-step stair over a floor threat
+        # the ground: a 2-step stair (two singles, then the 2x2 pair)
         var gx := x + CELL * 1.6
         _add_col(gx, 1, GROUND_Y)
         _add_col(gx + CELL, 1, GROUND_Y)
         _add_col(gx + CELL * 4.0, 2, GROUND_Y)
         _add_col(gx + CELL * 5.0, 2, GROUND_Y)
         _add_orbit(gx + CELL * 2.5, GROUND_Y - 250.0)
-        # the middle: a block deck on L1 with orbits
-        var mx := x + CELL * 3.0
+        # the middle: a block deck on L1, starting PAST the 2x2 pair
+        var mx := x + CELL * 8.6
         for i in 4:
                 _add_block(mx + float(i) * CELL, L1_Y, 1)
         _add_orbit(mx + CELL * 2.0, L1_Y - 115.0)
         # the roof: a hanging pad cluster (reachable only in flip/sticky)
-        var hx := x + CELL * 8.0
+        var hx := x + CELL * 14.4
         for i in 2:
                 _add_hang(hx + float(i) * CELL, 1, L3_Y)
         _add_orbit(hx + CELL, L3_Y + 135.0)
+        return w
+
+## ================================================== THE RICH WORLD DECKS ==
+## v0.3.7-1 - six new shapes for the owner's "use every single pixel" law.
+## Same fairness rules as the built world: every step inside the apex, the
+## ground route always has a lane, threats never share a window with a
+## forced jump, and every shape owns its x-space (the overlap lesson).
+
+## THE GATE - a tunnel: a ground column and a hanging column with ONE open
+## lane between. The square hops through the doorway (or rides the line
+## over it). Full-height vertical read without a single threat.
+func _chunk_gate(x: float) -> float:
+        var w := CELL * 13.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var ax := x + CELL * 4.0
+        _add_col(ax, 2, GROUND_Y)                 # the ground pillar
+        _add_hang(ax, 2, L3_Y - CELL * 2.0)       # the hanging pillar above
+        _add_orbit(ax + CELL * 0.5, GROUND_Y - CELL * 0.5)
+        _add_orbit(ax + CELL * 2.4, GROUND_Y - CELL * 1.6)
+        if _level() >= 2 and rng.randf() < 0.4:
+                _add_spike3(x + w - CELL * 1.5, GROUND_Y)
+        return w
+
+## THE VALLEY - a raised bank, a dip, a raised bank: real UPS AND DOWNS on
+## the ground line itself (the dip is a shallow pit the apex clears; the
+## far bank is one block higher - the world stops being a flat corridor).
+func _chunk_valley(x: float) -> float:
+        var w := CELL * 14.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var bx := x + CELL * 1.6
+        _add_col(bx, 1, GROUND_Y)                 # the near bank lip
+        _add_col(bx + CELL, 1, GROUND_Y)
+        var pit := CELL * 2.2
+        var px := bx + CELL * 2.6
+        _add_gseg(px, px + pit)                   # the dip floor (raised edge)
+        _orbit_arc(px, pit, GROUND_Y)
+        var fx := px + pit + CELL * 0.6
+        _add_col(fx, 2, GROUND_Y)                 # the far bank, one higher
+        _add_col(fx + CELL, 2, GROUND_Y)
+        _add_orbit(fx + CELL, GROUND_Y - CELL * 2.0 - 115.0)
+        return w
+
+## THE WAVE - up, down, up, down: the staircase rhythm in ONE chunk (a
+## pyramid that never stops moving). Reads like rolling terrain.
+func _chunk_wave(x: float) -> float:
+        var w := CELL * 20.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var cx := x + CELL * 1.6
+        var h := 1
+        var up := true
+        for i in 5:
+                _add_col(cx, h, GROUND_Y)
+                _add_col(cx + CELL, h, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(h) * CELL - 115.0)
+                cx += CELL * 3.2
+                h += 1 if up else -1
+                if h >= 3:
+                        up = false
+                if h <= 1:
+                        up = true
+        return w
+
+## THE ISLANDS - a chain of 1-tall block islands over real pits: hop,
+## land, hop again. The sea gap obeys the pit math; the islands are the
+## only ground (the roof line stays whole - the flip modes get a lane).
+func _chunk_islands(x: float) -> float:
+        var w := CELL * 17.0
+        var lead := CELL * 2.0
+        _add_gseg(x, x + lead)
+        _add_rseg(x, x + w)
+        var ix := x + lead
+        for i in 3:
+                _add_col(ix, 1, GROUND_Y)
+                _add_col(ix + CELL, 1, GROUND_Y)
+                _add_orbit(ix + CELL * 0.5, GROUND_Y - CELL - 130.0)
+                ix += CELL * 4.2                  # island + a 2.2-cell sea
+        _add_gseg(ix + CELL * 0.4, x + w)         # the far shore
+        if _level() >= 3 and rng.randf() < 0.4:
+                _add_spike3(x + w - CELL * 1.5, GROUND_Y)
+        return w
+
+## THE HIGHWAY - a long L1 ride above a spiked floor: the line lane is the
+## road, the ground is the danger, the on-ramp is a 1-tall block step.
+func _chunk_highway(x: float) -> float:
+        var w := CELL * 16.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var rx := x + CELL * 2.0
+        _add_col(rx, 1, GROUND_Y)                 # the on-ramp
+        _add_col(rx + CELL, 1, GROUND_Y)
+        var lx := rx + CELL * 2.6
+        var road_end := x + w - CELL * 2.0
+        _add_line(lx, road_end, L1_Y)
+        var i := 0
+        var sx := lx + CELL
+        while sx < road_end - CELL:
+                _add_orbit(sx, L1_Y - 115.0)
+                if i % 2 == 0 and _level() >= 3:
+                        _add_spike3(sx, GROUND_Y)
+                sx += CELL * 1.9
+                i += 1
+        return w
+
+## THE TOWERS - full-height vertical play: a 3-tall tower pair, a 2-tall
+## valley tower, then a 4-tall crown. The biggest up-and-down the box
+## builds; every step is one cell and every apex clears the next.
+func _chunk_towers(x: float) -> float:
+        var w := CELL * 20.0
+        _add_gseg(x, x + w)
+        _add_rseg(x, x + w)
+        var cx := x + CELL * 1.6
+        for h: int in [3, 2, 4]:
+                _add_col(cx, h, GROUND_Y)
+                _add_col(cx + CELL, h, GROUND_Y)
+                _add_orbit(cx + CELL * 0.5, GROUND_Y - float(h) * CELL - 115.0)
+                cx += CELL * 3.4
+        if _level() >= 4 and rng.randf() < 0.5:
+                _add_spike3(cx + CELL * 0.8, GROUND_Y)
+                _add_orbit(cx + CELL * 0.8, GROUND_Y - 250.0)
         return w
 
 ## THE LADDER (v0.3.6-1) - "proper obstacles to climb them up": a rising
@@ -2538,10 +2723,6 @@ func _death_burst() -> void:
                         embers.queue_free())
 
 func _idle_pulse(delta: float) -> void:
-        if ready_ring != null and is_instance_valid(ready_ring):
-                var s := (1.25 + 0.18 * sin(beat_t * 4.0)) * us
-                ready_ring.scale = Vector2.ONE * s
-                ready_ring.modulate.a = 0.4 + 0.25 * sin(beat_t * 4.0)
         var p := player
         # THE READY GROUND LAW: the bob breathes UP from the surface only and
         # stays inside the support snap band - a run start can never bury the
@@ -2626,6 +2807,10 @@ func _shop_open() -> void:
                 sc.register_tappable(b, Arc._tap_emitter(b))
 
 func _goga_sheet_popped(id: String) -> void:
+        if id == "lore":
+                # v0.3.7-1: the story is told - the gate comes back
+                if ready_ui != null and is_instance_valid(ready_ui):
+                        ready_ui.visible = true
         if id == "shop":
                 shop_id = ""
                 if phase == "run":
