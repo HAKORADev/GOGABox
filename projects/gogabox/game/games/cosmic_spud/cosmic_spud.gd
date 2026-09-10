@@ -219,9 +219,14 @@ func _t(key: String) -> Texture2D:
                 # the engineer and tap drop-in makes the app crash"). Every
                 # ally texture registers now; the art lives with the enemies'
                 # sheets it was recomposed from.
+                # v0.3.8-4 THE WALK FRAMES: each ally wears the hero's own
+                # 4-frame waddle (ally_<id>_f0..f3, the v038p4 potato crew)
                 for aid in CSData.ALLY_ORDER:
                         paths[String(CSData.ALLIES[aid]["tex"])] = \
                                         base + "allies/" + String(CSData.ALLIES[aid]["tex"]) + ".png"
+                        for k in 4:
+                                paths["ally_%s_f%d" % [aid, k]] = \
+                                                base + "allies/ally_%s_f%d.png" % [aid, k]
                 _tex[key] = load(paths[key])
         return _tex[key]
 
@@ -363,6 +368,14 @@ func _cs_label(txt: String, sz: int, col: Color, parent: Node = null) -> Label:
         if parent != null:
                 parent.add_child(l)
         return l
+
+## v0.3.8-4 THE OUTLINE LAW (the owner: "update the XP meter text and
+## skills meter to have black out lines, for better contrast"): every HUD
+## label that floats over the field wears a black rim - the read never
+## depends on what the arena paints under it.
+func _cs_outline(l: Label, px := 4) -> void:
+        l.add_theme_constant_override("outline_size", _fs(px))
+        l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 
 func _cs_button(txt: String, sz: int, col: Color, cb: Callable) -> Button:
         var b := Button.new()
@@ -528,13 +541,43 @@ func _close_all_sheets() -> void:
 
 func _cs_reopen(build: Callable) -> void:
         # pop the top sheet and rebuild it (the live-state refresh)
+        # v0.3.8-4 THE SCROLL SEAT LAW (the owner: "in the shop, if i buy
+        # something from the bottom, the shop menu refreshes and returns me
+        # to the top... make it just let me in my place while updating the
+        # list normally"): the rebuild CAPTURES the old sheet's scroll
+        # offset and seats the rebuilt one back at it (the pop-siege law).
+        var want := -1
         if not cs_sheets.is_empty():
                 var s: Dictionary = cs_sheets.pop_back()
+                var old_sc := _cs_find_scroll(s["dim"])
+                if old_sc != null:
+                        want = int(old_sc.scroll_vertical)
                 (s["dim"] as Control).queue_free()
                 if cs_sheets.is_empty():
                         get_tree().paused = false
                         paused = false
         build.call()
+        if want >= 0:
+                _cs_restore_scroll(want)
+
+func _cs_find_scroll(root: Node) -> BoxScroll:
+        if root is BoxScroll:
+                return root
+        for c in root.get_children():
+                var f := _cs_find_scroll(c)
+                if f != null:
+                        return f
+        return null
+
+func _cs_restore_scroll(want: int) -> void:
+        # the offset only sticks once the rebuilt sheet has laid out twice
+        await get_tree().process_frame
+        await get_tree().process_frame
+        if cs_sheets.is_empty():
+                return
+        var sc := _cs_find_scroll((cs_sheets.back() as Dictionary)["dim"])
+        if sc != null:
+                sc.scroll_vertical = want
 
 ## THE BACK LAW (v0.3.4-2 - THE DOOR): the HUD "<" and the Android back both
 ## land here. Over a RUNNING game a CS sheet closes first, else the box pause
@@ -675,8 +718,8 @@ func _retheme(tid: String, nite: bool) -> void:
 func _build_camera() -> void:
         cam = Camera2D.new()
         cam.position = p_pos
-        cam.make_current()
-        add_child(cam)
+        add_child(cam)          # v0.3.8-4: IN the tree first - make_current
+        cam.make_current()      # errors "!is_inside_tree()" the other order
         _apply_cam_zoom()
 
 ## THE ZOOM LAW: on huge logical viewports the camera zooms OUT so the
@@ -934,26 +977,36 @@ func _build_hud() -> void:
         left.add_child(hp_meter)
         hp_meter.get_meta("set_ratio").call(1.0, CS_GREEN)   # full at boot
         hp_txt = _cs_label("", 12, CS_WHITE)
+        _cs_outline(hp_txt)
         hp_meter.add_child(hp_txt)
         var sub := HBoxContainer.new()
         sub.add_theme_constant_override("separation", 12)
         left.add_child(sub)
         arm_txt = _cs_label("ARM 0", 12, CS_BLUE)
+        _cs_outline(arm_txt)
         sub.add_child(arm_txt)
         lvl_txt = _cs_label("LV 1", 12, CS_BLUE)
         lvl_txt.custom_minimum_size = Vector2(64, 0)
+        _cs_outline(lvl_txt)
         sub.add_child(lvl_txt)
         # the XP bar (blue, honest: run_xp / xp needed for the next level)
         xp_meter = _cs_meter(300, 14, CS_BLUE)
         left.add_child(xp_meter)
+        # v0.3.8-4 THE SKILL PTS LABEL (the owner: "the text of skill points
+        # meter is in the bar itself and the bar looks like it has no place
+        # to breath... make the text just show SKILL PTS nn... a better way
+        # is to be current/100 so it shows like 50/100"): the label leaves
+        # the bar for its OWN line above it, and the text is the honest
+        # current/100 count. Black outlined - it floats over the field now.
+        sp_txt = _cs_label("SKILL PTS 0/100", 12, CS_YELLOW)
+        _cs_outline(sp_txt)
+        sp_txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        left.add_child(sp_txt)
         # v0.3.8-3 THE SKILL POINT METER: the twin of the XP bar - it fills
         # with the KILLS that feed the next SKILL POINT (one per 100 kills,
-        # lifetime + this run), and its label reads the points you hold
-        # right now. Gold, because a point is a promise.
-        sp_meter = _cs_meter(300, 10, CS_YELLOW)
+        # lifetime + this run). Gold, because a point is a promise.
+        sp_meter = _cs_meter(300, 12, CS_YELLOW)
         left.add_child(sp_meter)
-        sp_txt = _cs_label("", 10, CS_YELLOW)
-        sp_meter.add_child(sp_txt)
         # the wave box with its time bar
         var wave_box := _cs_black_box(left, Vector2(300, 42))
         var wv := VBoxContainer.new()
@@ -1138,9 +1191,12 @@ func _refresh_hud() -> void:
                         _sp_disp = spr
                 sp_meter.get_meta("set_ratio").call(_sp_disp)
                 var free := meta.skill_points_free(run_kills)
-                sp_txt.text = "SKILL PTS %d  -  next in %d kills" \
-                                % [free, CSData.SKILL_PT_KILLS - into]
-                sp_txt.position = Vector2(4.0, (10.0 - sp_txt.size.y) * 0.5)
+                # v0.3.8-4: the label left the bar - OWN line above it, the
+                # honest current/100 count (the owner: "current/100 so it
+                # shows like 50/100 and will be more helpful")
+                sp_txt.text = "SKILL PTS %d/%d" % [into, CSData.SKILL_PT_KILLS]
+                if free > 0:
+                        sp_txt.text += "  +%d" % free
         if arm_txt != null:
                 arm_txt.text = "ARM %d" % int(stats.get("armor", 0))
                 lvl_txt.text = "LV %d" % run_level
@@ -1379,14 +1435,59 @@ const GUARD_AURA := 130.0       # the guard's protective ring, px
 func _deploy_ally(aid: String, level: int) -> void:
         var ad: Dictionary = CSData.ALLIES[aid]
         var spr := Sprite2D.new()
-        spr.texture = _t(String(ad["tex"]))
+        # v0.3.8-4 THE ALIVE CREW: the sprite wears the 4-frame waddle now
+        spr.texture = _t("ally_%s_f0" % aid)
         spr.scale = Vector2.ONE * 0.7
         spr.modulate = ALLY_TINTS.get(aid, Color(0.82, 1.0, 0.9))
         spr.z_index = 8
         world.add_child(spr)
         allies.append({"id": aid, "level": level, "pos": p_pos
                         + Vector2.from_angle(randf() * TAU) * 50.0, "node": spr,
-                        "cd": 0.0, "state": "", "t": 0.0})
+                        "cd": 0.0, "state": "", "t": 0.0,
+                        "anim": randf() * TAU, "ppos": p_pos})
+
+## v0.3.8-4 THE ALIVE CREW THEATER (the owner: "they are still feel like a
+## static image that someone drags it to follow me, give it moving
+## animation like the character or enemies and the left-right looking,
+## make it feel like a real thing"): every ally now walks the potato walk -
+## the hero's 4-frame waddle driven by REAL movement, the flip facing the
+## job (the aim when working, the travel when walking), the squash-and-
+## stretch wobble, the drone's hover bob. Same laws the enemies wear.
+func _ally_theater(a: Dictionary, delta: float) -> void:
+        var nd: Sprite2D = a["node"]
+        if nd == null or not is_instance_valid(nd):
+                return
+        var moved: Vector2 = (a["pos"] as Vector2) - (a["ppos"] as Vector2)
+        var spd: float = moved.length() / maxf(0.0001, delta)
+        var walking: bool = spd > 9.0
+        a["anim"] = float(a["anim"]) + delta * (3.4 + clampf(spd, 0.0, 240.0) * 0.022)
+        var aid: String = a["id"]
+        var hovering := aid == "drone"
+        var frame := 0
+        if hovering or walking:
+                frame = int(float(a["anim"]) * 4.0) % 4
+        nd.texture = _t("ally_%s_f%d" % [aid, frame])
+        # the flip faces the JOB: a remembered aim while working, the travel
+        # direction while walking (the left-right looking the owner asked for)
+        var face := 0.0
+        # the remembered aim decays - the flip returns to the travel face
+        if a.get("face_x", 0.0) != 0.0:
+                a["face_x"] = move_toward(float(a["face_x"]), 0.0, delta * 90.0)
+                face = float(a["face_x"])
+        elif absf(moved.x) > 0.5:
+                face = moved.x
+        else:
+                face = (a["pos"] as Vector2).x - p_pos.x
+        if absf(face) > 2.0:
+                nd.flip_h = face < 0.0
+        var base_s := 0.7
+        var wob := 0.06 * sin(float(a["anim"]) * TAU)
+        nd.scale = Vector2(base_s * (1.0 + wob), base_s * (1.0 - wob))
+        var hover_dy := 0.0
+        if hovering:
+                hover_dy = sin(float(a["anim"]) * 2.2) * 4.0
+        nd.position = (a["pos"] as Vector2) + Vector2(0, hover_dy)
+        a["ppos"] = a["pos"]
 
 func _ally_cap() -> int:
         return meta.ally_slots()
@@ -1421,6 +1522,7 @@ func _tick_allies(delta: float) -> void:
                                         a["cd"] = 0.5 if lv < 4 else 0.4
                                         var tgt: Variant = _nearest_enemy(a["pos"], 520.0)
                                         if tgt != null:
+                                                _ally_face_target(a, tgt)
                                                 var dir: Vector2 = tgt["pos"] - a["pos"]
                                                 var barrels := 1
                                                 if lv >= 2:
@@ -1445,6 +1547,7 @@ func _tick_allies(delta: float) -> void:
                                         a["cd"] = 0.42 if lv < 2 else (0.28 if lv < 4 else 0.22)
                                         var tgt2: Variant = _nearest_enemy(a["pos"], 440.0)
                                         if tgt2 != null:
+                                                _ally_face_target(a, tgt2)
                                                 var d2: Vector2 = tgt2["pos"] - a["pos"]
                                                 _ally_bullet(a["pos"], d2.angle(),
                                                                 6.0 + 3.0 * lv * float(stats["ally_dmg"]),
@@ -1561,6 +1664,7 @@ func _tick_allies(delta: float) -> void:
                                         a["cd"] = 1.8
                                         var tgt4: Variant = _nearest_enemy(a["pos"], 360.0)
                                         if tgt4 != null:
+                                                _ally_face_target(a, tgt4)
                                                 var d4: Vector2 = tgt4["pos"] - a["pos"]
                                                 var shots := 1
                                                 if lv >= 5:
@@ -1571,6 +1675,15 @@ func _tick_allies(delta: float) -> void:
                                                         _ally_bullet(a["pos"], d4.angle() + 0.09 * (float(si) - float(shots - 1) * 0.5),
                                                                         3.0 + 1.5 * float(lv), 0)
                 a["node"].position = a["pos"]
+        # v0.3.8-4: the crew theater rides AFTER the tick (the node sync
+        # stays honest; the frames, flip and wobble live in one place)
+        for a in allies:
+                _ally_theater(a, delta)
+
+## remembers which way an ally's JOB points this tick (the flip eats it)
+func _ally_face_target(a: Dictionary, tgt: Variant) -> void:
+        if tgt != null:
+                a["face_x"] = float((tgt["pos"] as Vector2).x - (a["pos"] as Vector2).x)
 
 func _nearest_enemy(from: Vector2, rng: float) -> Variant:
         var best: Variant = null
@@ -3487,14 +3600,20 @@ func _market_items(shelf: VBoxContainer) -> void:
 
 ## THE TIER RANGE LAW's face (v0.3.4-5): ONE honest stat line - the EFFECTIVE
 ## dmg / cadence / range of this weapon at this tier. Melee says "melee".
+## v0.3.8-4 THE DIRECT SHOTS LAW (the owner: "i thought you made the
+## presentation to say it like 0.5/s so it means a shot after each 500ms so
+## there is 2 shots per second, if like this, the user will do the math by
+## itself so it will be more confusing, just make it direct shot/s is much
+## cooler"): the cadence speaks SHOTS PER SECOND - the interval never shows.
 func _weapon_stat_line(wid: String, tier: int) -> String:
         var wd: Dictionary = CSData.WEAPONS[wid]
         var mult: Dictionary = CSData.tier_mult(tier)
         var rng_v: float = float(wd["rng"]) * float(mult.get("rng", 1.0))
         var tail := " (melee)" if bool(wd.get("melee", false)) else ""
-        return "%d dmg / %.2fs / rng %d%s" % [
+        var cad: float = maxf(0.02, float(wd["cad"]) * float(mult["cad"]))
+        return "%d dmg / %.1f/s / rng %d%s" % [
                 int(float(wd["dmg"]) * float(mult["dmg"])),
-                float(wd["cad"]) * float(mult["cad"]), int(rng_v), tail]
+                1.0 / cad, int(rng_v), tail]
 
 func _market_weapons(shelf: VBoxContainer) -> void:
         _section(shelf, "WEAPON OFFERS")

@@ -1175,11 +1175,12 @@ def scene_maze():
 
 
 def scene_domino():
-    """DOMINO (v0.3.8-3): the real table footage - the tavern felt, the
-    snake with TRUE pips (the 6 wears 3+3 columns), the doubles standing
-    perpendicular, the CPU fan of backs top-center, the goals stack on the
-    right cut, the yard stack on the left, the coin waiting on the end
-    slot, and the lifted tile glowing in the hand."""
+    """DOMINO (v0.3.8-4): the real table footage - the tavern felt, the
+    SERPENTINE snake with TRUE pips (the 6 wears 3+3 columns) and the
+    doubles STANDING across their rows, the CPU fan of backs top-center,
+    the W-D-L letter chips, the yard stack in the felt's top-left corner
+    with its BONEYARD count, the coin waiting on the end slot, and the
+    lifted tile glowing in the hand."""
     sc = Scene()
     sc.backdrop((46, 107, 70), (24, 62, 40))
     rng = __import__("random").Random(3808)
@@ -1274,41 +1275,49 @@ def scene_domino():
         sc.work.alpha_composite(img, (int(bx - 29), int(16)))
     sc.text("CPU - 7", 26, W * 0.5, 122, (255, 255, 255, 190))
 
-    # ---- the chain: 6-6 | 6-4 | 4-2 | 2-3, then the elbow 3-5 down,
-    # back left 5-5 | 5-0 - the real wrap, doubles standing perpendicular
-    tile(W * 0.315, H * 0.46, 6, 6, w=54)                     # standing 6-6
-    tile(W * 0.425, H * 0.475, 6, 4, vertical=False, w=48)    # lying 6-4
-    tile(W * 0.535, H * 0.475, 4, 2, vertical=False, w=48)
-    tile(W * 0.645, H * 0.475, 2, 3, vertical=False, w=48)
-    tile(W * 0.76, H * 0.50, 3, 5, w=50)                      # the elbow drop
-    tile(W * 0.655, H * 0.585, 5, 5, vertical=False, w=48)    # row 2 <- back
-    tile(W * 0.545, H * 0.585, 5, 0, vertical=False, w=48)
-    # the glowing end slot past the 5-5... on the left of row 2
-    ex, ey = W * 0.40, H * 0.585
+    # ---- the chain: the v0.3.8-4 SERPENTINE - row 1 runs right, the
+    # elbow drops, row 2 runs back left; every double STANDS across its
+    # row (the classic law the rig certifies). Poses are explicit px so
+    # nothing kisses: rows 90px apart, one clear slot past the elbow.
+    tile(290, 330, 6, 6, w=48)                                 # 6-6 STANDS
+    tile(400, 330, 6, 4, vertical=False, w=48)
+    tile(510, 330, 4, 2, vertical=False, w=48)
+    tile(620, 330, 2, 3, vertical=False, w=48)
+    tile(750, 330, 3, 5, w=48)                                 # the elbow
+    tile(600, 420, 5, 5, w=48)                                 # 5-5 STANDS
+    tile(490, 420, 5, 0, vertical=False, w=48)
+    tile(380, 420, 0, 3, vertical=False, w=48)
+    tile(270, 420, 3, 3, w=48)                                 # 3-3 STANDS
+    # the glowing end slot past the 3-3, on the left of row 2
+    ex, ey = 110, 420
     sc.glow(ex, ey, 44, (120, 240, 160), 120)
     sc.rect([ex - 34, ey - 34, ex + 34, ey + 34], r=10,
             outline=(120, 240, 160, 200), width=4)
     # the coin ON the slot (the race)
     sc.glow(ex, ey, 30, (255, 214, 100), 140)
     sc.stamp(load_sprite("ui/coin.png"), ex, ey, scale=0.44)
-    # ---- the yard stack on the left rail (the resting boneyard)
+    # ---- the yard stack, the felt's TOP-LEFT corner (the v0.3.8-4 seat:
+    # the serpentine rows pack from the center - the corner stays open)
     for k in range(5):
-        bx = 96 + k * 5
-        by = H * 0.50 - k * 7
+        bx = 52 + k * 5
+        by = 150 - k * 7
         img = Image.new("RGBA", (76, 130), (0, 0, 0, 0))
         dr = ImageDraw.Draw(img)
         dr.rounded_rectangle([4, 4, 72, 126], 9, fill=(84, 74, 62, 255),
                              outline=(52, 44, 36, 255), width=3)
         dr.ellipse([30, 56, 46, 72], fill=(52, 44, 36, 255))
         sc.work.alpha_composite(img, (int(bx), int(by)))
-    # ---- the goals stack, the RIGHT cut (the owner's seat) - ABOVE the rail
-    for i, (lab, col) in enumerate([("YOU 2", (88, 196, 112)),
-                                    ("DRAWS 0", (107, 114, 128)),
-                                    ("CPU 1", (232, 87, 74))]):
-        by = 10 + i * 38
-        sc.rect([W - 132, by, W - 40, by + 30], r=6,
+    sc.text("BONEYARD 14", 20, 140, 296, (255, 255, 255, 175))
+    # ---- the W-D-L strip (v0.3.8-4): three fat letter chips, one honest
+    # row, the band between the CPU fan and the chain rows (the owner:
+    # "the word draw made the number next to it out of resolution")
+    for i, (lab, col) in enumerate([("W 2", (88, 196, 112)),
+                                    ("D 0", (107, 114, 128)),
+                                    ("L 1", (232, 87, 74))]):
+        bx = W - 300 + i * 88
+        sc.rect([bx, 146, bx + 80, 182], r=6,
                 fill=(255, 255, 255, 245), outline=col + (255,), width=4)
-        sc.text(lab, 20, W - 86, by + 15, (34, 30, 26, 255), big=False)
+        sc.text(lab, 22, bx + 40, 164, (34, 30, 26, 255), big=False)
     # ---- the hand: two tiles + the LIFTED one glowing (the carry)
     tile(W * 0.38, H * 0.855, 1, 4, w=66)
     tile(W * 0.54, H * 0.855, 0, 6, w=66)

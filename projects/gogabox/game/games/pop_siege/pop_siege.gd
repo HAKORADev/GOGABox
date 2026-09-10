@@ -428,13 +428,19 @@ func _build_panel() -> void:
         var sp := Arc.button("x1", Vector2(58, 44), _fs(21), Color(0.22, 0.15, 0.08), func(): _toggle_speed())
         wave_row.add_child(sp)
         chips["speed_btn"] = sp
-        var am := Arc.button("AUTO", Vector2(104, 44), _fs(18), Arc.GOOD, func(): _toggle_am())
+        var am := Arc.button("AUTO", Vector2(132, 44), _fs(18), Arc.GOOD, func(): _toggle_am())
+        # v0.3.8-4: 132 fits "MANUAL" - the old 104 made the AUTO/MANUAL
+        # toggle's text walk out the right side (the owner: "the word manual
+        # is bigger than auto and makes the text goes to the right side")
         wave_row.add_child(am)
         chips["am_btn"] = am
         _paint_am()      # THE A/M TRUTH LAW: the button paints the RESTORED mode
         wave_lbl = Arc.label("PRESS START", _fs(22), Color(1, 0.95, 0.8))
         wave_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         wave_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        # v0.3.8-4: clip keeps the label's MINIMUM width at 0 - the row can
+        # never push past the panel while the fitted font catches up
+        wave_lbl.clip_text = true
         wave_row.add_child(wave_lbl)
         # the folk cards (2 columns x 5)
         cards_box = GridContainer.new()
@@ -506,6 +512,28 @@ func _refresh_chips() -> void:
                         line = "WAVE %d ROLLING" % wave_n
                 if line != _chip_line:
                         _chip_line = line
+                        # v0.3.8-4 THE FITTED WAVE LINE (the owner: "the words
+                        # at the top that says send the first wave letters ve
+                        # are out of resolution"): the line steps its font
+                        # down until it fits the seat the x1 + AUTO/MANUAL
+                        # buttons leave it.
+                        # THE HONEST SEAT (the rig caught the E still cut):
+                        # the label's OWN size.x is its text's minimum width -
+                        # feeding it back as the seat can never shrink the
+                        # font (399 in, 399 out). The seat is the ROW's real
+                        # room: the panel minus the two fixed buttons, the
+                        # gaps and a breath.
+                        var seat: float = get_viewport_rect().size.x - 240.0
+                        if panel != null and is_instance_valid(panel) \
+                                        and panel.size.x > 200.0:
+                                seat = panel.size.x - 58.0 - 132.0 - 12.0 - 10.0
+                        # THE FIT EATS THE 1.15 (the rig caught the E cut
+                        # twice): _fs multiplies by 1.15 - inflating the
+                        # FITTED size back past the seat (fit 20 -> paint
+                        # 23). Fit the LOUD size, use the fitted int as-is.
+                        wave_lbl.add_theme_font_size_override("font_size",
+                                        Arc.fit_size(line, _fs(22), seat,
+                                        null, true, 13))
                         wave_lbl.text = line
         if next_btn != null and is_instance_valid(next_btn):
                 var btxt := ""
@@ -521,10 +549,27 @@ func _refresh_chips() -> void:
                         next_btn.visible = bvis
         # the afford paint: only when a card's affordability or the selection
         # actually flipped (a string of booleans - the cheapest honest sig)
+        # v0.3.8-4: the menu's OWN doors ride the sig too - the upgrade and
+        # gear-up buttons the purse could not open MUST gray-in live when the
+        # pops pay (the owner: "waited in that state and earned the money,
+        # the button do not come available, it stays grayed-out")
         var asig := str(selected_place) + "|"
         for fid in card_panels:
                 asig += "1" if coins >= int(PDData.FOLK[fid]["place"]) else "0"
         asig += "|" + str(int(menu_box != null and is_instance_valid(menu_box)))
+        if menu_box != null and is_instance_valid(menu_box):
+                # v0.3.8-4: has_meta FIRST - get_meta(key, default) still
+                # ERRORS in Godot 4.7 when the key is missing (the boot log
+                # proved it on the very first paint before the menu builds
+                # its buttons).
+                if menu_box.has_meta("up_btn"):
+                        var upb: Button = menu_box.get_meta("up_btn")
+                        if upb != null and is_instance_valid(upb):
+                                asig += "1" if coins >= int(menu_box.get_meta("up_cost", 0)) else "0"
+                if menu_box.has_meta("gear_btn"):
+                        var gb: Button = menu_box.get_meta("gear_btn")
+                        if gb != null and is_instance_valid(gb):
+                                asig += "1" if coins >= int(menu_box.get_meta("gear_cost", 0)) else "0"
         if asig != _afford_sig:
                 _afford_sig = asig
                 _paint_cards()
@@ -1338,27 +1383,44 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         if b["frozen"]:
                 real += 1.0
         b["hp"] = float(b["hp"]) - real
-        _pay_damage(b, real, src)
+        if src != null:
+                src["inflicted"] = float(src.get("inflicted", 0.0)) + real
         _paint_bloon(b)
         if float(b["hp"]) <= 0.0:
                 # THE WHEEL LADDER: the level cracks down (each level cost +1
                 # more - the over-damage spills into the next ring).
-                # v0.3.8-3 THE POPS LAW: every ring cracked is ONE pop.
+                # v0.3.8-4 THE POP PAY LAW v3: every ring crack PAYS THE
+                # MOMENT IT CRACKS (see the pay below the ladder).
+                var popped := 0
+                var pop_at: Vector2 = (b["spr"] as Sprite2D).position
                 while float(b["hp"]) <= 0.0 and int(b["lv"]) > 1:
                         var over := -float(b["hp"])
                         b["lv"] = int(b["lv"]) - 1
                         b["max_hp"] = PDData.crack_hp(b["kind"], int(b["lv"]))
                         b["hp"] = float(b["max_hp"]) - over
                         add_score(1)
+                        popped += 1
                 if float(b["hp"]) <= 0.0:
+                        popped += 1
                         _pop_bloon(b, src)
+                # v0.3.8-4 THE POP PAY LAW v3 (the owner: "1 damage = 1 layer
+                # = 1 popcoin where the popcoin comes to be once the layer
+                # popped instead of waiting for 10-20 hits"): the coins ARE
+                # the layers now - a 1-layer bloon pays exactly 1 coin no
+                # matter how hard the hit was, a 5-layer bloon pays 5, one
+                # per pop, the moment it happens. Overkill pays NOTHING
+                # (damage past the last layer never happened).
+                if popped > 0:
+                        coins += popped
+                        _coin_text(pop_at, popped)
         if not selected_folk.is_empty() and src == selected_folk:
                 _menu_paint_live()
         return true
 
-## THE POP PAY LAW v2: a popcoin per DAMAGE dealt (the owner's ladder).
-## v0.3.8-3: the ledger SPLIT - the score is NOT fed here anymore (the
-## score counts layers popped; the coins count damage points).
+## THE POP PAY LAW v2 (retired v0.3.8-4): paid per DAMAGE point - LongEye's
+## 8-dmg bullet on a 1-hp red paid 8 coins for ONE layer. The armor shell
+## still pays what it ATE (a shell is not a wheel layer - v0.3.8-3's law
+## stands for it alone).
 func _pay_damage(b: Dictionary, real: float, src: Variant) -> void:
         if real <= 0.0:
                 return
@@ -1391,13 +1453,13 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
         # v0.3.8-3 THE POPS LAW: the body's final break is ONE pop (the ring
         # cracks each scored their own on the way down)
         add_score(1)
-        # THE POP PAY LAW: the body's damage already paid per point - the
-        # pop speaks the total + the kaching gold-wing bonus
-        var pay := int(b.get("paid", 0))
-        if src != null:
-                pay += int((src as Dictionary)["buffs"].get("coin_pop", 0))
-                coins += int((src as Dictionary)["buffs"].get("coin_pop", 0))
+        # v0.3.8-4: the body pop's own coin rides the per-pop pay in
+        # _hurt_bloon now - what lives here is the kaching GOLD-WING bonus
+        # (+2 PopCoins per pop, the synergy's own law)
+        var pay := int((src as Dictionary)["buffs"].get("coin_pop", 0)) \
+                if src != null else 0
         if pay > 0:
+                coins += pay
                 _coin_text(b["spr"].position, pay)
         _pops_run += 1
         achievement_max("pops_run", _pops_run)
@@ -1548,6 +1610,14 @@ func _goga_tick(delta: float) -> void:
         _tick_bullets(d)
         _move_bloons(d)
         _tick_traps(d)
+        # v0.3.8-4 THE EVERY-TICK TRUTH: the chips + the menu afford paint
+        # run EVERY tick now - the paint is value-gated (a chip only moves
+        # when its own number moves), so the idle-MANUAL siege (income
+        # folk dripping, the SEND gate up) repaints honestly. The old
+        # phase-only calls left the purse and the grayed buttons STALE
+        # before the first wave (the rig caught the purse frozen at 650
+        # through a paid pop).
+        _refresh_chips()
 
 # ------------------------------------------------------------ folk firing
 func _pick_target(f: Dictionary, rng_px: float) -> Dictionary:
@@ -2183,11 +2253,15 @@ func _build_menu() -> void:
                 var spacer := Control.new()
                 spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 r.add_child(spacer)
-                r.add_child(Arc.label(_stat_text(key, v), _fs(19), Arc.CARD))
+                # v0.3.8-4 THE FITTED ROW: the value and the preview wear fit
+                # labels on fixed seats - the RANGE line's tail can never walk
+                # off the panel again (the owner: "it shows nn >> + and the
+                # other text is out of screen")
+                r.add_child(Arc.fit_label(_stat_text(key, v), _fs(19), Arc.CARD, 96.0))
                 if nx > 0.0:
                         var up_col := Color(0.5, 0.9, 0.5)
                         r.add_child(Arc.label(">>", _fs(17), up_col))
-                        r.add_child(Arc.label("+" + _stat_text(key, nx - v), _fs(18), up_col))
+                        r.add_child(Arc.fit_label(_stat_delta_text(key, v, nx), _fs(18), up_col, 110.0))
                 else:
                         r.add_child(Arc.label("MAX", _fs(16), Color(1, 0.85, 0.4)))
         # gear extras line (what this gear unlocked)
@@ -2256,13 +2330,32 @@ func _paint_menu_afford() -> void:
                 gb.modulate = Color(1, 1, 1) if coins >= gc else Color(0.45, 0.45, 0.45, 0.85)
 
 func _stat_text(key: String, v: float) -> String:
+        # v0.3.8-4 THE DIRECT SHOTS LAW (the owner: "just make it direct
+        # shot/s is much cooler"): the value speaks shots PER SECOND - no
+        # interval math is ever asked of the player. Range speaks CELLS (the
+        # game's own unit law) - the old px number (434) read like a password.
         match key:
                 "rate": return "%.2f/s" % (1.0 / maxf(0.05, v))
-                "rng": return "%d" % int(v * CELL)
+                "rng": return "%.1f" % v
                 "slow": return "%d%%" % int(v * 100.0)
                 "aura": return "+%d%%" % int(v * 100.0)
                 "income": return "%d" % int(v)
                 _: return "%.1f" % v
+
+## v0.3.8-4 THE HONEST DELTA (the owner: "it says like +20.00/s while the
+## increasement could be just extra 0.30/s"): the >> preview computes the
+## gain in the SAME units the value wears. The old code fed the raw
+## INTERVAL difference (a NEGATIVE number) into the per-second formatter -
+## maxf(0.05, -0.03) = 0.05 -> 1/0.05 = "+20.00/s" out of thin air.
+func _stat_delta_text(key: String, v: float, nx: float) -> String:
+        match key:
+                "rate":
+                        var d := (1.0 / maxf(0.05, nx)) - (1.0 / maxf(0.05, v))
+                        return "%+.2f/s" % d
+                "rng": return "%+.1f" % (nx - v)
+                "slow", "aura": return "+%d%%" % int(round((nx - v) * 100.0))
+                "income": return "%+d" % int(round(nx - v))
+                _: return "%+.1f" % (nx - v)
 
 func _gear_extras(fid: String, gear: int) -> String:
         match [fid, gear]:
@@ -2310,6 +2403,10 @@ func _do_upgrade(f: Dictionary) -> void:
         Jukebox.sfx("ps_upgrade", -6.0)
         _fx_spawn("spark", f["pos"], 0.5, Color(1, 0.9, 0.5))
         _recompute_auras()
+        # v0.3.8-4 THE LIVE RING: the selection circle reads eff_rng - the
+        # upgrade grew it, so the ring REDRAWS NOW (the owner: "the circle
+        # does not get refreshed in real-time... i have to re-tap it")
+        sel_draw.queue_redraw()
         _refresh_chips()
         _rebuild_cards()
         _build_menu()
@@ -2350,6 +2447,7 @@ func _do_gearup(f: Dictionary) -> void:
         Jukebox.sfx("ps_gearup", -4.0)
         shake_t = 0.2
         _recompute_auras()
+        sel_draw.queue_redraw()      # v0.3.8-4 THE LIVE RING (range grew)
         _refresh_chips()
         _build_menu()
 

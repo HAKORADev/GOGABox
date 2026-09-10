@@ -4,7 +4,9 @@ extends RefCounted
 ## LEVELS (each level cracks for +1 damage more and shifts the hue a visible
 ## step), STRIPS (each band hides another bloon inside - 10 on balloons, 50
 ## on blimps, the counts stay hidden), and ARMOR shells (metal fears only
-## fire, rock fears only bombs). PopCoins pay PER DAMAGE. Prices climbed so
+## fire, rock fears only bombs). PopCoins pay PER LAYER POP (v0.3.8-4: 1
+## layer popped = 1 popcoin, paid the moment it pops - overkill pays
+## nothing). Prices climbed so
 ## the gear-ups are the rich door. All distances stay in CELL units.
 
 const START_COINS := 650            # the purse at drop in (per-damage pay rebalance)
@@ -36,7 +38,7 @@ const STRIP_WAVE := 13              # the first striped bloons
 # ------------------------------------------------------------------ BLOONS
 # hp = the crack cost of LEVEL 1 (the honest body); speed px/s in cells;
 # kids = what pops out; immunities; scl = art scale in cells; rbe = lives
-# lost on leak (the full chain). PopCoins pay per damage dealt (no table).
+# lost on leak (the full chain). PopCoins pay per LAYER POPPED (no table).
 const BLOONS := {
         "red":      {"hp": 1, "sp": 1.05, "kids": [], "imm": [], "rbe": 1, "scl": 0.50},
         "blue":     {"hp": 1, "sp": 1.4, "kids": ["red", "red"], "imm": [], "rbe": 2, "scl": 0.50},

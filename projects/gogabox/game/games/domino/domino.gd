@@ -157,19 +157,31 @@ var drag_armed := false
 var shake_t := 0.0
 var shake_i := -1
 
-# layout (recomputed per draw - immediate mode)
-var bw := 150.0                # board tile long side (the 1080 design law)
-var hw := 200.0                # hand tile long side (the 1080 design law)
+# layout (v0.3.8-4 THE ANCHORED SNAKE - the Loop Games study law):
+## every placed tile KEEPS the pose it landed in (board-space center +
+## orientation, computed ONCE at placement from that side's cursor). Tiles
+## never reflow, never switch seats, never lean - the table's only job is
+## the FIT: the chain's bounding box is centered in the ground and the
+## scale walks down continuously only when the snake truly outgrows it
+## (the real game's ChainDominoDirectionVec + CalculateBoardWidth/Height
+## + BoardSimulator vocabulary, rewritten honest).
+var BASE_L := 168.0            # board tile long side (the 1080 design law)
+var hw := 236.0                # hand tile long side (v0.3.8-4: bigger - the
+                               # owner: "everything is too small... no one
+                               # play games using a magnifier glass")
 var board_rect := Rect2()
-var chain_rects: Array = []    # [{rect: Rect2, vertical: bool}]
-var end_l := Rect2()           # the open play slots
+var chain_rects: Array = []    # [{rect: Rect2 (SCREEN space), vertical: bool}]
+var end_l := Rect2()           # the open play slots (screen space)
 var end_r := Rect2()
 var hand_rects: Array = []
 var pile_pos := Vector2.ZERO
 var cpu_pos := Vector2.ZERO
-var _fit_scale := 1.0          # v0.3.8-3: the CONTINUOUS fit scale (the old
-                               # 4-step jump counted tiles, not pixels - the
-                               # snake overflowed long before it shrank)
+var _fit_scale := 1.0          # the CONTINUOUS fit scale (bbox -> ground)
+# the two snake cursors: the open edge each side grows from
+# {pos: Vector2 (board space), dir: Vector2 (unit, axis-aligned)}
+var cur_l := {}
+var cur_r := {}
+var _end_board := {}       # side -> the open slot's BOARD-space center
 
 # fly animations [{tile, from, to, r0, r1, t, dur}]
 var flies: Array = []          # every flight: deal_p / deal_c / place / ""
@@ -187,9 +199,6 @@ var hand_l: Node2D
 var fx_l: Node2D
 var ready_ui: Control = null
 var turn_lbl: Label
-var you_lbl: Label
-var draw_lbl: Label
-var cpu_lbl: Label
 var draw_btn: Button = null    # PASS (lives only when the yard is dry)
 var hand_c_lbl: Label
 var pile_lbl: Label
@@ -431,190 +440,395 @@ func _build_ready() -> void:
                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_widgets(vp: Vector2) -> void:
-        # v0.3.8-1 THE OWNER'S SEAT: the score leaves the middle of the top
-        # bar for the RIGHT side - a compact vertical stack (YOU / DRAWS /
-        # CPU), the domino mirror of the chess strip.
-        # v0.3.8-3 THE GOALS SEAT: the stack ends ABOVE the table rail - the
-        # old CPU row hung INSIDE the felt (the owner: "the goals widgets
-        # are misplaced, the cpu is already in the table area"). The boxes
-        # slimmed to fit the strip between the top bar and the ground.
+        # v0.3.8-1 THE OWNER'S SEAT: the score strip rides the RIGHT cut.
+        # v0.3.8-4 THE W-D-L STRIP (the owner: "update the goals widgets to
+        # write W-D-L instead of full you-draw-cpu because the word draw
+        # itself made the number next to it out of resolution"): three fat
+        # letter chips - W green, D gray, L red - one honest row.
         var widget := Node2D.new()
-        widget.position = Vector2(vp.x - 76.0, 158.0)
+        # v0.3.8-4: the seat is the band BETWEEN the CPU fan and the felt
+        # rail - the old y=120 row sat ON the fan's rightmost back (the rig
+        # caught the W chip covering a dealt tile)
+        widget.position = Vector2(vp.x - 190.0, 196.0)
         widget.draw.connect(func():
-                var bwid := 118.0
-                var bh := 42.0
+                var cw := 108.0
+                var ch := 46.0
                 var gapw := 8.0
-                var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5,
-                        (bh + gapw) - bh * 0.5]
-                var cols := [Color("58c470"), Color("6b7280"), Color("e8574a")]
+                var cols := [Color("58c470"), Color("8b93a1"), Color("e8574a")]
+                var letters := ["W", "D", "L"]
+                var f := ThemeDB.fallback_font
                 for i in 3:
-                        var r := Rect2(-bwid * 0.5, ys[i], bwid, bh)
+                        var x := (cw + gapw) * (i - 1)
+                        var r := Rect2(x - cw * 0.5, -ch * 0.5, cw, ch)
                         widget.draw_rect(Rect2(r.position + Vector2(4, 4),
                                 r.size), Color(0.09, 0.05, 0.02, 0.85))
                         widget.draw_rect(r, Color(1, 1, 1, 0.95))
-                        widget.draw_rect(r, cols[i], false, 4.0))
+                        widget.draw_rect(r, cols[i], false, 5.0)
+                        var num: int = [wins, draws, losses][i]
+                        widget.draw_string(f, Vector2(x - cw * 0.5 + 10.0, 15.0),
+                                letters[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 26,
+                                cols[i])
+                        widget.draw_string(f,
+                                Vector2(x - cw * 0.5 + 36.0, 17.0), str(num),
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Arc.INK))
         world.add_child(widget)
-        you_lbl = Arc.label("YOU 0", 21, Color("2f7a44"))
-        draw_lbl = Arc.label("DRAWS 0", 21, Color("4b5563"))
-        cpu_lbl = Arc.label("CPU 0", 21, Color("9c3a32"))
-        for l in [you_lbl, draw_lbl, cpu_lbl]:
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                world.add_child(l)
-        _refresh_widget()
+        widget_strip = widget
         turn_lbl = Arc.label("", 28, Color(1, 1, 1, 0.92))
         turn_lbl.position = Vector2(0, 242)
         turn_lbl.custom_minimum_size = Vector2(vp.x, 38)
         turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         world.add_child(turn_lbl)
         pile_lbl = Arc.label("", 20, Color(1, 1, 1, 0.7))
+        pile_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         world.add_child(pile_lbl)
         hand_c_lbl = Arc.label("", 20, Color(1, 1, 1, 0.7))
         world.add_child(hand_c_lbl)
 
 func _refresh_widget() -> void:
-        var vp := get_viewport_rect().size
-        var w := 118.0
-        var bh := 42.0
-        var gapw := 8.0
-        var ys := [-(bh + gapw) - bh * 0.5, -bh * 0.5, (bh + gapw) - bh * 0.5]
-        var labels := [you_lbl, draw_lbl, cpu_lbl]
-        var texts := ["YOU %d" % wins, "DRAWS %d" % draws, "CPU %d" % losses]
-        for i in 3:
-                var v: Label = labels[i]
-                v.text = texts[i]
-                v.position = Vector2(vp.x - 76.0 - w * 0.5,
-                        158.0 + ys[i] + 9.0)
-                v.custom_minimum_size = Vector2(w, bh - 16.0)
+        # v0.3.8-4: the W-D-L strip paints itself from wins/draws/losses on
+        # its own draw pass - the labels of the old stack are gone
+        if widget_strip != null and is_instance_valid(widget_strip):
+                widget_strip.queue_redraw()
+
+var widget_strip: Node2D = null
 
 # ============================================================ the layout
-## Recomputed on every structural change - the chain snake wraps in rows.
-## v0.3.8-3 THE FIT LAW (the owner: "the ground scaling thing is very
-## shitty and wrong as fuck, the distance between each domino, or the zoom
-## out to fit more or the placing, all are very wrong"): the scale is no
-## longer a 4-step jump keyed on tile COUNT - the snake is SIMULATED at
-## full size, and the scale walks down in small honest steps until the
-## WHOLE snake (wrapped rows and all) fits the ground. Continuous, real,
-## no jumps.
+## Recomputed on every structural change.
+## v0.3.8-4 THE ANCHORED SNAKE (the owner sent the Loop Games Dominoes XAPK
+## and demanded the study: "obviously the ground should not work this
+## way"): the decompiled truth is ChainDominoDirectionVec + Calculate(simple
+## |double)DominoPosition + DoDominosOverlap + CalculateBoardWidth/Height -
+## a chain that GROWS from its ends along a direction vector, tiles that
+## NEVER move once placed, elbows that turn the line like a road, and a
+## table that fits the whole chain's bounding box. The old sheet RE-FLOWED
+## the whole snake from the screen center on every placement (tiles slid,
+## switched rows, leaned left) - that game is dead.
 
 func _board_scale() -> float:
         return _fit_scale
 
-## one full wrap simulation at `scale` - the layout IS the simulation.
-## v0.3.8-3 THE EDGE CURSOR: the cursor walks the chain's open END (not a
-## chain of centers) - every tile's near edge lands a gap past the last
-## extent, so a double (half-width) and a tile (full-length) both seat
-## exactly one gap apart. The old center math stepped doubles by their
-## WIDTH and overlapped every neighbor by 34px (the rig's messy snake).
-func _chain_sim(scale: float) -> Dictionary:
-        var b := 150.0 * scale
-        var th := b * 0.5
-        var gap := 3.0
-        var min_x: float = board_rect.position.x + 44.0
-        var max_x: float = board_rect.end.x - 44.0
-        var cy: float = board_rect.get_center().y
-        var dir := 1
-        var edge: float = board_rect.get_center().x
-        var rects: Array = []
-        var min_y := cy
-        var max_y := cy
-        var min_rx := cy
-        var max_rx := cy
-        for i in chain.size():
+func _tile_long() -> float:
+        return BASE_L
+
+func _tile_short() -> float:
+        return BASE_L * 0.5
+
+const SNAKE_GAP := 4.0
+
+## the rect a tile at `center` occupies in BOARD space
+## along = the extent in the flow direction, across = the perpendicular one
+func _pose_rect(center: Vector2, dir: Vector2, along: float,
+                across: float) -> Rect2:
+        if absf(dir.x) > 0.5:
+                return Rect2(center - Vector2(along, across) * 0.5,
+                                Vector2(along, across))
+        return Rect2(center - Vector2(across, along) * 0.5,
+                        Vector2(across, along))
+
+## v0.3.8-4 THE PV TRUTH: a placed tile's rect reads its OWN pv (the
+## orientation the renderer draws) - short side across x when vertical,
+## long side across x when horizontal. The census re-deriving orientation
+## from dir+dbl disagreed with the elbow's pv on TURN DOUBLES (the rig
+## caught a 38px bite the renderer never showed) - pv is the ONE truth.
+func _pose_rect_pv(center: Vector2, vert: bool) -> Rect2:
+        var sz := Vector2(_tile_short(), _tile_long()) if vert \
+                        else Vector2(_tile_long(), _tile_short())
+        return Rect2(center - sz * 0.5, sz)
+
+## the candidate step for one side's cursor: the NEXT tile's pose
+## (dbl = the tile is a double: it lies ACROSS the flow, the classic law)
+func _snake_candidate(cur: Dictionary, dbl: bool) -> Dictionary:
+        var dir: Vector2 = cur["dir"]
+        var horiz := absf(dir.x) > 0.5
+        var along := _tile_short() if dbl else _tile_long()
+        var across := _tile_long() if dbl else _tile_short()
+        var center: Vector2 = (cur["pos"] as Vector2) + dir * (along * 0.5)
+        return {"center": center, "dir": dir, "rect": _pose_rect(center, dir,
+                along, across), "vert": (horiz and dbl) \
+                or ((not horiz) and (not dbl))}
+
+## every placed tile's board-space rect (the overlap law's census)
+func _placed_rects() -> Array:
+        var out: Array = []
+        for t in chain:
+                if not t.has("px"):
+                        continue
+                # v0.3.8-4 THE ONE TRANSPOSE LAW + THE PV TRUTH: pv (the
+                # renderer's own orientation) is the rect's truth - the old
+                # dir+dbl re-derivation transposed twice and fought the
+                # elbow's pv on turn doubles
+                var vert: bool = bool(t["pv"]) if t.has("pv") \
+                                else (absf(Vector2(t["pdx"], t["pdy"]).x) < 0.5)
+                out.append(_pose_rect_pv(Vector2(t["px"], t["py"]), vert))
+        return out
+
+## THE LOGICAL TABLE (the Loop Games study law): placement happens on a
+## board larger than the screen - the real game's CalculateBoardWidth/
+## Height logical space - and the fit zoom maps whatever the chain used
+## back into the visible ground. Rows of a 28-tile line never meet each
+## other, corners always have room, nothing ever overlaps.
+## v0.3.8-4 THE GROWN TABLE: the table FOLLOWS the ground (1.35x wide,
+## 1.10x tall) instead of a fixed 2160x2560 - rows pack tighter (bigger
+## on-screen tiles, the owner's "everything is too small"), and a shrunk
+## ground re-packs its table the same way, so the fit zoom never bottoms
+## out (the rig caught the fixed table holding 2152-wide boxes that no
+## honest zoom could seat back into a half ground).
+func _logical_board() -> Rect2:
+        var sz := board_rect.size
+        return Rect2(board_rect.get_center()
+                        - Vector2(sz.x * 1.35, sz.y * 1.10) * 0.5,
+                Vector2(sz.x * 1.35, sz.y * 1.10))
+
+func _safe_bounds() -> Rect2:
+        return _logical_board().grow(-30.0)
+
+func _rect_in_bounds(r: Rect2) -> bool:
+        return _safe_bounds().encloses(r)
+
+func _rect_hits_tiles(r: Rect2, placed: Array) -> bool:
+        for p in placed:
+                if (p as Rect2).grow(-2.0).intersects(r.grow(-2.0)):
+                        return true
+        return false
+
+## THE ELBOW: the line turns like a road - the turn tile lies
+## perpendicular astride the corner, then the direction rotates. The turn
+## side is the one with room (away from the near wall, back under/over the
+## row when the wall is vertical).
+## v0.3.8-4 THE SERPENTINE LAW (the Loop Games study law): a row runs back
+## the way it came - the cursor remembers its row's horizontal heading
+## (row_dir) and the side its pack grows to (row_side). The old turn
+## re-picked a heading by the board center, so a dense rebuild SPIRALED
+## back into row 1 and dropped a tile on an occupied seat (the rig caught
+## two tiles at the exact same center).
+func _snake_turn(cur: Dictionary, dbl: bool, placed: Array) -> Dictionary:
+        var dir: Vector2 = cur["dir"]
+        var horiz := absf(dir.x) > 0.5
+        var t := _tile_short()
+        var L := _tile_long()
+        var center: Vector2 = (cur["pos"] as Vector2) + dir * (t * 0.5)
+        var ecenter := center
+        var evert := horiz
+        var newdir := Vector2.ZERO
+        if horiz:
+                # turn up or down: the remembered growth side first, else
+                # the side with the open air
+                var c1 := Vector2(center.x, center.y + (L * 0.5 + SNAKE_GAP))
+                var c2 := Vector2(center.x, center.y - (L * 0.5 + SNAKE_GAP))
+                var d1_ok := _rect_in_bounds(_pose_rect(c1, Vector2(0, 1), L, t)) \
+                                and not _rect_hits_tiles(_pose_rect(c1,
+                                        Vector2(0, 1), L, t), placed)
+                var d2_ok := _rect_in_bounds(_pose_rect(c2, Vector2(0, -1), L, t)) \
+                                and not _rect_hits_tiles(_pose_rect(c2,
+                                        Vector2(0, -1), L, t), placed)
+                var want := Vector2(0, 1) if center.y \
+                                <= board_rect.get_center().y else Vector2(0, -1)
+                var side: Vector2 = cur.get("row_side", Vector2.ZERO)
+                if side != Vector2.ZERO:
+                        want = side
+                if want.y > 0.0 and d1_ok:
+                        newdir = Vector2(0, 1)
+                elif want.y < 0.0 and d2_ok:
+                        newdir = Vector2(0, -1)
+                elif d1_ok:
+                        newdir = Vector2(0, 1)
+                elif d2_ok:
+                        newdir = Vector2(0, -1)
+                else:
+                        newdir = want
+                cur["row_side"] = newdir
+        else:
+                # SERPENTINE: the next horizontal row runs OPPOSITE the last
+                # one - the S-pack the real tables draw
+                var rev: Vector2 = -(cur.get("row_dir", Vector2(1, 0)) as Vector2)
+                var c1 := Vector2(center.x + (L * 0.5 + SNAKE_GAP), center.y)
+                var c2 := Vector2(center.x - (L * 0.5 + SNAKE_GAP), center.y)
+                var r1_ok := _rect_in_bounds(_pose_rect(c1, Vector2(1, 0), L, t)) \
+                                and not _rect_hits_tiles(_pose_rect(c1,
+                                        Vector2(1, 0), L, t), placed)
+                var r2_ok := _rect_in_bounds(_pose_rect(c2, Vector2(-1, 0), L, t)) \
+                                and not _rect_hits_tiles(_pose_rect(c2,
+                                        Vector2(-1, 0), L, t), placed)
+                if rev.x > 0.5 and r1_ok:
+                        newdir = rev
+                elif rev.x < 0.5 and r2_ok:
+                        newdir = rev
+                elif r1_ok:
+                        newdir = Vector2(1, 0)
+                elif r2_ok:
+                        newdir = Vector2(-1, 0)
+                else:
+                        newdir = rev
+                cur["row_dir"] = newdir
+        ecenter = center
+        var erect := Rect2()
+        if evert:
+                erect = Rect2(ecenter - Vector2(t, L) * 0.5, Vector2(t, L))
+        else:
+                erect = Rect2(ecenter - Vector2(L, t) * 0.5, Vector2(L, t))
+        # v0.3.8-4 THE ROW PITCH TRUTH: the step clears a FULL tile long
+        # side PLUS the turn tile's own half - two facing doubles (168 of
+        # reach each) need L + gap between the row LINES, or the next row's
+        # elbow bites the previous row's double (the rig caught 38px bites)
+        var npos: Vector2 = ecenter + newdir \
+                        * (L * 0.5 + t * 0.5 + SNAKE_GAP)
+        return {"center": ecenter, "rect": erect, "vert": evert,
+                "newdir": newdir, "npos": npos}
+
+## THE STEP: where a tile lands when played on `side` (1 left / 2 right),
+## storing the pose into `entry`. Honest physics: the candidate is taken if
+## it is inside the ground AND touches no placed tile; else the ELBOW - and
+## a horizontal run's elbow is a ONE-TILE vertical step: the cursor comes
+## back horizontal at once (the classic S-pack of real dominoes tables -
+## the old free-run column slammed into the first row on its way back).
+func _snake_place(side: int, dbl: bool, entry: Dictionary) -> void:
+        var cur: Dictionary = cur_r if side == 2 else cur_l
+        var placed := _placed_rects()
+        # THE ROW STEP: the forced turn back to horizontal
+        if bool(cur.get("force_turn", false)):
+                var back := _snake_turn(cur, dbl, placed)
+                entry["px"] = back["center"].x
+                entry["py"] = back["center"].y
+                entry["pv"] = back["vert"]
+                entry["pdx"] = back["newdir"].x
+                entry["pdy"] = back["newdir"].y
+                cur["dir"] = back["newdir"]
+                cur["pos"] = back["npos"]
+                cur["force_turn"] = false
+                return
+        var cand := _snake_candidate(cur, dbl)
+        # THE EXIT RESERVE: a row keeps one tile-width of runway past its
+        # end, so the corner's own turn tile always fits when the elbow
+        # comes (the rig caught a wall-hugging elbow half off the table)
+        var reserve := (cand["rect"] as Rect2)
+        var d: Vector2 = cand["dir"]
+        if d.x > 0.5:
+                reserve.size.x += _tile_long() + SNAKE_GAP
+        elif d.x < -0.5:
+                reserve.position.x -= _tile_long() + SNAKE_GAP
+                reserve.size.x += _tile_long() + SNAKE_GAP
+        elif d.y > 0.5:
+                reserve.size.y += _tile_long() + SNAKE_GAP
+        else:
+                reserve.position.y -= _tile_long() + SNAKE_GAP
+                reserve.size.y += _tile_long() + SNAKE_GAP
+        if _rect_in_bounds(reserve) \
+                        and not _rect_hits_tiles(cand["rect"], placed):
+                entry["px"] = cand["center"].x
+                entry["py"] = cand["center"].y
+                entry["pv"] = cand["vert"]
+                entry["pdx"] = cand["dir"].x
+                entry["pdy"] = cand["dir"].y
+                var along := _tile_short() if dbl else _tile_long()
+                var npos: Vector2 = cand["center"] + (cand["dir"] as Vector2) \
+                                * (along * 0.5 + SNAKE_GAP)
+                cur["pos"] = npos
+                # the row's horizontal heading rides the cursor (the
+                # serpentine's memory)
+                if absf((cand["dir"] as Vector2).x) > 0.5:
+                        cur["row_dir"] = cand["dir"]
+                cur["force_turn"] = false
+                return
+        # THE TURN
+        var elbow := _snake_turn(cur, dbl, placed)
+        entry["px"] = elbow["center"].x
+        entry["py"] = elbow["center"].y
+        entry["pv"] = elbow["vert"]
+        entry["pdx"] = elbow["newdir"].x
+        entry["pdy"] = elbow["newdir"].y
+        cur["dir"] = elbow["newdir"]
+        cur["pos"] = elbow["npos"]
+        # a horizontal run just bent vertical - the step comes back at once
+        cur["force_turn"] = absf(elbow["newdir"].y) > 0.5
+
+## the opener's pose: dead center of the ground, the double stands (the
+## classic), both cursors step off its two ends
+func _snake_open(entry: Dictionary) -> void:
+        var c := board_rect.get_center()
+        entry["px"] = c.x
+        entry["py"] = c.y
+        entry["pv"] = int(entry["a"]) == int(entry["b"])
+        entry["pdx"] = 1.0
+        entry["pdy"] = 0.0
+        var off := _tile_long() * 0.5 + SNAKE_GAP
+        cur_r = {"pos": c + Vector2(off, 0), "dir": Vector2(1, 0),
+                "row_dir": Vector2(1, 0), "row_side": Vector2.ZERO,
+                "force_turn": false}
+        cur_l = {"pos": c - Vector2(off, 0), "dir": Vector2(-1, 0),
+                "row_dir": Vector2(-1, 0), "row_side": Vector2.ZERO,
+                "force_turn": false}
+
+## a from-scratch rebuild (probe-built chains, stale poses): the array order
+## IS the left->right order, so the replay just snakes it to the right
+func _snake_rebuild() -> void:
+        if chain.is_empty():
+                return
+        var first: Dictionary = chain[0]
+        first.erase("fl")
+        _snake_open(first)
+        first["fl"] = false
+        for i in range(1, chain.size()):
                 var t: Dictionary = chain[i]
                 var dbl: bool = int(t["a"]) == int(t["b"])
-                var size := Vector2(th, b) if dbl else Vector2(b, th)
-                var vertical := dbl
-                var elbowed := false
-                if not vertical:
-                        if (dir > 0 and edge + size.x > max_x and i > 0) \
-                                        or (dir < 0 and edge - size.x < min_x \
-                                        and i > 0):
-                                vertical = true
-                                elbowed = true
-                                size = Vector2(th, b)
-                var cx: float = edge + dir * size.x * 0.5
-                var r := Rect2(Vector2(cx - size.x * 0.5,
-                        cy - size.y * 0.5), size)
-                rects.append({"rect": r, "vertical": vertical})
-                min_y = minf(min_y, r.position.y)
-                max_y = maxf(max_y, r.end.y)
-                min_rx = minf(min_rx, r.position.x)
-                max_rx = maxf(max_rx, r.end.x)
-                # THE DOUBLE TRUTH: a double stands PERPENDICULAR in the
-                # line but the snake FLOWS STRAIGHT THROUGH it. Only a
-                # margin-converted tile is an elbow: it drops a row, flips,
-                # and the new row clears it by exactly the gap.
-                # THE ROW PITCH TRUTH: the drop clears a FULL tile height
-                # (b + gap), not a half - the new row may carry its own
-                # standing doubles (150 tall); a half-tile drop made two
-                # stacked doubles intersect by 34px on the portrait board.
-                if elbowed:
-                        cy += b + gap
-                        dir = -dir
-                        edge = cx + dir * (th * 0.5 + gap)
-                else:
-                        edge += dir * (size.x + gap)
-        # v0.3.8-3: the fit is HONEST on BOTH axes - the old test read the
-        # vertical band alone, so an elbow could poke past the board's edge
-        # at full scale and the walk never shrank
-        var fits: bool = max_y <= board_rect.end.y - 6.0 \
-                and min_y >= board_rect.position.y + 6.0 \
-                and max_rx <= board_rect.end.x - 2.0 \
-                and min_rx >= board_rect.position.x + 2.0
-        return {"rects": rects, "fits": fits, "min_y": min_y, "max_y": max_y}
+                _snake_place(2, dbl, t)
 
+## THE FIT LAW: the chain's bounding box is CENTERED in the ground and the
+## scale walks down in small honest steps only when the box outgrows it.
+## Continuous, real, no jumps - and a tile NEVER moves relative to its
+## neighbours (the zoom moves them all together).
 func _fit_chain() -> float:
         if chain.size() <= 1:
                 return 1.0
-        var s := 1.0
-        while s > 0.40:
-                if bool(_chain_sim(s)["fits"]):
-                        return s
-                s -= 0.04
-        return 0.40
+        var bb := _chain_bbox()
+        var avail := board_rect.grow(-24.0).size
+        if bb.size.x <= 0.0 or bb.size.y <= 0.0:
+                return 1.0
+        var s: float = minf(1.0, minf(avail.x / bb.size.x, avail.y / bb.size.y))
+        # v0.3.8-4: the floor walks DOWN to 0.26 - the grown table keeps
+        # boxes ~1.35x the ground, so real play never gets near the floor;
+        # only a pathological half-seat worst case touches it (the rig's
+        # law: the WHOLE deck must seat, even in a half ground)
+        return clampf(s, 0.26, 1.0)
+
+func _chain_bbox() -> Rect2:
+        var rs := _placed_rects()
+        var bb := Rect2()
+        var first := true
+        for r in rs:
+                if first:
+                        bb = r
+                        first = false
+                else:
+                        bb = bb.merge(r)
+        return bb
+
+## board-space pose -> screen rect under the current fit
+func _pose_to_screen(t: Dictionary) -> Rect2:
+        # v0.3.8-4 THE PV TRUTH: the screen rect reads pv - the ONE
+        # orientation truth, the same law the census and the renderer wear
+        var vert: bool = bool(t["pv"]) if t.has("pv") \
+                        else (absf(Vector2(t["pdx"], t["pdy"]).x) < 0.5)
+        var board := _pose_rect_pv(Vector2(t["px"], t["py"]), vert)
+        var bc := board_rect.get_center()
+        var bb := _chain_bbox()
+        var off := (board.get_center() - bb.get_center()) * _fit_scale
+        var center := bc + off
+        var size := board.size * _fit_scale
+        return Rect2(center - size * 0.5, size)
 
 func _relayout() -> void:
         var vp := get_viewport_rect().size
-        # v0.3.8-1 THE GROUND LAW: the score strip moved to the RIGHT cut
+        # v0.3.8-1 THE GROUND LAW: the score strip lives in the RIGHT cut
         # and the CPU hand row lives top-center - the ground starts just
-        # under it and runs to the hand fan, much taller than before.
+        # under it and runs to the hand fan.
+        # v0.3.8-4 THE BIG ROOM: the ground grows taller (the hand fan sits
+        # lower) and the boneyard pile steps in from the left edge (the
+        # owner: "the letter b is literally going to exit the screen").
         var top := 236.0
-        var bot := vp.y - banner_bottom() - hw - 78.0
-        board_rect = Rect2(18.0, top, vp.x - 36.0, maxf(200.0, bot - top))
-        # v0.3.8-3 THE FIT LAW: simulate, shrink until it fits, then CENTER
-        # the snake vertically (the old layout grew down-only and hugged
-        # whatever row it started on)
-        _fit_scale = _fit_chain()
-        bw = 150.0 * _fit_scale
-        var sim: Dictionary = _chain_sim(_fit_scale)
-        chain_rects = sim["rects"]
-        if not chain_rects.is_empty():
-                var mid_y: float = (float(sim["min_y"]) + float(sim["max_y"])) * 0.5
-                var dy: float = board_rect.get_center().y - mid_y
-                for cr in chain_rects:
-                        var r: Rect2 = cr["rect"]
-                        cr["rect"] = Rect2(r.position + Vector2(0, dy), r.size)
-        # the resting yard: a neat stack on the ground's LEFT edge, mid-height
-        pile_pos = Vector2(board_rect.position.x + 46.0,
-                board_rect.position.y + board_rect.size.y * 0.5)
-        # the CPU hand: top-center of the ground (the mirror of the owner's
-        # fan - see _draw_cpu_hand)
+        var bot := vp.y - banner_bottom() - hw - 64.0
+        board_rect = Rect2(16.0, top, vp.x - 32.0, maxf(200.0, bot - top))
+        _relayout_board()
         cpu_pos = Vector2(vp.x * 0.5, 140.0)
-        var margin_r := board_rect.position.x + board_rect.size.x - 44.0
-        var margin_l := board_rect.position.x + 44.0
-        if chain.is_empty() or chain_rects.is_empty():
-                end_l = Rect2()
-                end_r = Rect2()
-        else:
-                var lr: Rect2 = chain_rects[0]["rect"]
-                var rr: Rect2 = chain_rects[chain_rects.size() - 1]["rect"]
-                end_l = Rect2(lr.position.x - bw - 6.0, lr.position.y
-                                + (lr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
-                                if lr.position.x - bw - 6.0 > margin_l - 14.0 else Rect2()
-                end_r = Rect2(rr.position.x + rr.size.x + 6.0, rr.position.y
-                                + (rr.size.y - bw * 0.5) * 0.5, bw, bw * 0.5) \
-                                if rr.position.x + rr.size.x + 6.0 < margin_r + 14.0 \
-                                else Rect2()
         # the hand fan
         hand_rects = []
         for i in hand_p.size():
@@ -623,8 +837,8 @@ func _relayout() -> void:
         # fans out face-down across the ground's middle - one rect per tile
         spread_rects = []
         if spread and deck.size() > 0:
-                var sw := bw * 0.52
-                var sh := bw * 0.92
+                var sw := bw() * 0.52
+                var sh := bw() * 0.92
                 var cnt := deck.size()
                 var gapw := 6.0
                 var row_w := cnt * sw + (cnt - 1) * gapw
@@ -637,6 +851,81 @@ func _relayout() -> void:
                 for i in cnt:
                         spread_rects.append(Rect2(Vector2(
                                 sx + i * step, sy), Vector2(sw, sh)))
+
+## the board-space half of the relayout (the snake, the fit, the slots) -
+## callable on its own so the probe can shrink the ground and certify the
+## fit law honestly
+func _relayout_board() -> void:
+        # the resting yard: the felt's TOP-LEFT corner band - the old
+        # mid-left seat drowned under the serpentine's rows once the chain
+        # grew wide (the rig caught the stack buried behind row tiles; the
+        # rows pack from the center outward, the corner stays open)
+        pile_pos = Vector2(board_rect.position.x + 92.0,
+                board_rect.position.y + 96.0)
+        if chain.is_empty():
+                chain_rects = []
+                end_l = Rect2()
+                end_r = Rect2()
+                _fit_scale = 1.0
+                return
+        # stale poses (probe-built chains)? rebuild the snake honest
+        var stale := false
+        for t in chain:
+                if not t.has("px"):
+                        stale = true
+                        break
+        if stale:
+                _snake_rebuild()
+        _fit_scale = _fit_chain()
+        chain_rects = []
+        for t in chain:
+                chain_rects.append({"rect": _pose_to_screen(t),
+                                "vertical": bool(t["pv"])})
+        # the open-end slots: the REAL next candidate (elbow honest) - and
+        # their BOARD-space centers (the coin race judges in board space:
+        # the screen pan must never steal a landed domino's coin)
+        var e := ends(chain)
+        end_l = Rect2()
+        end_r = Rect2()
+        _end_board = {}
+        if not e.x == -1:
+                var cl := _snake_candidate(cur_l, false)
+                var cr := _snake_candidate(cur_r, false)
+                var placed := _placed_rects()
+                if not _rect_in_bounds(cl["rect"]) \
+                                or _rect_hits_tiles(cl["rect"], placed):
+                        var el := _snake_turn(cur_l, false, placed)
+                        cl = {"rect": el["rect"], "center": el["center"]}
+                if not _rect_in_bounds(cr["rect"]) \
+                                or _rect_hits_tiles(cr["rect"], placed):
+                        var er := _snake_turn(cur_r, false, placed)
+                        cr = {"rect": er["rect"], "center": er["center"]}
+                end_l = _board_to_screen_rect(cl["rect"])
+                end_r = _board_to_screen_rect(cr["rect"])
+                _end_board = {1: cl["center"], 2: cr["center"]}
+
+## a board-space rect through the fit transform (the slot truth)
+func _board_to_screen_rect(r: Rect2) -> Rect2:
+        var bc := board_rect.get_center()
+        var bb := _chain_bbox()
+        var off := (r.get_center() - bb.get_center()) * _fit_scale
+        var center := bc + off
+        var size := r.size * _fit_scale
+        return Rect2(center - size * 0.5, size)
+
+## the SCALED board tile size (the drag carry + the yard read it)
+func bw() -> float:
+        return BASE_L * _fit_scale
+
+## the finger's distance to a drop seat (0 inside) - Rect2 has no such
+## helper in Godot 4, and the wide catch needs the honest number
+func _drop_dist(r: Rect2, at: Vector2) -> float:
+        if r.has_point(at):
+                return 0.0
+        var dx: float = maxf(r.position.x - at.x, at.x - r.end.x)
+        var dy: float = maxf(r.position.y - at.y, at.y - r.end.y)
+        return maxf(0.0, maxf(dx, dy)) if (dx < 0.0 or dy < 0.0) \
+                else Vector2(maxf(dx, 0.0), maxf(dy, 0.0)).length()
 
 ## the fan slot for a hand of `n` tiles, tile `i` - ONE truth for the
 ## layout AND the deal flies (a landing tile always knows its seat)
@@ -867,7 +1156,7 @@ func _draw_fx() -> void:
                                         Vector2.ONE)
                         _:
                                 # the yard-take flight: face-down, board scale
-                                var tsz := Vector2(bw, bw * 0.5)
+                                var tsz := Vector2(bw(), bw() * 0.5)
                                 fx_l.draw_set_transform(at, 0.0, Vector2.ONE)
                                 if bool(f.get("back", false)):
                                         _draw_tile_back(fx_l,
@@ -883,8 +1172,8 @@ func _draw_fx() -> void:
         # rides STANDING at board scale above the fingertip
         if drag and drag_armed and drag_i >= 0 and drag_i < hand_p.size():
                 var t: Array = hand_p[drag_i]
-                var dsz := Vector2(bw * 0.5, bw)   # carried standing, board scale
-                var at2 := drag_pos - Vector2(0, bw * 0.62)
+                var dsz := Vector2(bw() * 0.5, bw())   # carried standing, board scale
+                var at2 := drag_pos - Vector2(0, bw() * 0.62)
                 var r := Rect2(at2 - dsz * 0.5, dsz)
                 fx_l.draw_rect(r.grow(5.0), Color(0, 0, 0, 0.35))
                 _draw_tile_body(fx_l, r, int(t[0]), int(t[1]), true, 1.0)
@@ -920,18 +1209,27 @@ func _draw_pile() -> void:
                 return
         if n <= 0:
                 pile_lbl.text = "THE YARD IS DRY"
-                pile_lbl.position = pile_pos + Vector2(-70.0, -14.0)
-                pile_lbl.custom_minimum_size = Vector2(160.0, 24)
+                # v0.3.8-4: the label keeps its whole self on screen (the
+                # owner: "the letter b is literally going to exit the
+                # screen") - centered under the pile, x clamped inside
+                pile_lbl.position = Vector2(
+                        maxf(10.0, pile_pos.x - 110.0), pile_pos.y - 16.0)
+                pile_lbl.custom_minimum_size = Vector2(220.0, 28)
                 return
         # a taller honest stack: up to 6 backs with real depth
-        var s := Vector2(bw * 0.44, bw * 0.88)
+        # v0.3.8-4: the stack reads BIGGER (the magnifier-glass round)
+        var s := Vector2(bw() * 0.50, bw() * 0.98)
         for k in mini(6, n):
                 var r := Rect2(pile_pos - s * 0.5
-                        + Vector2(k * 2.5, -k * 4.0), s)
+                        + Vector2(k * 2.8, -k * 4.4), s)
                 _draw_tile_back(table_l, r)
         pile_lbl.text = "BONEYARD %d" % n
-        pile_lbl.position = pile_pos + Vector2(-70.0, s.y * 0.5 + 12.0)
-        pile_lbl.custom_minimum_size = Vector2(160.0, 24)
+        # v0.3.8-4 THE SEEN LABEL: centered under the pile, x clamped inside
+        # the screen (the old -70 offset started the B at x=-6)
+        pile_lbl.add_theme_font_size_override("font_size", 24)
+        pile_lbl.position = Vector2(
+                maxf(10.0, pile_pos.x - 110.0), pile_pos.y + s.y * 0.5 + 10.0)
+        pile_lbl.custom_minimum_size = Vector2(220.0, 28)
 
 ## the spread fan (fx layer): the face-down yard the user picks from
 func _draw_spread() -> void:
@@ -945,11 +1243,18 @@ func _draw_spread() -> void:
                         Color(1, 1, 1, 0.05 + 0.05 * pulse), false, 2.0)
         var hint := "TAP A TILE TO DRAW"
         var f := ThemeDB.fallback_font
-        fx_l.draw_string(f, Vector2(
-                board_rect.get_center().x - 130.0,
-                spread_rects[0].position.y - 18.0 + 8.0),
-                hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 26,
-                Color(1, 1, 1, 0.55 + 0.3 * pulse))
+        # v0.3.8-4 THE SEEN HINT (the owner: "everything is too small...
+        # no one play games using a magnifier glass"): the hint is BIG and
+        # centered, with a soft dark plate so it reads over any felt
+        var hs := 40
+        var hw2 := f.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hs).x
+        var hx: float = board_rect.get_center().x - hw2 * 0.5
+        var hy: float = (spread_rects[0] as Rect2).position.y - 26.0
+        fx_l.draw_rect(Rect2(hx - 24.0, hy - hs - 10.0, hw2 + 48.0, hs + 22.0),
+                Color(0, 0, 0, 0.35 + 0.12 * pulse))
+        fx_l.draw_string(f, Vector2(hx, hy), hint,
+                HORIZONTAL_ALIGNMENT_LEFT, -1, hs,
+                Color(1, 1, 1, 0.72 + 0.28 * pulse))
 
 func _draw_cpu_hand() -> void:
         # v0.3.8-1 THE MIRROR LAW: the CPU's fan is set the SAME way as the
@@ -1072,11 +1377,12 @@ func _press(at: Vector2) -> void:
                         chain_l.queue_redraw()
                         return
         # an end slot?
+        # v0.3.8-4: the tap seats grow too (the wide catch, both input paths)
         if sel >= 0:
-                if end_l.size.x > 0.0 and end_l.grow(10.0).has_point(at):
+                if end_l.size.x > 0.0 and end_l.grow(26.0).has_point(at):
                         _player_play(1)
                         return
-                if end_r.size.x > 0.0 and end_r.grow(10.0).has_point(at):
+                if end_r.size.x > 0.0 and end_r.grow(26.0).has_point(at):
                         _player_play(2)
                         return
                 var e2 := ends(chain)
@@ -1094,18 +1400,34 @@ func _press(at: Vector2) -> void:
 func _release(_at: Vector2) -> void:
         # v0.3.8-3: only an ARMED drag drops - a tap (never armed) leaves the
         # tile selected for the tap-tap law, exactly where it stood
+        # v0.3.8-4 THE WIDE CATCH (the owner: "when i am close to a place
+        # more than my hand or the other place, it refuses to put it, make
+        # it detect it from wider range"): the drop hunts BOTH ends by
+        # DISTANCE now - the finger's tile lands on the nearest fitting end
+        # inside a generous finger-halos radius, no more pixel hunting.
         if drag and drag_armed and drag_i >= 0 and sel == drag_i \
                                 and drag_i < hand_p.size():
                 var dropped := false
                 var e := ends(chain)
                 var cp := can_play(hand_p[drag_i], e.x, e.y)
-                var drop_at := drag_pos - Vector2(0, bw * 0.62)
-                if end_l.size.x > 0.0 and end_l.grow(14.0).has_point(drop_at) \
-                                        and (cp & 1) != 0:
+                var drop_at := drag_pos - Vector2(0, bw() * 0.62)
+                var reach: float = maxf(120.0, bw() * 0.9)
+                var best_side := 0
+                var best_d := reach
+                if end_l.size.x > 0.0 and (cp & 1) != 0:
+                        var dl: float = _drop_dist(end_l.grow(18.0), drop_at)
+                        if dl < best_d:
+                                best_d = dl
+                                best_side = 1
+                if end_r.size.x > 0.0 and (cp & 2) != 0:
+                        var dr: float = _drop_dist(end_r.grow(18.0), drop_at)
+                        if dr < best_d:
+                                best_d = dr
+                                best_side = 2
+                if best_side == 1:
                         _place(P, drag_i, 1, drag_pos)
                         dropped = true
-                elif end_r.size.x > 0.0 and end_r.grow(14.0).has_point(drop_at) \
-                                        and (cp & 2) != 0:
+                elif best_side == 2:
                         _place(P, drag_i, 2, drag_pos)
                         dropped = true
                 drag = false
@@ -1181,14 +1503,26 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                 chain.append({"a": int(t[0]), "b": int(t[1]),
                         "fl": fl, "who": who, "landed": false})
                 idx = chain.size() - 1
-        # the coin spot in WORLD space, captured BEFORE the reflow
-        var coin_pos := Vector2.ZERO
+        # v0.3.8-4 THE ANCHORED SNAKE: the new entry's pose is computed NOW
+        # from its side's cursor - the tile will never move again (the old
+        # sheet re-flowed the whole snake every placement: tiles slid and
+        # switched seats - "the dominoes go down and switch positions by
+        # themselves")
+        var entry: Dictionary = chain[0] if side == 1 \
+                        else chain[chain.size() - 1]
+        if chain.size() == 1:
+                _snake_open(entry)
+        else:
+                _snake_place(side, int(t[0]) == int(t[1]), entry)
+        # the coin spot in BOARD space, captured BEFORE the reflow - the
+        # screen pan moves every tile together, so the race is judged where
+        # the tiles actually live (the old screen-space check let the pan
+        # steal a coin the domino had honestly landed on)
+        var coin_anchor := Vector2.ZERO
         var coin_live := coin_side != 0
         if coin_live:
-                var slot := end_l if coin_side == 1 else end_r
-                coin_pos = slot.get_center() if slot.size.x > 0.0 \
-                                else Vector2.ZERO
-                if coin_pos == Vector2.ZERO:
+                coin_anchor = _end_board.get(coin_side, Vector2.ZERO)
+                if coin_anchor == Vector2.ZERO:
                         coin_live = false
         # the fly source: the drag's fingertip, the hand seat, or the CPU fan
         var from: Vector2
@@ -1223,8 +1557,20 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                 "rect": ir["rect"] as Rect2, "vert": vert,
                 "r0": r0, "r1": 0.0, "t": 0.0, "dur": 0.3, "idx": idx})
         # THE COIN RACE: the tile that lands on the coin spot takes it
-        if coin_live and (ir["rect"] as Rect2).has_point(coin_pos):
-                _coin_taken(who)
+        # (judged in BOARD space - the landed pose against the slot anchor)
+        if coin_live:
+                var dbl2: bool = int(t[0]) == int(t[1])
+                var horiz2 := absf(Vector2(entry["pdx"], entry["pdy"]).x) > 0.5
+                var along2 := (_tile_short() if dbl2 else _tile_long())
+                var across2 := (_tile_long() if dbl2 else _tile_short())
+                if not horiz2:
+                        var tmp2 := along2
+                        along2 = across2
+                        across2 = tmp2
+                var er := _pose_rect(Vector2(entry["px"], entry["py"]),
+                        Vector2(entry["pdx"], entry["pdy"]), along2, across2)
+                if er.has_point(coin_anchor):
+                        _coin_taken(who)
         _after_move(who)
 
 func _coin_taken(who: int) -> void:

@@ -458,7 +458,21 @@ func _run() -> void:
         G._hurt_bloon(red, 1.0, PDData.SHARP, null)
         ck(G.bloons.is_empty(), "the red pops")
         ck(G.score == score0 + 1, "THE POPS LAW (v0.3.8-3): one pop = one point - the POPS chip counts pops, not money")
-        ck(int(G.coins) == coins_c0 + 1, "THE POP PAY LAW v2: one damage = one popcoin (no more free 2s)")
+        ck(int(G.coins) == coins_c0 + 1, "THE POP PAY LAW v3 (v0.3.8-4): one layer = one popcoin - the overkill pays nothing")
+        # THE POP PAY LAW v3 IN THE FLESH (the owner's own examples): a
+        # LONGEYE-sized 8-dmg bullet on a 1-layer bloon pays ONE coin, and a
+        # 5-layer wheel finished in one big hit pays exactly FIVE
+        G.coins = 5000
+        var over_coins0: int = int(G.coins)
+        G._spawn_bloon("red", 0)
+        var red8: Dictionary = G.bloons[-1]
+        G._hurt_bloon(red8, 8.0, PDData.SHARP, null)
+        ck(int(G.coins) == over_coins0 + 1, "THE 8-DMG TRUTH: Longeye pops a 1-layer red and banks ONE popcoin (was 8)")
+        G._spawn_bloon("black", 0, 5)
+        var bk5: Dictionary = G.bloons[-1]
+        G._hurt_bloon(bk5, 20.0, PDData.SHARP, null)
+        ck((not G.bloons.has(bk5)) and int(G.coins) == over_coins0 + 6,
+                "THE 5-LAYER TRUTH: one big hit through the whole wheel pays 5 (4 cracks + the body)")
         # THE WHEEL LADDER: a black 003 eats 1+2+3
         G._spawn_bloon("black", 0, 3)
         var bk: Dictionary = G.bloons[-1]
@@ -516,7 +530,7 @@ func _run() -> void:
         while not G.bloons.is_empty() and (G.bloons[-1] as Dictionary)["id"] == cer["id"] and hits < 20:
                 G._hurt_bloon(cer, 1.0, PDData.SHARP, null)
                 hits += 1
-        ck(hits == 10, "THE CERAMIC LAW: ten hits, ten points, ten popcoins")
+        ck(hits == 10, "THE CERAMIC LAW: ten hits to break the body - the pop pays its layer")
         # the leak law (the threat: levels + strips)
         var lives0: int = G.lives
         G.lives = 5000

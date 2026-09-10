@@ -92,9 +92,10 @@ func _run() -> void:
         _check(g.state == "play" or g.state == "cpu_wait",
                 "the opener's holder owns the first move")
 
-        # ---- v0.3.8-3 THE SNAKE LAWS (the layout, certified) ----
-        # a heavy mixed chain with doubles everywhere: the snake may wrap,
-        # but it may NEVER overlap itself and NEVER leave the ground
+        # ---- v0.3.8-4 THE ANCHORED SNAKE LAWS (the layout, certified) ----
+        # a heavy mixed chain with doubles everywhere: the snake may turn,
+        # but it may NEVER overlap itself and NEVER leave the ground, and
+        # the fit only walks down when the box truly outgrows the ground
         var sim_chain := [[6, 6], [6, 4], [4, 4], [4, 2], [2, 3], [3, 5],
                 [5, 5], [5, 0], [0, 1], [1, 1], [1, 4], [4, 6], [6, 2],
                 [2, 2], [2, 0], [0, 0], [0, 3], [3, 3], [3, 6], [6, 6]]
@@ -112,10 +113,45 @@ func _run() -> void:
                 for j in range(i + 1, g.chain_rects.size()):
                         if ri.intersects(g.chain_rects[j]["rect"] as Rect2):
                                 overlap = true
+        if overlap:
+                var dumped := false
+                for i in g.chain_rects.size():
+                        if dumped:
+                                break
+                        for j in range(i + 1, g.chain_rects.size()):
+                                if (g.chain_rects[i]["rect"] as Rect2).intersects(g.chain_rects[j]["rect"] as Rect2):
+                                        print("    [dbg] overlap #%d %s vs #%d %s  BASE_L=%s board=%s" % [i, g.chain_rects[i]["rect"], j, g.chain_rects[j]["rect"], g.BASE_L, g.board_rect])
+                                        for k in g.chain.size():
+                                                var tk: Dictionary = g.chain[k]
+                                                print("      pose#%02d=(%s,%s) v=%s dir=(%s,%s)" % [k, tk.get("px", "?"), tk.get("py", "?"), tk.get("pv", "?"), tk.get("pdx", "?"), tk.get("pdy", "?")])
+                                        dumped = true
+                                        break
         _check(not overlap, "THE SNAKE LAW: a 21-tile chain (5 doubles) never overlaps itself")
-        _check(not outside, "THE FIT LAW: the wrapped snake lives inside the ground")
-        _check(float(g._board_scale()) < 1.0,
-                "THE FIT LAW: the scale walked down to fit (%.2f)" % float(g._board_scale()))
+        _check(not outside, "THE FIT LAW: the snake lives inside the ground")
+        # THE FIT LAW v2: the zoom is the bbox -> ground ratio. Shrink the
+        # ground and the SAME chain walks the scale down, still clean
+        # (_relayout_board: the board-space half only - _relayout would
+        # re-derive the ground from the viewport)
+        var wide_board: Rect2 = g.board_rect
+        var full_scale: float = float(g._board_scale())
+        g.board_rect = Rect2(wide_board.position, wide_board.size * 0.5)
+        g._relayout_board()
+        var shrink_ok := true
+        var s_out := false
+        for i in g.chain_rects.size():
+                var rs: Rect2 = g.chain_rects[i]["rect"]
+                if not g.board_rect.grow(2.0).encloses(rs):
+                        s_out = true
+                for j in range(i + 1, g.chain_rects.size()):
+                        if rs.intersects(g.chain_rects[j]["rect"] as Rect2):
+                                shrink_ok = false
+        _check(float(g._board_scale()) < full_scale and float(g._board_scale()) < 1.0,
+                "THE FIT LAW: the scale walks down only when the box outgrows the ground (%.2f -> %.2f)"
+                        % [full_scale, float(g._board_scale())])
+        _check(shrink_ok and not s_out,
+                "THE FIT LAW: the shrunk ground still holds a clean snake")
+        g.board_rect = wide_board
+        g._relayout()
         # the full 28-tile worst case still holds the laws
         g.chain.clear()
         for c in DOM.full_deck():
@@ -137,6 +173,44 @@ func _run() -> void:
         _check(not worst, "THE SNAKE LAW: even the FULL 28-tile deck never overlaps or leaves the ground")
         g.chain.clear()
         g._relayout()
+
+        # ---- v0.3.8-4 THE ANCHOR LAW (the owner's headline: tiles never
+        # move) - live placements through _place, then a LEFT placement:
+        # every earlier screen rect must be BIT-IDENTICAL ----
+        g.probe_reset(51)
+        g.chain = []
+        g.hand_p = [[6, 6], [6, 4], [6, 3]]
+        g.hand_c = [[0, 0]]
+        g.deck = []
+        g.opening = false
+        g.state = "play"
+        g.turn = g.P
+        g._relayout()
+        g.sel = 0
+        g._place(g.P, 0, 2)          # the 6-6 opens
+        g.sel = 0
+        g._place(g.P, 0, 2)          # the 6-4 to the right end (6)
+        var frozen: Array = []
+        for cr in g.chain_rects:
+                frozen.append(cr["rect"])
+        g.sel = 0
+        g._place(g.P, 0, 1)          # the 6-3 to the LEFT end (6)
+        # v0.3.8-4 THE ANCHOR LAW: the view may PAN (a uniform shift when
+        # the bbox re-centers - the real game's camera), but a tile's
+        # offset from its NEIGHBOURS is sacred. The old tiles ride at
+        # indices 1..n now (chain[0] is the new left tile) - every old
+        # neighbour pair must wear the exact offset it wore before.
+        var anchored := true
+        for i in range(1, frozen.size()):
+                # before: pair (i-1, i) inside frozen; after: the same two
+                # old tiles sit at chain_rects[i], chain_rects[i+1]
+                var before: Vector2 = (frozen[i] as Rect2).position \
+                                - (frozen[i - 1] as Rect2).position
+                var after: Vector2 = (g.chain_rects[i + 1]["rect"] as Rect2).position \
+                                - (g.chain_rects[i]["rect"] as Rect2).position
+                if not before.is_equal_approx(after):
+                        anchored = false
+        _check(anchored, "THE ANCHOR LAW: a left placement never reflows a single pair of placed tiles")
 
         # ---- FULL SEEDED ROUNDS through the live scene ----
         var rounds_ok := true
