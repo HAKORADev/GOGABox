@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bwddctotobgbe"
-path="res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.ctex"
+path.s3tc="res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.s3tc.ctex"
+path.etc2="res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/games/matcher/bg/plate.png"
-dest_files=["res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.ctex"]
+dest_files=["res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.s3tc.ctex", "res://.godot/imported/plate.png-ad087c2b32df416ba3335e784d40a806.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -23,7 +25,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

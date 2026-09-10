@@ -30,6 +30,45 @@ func _ready() -> void:
 
         _show_splash()
 
+        # v0.3.8-5 THE COMFORT LAW (the owner: "high phone battery usage with
+        # no reason and high heat even in just main menu ... it's really just
+        # shitty optimization"): the BOX never needs 60 frames - the feed is
+        # a list and the dust is 34 circles. The menu breathes at 30; a game
+        # buys the full 60 the moment it launches (GameHost) and hands them
+        # back on the way out. The background is still a living shader - just
+        # half the refresh bill.
+        Engine.max_fps = 30
+
+var _was_paused := false
+var _resume_mute := false
+
+## v0.3.8-5 THE SLEEP LAW (the owner: "the app always get closed whenever it
+## takes less than a minute in the background ... likely it is not get
+## frozen"). While the app is backgrounded Android destroys the render
+## surface, but our scene tree KEPT RUNNING (process, physics, tweens,
+## timers, the audio server) - a backgrounded box still burning CPU is
+## exactly what Android's cached-app freezer + LMK punish with a quick
+## death. Now APPLICATION_PAUSED freezes the whole tree and silences the
+## master bus; APPLICATION_RESUMED wakes everything back up.
+func _lifecycle(what: int) -> void:
+        if what == NOTIFICATION_APPLICATION_PAUSED:
+                if not _was_paused:
+                        _was_paused = true
+                        _resume_mute = AudioServer.is_bus_mute(0)
+                        AudioServer.set_bus_mute(0, true)
+                        get_tree().paused = true
+        elif what == NOTIFICATION_APPLICATION_RESUMED:
+                if _was_paused:
+                        _was_paused = false
+                        AudioServer.set_bus_mute(0, _resume_mute)
+                        get_tree().paused = false
+                        # the governor re-decides the design on the next
+                        # frame after resume (a background kill may have
+                        # changed the window under us)
+                        if _menu != null and is_instance_valid(_menu) \
+                                        and _menu.has_method("apply_resolution"):
+                                _menu.call("apply_resolution")
+
 ## v0.1.3 THE GOVERNOR - the resolution system's safety net. Every frame
 ## (menu in the box, splash included) re-decide the design from the REAL
 ## window pixels. At steady state this is one Vector2i compare; when the
@@ -145,6 +184,10 @@ func _input(event: InputEvent) -> void:
 ## Android BACK button (config/quit_on_go_back=false routes it here):
 ## in-game -> pause | sheet open -> close it | menu -> "leave GOGABox?"
 func _notification(what: int) -> void:
+        # v0.3.8-5: the app lifecycle rides the same hook (THE SLEEP LAW)
+        if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_RESUMED:
+                _lifecycle(what)
+                return
         if what != NOTIFICATION_WM_GO_BACK_REQUEST:
                 return
         if _splash_alive:

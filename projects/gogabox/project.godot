@@ -16,7 +16,12 @@ boot_splash/image="res://assets/ui/logo.png"
 boot_splash/fullsize=false
 config/icon="res://icon.svg"
 # THE 60 LAW: the siege runs at a real 60 in both hardware and software
+# v0.3.8-5 THE COMFORT LAW: the ENGINE cap stays 60; the box menu breathes
+# at 30 (main.gd sets Engine.max_fps=30 at boot, GameHost buys 60 per game)
 run/max_fps=60
+# v0.3.8-5 THE PERFORMANCE PACKAGE: no sub-frame timer churn (the games are
+# render-driven, delta smoothing's extra scheduler wakeups buy nothing here)
+run/delta_smoothing=false
 
 [autoload]
 

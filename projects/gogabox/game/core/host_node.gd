@@ -32,6 +32,10 @@ func configure(g: Dictionary, router_: Node, fee_: int, partial_: bool) -> void:
         partial = partial_
 
 func _ready() -> void:
+        # v0.3.8-5 THE COMFORT LAW: a game buys the full 60 frames; the box
+        # menu drops back to its 30-breath on the way out (main sets it at
+        # boot, _restore hands it back).
+        Engine.max_fps = 60
         # v0.1.8 "auto" orientation (owner: mode chosen WHEN THE GAME LOADS,
         # before the run): a game may support BOTH orientations - the REAL
         # window shape at load decides (hold vertical -> portrait design,
@@ -164,6 +168,8 @@ func _apply_orientation(landscape: bool) -> void:
                         if landscape else DisplayServer.SCREEN_SENSOR_PORTRAIT)
 
 func _restore() -> void:
+        # v0.3.8-5 THE COMFORT LAW: hand the 60 frames back to the box
+        Engine.max_fps = 30
         # v0.1.3: NO blind portrait pin. Decide from the REAL window px at
         # this exact moment (a landscape-held phone keeps the landscape
         # design - no flash), release the rotation lock, and let the menu
