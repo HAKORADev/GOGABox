@@ -169,13 +169,15 @@ func _run() -> void:
                 var def: Dictionary = PDData.BLOONS[k]
                 if k != "red":
                         ck((def["kids"] as Array).size() > 0, k + " has children")
-        # THE WHEEL LAW: every level costs +1 more to crack, the total is the pyramid
+        # v0.3.8-5 THE SHOT LAW v1: every ring costs the body's OWN thickness
+        # (red 1, ceramic 10, moab 200) - the +1-per-level pyramid is retired
+        # ("whatever is the damage points, they have no meaning at all").
         ck(PDData.crack_hp("red", 1) == 1.0, "red 001 cracks for 1")
         ck(PDData.crack_hp("black", 1) == 1.0, "black 001 cracks for 1")
-        ck(PDData.crack_hp("black", 2) == 2.0, "black 002 cracks for 2")
-        ck(PDData.crack_hp("black", 3) == 3.0, "black 003 cracks for 3")
-        ck(absf(PDData.body_hp("black", 3) - 6.0) < 0.01, "black 003 = 1+2+3 overall")
-        ck(absf(PDData.crack_hp("ceramic", 2) - 11.0) < 0.01, "ceramic 002 cracks for 11")
+        ck(PDData.crack_hp("black", 3) == 1.0, "SHOT LAW: every black ring cracks for 1 - the pyramid is gone")
+        ck(absf(PDData.body_hp("black", 3) - 3.0) < 0.01, "black 003 = 3 honest layers")
+        ck(absf(PDData.crack_hp("ceramic", 2) - 10.0) < 0.01, "a ceramic ring keeps its 10 thickness at any level")
+        ck(absf(PDData.body_hp("ceramic", 2) - 20.0) < 0.01, "ceramic 002 = 20 honest layers")
         ck(PDData.threat("red", 1, []) == 1, "a red leak costs 1")
         ck(PDData.threat("black", 2, ["blue"]) == 15, "the threat counts levels + strips")
         # THE ARMOR LAW: one class per shell
@@ -473,18 +475,35 @@ func _run() -> void:
         G._hurt_bloon(bk5, 20.0, PDData.SHARP, null)
         ck((not G.bloons.has(bk5)) and int(G.coins) == over_coins0 + 6,
                 "THE 5-LAYER TRUTH: one big hit through the whole wheel pays 5 (4 cracks + the body)")
-        # THE WHEEL LADDER: a black 003 eats 1+2+3
+        # v0.3.8-5 THE SHOT LAW v1 IN THE FLESH (the owner's own math:
+        # "8 - 2 = 6 which means one shot can eliminate the whole bloon")
+        G._spawn_bloon("black", 0, 2)
+        var bk2: Dictionary = G.bloons[-1]
+        var two0: int = int(G.coins)
+        G._hurt_bloon(bk2, 8.0, PDData.SHARP, null)
+        ck(not G.bloons.has(bk2), "THE 8v2 LAW: one 8-dmg shot erases a 2-ring wheel - NO second shot")
+        ck(int(G.coins) == two0 + 2, "the weaker bloon pays its 2 popcoins at once as +nn")
+        # a wheel STRONGER than the shot: each shot strips its damage worth
+        # of rings and pays exactly that (+nn per shot)
+        G._spawn_bloon("black", 0, 5)
+        var bk5s: Dictionary = G.bloons[-1]
+        var s0: int = int(G.coins)
+        G._hurt_bloon(bk5s, 2.0, PDData.SHARP, null)
+        ck(G.bloons.has(bk5s) and int(bk5s["lv"]) == 3, "a 2-dmg shot strips the 5-ring wheel to 3 rings")
+        ck(int(G.coins) == s0 + 2, "and pays +2 - the layers that shot actually dealt")
+        G._hurt_bloon(bk5s, 2.0, PDData.SHARP, null)
+        ck(int(bk5s["lv"]) == 1, "the second shot lands on the last ring")
+        G._hurt_bloon(bk5s, 2.0, PDData.SHARP, null)
+        ck(not G.bloons.has(bk5s), "the third shot finishes the 5-ring wheel")
+        ck(int(G.coins) == s0 + 5, "every layer paid exactly once (2+2+1 = the honest 5)")
+        # THE WHEEL LADDER: a black 003 is 3 honest layers
         G._spawn_bloon("black", 0, 3)
         var bk: Dictionary = G.bloons[-1]
-        ck(int(bk["lv"]) == 3 and absf(float(bk["hp"]) - 3.0) < 0.01, "black 003 spawns on the outer ring (3 to crack)")
+        ck(int(bk["lv"]) == 3 and absf(float(bk["hp"]) - 3.0) < 0.01, "black 003 spawns with 3 honest layers")
         G._hurt_bloon(bk, 3.0, PDData.SHARP, null)
-        ck(G.bloons.has(bk) and int(bk["lv"]) == 2 and absf(float(bk["hp"]) - 2.0) < 0.01, "the crack rolls to black 002 (2 to crack)")
-        G._hurt_bloon(bk, 2.0, PDData.SHARP, null)
-        ck(int(bk["lv"]) == 1 and absf(float(bk["hp"]) - 1.0) < 0.01, "then black 001 (1 to crack)")
-        var wheel_coins: int = int(G.coins)
-        G._hurt_bloon(bk, 1.0, PDData.SHARP, null)
-        ck(G.bloons.is_empty() or not G.bloons.has(bk), "black 003 pops after the full pyramid")
-        ck(int(G.coins) == wheel_coins + 1, "the last ring pays its popcoin")
+        ck(not G.bloons.has(bk), "black 003 pops to a full-strength 3-dmg shot in ONE hit")
+        for bb in G.bloons.duplicate():
+                G._bloon_free(bb)
         # THE ARMOR LAW in the flesh
         G._spawn_bloon("red", 0, 1, [], PDData.ARMOR_METAL, 3.0)
         var met: Dictionary = G.bloons[-1]
@@ -492,14 +511,18 @@ func _run() -> void:
         var met_ok: bool = G._hurt_bloon(met, 5.0, PDData.SHARP, null, true)
         ck((not met_ok) and absf(float(met["hp"]) - met_hp) < 0.01 and float(met["armor_hp"]) > 2.0,
                 "sharp CLINKS off the metal (the body never felt it)")
-        # THE PAY TRUTH (v0.3.8-3): the shell earns what it ATE - a 10-dmg
-        # fire shell meeting 1.5 armor points pays 1.5, never 10
+        # THE PAY TRUTH (v0.3.8-3) + THE PUNCH-THROUGH LAW (v0.3.8-5): the
+        # shell earns what it ATE (1.5 armor -> 1 whole coin) and the 10-dmg
+        # shell's LEFTOVER 8.5 lands straight on the body - the red dies in
+        # the SAME shot (overkill is never eaten by the shell)
         G._spawn_bloon("red", 0, 1, [], PDData.ARMOR_METAL, 1.5)
         var met2: Dictionary = G.bloons[-1]
         var pay_c0: int = int(G.coins)
         G._hurt_bloon(met2, 10.0, PDData.FIRE, null, true)
-        ck(int(G.coins) == pay_c0 + 1,   # 1.5 armor eaten -> 1 whole coin
-                "THE PAY TRUTH: the armor pays only the damage it actually ate")
+        ck(not G.bloons.has(met2),
+                "THE PUNCH-THROUGH LAW: the 10-dmg shell spends 1.5 on the armor and the leftover kills the red in the same shot")
+        ck(int(G.coins) == pay_c0 + 2,
+                "the shell paid its eaten coin and the body paid its own popcoin")
         G._hurt_bloon(met, 3.0, PDData.FIRE, null, true)
         ck(float(met["armor_hp"]) <= 0.01, "fire strips the metal shell")
         var met_body := float(met["hp"])

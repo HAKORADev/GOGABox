@@ -1141,7 +1141,9 @@ func _spawn_bloon(kind: String, pi: int, lv := 1, strips: Array = [], armor := "
         # center, one honest row (the owner's 4 + 11)
         var lane := 0.0
         _bloon_seq += 1
-        var crack := PDData.crack_hp(kind, lv)
+        # THE SHOT LAW v1 (v0.3.8-5): the wheel's health is the whole honest
+        # stack - lv rings x the body's own thickness (black 003 = 3).
+        var crack := PDData.body_hp(kind, lv)
         var b := {
                 "id": _bloon_seq, "kind": kind, "lv": lv, "strips": strips, "armor": armor,
                 "armor_hp": armor_hp,
@@ -1350,6 +1352,7 @@ var _score_f := 0.0            # (retired with the split - kept for save compat)
 func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent := false) -> bool:
         # THE ARMOR LAW: the shell eats the hit FIRST - and only its feared
         # class bites at all (metal fears fire, rock fears bombs)
+        var body_dmg := dmg
         if float(b.get("armor_hp", 0.0)) > 0.0:
                 if not PDData.armor_allows(String(b["armor"]), cls):
                         if not silent:
@@ -1363,14 +1366,27 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
                 # paid the full hit even when 1 armor point met a 10-dmg shell
                 # (money for damage that never happened)
                 _pay_damage(b, minf(a_real, a_before), src)
-                if float(b["armor_hp"]) <= 0.0:
-                        b["armor_hp"] = 0.0
-                        _paint_bloon(b)
-                        if not silent:
-                                _fx_spawn("smoke", b["spr"].position, 0.4)
-                return true
+                if float(b["armor_hp"]) > 0.0:
+                        # the shell swallowed the whole shot - the body never felt it
+                        if not selected_folk.is_empty() and src == selected_folk:
+                                _menu_paint_live()
+                        return true
+                # v0.3.8-5 THE SHOT LAW v1 (the owner: "whatever is the damage
+                # points, they have no meaning at all"): the shell just broke
+                # and the LEFTOVER PUNCHES THROUGH - a 10-dmg fire shell on a
+                # 3-armor red spends 3 on the shell and lands the remaining 7
+                # straight on the body. Overkill is never eaten by the shell.
+                b["armor_hp"] = 0.0
+                _paint_bloon(b)
+                if not silent:
+                        _fx_spawn("smoke", b["spr"].position, 0.4)
+                body_dmg = a_real - a_before
+                if body_dmg <= 0.0:
+                        if not selected_folk.is_empty() and src == selected_folk:
+                                _menu_paint_live()
+                        return true
         # the honest matrix (immunities block, the fat blimps halve sharp)
-        var real := PDData.dmg_vs(b["kind"], cls, dmg)
+        var real := PDData.dmg_vs(b["kind"], cls, body_dmg)
         if real <= 0.0:
                 if not silent:
                         Jukebox.sfx("ps_tick_bad", -18.0, 1.6)
@@ -1386,23 +1402,32 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         if src != null:
                 src["inflicted"] = float(src.get("inflicted", 0.0)) + real
         _paint_bloon(b)
-        if float(b["hp"]) <= 0.0:
-                # THE WHEEL LADDER: the level cracks down (each level cost +1
-                # more - the over-damage spills into the next ring).
-                # v0.3.8-4 THE POP PAY LAW v3: every ring crack PAYS THE
-                # MOMENT IT CRACKS (see the pay below the ladder).
+        if float(b["hp"]) <= 0.0 or int(ceilf(float(b["hp"]))) < int(b["lv"]):
+                # THE SHOT LAW v1 LADDER (v0.3.8-5): rings crack the moment
+                # the damage eaten crosses a ring border - a 2-dmg shot on a
+                # 5-ring wheel visibly strips it to 3 rings and pays +2 the
+                # moment it lands. Every ring costs the body's own thickness
+                # (red 1, ceramic 10, moab 200 - the +1-per-level pyramid is
+                # retired), so a shot's damage FLOWS through rings: an
+                # 8-dmg shot empties a 2-ring wheel in ONE shot ("8 - 2 = 6").
+                # v0.3.8-4 THE POP PAY LAW v3 still rules the money: 1 layer
+                # = 1 popcoin, paid the moment it happens.
                 var popped := 0
                 var pop_at: Vector2 = (b["spr"] as Sprite2D).position
-                while float(b["hp"]) <= 0.0 and int(b["lv"]) > 1:
-                        var over := -float(b["hp"])
-                        b["lv"] = int(b["lv"]) - 1
-                        b["max_hp"] = PDData.crack_hp(b["kind"], int(b["lv"]))
-                        b["hp"] = float(b["max_hp"]) - over
-                        add_score(1)
-                        popped += 1
+                var new_lv := int(ceilf(float(b["hp"])))
+                if new_lv < 0:
+                        new_lv = 0
+                var crossed := int(b["lv"]) - maxi(new_lv, 1)
+                if crossed > 0:
+                        popped += crossed
+                        add_score(crossed)
+                        b["lv"] = maxi(new_lv, 1)
+                        b["max_hp"] = PDData.body_hp(b["kind"], int(b["lv"]))
                 if float(b["hp"]) <= 0.0:
                         popped += 1
                         _pop_bloon(b, src)
+                elif crossed > 0:
+                        _paint_bloon(b)
                 # v0.3.8-4 THE POP PAY LAW v3 (the owner: "1 damage = 1 layer
                 # = 1 popcoin where the popcoin comes to be once the layer
                 # popped instead of waiting for 10-20 hits"): the coins ARE
@@ -1410,6 +1435,11 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
                 # matter how hard the hit was, a 5-layer bloon pays 5, one
                 # per pop, the moment it happens. Overkill pays NOTHING
                 # (damage past the last layer never happened).
+                # v0.3.8-5: with the pyramid gone, popped IS the damage the
+                # shot dealt (capped by the layers that were there) - a
+                # weaker bloon pays everything at once as +nn, a stronger
+                # one pays +nn per shot for exactly the layers that shot
+                # stripped.
                 if popped > 0:
                         coins += popped
                         _coin_text(pop_at, popped)
@@ -1540,7 +1570,9 @@ func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips:
         spr.texture = _bloon_tex(kind, lv)
         bloon_layer.add_child(spr)
         _bloon_seq += 1
-        var crack := PDData.crack_hp(kind, lv)
+        # THE SHOT LAW v1 (v0.3.8-5): the wheel's health is the whole honest
+        # stack - lv rings x the body's own thickness (black 003 = 3).
+        var crack := PDData.body_hp(kind, lv)
         var b := {
                 "id": _bloon_seq, "kind": kind, "lv": lv, "strips": strips, "armor": "",
                 "armor_hp": 0.0,

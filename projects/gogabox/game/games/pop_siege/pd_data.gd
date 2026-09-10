@@ -64,12 +64,18 @@ const BLOONS := {
 static func rbe(kind: String) -> int:
         return int(BLOONS[kind]["rbe"])
 
-## THE WHEEL LAW: the crack cost of color level L (lv 1 = the honest body,
-## every level after takes +1 more to crack - the owner's 2/3/4 ladder).
-static func crack_hp(kind: String, lv: int) -> float:
-        return float(BLOONS[kind]["hp"]) + float(maxi(0, lv - 1))
+## THE SHOT LAW v1 (v0.3.8-5, the owner: "8 - 2 = 6 which means one shot can
+## eliminate the whole bloon ... whatever is the damage points, they have no
+## meaning at all ... not that complex thing"): every ring costs the body's
+## OWN honest thickness - a red ring is 1, a ceramic ring is 10, a moab ring
+## is 200. The old +1-per-level pyramid (3/2/1 ladders) is GONE: it made a
+## big shot stop at ring borders and damage points meant nothing. Now a
+## shot's damage flows through rings like water - 8 damage empties a 2-ring
+## wheel in ONE shot and has 6 left for the next bloon.
+static func crack_hp(kind: String, _lv: int) -> float:
+        return float(BLOONS[kind]["hp"])
 
-## the total damage a fully-leveled body absorbs (levels 1..lv pyramid).
+## the total damage a fully-leveled body absorbs (lv rings x the thickness).
 static func body_hp(kind: String, lv: int) -> float:
         var total := 0.0
         for i in range(1, lv + 1):
