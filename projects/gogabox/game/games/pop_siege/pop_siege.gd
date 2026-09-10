@@ -1402,7 +1402,13 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         if src != null:
                 src["inflicted"] = float(src.get("inflicted", 0.0)) + real
         _paint_bloon(b)
-        if float(b["hp"]) <= 0.0 or int(ceilf(float(b["hp"]))) < int(b["lv"]):
+        # THE GATE LIVES IN DIVISION TOO (v0.3.8-5 round 2): ceil(hp) < lv
+        # was another thickness-1 assumption - a bitten-into ceramic ring
+        # (hp 8 of 10) sailed over the gate and the ladder never ran, so
+        # thick wheels paid NOTHING until they died whole. rings_left =
+        # ceil(hp / thickness) is the honest gate.
+        var gate_thick := maxf(1.0, PDData.crack_hp(String(b["kind"]), int(b["lv"])))
+        if float(b["hp"]) <= 0.0 or int(ceilf(float(b["hp"]) / gate_thick)) < int(b["lv"]):
                 # THE SHOT LAW v1 LADDER (v0.3.8-5): rings crack the moment
                 # the damage eaten crosses a ring border - a 2-dmg shot on a
                 # 5-ring wheel visibly strips it to 3 rings and pays +2 the
@@ -1414,7 +1420,17 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
                 # = 1 popcoin, paid the moment it happens.
                 var popped := 0
                 var pop_at: Vector2 = (b["spr"] as Sprite2D).position
-                var new_lv := int(ceilf(float(b["hp"])))
+                # v0.3.8-5 ROUND 2 - THE DIVISION FIX (the owner's fist/ass
+                # math): the rings left live in DIVISION, not in ceil(hp).
+                # ceil(hp) only worked while every ring was 1 thick; a
+                # ceramic ring is 10 thick and a moab ring is 200 - ceil(hp)
+                # sailed far above lv, crossed stayed 0 and the whole wheel
+                # paid exactly +1 when it finally died. Now: rings_left =
+                # ceil(hp / ring_thickness). A 12-dmg shot on a 2-ring
+                # ceramic eats the 10-ring whole AND bites the next - +1 the
+                # moment it lands, exactly the layers that shot emptied.
+                var thick := maxf(1.0, PDData.crack_hp(String(b["kind"]), int(b["lv"])))
+                var new_lv := int(ceilf(float(b["hp"]) / thick))
                 if new_lv < 0:
                         new_lv = 0
                 var crossed := int(b["lv"]) - maxi(new_lv, 1)

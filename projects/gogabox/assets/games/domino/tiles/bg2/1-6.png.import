@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cgs1ade1j48y3"
-path="res://.godot/imported/bg_wood_l.png-9c8a1a776598971fc197fbf5e4bc9d21.ctex"
+uid="uid://bqn2lwgyu5bxx"
+path="res://.godot/imported/1-6.png-483a8c64a64ad8723d739ea096fc8444.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/games/chess/bg_wood_l.png"
-dest_files=["res://.godot/imported/bg_wood_l.png-9c8a1a776598971fc197fbf5e4bc9d21.ctex"]
+source_file="res://assets/games/domino/tiles/bg2/1-6.png"
+dest_files=["res://.godot/imported/1-6.png-483a8c64a64ad8723d739ea096fc8444.ctex"]
 
 [params]
 

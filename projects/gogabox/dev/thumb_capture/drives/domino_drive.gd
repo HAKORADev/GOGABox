@@ -55,10 +55,27 @@ func tick(t: float) -> void:
                 return
         _act_t = 0.0
         # the yard fan is up: take a tile from it (the honest manual draw)
+        # v0.3.8-5 R2 THE HOLE LAW: a taken slot keeps its hole - the drive
+        # picks the first LIVE slot, never a hole.
         if game.spread:
-                if game.spread_rects.size() > 0:
-                        var mid: int = game.spread_rects.size() / 2
-                        _tap((game.spread_rects[mid] as Rect2).get_center())
+                var pick := -1
+                for i in game.spread_rects.size():
+                        if not game.spread_taken.has(i):
+                                pick = i
+                                break
+                if pick >= 0:
+                        if OS.get_environment("DBG_FAN") != "":
+                                print("[drive] fan tap t=%.1f rects=%d holes=%s deck=%d hand=%d pick=%d" % [
+                                        t, game.spread_rects.size(),
+                                        str(game.spread_taken.keys()),
+                                        game.deck.size(), game.hand_p.size(),
+                                        pick])
+                        _tap((game.spread_rects[pick] as Rect2).get_center())
+                        if OS.get_environment("DBG_FAN") != "":
+                                print("[drive]   -> deck=%d hand=%d holes=%s spread=%s" % [
+                                        game.deck.size(), game.hand_p.size(),
+                                        str(game.spread_taken.keys()),
+                                        str(game.spread)])
                 return
         # THE OPENING: the glowing opener tile places on its own tap
         if game.opening:

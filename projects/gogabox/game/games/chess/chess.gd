@@ -973,52 +973,19 @@ func _layout(vp: Vector2) -> void:
 ## textures rendered as a blank white plate on the rig's GL stack, the
 ## primitives render everywhere - same law that keeps the felt procedural)
 func _draw_bg() -> void:
-        var vp := get_viewport_rect().size
-        # the base room shadow
-        bg_l.draw_rect(Rect2(Vector2.ZERO, vp), Color("1d1409"))
-        # the planks: vertical bands with deterministic widths, values and
-        # grain streaks (the reference's warm walnut floor)
-        var st := 0x2a7f3b
-        var x := 0.0
-        while x < vp.x:
-                st = int((st * 1103515245 + 12345) & 0x7fffffff)
-                var w := 92.0 + float(st % 74)
-                st = int((st * 1103515245 + 12345) & 0x7fffffff)
-                var v := 0.10 + float(st % 100) / 100.0 * 0.085
-                bg_l.draw_rect(Rect2(x, 0.0, w + 1.0, vp.y),
-                        Color(0.155 + v, 0.096 + v * 0.68,
-                                0.050 + v * 0.38))
-                # the plank seam
-                bg_l.draw_rect(Rect2(x + w - 1.5, 0.0, 2.5, vp.y),
-                        Color(0.085, 0.05, 0.026, 0.85))
-                # the grain: horizontal streaks, dark and light
-                for g in 6:
-                        st = int((st * 1103515245 + 12345) & 0x7fffffff)
-                        var gy := float(st % int(maxf(1.0, vp.y)))
-                        st = int((st * 1103515245 + 12345) & 0x7fffffff)
-                        var gl := 42.0 + float(st % 230)
-                        if g % 3 == 2:
-                                bg_l.draw_rect(Rect2(x + 5.0, gy, gl, 1.4),
-                                        Color(0.42, 0.30, 0.16, 0.10))
-                        else:
-                                bg_l.draw_rect(Rect2(x + 5.0, gy, gl, 1.7),
-                                        Color(0, 0, 0, 0.11))
-                x += w
-        # the room light: a radial wash - the heart of the parlor glows,
-        # the walls sink into shadow (drawn big-ring-first, the smaller
-        # rings ease the center back toward the raw wood)
-        var c0 := Vector2(vp.x * 0.5, vp.y * 0.46)
-        var rad_max := vp.length() * 0.64
-        var rings := 18
-        for i in range(rings, 0, -1):
-                var rk := float(i) / float(rings)
-                bg_l.draw_circle(c0, rad_max * rk,
-                        Color(0.30, 0.20, 0.10,
-                                0.30 * pow(1.0 - rk, 1.5)))
-                bg_l.draw_circle(c0, rad_max * rk,
-                        Color(0.02, 0.012, 0.006,
-                                0.42 * pow(rk, 2.2)))
-
+    # v0.3.8-5 ROUND 2 - THE REAL ROOM (the owner: "the current background
+    # has that fake shitty light instead of real background" - the law:
+    # scrape the assets and put them as-is): the studied ChessClassic's own
+    # room texture - flat dark walnut, vertical grain, NO light spot -
+    # blitted cover-fit. The painted planks and the radial wash: dead.
+    var vp := get_viewport_rect().size
+    var tex: Texture2D = _bg_wood()
+    var ts := tex.get_size()
+    var k: float = maxf(vp.x / ts.x, vp.y / ts.y)
+    var dst := Vector2(ts.x * k, ts.y * k)
+    var off := (vp - dst) * 0.5
+    bg_l.draw_texture_rect(tex,
+            Rect2(off, dst), false)
 func _sq_rect(i: int) -> Rect2:
         var f := i % 8
         var r := i / 8
@@ -1041,6 +1008,22 @@ func _sq_at(pos: Vector2) -> int:
         else:
                 col = 7 - col
         return row * 8 + col
+
+# v0.3.8-5 ROUND 2: the real room texture, cached (as-is from the study)
+var _wood_tex: Texture2D = null
+
+func _bg_wood() -> Texture2D:
+    if _wood_tex == null:
+        _wood_tex = load("res://assets/games/chess/bg_wood.jpg")
+    return _wood_tex
+
+var _tray_tex: Texture2D = null
+var _tray_v_tex: Texture2D = null
+
+func _panel_tex() -> Texture2D:
+    if _tray_tex == null:
+        _tray_tex = load("res://assets/games/chess/tray.png")
+    return _tray_tex
 
 func _tex(set_id: String, color: String, piece: int) -> Texture2D:
         var names := ["", "pawn", "knight", "bishop", "rook", "queen", "king"]
@@ -1209,76 +1192,125 @@ func _draw_fx() -> void:
 ## pile LEFT, the CPU's pile RIGHT, each carrying the pieces that captor
 ## took off the board.
 func _tray_rects() -> Array:
-        var vp := get_viewport_rect().size
-        var y0 := board_origin.y
-        var y1 := board_origin.y + sq_px * 8.0
-        var mid_y := (y0 + y1) * 0.5
-        var lx1 := board_origin.x - 14.0
-        var rx0 := board_origin.x + sq_px * 8.0 + 14.0
-        return [Rect2(14.0, y0 + 6.0, maxf(60.0, lx1 - 14.0),
-                        mid_y - y0 - 12.0),
-                Rect2(rx0, y0 + 6.0, maxf(60.0, vp.x - 14.0 - rx0),
-                        y1 - mid_y - 12.0)]
-
+    # v0.3.8-5 ROUND 2 - THE VERTICAL TRAYS (the owner: "in the image they
+    # were vertical and carry two vertical lines for each one and each line
+    # takes 8"): the studied ChessClassic's tray law - a 564x125 parchment
+    # bar rotated 90deg beside the board (landscape), two columns of 8
+    # dead pieces at half size. Portrait keeps the studied build's other
+    # truth: the bar flat, 8 across, 2 rows - top bar for the CPU's
+    # victims, bottom bar for yours.
+    var vp := get_viewport_rect().size
+    var y0 := board_origin.y
+    var y1 := board_origin.y + sq_px * 8.0
+    var x0 := board_origin.x
+    var x1 := board_origin.x + sq_px * 8.0
+    var out: Array = []
+    if vp.x >= vp.y:
+        var bh := (y1 - y0) - 8.0
+        var side_l := maxf(0.0, x0 - 18.0)
+        var side_r := maxf(0.0, vp.x - x1 - 18.0)
+        var wv := clampf(minf(sq_px * 1.55, minf(side_l, side_r)),
+                46.0, 150.0)
+        out.append(Rect2(x0 - 14.0 - wv, y0 + 4.0, wv, bh))
+        out.append(Rect2(x1 + 14.0, y0 + 4.0, wv, bh))
+    else:
+        var ht := clampf(sq_px * 1.55, 62.0, 130.0)
+        out.append(Rect2(x0, maxf(6.0, y0 - 12.0 - ht), x1 - x0, ht))
+        out.append(Rect2(x0, minf(vp.y - 6.0 - ht, y1 + 12.0),
+                x1 - x0, ht))
+    return out
 func _draw_tray() -> void:
-        if board_origin == Vector2.ZERO:
-                return
-        var trays := _tray_rects()
-        var caps := [cap_w, cap_b]
-        var cols := [Color(0.36, 0.27, 0.16), Color(0.36, 0.27, 0.16)]
-        var kings := ["w", "b"]
-        for side in 2:
-                var r: Rect2 = trays[side]
-                # v0.3.8-5 THE PARCHMENT TRAY (the reference's room): warm
-                # parchment body, deep-brown edge, a soft drop and a top
-                # inner shade - the fallen pieces read on it instantly
-                fx_l.draw_rect(Rect2(r.position + Vector2(5, 5), r.size),
-                        Color(0.09, 0.05, 0.02, 0.5))
-                fx_l.draw_rect(r, Color(0.906, 0.847, 0.686, 0.97))
-                fx_l.draw_rect(r, cols[side], false, 4.0)
-                fx_l.draw_rect(Rect2(r.position,
-                        Vector2(r.size.x, 9.0)), Color(0, 0, 0, 0.08))
-                # the line's own king sits left - whose dead pile this is
-                var ktex := _tex(Box.skin_on(game_id) if SETS.has(Box.skin_on(game_id)) else "classic",
-                        kings[side], 6)
-                var kis := minf(r.size.y - 18.0, 58.0)
-                fx_l.draw_texture_rect(ktex, Rect2(
-                        Vector2(r.position.x + 10.0,
-                                r.get_center().y - kis * 0.5),
-                        Vector2(kis, kis)), false)
-                # the dead pieces, wrapped rows starting right of the king
-                # (the ones still FLYING sit out - the theater draws them)
-                var dead: Array = caps[side]
-                if dead.is_empty():
-                        continue
-                var ic := minf(44.0, (r.size.x - kis - 26.0) / 4.0)
-                var per_row := maxi(1, int((r.size.x - kis - 24.0) / ic))
-                var row := Rect2(r.position.x + kis + 14.0, 0.0, ic, ic)
-                for i in dead.size():
-                        if _cap_flying(side, i):
-                                continue
-                        var di := i / per_row
-                        var dc := i % per_row
-                        var dtex := _piece_tex(int(dead[i]))
-                        var dr := Rect2(
-                                row.position.x + dc * (ic + 2.0),
-                                r.get_center().y - (ic + 3.0) * 0.5
-                                        + di * (ic + 3.0), ic, ic)
-                        fx_l.draw_texture_rect(dtex, dr, false,
-                                Color(1, 1, 1, 0.92))
-
-## the slot a fallen piece lands in (the theater's landing pad)
+    if board_origin == Vector2.ZERO:
+        return
+    var vp := get_viewport_rect().size
+    var trays := _tray_rects()
+    var land := vp.x >= vp.y
+    var panel: Texture2D = _panel_tex()
+    var caps := [cap_w, cap_b]
+    var kings := ["w", "b"]   # whose victims each tray carries (cap_w, cap_b)
+    # side 0 = the tray that holds the pieces THE PLAYER took (cap_w =
+    # white's captures). In landscape it rides LEFT, in portrait BOTTOM
+    # (the seat under the player's hand); the other side mirrors it.
+    for side in 2:
+        var r: Rect2 = trays[side]
+        # THE REAL PANEL: the studied build's own parchment bar, drawn
+        # as-is - the pre-rotated copy rides the vertical (landscape)
+        # tray, the flat bar rides portrait. Its beveled frame does the
+        # work; no painted shade.
+        if land:
+            if _tray_v_tex == null:
+                _tray_v_tex = load("res://assets/games/chess/tray_v.png")
+            fx_l.draw_texture_rect(_tray_v_tex, r, false)
+        else:
+            fx_l.draw_texture_rect(panel, r, false)
+        # the dead: the studied law - half-size pieces, TWO columns x 8
+        # (landscape) / 8 across x 2 rows (portrait), top-down, and the
+        # owner king badge at the tray's head
+        var dead: Array = caps[side]
+        var head := minf(r.size.y if land else r.size.x,
+                (r.size.x if land else r.size.y) * 0.62)
+        var kis: float = head * 0.52
+        var kpos: Vector2
+        if land:
+            kpos = Vector2(r.get_center().x - kis * 0.5,
+                    r.position.y + head * 0.30 - kis * 0.5)
+        else:
+            kpos = Vector2(r.position.x + head * 0.30 - kis * 0.5,
+                    r.get_center().y - kis * 0.5)
+        var sid := Box.skin_on(game_id)
+        if not SETS.has(sid):
+            sid = "classic"
+        fx_l.draw_texture_rect(_tex(sid, kings[side], 6),
+                Rect2(kpos, Vector2(kis, kis)), false)
+        # the two vertical lines (landscape): 2 across, 8 down
+        var across := 2 if land else 8
+        var cw: float = ((r.size.x if land else r.size.y) - kis * 0.0) \
+                * 0.5
+        var ic := minf(cw * 0.72,
+                ((r.size.y if land else r.size.x) - head * 0.72)
+                / 8.0 * 0.92)
+        var ox: float
+        var oy: float
+        if land:
+            ox = r.position.x + (r.size.x - across * ic
+                    - (across - 1) * 2.0) * 0.5
+            oy = r.position.y + head * 0.66
+        else:
+            oy = r.position.y + (r.size.y - 2 * ic - 3.0) * 0.5
+            ox = r.position.x + head * 0.66
+        for i in dead.size():
+            if _cap_flying(side, i):
+                continue
+            var di := i / across
+            var dc := i % across
+            var dtex := _piece_tex(int(dead[i]))
+            var dr := Rect2(ox + dc * (ic + 2.0),
+                    oy + di * (ic + 2.0), ic, ic)
+            fx_l.draw_texture_rect(dtex, dr, false,
+                    Color(1, 1, 1, 0.95))
 func _tray_slot(side: int, idx: int) -> Rect2:
-        var r: Rect2 = _tray_rects()[side]
-        var kis := minf(r.size.y - 18.0, 58.0)
-        var ic := minf(44.0, (r.size.x - kis - 26.0) / 4.0)
-        var per_row := maxi(1, int((r.size.x - kis - 24.0) / ic))
-        var di := idx / per_row
-        var dc := idx % per_row
-        return Rect2(r.position.x + kis + 14.0 + dc * (ic + 2.0),
-                r.get_center().y - (ic + 3.0) * 0.5 + di * (ic + 3.0),
-                ic, ic)
-
+    # the landing pad = the exact cell the tray law just drew
+    var vp := get_viewport_rect().size
+    var land := vp.x >= vp.y
+    var r: Rect2 = _tray_rects()[side]
+    var head := minf(r.size.y if land else r.size.x,
+            (r.size.x if land else r.size.y) * 0.62)
+    var kis: float = head * 0.52
+    var across := 2 if land else 8
+    var cw: float = (r.size.x if land else r.size.y) * 0.5
+    var ic := minf(cw * 0.72,
+            ((r.size.y if land else r.size.x) - head * 0.72) / 8.0 * 0.92)
+    var ox: float
+    var oy: float
+    if land:
+        ox = r.position.x + (r.size.x - across * ic - (across - 1) * 2.0) * 0.5
+        oy = r.position.y + head * 0.66
+    else:
+        oy = r.position.y + (r.size.y - 2 * ic - 3.0) * 0.5
+        ox = r.position.x + head * 0.66
+    var di := idx / across
+    var dc := idx % across
+    return Rect2(ox + dc * (ic + 2.0), oy + di * (ic + 2.0), ic, ic)
 func _cap_flying(side: int, idx: int) -> bool:
         for c in cap_q:
                 if int(c["side"]) == side and int(c["idx"]) == idx:

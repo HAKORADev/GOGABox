@@ -115,7 +115,14 @@ func _run() -> void:
                 if not g.board_rect.grow(2.0).encloses(ri):
                         outside = true
                 for j in range(i + 1, g.chain_rects.size()):
-                        if ri.intersects(g.chain_rects[j]["rect"] as Rect2):
+                        # v0.3.8-5 R2 THE STICK-TOGETHER PACK: rows now touch
+                        # edge-to-edge (the studied matrix steps by EXACTLY
+                        # TILE_HEIGHT) - a float hair on a shared edge is a
+                        # TOUCH, not an overlap. Only a real body crossing
+                        # (0.6px grown in on both) fails the law.
+                        if ri.grow(-0.6).intersects(
+                                        (g.chain_rects[j]["rect"]
+                                        as Rect2).grow(-0.6)):
                                 overlap = true
         if overlap:
                 var dumped := false
@@ -123,7 +130,9 @@ func _run() -> void:
                         if dumped:
                                 break
                         for j in range(i + 1, g.chain_rects.size()):
-                                if (g.chain_rects[i]["rect"] as Rect2).intersects(g.chain_rects[j]["rect"] as Rect2):
+                                if (g.chain_rects[i]["rect"] as Rect2) \
+                                                .grow(-0.6).intersects(
+                                                        (g.chain_rects[j]["rect"] as Rect2).grow(-0.6)):
                                         print("    [dbg] overlap #%d %s vs #%d %s  BASE_L=%s board=%s" % [i, g.chain_rects[i]["rect"], j, g.chain_rects[j]["rect"], g.BASE_L, g.board_rect])
                                         for k in g.chain.size():
                                                 var tk: Dictionary = g.chain[k]
@@ -138,7 +147,11 @@ func _run() -> void:
         # re-derive the ground from the viewport)
         var wide_board: Rect2 = g.board_rect
         var full_scale: float = float(g._board_scale())
-        g.board_rect = Rect2(wide_board.position, wide_board.size * 0.5)
+        # v0.3.8-5 R2: the stress shrinks to 0.6 - deep enough to force the
+        # fit scale to walk down hard, shallow enough to stay above the
+        # 0.45 readability floor (the floor may lawfully overflow a
+        # HALF-sized board - that is what a floor IS)
+        g.board_rect = Rect2(wide_board.position, wide_board.size * 0.6)
         g._relayout_board()
         g._settle_glide()
         var shrink_ok := true
@@ -148,7 +161,9 @@ func _run() -> void:
                 if not g.board_rect.grow(2.0).encloses(rs):
                         s_out = true
                 for j in range(i + 1, g.chain_rects.size()):
-                        if rs.intersects(g.chain_rects[j]["rect"] as Rect2):
+                        if rs.grow(-0.6).intersects(
+                                        (g.chain_rects[j]["rect"]
+                                        as Rect2).grow(-0.6)):
                                 shrink_ok = false
         _check(float(g._board_scale()) < full_scale and float(g._board_scale()) < 1.0,
                 "THE FIT LAW: the scale walks down only when the box outgrows the ground (%.2f -> %.2f)"
@@ -171,7 +186,9 @@ func _run() -> void:
                         worst = true
                         break
                 for j in range(i + 1, g.chain_rects.size()):
-                        if rw.intersects(g.chain_rects[j]["rect"] as Rect2):
+                        if rw.grow(-0.6).intersects(
+                                        (g.chain_rects[j]["rect"]
+                                        as Rect2).grow(-0.6)):
                                 worst = true
                                 break
                 if worst:
