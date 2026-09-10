@@ -104,6 +104,10 @@ func _run() -> void:
                 g.chain.append({"a": c[0], "b": c[1], "fl": false,
                         "who": 1, "landed": true})
         g._relayout()
+        # v0.3.8-5 THE SETTLE LAW: the smooth group glide zooms the table
+        # over a few frames - the rig certifies the SETTLED layout, so
+        # snap the glide to its target before measuring
+        g._settle_glide()
         var overlap := false
         var outside := false
         for i in g.chain_rects.size():
@@ -136,6 +140,7 @@ func _run() -> void:
         var full_scale: float = float(g._board_scale())
         g.board_rect = Rect2(wide_board.position, wide_board.size * 0.5)
         g._relayout_board()
+        g._settle_glide()
         var shrink_ok := true
         var s_out := false
         for i in g.chain_rects.size():
@@ -158,6 +163,7 @@ func _run() -> void:
                 g.chain.append({"a": int(c[0]), "b": int(c[1]), "fl": false,
                         "who": 1, "landed": true})
         g._relayout()
+        g._settle_glide()
         var worst := false
         for i in g.chain_rects.size():
                 var rw: Rect2 = g.chain_rects[i]["rect"]

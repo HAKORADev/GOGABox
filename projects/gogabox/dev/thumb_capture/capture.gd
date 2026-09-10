@@ -101,11 +101,22 @@ func _next_game() -> void:
         get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
         for c in get_children():
                 c.queue_free()
+        # v0.3.8-5: the DEFAULT look only - a stale dev save must never
+        # pick the skin/theme for a candidate frame (the rig is seeded,
+        # the wallet is clean, the equipped skin is the stock one)
+        Box.reset_all()
+        # v0.3.8-5: the bg rides a CanvasLayer -1 like the real host does
+        # (host_node) - a plain sibling ColorRect sits on canvas layer 0
+        # where any game layer with a negative z_index (domino's table at
+        # -5) paints UNDER it and vanishes from the frame
+        var bg_layer := CanvasLayer.new()
+        bg_layer.layer = -1
+        add_child(bg_layer)
         var bg := ColorRect.new()
         bg.color = Color("241407")   # the host's own-world background color
         bg.set_anchors_preset(Control.PRESET_FULL_RECT)
         bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        add_child(bg)
+        bg_layer.add_child(bg)
 
         _game = (load(String(g["script"])) as GDScript).new()
         _game.game_id = _id
