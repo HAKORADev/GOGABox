@@ -432,16 +432,23 @@ static func daily_picks() -> Array:
 
 ## v0.1.1 THE OWNER FEED ORDER (replaces raw registry order, which interleaved
 ## states "uncannily" - an owned game buried between black boxes): OWNED
-## games first (oldest unlock first - the save's owned[] append order), then
-## the revealed charging/locked/gated/soon tiles (catalog order = the box's
-## growth order), then the mysteries (catalog order). HIDDEN games never
-## appear. [ {g, st, bucket, ord} ]
+## games first, then the revealed charging/locked/gated/soon tiles (catalog
+## order = the box's growth order), then the mysteries (catalog order).
+## HIDDEN games never appear. [ {g, st, bucket, ord} ]
+##
+## v0.3.8-7 THE FEED TRUTH (the owner: "the old versions was showing games
+## from oldest to newest... snake then pong... currently the sorting follow
+## unclear something?"): the owned block wore ACQUISITION order (the save's
+## owned[] append order). That read as catalog order only while the reveal
+## ladder was one straight chain - v0.3.7-1 added parallel paths (the inbox
+## rung, the charge meters, the cross-game orders) and games started
+## unlocking OUT of catalog order; worse, the all_owned cheat answers
+## owns_game() = true WITHOUT ever appending to owned[], so every owned tile
+## tied at the fallback ord and Godot's UNSTABLE sort scrambled the whole
+## block into "unclear something". The owned block now sorts by the CATALOG
+## index - the release order itself: snake, pong, space dash ... chess, the
+## oldest game first and the newest game last, on every save, forever.
 static func feed_rows() -> Array:
-        var owned_idx := {}
-        var i := 0
-        for oid in (Box.data["owned"] as Array):
-                owned_idx[String(oid)] = i
-                i += 1
         var reg_idx := {}
         for k in GameReg.GAMES.size():
                 reg_idx[String(GameReg.GAMES[k]["id"])] = k
@@ -451,18 +458,13 @@ static func feed_rows() -> Array:
                 var st := state(id)
                 if st == "HIDDEN":
                         continue
-                # v0.3.8-1 THE OWNER'S OLD SORT, restored for real this time:
-                # owned (acquisition order) -> locked/gated/charging (catalog
-                # order) -> mysteries (catalog order) -> SOON teasers LAST.
-                # v0.3.7-2 unwound the wrong half of the ladder (the
-                # requirements came back as chains while the sort stayed) -
-                # the registry ladder is restored in this patch and the SOON
-                # teasers finally leave the locked area for the end of the
-                # feed where the owner always wanted them.
+                # v0.3.8-1 THE OWNER'S OLD SORT: owned -> locked/gated/charging
+                # (catalog order) -> mysteries (catalog order) -> SOON teasers
+                # LAST. v0.3.8-7: EVERY bucket sorts by the catalog index - the
+                # acquisition order is retired (see THE FEED TRUTH above).
                 var bucket := 0 if st == "OWNED" \
                         else (3 if st == "SOON" else (2 if st == "MYSTERY" else 1))
-                var ord := int(owned_idx.get(id, 100000)) if bucket == 0 \
-                                else int(reg_idx.get(id, 100000))
+                var ord := int(reg_idx.get(id, 100000))
                 rows.append({"g": g, "st": st, "bucket": bucket, "ord": ord})
         rows.sort_custom(func(a, b):
                 if int(a["bucket"]) != int(b["bucket"]):

@@ -837,16 +837,23 @@ def scene_dario(spec=DARIO_SPEC):
 # the amber winning strike, and the GOGACoin waiting in an empty cell
 # (the per-3-rounds coin race). NO ladder - the ladder is gone.
 XO_SPEC = dict(
-    board_c=(0.52, 0.52),         # board center (fractions)
-    cell=172,                     # px per cell
-    xs=((0, 0), (1, 0), (2, 0)),      # X's winning row (a real 5-move game)
-    os=((1, 1), (0, 2)),              # O's two replies
-    win_line=((0, 0), (2, 0)),    # the amber strike (the drama)
-    coin_cell=(2, 2),             # the GOGACoin waiting in an empty cell
+    board_c=(0.5, 0.505),         # board center (fractions)
+    cell=180,                     # px per cell
+    xs=((0, 0), (1, 0)),          # X's OPEN threat - two on the top row
+    os=((1, 1), (0, 2)),          # O's replies (center + bottom-left)
+    coin_cell=(2, 0),             # the winning cell WEARS THE COIN (the race)
 )
 
 
 def scene_xo(spec=XO_SPEC):
+    # v0.3.8-7 THE LIVE STORY (the owner: the old thumb "feels somehow
+    # wrong" - it showed a FINISHED game: three X's already struck through,
+    # nothing left to play for). The new read: a LIVE 4-mark position where
+    # X is ONE move from the row - and that winning cell wears the glowing
+    # GOGACoin, so the thumb teaches BOTH laws at once (win the row, win
+    # the coin race). The marks are the game's OWN hand-drawn sprites now
+    # (mark_x_0/1 + mark_o_0/1 - the exact art the round paints), the
+    # shadow is one soft stack instead of the blurry hard double plate.
     sc = Scene()
     # the sketchbook page (warm paper, the faint ruled lines)
     sc.backdrop((250, 249, 246), (238, 234, 226))
@@ -876,33 +883,12 @@ def scene_xo(spec=XO_SPEC):
             pts.append((p0[0] + dx * f + px * w, p0[1] + dy * f + py * w))
         dr.line(pts, fill=col, width=width, joint="curve")
 
-    def cross(cxy, col, dark, r, seed, width=17):
-        x, y = cc(cxy)
-        rough_line((x - r + 4, y - r + 4), (x + r + 4, y + r + 4), width,
-                   dark + (210,), seed)
-        rough_line((x - r, y - r), (x + r, y + r), width, col + (255,), seed + 1)
-        rough_line((x - r + 4, y + r + 4), (x + r + 4, y - r + 4), width,
-                   dark + (210,), seed + 2)
-        rough_line((x - r, y + r), (x + r, y - r), width, col + (255,), seed + 3)
-
-    def ring(cxy, col, dark, r, seed, width=17):
-        x, y = cc(cxy)
-        rr = __import__("random").Random(seed)
-        a0 = rr.uniform(0, 6.28)
-        for rad, ccol in ((r + 4, dark + (210,)), (r, col + (255,))):
-            pts = []
-            for k in range(27):
-                ang = a0 + 6.283 * k / 26.0
-                wob = rr.uniform(-1, 1) * 2.6
-                pts.append((x + math.cos(ang) * (rad + wob),
-                            y + math.sin(ang) * (rad + wob)))
-            dr.line(pts, fill=ccol, width=width, joint="curve")
-
-    # the board plate: white, ink rim, hard offset shadow (the html look)
+    # the board plate: white, ink rim, ONE soft stacked shadow
     pad = 26
-    sc.rect([bcx - half - pad + 7, bcy - half - pad + 7,
-             bcx + half + pad + 7, bcy + half + pad + 7], r=22,
-            fill=(26, 26, 26))
+    for off, a in ((11, 36), (7, 64), (3, 110)):
+        sc.rect([bcx - half - pad + off, bcy - half - pad + off + 3,
+                 bcx + half + pad + off, bcy + half + pad + off + 3],
+                r=22, fill=(26, 26, 26, a))
     sc.rect([bcx - half - pad, bcy - half - pad,
              bcx + half + pad, bcy + half + pad], r=22, fill=(255, 255, 255))
     sc.rect([bcx - half - pad, bcy - half - pad,
@@ -915,30 +901,39 @@ def scene_xo(spec=XO_SPEC):
                    7, (26, 26, 26, 205), 40 + k)
         rough_line((bcx - half + 8, bcy + off), (bcx + half - 8, bcy + off),
                    7, (26, 26, 26, 205), 50 + k)
-    XCOL, XDARK = (239, 68, 68), (153, 27, 27)
-    OCOL, ODARK = (59, 130, 246), (30, 64, 175)
-    # the amber winners glow behind the strike row
-    wl = spec["win_line"]
-    for cxy in wl:
+    # the warm threat glow behind X's two marks (the coin glow is its own)
+    for cxy in ((0, 0), (1, 0)):
         x, y = cc(cxy)
-        sc.glow(x, y, int(cell * 0.72), (245, 158, 11), 80)
-    for cxy in spec["xs"]:
-        cross(cxy, XCOL, XDARK, int(cell * 0.29), hash(cxy) % 997)
-    for cxy in spec["os"]:
-        ring(cxy, OCOL, ODARK, int(cell * 0.29), hash(cxy) % 997 + 13)
-    # the amber strike across the winning row (the marker swipe)
-    x0, y0 = cc(wl[0])
-    x1, y1 = cc(wl[1])
-    rough_line((x0 - cell * 0.22, y0), (x1 + cell * 0.22, y1), 13,
-               (245, 158, 11, 235), 77)
-    # the GOGACoin waiting in an empty cell (the coin race)
+        sc.glow(x, y, int(cell * 0.66), (245, 158, 11), 66)
+    # THE REAL MARKS: the game's own hand-drawn X and O sprites, one
+    # variant each like the round's random picks
+    mxs = int(cell * 0.66)
+    sc.stamp(load_sprite("games/xo/mark_x_0.png", mxs),
+             *cc(spec["xs"][0]))
+    sc.stamp(load_sprite("games/xo/mark_x_1.png", mxs),
+             *cc(spec["xs"][1]))
+    mos = int(cell * 0.64)
+    sc.stamp(load_sprite("games/xo/mark_o_0.png", mos),
+             *cc(spec["os"][0]))
+    sc.stamp(load_sprite("games/xo/mark_o_1.png", mos),
+             *cc(spec["os"][1]))
+    # the amber hint stroke: dashed, from X's last mark INTO the coin cell
+    # (the row about to happen - the strike only fires when the game ends)
+    x0, y0 = cc(spec["xs"][1])
+    x1, y1 = cc(spec["coin_cell"])
+    step, dash = 34.0, 20.0
+    d = step
+    while d < x1 - x0 - step * 0.4:
+        a, b = d, min(d + dash, x1 - x0)
+        rough_line((x0 + a, y0), (x0 + b, y1), 11, (245, 158, 11, 215), 77)
+        d += step
+    # the GOGACoin waiting in the winning cell (THE COIN RACE)
     cx, cy = cc(spec["coin_cell"])
-    sc.glow(cx, cy, int(cell * 0.6), (255, 210, 70), 95)
-    coin = load_sprite("ui/coin.png", int(cell * 0.56))
+    sc.glow(cx, cy, int(cell * 0.62), (255, 210, 70), 110)
+    coin = load_sprite("ui/coin.png", int(cell * 0.58))
     sc.stamp(coin, cx, cy)
     sc.vignette(56)
     return sc.render()
-
 
 # ------------------------------------------------------------------ v0.3.4
 # COSMIC SPUD: SPUDNIK holds the line on the decayed desert, the swarm
@@ -993,60 +988,61 @@ def scene_spud():
 # and the GOGACoin - smaller, honest to the in-game scale. Brighter, fuller,
 # zero empty space.
 def scene_geometry():
+    # v0.3.8-7 THE CLEAR WORLD (the owner: the old thumb "feels somehow
+    # wrong" - the square drowned mid-frame in dark-on-dark, the block
+    # towers read as furniture drawers, the fire tail read as debris, and
+    # half the canvas was empty panels). The new read, one glance: the
+    # bright square LEAPING over the triple spike, its fire tail streaming
+    # off its back, a golden orbit arc swinging up toward the coin, the
+    # block step waiting on the right, and BOTH floors visible - the slim
+    # roof band up top mirrors the ground, that is the flip identity.
     sc = Scene()
-    # the midnight gradient, a touch brighter than v0.3.6 + the pulse glow
-    sc.backdrop((14, 20, 46), (6, 8, 20))
-    sc.glow(W * 0.5, H * 0.46, 360, (44, 64, 140), 58)
+    # the midnight gradient, a touch brighter + the action glow
+    sc.backdrop((18, 26, 60), (7, 9, 22))
+    sc.glow(W * 0.42, H * 0.42, 380, (60, 96, 200), 84)
     import random as _r
     rng = _r.Random(3607)
-    for i in range(80):                       # the faint grid dust
+    for i in range(90):                       # the faint grid dust
         gx, gy = rng.randint(0, W), rng.randint(0, H)
-        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(80, 112, 200, 75))
+        sc.ellipse([gx - 1, gy - 1, gx + 1, gy + 1], fill=(96, 128, 220, 85))
     G = "games/geometry/"
-    # ground + roof bands: the real strip texture, tiled to the canvas
     strip = load_sprite(G + "strip.png")
-    ground = strip.crop((0, 0, 512, 380)).resize((W, 190), Image.LANCZOS)
-    sc.work.alpha_composite(ground, (0, H - 190))
-    roof = strip.crop((0, 0, 512, 300)).resize((W, 140), Image.LANCZOS) \
+    gy_top = H - 128
+    # the GROUND: one thin band - its bright top edge shows (the real
+    # ground line the square runs on)
+    ground = strip.crop((0, 0, 512, 150)).resize((W, 128), Image.LANCZOS)
+    sc.work.alpha_composite(ground, (0, gy_top))
+    # the ROOF: the same strip mirrored, slim - its bright edge faces the
+    # field (the flip modes' second floor, the game's signature)
+    roof = strip.crop((0, 0, 512, 96)).resize((W, 58), Image.LANCZOS) \
         .transpose(Image.FLIP_TOP_BOTTOM)
     sc.work.alpha_composite(roof, (0, 0))
-    gy = H - 190                              # the ground line
-    # THE BLOCK STAIRCASE (the world law): 1-2-3 rising steps, the pads the
-    # square just hopped up - every block is the real block texture
+    # THE BLOCK STEP on the right (the world's built structures): 1 then 2
     blk = load_sprite(G + "block.png")
-    bs = 0.42                                  # one cell ~ 70px on the canvas
+    bs = 0.5
     bpix = int(168 * bs)
-    cols = [(0.285, 1), (0.365, 2), (0.445, 3)]
-    for fx, n in cols:
+    for fx, lvl in ((0.735, 1), (0.815, 1), (0.815, 2)):
         cx = fx * W
-        for k in range(n):
-            cy = gy - bpix // 2 - k * bpix
-            sc.glow(cx, cy, 26, (150, 190, 255), 34)
-            sc.stamp(blk, cx, cy, scale=bs)
-    # the small triple spike on the ground past the staircase (the new spike)
-    sp_w = 126 * 0.9
-    sc.glow(W * 0.615, gy - 26, 30, (255, 130, 140), 62)
-    sc.stamp(load_sprite(G + "spike3.png"), W * 0.615, gy - 26, scale=0.9)
-    # the road shover waiting far right (the pusher law, balancing the floor)
-    sc.glow(W * 0.875, gy - 42, 26, (150, 190, 255), 40)
-    sc.stamp(load_sprite(G + "pusher.png"), W * 0.875, gy - 42, scale=0.5)
-    # the platform line mid-air right (its bright edge up) + its orbit
-    line = load_sprite(G + "line.png")
-    sc.work.alpha_composite(line.resize((300, 52), Image.LANCZOS),
-                            (int(W * 0.66), int(H * 0.285)))
-    # the golden orbit arc: off the staircase top toward the line
-    arc = [(0.565, 0.455), (0.635, 0.385), (0.715, 0.335), (0.81, 0.315)]
+        cy = gy_top - bpix // 2 - (lvl - 1) * bpix
+        sc.glow(cx, cy, 26, (150, 190, 255), 40)
+        sc.stamp(blk, cx, cy, scale=bs)
+    # THE TRIPLE SPIKE on the ground under the leap (the thing being
+    # cleared - lit warm so it reads as danger)
+    sc.glow(W * 0.455, gy_top - 24, 34, (255, 130, 140), 80)
+    sc.stamp(load_sprite(G + "spike3.png"), W * 0.455, gy_top - 24, scale=1.0)
+    # THE GOLDEN ORBIT ARC: off the leap, swinging up toward the coin
+    arc = [(0.545, 0.400), (0.625, 0.300), (0.705, 0.225)]
     for i, (fx, fy) in enumerate(arc):
-        sc.glow(fx * W, fy * H, 30, (255, 208, 84), 95)
-        sc.stamp(load_sprite(G + "orbit.png"), fx * W, fy * H, scale=0.56)
+        sc.glow(fx * W, fy * H, 32, (255, 208, 84), 105)
+        sc.stamp(load_sprite(G + "orbit.png"), fx * W, fy * H, scale=0.62)
         sc.stamp(load_sprite(G + "tw_%d.png" % (i % 4)),
-                 fx * W + 18, fy * H - 17, scale=0.58)
-    # the GOGACoin - the honest 44px-core pickup read, top right
-    sc.glow(W * 0.895, H * 0.115, 30, (255, 214, 100), 105)
-    sc.stamp(load_sprite("ui/coin.png"), W * 0.895, H * 0.115, scale=0.72)
-    # THE SQUARE: mid-jump past the staircase top, FIRE tail streaming
-    # BEHIND it (the tail law: always screen-behind, never below)
-    hx, hy = W * 0.525, H * 0.335
+                 fx * W + 20, fy * H - 19, scale=0.62)
+    # the GOGACoin up the arc's path (the honest pickup read)
+    sc.glow(W * 0.835, H * 0.165, 34, (255, 214, 100), 115)
+    sc.stamp(load_sprite("ui/coin.png"), W * 0.835, H * 0.165, scale=0.78)
+    # THE SQUARE: mid-leap, big, tilted - FIRE tail streaming BEHIND it
+    # (tight and attached now: the old puffs spread too far and read as
+    # floating debris)
     puff = load_sprite(G + "p_puff.png")
 
     def tint(img, rgb):
@@ -1055,21 +1051,24 @@ def scene_geometry():
         solid.putalpha(a)
         return solid
 
-    ember = tint(puff, (255, 148, 56))
-    amber = tint(puff, (255, 208, 96))
-    trail = [(0.462, 0.375, 0.34, 215), (0.415, 0.405, 0.29, 175),
-             (0.372, 0.428, 0.25, 135), (0.335, 0.445, 0.21, 100),
-             (0.302, 0.458, 0.17, 70)]
-    for i, (fx, fy, s, a) in enumerate(trail):
-        sc.glow(fx * W, fy * H, 16 + i * 3, (255, 140, 50), 55 - i * 8)
-        sc.stamp(ember if i < 3 else amber, fx * W, fy * H, scale=s, alpha=a)
-    sc.glow(hx, hy, 64, (96, 226, 255), 85)
-    sc.stamp(load_sprite(G + "skin_classic.png"), hx, hy, scale=0.82, rot=-12)
-    # the landing ring waiting on the next pad (the climb truth whisper)
-    sc.glow(W * 0.445, gy - bpix * 3, 24, (96, 226, 255), 40)
-    sc.vignette(78)
+    ember = tint(puff, (255, 150, 58))
+    amber = tint(puff, (255, 210, 100))
+    streak = tint(load_sprite(G + "p_streak.png"), (255, 158, 62))
+    streak2 = tint(load_sprite(G + "p_streak.png"), (255, 205, 105))
+    # the comet tail: three fire streaks aligned down-left (rot + = CCW
+    # turns the left-pointing tail down-left), an ember blob at the back
+    sc.stamp(ember, W * 0.352, H * 0.438, scale=0.52, alpha=245)
+    sc.stamp(streak, W * 0.298, H * 0.492, scale=0.72, rot=35, alpha=225)
+    sc.stamp(streak2, W * 0.252, H * 0.552, scale=0.55, rot=42, alpha=165)
+    sc.stamp(streak2, W * 0.215, H * 0.605, scale=0.42, rot=48, alpha=110)
+    sc.glow(W * 0.30, H * 0.50, 40, (255, 145, 52), 70)
+    hx, hy = W * 0.405, H * 0.395
+    sc.glow(hx, hy, 78, (110, 232, 255), 105)
+    sc.stamp(load_sprite(G + "skin_classic.png"), hx, hy, scale=0.95, rot=-12)
+    # the landing whisper on the block step
+    sc.glow(W * 0.815, gy_top - bpix * 2 + 6, 26, (110, 232, 255), 55)
+    sc.vignette(74)
     return sc.render()
-
 
 # ----------------------------------------------------------- registry/CLI
 

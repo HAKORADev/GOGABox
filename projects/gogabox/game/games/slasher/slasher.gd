@@ -241,6 +241,15 @@ func _show_orient_select() -> void:
                 row.add_child(card)
 
 ## Screen 2: the produce toggle (vegetables need buying) + START
+## v0.3.8-7 (owner: optionals text needs BLACK OUTLINES for clearer
+## readability). Every word in the sheet wears a hard near-black outline -
+## the white button text on the cream unselected pick (Arc.CARD bg) and
+## the thin orange note used to wash out on the bright sheet.
+func _ink_outline(c: Control, size := 8) -> void:
+        c.add_theme_constant_override("outline_size", size)
+        c.add_theme_color_override("font_outline_color",
+                        Color(0.10, 0.07, 0.03, 0.92))
+
 func _show_options() -> void:
         _phase = "options"
         _clear_overlay()
@@ -255,6 +264,7 @@ func _show_options() -> void:
         panel.add_child(box)
         var title := Arc.label("FRUIT SLASHER", 40, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _ink_outline(title, 12)
         box.add_child(title)
         var owned := Box.item_owned(game_id, "produce", "veggies") \
                         or int(Box.dev_cheat("all_owned")) > 0
@@ -280,11 +290,14 @@ func _show_options() -> void:
                                         Box.equip_item(game_id, "produce", "veggies")
                                         Jukebox.sfx("confirm", -4.0)
                                         _show_options()))
+                for b in row.get_children():
+                        _ink_outline(b, 7)
         else:
                 var desc := Arc.fit_label("the vegetable basket is a shop "
                                 + "item - one purchase, yours forever", 18,
                                 Arc.HOT, 520)
                 desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                _ink_outline(desc, 7)
                 box.add_child(desc)
                 var buy := Arc.coin_button("BUY THE VEGETABLES  %d" % VEG_PRICE,
                                 Vector2(520, 74), 22, Color("4a5ab8"), func():
@@ -295,6 +308,7 @@ func _show_options() -> void:
                                                 Box.equip_item(game_id,
                                                         "produce", "veggies")
                                         _show_options())
+                _ink_outline(buy, 7)
                 if Box.coins() < VEG_PRICE and not int(Box.dev_cheat("all_owned")) > 0:
                         buy.disabled = true
                 var bc := HBoxContainer.new()
@@ -303,6 +317,7 @@ func _show_options() -> void:
                 box.add_child(bc)
         var start := Arc.button("START", Vector2(520, 88), 30, Arc.GOOD,
                         func(): _start_run())
+        _ink_outline(start, 8)
         var sc := HBoxContainer.new()
         sc.alignment = BoxContainer.ALIGNMENT_CENTER
         sc.add_child(start)

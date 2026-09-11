@@ -118,11 +118,14 @@ const GAMES := [
                 # "for real"): coin_div 20 -> 50, the whole shop ladder
                 # re-priced (skins 1200-5500, weapons 2500-4500, shield
                 # 3000, spaces 1500/2000).
+                # v0.3.8-7 (owner: "score bonus /500"): coin_div 50 -> 500 -
+                # the run-end bonus is a long-game reward now, riding the
+                # 200-kill coin cadence.
                 "id": "lanes", "title": "Space Dash", "tag": "kill the sky",
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 50, "price": 200, "fee": 20, "shop": true,
+                "coin_div": 500, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 0,
         "orders": [{"type": "plays", "game": "rally", "count": 3},
                 {"type": "beat_best", "game": "rally"}],
@@ -162,11 +165,13 @@ const GAMES := [
                 # the position ask (each position = different physics), the
                 # real slicing (the fruit splits along YOUR cut), the hearts,
                 # the +N/-N reader, the vegetable shop, /15.
+                # v0.3.8-7 (owner: "make score bonus be /30 instead of /15"):
+                # coin_div 15 -> 30.
                 "id": "slasher", "title": "Fruit Slasher", "tag": "swipe everything",
                 "script": "res://game/games/slasher/slasher.gd",
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "auto", "dim": "2d",
-                "coin_div": 15, "price": 250, "fee": 15, "shop": true,
+                "coin_div": 30, "price": 250, "fee": 15, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 1,
         "orders": [{"type": "spend_in", "game": "lanes", "amount": 120},
                 {"type": "plays", "game": "rally", "count": 5}],
@@ -263,11 +268,14 @@ const GAMES := [
 ],
         },
         {
+                # v0.3.8-7 (owner: "the original ... score be /100"):
+                # coin_div 20 -> 100 for the 4x4; the 6x6/8x8 wear their own
+                # x4/x12 overrides in the game's SIZES table (/400, /1200).
                 "id": "merge", "title": "2048", "tag": "swipe and double",
                 "script": "res://game/games/merge/merge2048.gd",
                 "thumb": "res://assets/thumbs/merge.png",
                 "orientation": "portrait", "dim": "2d",
-                "coin_div": 20, "price": 400, "fee": 15, "shop": true,
+                "coin_div": 100, "price": 400, "fee": 15, "shop": true,
                 "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "orders", "appear_after": 2,
         "orders": [{"type": "earn_in", "game": "hopper", "amount": 120},

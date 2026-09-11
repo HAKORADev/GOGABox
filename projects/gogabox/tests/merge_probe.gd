@@ -3,9 +3,10 @@ extends Node
 ## "somehow totally broken for real" (the owner) - these laws pin the real
 ## game: the CENTERED BIGGER board (banner-aware), the slide engine (classic
 ## compress + merge, one fusion = EXACTLY +1), the GOGACoin CELL law (one
-## empty cell grows a coin every 15 fusions, a tile sliding into it takes
+## empty cell grows a coin per the board size (50 fusions on the 4x4 -
+## v0.3.8-7; 200/600 on the 6x6/8x8), a tile sliding into it takes
 ## it), the stuck/death law, the THEMES (prices + the water fill tiers),
-## the board-frame particle bounce, and the registry economy (/20, shop).
+## the board-frame particle bounce, and the registry economy (/100, shop).
 ##
 ##   godot --headless --path projects/gogabox res://tests/merge_probe.tscn
 
@@ -43,11 +44,14 @@ func _run() -> void:
         # ---- registry sanity (the owner's economy) ----
         var mr: Dictionary = GameReg.get_game("merge")
         _check(not mr.is_empty(), "merge is in the registry")
-        _check(int(mr["coin_div"]) == 20, "2048 run bonus = score/20 (owner)")
+        _check(int(mr["coin_div"]) == 100, "2048 run bonus = score/100 (v0.3.8-7)")
         _check(bool(mr["shop"]), "2048 wears a shop (the themes)")
         _check(bool(mr["banner"]), "2048 carries the ad banner")
         _check(int(mr["fee"]) == 15, "the round fee stays 15")
-        _check(int(M.COIN_EVERY) == 15, "one GOGACoin cell every 15 fusions (owner)")
+        # v0.3.8-7 THE SIZE SCALING: 50 fusions on the 4x4, x4/x12 beyond
+        _check(int(M.COIN_EVERY) == 50 and int(M.COIN_EVERY_X4) == 200 \
+                        and int(M.COIN_EVERY_X12) == 600,
+                "coin cells: 50 / 200 / 600 fusions per board size (owner)")
 
         # ---- the theme wardrobe ----
         _check(M.THEMES.size() == 3, "three themes (classic / minecraft / sea)")
@@ -118,13 +122,14 @@ func _run() -> void:
         _check(g.fusions_since == 2, "the fusion counter tracks fusions")
 
         # ---- the GOGACoin CELL law ----
-        # starve it to 14 fusions, then one fusion spawns the coin in an
+        # starve it to 49 fusions, then one fusion spawns the coin in an
         # empty cell (deterministic: the coin claims it BEFORE the spawn)
-        g.fusions_since = 14
+        # v0.3.8-7: the 4x4 cadence is 50 fusions (was 15)
+        g.fusions_since = 49
         _grid(g, [[0, 0, 0, 0], [0, 0, 0, 0], [2, 2, 0, 0], [0, 0, 0, 0]])
         g._slide(Vector2i(-1, 0))
         g._finish_slide()
-        _check(g.coin_cell.x >= 0, "the 15th fusion spawns a coin cell")
+        _check(g.coin_cell.x >= 0, "the 50th fusion spawns a coin cell")
         if g.coin_cell.x >= 0:
                 _check(int(g.board[g.coin_cell.x][g.coin_cell.y]) == 0,
                         "the coin grows in an EMPTY cell")
@@ -240,17 +245,17 @@ func _run() -> void:
         # ---- THE BOARD SIZES (the owner's options menu) ----
         _check(M.SIZES.size() == 3, "three sizes in the OPTIONS (4 / 6 / 8)")
         _check(int(M.SIZES["4"]["price"]) == 0, "4 x 4 is the free normal game")
-        _check(int(M.SIZES["6"]["price"]) >= 1000 and int(M.SIZES["6"]["div"]) == 80,
-                "6 x 6 is a real purchase and pays /80 (owner)")
-        _check(int(M.SIZES["8"]["price"]) >= 2000 and int(M.SIZES["8"]["div"]) == 160,
-                "8 x 8 is a real purchase and pays /160 (owner)")
+        _check(int(M.SIZES["6"]["price"]) >= 1000 and int(M.SIZES["6"]["div"]) == 400,
+                "6 x 6 is a real purchase and pays /400 (owner, v0.3.8-7 x4)")
+        _check(int(M.SIZES["8"]["price"]) >= 2000 and int(M.SIZES["8"]["div"]) == 1200,
+                "8 x 8 is a real purchase and pays /1200 (owner, v0.3.8-7 x12)")
         Box.dev_set_cheat("all_owned", 1)
         var cell4: float = g2.cell
         g2._apply_size("6")
         _check(g2.grid_n == 6 and g2.size_id == "6", "6 x 6 equips")
-        _check(int(g2.bonus_div_override) == 80,
-                "the run bonus follows the board through the MODULAR override (/80)")
-        _check(g2._size_div() == 80, "the live divider reads /80")
+        _check(int(g2.bonus_div_override) == 400,
+                "the run bonus follows the board through the MODULAR override (/400)")
+        _check(g2._size_div() == 400, "the live divider reads /400")
         _check(g2.board.size() == 6 and g2.board[0].size() == 6,
                 "the board REBUILT as 6 x 6")
         _check(int(g2.score) == 0, "a size switch starts a FRESH board (score reset)")
@@ -275,11 +280,11 @@ func _run() -> void:
         _check(int(g2.board[0][0]) == 4, "a 6 x 6 column slide fuses 2+2 into 4")
         _check(int(g2.score) == 1, "one fusion on the 6 x 6 pays EXACTLY +1")
         g2._apply_size("8")
-        _check(g2.grid_n == 8 and int(g2.bonus_div_override) == 160,
-                "8 x 8 equips at /160")
+        _check(g2.grid_n == 8 and int(g2.bonus_div_override) == 1200,
+                "8 x 8 equips at /1200")
         g2._apply_size("4")
         _check(g2.grid_n == 4 and int(g2.bonus_div_override) == -1,
-                "back to 4 x 4: the registry /20 rules again (override cleared)")
+                "back to 4 x 4: the registry /100 rules again (override cleared)")
         # the options sheet owns its exact dim+center pair (THE PAIR LAW)
         g2._options_open()
         await get_tree().process_frame

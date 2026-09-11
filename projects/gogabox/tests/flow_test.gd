@@ -339,8 +339,8 @@ func _t_registry() -> int:
         # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
         var dash: Dictionary = GameReg.get_game("lanes")
         ok += _check(int(dash["fee"]) == 20, "space dash round costs 20")
-        # same-version patch: the bonus slowed /20 -> /50 (owner call)
-        ok += _check(int(dash["coin_div"]) == 50, "space dash score / 50")
+        # v0.3.8-7: the bonus slowed /50 -> /500 (owner call, the 200-kill coin)
+        ok += _check(int(dash["coin_div"]) == 500, "space dash score / 500")
         ok += _check(bool(dash["shop"]), "space dash wears a shop")
         # same-version patch: the shop is a REAL goal ladder now - nothing
         # (except the price-0 defaults) costs chump change any more
@@ -394,16 +394,20 @@ func _t_registry() -> int:
                 "MELTING: a real price and the x1.5 growth cap")
         # v0.2.8: 2048's verdict round + XO's sketch remake in the registry
         var mg: Dictionary = GameReg.get_game("merge")
-        ok += _check(String(mg["title"]) == "2048" and int(mg["coin_div"]) == 20,
-                "2048 keeps its /20 (the 4x4 default)")
+        ok += _check(String(mg["title"]) == "2048" and int(mg["coin_div"]) == 100,
+                "2048 wears its /100 (the 4x4 default, v0.3.8-7)")
         var MO := load("res://game/games/merge/merge2048.gd")
         ok += _check(MO.SIZES.size() == 3, "2048 sells three board sizes")
+        # v0.3.8-7 THE SIZE SCALING: original /100, second size x4, third x12
+        ok += _check(int(MO.COIN_EVERY) == 50 and int(MO.COIN_EVERY_X4) == 200 \
+                        and int(MO.COIN_EVERY_X12) == 600,
+                "coin cadence per size: 50 / 200 / 600 fusions (owner)")
         ok += _check(int(MO.SIZES["6"]["price"]) >= 1000 \
-                        and int(MO.SIZES["6"]["div"]) == 80,
-                "6 x 6 is a real purchase and pays /80 (owner)")
+                        and int(MO.SIZES["6"]["div"]) == 400,
+                "6 x 6 is a real purchase and pays /400 (owner)")
         ok += _check(int(MO.SIZES["8"]["price"]) >= 2000 \
-                        and int(MO.SIZES["8"]["div"]) == 160,
-                "8 x 8 is a real purchase and pays /160 (owner)")
+                        and int(MO.SIZES["8"]["div"]) == 1200,
+                "8 x 8 is a real purchase and pays /1200 (owner)")
         var xg: Dictionary = GameReg.get_game("xo")
         ok += _check(String(xg["title"]) == "XO",
                 "the ladder word is GONE - the game is just XO (owner)")
@@ -899,14 +903,18 @@ func _t_feed_order() -> int:
         ok += _check(buckets == sorted_b, "buckets ascend owned->locked->mystery %s" % [buckets])
         ok += _check(buckets.has(0) and buckets.has(2),
                 "owned + mystery buckets present %s" % [buckets])
-        # within the owned block: acquisition order (owned[] append order)
+        # within the owned block: v0.3.8-7 THE FEED TRUTH - CATALOG order
+        # (the release order), no longer the owned[] acquisition order. The
+        # walk unlocked snake->rally which IS catalog order, so the pair
+        # reads the same; a save that unlocked things out of order no longer
+        # scrambles the shelf.
         rows = Roadmap.feed_rows()
         var owned_ids: Array = []
         for r in rows:
                 if int(r["bucket"]) == 0:
                         owned_ids.append(String(r["g"]["id"]))
         ok += _check(owned_ids == ["snake", "rally"],
-                "owned block is unlock order %s" % [owned_ids])
+                "owned block is catalog order %s" % [owned_ids])
         ok += _check(Roadmap.can_play_now("snake"), "oracle: snake always playable")
         ok += _check(Roadmap.can_play_now("dario") == false, "oracle: unowned dario not playable")
         ok += _check(Roadmap.can_play_now("xo") == false, "oracle: unowned xo not playable")

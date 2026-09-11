@@ -402,3 +402,21 @@ came from two places computing the same slot (relayout + a leftover
 block). When retiring a law, grep the call sites of its helpers and kill
 them in the same commit - the compiler (GDScript) will NOT warn about a
 dead duplicate painting on top.
+
+**8. THE FEED TRUTH (v0.3.8-7) - "unclear sorting" means a TIE hitting an
+UNSTABLE sort.**
+The owner's "the feed sorting follow unclear something?" (failed fix
+attempts across sessions) was never a sort-expression bug: feed_rows
+ranked OWNED tiles by the save's owned[] ACQUISITION order, which only
+LOOKED like release order while the reveal ladder was one straight chain.
+Two quiet breaks: (a) v0.3.7-1's parallel paths (inbox rung, charge
+meters, cross-game orders) let games unlock out of catalog order; (b) the
+all_owned cheat answers owns_game() = true WITHOUT appending to owned[],
+so every cheat-owned tile tied at the fallback ord - and Godot's
+sort_custom is NOT stable, so ties land in an arbitrary but repeatable
+scramble that reads as "some unclear thing". THE METHOD: when a user
+reports an order that "follows unclear something", print the SORT KEYS
+first and look for ties; an unstable sort turns ties into a mystery.
+Ranking by the CATALOG index (release order) kills the tie class whole -
+the feed reads snake -> pong -> ... -> chess on every save, under any
+cheat, forever.

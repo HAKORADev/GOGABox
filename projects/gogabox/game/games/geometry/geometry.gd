@@ -709,6 +709,11 @@ func _rocket_burst() -> void:
 ## THE FLIP PUSH LAW (v0.3.6-3): the switch reads as a simple push from the
 ## side being LEFT - a puff under the square when it leaves the ground, above
 ## it when it leaves the roof (the old radial burst looked broken).
+## v0.3.8-7 THE EXIT DIRECTION (the owner: jumping top->bottom must read
+## the effect "coming from top then goes up", bottom->top "from the bottom
+## of the square and goes down"): the puff sits on the side being left and
+## now FLIES OUT - away from the square, off that side. The old (0, -side)
+## sent it TOWARD the square (crossing it), exactly the opposite read.
 func _flip_gravity(damp: float, from_sticky := false) -> void:
         var p := player
         var old_g := int(p["g"])
@@ -2593,7 +2598,7 @@ func _push_puff(at: Vector2, from_g: int, col: Color, power := 1.0) -> void:
         puff.one_shot = true
         puff.explosiveness = 1.0
         puff.lifetime = 0.3
-        puff.direction = Vector2(0, -side)          # travels AWAY from the square
+        puff.direction = Vector2(0, side)           # v0.3.8-7: EXITS the side being left
         puff.spread = 26.0
         puff.initial_velocity_min = 240.0 * power * us
         puff.initial_velocity_max = 520.0 * power * us

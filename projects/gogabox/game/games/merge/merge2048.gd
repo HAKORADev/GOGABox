@@ -29,8 +29,9 @@ extends GogaGame
 ## (v0.2.7 history: the owner called the old stub "somehow totally broken
 ## for real" - hardcoded corner board, teleporting tiles, merge-value-sum
 ## score, auto coins. The rebuild: the centered board, tiles that keep
-## their identity and tween, +1 per fusion, the coin cell every 15
-## fusions, the theme shop.)
+## THEIR identity and tween, +1 per fusion, the coin cell per the board
+## size (50 fusions on the 4x4 - v0.3.8-7 the size scaling), the theme
+## shop.)
 ##
 ## Owner contract (v0.2.7, still law):
 ##   - the grid CENTERED and BIGGER (viewport-computed, aware of the
@@ -38,7 +39,8 @@ extends GogaGame
 ##   - controls = swipe the finger in ANY direction (TouchKit.swiped) +
 ##     a board nudge so every accepted swipe is FELT
 ##   - each successful fusion worth EXACTLY 1 score point
-##   - after every 15 fusions, one empty cell grows a REAL GOGACoin
+##   - after the board size's fusion count, one empty cell grows a REAL
+##     GOGACoin (50 on the 4x4; the 6x6/8x8 wear x4/x12 - v0.3.8-7)
 ##     (coin.png, fade-in, bob, glint) - slide any tile INTO that cell
 ##     to take it; if the board is full when it falls due, it waits
 ##   - animations and effects: real slides, merges pop + ring +
@@ -51,21 +53,30 @@ extends GogaGame
 ## Probe contract: board/tiles/_slide/coin state is public, _load_grid
 ## seeds a board directly, theme ids + prices are consts.
 
-const COIN_EVERY := 15               # owner: one GOGACoin cell per 15 fusions
+# v0.3.8-7 THE SIZE SCALING (owner: "the original gets a coin after 50
+# matches and score be /100 and the second size be X4 the numbers and third
+# be X12 the numbers"): the coin cadence rides the BOARD SIZE now - the
+# original 4x4 grows a coin every 50 fusions, the 6x6 four times that
+# (200), the 8x8 twelve times (600). See COIN_EVERY_X4 / COIN_EVERY_X12
+# and _coin_every(); COIN_EVERY stays the original cadence.
+const COIN_EVERY := 50               # 4x4: one GOGACoin cell per 50 fusions
+const COIN_EVERY_X4 := 200           # 6x6: x4 the numbers
+const COIN_EVERY_X12 := 600          # 8x8: x12 the numbers
 const WIN_TILE := 2048
 const SLIDE_TIME := 0.11             # s - the tween + lock window
 const MERGE_POP := 1.24
 
 ## THE BOARD SIZES (owner v0.2.8): 4x4 is the free normal game, 6x6 and
 ## 8x8 are SHOP items bought for real prices first. The run bonus follows
-## the board: /20 (the registry default, div 0 = use it), /80, /160.
+## the board. v0.3.8-7 the size scaling: 4x4 /100 (the registry default,
+## div 0 = use it), 6x6 x4 = /400, 8x8 x12 = /1200.
 const SIZES := {
                 "4": {"name": "4 x 4", "price": 0, "div": 0,
-                                "desc": "normal - the classic board, bonus /20"},
-                "6": {"name": "6 x 6", "price": 1800, "div": 80,
-                                "desc": "bigger board - score bonus /80"},
-                "8": {"name": "8 x 8", "price": 3600, "div": 160,
-                                "desc": "the monster board - score bonus /160"},
+                                "desc": "normal - the classic board, bonus /100"},
+                "6": {"name": "6 x 6", "price": 1800, "div": 400,
+                                "desc": "bigger board - score bonus /400"},
+                "8": {"name": "8 x 8", "price": 3600, "div": 1200,
+                                "desc": "the monster board - score bonus /1200"},
 }
 
 const THEMES := {
@@ -182,7 +193,8 @@ func _goga_setup() -> void:
         Jukebox.sfx("confirm", -14.0)
 
 ## THE SIZE LAW (owner v0.2.8): the equipped board size decides grid_n and
-## the run bonus. div 0 = use the registry coin_div (4x4 stays /20).
+## the run bonus. div 0 = use the registry coin_div (4x4 stays the
+## registry law - /100 since v0.3.8-7).
 func _load_size() -> void:
         var on := Box.item_on(game_id, "size")
         size_id = on if SIZES.has(on) else "4"
@@ -193,6 +205,16 @@ func _load_size() -> void:
 func _size_div() -> int:
         var div := int(SIZES[size_id]["div"])
         return div if div > 0 else int(GameReg.get_game(game_id).get("coin_div", 100))
+
+## v0.3.8-7 THE SIZE SCALING: the fusion count that grows a coin rides the
+## board size - 50 on the original 4x4, x4 (200) on the 6x6, x12 (600) on
+## the 8x8 (owner: "the original gets a coin after 50 matches ... the
+## second size be X4 the numbers and third be X12 the numbers").
+func _coin_every() -> int:
+        match size_id:
+                "6": return COIN_EVERY_X4
+                "8": return COIN_EVERY_X12
+        return COIN_EVERY
 
 ## a size change REBUILDS the run (the honest board: fresh tiles, fresh
 ## score - no mixing 6x6 earnings into a 4x4 run).
@@ -700,15 +722,17 @@ func _finish_slide() -> void:
         if gained > 0:
                 check_achievements()
                 fusions_since += gained
-        # 2. the coin cell law (the owner): every 15 fusions one EMPTY cell
-        # grows a coin - it claims its cell BEFORE the fresh tile spawns, so
-        # the reward can never be squeezed out by the 90/10 spawn
+        # 2. the coin cell law (the owner): every 50 fusions (4x4; x4/x12
+        # on the bigger boards) one EMPTY cell grows a coin - it claims its
+        # cell BEFORE the fresh tile spawns, so the reward can never be
+        # squeezed out by the 90/10 spawn
+        var coin_need := _coin_every()
         if coin_cell.x >= 0 and int(board[coin_cell.x][coin_cell.y]) != 0:
                 _take_coin_cell()                        # a tile landed dead on it
         if coin_pending and coin_cell.x < 0:
                 coin_pending = false
-                fusions_since = COIN_EVERY               # a cell freed - pay the wait
-        if fusions_since >= COIN_EVERY and coin_cell.x < 0:
+                fusions_since = coin_need                # a cell freed - pay the wait
+        if fusions_since >= coin_need and coin_cell.x < 0:
                 fusions_since = 0
                 _spawn_coin_cell()
         # 3. a fresh tile joins (the classic 90/10)

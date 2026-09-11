@@ -35,8 +35,12 @@ const INVULN_T := 1.4               # post-wreck grace seconds
 const WRECK_SCORE := -500           # owner: "each crash takes -500"
 const HEART_EVERY := 1000           # +1 heart per 1000 score
 const START_HEARTS := 3
-const COIN_KILLS_MIN := 5           # owner: "1 coin between 5-10 enemies"
-const COIN_KILLS_MAX := 10
+# v0.3.8-7 (owner: "a gogacoin appear after each 200 kill instead of 10"):
+# the 5-10 kill heartbeat is gone - the coin is a LONG-RANGE reward now,
+# one GOGACoin every 200 kills exactly (both bounds pinned to 200 so the
+# reroll below always lands the same number).
+const COIN_KILLS_MIN := 200
+const COIN_KILLS_MAX := 200
 
 ## THE SPAM LAW (owner: "max shoots will be one per 30ms ... study it, not
 ## hardcode it"): the floor is the bigger of 30ms and ONE LIVE FRAME - a

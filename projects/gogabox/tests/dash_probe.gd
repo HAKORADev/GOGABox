@@ -154,8 +154,9 @@ func _run() -> void:
                         break
         _check(g.run_coins == 1, "the coin is ONE goga coin")
         _check(g.kills_since_coin == 0, "the counter resets at COLLECTION")
-        _check(g.coin_target >= 5 and g.coin_target <= 10,
-                "the next coin target rerolled inside 5..10")
+        # v0.3.8-7: the coin heartbeat is 200 kills EXACTLY (was 5..10)
+        _check(g.coin_target == 200 and int(g.COIN_KILLS_MAX) == 200,
+                "the next coin target rerolled at the 200-kill law")
 
         # ---- loot gating: weapons/shield exist only when bought ----
         var gated := true
