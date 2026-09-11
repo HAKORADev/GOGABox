@@ -5,7 +5,8 @@ extends Node
 ##   the deck (28 unique tiles), the ends math, the flip law (a placed
 ##   chain ALWAYS reads valid end-to-end), the opener law (highest double,
 ##   else heaviest), the 7/7/14 deal, the draw-when-stuck law, the pass
-##   law, THE BLOCKED LAW (lighter hand wins, tie draws), the scoring
+##   law, THE BLOCKED LAW (v0.3.8-6: both passed in a row = DRAW, the
+##   owner's call), the scoring
 ##   (+1/-1 floor-at-0/draw 0), the 3rd-round coin race, the CPU legality
 ##   across all four moods (600 seeded picks), and FULL seeded rounds
 ##   driven through the real scene (conservation every ply: chain + hands
@@ -317,7 +318,10 @@ func _run() -> void:
         _check(done_wins > 3 and done_losses > 3,
                 "both sides win real rounds (the owner's beatable-but-alive law)")
 
-        # ---- THE BLOCKED LAW (constructed) ----
+        # ---- THE BLOCKED LAW (constructed, v0.3.8-6: the owner's call -
+        # "a draw situation should happen when both do a pass meaning they
+        # have no legal moves and no more boneyard tiles ... i just want it
+        # to be draw here" - the pip count is OUT, both passes = DRAW) ----
         g.probe_reset(7)
         g.chain = [{"a": 6, "b": 6, "fl": false, "who": 1}]
         g.hand_p = [[6, 3], [4, 4]]
@@ -331,22 +335,24 @@ func _run() -> void:
         g._pass(g.P)
         _check(g.pass_streak == 1, "the first pass is just a pass")
         g._pass(g.C)
-        _check(g.state == "round_over" and g.losses == 1 and g.wins == 0,
-                "THE BLOCKED LAW: the CPU is lighter (15 vs 17) - the CPU wins")
+        _check(g.state == "round_over" and g.draws == 1 and g.wins == 0
+                        and g.losses == 0,
+                "THE BLOCKED LAW: both passed - DRAW (even when the CPU is lighter, 15 vs 17)")
         _check("BLOCKED" in g.turn_lbl.text, "the verdict says BLOCKED")
-        # the tie draws
+        _check("DRAW" in g.turn_lbl.text, "the verdict says DRAW")
+        # and the same for the heavier hand - the verdict never flips
         g.probe_reset(8)
         g.chain = [{"a": 0, "b": 0, "fl": false, "who": 1}]
         g.hand_p = [[1, 2]]
-        g.hand_c = [[1, 2]]
+        g.hand_c = [[5, 5]]
         g.deck = []
         g.opening = false
         g.pass_streak = 0
         g._relayout()
         g._pass(g.P)
         g._pass(g.C)
-        _check(g.draws == 1,
-                "THE BLOCKED LAW: even pips draw")
+        _check(g.draws == 1 and g.wins == 0 and g.losses == 0,
+                "THE BLOCKED LAW: both passed - DRAW even when the player is lighter")
 
         # ---- THE COIN LAW (every 3rd round) ----
         var coin_ok := true

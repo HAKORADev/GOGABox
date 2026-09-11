@@ -328,3 +328,77 @@ subjects (`git log` is the real history).
 | studying other games: portals, APKs, engines, the usage law | docs/DECOMPILATION.md |
 | CI, caching, releases, signing | docs/CI.md |
 | what happened so far | `git log` + the sandbox session journal (§8) |
+
+## 10. THE METHODS THAT CLICKED (v0.3.8-5/-6 field-tested)
+
+The owner asked, after v0.3.8-6 landed: "if there is a thing you did that
+helped you to fix the things, write it in the agents md itself if it is
+that helpful for real." These are the methods that actually broke the
+failure loops - written here so every future session starts with them.
+
+**1. EVIDENCE BEFORE EDITS - boot the real thing and LOOK at it.**
+The single biggest unlock across v0.3.8-5/-6. Headless probes verify LAWS,
+but the bugs that shipped ("it is still the old thing", the transposed
+dominoes, the misplaced frame) were all things a headless check can never
+see. The working loop:
+
+```bash
+GODOT_BIN --path projects/gogabox res://tests/rec_domino.tscn   # or qa_*.tscn
+# on the Xvfb rig: xvfb-run -a ... , film with ffmpeg -f x11grab,
+# then MEASURE the frames with PIL (pixel census: where are the tiles,
+# what color is the band, how big is the rect) - not eyeballs, numbers.
+```
+
+Never claim a visual fix without a still from the rig. A pixel census
+(count the felt pixels, find the brown band, measure the chain tile's
+aspect) catches in one command what nine thousand headless asserts miss.
+
+**2. THE INDEX LAW - Controls are not their parents.**
+The W-D-L widget "flip" (top-left over the back/shop buttons) happened
+because `_score_label.get_parent()` is the chip's INNER panel, and its
+`get_index()` is its seat INSIDE the chip (0) - so `move_child(widget,
+that_index)` made the widget the FIRST child of the HUD row. When seating
+a sibling relative to a composite control, seat by the OUTER container:
+`_score_label.get_parent().get_parent().get_index()`. Verify with one
+print of the row's child order after build.
+
+**3. THE SEAM LAW - cover-fit math must clip.**
+`draw_texture_rect(tex, Rect2(off, dst))` with a cover-fit dst SPILLS the
+overflow outside the destination rect (no clipping in canvas draws). Any
+texture fitted into a frame must use `draw_texture_rect_region` with the
+visible source window (`src = (tex_size - dst_size / k) * 0.5`), or a
+CanvasGroup/clip. The felt used to bleed past the rails on two sides -
+that was the "mis-placed frame" the owner saw.
+
+**4. THE SHORE LAW - interface separation is a painted overlay, not luck.**
+"Map things overlap the interface" (tall trees into the HUD strip, wide
+props into the side panel) is fixed by a field-owned overlay that is the
+LAST child of the field: solid room tone across the interface's own
+strips, fading over the field like a soft shelf shadow. Tree order then
+does the z-work: every map layer under it, the panel + HUD CanvasLayer
+above it. Things "sink" under the interface smoothly - no hard clip, no
+sprite surgery.
+
+**5. STATIC PIXELS FOR LOCKED ORIENTATIONS.**
+For a portrait-locked game on a fixed design canvas (1080x1920), every
+seat is an ABSOLUTE constant - no `vp.y * 0.4` proportional math. The
+same numbers land the same pixels on every device, and the rig can
+assert exact rects. Proportional math is only for designs that truly
+scale.
+
+**6. THE CHAIN-HONESTY CHECK FOR COMPOSED ART.**
+When code composes dominoes/snake/cards art (thumbnails, posters), adjacent
+halves must MATCH - build the pose from the game's own placement law (the
+serpentine pack), and read the composed image back at face value. A poster
+with a lying tile whose ends don't touch their neighbours reads fake
+instantly. PIL note: `rotate(+90)` is CCW (top half ends up LEFT);
+face files stored lo-hi need a vertical flip when the bigger value must
+face an end.
+
+**7. THE ONE-TRUTH RULE FOR POSITIONS.**
+Every screen position gets exactly ONE computation point (a constant, or
+one layout function). The dominoes end-slot bugs of v0.3.8-4/-5 round 1
+came from two places computing the same slot (relayout + a leftover
+block). When retiring a law, grep the call sites of its helpers and kill
+them in the same commit - the compiler (GDScript) will NOT warn about a
+dead duplicate painting on top.

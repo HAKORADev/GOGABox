@@ -909,13 +909,21 @@ func _build_widgets(vp: Vector2) -> void:
         # The dead pieces live in two parchment trays flanking the board
         # (the studied reference's room); the turn still speaks through the
         # side-to-move's KING alone (drawn in fx).
+        # v0.3.8-6 THE INDEX LAW (the owner: "i realized you flipped the
+        # position of the goals area ... not top left because currently it
+        # has conflicted with back and shop buttons" - root cause: the seat
+        # was _score_label.get_parent() = the chip's INNER panel, whose
+        # get_index() is its seat INSIDE the chip (0) - moving there made
+        # the cards the FIRST child of the row, top LEFT over back + shop.
+        # The seat is the CHIP's row index: [back, ..., spacer, CARDS, score,
+        # coins] - the cards hug the score at the true top right.)
         goals_row = Control.new()
         goals_row.custom_minimum_size = Vector2(108.0 * 3.0 + 8.0 * 2.0, 64.0)
         goals_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         goals_row.draw.connect(_draw_goal_cards.bind(goals_row))
         _hud_row.add_child(goals_row)
-        var score_panel: Control = _score_label.get_parent()
-        _hud_row.move_child(goals_row, score_panel.get_index())
+        var score_chip: Control = _score_label.get_parent().get_parent()
+        _hud_row.move_child(goals_row, score_chip.get_index())
         verdict_lbl = Arc.label("", 30, Color(1, 1, 1, 0.95))
         verdict_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         verdict_lbl.visible = false

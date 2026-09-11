@@ -307,6 +307,50 @@ func _build_field() -> void:
         fireflies.color = Color(1.0, 0.95, 0.6, 0.7)
         fireflies.visible = night
         field.add_child(fireflies)
+        _build_edges()
+
+func _build_edges() -> void:
+        # v0.3.8-6 THE SHORE LAW (the owner: "in the game map stuff, if thing
+        # is tall or wider, and went to the edges like the top of screen or
+        # the right side where the panel is, the thing looks like it is in
+        # same place of the game interface, things should get down, i mean
+        # the interface feels out and things feels smoothly in without
+        # looking clipped, i guess a z-order or a trick like that"):
+        # tall props / folk / bloon stacks rose past the field's top edge and
+        # drifted into the folk panel's zone - same canvas as the interface,
+        # zero separation. THE SHORE: a field-owned overlay painted ABOVE
+        # every map layer (it is field's LAST child - bloons, bullets, fx,
+        # ghosts all sit under it) while the folk panel + the HUD CanvasLayer
+        # stay above IT - so the interface is genuinely IN FRONT. The room
+        # tone runs SOLID across the interface's own strips (behind the HUD
+        # row, behind the panel), then FADES over the field like a soft
+        # shelf shadow: tall things sink under the interface smoothly -
+        # nothing hard-clipped, nothing floating over the UI. The night
+        # tint (added later, same parent) darkens the shore with the world.
+        var room := Color(0.227451, 0.137255, 0.074510, 1.0)
+        var vp := get_viewport_rect().size
+        var fade := 64.0
+        var steps := 10
+        var edge := Node2D.new()
+        edge.draw.connect(func():
+                # THE TOP SHELF: solid room tone across the HUD strip, the
+                # fade melting into the field's first rows
+                edge.draw_rect(Rect2(-14.0, -14.0, vp.x + 28.0, FIELD.y + 14.0), room)
+                for i in steps:
+                        var a: float = 1.0 - float(i) / float(steps)
+                        edge.draw_rect(Rect2(-14.0, FIELD.y + fade * float(i) / float(steps),
+                                        vp.x + 28.0, fade / float(steps) + 1.0),
+                                        Color(room.r, room.g, room.b, a))
+                # THE RIGHT DOCK: solid room tone under the folk panel, the
+                # fade eating into the field's last columns
+                var frx: float = FIELD.x + COLS * CELL
+                edge.draw_rect(Rect2(frx, -14.0, vp.x - frx + 14.0, vp.y + 28.0), room)
+                for i in steps:
+                        var a2: float = 1.0 - float(i) / float(steps)
+                        edge.draw_rect(Rect2(frx - fade + fade * float(i) / float(steps),
+                                        -14.0, fade / float(steps) + 1.0, vp.y + 28.0),
+                                        Color(room.r, room.g, room.b, a2)))
+        field.add_child(edge)
 
 func _build_next_button() -> void:
         # THE NEXT WAVE button (the field's pink call): idle -> call now, roll

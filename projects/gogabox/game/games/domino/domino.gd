@@ -30,7 +30,8 @@ extends GogaGame
 ##   - turns alternate; a tile must match one open end
 ##   - can't play: DRAW from the boneyard until you can (or it empties),
 ##     then PASS
-##   - both pass in a row = BLOCKED: the LOWER pip total wins, a tie draws
+##   - both pass in a row = BLOCKED = DRAW (v0.3.8-6, the owner's call:
+##     no pip counting, the gentle verdict)
 ##   - empty your hand = DOMINO! you win the round
 ##
 ## Probe contract: the whole rules core + CPU brain are STATIC -
@@ -165,13 +166,19 @@ const SCREEN_W := 1080.0
 const SCREEN_H := 1920.0
 ## THE GROUND FRAME (re-added, the owner: "re-add the ground frame"): the
 ## felt lives inside a real rail frame; FIELD is the chain zone it holds.
-const FRAME := Rect2(30.0, 356.0, 1020.0, 1092.0)   # the outer rail edge
-const FIELD := Rect2(54.0, 380.0, 972.0, 1044.0)    # the chain zone inside
+## v0.3.8-6 THE BIG TABLE (the owner, with the reference shot: "that
+## dominobattle game from gamesnacks board is more bigger, it covers all
+## parts except that out of frame in-hands area"): the frame now eats
+## EVERYTHING between the CPU's fan strip and the player's out-of-frame
+## hand fan - the rails sit 14px above the hand slots and the felt runs
+## full width. Nothing dead, nothing wasted.
+const FRAME := Rect2(24.0, 330.0, 1032.0, 1196.0)   # the outer rail edge
+const FIELD := Rect2(48.0, 354.0, 984.0, 1148.0)    # the chain zone inside
 ## THE BONEYARD POCKET: the yard stack's own reserved seat inside the
 ## frame's top-left - the snake's census treats it as occupied, so a chain
 ## row can NEVER bury the pile or its count again (the rig caught the
 ## BONEYARD label printed under row tiles one time too many).
-const POCKET := Rect2(54.0, 380.0, 212.0, 260.0)
+const POCKET := Rect2(48.0, 354.0, 212.0, 260.0)
 var BASE_L := 190.0            # board tile long side (board space)
 var hw := 252.0                # hand tile long side
 # v0.3.8-5 THE SMOOTH GROUP LAW (the DominoBattle study law): the fit zoom
@@ -491,27 +498,45 @@ func _build_ready() -> void:
                                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_widgets(vp: Vector2) -> void:
-                                # v0.3.8-6 THE W-D-L CARDS IN THE HUD ROW (the owner moved the chess
-                                # widget "next to score widget, like the dominoes one" - so the
-                                # dominoes one lives in the SAME seat now: one law for both games,
-                                # and the old top-right seat can never cover a dealt back again):
-                                # three white cards, W green / D gray / L red - LEFT of the score.
+                                # v0.3.8-6 THE W-D-L CARDS IN THE HUD ROW: three white cards,
+                                # W green / D gray / L red - seated LEFT of the score chip, at the
+                                # TOP RIGHT (the owner: "they are supposed to be at the top right
+                                # next to the score, not top left because currently it has
+                                # conflicted with back and shop buttons").
+                                # THE INDEX LAW (the flip that shipped in -5: root-caused for -6):
+                                # _score_label.get_parent() is the chip's INNER panel - its
+                                # get_index() is its seat INSIDE the chip (0), so moving the strip
+                                # there made it the FIRST child of the row: top LEFT, on top of
+                                # back + shop. The seat is the CHIP's index in the row:
+                                # [back, shop..., spacer, CARDS, score, coins] - spacer expands,
+                                # the cards hug the score at the true right edge.
                                 widget_strip = Control.new()
                                 widget_strip.custom_minimum_size = Vector2(108.0 * 3.0 + 8.0 * 2.0, 64.0)
                                 widget_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
                                 widget_strip.draw.connect(_draw_goal_cards.bind(widget_strip))
                                 _hud_row.add_child(widget_strip)
-                                var score_panel: Control = _score_label.get_parent()
-                                _hud_row.move_child(widget_strip, score_panel.get_index())
+                                var score_chip: Control = _score_label.get_parent().get_parent()
+                                _hud_row.move_child(widget_strip, score_chip.get_index())
                                 turn_lbl = Arc.label("", 28, Color(1, 1, 1, 0.92))
-                                turn_lbl.position = Vector2(0, 302)
+                                turn_lbl.position = Vector2(0, 372)
                                 turn_lbl.custom_minimum_size = Vector2(SCREEN_W, 38)
                                 turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                                # THE INK LAW (the owner: "the text your move is bad, give it
+                                # black outlines to be more clear"): the banner lives INSIDE
+                                # the frame now (top-center of the felt, clear of the top
+                                # rail) and wears a hard black outline - readable on the
+                                # felt, on the ivory chain, on any theme.
+                                turn_lbl.add_theme_color_override("font_outline_color",
+                                                                Color(0.05, 0.03, 0.01, 1.0))
+                                turn_lbl.add_theme_constant_override("outline_size", 12)
                                 world.add_child(turn_lbl)
                                 pile_lbl = Arc.label("", 20, Color(1, 1, 1, 0.7))
                                 pile_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                                 world.add_child(pile_lbl)
                                 hand_c_lbl = Arc.label("", 20, Color(1, 1, 1, 0.7))
+                                hand_c_lbl.add_theme_color_override("font_outline_color",
+                                                                Color(0.05, 0.03, 0.01, 0.9))
+                                hand_c_lbl.add_theme_constant_override("outline_size", 8)
                                 world.add_child(hand_c_lbl)
 
 func _draw_goal_cards(c: Control) -> void:
@@ -783,10 +808,10 @@ func _relayout() -> void:
                                 board_rect = FIELD
                                 _relayout_board()
                                 cpu_pos = Vector2(SCREEN_W * 0.5, 208.0)
-                                # the turn status rides the clear strip between the CPU fan and the
-                                # frame's top rail
+                                # the turn banner rides INSIDE the frame, top-center of the
+                                # felt (the old 302 seat ended up ON the frame's top rail)
                                 if turn_lbl != null:
-                                                turn_lbl.position = Vector2(0, 302)
+                                                turn_lbl.position = Vector2(0, 372)
                                 pile_pos = POCKET.get_center() + Vector2(0, -14.0)
                                 # the hand fan (v0.3.8-6: OUT of the frame - the owner's law)
                                 hand_rects = []
@@ -937,13 +962,19 @@ func _draw_table() -> void:
                                 var room: Color = t["room"]
                                 table_l.draw_rect(Rect2(0, 0, SCREEN_W, SCREEN_H), room)
                                 # THE FELT: the studied build's own bg_game texture, cover-fit
-                                # inside the frame's field
+                                # CROPPED into the frame's field (v0.3.8-6 THE SEAM LAW: the old
+                                # draw_texture_rect spilled the cover's overflow past the rails
+                                # - a felt band bled over the room at the top and bottom; the
+                                # region draw shows exactly the visible crop, nothing more).
                                 var tex := _ground_tex(String(t["ground"]))
                                 var ts := tex.get_size()
                                 var k: float = maxf(FIELD.size.x / ts.x, FIELD.size.y / ts.y)
-                                var dst := ts * k
-                                var off := FIELD.get_center() - dst * 0.5
-                                table_l.draw_texture_rect(tex, Rect2(off, dst), false)
+                                # the visible source window: FIELD.size / k, centered in the
+                                # texture - mapped 1:1 onto the field rect, zero spill
+                                var vis := FIELD.size / k
+                                var src_org := (ts - vis) * 0.5
+                                table_l.draw_texture_rect_region(tex, FIELD,
+                                                                Rect2(src_org, vis))
                                 # THE INNER EDGE SHADE (canvas gradient strips - never a texture):
                                 # the table dips into shadow where it meets the rails
                                 var steps := 12
@@ -1740,20 +1771,13 @@ func _pass(who: int) -> void:
                                 return
                 _after_move(who)
 
-## THE BLOCKED LAW: lower pip total wins, tie = draw
+## THE BLOCKED LAW (v0.3.8-6, the owner's call: "a draw situation should
+## happen when both do a pass meaning they have no legal moves and no more
+## boneyard tiles ... i just want it to be draw here"): both passed in a
+## row - the board is locked and the yard is dry - the round is a DRAW.
+## Full stop. The real-table pip count stays out of the box.
 func _blocked() -> void:
-                var pp := 0
-                for t in hand_p:
-                                pp += pips(t)
-                var pc := 0
-                for t in hand_c:
-                                pc += pips(t)
-                if pp < pc:
-                                _resolve("win", true)
-                elif pc < pp:
-                                _resolve("lose", true)
-                else:
-                                _resolve("draw", true)
+                _resolve("draw", true)
 
 func _resolve(outcome: String, blocked: bool) -> void:
                 state = "round_over"
@@ -1784,7 +1808,7 @@ func _resolve(outcome: String, blocked: bool) -> void:
                                 Jukebox.sfx("d_lose", -3.0)
                 else:
                                 draws += 1
-                                verdict_txt = "BLOCKED - EVEN PIPS  DRAW"
+                                verdict_txt = "BLOCKED - NO MOVES  DRAW"
                                 Jukebox.sfx("d_blocked", -4.0)
                 turn_lbl.text = verdict_txt
                 turn_lbl.add_theme_color_override("font_color",
