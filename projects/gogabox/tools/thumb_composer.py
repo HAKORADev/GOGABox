@@ -1435,6 +1435,165 @@ def scene_chess():
     return sc.render()
 
 
+def scene_fourline():
+    """FOUR IN LINE (v0.3.9): IN-GAME FOOTAGE - the toy on its tavern
+    table, a LIVE position: red is one disc from a vertical four and the
+    winning hole WEARS the GOGACoin (win the row + take the coin race),
+    the aim ghost hovers over that column, yellow probes the flanks."""
+    sc = Scene()
+    sc.backdrop((44, 29, 16), (34, 21, 10))
+    cell = 71
+    cols, rows = 8, 7
+    bw, bh = cols * cell, rows * cell
+    ox = W // 2 - bw // 2
+    oy = (H - bh) // 2 + 12
+    pad = int(cell * 0.30)
+    frame = (181, 136, 99)
+    frame_dk = (107, 74, 46)
+    hole = (23, 13, 5)
+    red = (232, 87, 74)
+    red_dk = (153, 27, 27)
+    yel = (255, 201, 60)
+    yel_dk = (202, 138, 4)
+    # the frame slab + bevel + feet
+    fx0, fy0 = ox - pad, oy - pad
+    fx1, fy1 = ox + bw + pad, oy + bh + pad
+    sc.rect([fx0 + 8, fy0 + 10, fx1 + 8, fy1 + 14], r=22, fill=frame_dk + (255,))
+    sc.rect([fx0, fy0, fx1, fy1], r=22, fill=frame + (255,))
+    sc.rect([fx0 + 24, fy0 + 8, fx1 - 24, fy0 + 13], fill=(214, 172, 128, 255))
+    for footx in (fx0 + 20, fx1 - 96):
+        sc.rect([footx, fy1, footx + 76, fy1 + 18], r=8,
+                fill=frame_dk + (255,))
+    rad = int(cell * 0.40)
+    # the holes (the cavities) + a LIVE position (gravity-true: every
+    # column seats from the BOTTOM row up - nothing floats)
+    discs = {}
+    for c in (2, 4):
+        discs[(c, 6)] = 2
+        discs[(c, 5)] = 2
+    discs[(2, 4)] = 1
+    discs[(4, 4)] = 1
+    for r in (6, 5, 4):
+        discs[(3, r)] = 1          # red is three tall in column 3
+    win_cell = (3, 3)              # the four AND the coin, one hole away
+    for c in range(cols):
+        for r in range(rows):
+            cx = ox + c * cell + cell // 2
+            cy = oy + r * cell + cell // 2
+            sc.ellipse([cx - rad, cy - rad, cx + rad, cy + rad],
+                       fill=hole + (255,))
+            sc.ellipse([cx - rad + 3, cy - rad + 3, cx + rad - 3,
+                        cy + rad - 3], outline=(0, 0, 0, 90), width=3)
+            if (c, r) in discs:
+                col, dk = (red, red_dk) if discs[(c, r)] == 1 else (yel, yel_dk)
+                sc.ellipse([cx - rad + 2, cy - rad + 4, cx + rad + 2,
+                            cy + rad + 4], fill=(0, 0, 0, 70))
+                sc.ellipse([cx - rad, cy - rad, cx + rad, cy + rad],
+                           fill=dk + (255,))
+                sc.ellipse([cx - rad + 3, cy - rad + 1, cx + rad - 3,
+                            cy + rad - 5], fill=col + (255,))
+                sc.ellipse([cx - rad * 0.55, cy - rad * 0.62,
+                            cx - rad * 0.05, cy - rad * 0.12],
+                           fill=(255, 255, 255, 120))
+    # the winning hole glows + the coin rests inside it
+    wx = ox + win_cell[0] * cell + cell // 2
+    wy = oy + win_cell[1] * cell + cell // 2
+    sc.glow(wx, wy, 46, (255, 214, 100), 130)
+    sc.stamp(load_sprite("ui/coin.png"), wx, wy, scale=0.30)
+    # the aim ghost above the winning column (the next disc, kissing the
+    # frame's top edge - it is ABOUT to drop)
+    gx = wx
+    gy = fy0 - int(rad * 0.55)
+    sc.ellipse([gx - rad, gy - rad, gx + rad, gy + rad],
+               fill=red + (120,))
+    sc.ellipse([gx - rad, gy - rad, gx + rad, gy + rad],
+               outline=red + (220,), width=3)
+    sc.vignette(90)
+    return sc.render()
+
+
+def scene_bovo():
+    """FIVE IN ROW (v0.3.9): IN-GAME FOOTAGE - the honey wood slab, a
+    LIVE position: charcoal has an open four across the middle and the
+    fifth point WEARS the GOGACoin (five + coin in one placement), the
+    aim ghost waits on it, ivory probes around."""
+    sc = Scene()
+    sc.backdrop((44, 29, 16), (34, 21, 10))
+    cell = 60
+    n = 8
+    bw = n * cell
+    ox = W // 2 - bw // 2
+    oy = (H - bw) // 2 + 12
+    pad = int(cell * 0.42)
+    board = (217, 169, 95)
+    board_dk = (192, 141, 71)
+    line = (74, 47, 22)
+    dark_st = (38, 38, 46)
+    lite_st = (243, 234, 216)
+    # the slab + under-shadow + plank bands
+    bx0, by0 = ox - pad, oy - pad
+    bx1, by1 = ox + bw + pad, oy + bw + pad
+    sc.rect([bx0 + 9, by0 + 13, bx1 + 9, by1 + 13], fill=(0, 0, 0, 85))
+    sc.rect([bx0, by0, bx1, by1], fill=board + (255,))
+    sc.rect([bx0, by1 - 10, bx1, by1], fill=board_dk + (255,))
+    for k in range(1, 9):
+        yy = by0 + int(k * (by1 - by0) / 10.0)
+        if k % 3 != 2:
+            sc.rect([bx0 + 6, yy, bx1 - 6, yy + 2], fill=(192, 141, 71, 70))
+    # the grid
+    for k in range(n):
+        t = k * cell + cell // 2
+        w = 4 if k in (0, n - 1) else 2
+        sc.line([ox + t, oy + cell // 2, ox + t, oy + bw - cell // 2],
+                line + (255,), w)
+        sc.line([ox + cell // 2, oy + t, ox + bw - cell // 2, oy + t],
+                line + (255,), w)
+    # the star points
+    for (c, r) in [(2, 2), (5, 2), (2, 5), (5, 5)]:
+        px = ox + c * cell + cell // 2
+        py = oy + r * cell + cell // 2
+        sc.ellipse([px - 4, py - 4, px + 4, py + 4], fill=line + (255,))
+    rad = int(cell * 0.40)
+
+    def stone(c, r, who):
+        px = ox + c * cell + cell // 2
+        py = oy + r * cell + cell // 2
+        col = dark_st if who == 1 else lite_st
+        sc.ellipse([px - rad + 3, py - rad + 5, px + rad + 3, py + rad + 5],
+                   fill=(0, 0, 0, 80))
+        sc.ellipse([px - rad, py - rad, px + rad, py + rad], fill=col + (255,))
+        if who == 1:
+            sc.ellipse([px - int(rad * 0.72), py - int(rad * 0.72),
+                        px + int(rad * 0.1), py + int(rad * 0.1)],
+                       fill=(70, 70, 84, 255))
+            sc.ellipse([px - int(rad * 0.48), py - int(rad * 0.55),
+                        px - int(rad * 0.05), py - int(rad * 0.12)],
+                       fill=(130, 130, 148, 200))
+        else:
+            sc.ellipse([px - int(rad * 0.72), py - int(rad * 0.72),
+                        px + int(rad * 0.1), py + int(rad * 0.1)],
+                       fill=(255, 250, 238, 255))
+            sc.ellipse([px - int(rad * 0.48), py - int(rad * 0.55),
+                        px - int(rad * 0.05), py - int(rad * 0.12)],
+                       fill=(255, 255, 255, 220))
+    # the story: charcoal's open four on row 4, ivory crowded above
+    for c in (2, 3, 4, 5):
+        stone(c, 4, 1)
+    for (c, r) in [(2, 3), (3, 3), (4, 2), (5, 3), (3, 5), (6, 5), (1, 4),
+                   (6, 3)]:
+        stone(c, r, 2)
+    # the fifth point: the coin + the win glow
+    wx = ox + 6 * cell + cell // 2
+    wy = oy + 4 * cell + cell // 2
+    sc.glow(wx, wy, 48, (255, 214, 100), 135)
+    sc.stamp(load_sprite("ui/coin.png"), wx, wy, scale=0.32)
+    # the aim ghost on the fifth point (the next charcoal stone)
+    sc.ellipse([wx - rad, wy - rad, wx + rad, wy + rad],
+               outline=dark_st + (230,), width=4)
+    sc.vignette(90)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1450,6 +1609,8 @@ SCENES = {
     "geometry": scene_geometry,
     "domino": scene_domino,
     "chess": scene_chess,
+    "fourline": scene_fourline,
+    "bovo": scene_bovo,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

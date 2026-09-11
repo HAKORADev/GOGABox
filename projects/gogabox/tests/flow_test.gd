@@ -17,6 +17,8 @@ func _ready() -> void:
         fails += _test("meta: registry metadata sane", _t_meta())
         fails += _test("registry: entries sane", _t_registry())
         fails += _test("xo: sketch CPU sanity", _t_xo_ai())
+        fails += _test("fourline: drop CPU sanity", _t_fourline_ai())
+        fails += _test("bovo: five-in-row CPU sanity", _t_bovo_ai())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -306,14 +308,15 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 16,
-                "16 playable games (domino + chess joined)")
+        var ok := _check(GameReg.playable().size() == 18,
+                "18 playable games (fourline + bovo joined, v0.3.9)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
-        # v0.3.8: DOMINO + CHECKMATE graduated - three teasers left
-        ok += _check(GameReg.workshop().size() == 3,
-                "3 workshop teasers (fourline / bovo / dots)")
+        # v0.3.8: DOMINO + CHECKMATE graduated
+        # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated - one teaser left
+        ok += _check(GameReg.workshop().size() == 1,
+                "1 workshop teaser (dots)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -387,7 +390,7 @@ func _t_registry() -> int:
         # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
         # the banner now, the tower included; MELTING stays
         var banner_ok := true
-        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess"]:
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo"]:
                 banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
@@ -445,6 +448,46 @@ func _t_registry() -> int:
         ok += _check(float(MZ.TIME_BASE) == 4.5 and float(MZ.TIME_PER_CELL) == 0.42 \
                         and float(MZ.TIME_MIN) == 13.0 and float(MZ.TIME_MAX) == 62.0,
                 "maze wears the tight clock (4.5 + 0.42/cell, 13..62)")
+        # v0.3.9: FOUR IN LINE + FIVE IN ROW graduate (the owner's GDD laws)
+        var fl: Dictionary = GameReg.get_game("fourline")
+        ok += _check(not bool(fl.get("coming_soon", false)) \
+                        and String(fl["orientation"]) == "portrait",
+                "fourline is PLAYABLE now: portrait only (the xo law, v0.3.9)")
+        ok += _check(int(fl["coin_div"]) == 3 and int(fl["fee"]) == 8,
+                "fourline wears the owner's economy (bonus /3, fee 8)")
+        ok += _check(bool(fl["shop"]) and bool(fl["banner"]),
+                "fourline wears the shop + the banner")
+        ok += _check(fl["ach"].size() == 11,
+                "fourline wears the tiered ladder (11)")
+        var FLO := load("res://game/games/fourline/fourline.gd")
+        ok += _check(int(FLO.COLS) == 8 and int(FLO.ROWS) == 7,
+                "fourline wears the mid-sized 8x7 board (owner)")
+        ok += _check(int(FLO.COIN_EVERY) == 4,
+                "fourline pays a GOGACoin after each 4 rounds (owner)")
+        ok += _check(FLO.SKINS.size() == 5 and FLO.THEMES.size() == 5,
+                "fourline wears the 5-5 shop (owner)")
+        var bv: Dictionary = GameReg.get_game("bovo")
+        ok += _check(not bool(bv.get("coming_soon", false)) \
+                        and String(bv["orientation"]) == "portrait",
+                "bovo is PLAYABLE now: FIVE IN ROW (the rename + the xo law, v0.3.9)")
+        ok += _check(String(bv["title"]) == "FIVE IN ROW",
+                "the teaser FIVE LINES ships as FIVE IN ROW (rename law)")
+        ok += _check(int(bv["coin_div"]) == 2 and int(bv["fee"]) == 8,
+                "bovo wears the owner's economy (bonus /2, fee 8)")
+        ok += _check(bool(bv["shop"]) and bool(bv["banner"]),
+                "bovo wears the shop + the banner")
+        ok += _check(bv["ach"].size() == 11,
+                "bovo wears the tiered ladder (11)")
+        var BVO := load("res://game/games/bovo/bovo.gd")
+        ok += _check(int(BVO.COIN_EVERY) == 3,
+                "bovo pays a GOGACoin after each 3 rounds (owner)")
+        ok += _check(BVO.SKINS.size() == 5 and BVO.THEMES.size() == 5,
+                "bovo wears the 5-5 shop (owner)")
+        ok += _check(BVO.SIZES.size() == 3 \
+                        and int(BVO.SIZES["8"]["price"]) == 0 \
+                        and int(BVO.SIZES["10"]["price"]) == 1800 \
+                        and int(BVO.SIZES["12"]["price"]) == 3600,
+                "bovo wears the 8/10/12 ladder (8 free, 10 = 1800, 12 = 3600)")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -556,6 +599,344 @@ func _t_xo_ai() -> int:
                 "the CPU wins most vs random but NOT always (%.0f%%)" % [wr * 100.0])
         ok += _check(lr < 0.2,
                 "the CPU rarely LOSES vs random (%.0f%%, owner: good enough to not lose)" % [lr * 100.0])
+        return ok
+
+# ---------------------------------------------------- fourline + bovo CPUs
+
+## v0.3.9: the drop classic's static core - the xo probe contract. Pins:
+## gravity seats, win detection in all 4 directions, full-board draws,
+## immediate win taken, immediate loss blocked, the burned-reply memory,
+## and the not-perfect law (random play beats it sometimes, loses most).
+func _t_fourline_ai() -> int:
+        var FL: GDScript = load("res://game/games/fourline/fourline.gd")
+        var ok := 0
+        # drop_row: gravity seats discs at the lowest empty row
+        var b := []
+        for i in 56:
+                b.append(0)
+        ok += _check(int(FL.drop_row(b, 0)) == FL.ROWS - 1,
+                "an empty column seats the BOTTOM row (gravity)")
+        ok += _check(int(FL.drop_row(b, 99)) == -1, "a ghost column is full")
+        b[FL.idx(3, FL.ROWS - 1)] = 1
+        b[FL.idx(3, FL.ROWS - 2)] = 2
+        ok += _check(int(FL.drop_row(b, 3)) == FL.ROWS - 3,
+                "the disc stacks upward from the bottom")
+        # winner_of: vertical, horizontal, diagonal, draw, none-yet
+        var vert := []
+        for i in 56:
+                vert.append(0)
+        for r in 4:
+                vert[FL.idx(2, r)] = 2
+        ok += _check(int(FL.winner_of(vert)) == 2, "vertical four wins")
+        var horz := []
+        for i in 56:
+                horz.append(0)
+        for c in range(1, 5):
+                horz[FL.idx(c, 0)] = 1
+        ok += _check(int(FL.winner_of(horz)) == 1, "horizontal four wins")
+        var diag := []
+        for i in 56:
+                diag.append(0)
+        for k in 4:
+                diag[FL.idx(1 + k, 1 + k)] = 1
+        ok += _check(int(FL.winner_of(diag)) == 1, "diagonal four wins")
+        ok += _check(FL.win_line(diag).size() == 4, "the win line is four cells")
+        # a FULL board with no four anywhere (greedy anti-win fill) - the
+        # checkerboard lies (its diagonals are four-of-a-kind)
+        var full := []
+        var filled := false
+        for attempt in 6:
+                full = []
+                for i in 56:
+                        full.append(0)
+                var order := []
+                for i in 56:
+                        order.append((i * 17 + attempt * 23) % 56)
+                var clean := true
+                for oi in order:
+                        var i: int = oi
+                        var placed := false
+                        for v in [1, 2]:
+                                full[i] = v
+                                if FL.win_line(full).is_empty():
+                                        placed = true
+                                        break
+                                full[i] = 0
+                        clean = clean and placed
+                if clean and FL.winner_of(full) == 3:
+                        filled = true
+                        break
+        ok += _check(filled and int(FL.winner_of(full)) == 3,
+                "a full board draws")
+        # winning_cols: the immediate win and the immediate threat
+        var near := []
+        for i in 56:
+                near.append(0)
+        near[FL.idx(0, FL.ROWS - 1)] = 2
+        near[FL.idx(0, FL.ROWS - 2)] = 2
+        near[FL.idx(0, FL.ROWS - 3)] = 2
+        ok += _check(FL.winning_cols(near, 2).has(0),
+                "the CPU sees its own winning column")
+        ok += _check(FL.winning_cols(near, 1).is_empty(),
+                "the player has no threat there")
+        # the memory law (the xo contract verbatim)
+        var mem := []
+        mem = FL.remember(mem, {"open": 4, "reply": 2, "result": 1, "fork": false})
+        mem = FL.remember(mem, {"open": 4, "reply": 2, "result": 1, "fork": false})
+        ok += _check(mem.size() == 2, "the memory holds 2 rounds")
+        ok += _check(int(FL.adapt(mem)["burned"]) == 2,
+                "the same opening twice burns the reply")
+        ok += _check(int(FL.adapt([])["burned"]) == -1,
+                "a fresh memory burns nothing")
+        var fork_mem: Array = FL.remember(mem, {"open": 0, "reply": 7, "result": 1,
+                        "fork": true})
+        ok += _check(bool(FL.adapt(fork_mem)["forkry"]),
+                "a forked round wakes the watch")
+        # every profile always picks a legal, non-full column
+        var rng := RandomNumberGenerator.new()
+        rng.seed = 39
+        var legal := true
+        for pr in FL.PROFILES.keys():
+                for t in 30:
+                        var c: int = FL.cpu_pick(near, pr, [], rng)
+                        legal = legal and c >= 0 and c < FL.COLS
+        ok += _check(legal, "every profile picks a legal column")
+        # THE PROGRAMMED FAILURES (the xo law, pinned directly like xo's):
+        # an immediate win is TAKEN most of the time, an immediate loss is
+        # BLOCKED most of the time - but never always (the CPU is beatable)
+        var near_w := []
+        for i in 56:
+                near_w.append(0)
+        near_w[FL.idx(3, FL.ROWS - 1)] = 2
+        near_w[FL.idx(3, FL.ROWS - 2)] = 2
+        near_w[FL.idx(3, FL.ROWS - 3)] = 2
+        var near_l := []
+        for i in 56:
+                near_l.append(0)
+        near_l[FL.idx(5, FL.ROWS - 1)] = 1
+        near_l[FL.idx(5, FL.ROWS - 2)] = 1
+        near_l[FL.idx(5, FL.ROWS - 3)] = 1
+        for pr in FL.PROFILES.keys():
+                var takes := 0
+                var blocks := 0
+                for t in 40:
+                        if int(FL.cpu_pick(near_w, pr, [], rng)) == 3:
+                                takes += 1
+                        if int(FL.cpu_pick(near_l, pr, [], rng)) == 5:
+                                blocks += 1
+                ok += _check(takes >= 26 and takes < 40,
+                                "%s takes the win %d/40 (never always)" % [pr, takes])
+                ok += _check(blocks >= 26 and blocks < 40,
+                                "%s blocks the loss %d/40 (never always)" % [pr, blocks])
+        # the competence law: vs random it wins nearly every playout
+        var wins := 0
+        var losses := 0
+        var games := 200
+        for g in games:
+                var bb := []
+                for i in 56:
+                        bb.append(0)
+                var pr: String = FL.PROFILES.keys()[g % FL.PROFILES.size()]
+                var mover := 1 if g % 2 == 0 else 2
+                var res := 0
+                for step in 56:
+                        if FL.winner_of(bb) != 0:
+                                break
+                        if mover == 1:
+                                var opts := []
+                                for c in FL.COLS:
+                                        if FL.drop_row(bb, c) >= 0:
+                                                opts.append(c)
+                                var c1: int = opts[rng.randi() % opts.size()]
+                                bb[FL.idx(c1, FL.drop_row(bb, c1))] = 1
+                        else:
+                                var mv: int = FL.cpu_pick(bb, pr, [], rng)
+                                if mv < 0:
+                                        break
+                                bb[FL.idx(mv, FL.drop_row(bb, mv))] = 2
+                        var w: int = FL.winner_of(bb)
+                        if w != 0:
+                                res = w
+                                break
+                        mover = 2 if mover == 1 else 1
+                if res == 2:
+                        wins += 1
+                elif res == 1:
+                        losses += 1
+        var wr := float(wins) / float(games)
+        var lr := float(losses) / float(games)
+        ok += _check(wr > 0.85,
+                "the CPU wins nearly every playout vs random (%.0f%%)" % [wr * 100.0])
+        ok += _check(lr < 0.05,
+                "the CPU never gifts games to random (%.0f%% losses)" % [lr * 100.0])
+        return ok
+
+## v0.3.9: the gomoku sibling's static core - same probe contract. Pins:
+## five detection in 4 directions, five-cell threat finding, the
+## candidate near-law, the burned-reply memory, the programmed failures.
+func _t_bovo_ai() -> int:
+        var BVO: GDScript = load("res://game/games/bovo/bovo.gd")
+        var ok := 0
+        var n := 8
+        # winner_of on all four directions (per-direction start points so
+        # every line stays on the board)
+        for ds in [[1, 0, 1, 3], [0, 1, 2, 1], [1, 1, 1, 1], [1, -1, 1, 5]]:
+                var b := []
+                for i in n * n:
+                        b.append(0)
+                for j in 5:
+                        var cc: int = int(ds[2]) + int(ds[0]) * j
+                        var rr: int = int(ds[3]) + int(ds[1]) * j
+                        b[BVO.idx(cc, rr, n)] = 1
+                ok += _check(int(BVO.winner_of(b, n)) == 1,
+                        "five wins along [%d,%d]" % [int(ds[0]), int(ds[1])])
+        # a FULL board with no five anywhere (greedy anti-win fill - the
+        # plain checkerboard carries diagonal fives)
+        var full := []
+        var filled := false
+        for attempt in 6:
+                full = []
+                for i in n * n:
+                        full.append(0)
+                var clean := true
+                for i in n * n:
+                        var oi: int = (i * 19 + attempt * 31) % (n * n)
+                        var placed := false
+                        for v in [1, 2]:
+                                full[oi] = v
+                                if BVO.win_line(full, n).is_empty():
+                                        placed = true
+                                        break
+                                full[oi] = 0
+                        clean = clean and placed
+                if clean and int(BVO.winner_of(full, n)) == 3:
+                        filled = true
+                        break
+        ok += _check(filled and int(BVO.winner_of(full, n)) == 3,
+                "a full board draws")
+        var empty := []
+        for i in n * n:
+                empty.append(0)
+        ok += _check(int(BVO.winner_of(empty, n)) == 0, "an empty board plays on")
+        # five_cells: the exact finishing points
+        var b2 := []
+        for i in n * n:
+                b2.append(0)
+        for j in 4:
+                b2[BVO.idx(1 + j, 1, n)] = 2
+        var fives: Array = BVO.five_cells(b2, n, 2)
+        ok += _check(fives.size() == 2 and fives.has(BVO.idx(0, 1, n)) \
+                        and fives.has(BVO.idx(5, 1, n)),
+                "both five-completing cells are seen (open four)")
+        ok += _check(BVO.five_cells(b2, n, 1).is_empty(),
+                "no phantom threats for the player")
+        # candidate_cells: only near stones, center on empty
+        var cands: Array = BVO.candidate_cells(b2, n)
+        var near_ok := true
+        for i in cands:
+                var c: int = i / n
+                var r: int = i % n
+                var close := false
+                for dc in range(-2, 3):
+                        for dr in range(-2, 3):
+                                var cc: int = c + dc
+                                var rr: int = r + dr
+                                if cc >= 0 and cc < n and rr >= 0 and rr < n \
+                                                and int(b2[BVO.idx(cc, rr, n)]) != 0:
+                                        close = true
+                near_ok = near_ok and close
+        ok += _check(near_ok, "candidates stay within arm's reach of stones")
+        ok += _check(BVO.candidate_cells(empty, n) == [BVO.idx(4, 4, n)],
+                "an empty board candidates the center")
+        # the memory law (the xo contract verbatim)
+        var mem := []
+        mem = BVO.remember(mem, {"open": 27, "reply": 28, "result": 1,
+                        "fork": false})
+        mem = BVO.remember(mem, {"open": 27, "reply": 28, "result": 1,
+                        "fork": false})
+        ok += _check(int(BVO.adapt(mem)["burned"]) == 28,
+                "the same opening twice burns the reply")
+        var fork_mem: Array = BVO.remember(mem, {"open": 3, "reply": 9, "result": 1,
+                        "fork": true})
+        ok += _check(bool(BVO.adapt(fork_mem)["forkry"]),
+                "a forked round wakes the watch")
+        # every profile picks a legal candidate
+        var rng := RandomNumberGenerator.new()
+        rng.seed = 39
+        var legal := true
+        for pr in BVO.PROFILES.keys():
+                for t in 20:
+                        var mv: int = BVO.cpu_pick(b2, n, pr, [], rng)
+                        legal = legal and mv >= 0 and mv < n * n \
+                                        and int(b2[mv]) == 0
+        ok += _check(legal, "every profile picks a legal point")
+        # THE PROGRAMMED FAILURES (the xo law, pinned directly): an open
+        # four is FINISHED most of the time, the player's four is BLOCKED
+        # most of the time - but never always
+        var b3 := []
+        for i in n * n:
+                b3.append(0)
+        for j in 4:
+                b3[BVO.idx(1 + j, 3, n)] = 1
+        var theirs: Array = BVO.five_cells(b3, n, 1)
+        ok += _check(theirs.size() == 2,
+                "the player's open four shows both block points")
+        for pr in BVO.PROFILES.keys():
+                var takes := 0
+                var blocks := 0
+                for t in 40:
+                        var mv: int = BVO.cpu_pick(b2, n, pr, [], rng)
+                        if mv == int(fives[0]) or mv == int(fives[1]):
+                                takes += 1
+                        var bl: int = BVO.cpu_pick(b3, n, pr, [], rng)
+                        if bl == int(theirs[0]) or bl == int(theirs[1]):
+                                blocks += 1
+                ok += _check(takes >= 26 and takes < 40,
+                                "%s takes the five %d/40 (never always)" % [pr, takes])
+                ok += _check(blocks >= 26 and blocks < 40,
+                                "%s blocks the five %d/40 (never always)" % [pr, blocks])
+        # the competence law: vs random it wins nearly every playout
+        var wins := 0
+        var losses := 0
+        var games := 120
+        for g in games:
+                var bb := []
+                for i in n * n:
+                        bb.append(0)
+                var pr: String = BVO.PROFILES.keys()[g % BVO.PROFILES.size()]
+                var mover := 1 if g % 2 == 0 else 2
+                var res := 0
+                for step in n * n:
+                        if BVO.winner_of(bb, n) != 0:
+                                break
+                        if mover == 1:
+                                var empties := []
+                                for i in n * n:
+                                        if int(bb[i]) == 0:
+                                                empties.append(i)
+                                if empties.is_empty():
+                                        break
+                                bb[empties[rng.randi() % empties.size()]] = 1
+                        else:
+                                var mv: int = BVO.cpu_pick(bb, n, pr, [], rng)
+                                if mv < 0:
+                                        break
+                                bb[mv] = 2
+                        var w: int = BVO.winner_of(bb, n)
+                        if w != 0:
+                                res = w
+                                break
+                        mover = 2 if mover == 1 else 1
+                if res == 2:
+                        wins += 1
+                elif res == 1:
+                        losses += 1
+        var wr := float(wins) / float(games)
+        var lr := float(losses) / float(games)
+        ok += _check(wr > 0.85,
+                "the CPU wins nearly every playout vs random (%.0f%%)" % [wr * 100.0])
+        ok += _check(lr < 0.05,
+                "the CPU never gifts games to random (%.0f%% losses)" % [lr * 100.0])
         return ok
 
 # ------------------------------------------------------------------ roadmap
@@ -918,24 +1299,42 @@ func _t_feed_order() -> int:
         ok += _check(Roadmap.can_play_now("snake"), "oracle: snake always playable")
         ok += _check(Roadmap.can_play_now("dario") == false, "oracle: unowned dario not playable")
         ok += _check(Roadmap.can_play_now("xo") == false, "oracle: unowned xo not playable")
-        # THE SOON TRUTH: drive to 10 owned - the fourline teaser surfaces
-        # SOON and must sit at the VERY END, after the mysteries.
+        # THE SOON TRUTH (v0.3.9): fourline + bovo are PLAYABLE catalog
+        # entries now - at 10 owned they surface LOCKED, never SOON; dots
+        # is the one workshop teaser left.
         for gid in ["lanes", "slasher", "hopper", "merge", "dario", "xo", "invaders", "matcher"]:
                 Box.unlock_game(gid, 0)   # owned -> 10
-        ok += _check(Roadmap.state("fourline") == "SOON",
-                "fourline surfaces SOON at 10 owned (%s)" % Roadmap.state("fourline"))
+        ok += _check(Roadmap.state("fourline") != "SOON",
+                "fourline is catalog now, not SOON (%s)" % Roadmap.state("fourline"))
+        ok += _check(Roadmap.state("bovo") != "SOON",
+                "bovo is catalog now, not SOON (%s)" % Roadmap.state("bovo"))
+        ok += _check(Roadmap.state("fourline") == "LOCKED",
+                "fourline surfaces LOCKED at 10 owned (%s)" % Roadmap.state("fourline"))
+        ok += _check(GameReg.workshop().size() == 1 \
+                        and String(GameReg.workshop()[0]["id"]) == "dots",
+                "dots is the one teaser left")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
         for r in rows:
                 ids.append(String(r["g"]["id"]))
                 buckets.append(int(r["bucket"]))
-        ok += _check(String(ids[ids.size() - 1]) == "fourline" and int(buckets[buckets.size() - 1]) == 3,
-                "SOON is the feed's last block (last: %s bucket %s)" % [ids[ids.size() - 1], buckets[buckets.size() - 1]])
         var soon_first_at := buckets.find(3)
-        ok += _check(soon_first_at > buckets.find(2),
-                "SOON comes AFTER the mysteries (buckets %s)" % [buckets])
-        ok += _check(Roadmap.can_play_now("fourline") == false, "oracle: a SOON teaser is not playable")
+        if soon_first_at >= 0:
+                ok += _check(String(ids[soon_first_at]) == "dots",
+                        "the SOON block wears dots (%s)" % [ids.slice(soon_first_at)])
+                ok += _check(soon_first_at == buckets.size() - 1 \
+                                or buckets[soon_first_at + 1] != 3,
+                        "SOON is the feed's last block (last: %s bucket %s)"
+                                        % [ids[ids.size() - 1],
+                                        buckets[buckets.size() - 1]])
+                ok += _check(soon_first_at > buckets.find(2),
+                        "SOON comes AFTER the mysteries (buckets %s)" % [buckets])
+        else:
+                ok += _check(not buckets.has(3),
+                        "no SOON block before dots' ladder (buckets %s)" % [buckets])
+        ok += _check(Roadmap.can_play_now("fourline") == false,
+                "oracle: an unowned fourline is not playable")
         Box.reset_all()
         return ok
 
