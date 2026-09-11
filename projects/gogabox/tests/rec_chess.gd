@@ -15,6 +15,14 @@ func _ready() -> void:
         Box.reset_all()
         g = load("res://game/games/chess/chess.gd").new()
         g.game_id = "chess"
+        # v0.3.8-8: the rig films ONE table - RIG_ORIENT=vertical films the
+        # tall war, the default keeps the classic landscape
+        var rig_orient := OS.get_environment("RIG_ORIENT")
+        g.start_orientation = rig_orient if rig_orient != "" else "horizontal"
+        # v0.3.8-8: the rig decides the design from the REAL window px (the
+        # bare boot skips the menu governor - a 1080x1920 window needs this
+        # or the canvas stays landscape)
+        ScaleRule.apply(get_window())
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame

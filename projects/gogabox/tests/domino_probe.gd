@@ -81,6 +81,7 @@ func _run() -> void:
         # ---- boot the real scene ----
         var g: GogaGame = DOM.new()
         g.game_id = "domino"
+        g.start_orientation = "vertical"   # v0.3.8-8: ask suppressed on the rig
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame

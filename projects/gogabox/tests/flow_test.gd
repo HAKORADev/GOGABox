@@ -423,8 +423,8 @@ func _t_registry() -> int:
         # v0.3.8: DOMINO + CHECKMATE graduate (the owner's economy laws)
         var dg: Dictionary = GameReg.get_game("domino")
         ok += _check(not bool(dg.get("coming_soon", false)) \
-                        and String(dg["orientation"]) == "portrait",
-                "domino is PLAYABLE now: portrait (the owner's layout law)")
+                        and String(dg["orientation"]) == "auto",
+                "domino is PLAYABLE now: BOTH tables - the position ask (v0.3.8-8)")
         ok += _check(int(dg["coin_div"]) == 2 and int(dg["fee"]) == 10,
                 "domino wears the owner's economy (bonus /2, fee 10)")
         ok += _check(bool(dg["shop"]) and bool(dg["banner"]),
@@ -432,8 +432,8 @@ func _t_registry() -> int:
         ok += _check(dg["ach"].size() == 10, "domino wears the tiered ladder (10)")
         var cg: Dictionary = GameReg.get_game("chess")
         ok += _check(not bool(cg.get("coming_soon", false)) \
-                        and String(cg["orientation"]) == "landscape",
-                "chess is PLAYABLE now: landscape (the owner's layout law)")
+                        and String(cg["orientation"]) == "auto",
+                "chess is PLAYABLE now: BOTH tables - the position ask (v0.3.8-8)")
         ok += _check(int(cg["coin_div"]) == 1 and int(cg["fee"]) == 10,
                 "chess wears the owner's economy (bonus /1, fee 10)")
         ok += _check(bool(cg["shop"]) and bool(cg["banner"]),

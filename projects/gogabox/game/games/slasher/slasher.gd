@@ -262,10 +262,10 @@ func _show_options() -> void:
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 14)
         panel.add_child(box)
-        var title := Arc.label("FRUIT SLASHER", 40, Arc.INK)
-        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        _ink_outline(title, 12)
-        box.add_child(title)
+        # v0.3.8-8 (owner: "the title appears in that menu is...i mean the
+        # fruit slasher word ... i actually want you to remove it so you
+        # keep the options only") - the FRUIT SLASHER wordmark is GONE from
+        # the sheet; the menu carries the produce options + START alone.
         var owned := Box.item_owned(game_id, "produce", "veggies") \
                         or int(Box.dev_cheat("all_owned")) > 0
         mode_id = Box.item_on(game_id, "produce")

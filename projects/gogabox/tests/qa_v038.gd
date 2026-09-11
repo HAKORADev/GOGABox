@@ -45,6 +45,7 @@ func _boot(id: String, w: int, h: int) -> void:
         ScaleRule.apply(get_window())
         G = load(GameReg.get_game(id)["script"]).new()
         G.game_id = id
+        G.start_orientation = "horizontal" if id == "chess" else "vertical"  # v0.3.8-8: ask suppressed
         add_child(G)
         await _settle(4)
 

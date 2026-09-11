@@ -152,6 +152,10 @@ const W_ACC_MAX := 150000.0  # px/s^2 clamp (a slide's ease spikes)
 
 func _goga_setup() -> void:
         _rng.randomize()
+        pause_end_run = true    # v0.3.8-8 (owner: a 2048 run "could last
+                                # forever... ending it is a good option") -
+                                # the pong/domino law: the pause sheet's END
+                                # banks the run and pays the bonus
         tk.swiped.connect(_on_swipe)
         var vp := get_viewport_rect().size
         bg_layer = Node2D.new()
@@ -1246,9 +1250,22 @@ func _size_confirm(id: String, bought: bool) -> void:
                         _confirm_open_id = ""
                         if _confirm_bought and sheet_open_count() > 0:
                                 sheet_pop()              # the shop under it too
+                        elif sheet_open_count() > 0:
+                                sheet_pop()              # v0.3.8-8: the STALE
+                                                         # options under it too
                         Box.equip_item(game_id, "size", id)
                         Jukebox.sfx("confirm", -4.0)
-                        _apply_size(id)))
+                        _apply_size(id)
+                        if not _confirm_bought:
+                                _options_open()))        # v0.3.8-8 (owner: "the
+                                                         # menu still shows the
+                                                         # previous one ... i
+                                                         # have to re-open it to
+                                                         # update the menu") -
+                                                         # a FRESH options sheet
+                                                         # takes the dead one's
+                                                         # seat, rows reading the
+                                                         # applied board (ON) now)
         sheet.add_child(Arc.button("NO", Vector2(560, 74), 26, Arc.BAD, func():
                         sheet_pop()
                         _confirm_open_id = ""

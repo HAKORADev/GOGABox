@@ -156,31 +156,40 @@ var drag_armed := false
 var shake_t := 0.0
 var shake_i := -1
 
-# layout (v0.3.8-6 THE STATIC GROUND - the owner: "our GOGABox itself uses
-## standard resolutions for both vertical and horizontal positions, so there
-## is static math at this point"): domino is PORTRAIT-ONLY on the FIXED
-## 1080x1920 canvas (registry "orientation": "portrait"), so every seat is
-## an ABSOLUTE pixel constant. No vp-proportional math anywhere - the same
-## numbers land the same pixels on every device, every run.
-const SCREEN_W := 1080.0
-const SCREEN_H := 1920.0
-## THE GROUND FRAME (re-added, the owner: "re-add the ground frame"): the
-## felt lives inside a real rail frame; FIELD is the chain zone it holds.
-## v0.3.8-6 THE BIG TABLE (the owner, with the reference shot: "that
-## dominobattle game from gamesnacks board is more bigger, it covers all
-## parts except that out of frame in-hands area"): the frame now eats
-## EVERYTHING between the CPU's fan strip and the player's out-of-frame
-## hand fan - the rails sit 14px above the hand slots and the felt runs
-## full width. Nothing dead, nothing wasted.
-const FRAME := Rect2(24.0, 330.0, 1032.0, 1196.0)   # the outer rail edge
-const FIELD := Rect2(48.0, 354.0, 984.0, 1148.0)    # the chain zone inside
+# layout
+## v0.3.8-8 THE TWO TABLES (the owner: "since dominoes is a....board game
+## at the end, i guess giving it position selection menu first and add
+## horizontal support will be cooler, building the horizontal view now
+## will make the game more suitable ... currently the board is too tall
+## and the game do not use many vertical space, so being horizontal can
+## give you the ability to make things appear bigger"): domino wears BOTH
+## positions now (registry "orientation": "auto" + the position ask, the
+## slasher law). Every seat below is a VAR seated by _apply_orientation:
+## the vertical table keeps the certified 1080x1920 pixels BIT-EXACT on a
+## 16:9 phone, GROWS the frame into the spare canvas on taller phones
+## (THE BROWN TRUTH: the bottom brown band the owner kept seeing was the
+## HOST's own backdrop showing through pixels domino never used - the
+## frame now eats that spare, the hand seats at the true bottom), and the
+## horizontal table is a NEW 1920x1080 layout - a wide felt, rows of ten,
+## the banner strip reserved at the physical bottom edge.
+var SCREEN_W := 1080.0
+var SCREEN_H := 1920.0
+## THE GROUND FRAME: the felt lives inside a real rail frame; FIELD is the
+## chain zone it holds (grown -24 off the frame by _apply_orientation).
+var FRAME := Rect2(24.0, 330.0, 1032.0, 1196.0)   # the outer rail edge
+var FIELD := Rect2(48.0, 354.0, 984.0, 1148.0)    # the chain zone inside
 ## THE BONEYARD POCKET: the yard stack's own reserved seat inside the
 ## frame's top-left - the snake's census treats it as occupied, so a chain
 ## row can NEVER bury the pile or its count again (the rig caught the
 ## BONEYARD label printed under row tiles one time too many).
-const POCKET := Rect2(48.0, 354.0, 212.0, 260.0)
+var POCKET := Rect2(48.0, 354.0, 212.0, 260.0)
 var BASE_L := 190.0            # board tile long side (board space)
 var hw := 252.0                # hand tile long side
+var hand_y := 1548.0           # the hand fan's TOP edge (seated per table)
+var horiz_table := false       # which table is live right now
+## THE ROW-PACK LAW: rows of at most ROW_MAX tiles, serpentine. The wide
+## table packs TEN a row - its field is 3.7:1, five-a-row would fold the
+## chain tall-narrow and starve the fit zoom.
 # v0.3.8-5 THE SMOOTH GROUP LAW (the DominoBattle study law): the fit zoom
 # and the re-center GLIDE to their target every tick - a placement never
 # teleports the table
@@ -394,6 +403,11 @@ static func profile_next(i: int) -> Array:
 
 func _goga_setup() -> void:
                 _rng.randomize()
+                # v0.3.8-8 THE TWO TABLES: seat every layout var for the shape
+                # the window lives in RIGHT NOW (the host's "auto" already
+                # rotated the design before this ran), then build
+                _apply_orientation("horizontal" if _auto_landscape() \
+                                else "vertical")
                 pause_end_run = true    # THE XO/PONG DESIGN: the pause sheet's END
                                                                 # is the only bank
                 var vp := get_viewport_rect().size
@@ -433,6 +447,128 @@ func _goga_setup() -> void:
                                 var seat := banner_bottom() + hw * 2.1
                                 tl.offset_top = -seat - 66.0
                                 tl.offset_bottom = -seat
+                # v0.3.8-8 THE POSITION ASK (the slasher law): a fresh entry
+                # (no reload ask riding in) chooses its table first - vertical
+                # or horizontal - before the tap-anywhere gate means anything
+                if start_orientation == "":
+                                _show_position_ask()
+
+# ---------------------------------------------------------- the two tables
+
+func _auto_landscape() -> bool:
+                var vp := get_viewport_rect().size
+                return vp.x > vp.y
+
+## seats EVERY layout var for one table. Vertical keeps the certified
+## 1080x1920 pixels bit-exact on a 16:9 phone and GROWS the frame into the
+## spare canvas of taller ones (the brown-band truth: the frame eats what
+## domino never used, the hand seats at the true bottom). Horizontal is the
+## NEW wide table: rows of ten, the banner strip reserved at the bottom.
+func _apply_orientation(o: String) -> void:
+                var bot := banner_bottom() + 12.0
+                horiz_table = o == "horizontal"
+                if horiz_table:
+                                SCREEN_W = 1920.0
+                                SCREEN_H = 1080.0
+                                hw = 190.0
+                                ROW_MAX = 10
+                                hand_y = SCREEN_H - bot - hw - 14.0
+                                FRAME = Rect2(24.0, 240.0, SCREEN_W - 48.0,
+                                                hand_y - 22.0 - 240.0)
+                else:
+                                SCREEN_W = 1080.0
+                                SCREEN_H = maxf(1920.0,
+                                                get_viewport_rect().size.y)
+                                hw = 252.0
+                                ROW_MAX = 5
+                                hand_y = 1548.0 if SCREEN_H <= 1920.0 \
+                                                else SCREEN_H - bot - hw - 14.0
+                                FRAME = Rect2(24.0, 330.0, SCREEN_W - 48.0,
+                                                hand_y - 22.0 - 330.0)
+                BASE_L = 190.0
+                FIELD = FRAME.grow_individual(-24.0, -24.0, -24.0, -24.0)
+                POCKET = Rect2(FIELD.position, Vector2(212.0, 260.0))
+
+## the position ask: the slasher screen whole - two phone cards, nothing
+## else (dim STOP eats every tap so the ready gate sleeps under it)
+var pos_ask: Control = null
+
+func _show_position_ask() -> void:
+                _ask_down()
+                pos_ask = Control.new()
+                pos_ask.set_anchors_preset(Control.PRESET_FULL_RECT)
+                pos_ask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                _overlay_root_ref().add_child(pos_ask)
+                var dim := ColorRect.new()
+                dim.color = Color(0.03, 0.02, 0.01, 0.62)
+                dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+                dim.mouse_filter = Control.MOUSE_FILTER_STOP
+                pos_ask.add_child(dim)
+                var cc := CenterContainer.new()
+                cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+                cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                pos_ask.add_child(cc)
+                var row := HBoxContainer.new()
+                row.add_theme_constant_override("separation", 14)
+                row.alignment = BoxContainer.ALIGNMENT_CENTER
+                cc.add_child(row)
+                var now := "horizontal" if _auto_landscape() else "vertical"
+                row.add_child(_phone_card("vertical", now == "vertical",
+                                func(): _orient_choice("vertical")))
+                row.add_child(_phone_card("horizontal", now == "horizontal",
+                                func(): _orient_choice("horizontal")))
+
+func _phone_card(kind: String, selected: bool, on_pick: Callable) -> Button:
+                var b := Button.new()
+                b.custom_minimum_size = Vector2(250, 300)
+                var sb := Arc.panel_style(Arc.ACCENT if selected else Arc.CARD,
+                                22, 12)
+                if not selected:
+                                sb.set_border_width_all(3)
+                                sb.border_color = Color(0, 0, 0, 0.12)
+                b.add_theme_stylebox_override("normal", sb)
+                var sbp := sb.duplicate() as StyleBoxFlat
+                sbp.bg_color = sbp.bg_color.darkened(0.06)
+                b.add_theme_stylebox_override("pressed", sbp)
+                b.pressed.connect(on_pick)
+                var vb := VBoxContainer.new()
+                vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+                vb.alignment = BoxContainer.ALIGNMENT_CENTER
+                vb.add_theme_constant_override("separation", 10)
+                vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.add_child(vb)
+                var ic := TextureRect.new()
+                ic.texture = load("res://assets/ui/phone_%s.png" % kind)
+                ic.custom_minimum_size = Vector2(190, 190)
+                ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                vb.add_child(ic)
+                var l := Arc.label(("VERTICAL" if kind == "vertical" \
+                                else "HORIZONTAL"), 17,
+                                Arc.INK if not selected else Color(0.16, 0.10, 0.05))
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                vb.add_child(l)
+                return b
+
+func _orient_choice(choice: String) -> void:
+                Jukebox.sfx("confirm", -4.0)
+                Box.set_progress(game_id, "orient_pref", choice)
+                if choice == ("horizontal" if _auto_landscape() else "vertical"):
+                                _ask_down()      # this table IS the pick: play on
+                else:
+                                request_orientation_reload.emit(choice)
+
+func _ask_down() -> void:
+                if pos_ask != null and is_instance_valid(pos_ask):
+                                pos_ask.queue_free()
+                pos_ask = null
+
+## the host REFUSED the rotation (a locked sensor, a desktop window): the
+## slasher law - settle the ask in THIS shape and play on
+func orientation_settled() -> void:
+                _ask_down()
 
 func _skin() -> Dictionary:
                 var sid := Box.skin_on(game_id)
@@ -485,6 +621,12 @@ func _build_ready() -> void:
                 ready_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
                 ready_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 _hud.add_child(ready_ui)
+                # v0.3.8-8: the chess gate law - the tap-anywhere text seats
+                # UNDER the overlay root (index 0 of the HUD), so the pause
+                # sheet and every other sheet draw ABOVE it (the owner caught
+                # the gate floating over the pause menu in chess; domino
+                # shares the structure, so it shares the fix)
+                _hud.move_child(ready_ui, 0)
                 var l := Arc.label("TAP ANYWHERE TO START", 50, Color(1, 1, 1, 0.95))
                 l.set_anchors_preset(Control.PRESET_TOP_WIDE)
                 l.offset_top = vp.y * 0.40
@@ -518,7 +660,8 @@ func _build_widgets(vp: Vector2) -> void:
                                 var score_chip: Control = _score_label.get_parent().get_parent()
                                 _hud_row.move_child(widget_strip, score_chip.get_index())
                                 turn_lbl = Arc.label("", 28, Color(1, 1, 1, 0.92))
-                                turn_lbl.position = Vector2(0, 372)
+                                turn_lbl.position = Vector2(0,
+                                                                FRAME.position.y + 42.0)
                                 turn_lbl.custom_minimum_size = Vector2(SCREEN_W, 38)
                                 turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                                 # THE INK LAW (the owner: "the text your move is bad, give it
@@ -639,7 +782,7 @@ func _placed_rects() -> Array:
 ## double lies ACROSS the flow - the classic. Overlap is impossible by
 ## construction, and the fit zoom guarantees the whole box sits in the
 ## chain area - the 28-tile worst case is a closed-form rectangle.
-const ROW_MAX := 5
+var ROW_MAX := 5
 
 ## the row pitch: one long side + one short side - facing doubles clear
 func _row_pitch() -> float:
@@ -807,11 +950,13 @@ func _relayout() -> void:
                                 # scales with the viewport, ever.
                                 board_rect = FIELD
                                 _relayout_board()
-                                cpu_pos = Vector2(SCREEN_W * 0.5, 208.0)
+                                cpu_pos = Vector2(SCREEN_W * 0.5,
+                                                                150.0 if horiz_table else 208.0)
                                 # the turn banner rides INSIDE the frame, top-center of the
                                 # felt (the old 302 seat ended up ON the frame's top rail)
                                 if turn_lbl != null:
-                                                turn_lbl.position = Vector2(0, 372)
+                                                turn_lbl.position = Vector2(0,
+                                                                FRAME.position.y + 42.0)
                                 pile_pos = POCKET.get_center() + Vector2(0, -14.0)
                                 # the hand fan (v0.3.8-6: OUT of the frame - the owner's law)
                                 hand_rects = []
@@ -819,7 +964,8 @@ func _relayout() -> void:
                                                                 hand_rects.append(_hand_slot(hand_p.size(), i))
                                 # the CPU fan's status sits just above the frame's top rail
                                 if hand_c_lbl != null:
-                                                hand_c_lbl.position = Vector2(0, 292)
+                                                hand_c_lbl.position = Vector2(0,
+                                                                FRAME.position.y - 38.0)
                                                 hand_c_lbl.custom_minimum_size = Vector2(SCREEN_W, 26)
 
 ## the board-space half of the relayout (the snake, the fit, the slots) -
@@ -928,7 +1074,7 @@ func _hand_slot(n: int, i: int) -> Rect2:
                                 if total > maxw and n > 1:
                                                                 overlap = (total - maxw) / float(n - 1)
                                 var x0 := (SCREEN_W - (total - overlap * (n - 1))) * 0.5
-                                var hy := 1548.0
+                                var hy := hand_y                # seated per table
                                 return Rect2(Vector2(x0 + i * (tw2 - overlap), hy),
                                                                 Vector2(tw2, hw))
 

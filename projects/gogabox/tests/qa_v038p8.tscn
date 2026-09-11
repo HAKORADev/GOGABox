@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://qa388p8rig01"]
+
+[ext_resource type="Script" path="res://tests/qa_v038p8.gd" id="1"]
+
+[node name="qa_v038p8" type="Node"]
+script = ExtResource("1")

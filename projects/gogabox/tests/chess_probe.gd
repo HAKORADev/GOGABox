@@ -248,6 +248,7 @@ func _run() -> void:
         # ---- boot the real scene ----
         var g: GogaGame = CH.new()
         g.game_id = "chess"
+        g.start_orientation = "horizontal"  # v0.3.8-8: ask suppressed on the rig
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame

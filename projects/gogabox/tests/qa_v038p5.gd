@@ -35,6 +35,7 @@ func _ready() -> void:
                         else "res://game/games/chess/chess.gd"
         G = load(script).new()
         G.game_id = "domino" if portrait else "chess"
+        G.start_orientation = "vertical" if portrait else "horizontal"  # v0.3.8-8: ask suppressed
         add_child(G)
         _drive = load("res://dev/thumb_capture/drives/%s_drive.gd"
                         % ("domino" if portrait else "chess")).new()

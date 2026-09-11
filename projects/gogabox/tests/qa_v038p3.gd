@@ -120,6 +120,7 @@ func _cs_rig(rig: String) -> void:
 func _dom_rig(rig: String) -> void:
 	var G: GogaGame = load("res://game/games/domino/domino.gd").new()
 	G.game_id = "domino"
+	G.start_orientation = "vertical"   # v0.3.8-8: ask suppressed on the rig
 	add_child(G)
 	for i in 40:
 		await get_tree().process_frame

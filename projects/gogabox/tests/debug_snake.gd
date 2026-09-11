@@ -5,6 +5,7 @@ func _init() -> void:
         var DOM: GDScript = load("res://game/games/domino/domino.gd")
         var g: GogaGame = DOM.new()
         g.game_id = "domino"
+        g.start_orientation = "vertical"   # v0.3.8-8: ask suppressed on the rig
         root.add_child(g)
         await process_frame
         await process_frame

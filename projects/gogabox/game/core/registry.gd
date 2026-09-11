@@ -663,7 +663,11 @@ const GAMES := [
         },        {"id": "domino", "title": "DOMINO", "tag": "the tile classic",
                 "script": "res://game/games/domino/domino.gd",
                 "thumb": "res://assets/thumbs/domino.png",
-                "orientation": "portrait", "dim": "2d",
+                # v0.3.8-8 THE TWO TABLES (owner: "giving it position selection
+                # menu first and add horizontal support will be cooler"): BOTH
+                # positions - the ask picks the table, vertical stays the
+                # certified layout, horizontal is the new wide table
+                "orientation": "auto", "dim": "2d",
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0 (the xo shape), run bonus /2, a GOGACoin
@@ -675,6 +679,7 @@ const GAMES := [
                         "needs_games": 8},
                 "desc": "the tile classic, played straight: seven tiles each, the highest double opens, match the ends and empty your hand. Draw from the boneyard when the ends starve you; both stuck means the lighter hand wins. Tap a tile then a glowing end, or drag it there - the ends glow only where your tile truly fits. A GOGACoin lands on the table after every 3rd round and the next domino on its spot takes it, yours or the CPU's. Win +1, lose -1, a blocked tie draws.",
                 "controls": ["TAP ANYWHERE TO START - the deal flies 7 tiles to you, 7 to the CPU, 14 wait in the boneyard",
+                        "choose your position first - the table stands TALL (vertical) or lies WIDE (horizontal)",
                         "the highest double OPENS (no doubles = the heaviest tile) - the glowing tile plays on touch",
                         "tap a tile to lift it, then tap a glowing end - or DRAG it there; ends glow green only where the tile truly fits, no fit = no glow",
                         "a second tap on a selected tile plays it when only ONE end fits; stuck? the BONEYARD SPREADS face-down across the felt - TAP the tile you take (the fan re-fans until something fits), a dry yard means PASS",
@@ -698,7 +703,11 @@ const GAMES := [
         {"id": "chess", "title": "CHECKMATE", "tag": "the old war",
                 "script": "res://game/games/chess/chess.gd",
                 "thumb": "res://assets/thumbs/chess.png",
-                "orientation": "landscape", "dim": "2d",
+                # v0.3.8-8 THE VERTICAL WAR (owner: "in chess, things will look
+                # better in vertical mode, make sure to tweak the interface
+                # properly"): BOTH positions - the ask picks, vertical grows
+                # the board to nearly the full width, landscape stays as built
+                "orientation": "auto", "dim": "2d",
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0, run bonus /1, a GOGACoin each 3 minutes on
@@ -709,6 +718,7 @@ const GAMES := [
                         "needs_games": 9},
                 "desc": "the old war, played by the book: every piece moves by the law, castling, en passant, promotion, check, checkmate, stalemate, the 50-move rule, repetition and bare kings are all real. The CPU wears SIX hidden personalities - each with its own opening book (the Jobava London lives here) and its own honest mistakes - and it adapts to your openings for two rounds. Highlights show every legal move, the last move and every check. Win +1, lose -1, a draw pays nothing.",
                 "controls": ["TAP ANYWHERE TO START - the OPTIONALS shelf opens: pick WHITE or BLACK for the first war (white by default); after that the loser takes WHITE next, a draw swaps colors; a mid-play pick from the OPTIONALS button rides the next opener",
+                        "choose your position first - the war stands TALL (vertical) or lies WIDE (horizontal)",
                         "tap a piece to see its legal moves - dots walk there, rings take; tap again to play, or DRAG the piece",
                         "castling moves the king two squares (all the real conditions hold), pawns promote through the picker - underpromotion included",
                         "a checked king glows red; checkmate, stalemate, the 50-move rule, threefold repetition and bare kings all end the round by the book",

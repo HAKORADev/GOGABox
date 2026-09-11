@@ -420,3 +420,53 @@ first and look for ties; an unstable sort turns ties into a mystery.
 Ranking by the CATALOG index (release order) kills the tie class whole -
 the feed reads snake -> pong -> ... -> chess on every save, under any
 cheat, forever.
+
+**9. THE WALL LAW (v0.3.8-8) - "really behind the interface" means SOLID
+occlusion, never a fade.**
+The owner rejected the v0.3.8-6 "shore" (a field-owned overlay fading the
+room tone over the field's edge rows) as "that blur-like thing": it washed
+the field's own pixels AND sank flying bloons under a gradient. What the
+owner wants for "map stuff goes under the interface" is the NORMAL thing:
+opaque interface surfaces seated BETWEEN the world and the widgets in the
+tree (pop_siege's two #241407 ColorRects - the top strip ends exactly at
+FIELD.y, the dock starts exactly at the field's right edge - so no field
+pixel is ever covered and the occlusion edge is seamless against the host
+backdrop). Props walk under a real surface and are GONE. No blur, no fade,
+no wash, no clip masks.
+
+**10. THE SPARE-CANVAS LAW (v0.3.8-8) - aspect EXPAND grows the canvas
+past 1080x1920, so a static table must seat its BOTTOM off the real
+viewport.**
+The "brown band at the bottom" was never a color choice: the stretch rule
+grows the design canvas in the spare axis (a 20:9 phone boots a 1080x2400
+canvas), and a game that paints only its certified 1080x1920 constants
+leaves the host's backdrop (#241407) visible below. The fix is not a
+full-screen patch - it is to seat the bottom-anchored furniture (the hand
+fan, the frame's bottom rail) off the REAL viewport height
+(`maxf(1920, vp.y)`) and let the frame EAT the spare (domino's vertical
+table grows the felt; the hand rides the true bottom). Keep the 16:9
+pixels bit-exact (`1548.0 if SCREEN_H <= 1920.0 else ...`), grow only the
+spare. Census the result with PIL (count the host-brown pixels; want 0).
+
+**11. THE TWO TABLES (v0.3.8-8) - adding a position to a pinned game is a
+CONSTRAINT SEAT, not a rewrite.**
+Domino went portrait->both, chess landscape->both (the owner's position
+ask, the slasher law). The pattern that worked: (1) turn the layout
+CONSTANTS into vars seated by one `_apply_orientation(o)` at setup; (2)
+keep every downstream seat FRAME/FIELD-relative so it follows for free;
+(3) the ask = slasher's raw overlay (dim STOP eats taps) shown only when
+`start_orientation == ""`, and `orientation_settled()` = drop the ask;
+(4) bare rigs (rec_*/qa_*) must set `start_orientation` AND call
+`ScaleRule.apply(get_window())` - a bare boot skips the menu governor, so
+a 1920x1080 window otherwise keeps a portrait canvas and the film draws
+the game in a column; (5) flow_test's orientation asserts update with the
+registry (they are the contract, not an obstacle).
+
+**12. THE FRESH SHEET LAW (v0.3.8-8) - a confirm that mutates state under
+a still-open menu must re-seat that menu.**
+The owner: "the menu still shows the previous one ... i have to re-open
+it to update the menu". Sheet rows read their state at BUILD time (the
+"(ON)" label, the SWITCH buttons), so a YES that equips underneath leaves
+a live, lying sheet. The fix: in the YES handler, after applying, pop the
+stale sheet and call its own open function again (merge2048's size
+confirm). The NO path stays as-is - nothing changed underneath it.

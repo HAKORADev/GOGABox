@@ -35,12 +35,17 @@ const INVULN_T := 1.4               # post-wreck grace seconds
 const WRECK_SCORE := -500           # owner: "each crash takes -500"
 const HEART_EVERY := 1000           # +1 heart per 1000 score
 const START_HEARTS := 3
-# v0.3.8-7 (owner: "a gogacoin appear after each 200 kill instead of 10"):
-# the 5-10 kill heartbeat is gone - the coin is a LONG-RANGE reward now,
-# one GOGACoin every 200 kills exactly (both bounds pinned to 200 so the
-# reroll below always lands the same number).
-const COIN_KILLS_MIN := 200
-const COIN_KILLS_MAX := 200
+# v0.3.8-8 (owner: "i feel gogacoin after 150 kills will be better ... make
+# it really now after 150 kills"): the v0.3.8-7 round kept a LIVE bug - the
+# coin_target field was declared `:= 7` and only rerolled AFTER the first
+# coin, so every run still paid its first coin at ~7 kills (the owner saw
+# "first gogacoin still after like 5-10 kills then the 200 kills"). Now the
+# declaration itself seeds from the constant: the FIRST coin lands at 150
+# kills, every next one 150 kills later. One GOGACoin every 150 kills
+# exactly, from kill one (both bounds pinned so the reroll lands the same
+# number).
+const COIN_KILLS_MIN := 150
+const COIN_KILLS_MAX := 150
 
 ## THE SPAM LAW (owner: "max shoots will be one per 30ms ... study it, not
 ## hardcode it"): the floor is the bigger of 30ms and ONE LIVE FRAME - a
@@ -158,7 +163,7 @@ var hearts := START_HEARTS
 var next_heart_at := HEART_EVERY
 var kills := 0
 var kills_since_coin := 0
-var coin_target := 7                # rerolled 5..10 at every coin
+var coin_target := COIN_KILLS_MIN   # v0.3.8-8: the FIRST coin waits 150 too
 var weapon := "beam"
 var power := {"beam": 0, "laser": 0, "thunder": 0, "bomb": 0}
 var firing := false                 # a fire-zone finger is DOWN

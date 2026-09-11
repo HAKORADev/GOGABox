@@ -19,6 +19,14 @@ func _ready() -> void:
         var DOM: GDScript = load("res://game/games/domino/domino.gd")
         g = DOM.new()
         g.game_id = "domino"
+        # v0.3.8-8: the rig films ONE table - RIG_ORIENT=horizontal films the
+        # wide table, the default keeps the certified vertical
+        var rig_orient := OS.get_environment("RIG_ORIENT")
+        g.start_orientation = rig_orient if rig_orient != "" else "vertical"
+        # v0.3.8-8: the rig decides the design from the REAL window px (the
+        # bare boot skips the menu governor - a 1920x1080 window needs this
+        # or the canvas stays portrait and the wide table draws in a column)
+        ScaleRule.apply(get_window())
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame

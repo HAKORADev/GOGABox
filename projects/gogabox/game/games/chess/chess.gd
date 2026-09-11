@@ -864,6 +864,97 @@ func _goga_setup() -> void:
         # first tap) and from the optionals flow itself
         Jukebox.music("res://assets/audio/music/c_theme.ogg")
         _build_ready()
+        # v0.3.8-8 THE POSITION ASK (the slasher law): a fresh entry (no
+        # reload ask riding in) chooses its table first - vertical or
+        # horizontal - before the tap-anywhere gate means anything
+        if start_orientation == "":
+                _show_position_ask()
+
+# ------------------------------------------------------- the two tables
+
+func _auto_landscape() -> bool:
+        var vp := get_viewport_rect().size
+        return vp.x > vp.y
+
+## the position ask: the slasher screen whole - two phone cards, nothing
+## else (dim STOP eats every tap so the ready gate sleeps under it)
+var pos_ask: Control = null
+
+func _show_position_ask() -> void:
+        _ask_down()
+        pos_ask = Control.new()
+        pos_ask.set_anchors_preset(Control.PRESET_FULL_RECT)
+        pos_ask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _overlay_root_ref().add_child(pos_ask)
+        var dim := ColorRect.new()
+        dim.color = Color(0.03, 0.02, 0.01, 0.62)
+        dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+        dim.mouse_filter = Control.MOUSE_FILTER_STOP
+        pos_ask.add_child(dim)
+        var cc := CenterContainer.new()
+        cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+        cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        pos_ask.add_child(cc)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 14)
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        cc.add_child(row)
+        var now := "horizontal" if _auto_landscape() else "vertical"
+        row.add_child(_phone_card("vertical", now == "vertical",
+                        func(): _orient_choice("vertical")))
+        row.add_child(_phone_card("horizontal", now == "horizontal",
+                        func(): _orient_choice("horizontal")))
+
+func _phone_card(kind: String, selected: bool, on_pick: Callable) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(250, 300)
+        var sb := Arc.panel_style(Arc.ACCENT if selected else Arc.CARD, 22, 12)
+        if not selected:
+                sb.set_border_width_all(3)
+                sb.border_color = Color(0, 0, 0, 0.12)
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        b.pressed.connect(on_pick)
+        var vb := VBoxContainer.new()
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_theme_constant_override("separation", 10)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(vb)
+        var ic := TextureRect.new()
+        ic.texture = load("res://assets/ui/phone_%s.png" % kind)
+        ic.custom_minimum_size = Vector2(190, 190)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(ic)
+        var l := Arc.label(("VERTICAL" if kind == "vertical" \
+                        else "HORIZONTAL"), 17,
+                        Arc.INK if not selected else Color(0.16, 0.10, 0.05))
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(l)
+        return b
+
+func _orient_choice(choice: String) -> void:
+        Jukebox.sfx("confirm", -4.0)
+        Box.set_progress(game_id, "orient_pref", choice)
+        if choice == ("horizontal" if _auto_landscape() else "vertical"):
+                _ask_down()      # this table IS the pick: play on
+        else:
+                request_orientation_reload.emit(choice)
+
+func _ask_down() -> void:
+        if pos_ask != null and is_instance_valid(pos_ask):
+                pos_ask.queue_free()
+        pos_ask = null
+
+## the host REFUSED the rotation (a locked sensor, a desktop window): the
+## slasher law - settle the ask in THIS shape and play on
+func orientation_settled() -> void:
+        _ask_down()
 
 func _set_skin() -> void:
         var sid := Box.skin_on(game_id)
@@ -886,6 +977,12 @@ func _build_ready() -> void:
         ready_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
         ready_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _hud.add_child(ready_ui)
+        # v0.3.8-8 (owner: "that text should be behind the pause menu, now
+        # it is in top of it") - the gate is seated at index 0 of the HUD,
+        # UNDER the overlay root: every sheet (the pause one included, the
+        # back button's own) now draws ABOVE the tap-anywhere text. The
+        # visibility toggles below stay - they are the ready-gate honesty.
+        _hud.move_child(ready_ui, 0)
         var l := Arc.label("TAP ANYWHERE TO START", 50, Color(1, 1, 1, 0.95))
         l.set_anchors_preset(Control.PRESET_TOP_WIDE)
         l.offset_top = vp.y * 0.40
@@ -959,8 +1056,12 @@ func _refresh_widget() -> void:
         if goals_row != null:
                 goals_row.queue_redraw()
         # the verdict sits under the board's bottom edge, board-wide
-        verdict_lbl.position = Vector2(board_origin.x,
-                board_origin.y + sq_px * 8.0 + 14.0)
+        # v0.3.8-8: in VERTICAL it clears the bottom tray (the tray owns
+        # the band right under the board) and rides under it instead
+        var vy := board_origin.y + sq_px * 8.0 + 14.0
+        if get_viewport_rect().size.x < get_viewport_rect().size.y:
+                vy += clampf(sq_px * 1.55, 62.0, 130.0) + 4.0
+        verdict_lbl.position = Vector2(board_origin.x, vy)
         verdict_lbl.custom_minimum_size = Vector2(sq_px * 8.0, 44.0)
 
 func _layout(vp: Vector2) -> void:
@@ -976,13 +1077,34 @@ func _layout(vp: Vector2) -> void:
         # strip left, the dead tray right).
         var top := 120.0
         var bot := banner_bottom() + 24.0
-        sq_px = (vp.y - top - bot) / 8.0
-        var min_side := 330.0   # both cuts must exist
-        sq_px = minf(sq_px, (vp.x - min_side) / 8.0)
+        if vp.x >= vp.y:
+                sq_px = (vp.y - top - bot) / 8.0
+                var min_side := 330.0   # both cuts must exist
+                sq_px = minf(sq_px, (vp.x - min_side) / 8.0)
+        else:
+                # v0.3.8-8 THE VERTICAL BOARD (the owner: "in chess, things
+                # will look better in vertical mode"): the WIDTH is the only
+                # real bound now - the trays live above/below the board (the
+                # portrait tray law), so the board eats nearly the whole
+                # width and every square grows past its landscape size. The
+                # vertical budget holds both trays, the verdict line and the
+                # banner strip; the spare splits 45/55 around the board.
+                var tray_h := 130.0     # the portrait tray clamp
+                var verdict_h := 54.0
+                sq_px = minf((vp.x - 40.0) / 8.0,
+                                (vp.y - top - bot - 2.0 * (tray_h + 12.0) \
+                                        - verdict_h) / 8.0)
         sq_px = maxf(40.0, sq_px)
         var bside := sq_px * 8.0
-        board_origin = Vector2((vp.x - bside) * 0.5,
-                top + maxf(0.0, (vp.y - top - bot - bside) * 0.5))
+        var by := top + maxf(0.0, (vp.y - top - bot - bside) * 0.5)
+        if vp.x < vp.y:
+                # the vertical seat: below the top tray, the spare split
+                # 45/55 - the bottom tray + verdict keep their reserved room
+                var tray_h := 130.0
+                var spare := vp.y - top - bot - 2.0 * (tray_h + 12.0) - 54.0 \
+                                - bside
+                by = top + tray_h + 12.0 + maxf(0.0, spare * 0.45)
+        board_origin = Vector2((vp.x - bside) * 0.5, by)
 
 # ============================================================ the drawing
 
@@ -1347,6 +1469,12 @@ func _draw_turn_king() -> void:
         var ktex := _tex(sid, "w" if white_turn else "b", 6)
         var cx := board_origin.x + sq_px * 4.0
         var cy := board_origin.y - 30.0
+        # v0.3.8-8: in VERTICAL the top tray owns the band right above the
+        # board - the turn king glows in the room band ABOVE the tray
+        # (clear of the dead pieces, the king badge and the HUD row)
+        if get_viewport_rect().size.x < get_viewport_rect().size.y:
+                cy = board_origin.y - 12.0 \
+                                - clampf(sq_px * 1.55, 62.0, 130.0) - 76.0
         var pulse := 0.5 + 0.5 * sin(_time * 4.0)
         var ks := sq_px * (0.50 + 0.03 * pulse)
         # the glow: green when the user holds the move, warm when the CPU
