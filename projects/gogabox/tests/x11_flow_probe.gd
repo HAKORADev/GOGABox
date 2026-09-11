@@ -23,7 +23,7 @@ func _ready() -> void:
         game._options_open()
         await get_tree().create_timer(0.5).timeout
         _dump_buttons("OPTIONS")
-        game._size_confirm("6", false)
+        game._size_confirm("6")
         await get_tree().create_timer(0.5).timeout
         _dump_buttons("CONFIRM")
 

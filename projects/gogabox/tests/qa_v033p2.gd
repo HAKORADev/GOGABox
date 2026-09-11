@@ -134,7 +134,7 @@ func _run() -> void:
         var mg = GameHost.active_host.game
         mg._options_open()
         await get_tree().create_timer(0.4).timeout
-        mg._size_confirm("6", false)
+        mg._size_confirm("6")
         await get_tree().create_timer(0.4).timeout
         await _shot(OUT + "10_confirm_over_options.png")
         # NO walks back to the options (the stack law)

@@ -468,7 +468,16 @@ func _apply_orientation(o: String) -> void:
                 var bot := banner_bottom() + 12.0
                 horiz_table = o == "horizontal"
                 if horiz_table:
-                                SCREEN_W = 1920.0
+                                # THE SPARE-CANVAS LAW, BOTH WAYS (v0.3.9-1):
+                                # the launch build pinned the wide table at
+                                # 1920x1080 - on a taller phone held sideways
+                                # (a 2400x1080 canvas) the table only painted
+                                # its 1920 and the RIGHT side showed the host
+                                # backdrop brown, the mirror of the vertical
+                                # bug the v0.3.8-8 round fixed. The wide table
+                                # now grows into the real canvas width too.
+                                SCREEN_W = maxf(1920.0,
+                                                get_viewport_rect().size.x)
                                 SCREEN_H = 1080.0
                                 hw = 190.0
                                 ROW_MAX = 10

@@ -81,11 +81,34 @@ func _boot_fourline() -> void:
         g.paused = true
         g._rng.seed = 11
         g._new_round()
+        # THE STATE LAW (v0.3.9-1): _new_round seats the machine itself -
+        # the player opens round 1, so the board is LIVE with no hand-set
+        # (the launch build left state="ready" here and the controls were
+        # dead - the rigs masked it by setting state by hand, THE MASK LAW)
+        fails += _check(g.state == "play" and g.turn == 1,
+                "fl: THE STATE LAW - the player-open round is live")
+        # THE CONTROLS LAW (v0.3.9-1): a REAL tap through _goga_input (the
+        # exact path _unhandled_input feeds) drops the disc
+        var tp: Vector2 = g._cell_mid_cr(4, 0)
+        var ev := InputEventScreenTouch.new()
+        ev.position = tp
+        ev.pressed = true
+        g._goga_input(ev)
+        var ev2 := InputEventScreenTouch.new()
+        ev2.position = tp + Vector2(0, 1)
+        ev2.pressed = false
+        g._goga_input(ev2)
+        var cguard := 0
+        g.cpu_think = false
+        while not g._discs.is_empty() and cguard < 240:
+                cguard += 1
+                g.cpu_think = false   # the CPU sleeps through the script
+                g.probe_step(0.016)
+        g.cpu_think = false
         g.state = "play"
         g.turn = 1
-        # THE SCRIPTED WIN: player stacks col 2, the CPU sleeps (probe
-        # steps keep the discs falling but the CPU profile is fed a board
-        # where its picks do not interfere - we place BOTH sides by hand)
+        fails += _check(int(g.board[g.idx(4, g.ROWS - 1)]) == 1,
+                "fl: a real tap through _goga_input dropped the disc")
         var plan := [[2, 1], [0, 2], [2, 1], [1, 2], [2, 1], [3, 2], [2, 1]]
         for p in plan:
                 g._drop_disc(int(p[0]), int(p[1]))
@@ -132,15 +155,27 @@ func _boot_fourline() -> void:
         fails += _check(g.next_opener == 2,
                 "fl: after a player win the CPU opens next (was %d)"
                                 % opener_before)
-        # THE COIN LAW: 4 done rounds -> the next round wears a coin
+        # THE COIN LAW: 4 done rounds -> the NEXT round opens wearing a
+        # coin (driven through the round's own door - the old clock-nudge
+        # assumed a dead state machine)
         g.done_rounds = 4
-        g.clock = 5.0
-        g.probe_step(0.016)
-        if g.state == "round_over":
-                g.clock = 5.0
-                g.probe_step(0.016)
+        g._new_round()
         fails += _check(g.coin_cell.x >= 0,
                 "fl: after 4 done rounds a coin waits in a hole")
+        # THE STATE LAW, CPU side: the CPU opened, so the round sits in
+        # wait with the brain armed - and it really thinks then drops
+        fails += _check(g.state == "wait" and g.cpu_think and g.turn == 2,
+                "fl: the CPU-open round is live in wait (THE STATE LAW)")
+        var think_wait := 0
+        while g.state == "wait" and g.cpu_think and think_wait < 240:
+                think_wait += 1
+                g.probe_step(0.016)
+        var fl_stones := 0
+        for v in g.board:
+                if int(v) != 0:
+                        fl_stones += 1
+        fails += _check(fl_stones >= 1,
+                "fl: the armed CPU brain fired its opening move")
         # done: move to bovo
         g.queue_free()
         _boot_bovo()
@@ -160,6 +195,22 @@ func _boot_bovo() -> void:
         g.paused = true
         g._rng.seed = 11
         g._new_round()
+        # THE STATE LAW (v0.3.9-1), bovo side
+        fails += _check(g.state == "play" and g.turn == 1,
+                "bv: THE STATE LAW - the player-open round is live")
+        # THE CONTROLS LAW (v0.3.9-1): a real tap places the stone
+        var tp: Vector2 = g._point_mid(g.idx(4, 4, g.grid_n))
+        var ev := InputEventScreenTouch.new()
+        ev.position = tp
+        ev.pressed = true
+        g._goga_input(ev)
+        var ev2 := InputEventScreenTouch.new()
+        ev2.position = tp
+        ev2.pressed = false
+        g._goga_input(ev2)
+        fails += _check(int(g.board[g.idx(4, 4, g.grid_n)]) == 1,
+                "bv: a real tap through _goga_input placed the stone")
+        g.cpu_think = false
         g.state = "play"
         g.turn = 1
         # THE SCRIPTED WIN: a horizontal five on row 0 for the player,
@@ -214,6 +265,118 @@ func _boot_bovo() -> void:
         Box.equip_item("bovo", "size", "8")
         g._apply_size("8")
         fails += _check(g.grid_n == 8, "bv: back to 8x8")
+        # ------------------------------------------------------ THE BUY LAW
+        # (v0.3.9-1, the owner: "it should be bought only from shop, never
+        # applied from it, the options menu is where this happens")
+        Box.reset_all()
+        Box.earn(9000)
+        fails += _check(Box.buy_item("bovo", "size", "10", 1800),
+                "bv: the wallet funds the 10x10 buy")
+        fails += _check(Box.item_owned("bovo", "size", "10"),
+                "bv: the buy marks the size OWNED")
+        fails += _check(g.size_id == "8" and g.grid_n == 8,
+                "bv: THE BUY LAW - the shop buy never touches the live board")
+        var shop_row: Control = g._size_row("10", true)
+        fails += _check(_buttons_in_tree(shop_row).is_empty(),
+                "bv: the SHOP row of an owned size wears no button (no apply)")
+        var opt_row: Control = g._size_row("10", false)
+        var opt_btns: Array = _buttons_in_tree(opt_row)
+        fails += _check(opt_btns.size() == 1 \
+                        and String(opt_btns[0].text).begins_with("SWITCH"),
+                "bv: the OPTIONS row of an owned size wears the SWITCH")
+        var shop_row2: Control = g._size_row("12", true)
+        var shop2_btns: Array = _buttons_in_tree(shop_row2)
+        var sells := shop2_btns.size() == 1
+        if sells and not String(shop2_btns[0].text).begins_with("BUY"):
+                # coin_buttons wear their words on an inner Label (the
+                # coin icon rides beside it) - read that instead
+                var lbls: Array = _labels_in_tree(shop2_btns[0])
+                sells = not lbls.is_empty() \
+                                and String(lbls[0].text).begins_with("BUY")
+        fails += _check(sells,
+                "bv: the SHOP row of a locked size still SELLS")
+        g.queue_free()
+        # --------------------------------------------- THE WIDE TABLE LAW
+        # (v0.3.9-1): the horizontal domino table grows into the REAL
+        # canvas - no brown right side on tall phones held sideways
+        get_window().size = Vector2i(2400, 1080)
+        ScaleRule.apply(get_window())
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var dvp := get_viewport().get_visible_rect().size
+        fails += _check(dvp.x > dvp.y, "the rig window is wide for this rig")
+        var D: GogaGame = load("res://game/games/domino/domino.gd").new()
+        D.game_id = "domino"
+        D.start_orientation = "horizontal"
+        add_child(D)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        fails += _check(float(D.SCREEN_W) == float(dvp.x),
+                "domino: THE WIDE TABLE LAW - SCREEN_W eats the canvas (%d)"
+                                % int(D.SCREEN_W))
+        fails += _check(D.FRAME.size.x == float(dvp.x) - 48.0,
+                "domino: the wide frame spans the grown table")
+        fails += _check(D.FIELD.grow_individual(24, 24, 24, 24) == D.FRAME,
+                "domino: the field is the frame's -24 inset (the seam law)")
+        var dimg: Image = get_viewport().get_texture().get_image()
+        if dimg != null:
+                dimg.save_png("/tmp/film39/qa_domino_wide.png")
+        else:
+                print("  SKIP: domino wide shot (headless renders nothing)")
+        D.queue_free()
+        # --------------------------------------------- THE TRAY ICON LAW
+        # (v0.3.9-1, the owner: the portrait graveyard pieces "could get
+        # a little bigger") - the portrait chess tray stacks 2 rows, so
+        # the icons size by the REAL depth (was /8 in both orientations)
+        get_window().size = Vector2i(1080, 1920)
+        ScaleRule.apply(get_window())
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var C: GogaGame = load("res://game/games/chess/chess.gd").new()
+        C.game_id = "chess"
+        C.start_orientation = "vertical"
+        add_child(C)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var cvp := get_viewport().get_visible_rect().size
+        fails += _check(cvp.x < cvp.y, "the rig window is vertical for this rig")
+        for k in 5:
+                C.cap_w.append(5)
+                C.cap_b.append(5)
+        C.fx_l.queue_redraw()
+        await get_tree().process_frame
+        await get_tree().process_frame
+        var slot0: Rect2 = C._tray_slot(0, 0)
+        fails += _check(slot0.size.x >= 40.0,
+                "chess: the portrait graveyard icons read at %dpx (was 8)"
+                                % int(slot0.size.x))
+        fails += _check(absf(C._tray_slot(0, 0).size.x \
+                        - C._tray_slot(1, 3).size.x) < 0.01,
+                "chess: both trays size their icons by ONE law")
+        var cimg: Image = get_viewport().get_texture().get_image()
+        if cimg != null:
+                cimg.save_png("/tmp/film39/qa_chess_tray.png")
+        else:
+                print("  SKIP: chess tray shot (headless renders nothing)")
+        C.queue_free()
         print("=== qa_v039 RESULT: %s ===" % ("ALL PASS" if fails == 0
                         else "%d FAILURES" % fails))
         get_tree().quit(1 if fails > 0 else 0)
+
+## every Button under a subtree (the sheet-law probe helper)
+func _buttons_in_tree(root: Node) -> Array:
+        var out: Array = []
+        if root is Button:
+                out.append(root)
+        for c in root.get_children():
+                out.append_array(_buttons_in_tree(c))
+        return out
+
+## every Label under a subtree (coin_buttons speak through children)
+func _labels_in_tree(root: Node) -> Array:
+        var out: Array = []
+        if root is Label:
+                out.append(root)
+        for c in root.get_children():
+                out.append_array(_labels_in_tree(c))
+        return out

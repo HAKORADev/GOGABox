@@ -392,6 +392,11 @@ var _dust: Array = []
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
 var aim_col := -1
+var aim_a := 0.0                  # THE GHOST FADE: the aim ghost breathes in
+                                  # on hold and out on leave (the owner's
+                                  # drag-and-drop law)
+var rail := Rect2()               # the drop rail's live geometry (the
+                                  # frame draws it, the fx lights it)
 var _pending_resolve := 0          # the verdict waiting on the fall
 var _pending_cpu := false
 
@@ -483,10 +488,38 @@ func _draw_frame() -> void:
         _rounded(frame_l, Rect2(r.position + Vector2(10, 12), r.size),
                         th["frame_dark"], 34)
         _rounded(frame_l, r, th["frame"], 34)
-        # the top highlight (a light kiss on the upper edge)
-        frame_l.draw_rect(Rect2(r.position.x + 26, r.position.y + 8,
-                        r.size.x - 52, 7),
-                        (th["frame"] as Color).lightened(0.22))
+        # THE DROP RAIL (v0.3.9-1 - the owner: the old straight highlight
+        # strip overhung the rounded top-left corner and read as a line
+        # crossing the edge; the fix is not a tighter inset but a DESIGN:
+        # the top band becomes the toy's drop track - a recessed groove
+        # with two bolted mount rings, everything inset well past the
+        # corners, so the edge and the rail read as one machined piece)
+        var rail_h := cell * 0.16
+        var rail_y := r.position.y + cell * 0.15 - rail_h * 0.5
+        var rail_x0 := r.position.x + cell * 0.62
+        var rail_x1 := r.end.x - cell * 0.62
+        rail = Rect2(rail_x0, rail_y, rail_x1 - rail_x0, rail_h)
+        # the recess (the groove the discs enter through) - a rect with
+        # circular end caps: a true stadium, no polygon to triangulate
+        # (a _rounded call at half-height radius trips the triangulator)
+        frame_l.draw_rect(Rect2(rail.position.x, rail.position.y,
+                        rail.size.x, rail.size.y), th["frame_dark"])
+        frame_l.draw_circle(Vector2(rail.position.x, rail.get_center().y),
+                        rail.size.y * 0.5, th["frame_dark"])
+        frame_l.draw_circle(Vector2(rail.end.x, rail.get_center().y),
+                        rail.size.y * 0.5, th["frame_dark"])
+        # the far lip: a light kiss on the groove's bottom edge (depth)
+        frame_l.draw_rect(Rect2(rail.position.x + rail_h * 0.5,
+                        rail.end.y - 2.5, rail.size.x - rail_h, 2.5),
+                        Color(th["frame"].lightened(0.18), 0.55))
+        # the mount rings: a bolt at each end - base, bright ring, pin
+        for rx in [rail.position.x - cell * 0.30, rail.end.x + cell * 0.30]:
+                var ry := rail.get_center().y
+                var rr := cell * 0.15
+                frame_l.draw_circle(Vector2(rx, ry), rr, th["frame_dark"])
+                frame_l.draw_arc(Vector2(rx, ry), rr - 1.5, 0, TAU, 28,
+                                th["frame"].lightened(0.30), 3.0)
+                frame_l.draw_circle(Vector2(rx, ry), rr * 0.42, th["hole"])
         # the holes
         for c in COLS:
                 for rw in ROWS:
@@ -573,20 +606,32 @@ func _paint_disc(l: Node2D, mid: Vector2, rad: float, col: Color,
 
 func _draw_fx() -> void:
         # the aim ghost: a translucent disc at the column mouth + the
-        # landing ring at its seat
+        # landing ring at its seat - it FADES in on hold, out on leave
+        # (THE GHOST FADE, the owner's drag-and-drop law: the circulated
+        # thing fades in on the line, rides the finger, fades out when
+        # the finger leaves the board)
         var sk := _skin()
-        if state == "play" and turn == 1 and aim_col >= 0 \
+        if aim_a > 0.015 and state == "play" and turn == 1 and aim_col >= 0 \
                         and drop_row(board, aim_col) >= 0:
                 var rad := cell * 0.40
                 var mouth := Vector2(board_origin.x + aim_col * cell + cell * 0.5,
                                 board_origin.y - cell * 0.62)
-                fx_l.draw_circle(mouth, rad, Color(sk["p1"], 0.38))
-                fx_l.draw_arc(mouth, rad, 0, TAU, 32, Color(sk["p1"], 0.7), 3.0)
+                fx_l.draw_circle(mouth, rad, Color(sk["p1"], 0.38 * aim_a))
+                fx_l.draw_arc(mouth, rad, 0, TAU, 32,
+                                Color(sk["p1"], 0.7 * aim_a), 3.0)
                 var seat := drop_row(board, aim_col)
                 var mid := _cell_mid_cr(aim_col, seat)
                 var pulse := 0.55 + 0.25 * sin(_time * 5.2)
                 fx_l.draw_arc(mid, rad * 1.04, 0, TAU, 32,
-                                Color(1, 1, 1, 0.30 * pulse), 3.0)
+                                Color(1, 1, 1, 0.30 * pulse * aim_a), 3.0)
+                # THE RAIL LIGHTS: the drop track's window under the aimed
+                # column glows in the disc's color - the rail and the ghost
+                # read as one mechanism
+                if rail.size.x > 0.0:
+                        var wx0 := board_origin.x + aim_col * cell + 3.0
+                        fx_l.draw_rect(Rect2(wx0, rail.position.y + 2.5,
+                                        cell - 6.0, rail.size.y - 5.0),
+                                        Color(sk["p1"], 0.34 * aim_a))
         # the dust pips (the xo dust law)
         for p in _dust:
                 var a: float = clampf(float(p["life"]) / float(p["max"]), 0.0, 1.0)
@@ -769,6 +814,20 @@ func _new_round() -> void:
         coin_t = 0.0
         if done_rounds > 0 and done_rounds % COIN_EVERY == 0:
                 coin_cell = _random_empty_cell()
+        # THE STATE LAW (v0.3.9-1): _new_round is the round's ONLY door -
+        # the gate tap and the round-over advance both walk through it, so
+        # it seats the state machine whole. The launch build left the
+        # state wherever the caller stood ("ready" after the gate,
+        # "round_over" after a verdict) and every aim/release handler
+        # early-returned - the owner played a board that could not be
+        # touched. The rigs never caught it because they all set
+        # state="play" by hand after _new_round (THE MASK LAW).
+        if turn == 1:
+                state = "play"      # the player opens: the board is live
+        else:
+                state = "wait"      # the CPU opens: it thinks, then drops
+                cpu_think = true
+                think_beat = _rng.randf_range(0.45, 0.9)
         _banner()
 
 func _settled_discs_clear() -> void:
@@ -829,12 +888,20 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         _release(mb.position)
 
-## the finger slides across the columns - the ghost follows
+## the finger slides across the columns - the ghost follows. THE AIM
+## BAND (v0.3.9-1, caught by the real-finger rig): the old aim read the
+## X only, so a tap BELOW the board (anywhere over the floor) still
+## dropped a disc - the release of the gate tap itself played a move.
+## The finger aims only over the board + the rail zone; outside it the
+## ghost fades out and a release plays nothing (the owner: "if finger
+## went out of board, it will fade-out")
 func _aim(at: Vector2) -> void:
         if state != "play" or turn != 1:
                 return
         var g := _grid_rect()
-        if at.x < g.position.x - cell * 0.5 or at.x > g.end.x + cell * 0.5:
+        if at.x < g.position.x - cell * 0.5 or at.x > g.end.x + cell * 0.5 \
+                        or at.y < g.position.y - cell * 1.2 \
+                        or at.y > g.end.y + cell * 0.5:
                 aim_col = -1
                 return
         var c := int(floor((at.x - g.position.x) / cell))
@@ -999,6 +1066,10 @@ func _resolve(w: int) -> void:
 
 func _goga_tick(delta: float) -> void:
         _time += delta
+        # THE GHOST FADE animator: in while the finger holds a column,
+        # out when it leaves (or the turn hands over)
+        var live: bool = state == "play" and turn == 1 and aim_col >= 0
+        aim_a = move_toward(aim_a, 1.0 if live else 0.0, delta * 6.0)
         if state == "wait":
                 clock += delta
                 if cpu_think:

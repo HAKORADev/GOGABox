@@ -424,7 +424,6 @@ var profile := "sage"
 
 # the 2048 confirm law (stack-borne, the fresh-sheet rule)
 var _confirm_open_id := ""
-var _confirm_bought := false
 
 # scene
 var world: Node2D
@@ -483,8 +482,11 @@ func _goga_setup() -> void:
         _layout(vp)
         _build_widgets(vp)
         _load_meta()
-        add_hud_button("OPTIONS", func(): _options_open())
+        # THE HUD SEAT LAW (v0.3.9-1, the owner: "the shop/options button
+        # are swapped, shop should be next to back button then the options
+        # be at the right side") - the flow seats in call order
         add_hud_button("SHOP", func(): _shop_open())
+        add_hud_button("OPTIONS", func(): _options_open())
         Jukebox.music("res://assets/audio/music/bv_theme.wav")
         _build_ready()
 
@@ -835,6 +837,20 @@ func _new_round() -> void:
         coin_t = 0.0
         if done_rounds > 0 and done_rounds % COIN_EVERY == 0:
                 coin_cell = _random_empty_cell()
+        # THE STATE LAW (v0.3.9-1): _new_round is the round's ONLY door -
+        # the gate tap and the round-over advance both walk through it, so
+        # it seats the state machine whole. The launch build left the
+        # state wherever the caller stood ("ready" after the gate,
+        # "round_over" after a verdict) and every tap/lift handler
+        # early-returned - the owner played a board that could not be
+        # touched. The rigs never caught it because they all set
+        # state="play" by hand after _new_round (THE MASK LAW).
+        if turn == 1:
+                state = "play"      # the player opens: the board is live
+        else:
+                state = "wait"      # the CPU opens: it thinks, then places
+                cpu_think = true
+                think_beat = _rng.randf_range(0.4, 0.8)
         _banner()
         board_l.queue_redraw()
         stone_l.queue_redraw()
@@ -899,14 +915,15 @@ func _aim_at(at: Vector2) -> void:
                 return
         aim_i = _nearest_point(at)
 
+## the tap commits on the PRESS (the snappiest read for a tap game):
+## the ghost's real life is the SLIDE - a finger gliding across the
+## points previews every placement before it commits
 func _tap(at: Vector2) -> void:
         if state != "play" or turn != 1:
                 return
         _aim_at(at)
         _lift(at)
 
-## the placement commits on lift (the finger confirms, not the touch
-## down - a slide off the point never places a stone)
 func _lift(_at: Vector2) -> void:
         if state != "play" or turn != 1:
                 return
@@ -1133,8 +1150,12 @@ func _options_open() -> void:
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
 
-## the row: in the SHOP a locked size SELLS (buy -> are-you-sure ->
-## fresh board); in the OPTIONS a locked size walks to the shop
+## the row: THE BUY LAW (v0.3.9-1, the owner: "it should be bought only
+## from shop, never applied from it, the options menu is where this
+## happens") - the SHOP only SELLS: a locked size's BUY takes the coins
+## and stops there (no confirm, no apply); an owned size reads OWNED and
+## points at the options. The OPTIONS is the picker: owned sizes SWITCH
+## behind the are-you-sure, locked ones walk to the shop.
 func _size_row(id: String, in_shop := false) -> Control:
         var sz: Dictionary = SIZES[id]
         var owned := Box.item_owned(game_id, "size", id) or int(sz["price"]) == 0
@@ -1151,8 +1172,17 @@ func _size_row(id: String, in_shop := false) -> Control:
         if on:
                 return v
         if owned:
+                if in_shop:
+                        # THE BUY LAW: the shop never applies - the owned
+                        # size just points home
+                        var ol := Arc.fit_label(
+                                        "OWNED - APPLY IT FROM THE OPTIONS",
+                                        20, Color("58c470"), 560)
+                        ol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        v.add_child(ol)
+                        return v
                 v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
-                                Color("4a5ab8"), func(): _size_confirm(id, false)))
+                                Color("4a5ab8"), func(): _size_confirm(id)))
                 return v
         if not in_shop:
                 var lk := Arc.button("LOCKED - %d IN THE SHOP" % int(sz["price"]),
@@ -1167,26 +1197,27 @@ func _size_row(id: String, in_shop := false) -> Control:
                                         if Box.buy_item(game_id, "size", id,
                                                         int(sz["price"])):
                                                 Jukebox.sfx("buy")
-                                                _size_confirm(id, true)
+                                                _toast_show("%s IS YOURS - APPLY IT FROM THE OPTIONS"
+                                                                % String(sz["name"]).to_upper())
                                         else:
                                                 Jukebox.sfx("error", -6.0)
                                                 _toast_show("need %d more GOGACoins"
                                                                 % (int(sz["price"])
                                                                 - Box.coins()))
-                                                _shop_reopen())
+                                        _shop_reopen())
         if Box.coins() < int(sz["price"]):
                 b.disabled = true
         v.add_child(b)
         return v
 
 ## THE ARE-YOU-SURE SHEET (the 2048 law): the confirm PUSHES on top of
-## whatever is live. YES pops it, pops the sheet under it (stale options
-## or the shop when the buy came from there) and applies the board.
-func _size_confirm(id: String, bought: bool) -> void:
+## whatever is live. YES pops it, pops the stale options sheet under it
+## and applies the board (the v0.3.8-8 fresh-sheet law). It exists in the
+## OPTIONS only - the shop buys, it never applies (THE BUY LAW).
+func _size_confirm(id: String) -> void:
         if _confirm_open_id != "":
                 sheet_pop()          # a confirm is already up - replace it
         _confirm_open_id = id
-        _confirm_bought = bought
         var sheet := sheet_push(0.0, "confirm")
         var sz: Dictionary = SIZES[id]
         var t := Arc.label("SWITCH TO %s?" % String(sz["name"]).to_upper(),
@@ -1206,14 +1237,11 @@ func _size_confirm(id: String, bought: bool) -> void:
                         Box.equip_item(game_id, "size", id)
                         Jukebox.sfx("confirm", -4.0)
                         _apply_size(id)
-                        if not _confirm_bought:
-                                _options_open()))        # a FRESH options sheet
+                        _options_open()))                # a FRESH options sheet
                                                          # reads the board (ON)
         sheet.add_child(Arc.button("NO", Vector2(560, 74), 26, Arc.BAD, func():
                         sheet_pop()
-                        _confirm_open_id = ""
-                        if _confirm_bought:
-                                Box.equip_item(game_id, "size", size_id)))
+                        _confirm_open_id = ""))
 
 ## the applied board: rebuild the grid, start a fresh round
 func _apply_size(id: String) -> void:

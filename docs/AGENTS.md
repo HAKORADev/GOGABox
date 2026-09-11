@@ -470,3 +470,77 @@ it to update the menu". Sheet rows read their state at BUILD time (the
 a live, lying sheet. The fix: in the YES handler, after applying, pop the
 stale sheet and call its own open function again (merge2048's size
 confirm). The NO path stays as-is - nothing changed underneath it.
+
+**13. THE STATE LAW (v0.3.9-1) - a round-entry function must seat the
+WHOLE state machine, and a rig that sets state by hand MASKS a dead one.**
+The owner tested v0.3.9 and reported both new games' controls as "like
+they are not existing". Root cause: `_new_round()` never assigned
+`state` - the gate tap left it "ready" and the round-over advance left
+it "round_over", and every aim/tap/release handler early-returns on
+those states. Every rig (qa + rec) called `_new_round()` and then set
+`state = "play"` BY HAND - the mask that hid the dead machine from
+~60 passing checks. Two rules fall out: (1) the function that opens a
+round is the ONLY door, so it seats state, turn, and the armed CPU in
+one place; (2) a probe may never set the machine's state after calling
+the entry function - if it must, the entry function is broken. Pin it:
+a qa check that calls `_new_round()` and asserts the state BEFORE any
+hand-set would have caught this in v0.3.9.
+
+**14. THE REAL-FINGER RIG (v0.3.9-1) - drive the TRUE input pipeline, not
+the handler.**
+Calling `g._goga_input(ev)` directly proves the handler's logic; it can
+NOT prove the finger's journey (engine queue -> `_unhandled_input` ->
+`tk.feed` -> handler), and it feeds coordinates the real events would
+never shape. `tests/qa_v039rig.gd` injects REAL events:
+
+```gdscript
+var ev := InputEventScreenTouch.new()
+ev.position = pos; ev.pressed = true; ev.index = 0
+Input.parse_input_event(ev)     # the engine delivers it for real
+```
+
+That rig caught what every direct-call probe missed: fourline's `_aim`
+read the X ONLY, so a tap BELOW the board (the gate-tap's own release!)
+dropped a disc into that column - THE AIM BAND fix (aim only over the
+board + rail; outside it the ghost fades and a release plays nothing).
+Run it on the Xvfb rig (it photographs every step) with
+`QA_RIG_PHASES=fl,bv,chess` on a 1080x1920 screen and
+`QA_RIG_PHASES=domino` on a 2400x1080 one - the window must fit the
+Xvfb screen or the grab clips it.
+
+**15. THE ALPHA LAW (v0.3.9-1) - a translucent fill on a shared draw
+layer PUNCHES THROUGH everything drawn before it.**
+The bovo poster's "extra lines that does not exist in the in-game" were
+the plank bands: `ImageDraw` writes RGBA raw, so a band at alpha 70
+REPLACED the slab pixels in the same working layer - at composite time
+the band region showed the BACKDROP through the hole (a phantom dark
+stripe). Same disease anywhere: the fourline poster's ghost disc punched
+a hole through the frame. Two cures in `thumb_composer.py`: pre-blend
+the tone opaque (`band = 0.28*dark + 0.72*base`), or bake the layer
+first (`Scene.layer()` opens a fresh transparent pass so translucent art
+composites for real). Rule of thumb: every pass that wears alpha fills
+gets a `layer()` before it. Certify a rebuilt poster with the same
+pixel scan that caught the bug (count the grid lines at a clean
+x-column; want exactly the in-game count).
+
+**16. THE BUY LAW (v0.3.9-1) - the shop SELLS, the options APPLY.**
+The owner's refinement of the 2048 mechanic: "it should be bought only
+from shop, never applied from it, the options menu is where this
+happens". The shop's row for an owned size reads
+"OWNED - APPLY IT FROM THE OPTIONS" (a label, no button); a locked
+size's BUY takes the coins and stops - no confirm, no apply, board
+untouched. The are-you-sure lives in the OPTIONS alone. Applied to
+bovo AND merge2048 (one shared mechanic, one law). Probe it without
+UI: buy, then assert the live board is untouched + the owned shop row
+contains NO Button subtree.
+
+**17. THE TWO-FORMULA RULE (v0.3.9-1) - a draw law and its landing-slot
+law are one law; duplicate them word for word or not at all.**
+Chess's graveyard draws each dead piece at `ic` (the tray icon size),
+and the capture flight lands on `_tray_slot()` - a SECOND copy of the
+same arithmetic. The portrait graveyard icons were 8px because the
+formula divided the tray depth by 8 rows in BOTH orientations (portrait
+stacks TWO rows of eight). The fix had to land in BOTH copies in the
+same commit (the flight must land where the tray draws). Grep for the
+second copy before fixing any layout formula - the compiler will not
+warn that two functions share a constant by convention.

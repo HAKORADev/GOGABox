@@ -138,7 +138,6 @@ var _sea_time := 0.0
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
 var _confirm_open_id := ""   # the size id the live are-you-sure asks about
-var _confirm_bought := false
 
 # the water physics constants (v0.2.8 THE REAL MOTION LAW). The surface is
 # a damped spring per tile; the container acceleration comes from the
@@ -1180,8 +1179,12 @@ func _options_open() -> void:
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
 
-## the row: in the SHOP a locked size SELLS (buy -> are-you-sure -> fresh
-## board); in the OPTIONS a locked size walks to the shop (the snake law)
+## the row: THE BUY LAW (v0.3.9-1, the owner: "it should be bought only
+## from shop, never applied from it, the options menu is where this
+## happens") - the SHOP only SELLS: BUY takes the coins and stops (no
+## confirm, no apply), an owned size reads OWNED and points at the
+## options. The OPTIONS is the picker: owned sizes SWITCH behind the
+## are-you-sure, locked ones walk to the shop (the snake law)
 func _size_row(id: String, in_shop := false) -> Control:
         var sz: Dictionary = SIZES[id]
         var owned := Box.item_owned(game_id, "size", id) or int(sz["price"]) == 0
@@ -1198,10 +1201,19 @@ func _size_row(id: String, in_shop := false) -> Control:
         if on:
                 return v
         if owned:
+                if in_shop:
+                        # THE BUY LAW: the shop never applies - the owned
+                        # size just points home
+                        var ol := Arc.fit_label(
+                                        "OWNED - APPLY IT FROM THE OPTIONS",
+                                        20, Color("58c470"), 560)
+                        ol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                        v.add_child(ol)
+                        return v
                 # THE ARE-YOU-SURE LAW (v0.3.3-p1, the owner): changing the
                 # grid size wipes the run - it asks first now
                 v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
-                                Color("4a5ab8"), func(): _size_confirm(id, false)))
+                                Color("4a5ab8"), func(): _size_confirm(id)))
                 return v
         if not in_shop:
                 var lk := Arc.button("LOCKED - %d IN THE SHOP" % int(sz["price"]),
@@ -1214,7 +1226,8 @@ func _size_row(id: String, in_shop := false) -> Control:
                         Vector2(560, 56), 22, Color("4a5ab8"), func():
                                         if Box.buy_item(game_id, "size", id, int(sz["price"])):
                                                 Jukebox.sfx("buy")
-                                                _size_confirm(id, true)
+                                                _toast_show("%s IS YOURS - APPLY IT FROM THE OPTIONS"
+                                                                % String(sz["name"]).to_upper())
                                         else:
                                                 Jukebox.sfx("error", -6.0)
                                                 _toast_show("need %d more GOGACoins" %
@@ -1226,16 +1239,15 @@ func _size_row(id: String, in_shop := false) -> Control:
         return v
 
 ## THE ARE-YOU-SURE SHEET (v0.3.3-p1, stack-borne v0.3.3-p2): the confirm
-## PUSHES on top of whatever is live. YES pops it (and the sheet under it
-## when it came from a buy) and applies the board. NO pops just the confirm -
-## the sheet under it never died, so there is nothing to rebuild and nothing
-## can hang (the old code queue_free'd its pair and rebuilt the options from
-## scratch - a race the Xvfb probe turned into a dead tap).
-func _size_confirm(id: String, bought: bool) -> void:
+## PUSHES on top of whatever is live. YES pops it, pops the stale options
+## sheet under it and applies the board, then a FRESH options sheet takes
+## the dead one's seat reading the applied board (the v0.3.8-8 law). It
+## exists in the OPTIONS only - the shop buys, it never applies (THE BUY
+## LAW v0.3.9-1).
+func _size_confirm(id: String) -> void:
         if _confirm_open_id != "":
                 sheet_pop()          # a confirm is already up - replace it
         _confirm_open_id = id
-        _confirm_bought = bought
         var sheet := sheet_push(0.0)
         var sz: Dictionary = SIZES[id]
         var t := Arc.label("SWITCH TO %s?" % String(sz["name"]).to_upper(), 32, Arc.INK)
@@ -1248,26 +1260,14 @@ func _size_confirm(id: String, bought: bool) -> void:
         sheet.add_child(Arc.button("YES - SWITCH", Vector2(560, 84), 28, Arc.GOOD, func():
                         sheet_pop()                      # the confirm dies first
                         _confirm_open_id = ""
-                        if _confirm_bought and sheet_open_count() > 0:
-                                sheet_pop()              # the shop under it too
-                        elif sheet_open_count() > 0:
-                                sheet_pop()              # v0.3.8-8: the STALE
-                                                         # options under it too
+                        if sheet_open_count() > 0:
+                                sheet_pop()              # the STALE options
+                                                         # under it too
                         Box.equip_item(game_id, "size", id)
                         Jukebox.sfx("confirm", -4.0)
                         _apply_size(id)
-                        if not _confirm_bought:
-                                _options_open()))        # v0.3.8-8 (owner: "the
-                                                         # menu still shows the
-                                                         # previous one ... i
-                                                         # have to re-open it to
-                                                         # update the menu") -
-                                                         # a FRESH options sheet
-                                                         # takes the dead one's
-                                                         # seat, rows reading the
-                                                         # applied board (ON) now)
+                        _options_open()))                # a FRESH options sheet
+                                                         # reads the board (ON)
         sheet.add_child(Arc.button("NO", Vector2(560, 74), 26, Arc.BAD, func():
                         sheet_pop()
-                        _confirm_open_id = ""
-                        if _confirm_bought:
-                                Box.equip_item(game_id, "size", size_id)))
+                        _confirm_open_id = ""))

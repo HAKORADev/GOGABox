@@ -84,7 +84,7 @@ func _run() -> void:
         await get_tree().create_timer(0.7).timeout
         M._options_open()
         await get_tree().create_timer(0.4).timeout
-        M._size_confirm("6", false)
+        M._size_confirm("6")
         await get_tree().create_timer(0.5).timeout
         await _shot(OUT + "05_2048_are_you_sure.png")
         M._confirm_pair_down()

@@ -1406,9 +1406,16 @@ func _draw_tray() -> void:
         var across := 2 if land else 8
         var cw: float = ((r.size.x if land else r.size.y) - kis * 0.0) \
                 * 0.5
-        var ic := minf(cw * 0.72,
-                ((r.size.y if land else r.size.x) - head * 0.72)
-                / 8.0 * 0.92)
+        # THE TRAY ICON LAW (v0.3.9-1, the owner: the portrait graveyard
+        # pieces "could get a little bigger"): the depth divisor is the
+        # orientation's OWN row count. The old formula divided by 8 in
+        # BOTH orientations - portrait stacks TWO rows of eight, so its
+        # icons were squeezed to ~8px, unreadable. Portrait now sizes by
+        # its real 2-row depth (46px at the 130px tray - 5x bigger).
+        var rows_deep := 8.0 if land else 2.0
+        var depth: float = (r.size.y - head * 0.72) if land \
+                        else (r.size.y - 6.0)
+        var ic := minf(cw * 0.72, depth / rows_deep * 0.92)
         var ox: float
         var oy: float
         if land:
@@ -1438,8 +1445,13 @@ func _tray_slot(side: int, idx: int) -> Rect2:
     var kis: float = head * 0.52
     var across := 2 if land else 8
     var cw: float = (r.size.x if land else r.size.y) * 0.5
-    var ic := minf(cw * 0.72,
-            ((r.size.y if land else r.size.x) - head * 0.72) / 8.0 * 0.92)
+    # THE TRAY ICON LAW (v0.3.9-1): same divisor fix as _draw_tray -
+    # portrait stacks 2 rows, not 8 (the capture flight lands where the
+    # tray law draws, so both formulas must match word for word)
+    var rows_deep := 8.0 if land else 2.0
+    var depth: float = (r.size.y - head * 0.72) if land \
+                    else (r.size.y - 6.0)
+    var ic := minf(cw * 0.72, depth / rows_deep * 0.92)
     var ox: float
     var oy: float
     if land:

@@ -29,9 +29,13 @@ not fall for the same trick twice in a row.
 - **THE OPTIONALS MENU (the 2048 mechanic word for word):** an OPTIONS
   button opens the board-size sheet; owned sizes show SWITCH with the
   are-you-sure (switching wipes the round); locked sizes are LOCKED and
-  their tap walks to the SHOP; the SHOP sells them (buy -> are-you-sure
-  -> the board applies, a fresh sheet reads it as ON — the v0.3.8-8
-  fresh-sheet law).
+  their tap walks to the SHOP. THE BUY LAW (v0.3.9-1, the owner: "it
+  should be bought only from shop, never applied from it, the options
+  menu is where this happens"): the SHOP only SELLS — a locked size's
+  BUY takes the coins and stops (an owned size reads OWNED - APPLY IT
+  FROM THE OPTIONS, no button); the are-you-sure lives in the OPTIONS
+  alone, and a YES pops the stale sheet and re-seats a FRESH one that
+  reads the applied board as ON (the v0.3.8-8 fresh-sheet law).
 - **The shop (5-5):** 5 stone skins (first = IVORY & CHARCOAL, owned) +
   5 themes (board wood + room), real prices, grayed when unaffordable.
 

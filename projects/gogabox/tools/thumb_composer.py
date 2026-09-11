@@ -100,6 +100,23 @@ class Scene:
         return self
 
     # -- layer ops -------------------------------------------------------
+    def layer(self):
+        """THE ALPHA LAW (v0.3.9-1): ImageDraw writes RGBA raw - a
+        semi-transparent fill on the working layer REPLACES the pixels
+        under it in that same layer, punching a hole through everything
+        drawn before it (the v0.3.9 bovo poster's plank bands rendered as
+        dark stripes because they composited over the BACKDROP, not the
+        board). layer() bakes the current work into the stack and opens a
+        fresh one - translucent art drawn after composites for real.
+        Call it once before any pass that wears alpha fills."""
+        acc = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
+        for lay in self.baked + [self.work]:
+            acc.alpha_composite(lay)
+        self.baked = [acc]
+        self.work = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
+        self.d = ImageDraw.Draw(self.work)
+        return self
+
     def fade_below(self, alpha):
         """Fade everything drawn so far to `alpha` (0..255); new layer opens."""
         acc = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
@@ -1455,16 +1472,39 @@ def scene_fourline():
     red_dk = (153, 27, 27)
     yel = (255, 201, 60)
     yel_dk = (202, 138, 4)
-    # the frame slab + bevel + feet
+    # the frame slab + bevel + feet, then THE DROP RAIL (v0.3.9-1 - the
+    # poster mirrors the game's new top edge: a recessed groove with two
+    # bolted mount rings, no more straight strip overhanging the corner)
     fx0, fy0 = ox - pad, oy - pad
     fx1, fy1 = ox + bw + pad, oy + bh + pad
     sc.rect([fx0 + 8, fy0 + 10, fx1 + 8, fy1 + 14], r=22, fill=frame_dk + (255,))
     sc.rect([fx0, fy0, fx1, fy1], r=22, fill=frame + (255,))
-    sc.rect([fx0 + 24, fy0 + 8, fx1 - 24, fy0 + 13], fill=(214, 172, 128, 255))
+    rail_h = max(8, int(cell * 0.16))
+    rail_y = fy0 + int(cell * 0.15) - rail_h // 2
+    rail_x0 = fx0 + int(cell * 0.62)
+    rail_x1 = fx1 - int(cell * 0.62)
+    sc.rect([rail_x0, rail_y, rail_x1, rail_y + rail_h], r=rail_h // 2,
+            fill=frame_dk + (255,))
+    sc.rect([rail_x0 + rail_h // 2, rail_y + rail_h - 2, rail_x1 - rail_h // 2,
+             rail_y + rail_h], fill=(214, 172, 128, 140))
+    rr = int(cell * 0.15)
+    for rx in (rail_x0 - int(cell * 0.30), rail_x1 + int(cell * 0.30)):
+        ry = rail_y + rail_h // 2
+        sc.ellipse([rx - rr, ry - rr, rx + rr, ry + rr],
+                   fill=frame_dk + (255,))
+        sc.ellipse([rx - rr + 2, ry - rr + 2, rx + rr - 2, ry + rr - 2],
+                   outline=(214, 172, 128, 255), width=3)
+        pin = max(3, rr * 2 // 5)
+        sc.ellipse([rx - pin // 2, ry - pin // 2, rx + pin // 2,
+                    ry + pin // 2], fill=hole + (255,))
     for footx in (fx0 + 20, fx1 - 96):
         sc.rect([footx, fy1, footx + 76, fy1 + 18], r=8,
                 fill=frame_dk + (255,))
     rad = int(cell * 0.40)
+    # THE ALPHA LAW: discs, shadows and the ghost ride a FRESH layer -
+    # translucent art over baked art composites for real (the old ghost
+    # punched a hole through the frame and read as a dark blob)
+    sc.layer()
     # the holes (the cavities) + a LIVE position (gravity-true: every
     # column seats from the BOTTOM row up - nothing floats)
     discs = {}
@@ -1500,14 +1540,20 @@ def scene_fourline():
     wy = oy + win_cell[1] * cell + cell // 2
     sc.glow(wx, wy, 46, (255, 214, 100), 130)
     sc.stamp(load_sprite("ui/coin.png"), wx, wy, scale=0.30)
-    # the aim ghost above the winning column (the next disc, kissing the
-    # frame's top edge - it is ABOUT to drop)
+    # the aim ghost SEATED IN THE RAIL above the winning column (the next
+    # disc, riding the drop track - the v0.3.9-1 ghost reads lit, not a
+    # dark blob over the backdrop)
     gx = wx
-    gy = fy0 - int(rad * 0.55)
+    gy = rail_y + rail_h // 2
     sc.ellipse([gx - rad, gy - rad, gx + rad, gy + rad],
-               fill=red + (120,))
+               fill=red + (165,))
+    sc.ellipse([gx - rad + 2, gy - rad + 2, gx + rad - 2, gy + rad - 2],
+               fill=red + (215,))
     sc.ellipse([gx - rad, gy - rad, gx + rad, gy + rad],
-               outline=red + (220,), width=3)
+               outline=(255, 230, 200, 235), width=3)
+    sc.ellipse([gx - int(rad * 0.5), gy - int(rad * 0.55),
+                gx - int(rad * 0.05), gy - int(rad * 0.1)],
+               fill=(255, 255, 255, 130))
     sc.vignette(90)
     return sc.render()
 
@@ -1530,16 +1576,22 @@ def scene_bovo():
     line = (74, 47, 22)
     dark_st = (38, 38, 46)
     lite_st = (243, 234, 216)
-    # the slab + under-shadow + plank bands
+    # the slab + under-shadow + plank bands (THE ALPHA LAW: the bands are
+    # a PRE-BLENDED OPAQUE tone - board_dark at 0.28 over board - the old
+    # raw alpha fill punched through the slab and the bands composited
+    # over the dark backdrop as phantom stripes, the owner's "extra lines
+    # that does not exist in the in-game")
     bx0, by0 = ox - pad, oy - pad
     bx1, by1 = ox + bw + pad, oy + bw + pad
     sc.rect([bx0 + 9, by0 + 13, bx1 + 9, by1 + 13], fill=(0, 0, 0, 85))
     sc.rect([bx0, by0, bx1, by1], fill=board + (255,))
     sc.rect([bx0, by1 - 10, bx1, by1], fill=board_dk + (255,))
+    band = tuple(int(0.28 * c + 0.72 * b) for c, b in
+                 zip(board_dk, board))
     for k in range(1, 9):
         yy = by0 + int(k * (by1 - by0) / 10.0)
         if k % 3 != 2:
-            sc.rect([bx0 + 6, yy, bx1 - 6, yy + 2], fill=(192, 141, 71, 70))
+            sc.rect([bx0 + 6, yy, bx1 - 6, yy + 2], fill=band + (255,))
     # the grid
     for k in range(n):
         t = k * cell + cell // 2
@@ -1554,6 +1606,9 @@ def scene_bovo():
         py = oy + r * cell + cell // 2
         sc.ellipse([px - 4, py - 4, px + 4, py + 4], fill=line + (255,))
     rad = int(cell * 0.40)
+    # THE ALPHA LAW: the stones' contact shadows + the ghost ride a FRESH
+    # layer - translucent art over baked art composites for real
+    sc.layer()
 
     def stone(c, r, who):
         px = ox + c * cell + cell // 2
