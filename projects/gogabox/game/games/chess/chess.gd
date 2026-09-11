@@ -817,8 +817,7 @@ var bg_l: Node2D
 var board_l: Node2D
 var piece_l: Node2D
 var fx_l: Node2D
-var goals_row: HBoxContainer  # v0.3.8-5: the W-D-L row, top right
-var goal_lbls: Array = []
+var goals_row: Control  # v0.3.8-6: the W-D-L cards, IN the HUD row by the score
 var ready_ui: Control = null
 var verdict_lbl: Label         # the round-end verdict ONLY (no turn text)
 var you_lbl: Label
@@ -900,46 +899,57 @@ func _build_ready() -> void:
                 .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_widgets(vp: Vector2) -> void:
-        # v0.3.8-5 THE GOALS ROW (the owner: "make the goals of cpu, you,
-        # draw to be as the old way at the top right next to the score
-        # widget i mean horizontal"): three chips pinned under the HUD bar
-        # at the RIGHT edge - the v0.3.8-1 left vertical strip is retired.
+        # v0.3.8-6 THE W-D-L CARDS (the owner: "the win/draw/lose widget should
+        # be like the dominoes one with same colors and be next to score
+        # widget, not where currently it is"): the DOMINOES WIDGET ITSELF -
+        # three white cards, W green / D gray / L red border, letter + number,
+        # the same 108x46 cards and the same colors - living IN the HUD top
+        # bar directly LEFT of the score chip (the floating top-right row is
+        # retired - it could never sit "next to the score" from out there).
         # The dead pieces live in two parchment trays flanking the board
         # (the studied reference's room); the turn still speaks through the
         # side-to-move's KING alone (drawn in fx).
-        goals_row = HBoxContainer.new()
-        goals_row.add_theme_constant_override("separation", 10)
+        goals_row = Control.new()
+        goals_row.custom_minimum_size = Vector2(108.0 * 3.0 + 8.0 * 2.0, 64.0)
         goals_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        goals_row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-        goals_row.offset_left = -620.0
-        goals_row.offset_right = -16.0
-        goals_row.offset_top = 76.0
-        goals_row.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-        _overlay_root.add_child(goals_row)
-        goal_lbls = []
-        for pair in [["YOU", Color("2f7a44")], ["DRAW", Color("4b5563")],
-                ["CPU", Color("9c3a32")]]:
-                var chip := Arc.chip("0", "", Color(0, 0, 0, 0.35), 22,
-                        Arc.CARD)
-                chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                goals_row.add_child(chip)
-                var l: Label = chip.get_child(0).get_child(
-                        chip.get_child(0).get_child_count() - 1)
-                l.text = "%s 0" % pair[0]
-                goal_lbls.append(l)
+        goals_row.draw.connect(_draw_goal_cards.bind(goals_row))
+        _hud_row.add_child(goals_row)
+        var score_panel: Control = _score_label.get_parent()
+        _hud_row.move_child(goals_row, score_panel.get_index())
         verdict_lbl = Arc.label("", 30, Color(1, 1, 1, 0.95))
         verdict_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         verdict_lbl.visible = false
         world.add_child(verdict_lbl)
         _refresh_widget()
 
+## the dominoes widget's own draw law, ported 1:1 (same cards, same colors)
+func _draw_goal_cards(c: Control) -> void:
+        var cw := 108.0
+        var ch := 46.0
+        var gapw := 8.0
+        var cols := [Color("58c470"), Color("8b93a1"), Color("e8574a")]
+        var letters := ["W", "D", "L"]
+        var f := ThemeDB.fallback_font
+        var mid_y := c.size.y * 0.5
+        var x0 := c.size.x * 0.5
+        for i in 3:
+                var x: float = (cw + gapw) * (i - 1) + x0
+                var r := Rect2(x - cw * 0.5, mid_y - ch * 0.5, cw, ch)
+                c.draw_rect(Rect2(r.position + Vector2(4, 4), r.size), Color(0.09, 0.05, 0.02, 0.85))
+                c.draw_rect(r, Color(1, 1, 1, 0.95))
+                c.draw_rect(r, cols[i], false, 5.0)
+                var num: int = [wins, draws, losses][i]
+                c.draw_string(f, Vector2(x - cw * 0.5 + 10.0, mid_y + 15.0),
+                                letters[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 26, cols[i])
+                c.draw_string(f, Vector2(x - cw * 0.5 + 36.0, mid_y + 17.0), str(num),
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Arc.INK)
+
 func _refresh_widget() -> void:
         if board_origin == Vector2.ZERO:
                 return
-        var texts := ["YOU %d" % wins, "DRAW %d" % draws, "CPU %d" % losses]
-        for i in 3:
-                var t: Label = goal_lbls[i]
-                t.text = texts[i]
+        # v0.3.8-6: the cards repaint straight from wins/draws/losses
+        if goals_row != null:
+                goals_row.queue_redraw()
         # the verdict sits under the board's bottom edge, board-wide
         verdict_lbl.position = Vector2(board_origin.x,
                 board_origin.y + sq_px * 8.0 + 14.0)

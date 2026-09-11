@@ -1398,70 +1398,82 @@ func _hurt_bloon(b: Dictionary, dmg: float, cls: String, src: Variant, silent :=
         # KOLDA G3: the deep freeze - frozen bloons take +1 from everything
         if b["frozen"]:
                 real += 1.0
-        b["hp"] = float(b["hp"]) - real
-        if src != null:
-                src["inflicted"] = float(src.get("inflicted", 0.0)) + real
-        _paint_bloon(b)
-        # THE GATE LIVES IN DIVISION TOO (v0.3.8-5 round 2): ceil(hp) < lv
-        # was another thickness-1 assumption - a bitten-into ceramic ring
-        # (hp 8 of 10) sailed over the gate and the ladder never ran, so
-        # thick wheels paid NOTHING until they died whole. rings_left =
-        # ceil(hp / thickness) is the honest gate.
-        var gate_thick := maxf(1.0, PDData.crack_hp(String(b["kind"]), int(b["lv"])))
-        if float(b["hp"]) <= 0.0 or int(ceilf(float(b["hp"]) / gate_thick)) < int(b["lv"]):
-                # THE SHOT LAW v1 LADDER (v0.3.8-5): rings crack the moment
-                # the damage eaten crosses a ring border - a 2-dmg shot on a
-                # 5-ring wheel visibly strips it to 3 rings and pays +2 the
-                # moment it lands. Every ring costs the body's own thickness
-                # (red 1, ceramic 10, moab 200 - the +1-per-level pyramid is
-                # retired), so a shot's damage FLOWS through rings: an
-                # 8-dmg shot empties a 2-ring wheel in ONE shot ("8 - 2 = 6").
-                # v0.3.8-4 THE POP PAY LAW v3 still rules the money: 1 layer
-                # = 1 popcoin, paid the moment it happens.
-                var popped := 0
-                var pop_at: Vector2 = (b["spr"] as Sprite2D).position
-                # v0.3.8-5 ROUND 2 - THE DIVISION FIX (the owner's fist/ass
-                # math): the rings left live in DIVISION, not in ceil(hp).
-                # ceil(hp) only worked while every ring was 1 thick; a
-                # ceramic ring is 10 thick and a moab ring is 200 - ceil(hp)
-                # sailed far above lv, crossed stayed 0 and the whole wheel
-                # paid exactly +1 when it finally died. Now: rings_left =
-                # ceil(hp / ring_thickness). A 12-dmg shot on a 2-ring
-                # ceramic eats the 10-ring whole AND bites the next - +1 the
-                # moment it lands, exactly the layers that shot emptied.
-                var thick := maxf(1.0, PDData.crack_hp(String(b["kind"]), int(b["lv"])))
-                var new_lv := int(ceilf(float(b["hp"]) / thick))
-                if new_lv < 0:
-                        new_lv = 0
-                var crossed := int(b["lv"]) - maxi(new_lv, 1)
-                if crossed > 0:
-                        popped += crossed
-                        add_score(crossed)
-                        b["lv"] = maxi(new_lv, 1)
-                        b["max_hp"] = PDData.body_hp(b["kind"], int(b["lv"]))
-                if float(b["hp"]) <= 0.0:
-                        popped += 1
-                        _pop_bloon(b, src)
-                elif crossed > 0:
-                        _paint_bloon(b)
-                # v0.3.8-4 THE POP PAY LAW v3 (the owner: "1 damage = 1 layer
-                # = 1 popcoin where the popcoin comes to be once the layer
-                # popped instead of waiting for 10-20 hits"): the coins ARE
-                # the layers now - a 1-layer bloon pays exactly 1 coin no
-                # matter how hard the hit was, a 5-layer bloon pays 5, one
-                # per pop, the moment it happens. Overkill pays NOTHING
-                # (damage past the last layer never happened).
-                # v0.3.8-5: with the pyramid gone, popped IS the damage the
-                # shot dealt (capped by the layers that were there) - a
-                # weaker bloon pays everything at once as +nn, a stronger
-                # one pays +nn per shot for exactly the layers that shot
-                # stripped.
-                if popped > 0:
-                        coins += popped
-                        _coin_text(pop_at, popped)
+        var landed: bool = _flow_damage(b, real, src, silent)
         if not selected_folk.is_empty() and src == selected_folk:
                 _menu_paint_live()
-        return true
+        return landed
+
+## v0.3.8-6 THE FLOW LAW - the owner's own math, verbatim: "if we have a
+## pussy that can take 3 at once and you give it 5, how much it will take?
+## 3. currently the game takes one even if it can take 3 ... it will forever
+## pop one layer at a time, forever". THE BUG: a shot's leftover died at the
+## layer border - the pop spawned the children FRESH and the overflow was
+## burned, so a 2-dmg dart and a 10000-dmg nuke both peeled exactly ONE
+## layer per shot. THE FIX: damage is WATER now. It pours into the bloon,
+## eats what the bloon HAS (min(damage, layers left)), and the LEFTOVER
+## keeps pouring through the pop - the children and the strips the pop
+## reveals ARE the next layer, and the water flows into them in the SAME
+## shot, breadth order, until the shot runs dry or the whole chain is gone.
+## An 8-dmg shot on a blue erases the blue AND its two reds in ONE shot.
+## THE INFLICTED TRUTH (the owner: "it counts damage_points x
+## bloons_collided_with_shot which is wrong - it should count damage points
+## dealt, not total x bloons_collided blindly"): a layer only ever
+## contributes what it TOOK - the counter carries the absorbed water, never
+## the raw stat x collisions. Overkill past the last layer never happened.
+func _flow_damage(entry: Dictionary, dmg: float, src: Variant, silent := false) -> bool:
+        var remaining := maxf(0.0, dmg)
+        var layers := 0                     # every layer THIS shot emptied
+        var landed := false
+        var pop_at: Vector2 = (entry["spr"] as Sprite2D).position
+        var queue: Array = [entry]          # breadth order: the onion peels
+        var qi := 0
+        while qi < queue.size() and remaining > 0.0:
+                var cur: Dictionary = queue[qi]
+                qi += 1
+                if float(cur["hp"]) <= 0.0 or not is_instance_valid(cur["spr"]):
+                        continue
+                # a layer can only take what it HAS (the owner's 3-of-5 law)
+                var absorbed := minf(remaining, float(cur["hp"]))
+                if absorbed <= 0.0:
+                        break               # an immune shell blocks the water here
+                remaining -= absorbed
+                landed = true
+                cur["hp"] = float(cur["hp"]) - absorbed
+                if src != null:
+                        src["inflicted"] = float(src.get("inflicted", 0.0)) + absorbed
+                _paint_bloon(cur)
+                # THE RING LADDER (v0.3.8-5 round 2 stands): rings_left lives
+                # in DIVISION - ceil(hp / thickness). Rings crack the moment
+                # the water crosses a border, every ring costs the body's own
+                # thickness (red 1, ceramic 10, moab 200).
+                var thick := maxf(1.0, PDData.crack_hp(String(cur["kind"]), int(cur["lv"])))
+                if float(cur["hp"]) <= 0.0 or int(ceilf(float(cur["hp"]) / thick)) < int(cur["lv"]):
+                        var new_lv := int(ceilf(float(cur["hp"]) / thick))
+                        if new_lv < 0:
+                                new_lv = 0
+                        var crossed := int(cur["lv"]) - maxi(new_lv, 1)
+                        if crossed > 0:
+                                layers += crossed
+                                add_score(crossed)
+                                cur["lv"] = maxi(new_lv, 1)
+                                cur["max_hp"] = PDData.body_hp(cur["kind"], int(cur["lv"]))
+                        if float(cur["hp"]) <= 0.0:
+                                layers += 1
+                                # the pop reveals the next layer - the water
+                                # flows straight into it, same shot
+                                var next: Array = _pop_bloon(cur, src)
+                                for nb in next:
+                                        queue.append(nb)
+                        elif crossed > 0:
+                                _paint_bloon(cur)
+        # THE POP PAY LAW v3: 1 layer = 1 popcoin - and the WHOLE shot's take
+        # banks as ONE +nn at the entry (a chain wipe pays its full nn at
+        # once, the owner's "one shot can eliminate the whole bloon").
+        # Overkill past the last layer pays nothing (it never happened).
+        if layers > 0:
+                coins += layers
+                _coin_text(pop_at, layers)
+        return landed
 
 ## THE POP PAY LAW v2 (retired v0.3.8-4): paid per DAMAGE point - LongEye's
 ## 8-dmg bullet on a 1-hp red paid 8 coins for ONE layer. The armor shell
@@ -1479,7 +1491,11 @@ func _pay_damage(b: Dictionary, real: float, src: Variant) -> void:
         if src != null:
                 src["inflicted"] = float(src.get("inflicted", 0.0)) + real
 
-func _pop_bloon(b: Dictionary, src: Variant) -> void:
+func _pop_bloon(b: Dictionary, src: Variant) -> Array:
+        ## v0.3.8-6 THE FLOW LAW: the pop hands back the layer it revealed -
+        ## the children (kids first, then the strips' inner bloons, in spawn
+        ## order) so the shot's leftover water pours straight into them.
+        var revealed: Array = []
         var def: Dictionary = PDData.BLOONS[b["kind"]]
         # the pop: the ladder pitch climbs with depth (the star sound)
         var pitch_idx: int = clampi(int(b["depth"]), 0, 4)
@@ -1516,10 +1532,12 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
                 Jukebox.sfx("ps_gogacoin", -4.0)
                 _fx_spawn("spark", b["spr"].position, 0.8, Color(1.0, 0.85, 0.3))
                 game_toast("GOGACOIN!")
-        # the children carry on (same path, spread)
+        # the children carry on (same path, spread) - and join the flow queue
         var off := 2.0
         for k in def["kids"]:
-                _spawn_child(k, b, off)
+                var kid: Dictionary = _spawn_child(k, b, off)
+                if not kid.is_empty():
+                        revealed.append(kid)
                 off += 6.0
         # THE STRIPS LAW: each band hid a bloon of that color - the counts
         # never showed, and the inner bloons can wear strips of their own
@@ -1533,10 +1551,13 @@ func _pop_bloon(b: Dictionary, src: Variant) -> void:
                                 inner_strips.append(_strip_kind(wave_n))
                                 if rng.randf() < 0.4:
                                         inner_strips.append(_strip_kind(wave_n))
-                        _spawn_child(String(s), b, sof, 1, inner_strips)
+                        var inner: Dictionary = _spawn_child(String(s), b, sof, 1, inner_strips)
+                        if not inner.is_empty():
+                                revealed.append(inner)
                         sof += 4.0
         _bloon_free(b)
         _refresh_chips()
+        return revealed
 
 func _splash_fx(at: Vector2, tint: Color) -> void:
         if _pop_frames.is_empty() or _splashes >= 22:
@@ -1580,7 +1601,7 @@ func _coin_text(at: Vector2, n: int) -> void:
 
 var _coin_texts := 0
 
-func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips: Array = []) -> void:
+func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips: Array = []) -> Dictionary:
         var def: Dictionary = PDData.BLOONS[kind]
         var spr := Sprite2D.new()
         spr.texture = _bloon_tex(kind, lv)
@@ -1611,6 +1632,7 @@ func _spawn_child(kind: String, parent: Dictionary, off: float, lv := 1, strips:
                 b["strip_draw"] = sd
         bloons.append(b)
         _paint_bloon(b)
+        return b
 
 var _pops_run := 0
 var _moabs_run := 0

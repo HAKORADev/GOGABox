@@ -472,21 +472,39 @@ func _run() -> void:
         ck(int(G.coins) == over_coins0 + 1, "THE 8-DMG TRUTH: Longeye pops a 1-layer red and banks ONE popcoin (was 8)")
         G._spawn_bloon("black", 0, 5)
         var bk5: Dictionary = G.bloons[-1]
+        for bb in G.bloons.duplicate():
+                if bb != bk5:
+                        G._bloon_free(bb)
         G._hurt_bloon(bk5, 20.0, PDData.SHARP, null)
-        ck((not G.bloons.has(bk5)) and int(G.coins) == over_coins0 + 6,
-                "THE 5-LAYER TRUTH: one big hit through the whole wheel pays 5 (4 cracks + the body)")
+        # v0.3.8-6 THE FLOW LAW: the 20 dmg pour through the black's 5 rings
+        # AND everything the pop reveals: 2 pinks + 4 yellows + 8 greens + 1
+        # blue = 20 layers eaten, one +nn. Standing: 15 blues + the eaten
+        # blue's 2 fresh reds (the water ran dry before them).
+        ck(G.bloons.size() == 17,
+                "THE FLOW TRUTH: 20dmg vs black 005 peels 20 layers, 15 blues + 2 fresh reds stand (got %d bloons)" % G.bloons.size())
+        ck(int(G.coins) == over_coins0 + 21,
+                "THE 5-LAYER + FLOW TRUTH: the red's +1 + the chain's +20 = 21 (got %d)" % (int(G.coins) - over_coins0))
         # v0.3.8-5 THE SHOT LAW v1 IN THE FLESH (the owner's own math:
         # "8 - 2 = 6 which means one shot can eliminate the whole bloon")
         G._spawn_bloon("black", 0, 2)
         var bk2: Dictionary = G.bloons[-1]
+        for bb in G.bloons.duplicate():
+                if bb != bk2:
+                        G._bloon_free(bb)
         var two0: int = int(G.coins)
         G._hurt_bloon(bk2, 8.0, PDData.SHARP, null)
         ck(not G.bloons.has(bk2), "THE 8v2 LAW: one 8-dmg shot erases a 2-ring wheel - NO second shot")
-        ck(int(G.coins) == two0 + 2, "the weaker bloon pays its 2 popcoins at once as +nn")
+        # v0.3.8-6 THE FLOW LAW: the wheel's 2 + the pinks' 2 + the yellows' 4
+        # = 8 layers eaten whole; the 8 greens it hid stand fresh (water dry).
+        ck(G.bloons.size() == 8, "THE 8v2 FLOW: 8 layers poured through, 8 greens stand (got %d)" % G.bloons.size())
+        ck(int(G.coins) == two0 + 8, "THE 8v2 FLOW: the weaker bloon pays ALL 8 layers at once as +nn (got %d)" % (int(G.coins) - two0))
         # a wheel STRONGER than the shot: each shot strips its damage worth
         # of rings and pays exactly that (+nn per shot)
         G._spawn_bloon("black", 0, 5)
         var bk5s: Dictionary = G.bloons[-1]
+        for bb in G.bloons.duplicate():
+                if bb != bk5s:
+                        G._bloon_free(bb)
         var s0: int = int(G.coins)
         G._hurt_bloon(bk5s, 2.0, PDData.SHARP, null)
         ck(G.bloons.has(bk5s) and int(bk5s["lv"]) == 3, "a 2-dmg shot strips the 5-ring wheel to 3 rings")
@@ -495,7 +513,11 @@ func _run() -> void:
         ck(int(bk5s["lv"]) == 1, "the second shot lands on the last ring")
         G._hurt_bloon(bk5s, 2.0, PDData.SHARP, null)
         ck(not G.bloons.has(bk5s), "the third shot finishes the 5-ring wheel")
-        ck(int(G.coins) == s0 + 5, "every layer paid exactly once (2+2+1 = the honest 5)")
+        # v0.3.8-6 THE FLOW LAW: the finisher's leftover 1 pours into the
+        # hidden pinks - one pink dies with it (2+2+1+1 = the honest 6), the
+        # second pink and 2 yellows stand.
+        ck(G.bloons.size() == 3, "the finisher's overflow bit ONE pink: pink+2 yellows stand (got %d)" % G.bloons.size())
+        ck(int(G.coins) == s0 + 6, "every layer paid exactly once (2+2+1+1 = the honest 6)")
         # THE WHEEL LADDER: a black 003 is 3 honest layers
         G._spawn_bloon("black", 0, 3)
         var bk: Dictionary = G.bloons[-1]

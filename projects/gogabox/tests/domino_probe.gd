@@ -147,11 +147,12 @@ func _run() -> void:
         # re-derive the ground from the viewport)
         var wide_board: Rect2 = g.board_rect
         var full_scale: float = float(g._board_scale())
-        # v0.3.8-5 R2: the stress shrinks to 0.6 - deep enough to force the
-        # fit scale to walk down hard, shallow enough to stay above the
-        # 0.45 readability floor (the floor may lawfully overflow a
-        # HALF-sized board - that is what a floor IS)
-        g.board_rect = Rect2(wide_board.position, wide_board.size * 0.6)
+        # v0.3.8-6: the stress shrinks to 0.68 - calibrated for the STATIC
+        # ground (FIELD 972x1044): deep enough to force the fit scale to
+        # walk down hard on the widest honest chain, shallow enough to stay
+        # above the 0.45 readability floor (the floor may lawfully overflow
+        # a HALF-sized board - that is what a floor IS)
+        g.board_rect = Rect2(wide_board.position, wide_board.size * 0.68)
         g._relayout_board()
         g._settle_glide()
         var shrink_ok := true
@@ -193,6 +194,14 @@ func _run() -> void:
                                 break
                 if worst:
                         break
+        if worst:
+                print("    [dbg28] board=", g.board_rect, " fit=", g._fit_scale)
+                for i in g.chain_rects.size():
+                        var dt: Dictionary = g.chain[i]
+                        print("      #%02d board=(%s,%s) pv=%s fl=%s a=%s b=%s" % [i,
+                                        dt.get("px", "?"), dt.get("py", "?"), dt.get("pv", "?"),
+                                        dt.get("fl", "?"), dt.get("a", "?"), dt.get("b", "?")])
+                print("      cur_l=", g.cur_l, " cur_r=", g.cur_r)
         _check(not worst, "THE SNAKE LAW: even the FULL 28-tile deck never overlaps or leaves the ground")
         g.chain.clear()
         g._relayout()

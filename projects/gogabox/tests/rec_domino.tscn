@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://recdominorig0001"]
+
+[ext_resource type="Script" path="res://tests/rec_domino.gd" id="1"]
+
+[node name="rec_domino" type="Node"]
+script = ExtResource("1")
