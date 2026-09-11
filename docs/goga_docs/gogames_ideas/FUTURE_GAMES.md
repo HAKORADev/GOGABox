@@ -79,6 +79,13 @@ vertical rogue-like game that is inspired from gamesnacks's zombie hunter
 game that is not horizontal like cosmic spud with different gameplay that
 feels like the game alien shooter".)
 
+Twelfth dump - the v0.3.9-2 patch round (2026-09-11, DOC ONLY alongside the
+dominoes board-law fixes): +1 (the death-worm-like), plus TWO grow-notes on
+existing entries - the good-stuff-catcher grows a TRAMPOLINE mechanic (the
+catcher bounces and must not fall, collectables wear power-up behavior),
+and the brick-breaker-like grows a BBTAN sibling (blocks cost balls, broken
+blocks pay balls).
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine. **SHIPPED v0.3.8** as
@@ -94,6 +101,11 @@ feels like the game alien shooter".)
   boxes wins; close one and you go again. Never leave a third side open.
 - **pacman-like** — maze chomp runner. Owner: "we may add".
 - **brick-breaker-like** — paddle + ball + the brick wall.
+  - **the BBTAN sibling** (owner, v0.3.9-2 round, added "under it"): a
+    BBTAN-style game where EACH PLATFORM/BLOCK REQUIRES AN AMOUNT OF BALLS
+    to break (a number worn on its face), every broken one gives an EXTRA
+    BALL, aim the volley, watch the shower - the pile of balls IS the
+    ammo economy, and it only grows if your aim earns it.
 - **jumping-cube territory capture** — KJumpingCube-like: tap cells to grow
   their value, overflow spills into neighbors, capture the board.
 - **ludo** — the dice race classic: roll, run the loop, climb your color's
@@ -108,6 +120,11 @@ feels like the game alien shooter".)
 - **craze-caves-like** — Gamesnacks' Craze Caves, same concept (the owner's
   v0.3.3-p5 dump): dig/drill your way through the caves, grab everything
   shiny, don't get crushed - the one-thumb dig-and-collect loop.
+- **death-worm-like** (owner, v0.3.9-2 round) — the Death Worm energy: YOU
+  ARE THE WORM - dive, tunnel and burst out of the ground to devour the
+  walkers, snap at the birds, dodge the bullets; the surface is the
+  hunting ground, the underground is the highway. Combo chains for eating
+  mid-air, the humans run, the machines shoot back.
 - **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
   chain, match 3 of a color, pop the run - never let the chain reach the
   hole.
@@ -141,6 +158,11 @@ feels like the game alien shooter".)
 - **good-stuff-catcher** — the falling-things collector: good things fall,
   catch them; bad things fall, dodge them. (Owner: "a game with concept of
   collecting good falling things and not collect the bad things".)
+  - **the trampoline twist** (owner, v0.3.9-2 round, added "under it"): the
+    character the user controls is JUMPING ON A TRAMPOLINE and has to not
+    fall - same catch-good/dodge-bad rain, but the catcher bounces, and
+    some of the collectables work like POWER-UPS (the bounce higher, the
+    safe longer, the catch wider - that family).
 - **fish-eats-fish-like** - the food-chain swimmer: start tiny, eat anything
   smaller, GROW, and everything bigger eats you back. Feeding-Frenzy eating
   but MORE OPEN - Hungry Shark energy: free-swim a whole map, hunt, keep the

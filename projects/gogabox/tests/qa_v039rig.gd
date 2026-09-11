@@ -218,6 +218,15 @@ func _chess_tray() -> void:
         var slot: Rect2 = g._tray_slot(0, 0)
         _ck(slot.size.x >= 40.0,
                         "chess: the tray icons read at %dpx (was 8)" % int(slot.size.x))
+        # v0.3.9-2 THE MAIN ICON LAW: the tray's own king badge fills its
+        # head band (the owner: "still small and has not got bigger")
+        var tr: Rect2 = g._tray_rects()[0]
+        var head := minf(tr.size.y, tr.size.x * 0.62)
+        var kis := head * 0.62
+        _ck(kis >= 78.0 && kis > slot.size.x,
+                        "chess: the king badge reads at %dpx > icons %dpx (was %d)"
+                                        % [int(kis), int(slot.size.x),
+                                        int(head * 0.52)])
         await _shot("chess_tray")
         g.queue_free()
         await _wait(0.2)

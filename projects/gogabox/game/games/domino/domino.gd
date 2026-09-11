@@ -216,6 +216,12 @@ var _deal_p := 0               # the deal's launched-per-side counters
 var _deal_c := 0
 var verdict_txt := ""          # the round-over banner line
 var _time := 0.0
+# v0.3.9-2 THE IDENTITY LAW: every chain entry wears a pid so a landing
+# flight marks ITS tile - the array index shifts under every left
+# push_front, and an index-marked flight then blesses the WRONG entry
+# (one tile silently never painted - the rig's fast plies exposed it,
+# a real insta-drop left after the CPU's move could too)
+var _pid := 0
 var _rng := RandomNumberGenerator.new()
 
 # nodes
@@ -882,9 +888,24 @@ func _snake_rebuild() -> void:
                 first.erase("fl")
                 _snake_open(first)
                 first["fl"] = false
+                # v0.3.9-2 THE FLOW LAW: the rebuild re-derives tv/ov from the
+                # array order (chain[i]'s chain-left value touches i-1) and the
+                # rightward snake paints [touch | open] on every row tile
+                first["tv"] = int(first["a"])
+                first["ov"] = int(first["b"])
+                if not first.has("pid"):
+                                _pid += 1
+                                first["pid"] = _pid
                 for i in range(1, chain.size()):
                                 var t: Dictionary = chain[i]
                                 var dbl: bool = int(t["a"]) == int(t["b"])
+                                t["tv"] = int(t["b"]) if bool(t.get("fl", false)) \
+                                                else int(t["a"])
+                                t["ov"] = int(t["a"]) if bool(t.get("fl", false)) \
+                                                else int(t["b"])
+                                if not t.has("pid"):
+                                                _pid += 1
+                                                t["pid"] = _pid
                                 _snake_place(2, dbl, t)
 
 ## THE FIT LAW: the chain's bounding box is CENTERED in the ground and the
@@ -1149,8 +1170,8 @@ func _draw_table() -> void:
                                 _draw_pile()
                                 _draw_cpu_hand()
 
-func _draw_tile_body(onto: Node2D, r: Rect2, a: int, b: int, vertical: bool,
-                sel_glow := 0.0) -> void:
+func _draw_tile_body(onto: Node2D, r: Rect2, lead: int, trail: int,
+                vertical: bool, sel_glow := 0.0) -> void:
         # v0.3.8-5 ROUND 2 - THE REAL TILE (the owner: "scrape the code and the
         # assets and put them as-is ... remove that fake in-domino shading"):
         # the studied build's own face sprite - one pre-rendered texture per
@@ -1158,21 +1179,39 @@ func _draw_tile_body(onto: Node2D, r: Rect2, a: int, b: int, vertical: bool,
         # transpose. The selection ring keeps the studied build's own decision
         # yellow (0xFFFF32). The painted sheen, the painted shade, the painted
         # pip wells, the painted drop shadow: dead.
+        # v0.3.9-2 THE FLOW LAW - the faces are lo-hi textures (the file is
+        # `%d-%d.png` of the SORTED pair, so the (lead, trail) order can never
+        # pick the texture's half order). The ROTATION is the half order:
+        #   lying  : lead==lo tips -PI/2 (lo lands left), lead==hi tips +PI/2
+        #            (lo lands right, hi left)
+        #   standing: lead==lo draws upright, lead==hi draws PI (hi on top) -
+        #            every pip pattern is centrally symmetric, so the half
+        #            turn reads clean
+        # `lead` is the value the CHAIN flow puts at the rect's leading half
+        # (left half of a lying tile, top half of a standing one).
         var s := _skin()
         if sel_glow > 0.0:
                 onto.draw_rect(r.grow(6.0),
                                 Color(1.0, 0.951, 0.196, 0.5 * sel_glow), false, 5.0)
-        var tex: Texture2D = _set_tex(String(s["set"]), a, b)
+        var tex: Texture2D = _set_tex(String(s["set"]), lead, trail)
+        var hi_leads: bool = lead != mini(lead, trail)
         # v0.3.8-5 ROUND 3 - THE HONEST TIP: the Xvfb film pixel-measured
         # draw_texture_rect's transpose drawing the RAW face into the
         # TRANSPOSED rect (rect 86x43, tile 40x75) - every lying domino
         # stood portrait on a landscape footprint. transpose is dead: a
-        # lying tile is the standing face tipped -PI/2 on the canvas.
+        # lying tile is the standing face tipped on the canvas.
         if vertical:
-                onto.draw_texture_rect(tex, r, false, Color.WHITE)
+                if hi_leads:
+                        onto.draw_set_transform(r.get_center(), PI, Vector2.ONE)
+                        onto.draw_texture_rect(tex,
+                                        Rect2(-r.size * 0.5, r.size), false,
+                                        Color.WHITE)
+                        onto.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                else:
+                        onto.draw_texture_rect(tex, r, false, Color.WHITE)
         else:
-                onto.draw_set_transform(r.get_center(), -PI * 0.5,
-                                Vector2.ONE)
+                var tip: float = PI * 0.5 if hi_leads else -PI * 0.5
+                onto.draw_set_transform(r.get_center(), tip, Vector2.ONE)
                 onto.draw_texture_rect(tex,
                                 Rect2(Vector2(-r.size.y, -r.size.x) * 0.5,
                                                 Vector2(r.size.y, r.size.x)),
@@ -1205,19 +1244,27 @@ func _draw_chain() -> void:
                                                 chain_l.draw_rect(end_r.grow(-8.0),
                                                                 Color(0.35, 0.9, 0.5, 0.10 + 0.08 * pulse))
                 # the chain (v0.3.8-3: a tile that is still FLYING does not paint -\n        # the old ghost pre-place drew the landed domino first and then the\n        # flight arrived on top of its own body: \"a fever dream situation\")
+                # v0.3.9-2 THE FLOW LAW: every entry wears tv (the half that met
+                # the chain) and ov (the half it offers). The painted order rides
+                # the FLOW: a lying tile paints [touch | open] along pdx - flow
+                # +x leads touch on the left, flow -x leads open on the left; a
+                # standing corner paints touch on TOP (the row above reads in,
+                # the return row below reads out).
                 for i in chain.size():
                                 var info: Dictionary = chain_rects[i]
                                 var t: Dictionary = chain[i]
                                 if not bool(t.get("landed", true)):
                                                 continue
-                                var a := int(t["a"])
-                                var b := int(t["b"])
-                                if bool(t["fl"]):
-                                                var tmp := a
-                                                a = b
-                                                b = tmp
-                                _draw_tile_body(chain_l, info["rect"], a, b,
-                                                bool(info["vertical"]))
+                                var tv: int = int(t.get("tv", int(t["a"])))
+                                var ov: int = int(t.get("ov", int(t["b"])))
+                                var vert: bool = bool(info["vertical"])
+                                var lead: int = tv
+                                var trail: int = ov
+                                if not vert and float(t.get("pdx", 1.0)) < 0.0:
+                                                lead = ov
+                                                trail = tv
+                                _draw_tile_body(chain_l, info["rect"], lead,
+                                                                trail, vert)
 
 ## v0.3.8-6: is this hand/cpu seat's tile still spin-flipping in the air?
 func _seat_in_flight(i: int, kind: String) -> bool:
@@ -1634,6 +1681,11 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                 var e := ends(chain)
                 var fl := false
                 var idx := 0
+                # v0.3.9-2 THE FLOW LAW: tv = the half that met the chain, ov =
+                # the half the tile offers the open end (the opener offers both
+                # its halves as-is). The renderer + the flights paint from these.
+                var tv: int
+                var ov: int
                 if side == 1:
                                 # the tile's touching half must show the left end
                                 var lv := e.x
@@ -1643,8 +1695,12 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                                                 fl = false    # [a|b] puts b (== lv) on the right
                                 else:
                                                 fl = false    # doubles / both-match: any way stands
+                                tv = lv
+                                ov = int(t[0]) if int(t[1]) == tv else int(t[1])
+                                _pid += 1
                                 chain.push_front({"a": int(t[0]), "b": int(t[1]),
-                                                "fl": fl, "who": who, "landed": false})
+                                                "fl": fl, "who": who, "landed": false,
+                                                "tv": tv, "ov": ov, "pid": _pid})
                                 idx = 0
                 else:
                                 var rv := e.y
@@ -1652,8 +1708,15 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                                                 fl = true     # [b|a] puts b (== rv) on the left
                                 else:
                                                 fl = false
+                                tv = rv
+                                ov = int(t[0]) if int(t[1]) == tv else int(t[1])
+                                if chain.is_empty():
+                                                tv = int(t[0])     # the opener: no touching half -
+                                                ov = int(t[1])     # both halves read as-is
+                                _pid += 1
                                 chain.append({"a": int(t[0]), "b": int(t[1]),
-                                                "fl": fl, "who": who, "landed": false})
+                                                "fl": fl, "who": who, "landed": false,
+                                                "tv": tv, "ov": ov, "pid": _pid})
                                 idx = chain.size() - 1
                 # v0.3.8-4 THE ANCHORED SNAKE: the new entry's pose is computed NOW
                 # from its side's cursor - the tile will never move again (the old
@@ -1704,9 +1767,7 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                 # THE FLIGHT TRUTH (v0.3.8-5 ROUND 2, the studied tween law): the
                 # ghost carries the EXACT half order that will land (fl-honest) -
                 # the old ghost flew the hand order and the dots snapped sideways
-                # at touchdown. The tip-over reads honest too: a horizontal landing
-                # starts standing (+90deg; the flipped half tips the other way so
-                # the left half comes from the top), a vertical landing stands.
+                # at touchdown.
                 var dbl: bool = int(t[0]) == int(t[1])
                 var vert: bool = bool(ir["vertical"])
                 var fa: int = int(t[0])
@@ -1714,16 +1775,31 @@ func _place(who: int, hi: int, side: int, from_override = null) -> void:
                 if fl:
                                 fa = int(t[1])
                                 fb = int(t[0])
-                # THE TIP IN THE AIR: every tile flies STANDING and a lying
-                # landing tips a quarter turn during the flight (rot 0 ->
-                # -PI/2) - the same law the body draw rides, so the ghost
-                # hands the pose over seamlessly
+                # v0.3.9-2 THE TIP RIDES THE FLOW: the flight ends in the EXACT
+                # rotation the body draw will wear (the face never snaps at
+                # touchdown). A lying landing tips a quarter turn - toward the
+                # flow (+x falls clockwise to lo-left, -x falls counter-
+                # clockwise to lo-right); a standing corner keeps its face
+                # (top = tv, upright or half-turned). r0 shows the same order
+                # standing, so the face rolls through the tip untouched.
+                var lead: int = tv
+                if not vert and float(entry.get("pdx", 1.0)) < 0.0:
+                                lead = ov
+                var other: int = ov if lead == tv else tv
+                var hi_leads: bool = lead > other
+                var r_stand: float = PI if hi_leads else 0.0
+                var r_land: float
+                if vert:
+                                r_land = r_stand
+                else:
+                                r_land = (PI * 0.5 if hi_leads else -PI * 0.5)
                 flies.append({"kind": "place", "tile": t, "from": from, "to": to,
                                 "rect": ir["rect"] as Rect2, "vert": vert,
                                 "fa": fa, "fb": fb,
-                                "r0": 0.0,
-                                "r1": 0.0 if vert else (-PI * 0.5),
+                                "r0": r_stand,
+                                "r1": r_land,
                                 "t": 0.0, "dur": 0.42, "idx": idx,
+                                "pid": int(entry.get("pid", -1)),
                                 "flip": who == C})
                 # THE COIN RACE: the tile that lands on the coin spot takes it
                 # (judged in BOARD space - the landed pose against the slot anchor)
@@ -2148,9 +2224,15 @@ func _fly_landed(f: Dictionary) -> void:
                                                 Jukebox.sfx("d_place", -14.0,
                                                                                 0.92 + _rng.randf() * 0.08)
                                 "place":
-                                                var idx: int = int(f.get("idx", -1))
-                                                if idx >= 0 and idx < chain.size():
-                                                                chain[idx]["landed"] = true
+                                                # v0.3.9-2 THE IDENTITY LAW: mark by pid, never
+                                                # by index - a left push_front shifts every
+                                                # index the moment a flight is in the air
+                                                var pid: int = int(f.get("pid", -1))
+                                                if pid >= 0:
+                                                                for ct in chain:
+                                                                                if int(ct.get("pid", -2)) == pid:
+                                                                                                ct["landed"] = true
+                                                                                                break
                                                 Jukebox.sfx("d_place", -4.0,
                                                                                 0.96 + _rng.randf() * 0.08)
                                                 shake_t = maxf(shake_t, 0.12)

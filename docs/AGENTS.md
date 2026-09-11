@@ -544,3 +544,47 @@ stacks TWO rows of eight). The fix had to land in BOTH copies in the
 same commit (the flight must land where the tray draws). Grep for the
 second copy before fixing any layout formula - the compiler will not
 warn that two functions share a constant by convention.
+
+**18. THE FLOW LAW (v0.3.9-2) - a SORTED-asset lookup eats order info; the
+ROTATION is the half order.**
+The owner tested the dominoes board "+3 logical bugs ... connects in the
+wrong direction using wrong position using wrong calculations". Root
+cause: every domino face ships as a SORTED `lo-hi.png` texture
+(`_set_tex` min/max's the pair), so the (a, b) ARGUMENTS can never pick
+which half faces where - a lying tile ALWAYS painted lo left / hi right,
+and half the chain's connections showed swapped pips (the serpentine's
+-x rows and left-placed +x rows all need hi facing the flow's other
+way). The fix is not in the lookup - it is in the DRAW: each chain entry
+wears tv (the half that met the chain) + ov (the half it offers), and
+the renderer picks the ROTATION per tile: lying = -PI/2 when lo leads,
++PI/2 when hi leads; standing corners = upright when tv == lo, PI when
+tv == hi (every pip pattern is centrally symmetric, so the half turn
+reads clean). The flight's r0/r1 must END in the body's exact rotation
+or the face snaps at touchdown. Rule of thumb: the moment an asset
+lookup SORTS its key, the caller's order is decoration - the transform
+carries the meaning.
+
+**19. THE IDENTITY LAW (v0.3.9-2) - a deferred landing marks by IDENTITY,
+never by index, when the collection can grow at the front.**
+Dominoes placed tiles into the chain array (left = push_front) and the
+landing flight marked `chain[idx]["landed"]` with the index captured at
+launch. A left placement inside the flight's 0.42s window shifts every
+index by one - the mark blesses the WRONG entry and one tile silently
+never paints (the rig's fast plies hit it every round; a real
+insta-drop-left after the CPU's move could too). Fix: every entry wears
+a monotonically increasing `pid` stamped at placement; the flight
+carries the pid and the landing searches for it. Rule of thumb: an
+index is a promise about a collection's future shape - if anything can
+push/pop before the deferred work runs, hand the work an identity.
+
+**20. THE DRAIN BEFORE THE VERDICT (v0.3.9-2) - a rig asserts only when
+the air is clean.**
+The chain-honesty rig kept seeing a tile "never painted" that the game
+had honestly placed: its flight was still in the air (0.42s), because
+the rig's own fat steps (0.3-0.5s) jump the CPU's 0.8s think mid-drain
+and the loop's final turn-wait steps launch ONE MORE CPU move right
+before the while-condition exits. Every rig that asserts on landed /
+painted / settled state must first DRAIN: `while flies.size() > 0:
+probe_step(0.3)` after the last action AND after the last turn-wait.
+The same law that built THE REAL-FINGER RIG: the game's timing keeps
+running under the rig's feet - drain, then judge.

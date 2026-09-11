@@ -89,3 +89,18 @@ cpu_pick/remember/adapt`) — the probe drives them headless: the 28-tile
 deck, the deal law (7/7/14), tile conservation every ply, the blocked law,
 the opener law across 600 seeds, all four moods legal, the coin race, the
 score floor, the memory law.
+
+## 10. THE CHAIN-HONESTY RIG (tests/qa_v0392_domino.gd - v0.3.9-2)
+
+The owner's "+3 logical bugs" round built the VISUAL half of the probe:
+it plays real plies past the serpentine corners on BOTH tables, and
+after every placement runs the chain-honesty check (AGENTS.md law #6,
+now automated) - for every consecutive pair the values the RENDERER
+paints at the touching edges must match (lying = [touch|open] along
+pdx, standing corner = [touch / open] top->bottom), plus every tile
+must actually PAINT (the identity law: flights mark by pid, never by
+index - a left push_front shifts indices under an airborne flight).
+It photographs checkpoints on the Xvfb rig. The renderer's own truth
+changed shape that round: `_draw_tile_body(lead, trail)` wears the
+rotation per tile (THE FLOW LAW, AGENTS.md #18) - the lo-hi face
+textures cannot express half order by argument, only by transform.

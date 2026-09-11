@@ -1389,13 +1389,18 @@ func _draw_tray() -> void:
         var dead: Array = caps[side]
         var head := minf(r.size.y if land else r.size.x,
                 (r.size.x if land else r.size.y) * 0.62)
-        var kis: float = head * 0.52
+        # THE MAIN ICON LAW (v0.3.9-2, the owner: the graveyard's own king
+        # badge "is still small and has not got bigger"): the badge fills
+        # its head band - the seat is the 0..0.66*head strip before the
+        # dead pieces start, so the badge may wear 0.62 of it (the old
+        # 0.52 read barely bigger than the captured icons it fronts)
+        var kis: float = head * 0.62
         var kpos: Vector2
         if land:
             kpos = Vector2(r.get_center().x - kis * 0.5,
-                    r.position.y + head * 0.30 - kis * 0.5)
+                    r.position.y + (head * 0.66 - kis) * 0.5)
         else:
-            kpos = Vector2(r.position.x + head * 0.30 - kis * 0.5,
+            kpos = Vector2(r.position.x + (head * 0.66 - kis) * 0.5,
                     r.get_center().y - kis * 0.5)
         var sid := Box.skin_on(game_id)
         if not SETS.has(sid):
@@ -1442,7 +1447,6 @@ func _tray_slot(side: int, idx: int) -> Rect2:
     var r: Rect2 = _tray_rects()[side]
     var head := minf(r.size.y if land else r.size.x,
             (r.size.x if land else r.size.y) * 0.62)
-    var kis: float = head * 0.52
     var across := 2 if land else 8
     var cw: float = (r.size.x if land else r.size.y) * 0.5
     # THE TRAY ICON LAW (v0.3.9-1): same divisor fix as _draw_tray -
