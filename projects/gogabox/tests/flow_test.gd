@@ -19,6 +19,7 @@ func _ready() -> void:
         fails += _test("xo: sketch CPU sanity", _t_xo_ai())
         fails += _test("fourline: drop CPU sanity", _t_fourline_ai())
         fails += _test("bovo: five-in-row CPU sanity", _t_bovo_ai())
+        fails += _test("squares: dots-and-boxes CPU sanity", _t_squares_ai())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -308,15 +309,17 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 18,
-                "18 playable games (fourline + bovo joined, v0.3.9)")
+        var ok := _check(GameReg.playable().size() == 19,
+                "19 playable games (squares joined, v0.3.9-3)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
         # v0.3.8: DOMINO + CHECKMATE graduated
-        # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated - one teaser left
-        ok += _check(GameReg.workshop().size() == 1,
-                "1 workshop teaser (dots)")
+        # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
+        # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
+        # NEXT FIVE teasers parked (the owner's soon-shelf order)
+        ok += _check(GameReg.workshop().size() == 5,
+                "5 workshop teasers (the next five)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -390,7 +393,7 @@ func _t_registry() -> int:
         # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
         # the banner now, the tower included; MELTING stays
         var banner_ok := true
-        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo"]:
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo", "squares"]:
                 banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
@@ -488,6 +491,38 @@ func _t_registry() -> int:
                         and int(BVO.SIZES["10"]["price"]) == 1800 \
                         and int(BVO.SIZES["12"]["price"]) == 3600,
                 "bovo wears the 8/10/12 ladder (8 free, 10 = 1800, 12 = 3600)")
+        # v0.3.9-3: SQUARES graduates (the owner's GDD laws)
+        var sg: Dictionary = GameReg.get_game("squares")
+        ok += _check(not bool(sg.get("coming_soon", false)) \
+                        and String(sg["orientation"]) == "portrait",
+                "squares is PLAYABLE now: portrait only (the xo law, v0.3.9-3)")
+        ok += _check(String(sg["title"]) == "SQUARES",
+                "the teaser DOTS ships as SQUARES (rename law)")
+        ok += _check(int(sg["coin_div"]) == 2 and int(sg["fee"]) == 8,
+                "squares wears the owner's economy (bonus /2, fee 8)")
+        ok += _check(bool(sg["shop"]) and bool(sg["banner"]),
+                "squares wears the shop + the banner")
+        ok += _check(sg["ach"].size() == 11,
+                "squares wears the tiered ladder (11)")
+        var SQ := load("res://game/games/squares/squares.gd")
+        ok += _check(int(SQ.COIN_EVERY) == 3,
+                "squares pays a GOGACoin after each 3 rounds (owner)")
+        ok += _check(SQ.THEMES.size() == 5,
+                "squares wears 5 paper themes (owner: themes only)")
+        ok += _check(not SQ.get_script_constant_map().has("SKINS"),
+                "squares has NO skins - the pens are not for sale (owner)")
+        ok += _check(SQ.SIZES.size() == 3 \
+                        and int(SQ.SIZES["4"]["price"]) == 0 \
+                        and int(SQ.SIZES["6"]["price"]) == 1800 \
+                        and int(SQ.SIZES["8"]["price"]) == 3600,
+                "squares wears the 4/6/8 ladder (4 free, 6 = 1800, 8 = 3600)")
+        ok += _check(int(SQ.boxes_total(4)) == 9 and int(SQ.boxes_total(6)) == 25 \
+                        and int(SQ.boxes_total(8)) == 49,
+                "the no-draw arithmetic: 9 / 25 / 49 boxes - all ODD")
+        ok += _check(String(GameReg.get_game("pacman")["title"]) == "DOT MUNCHER" \
+                        and bool(GameReg.get_game("pacman")["coming_soon"]) \
+                        and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
+                "the next five teasers are parked (pacman..snl)")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -939,6 +974,184 @@ func _t_bovo_ai() -> int:
                 "the CPU never gifts games to random (%.0f%% losses)" % [lr * 100.0])
         return ok
 
+# ------------------------------------------------------------- squares CPU
+
+## v0.3.9-3: SQUARES graduates - drive its pure CPU core directly (no
+## scene needed) and pin the owner's promises: it takes captures, it
+## plays safe edges while they exist, the double-cross eye fires hot and
+## the chain scar wakes it, the concede hand reads the chain it hands
+## over, the miss chances are real but small (the blind-spot law), and
+## the no-draw arithmetic holds.
+func _t_squares_ai() -> int:
+        var ok := 0
+        var SQ: GDScript = load("res://game/games/squares/squares.gd")
+        # the skeleton: 24 edges, 9 boxes, the box-edge vocabulary
+        ok += _check(int(SQ.edges_total(4)) == 24 and int(SQ.boxes_total(4)) == 9,
+                "4x4 dots: 24 edges, 9 boxes")
+        ok += _check(int(SQ.edge_boxes(int(SQ.idx_h(1, 1, 4)), 4).size()) == 2 \
+                        and int(SQ.edge_boxes(int(SQ.idx_h(1, 0, 4)), 4).size()) == 1,
+                "an inner edge touches 2 boxes, a rim edge touches 1")
+        var be: Array = SQ.box_edges(1, 1, 4)
+        ok += _check(be.size() == 4 and be[0] != be[1] and be[1] != be[2] \
+                        and be[2] != be[3],
+                "a box wears 4 distinct edges")
+        # a captured box: 3 sides then the 4th (box (1,1): top, bottom,
+        # left drawn - the right edge is THE closer)
+        var e := []
+        for i in 24:
+                e.append(0)
+        for ed in [SQ.idx_h(1, 1, 4), SQ.idx_h(1, 2, 4), SQ.idx_v(1, 1, 4)]:
+                e[ed] = 1
+        ok += _check(int(SQ.box_sides(e, 4, 4)) == 3,
+                "three sides read three")
+        var cl: Array = SQ.closers(e, 4)
+        ok += _check(cl.has(int(SQ.idx_v(2, 1, 4))) and cl.size() == 1,
+                "the 4th edge is THE closer")
+        # winner_of: 5 red vs 4 blue = red (the tie cannot exist)
+        var bx := []
+        for i in 9:
+                bx.append(0)
+        for i in 5:
+                bx[i] = 1
+        for i in range(5, 9):
+                bx[i] = 2
+        ok += _check(int(SQ.winner_of(bx)) == 1, "5 boxes beat 4 - red wins")
+        # the safe feel: a fresh board - every edge is safe; ONE side
+        # drawn and the rest still read safe, but at TWO sides the box's
+        # last two edges all read unsafe (the third-side law)
+        var e2 := []
+        for i in 24:
+                e2.append(0)
+        ok += _check(SQ.safe_edges(e2, 4).size() == 24,
+                "on a fresh board every edge is safe")
+        e2[int(SQ.idx_h(1, 1, 4))] = 1
+        ok += _check(SQ.safe_edges(e2, 4).has(int(SQ.idx_h(1, 2, 4))),
+                "at one side drawn the box stays harmless")
+        e2[int(SQ.idx_h(1, 2, 4))] = 1
+        var unsafe_count := 0
+        for ed in SQ.box_edges(1, 1, 4):
+                if int(ed) != int(SQ.idx_h(1, 1, 4)) \
+                                and int(ed) != int(SQ.idx_h(1, 2, 4)) \
+                                and not SQ.safe_edges(e2, 4).has(ed):
+                        unsafe_count += 1
+        ok += _check(unsafe_count == 2,
+                "at two sides the box's last edges read unsafe")
+        # THE GREEDY RUN: an opened 3-corridor reads 3 close edges
+        var e3 := []
+        for i in 24:
+                e3.append(0)
+        for ed in [SQ.idx_h(0, 0, 4), SQ.idx_h(1, 0, 4), SQ.idx_h(2, 0, 4),
+                        SQ.idx_h(0, 1, 4), SQ.idx_h(1, 1, 4),
+                        SQ.idx_h(2, 1, 4), SQ.idx_v(0, 0, 4)]:
+                e3[ed] = 1
+        var run: Dictionary = SQ.greedy_run(e3, 4)
+        ok += _check(int(run["n"]) == 3,
+                "the opened corridor reads a 3-run (%d)" % int(run["n"]))
+        # THE DOUBLE-CROSS POSITION: a 2-box run with a next chain behind
+        # it - the eat is V(2,1) (the shared edge), the cross is V(3,1)
+        # (the run's LAST close edge)
+        var ec := []
+        for i in 24:
+                ec.append(0)
+        for ed in [SQ.idx_h(1, 1, 4), SQ.idx_h(2, 1, 4),
+                        SQ.idx_h(1, 2, 4), SQ.idx_h(2, 2, 4),
+                        SQ.idx_v(1, 1, 4)]:
+                ec[ed] = 1
+        var run2: Dictionary = SQ.greedy_run(ec, 4)
+        ok += _check(int(run2["n"]) == 2 \
+                        and int(run2["e"][0]) == int(SQ.idx_v(2, 1, 4)) \
+                        and int(run2["e"][1]) == int(SQ.idx_v(3, 1, 4)),
+                "the 2-box run reads eat then cross edges")
+        var rng := RandomNumberGenerator.new()
+        # the hot eye (trick, chain_iq 0.75): crosses most of the time
+        var crosses := 0
+        rng.seed = 93
+        for t in 200:
+                var pick: int = SQ.cpu_pick(ec, 4, "trick", false, rng)
+                if pick == int(SQ.idx_v(3, 1, 4)):
+                        crosses += 1
+        ok += _check(crosses >= 100 and crosses <= 190,
+                "the hot eye double-crosses most (%d/200)" % crosses)
+        # the closed eye (wall, 0.35): eats most, crosses some
+        var eats := 0
+        var crosses_w := 0
+        rng.seed = 94
+        for t in 200:
+                var pick: int = SQ.cpu_pick(ec, 4, "wall", false, rng)
+                if pick == int(SQ.idx_v(2, 1, 4)):
+                        eats += 1
+                elif pick == int(SQ.idx_v(3, 1, 4)):
+                        crosses_w += 1
+        ok += _check(eats >= 70 and crosses_w <= 120,
+                "the closed eye eats the chain (%d eats / %d crosses)"
+                                % [eats, crosses_w])
+        # THE CHAIN SCAR: a 4+ chain loss wakes the eye on wall too
+        var mem: Array = SQ.remember([], {"streak": 5, "result": 2})
+        ok += _check(bool(SQ.adapt(mem)["alert"]),
+                "the chain scar wakes the eye (the memory law)")
+        ok += _check(not bool(SQ.adapt(SQ.remember([], {"streak": 3,
+                        "result": 2}))["alert"]),
+                "a 3-box chain is no scar (the bar is 4+)")
+        var scars := 0
+        rng.seed = 95
+        for t in 200:
+                var pick: int = SQ.cpu_pick(ec, 4, "wall",
+                                bool(SQ.adapt(mem)["alert"]), rng)
+                if pick == int(SQ.idx_v(3, 1, 4)):
+                        scars += 1
+        ok += _check(scars >= 130,
+                "the scarred wall double-crosses wide (%d/200)" % scars)
+        ok += _check(SQ.adapt([])["alert"] == false,
+                "a fresh memory sleeps (the xo law)")
+        # THE CONCEDE HAND: doors - a lone 1-box gift vs a 2-box corridor;
+        # the hand that opens reads the run it hands over
+        var eg := []
+        for i in 24:
+                eg.append(0)
+        # door A: box (0,0) top+bottom drawn - opening its left edge V(0,0)
+        # hands ONE box (the eater finishes via the right edge V(1,0))
+        eg[int(SQ.idx_h(0, 0, 4))] = 1
+        eg[int(SQ.idx_h(0, 1, 4))] = 1
+        # door B: boxes (1,2)+(2,2) tops+bottoms drawn - opening V(1,2)
+        # hands the TWO-box corridor
+        for ed in [SQ.idx_h(1, 2, 4), SQ.idx_h(2, 2, 4),
+                        SQ.idx_h(1, 3, 4), SQ.idx_h(2, 3, 4)]:
+                eg[ed] = 1
+        var hands_a: int = SQ.hands_run(eg, 4, int(SQ.idx_v(0, 0, 4)))
+        var hands_b: int = SQ.hands_run(eg, 4, int(SQ.idx_v(1, 2, 4)))
+        ok += _check(hands_a == 1,
+                "the lone door reads one box (a=%d)" % hands_a)
+        ok += _check(hands_b == 2,
+                "the corridor door reads two boxes (b=%d)" % hands_b)
+        # the blind-spot law: miss_take is small but REAL (never 0, never all)
+        var em := []
+        for i in 24:
+                em.append(0)
+        # box (0,0) at three sides - its right edge V(1,0) stays UNDRAWN
+        for ed in [SQ.idx_h(0, 0, 4), SQ.idx_h(0, 1, 4), SQ.idx_v(0, 0, 4)]:
+                em[ed] = 2
+        var misses := 0
+        for pr in SQ.PROFILES.keys():
+                rng.seed = 96 + int(String(pr).hash() % 1000)
+                for t in 40:
+                        var pick: int = SQ.cpu_pick(em, 4, pr, false, rng)
+                        if pick != int(SQ.idx_v(1, 0, 4)):
+                                misses += 1
+        ok += _check(misses > 0 and misses < 40 * SQ.PROFILES.size(),
+                "the miss is real but bounded (%d of %d)"
+                                % [misses, 40 * SQ.PROFILES.size()])
+        # competence: picks stay legal on every profile, any board
+        var e6 := []
+        for i in 60:
+                e6.append(0)
+        var legal := true
+        for pr in SQ.PROFILES.keys():
+                for t in 20:
+                        var pick: int = SQ.cpu_pick(e6, 6, pr, false, rng)
+                        legal = legal and pick >= 0 and pick < 60
+        ok += _check(legal, "picks stay legal on every profile")
+        return ok
+
 # ------------------------------------------------------------------ roadmap
 
 func _t_roadmap() -> int:
@@ -1299,20 +1512,24 @@ func _t_feed_order() -> int:
         ok += _check(Roadmap.can_play_now("snake"), "oracle: snake always playable")
         ok += _check(Roadmap.can_play_now("dario") == false, "oracle: unowned dario not playable")
         ok += _check(Roadmap.can_play_now("xo") == false, "oracle: unowned xo not playable")
-        # THE SOON TRUTH (v0.3.9): fourline + bovo are PLAYABLE catalog
-        # entries now - at 10 owned they surface LOCKED, never SOON; dots
-        # is the one workshop teaser left.
-        for gid in ["lanes", "slasher", "hopper", "merge", "dario", "xo", "invaders", "matcher"]:
-                Box.unlock_game(gid, 0)   # owned -> 10
+        # THE SOON TRUTH (v0.3.9-3): squares is a PLAYABLE catalog entry
+        # now - at 12 owned it surfaces LOCKED, never SOON; the next five
+        # teasers stay parked (GATED at most at 12 owned - their ladder
+        # starts at 13)
+        for gid in ["lanes", "slasher", "hopper", "merge", "dario", "xo",
+                        "invaders", "matcher", "geometry", "maze",
+                        "pop_siege", "domino"]:
+                Box.unlock_game(gid, 0)   # owned -> 12
         ok += _check(Roadmap.state("fourline") != "SOON",
                 "fourline is catalog now, not SOON (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("bovo") != "SOON",
                 "bovo is catalog now, not SOON (%s)" % Roadmap.state("bovo"))
         ok += _check(Roadmap.state("fourline") == "LOCKED",
-                "fourline surfaces LOCKED at 10 owned (%s)" % Roadmap.state("fourline"))
-        ok += _check(GameReg.workshop().size() == 1 \
-                        and String(GameReg.workshop()[0]["id"]) == "dots",
-                "dots is the one teaser left")
+                "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
+        ok += _check(Roadmap.state("squares") == "LOCKED",
+                "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
+        ok += _check(GameReg.workshop().size() == 5,
+                "the next five are the workshop (5 teasers)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -1321,20 +1538,26 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "dots",
-                        "the SOON block wears dots (%s)" % [ids.slice(soon_first_at)])
-                ok += _check(soon_first_at == buckets.size() - 1 \
-                                or buckets[soon_first_at + 1] != 3,
-                        "SOON is the feed's last block (last: %s bucket %s)"
+                ok += _check(String(ids[soon_first_at]) == "pacman",
+                        "the SOON block wears pacman first (%s)" % [ids.slice(soon_first_at)])
+                var soon_tail_ok := true
+                for k in range(soon_first_at, buckets.size()):
+                        if int(buckets[k]) != 3:
+                                soon_tail_ok = false
+                ok += _check(soon_tail_ok,
+                        "SOON is the feed's last, contiguous block (last: %s bucket %s)"
                                         % [ids[ids.size() - 1],
                                         buckets[buckets.size() - 1]])
                 ok += _check(soon_first_at > buckets.find(2),
                         "SOON comes AFTER the mysteries (buckets %s)" % [buckets])
         else:
                 ok += _check(not buckets.has(3),
-                        "no SOON block before dots' ladder (buckets %s)" % [buckets])
+                        "no SOON block at 12 owned - the teasers are GATED (%s)"
+                                        % [buckets])
         ok += _check(Roadmap.can_play_now("fourline") == false,
                 "oracle: an unowned fourline is not playable")
+        ok += _check(Roadmap.can_play_now("squares") == false,
+                "oracle: an unowned squares is not playable")
         Box.reset_all()
         return ok
 

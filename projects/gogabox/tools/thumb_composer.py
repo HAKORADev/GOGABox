@@ -1649,6 +1649,99 @@ def scene_bovo():
     return sc.render()
 
 
+def scene_squares():
+    """SQUARES (v0.3.9-3): IN-GAME FOOTAGE - the paper slab mid-war: red
+    holds three boxes (one still fading in), blue holds two, a red line
+    is mid-dry (the color->ink life), the dashed red standby waits on the
+    open edge, the GOGACoin rests inside a box both pens want."""
+    sc = Scene()
+    sc.backdrop((44, 36, 22), (33, 26, 14))
+    d = 5          # 5x5 dots -> 4x4 boxes
+    cell = 104
+    bw = (d - 1) * cell
+    ox = W // 2 - bw // 2
+    oy = (H - bw) // 2 + 6
+    pad = int(cell * 0.42)
+    paper = (243, 236, 217)
+    paper_dk = (224, 212, 184)
+    ink = (58, 44, 26)
+    red = (224, 83, 63)
+    blue = (65, 121, 223)
+    # the slab + under-shadow + pre-blended grain bands (THE ALPHA LAW)
+    bx0, by0 = ox - pad, oy - pad
+    bx1, by1 = ox + bw + pad, oy + bw + pad
+    sc.rect([bx0 + 9, by0 + 13, bx1 + 9, by1 + 13], fill=(0, 0, 0, 85))
+    sc.rect([bx0, by0, bx1, by1], fill=paper + (255,))
+    sc.rect([bx0, by1 - 10, bx1, by1], fill=paper_dk + (255,))
+    band = tuple(int(0.22 * c + 0.78 * b) for c, b in
+                 zip(paper_dk, paper))
+    for k in range(1, 8):
+        yy = by0 + int(k * (by1 - by0) / 9.0)
+        if k % 3 != 2:
+            sc.rect([bx0 + 6, yy, bx1 - 6, yy + 2], fill=band + (255,))
+    # the claimed boxes first (under the ink): red 3, blue 2
+    fills = [(0, 0, red), (1, 0, red), (0, 1, red), (2, 1, blue),
+             (1, 3, blue)]
+    for (bc, br, col) in fills:
+        x0, y0 = ox + bc * cell, oy + br * cell
+        sc.rect([x0 + 3, y0 + 3, x0 + cell - 3, y0 + cell - 3],
+                fill=col + (132,))
+    # the ink lines: most of the grid's edges, honest and dry
+    drawn = set()
+    for (bc, br, col) in fills:
+        for e in [(bc, br, 'h'), (bc, br + 1, 'h'), (bc, br, 'v'),
+                  (bc + 1, br, 'v')]:
+            drawn.add(e)
+
+    def hline(c, r, col=ink + (255,), w=5, dash=None):
+        x0, y0 = ox + c * cell, oy + r * cell
+        x1, y1 = ox + (c + 1) * cell, y0
+        if dash:
+            for k in range(dash):
+                f0 = k / dash
+                f1 = (k + 0.55) / dash
+                sc.line([int(x0 + (x1 - x0) * f0), y0,
+                         int(x0 + (x1 - x0) * f1), y0], col, w)
+        else:
+            sc.line([x0, y0, x1, y1], col, w)
+
+    def vline(c, r, col=ink + (255,), w=5):
+        x0, y0 = ox + c * cell, oy + r * cell
+        sc.line([x0, y0, x0, y0 + cell], col, w)
+
+    # the claimed boxes' own edges
+    for (bc, br, col) in fills:
+        hline(bc, br)
+        hline(bc, br + 1)
+        vline(bc, br)
+        vline(bc + 1, br)
+    # neighboring shared edges + scatter (a LIVE mid-game, not a lecture)
+    for e in [(1, 1, 'h'), (2, 0, 'h'), (3, 1, 'h'), (1, 2, 'h'),
+              (3, 2, 'h'), (2, 3, 'h'), (0, 3, 'h'), (3, 3, 'h')]:
+        hline(e[0], e[1])
+    for e in [(2, 0), (3, 0), (2, 2), (3, 2), (1, 1), (2, 3)]:
+        vline(e[0], e[1])
+    # the mid-dry red line (phase B: red bleeding into ink)
+    hline(1, 2, col=(168, 74, 51, 255), w=5)
+    # the dots on top of everything
+    for c in range(d):
+        for r in range(d):
+            px, py = ox + c * cell, oy + r * cell
+            sc.ellipse([px - 7, py - 7, px + 7, py + 7],
+                       fill=ink + (255,))
+    # THE ALPHA LAW: the coin glow + the dashed standby ride a fresh layer
+    sc.layer()
+    # the coin inside the contested box (2,3)
+    cx = ox + 2 * cell + cell // 2
+    cy = oy + 3 * cell + cell // 2
+    sc.glow(cx, cy, 52, (255, 214, 100), 140)
+    sc.stamp(load_sprite("ui/coin.png"), cx, cy, scale=0.30)
+    # the dashed red standby on box (3,0)'s right edge... its top edge
+    hline(3, 0, col=red + (150,), w=6, dash=6)
+    sc.vignette(90)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1666,6 +1759,7 @@ SCENES = {
     "chess": scene_chess,
     "fourline": scene_fourline,
     "bovo": scene_bovo,
+    "squares": scene_squares,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

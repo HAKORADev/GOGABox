@@ -588,3 +588,38 @@ painted / settled state must first DRAIN: `while flies.size() > 0:
 probe_step(0.3)` after the last action AND after the last turn-wait.
 The same law that built THE REAL-FINGER RIG: the game's timing keeps
 running under the rig's feet - drain, then judge.
+
+**21. THE VERDICT-FIRST LAW (v0.3.9-3) - a round's last move is always the
+game's biggest event; the verdict outranks the turn hand-off.**
+Squares shipped with a round that could NEVER end: `_place` handled the
+keep-brush branches (the KSquares "close one, go again") BEFORE checking
+the winner - and on a dots-and-boxes board the final edge ALWAYS falls as
+a capture, so the keep-brush return swallowed the resolve and the round
+hung in "CPU IS THINKING" forever over a full board. The qa rig's
+scripted finish caught it in one run (W=0 L=0, no memory record). The
+fix is an ORDER law: inside the move resolver, check the terminal
+condition FIRST, then the special-turn branches, then the plain hand-off.
+Rule of thumb: when a game has a "same player continues" rule, the end
+check comes before it in the code - or the game's last breath never gets
+called.
+
+**22. THE CLOCK TRUTH (v0.3.9-3) - fades live on the game clock; a rig
+that samples one must DRIVE the clock, and a layer whose data changed
+repaints in the mutator.**
+Two faces of one law, both caught on the rig's film. (a) The squares qa
+sampled a claimed box's fade pixel and got pure paper: the game was
+probed with `paused = true`, so `_time` was FROZEN at the claim moment -
+the fade's age was 0, its alpha was 0, and an invisible fill is HONEST
+rendering of a stopped clock. A rig that wants to see a fade at age X
+must `probe_step()` the clock there (13 steps of 0.01 for the 0.16s
+color fade). (b) The same film showed placed lines missing from the
+board: `_place` mutated the edge data but only the per-frame tick
+repainted the layer - under a paused tick the paint stayed stale until
+something else redrew. The mutator now repaints what it mutates
+(`line_l.queue_redraw()` in `_place`, `_press`, `_drag_to`). Rule of
+thumb: headless asserts check LAWS, the film checks TRUTH - and the
+film's truth is only as fresh as the last repaint and the clock the
+rig actually drove. Bonus seat: moving a widget AFTER the widget it
+follows means its own removal SHIFTS every later index - compute the
+insert seat from live indices (the squares goals card landed behind the
+coins chip twice before the shift correction landed).

@@ -808,11 +808,96 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Board's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
         },
-        {"id": "dots", "title": "DOTS", "tag": "close the boxes", "coming_soon": true,
-            "orientation": "auto", "dim": "2d",
-            "price": 450, "fee": 8,
-            "reveal": {"kind": "direct", "appear_after": 11, "needs_games": 12},
-            "desc": "draw lines between dots, close boxes, take the board - the workshop version is baking"},
+        {"id": "squares", "title": "SQUARES", "tag": "close the boxes",
+                "script": "res://game/games/squares/squares.gd",
+                "thumb": "res://assets/thumbs/squares.png",
+                # v0.3.9-3 THE GRADUATION (the owner's GDD round; the
+                # teaser DOTS is renamed SQUARES by the owner's order).
+                # VERTICAL ONLY (the xo law). THE OWNER'S ECONOMY: win
+                # +1 / lose -1, run bonus /2, and NO DRAWS - every board
+                # wears an ODD box total (9 / 25 / 49) so a tie cannot
+                # exist. THE PENS ARE FIXED: the user draws RED, the
+                # enemy draws BLUE - the shop sells THEMES ONLY (the
+                # owner: "no skins") + the 3 board sizes (the 2048
+                # mechanic: bought in the shop, applied in the options).
+                # A GOGACoin rests inside a box after every 3 rounds -
+                # the box's claimer takes it.
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 2, "price": 450, "fee": 8, "shop": true,
+                "banner": true,
+                "reveal": {"kind": "direct", "appear_after": 11,
+                        "needs_games": 12},
+                "desc": "draw lines between the dots, close boxes, take the board - the dots-and-boxes classic (KDE KSquares energy). Close a box and you go AGAIN: the chains are the whole war. Your pen is RED, the CPU's is BLUE; the lines dry to ink, the boxes keep their color. One opponent with four invisible moods watches the chains - lose to a big one and its double-cross eye wakes for two rounds. Every board holds an ODD number of boxes (9 / 25 / 49) so a round can never end in a draw. Win +1, lose -1, and after every 3 rounds a GOGACoin rests inside a box.",
+                "controls": ["TAP ANYWHERE TO START - press near an edge and a dashed translucent standby line snaps to the NEAREST edge; slide and it follows your finger edge to edge; lift and the line is drawn (slide off the board and the standby cancels - a release out there places nothing)",
+                        "a placed line first fades in the pen's color (yours RED, the CPU's BLUE), then smoothly dries into the board ink - a closed square fades its owner's color in",
+                        "close a box and you go AGAIN - the chains are the whole war; never leave a third side open unless the double-cross is the plan",
+                        "most boxes takes the round - there are NO draws (every board holds 9, 25 or 49 boxes): win +1, loss -1",
+                        "after every 3 rounds a GOGACoin rests inside a box - claim that box first, the CPU races you",
+                        "OPTIONS switches the board: 4x4 dots (9 boxes) free, 6x6 and 8x8 bought in the shop first (the 2048 way - a switch starts a fresh board)",
+                        "the bank is in the pause sheet: END ends the run and pays (run bonus /2)",
+                        "the shop wears 5 paper themes + the board sizes - NO pens for sale: red is yours, blue is the enemy's, forever"],
+                "genres": {"main": ["strategy", "puzzle"],
+                        "sub": ["turnbased", "competitive", "singleplayer"]},
+                "ach": [
+    {"id": "score_t1", "title": "First Territory", "desc": "Score 5 in one run", "tier": 1, "rule": {"k": "max", "key": "max_score", "v": 5}},
+    {"id": "score_t2", "title": "Box Baron", "desc": "Score 15 in one run", "tier": 2, "rule": {"k": "max", "key": "max_score", "v": 15}},
+    {"id": "score_t3", "title": "The Chain Lord", "desc": "Score 40 in one run", "tier": 3, "rule": {"k": "max", "key": "max_score", "v": 40}},
+    {"id": "score_t4", "title": "The Board's Owner", "desc": "Score 100 in one run", "tier": 4, "rule": {"k": "max", "key": "max_score", "v": 100}},
+    {"id": "wins_t1", "title": "Boxed!", "desc": "Win 10 rounds total", "tier": 1, "rule": {"k": "cnt", "key": "wins", "v": 10}},
+    {"id": "wins_t2", "title": "The Quiet Pen", "desc": "Win 50 rounds total", "tier": 2, "rule": {"k": "cnt", "key": "wins", "v": 50}},
+    {"id": "boxes_t1", "title": "The Landlord", "desc": "Claim 250 boxes total", "tier": 2, "rule": {"k": "cnt", "key": "boxes", "v": 250}},
+    {"id": "streak_t1", "title": "Relentless", "desc": "Win 5 rounds in a row", "tier": 2, "rule": {"k": "max", "key": "streak", "v": 5}},
+    {"id": "coins_t1", "title": "Coin Snatcher", "desc": "Take 25 GOGACoins total", "tier": 1, "rule": {"k": "cnt", "key": "coins_taken", "v": 25}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Page's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
+        # v0.3.9-3 THE NEXT FIVE (the owner: "take the next 5 games in
+        # future_games.md and put them as 'soon' titles in GOGABox so me
+        # after testing this patch 3, i think about newer games GDDs so
+        # we work on them next") - the first five un-shipped names in the
+        # parking lot's file order, parked as workshop teasers.
+        {"id": "pacman", "title": "DOT MUNCHER", "tag": "the maze chomp",
+                "coming_soon": true, "orientation": "auto", "dim": "2d",
+                "price": 450, "fee": 8,
+                "reveal": {"kind": "direct", "appear_after": 12,
+                        "needs_games": 13},
+                "desc": "the maze chomp runner - gobbles, ghosts and "
+                        + "power pellets; the workshop version is baking"},
+        {"id": "brickbreaker", "title": "BRICK STORM",
+                "tag": "paddle and the wall",
+                "coming_soon": true, "orientation": "auto", "dim": "2d",
+                "price": 450, "fee": 8,
+                "reveal": {"kind": "direct", "appear_after": 13,
+                        "needs_games": 14},
+                "desc": "the paddle, the ball and the brick wall (and a "
+                        + "BBTAN sibling waiting in the notes) - the "
+                        + "workshop version is baking"},
+        {"id": "jumpcube", "title": "CUBE OVERFLOW",
+                "tag": "grow and spill",
+                "coming_soon": true, "orientation": "auto", "dim": "2d",
+                "price": 450, "fee": 8,
+                "reveal": {"kind": "direct", "appear_after": 14,
+                        "needs_games": 15},
+                "desc": "tap cells to grow their value, overflow spills "
+                        + "into the neighbors, capture the board - the "
+                        + "workshop version is baking"},
+        {"id": "ludo", "title": "LUDO ROAD", "tag": "the dice race",
+                "coming_soon": true, "orientation": "auto", "dim": "2d",
+                "price": 450, "fee": 8,
+                "reveal": {"kind": "direct", "appear_after": 15,
+                        "needs_games": 16},
+                "desc": "roll, run the loop, climb your color's arm, get "
+                        + "all four home - the workshop version is baking"},
+        {"id": "snl", "title": "SNAKES & LADDERS",
+                "tag": "climb and slide",
+                "coming_soon": true, "orientation": "auto", "dim": "2d",
+                "price": 450, "fee": 8,
+                "reveal": {"kind": "direct", "appear_after": 16,
+                        "needs_games": 17},
+                "desc": "roll the dice, climb the ladders, slide down the "
+                        + "snakes, first token home wins - the workshop "
+                        + "version is baking"},
 
 ]
 

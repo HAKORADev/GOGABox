@@ -1,5 +1,11 @@
 # FUTURE GAMES — the parking lot
 
+> **READ `games_done.md` FIRST (same folder)** — the shipped shelf, names
+> only. This file is the parking lot of IDEAS; `games_done.md` is the
+> source of truth for what is ALREADY DONE, so the future agent never
+> rebuilds a shipped game or miscounts the shelf. When a name below
+> graduates, it leaves this list's waiting and joins that list.
+
 The owner's name dump, saved so we can return to them later. Nothing here is
 scheduled or started. When one gets picked for a version, it graduates into
 its own `<id>.md` GDD in this folder and gets a task in `plans/PLAN_vX.Y.Z.md`.
@@ -86,6 +92,17 @@ catcher bounces and must not fall, collectables wear power-up behavior),
 and the brick-breaker-like grows a BBTAN sibling (blocks cost balls, broken
 blocks pay balls).
 
+Thirteenth dump - the v0.3.9-3 round (2026-09-12): THE NAME CAME HOME
+again - the **ksquares-like** graduated as **SQUARES** (the owner renamed
+the parked "dots" teaser: "i guess we should rename it to squares? feels
+better") — gogames_ideas/squares.md. And THE SOON SHELF grew its next
+five: the first five un-shipped names in this file's order (pacman-like,
+brick-breaker-like, jumping-cube territory capture, ludo,
+snakes-and-ladders) are parked in the box as the workshop teasers DOT
+MUNCHER / BRICK STORM / CUBE OVERFLOW / LUDO ROAD / SNAKES & LADDERS
+(registry ids pacman, brickbreaker, jumpcube, ludo, snl) so the owner can
+pick the next GDDs after the v0.3.9-3 test.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine. **SHIPPED v0.3.8** as
@@ -99,6 +116,8 @@ blocks pay balls).
 - **ksquares-like** - KDE KSquares: dots and boxes - take turns drawing lines
   between the dots, close a box to claim it (your initial goes inside), most
   boxes wins; close one and you go again. Never leave a third side open.
+  **SHIPPED v0.3.9-3** as SQUARES (the teaser was DOTS, renamed by the
+  owner) — gogames_ideas/squares.md.
 - **pacman-like** — maze chomp runner. Owner: "we may add".
 - **brick-breaker-like** — paddle + ball + the brick wall.
   - **the BBTAN sibling** (owner, v0.3.9-2 round, added "under it"): a
