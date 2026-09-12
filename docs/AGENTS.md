@@ -646,3 +646,18 @@ playable edge a visible gray placeholder, the ink covers it when drawn;
 and the HBoxContainer seat - `move_child(x, chip.get_index())` seats x
 BEFORE the chip, `get_index() + 1` seats it after. The old index
 gymnastics had been masking the wrong insert seat.)
+
+**24. THE OVERFLOW LAW (v0.3.9-5) - a line that cannot fit at the floor
+size must WRAP, never stretch its column.**
+The owner tested the squares shop: "too wide buttons while content is
+smaller". Root cause: the shop's long section labels went through
+`Arc.fit_label`, whose font steps down to the FLOOR (12) and stops - a
+text still wider than max_w at font 12 stayed a single-line Label whose
+min width was its full text (825px inside a 560px scroll). One child's
+min width stretches the whole VBox, so every 560px button FILLED to 825
+and clipped at the viewport - the coins cut, the words cut, the buttons
+"too wide". The fix lives in the ONE helper (ui_kit.gd): when the fitted
+line still overflows, fit_label enables autowrap inside max_w. Rule of
+thumb: a Label is a LAYOUT ACTOR - its min width votes on the column's
+width; a non-wrapping label votes with its full text length. Any long
+text inside a fixed column wraps or the column dies.

@@ -1255,7 +1255,31 @@ func _tick_weapons(delta: float) -> void:
         if _adrenaline > 0.0:
                 aspeed *= float(CSData.skill_num("adrenaline", "aspeed",
                                 meta.skill_level("adrenaline"), 1.8))
+        # THE SPLIT SIGHT (v0.3.9-5, the owner: "when there is more than one
+        # weapon, make each one shoots another enemy based on distance and
+        # range ... making multi-targets as a skill with upgrades so it
+        # specifies how many weapons can be used to shoot different enemies
+        # and the rest will remain one at a time"): the first N slots each
+        # CLAIM their own prey (greedy, slot order, each inside ITS range);
+        # the remaining weapons all hunt the one best target together.
+        var split_n := 0
+        if meta.has_skill("split_sight"):
+                split_n = int(CSData.skill_num("split_sight", "guns",
+                                meta.skill_level("split_sight"), 2))
+        var claimed: Array = []
+        for i in weapons_run.size():
+                var w: Dictionary = weapons_run[i]
+                w["target"] = null
+                if i < split_n:
+                        var tgt: Variant = _pick_target(_weapon_range(w), claimed)
+                        if tgt != null:
+                                claimed.append(tgt)
+                                w["target"] = tgt
         for w in weapons_run:
+                # THE HEAVY KICK: the barrel cools every tick it doesn't fire
+                if float(w.get("heat", 0.0)) > 0.0:
+                        w["heat"] = maxf(0.0, float(w["heat"])
+                                        - CSData.KICK_COOL * delta)
                 w["cd"] -= delta * aspeed
                 if w["cd"] <= 0.0:
                         if _fire_weapon(w):
@@ -1263,6 +1287,12 @@ func _tick_weapons(delta: float) -> void:
                                 w["cd"] = float(CSData.WEAPONS[w["id"]]["cad"]) * float(mult["cad"])
                         else:
                                 w["cd"] = 0.05   # nothing in range - retry soon
+
+## the effective range of one holstered weapon (the kick/target helpers)
+func _weapon_range(w: Dictionary) -> float:
+        var wd: Dictionary = CSData.WEAPONS[w["id"]]
+        return float(wd["rng"]) * float(stats["range_m"]) \
+                        * float(CSData.tier_mult(int(w["tier"])).get("rng", 1.0))
 
 func _aim_angle() -> float:
         var best := p_aim
@@ -1291,11 +1321,31 @@ func _fire_weapon(w: Dictionary) -> bool:
         var rng: float = float(wd["rng"]) * float(stats["range_m"]) \
                         * float(mult.get("rng", 1.0))
         var count: int = int(wd["count"]) + int(mult["count"]) + int(stats["proj_add"])
-        var target: Variant = _pick_target(rng)
+        # THE SPLIT SIGHT: a split slot fires at its OWN claimed prey while
+        # it lives and stays (near) in range - a dead or fled claim falls
+        # back to the shared best target
+        var target: Variant = w.get("target", null)
+        if target != null and (target.get("dead", false)
+                        or (target["pos"] - p_pos).length() > rng * 1.2):
+                target = null
+        if target == null:
+                target = _pick_target(rng)
         if target == null:
                 return false
         var te: Dictionary = target
         var base_a: float = (te["pos"] - p_pos).angle()
+        # THE HEAVY KICK (v0.3.9-5): the shot walks out of line by a
+        # specific angle as the barrel heats - "slightly out of line by
+        # specific angle from shot to shot ... after rapid firing like a
+        # real thing". Slow fire keeps it microscopic; spamming shakes it.
+        var kick_heat := 0.0
+        var kick_spec: Dictionary = CSData.HEAVY_KICK.get(wid, {})
+        if not kick_spec.is_empty():
+                kick_heat = clampf(float(w.get("heat", 0.0)) + CSData.KICK_HEAT,
+                                0.0, 1.0)
+                w["heat"] = kick_heat
+                base_a += randf_range(-1.0, 1.0) * float(kick_spec["kick"]) \
+                                * pow(kick_heat, 1.5)
         var shot_name: String = wd["shot"]
         var pierce: int = int(wd["pierce"]) + int(stats.get("pierce_add", 0))
         if int(stats["pierce_all"]) > 0:
@@ -1342,7 +1392,18 @@ func _fire_weapon(w: Dictionary) -> bool:
                 var dmg: float = base_dmg
                 var kind: String = wd["proj"]
                 if kind == "strike":
-                        _orbital_strike(te["pos"], dmg, float(wd.get("aoe", 60.0)))
+                        # the orbital lands where the barrel points it - the
+                        # kick walks the LANDING SPOT, not the angle
+                        var land: Vector2 = te["pos"]
+                        if kick_heat > 0.0:
+                                land += Vector2.from_angle(
+                                                randf_range(0.0, TAU)) \
+                                                * float(kick_spec["kick"]) \
+                                                * pow(kick_heat, 1.5) \
+                                                * maxf(140.0,
+                                                (te["pos"] - p_pos).length()) \
+                                                * 0.5
+                        _orbital_strike(land, dmg, float(wd.get("aoe", 60.0)))
                         continue
                 _spawn_bullet(p_pos + Vector2.from_angle(a) * 26.0, a, wd, dmg, pierce, tier)
         # v0.3.4-4 THE NO-SHOOT-VFX LAW (the owner: "remove the shooting
@@ -1359,11 +1420,13 @@ func _fire_weapon(w: Dictionary) -> bool:
                                 int(CSData.skill_num("twin_tail", "pierce", tt_lv, 0)), tier)
         return true
 
-func _pick_target(rng: float) -> Variant:
+func _pick_target(rng: float, exclude: Array = []) -> Variant:
         var best: Variant = null
         var best_score := -1.0
         var rng2 := rng * rng
         for e in enemies:
+                if e.get("dead", false) or exclude.has(e):
+                        continue
                 var d: Vector2 = e["pos"] - p_pos
                 var dist2 := d.length_squared()
                 if dist2 > rng2:

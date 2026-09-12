@@ -243,7 +243,7 @@ func _t_batteries() -> int:
         Box.meta().erase("batt_ping_at")
         Box.game_battery("rally")            # 8 -> 10 FULL -> PING
         ok += _check(pings[0] == 1, "pool reaching FULL pings once")
-        ok += _check(ping_titles.size() == 1 and String(ping_titles[0]) == "PONG",
+        ok += _check(ping_titles.size() == 1 and String(ping_titles[0]) == "PING-PONG",
                 "the ping carries WHICH game filled (%s)" % str(ping_titles))
         Box.game_battery("rally")            # steady full - no new ping
         ok += _check(pings[0] == 1, "no repeat ping while the pool sits full")
@@ -309,8 +309,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 19,
-                "19 playable games (squares joined, v0.3.9-3)")
+        var ok := _check(GameReg.playable().size() == 20,
+                "20 playable games (dot eater joined, v0.3.9-5)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -318,8 +318,8 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
-        ok += _check(GameReg.workshop().size() == 5,
-                "5 workshop teasers (the next five)")
+        ok += _check(GameReg.workshop().size() == 4,
+                "4 workshop teasers (dot eater graduated)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -327,6 +327,8 @@ func _t_registry() -> int:
         ok += _check(int(GameReg.get_game("maze")["coin_div"]) == 3
                 and String(GameReg.get_game("maze")["orientation"]) == "landscape",
                 "maze wears the owner's economy (bonus /3, landscape)")
+        ok += _check(String(GameReg.get_game("rally")["title"]) == "PING-PONG",
+                "rally ships as PING-PONG (the trademark rename, v0.3.9-5)")
         ok += _check(String(GameReg.get_game("invaders")["title"]) == "Space Invaders",
                 "the hen teaser ships as SPACE INVADERS (rename law)")
         ok += _check(int(GameReg.get_game("invaders")["coin_div"]) == 500
@@ -340,6 +342,20 @@ func _t_registry() -> int:
                 "cosmic spud wears the owner's economy (bonus /200, fee 50)")
         ok += _check(String(GameReg.get_game("cosmic_spud")["orientation"]) == "landscape",
                 "cosmic spud is landscape (the camera law)")
+        # v0.3.9-5: THE SPLIT SIGHT + THE HEAVY KICK (the owner's patch-5)
+        var CSData: GDScript = load("res://game/games/cosmic_spud/cs_data.gd")
+        ok += _check(CSData.SKILLS.has("split_sight") \
+                        and CSData.SKILL_ORDER.has("split_sight"),
+                "the spud wears SPLIT SIGHT (the multi-target skill)")
+        var guns: Array = CSData.SKILL_LEVELS["split_sight"]["guns"]
+        ok += _check(guns == [2, 3, 4, 5, 6],
+                "SPLIT SIGHT levels: 2..6 weapons hunt alone (%s)" % str(guns))
+        ok += _check(CSData.HEAVY_KICK.size() == 6 \
+                        and CSData.HEAVY_KICK.has("cannon") \
+                        and CSData.HEAVY_KICK.has("rail") \
+                        and float(CSData.KICK_HEAT) > 0.0 \
+                        and float(CSData.KICK_COOL) > 0.0,
+                "the HEAVY KICK wears 6 heavy shells + the heat clock")
         ok += _check(String(GameReg.get_game("lanes")["title"]) == "Space Dash",
                 "the lane-dodger ships as SPACE DASH (rename law)")
         # v0.2.4 the redesign's registry sanity (the owner's GDD numbers)
@@ -393,7 +409,7 @@ func _t_registry() -> int:
         # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
         # the banner now, the tower included; MELTING stays
         var banner_ok := true
-        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo", "squares"]:
+        for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo", "squares", "pacman"]:
                 banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
         ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
@@ -519,10 +535,78 @@ func _t_registry() -> int:
         ok += _check(int(SQ.boxes_total(4)) == 9 and int(SQ.boxes_total(6)) == 25 \
                         and int(SQ.boxes_total(8)) == 49,
                 "the no-draw arithmetic: 9 / 25 / 49 boxes - all ODD")
-        ok += _check(String(GameReg.get_game("pacman")["title"]) == "DOT MUNCHER" \
-                        and bool(GameReg.get_game("pacman")["coming_soon"]) \
+        ok += _check(String(GameReg.get_game("brickbreaker")["title"]) == "BRICK STORM" \
+                        and String(GameReg.get_game("jumpcube")["title"]) == "CUBE OVERFLOW" \
+                        and String(GameReg.get_game("ludo")["title"]) == "LUDO ROAD" \
                         and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
-                "the next five teasers are parked (pacman..snl)")
+                "the next four teasers are parked (brickbreaker..snl)")
+        # v0.3.9-5: DOT EATER graduates (the teaser DOT MUNCHER renamed)
+        var pg: Dictionary = GameReg.get_game("pacman")
+        ok += _check(not bool(pg.get("coming_soon", false)) \
+                        and String(pg["orientation"]) == "landscape",
+                "dot eater is PLAYABLE now: landscape only (horizontal law, v0.3.9-5)")
+        ok += _check(String(pg["title"]) == "DOT EATER",
+                "the teaser DOT MUNCHER ships as DOT EATER (rename law)")
+        ok += _check(int(pg["coin_div"]) == 3 and int(pg["fee"]) == 8,
+                "dot eater wears the owner's economy (bonus /3, fee 8)")
+        ok += _check(bool(pg["shop"]) and bool(pg["banner"]),
+                "dot eater wears the shop + the banner")
+        ok += _check(pg["ach"].size() == 12,
+                "dot eater wears the tiered ladder (12)")
+        var PM := load("res://game/games/pacman/pacman.gd")
+        ok += _check(int(PM.START_LIVES) == 3 and int(PM.DOTS_PER_LIFE) == 500,
+                "dot eater wears the life law (3 to start, 500 dots = one more)")
+        ok += _check(int(PM.COIN_EVERY) == 3,
+                "dot eater pays a GOGACoin after each 3 mazes (owner)")
+        ok += _check(int(PM.RUSH_TIME) == 7 and float(PM.RUSH_PLAYER_MULT) > 1.0 \
+                        and float(PM.RUSH_EATER_MULT) < 1.0,
+                "the RUSH is accurate: 7s, you faster, them slower")
+        ok += _check(float(PM.BUF_WINDOW) > 0.0 and float(PM.BUF_WINDOW) < 10.0,
+                "the junction buffer wears the owner's window")
+        # THE MAZE LAWS (static, deterministic): mirrored, braided, wrapped
+        var mrng := RandomNumberGenerator.new()
+        for seed_v in [11, 42, 777, 31337]:
+                mrng.seed = seed_v
+                var dims: Vector2i = PM.gen_sizes(seed_v % 7)
+                var m: Dictionary = PM.gen_maze(dims.x, dims.y, mrng)
+                var pmg: Array = m["g"]
+                # THE CONNECTIVITY LAW: every dot cell is reachable
+                var spawn := Vector2i(m["plaza"].x, m["plaza"].y + 2)
+                var seen: Dictionary = PM.reach(pmg, dims.x, spawn)
+                var dots_n := 0
+                var all_ok := true
+                for y in dims.y:
+                        for x in dims.x:
+                                var cc := Vector2i(x, y)
+                                var open_n := 0
+                                for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+                                        if PM.is_open(pmg, dims.x, x, y, dd):
+                                                open_n += 1
+                                var is_dot := open_n >= 2 \
+                                                and not (absi(x - m["plaza"].x) <= 1 \
+                                                and absi(y - m["plaza"].y) <= 1)
+                                if is_dot:
+                                        dots_n += 1
+                                        if not seen.has(cc):
+                                                all_ok = false
+                ok += _check(all_ok and dots_n > 0,
+                        "seed %d: the maze is braided + every dot reachable (%d dots)" % [seed_v, dots_n])
+                # THE WRAP LAW: at least one row joins the board sides
+                ok += _check(m["wraps"].size() >= 1,
+                        "seed %d: the wrap tunnels exist (%s)" % [seed_v, str(m["wraps"])])
+                # THE BRAID LAW: no dead-end corridor cell (1 open neighbor)
+                var dead_ends := 0
+                for y in range(1, dims.y - 1):
+                        for x in range(1, dims.x - 1):
+                                var open_n := 0
+                                for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+                                        if PM.is_open(pmg, dims.x, x, y, dd):
+                                                open_n += 1
+                                if open_n == 1 and not (absi(x - m["plaza"].x) <= 1 \
+                                                and absi(y - m["plaza"].y) <= 1):
+                                        dead_ends += 1
+                ok += _check(dead_ends == 0,
+                        "seed %d: the braid law holds (0 dead ends)" % seed_v)
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -1528,8 +1612,8 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 5,
-                "the next five are the workshop (5 teasers)")
+        ok += _check(GameReg.workshop().size() == 4,
+                "the next four are the workshop (dot eater graduated)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -1538,8 +1622,8 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "pacman",
-                        "the SOON block wears pacman first (%s)" % [ids.slice(soon_first_at)])
+                ok += _check(String(ids[soon_first_at]) == "brickbreaker",
+                        "the SOON block wears brickbreaker first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

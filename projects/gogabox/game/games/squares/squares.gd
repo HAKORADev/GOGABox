@@ -629,10 +629,19 @@ func _edge_seg(e: int) -> Array:
         var r2 := j % (d - 1)
         return [dot_at(c2, r2), dot_at(c2, r2 + 1)]
 
-## the claimed squares: the owner's color, faded in (THE COLOR FADE LAW)
+## the claimed squares: the owner's color, faded in (THE COLOR FADE LAW).
+## THE OUTLINE TRUTH (v0.3.9-5, the owner: "a player-owned square outlines
+## should be black and only the inside be the color of the player so the
+## contrast be better"): the fill wears the owner's color, the RING around
+## it wears a dark ink that no theme can wash out - the ownership reads
+## at a glance on every paper.
 func _draw_boxes() -> void:
         var d := dots_n
         var bps := d - 1
+        var th := _theme()
+        var ring := Color(th["line"]).darkened(0.55)
+        ring.a = 1.0
+        var rw := maxf(2.0, cell * 0.05)
         for b in boxes.size():
                 var v: int = boxes[b]
                 if v == 0:
@@ -650,6 +659,9 @@ func _draw_boxes() -> void:
                 box_l.draw_rect(Rect2(pos.x + inner, pos.y + inner,
                                 cell - inner * 2.0, cell - inner * 2.0),
                                 Color(col, a))
+                box_l.draw_rect(Rect2(pos.x + inner, pos.y + inner,
+                                cell - inner * 2.0, cell - inner * 2.0),
+                                Color(ring, a), false, rw)
                 if state == "round_over" and glow_t >= 0.0 \
                                 and glow_t < 1.1 and int(v) == _glow_owner:
                         # the round-over breath: the winner's boxes bloom

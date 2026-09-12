@@ -1742,6 +1742,141 @@ def scene_squares():
     return sc.render()
 
 
+
+def _peyed_ball(d, cx, cy, r, body, shade, mouth_a, mouth_arc, ang,
+                eye_col=(24, 20, 14), eye_white=(248, 246, 238)):
+    """A round body with a mouth wedge cut toward `ang` + two perched
+    eyes - Balldozer and the ball-eaters share one honest shape."""
+    steps = 40
+    pts = [(cx, cy)]
+    for i in range(steps + 1):
+        a = ang + mouth_a + (2 * math.pi - mouth_a * 2.0) * i / steps
+        pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    d.polygon(pts, fill=body)
+    # the shade rim opposite the mouth
+    d.arc([cx - r * 0.78, cy - r * 0.78, cx + r * 0.78, cy + r * 0.78],
+          start=math.degrees(ang + math.pi - 1.25),
+          end=math.degrees(ang + math.pi + 1.25), fill=shade, width=max(3, int(r * 0.16)))
+    for s in (-1, 1):
+        ex = cx + math.cos(ang + s * 0.92) * r * 0.5
+        ey = cy + math.sin(ang + s * 0.92) * r * 0.5
+        er = r * 0.24
+        d.ellipse([ex - er, ey - er, ex + er, ey + er], fill=eye_white)
+        pr = er * 0.5
+        d.ellipse([ex + math.cos(ang) * er * 0.3 - pr,
+                   ey + math.sin(ang) * er * 0.3 - pr,
+                   ex + math.cos(ang) * er * 0.3 + pr,
+                   ey + math.sin(ang) * er * 0.3 + pr], fill=eye_col)
+
+
+def scene_pacman():
+    """DOT EATER (v0.3.9-5): IN-GAME FOOTAGE - the neon maze mid-chomp:
+    Balldozer bites up a golden corridor, the scared blue ball-eater
+    flees around the loop, the BLUE rush orb waits at the corner, the
+    wrap tunnel mouth glows on the board's edge."""
+    sc = Scene()
+    sc.backdrop((13, 19, 44), (4, 6, 16))
+    sc.glow(W * 0.5, H * 0.5, 400, (40, 62, 140), 60)
+    cols, rows, cell = 15, 8, 62
+    ox, oy = (W - cols * cell) // 2, (H - rows * cell) // 2 + 6
+    lw = 6
+    wall = (116, 224, 255, 255)
+    dim = (38, 74, 132, 255)
+    # a hand-woven braided patch: loops everywhere (the braid law), the
+    # middle row rides the wrap seam
+    corridors = set()
+
+    def carve(a, b):
+        corridors.add((a, b))
+        corridors.add((b, a))
+
+    rows_paths = [
+        [(1, 1), (13, 1)],
+        [(1, 1), (1, 3)], [(3, 1), (3, 3)], [(5, 1), (5, 3)],
+        [(7, 1), (7, 3)], [(9, 1), (9, 3)], [(11, 1), (11, 3)],
+        [(13, 1), (13, 3)],
+        [(1, 3), (13, 3)],
+        [(1, 3), (1, 5)], [(3, 3), (3, 5)], [(5, 3), (5, 5)],
+        [(7, 3), (7, 5)], [(9, 3), (9, 5)], [(11, 3), (11, 5)],
+        [(13, 3), (13, 5)],
+        [(1, 5), (13, 5)],
+        [(3, 5), (3, 7)], [(7, 5), (7, 7)], [(11, 5), (11, 7)],
+        [(3, 7), (5, 7)], [(5, 7), (7, 7)], [(7, 7), (9, 7)],
+        [(9, 7), (11, 7)], [(1, 5), (1, 7)], [(13, 5), (13, 7)],
+        [(1, 7), (3, 7)],
+    ]
+    for a, b in rows_paths:
+        carve(a, b)
+
+    def opn(a, b):
+        return (a, b) in corridors
+
+    # the glow bed under the walls
+    for r in range(rows):
+        for c in range(cols):
+            x, y = ox + c * cell, oy + r * cell
+            top = r > 0 and opn((c, r), (c, r - 1))
+            left = c > 0 and opn((c, r), (c - 1, r))
+            right = c < cols - 1 and opn((c, r), (c + 1, r))
+            bot = r < rows - 1 and opn((c, r), (c, r + 1))
+            if not top:
+                sc.line([(x, y), (x + cell, y)], dim, lw + 7)
+            if not left:
+                sc.line([(x, y), (x, y + cell)], dim, lw + 7)
+            if c == cols - 1 and not right:
+                sc.line([(x + cell, y), (x + cell, y + cell)], dim, lw + 7)
+            if r == rows - 1 and not bot:
+                sc.line([(x, y + cell), (x + cell, y + cell)], dim, lw + 7)
+    # the wrap mouths: the middle row's edges glow open
+    wy = oy + 3 * cell + cell // 2
+    sc.glow(ox - 4, wy, 40, (116, 224, 255), 120)
+    sc.glow(ox + cols * cell + 4, wy, 40, (116, 224, 255), 120)
+    # the core walls
+    for r in range(rows):
+        for c in range(cols):
+            x, y = ox + c * cell, oy + r * cell
+            top = r > 0 and opn((c, r), (c, r - 1))
+            left = c > 0 and opn((c, r), (c - 1, r))
+            right = c < cols - 1 and opn((c, r), (c + 1, r))
+            bot = r < rows - 1 and opn((c, r), (c, r + 1))
+            if not top:
+                sc.line([(x, y), (x + cell, y)], wall, lw)
+            if not left:
+                sc.line([(x, y), (x, y + cell)], wall, lw)
+            if c == cols - 1 and not right:
+                sc.line([(x + cell, y), (x + cell, y + cell)], wall, lw)
+            if r == rows - 1 and not bot:
+                sc.line([(x, y + cell), (x + cell, y + cell)], wall, lw)
+
+    # the golden dots along the corridors (the GOLD LAW)
+    gold = (255, 208, 74, 255)
+    for (a, b) in rows_paths:
+        x0, y0 = ox + a[0] * cell + cell // 2, oy + a[1] * cell + cell // 2
+        x1, y1 = ox + b[0] * cell + cell // 2, oy + b[1] * cell + cell // 2
+        n = max(abs(x1 - x0), abs(y1 - y0)) // 34
+        for k in range(n + 1):
+            f = k / max(1, n)
+            dx, dy = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
+            sc.ellipse([dx - 6, dy - 6, dx + 6, dy + 6], fill=gold)
+    # the BLUE rush orb at the corner (the magical dot breathes)
+    px, py = ox + 13 * cell + cell // 2, oy + 5 * cell + cell // 2
+    sc.glow(px, py, 44, (70, 120, 255), 150)
+    sc.ellipse([px - 15, py - 15, px + 15, py + 15], fill=(86, 132, 255, 255))
+    sc.ellipse([px - 6, py - 6, px + 4, py + 4], fill=(220, 235, 255, 200))
+
+    # the scared ball-eater fleeing left (blue, the "o" of panic)
+    fx, fy = ox + 9 * cell + cell // 2, oy + 3 * cell + cell // 2
+    _peyed_ball(sc.d, fx, fy, 30, (66, 96, 255, 255), (30, 46, 150, 255),
+                0.55, 0, math.pi, eye_col=(14, 16, 40))
+    sc.ellipse([fx - 7, fy + 8, fx + 9, fy + 24], fill=(210, 226, 255, 220))
+    # Balldozer bites up the corridor after it (mouth open, golden)
+    bx, by = ox + 5 * cell + cell // 2, oy + 3 * cell + cell // 2
+    _peyed_ball(sc.d, bx, by, 40, (255, 204, 66, 255), (176, 120, 22, 255),
+                0.34, 0, 0.0)
+    sc.vignette(80)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1760,6 +1895,7 @@ SCENES = {
     "fourline": scene_fourline,
     "bovo": scene_bovo,
     "squares": scene_squares,
+    "pacman": scene_pacman,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

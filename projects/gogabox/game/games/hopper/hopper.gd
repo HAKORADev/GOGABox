@@ -215,9 +215,10 @@ const MELT_SHRINK := 0.045           # size/s lost with no snow under you
 ## sticks; shed_roll = snow shed per second while rolling; shed_land =
 ## fraction of snow that pops off on a landing.
 const CHARS := {
-        "ball":   {"name": "Snowball", "price": 0, "g": 1.0, "accel": 1.0,
+        "ball":   {"name": "Balldozer", "price": 0, "g": 1.0, "accel": 1.0,
                         "fric": 1.0, "jump": 1.0, "snow_in": 1.0, "shed_roll": 1.0,
-                        "shed_land": 0.35, "desc": "the classic roller"},
+                        "shed_land": 0.35, "desc": "the classic roller - the "
+                        + "same ball that dozes through every GOGABox world"},
         "square": {"name": "Geoquare", "price": 400, "g": 1.05, "accel": 0.82,
                         "fric": 1.6, "jump": 0.94, "snow_in": 1.15, "shed_roll": 0.35,
                         "shed_land": 0.6, "desc": "the matrix escapee, slumming it in the snow"},

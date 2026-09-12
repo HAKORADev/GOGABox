@@ -74,7 +74,7 @@ const GAMES := [
 ],
         },
         {
-                "id": "rally", "title": "PONG", "tag": "goals win",
+                "id": "rally", "title": "PING-PONG", "tag": "goals win",
                 "script": "res://game/games/rally/pong.gd",
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "auto", "dim": "2d",
@@ -857,13 +857,78 @@ const GAMES := [
         # after testing this patch 3, i think about newer games GDDs so
         # we work on them next") - the first five un-shipped names in the
         # parking lot's file order, parked as workshop teasers.
-        {"id": "pacman", "title": "DOT MUNCHER", "tag": "the maze chomp",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+        # v0.3.9-5 THE GRADUATION: the teaser DOT MUNCHER is renamed DOT
+        # EATER by the owner ("i guess dot eater better so dot eater") and
+        # ships as the box's endless maze chomp. The character is
+        # BAL.DOZER - the owner's cross-game ball (its lore starts here;
+        # Snowy Tower's roller wears the name in the same round). THE
+        # OWNER'S ECONOMY: dots are NOT score ("1 dot 2 dot 3 dot" is a
+        # counter), score = the mazes completed (+1 each), the run starts
+        # with 3 lives, every 500 dots grant ONE extra life, a GOGACoin
+        # rests in a dot's place after each 3 mazes, and the score bonus
+        # is /3 (coin_div 3). HORIZONTAL ONLY (the maze escaper frame).
+        {"id": "pacman", "title": "DOT EATER", "tag": "the maze chomp",
+                "script": "res://game/games/pacman/pacman.gd",
+                "thumb": "res://assets/thumbs/pacman.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 3, "price": 450, "fee": 8, "shop": true,
+                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 12,
                         "needs_games": 13},
-                "desc": "the maze chomp runner - gobbles, ghosts and "
-                        + "power pellets; the workshop version is baking"},
+                "desc": "Balldozer's own maze: ENDLESS, RANDOM, braided - "
+                        + "every maze weaves fresh (mirrored like the "
+                        + "classic, loops everywhere, never a corner with "
+                        + "no way out) and the wrap tunnels join the sides. "
+                        + "Swipe once and the bite runs the WHOLE corridor; "
+                        + "the junction buffer takes ONE turn early - near "
+                        + "the corner, not a mile before it. The dots are "
+                        + "GOLDEN and they are NOT score: eat every dot in "
+                        + "the maze and the maze is yours (+1). Four "
+                        + "BALL-EATERS hunt in waves - the hunter, the "
+                        + "ambusher, the flanker and the mood-swinger. The "
+                        + "BLUE magical dot is the RUSH: you speed up, they "
+                        + "slow down and turn edible for 7 seconds - the "
+                        + "countdown wears a widget, the original hid it. "
+                        + "3 lives to start, every 500 dots grant one more, "
+                        + "and after each 3 mazes a GOGACoin waits where a "
+                        + "dot was. Lose them all and Balldozer wonders, "
+                        + "out loud, where the box will drop it next.",
+                "controls": ["TAP ANYWHERE TO START - then SWIPE: the bite "
+                        + "runs the corridor until the next turn; swiping "
+                        + "ahead works only NEAR the corner (one buffered "
+                        + "turn, a second swipe is not recorded)",
+                        "eat EVERY dot to clear the maze - each maze = +1 "
+                        + "score; dots are not score, the counter on top "
+                        + "is just the count",
+                        "the BLUE dot starts the RUSH: 7 seconds, you run "
+                        + "x1.32, the ball-eaters crawl and are EDIBLE - "
+                        + "eat all four in one rush for the glory",
+                        "the wrap tunnels at the board's sides join the "
+                        + "edges - vanish left, return right",
+                        "a caught Balldozer loses a life (3 to start); "
+                        + "every 500 dots grant ONE extra life",
+                        "after each 3 mazes a GOGACoin rests where a dot "
+                        + "was - take it before the maze ends",
+                        "the shop wears Balldozer coats and MAZE themes "
+                        + "that redraw the world: NEON, ARCADE '80, "
+                        + "DUNGEON, CANDY PAGE"],
+                "genres": {"main": ["arcade"], "sub": ["maze",
+                        "singleplayer", "endless"]},
+                "ach": [
+    {"id": "maze_t1", "title": "First Mazes", "desc": "Clear 10 mazes in one run", "tier": 1, "rule": {"k": "max", "key": "max_mazes", "v": 10}},
+    {"id": "maze_t2", "title": "The Corridor Lord", "desc": "Clear 25 mazes in one run", "tier": 2, "rule": {"k": "max", "key": "max_mazes", "v": 25}},
+    {"id": "maze_t3", "title": "The Maze Itself", "desc": "Clear 50 mazes in one run", "tier": 3, "rule": {"k": "max", "key": "max_mazes", "v": 50}},
+    {"id": "clear_t1", "title": "Dot Diet", "desc": "Clear 100 mazes total", "tier": 1, "rule": {"k": "cnt", "key": "clears", "v": 100}},
+    {"id": "clear_t2", "title": "The Box Runs Out Never", "desc": "Clear 500 mazes total", "tier": 2, "rule": {"k": "cnt", "key": "clears", "v": 500}},
+    {"id": "dots_t1", "title": "1 Dot 2 Dot 3 Dot", "desc": "Eat 1000 dots total", "tier": 1, "rule": {"k": "cnt", "key": "dots", "v": 1000}},
+    {"id": "dots_t2", "title": "The Golden Gut", "desc": "Eat 10000 dots total", "tier": 2, "rule": {"k": "cnt", "key": "dots", "v": 10000}},
+    {"id": "eat_t1", "title": "Who Eats Whom", "desc": "Swallow 50 ball-eaters total", "tier": 1, "rule": {"k": "cnt", "key": "eats", "v": 50}},
+    {"id": "eat_t2", "title": "The Food Chain Bends", "desc": "Swallow 250 ball-eaters total", "tier": 2, "rule": {"k": "cnt", "key": "eats", "v": 250}},
+    {"id": "quad_t1", "title": "THE FULL COURSE", "desc": "Eat all 4 ball-eaters in one rush", "tier": 3, "rule": {"k": "cnt", "key": "quads", "v": 1}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Maze's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
         {"id": "brickbreaker", "title": "BRICK STORM",
                 "tag": "paddle and the wall",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",

@@ -43,7 +43,20 @@ static func label(txt: String, size: int, color := INK, use_display := true) -> 
 ## pre-play page keeps its scroll, so it stays big there.
 static func fit_label(txt: String, size: int, color: Color, max_w: float,
                 use_display := true) -> Label:
-        return label(txt, fit_size(txt, size, max_w, null, use_display), color, use_display)
+        var f := font_big() if use_display else font_ui()
+        var fs := fit_size(txt, size, max_w, null, use_display)
+        var l := label(txt, fs, color, use_display)
+        # THE OVERFLOW LAW (v0.3.9-5, the owner's squares shop round: "too
+        # wide buttons while content is smaller"): a line that will not fit
+        # even AT THE FLOOR size must WRAP, never stretch its column - a
+        # single-line label at min width 825 pushed the whole shop column
+        # wide and the 560px buttons clipped in the 560px viewport. When
+        # the fitted line still overflows, the label wraps inside max_w.
+        if f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > max_w:
+                l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                l.custom_minimum_size = Vector2(max_w, 0)
+                l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        return l
 
 ## v0.1.5 THE ONE MEASURER (shared, was fit_label's private loop): step a
 ## font size down until the rendered line lands inside `max_w`. Any screen

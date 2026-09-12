@@ -102,6 +102,34 @@ snakes-and-ladders) are parked in the box as the workshop teasers DOT
 MUNCHER / BRICK STORM / CUBE OVERFLOW / LUDO ROAD / SNAKES & LADDERS
 (registry ids pacman, brickbreaker, jumpcube, ludo, snl) so the owner can
 pick the next GDDs after the v0.3.9-3 test.
+(RENAMES, v0.3.9-5 round: the pacman teaser's title became **DOT EATER**
+before graduating - the owner on "dot muncher" vs "dot eater": "i guess
+dot eater better so dot eater" - and the parked rally title PONG became
+**PING-PONG** everywhere, the owner: "the naming pong itself is a
+trademark so maybe you have to rename that game to ping-pong? it works".)
+
+Fourteenth dump - the v0.3.9-5 round (2026-09-12, DOC ONLY alongside the
+dot eater build): +4 games and one grow-note. THE LINE-RIDER-LIKE: an
+object (a ball) keeps moving and the USER DRAWS THE LINES that keep it
+from falling - draw the ramp, save the roll, plus power-ups, enemies and
+collectables on the way (the happy-glass/draw-a-line family, but the
+line is for a ROLLER, not water). THE 3D ROGUE-LIKE ZOMBIE SHOOTER: the
+standing-shooter Android energy - the character HOLDS THE LINE and the
+zombies RUN AT HIM from the dark, shoot them down wave after wave, stage
+after stage, first-person, rogue-like structure (the v0.3.7-1 vertical
+zombie hunter note stays its own thing - THIS one is the 3D FPS take).
+THE GOLF WITH TWO MODES: the same putting game worn twice - one mode
+NORMAL TOP-DOWN (the minigolf map view) and one mode SIDE-SCROLLER VIEW
+(the side hill-climb view), the goal is shared: hole in the LOWEST tries.
+THE ROCKET-LANDING-LIKE: land the rocket on the correct pad WITHOUT
+crashing - the lunar-lander energy, maybe with collectables and a
+survival flavor on top (the owner: "but maybe adding collectables and be
+a survival-like and like that too").
+THE STACK BALL NOTE (owner, same round, parked under the helix-jump-like
+below): "I may do it with two modes - the first is the classic and the
+second will be inspired by the game Neon Tower from Gamesnacks. I think
+I will make the game endless without an end, or maybe with ends that
+carry dynamic lengths and colors."
 
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
@@ -119,6 +147,11 @@ pick the next GDDs after the v0.3.9-3 test.
   **SHIPPED v0.3.9-3** as SQUARES (the teaser was DOTS, renamed by the
   owner) — gogames_ideas/squares.md.
 - **pacman-like** — maze chomp runner. Owner: "we may add".
+  **GRADUATED v0.3.9-5** as DOT EATER (the teaser was DOT MUNCHER, the
+  owner renamed it: "dot eater better so dot eater") —
+  gogames_ideas/pacman.md. Endless random braided mazes, the single-slot
+  junction buffer, the blue rush, four ball-eaters, and Balldozer's
+  golden chomp.
 - **brick-breaker-like** — paddle + ball + the brick wall.
   - **the BBTAN sibling** (owner, v0.3.9-2 round, added "under it"): a
     BBTAN-style game where EACH PLATFORM/BLOCK REQUIRES AN AMOUNT OF BALLS
@@ -299,6 +332,18 @@ pick the next GDDs after the v0.3.9-3 test.
   vertical climb, falling loses everything, keep going anyway. (rage game)
 
 ## Vehicles
+- **line-rider-like** (owner, v0.3.9-5 round) — a ball keeps ROLLING and
+  the user DRAWS THE LINES under it: draw the ramp, catch the fall, ride
+  the slope you made - power-ups, enemies and collectables ride along.
+  The draw-to-save-the-roller (the happy-glass family, physics flavor).
+- **golf-two-modes** (owner, v0.3.9-5 round) — the putting classic worn
+  twice in one game: mode one is the NORMAL TOP-DOWN minigolf view, mode
+  two is the SIDE-SCROLLER view (the hill you read, the arc you feel);
+  both share one goal - the hole, in the LOWEST tries.
+- **rocket-landing-like** (owner, v0.3.9-5 round) — land the rocket on
+  the correct pad WITHOUT crashing: thrust taps, gravity, the pad that
+  keeps moving its demands; maybe collectables and a survival flavor on
+  top. The lunar-lander energy, GOGABox-cut.
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
@@ -364,12 +409,26 @@ pick the next GDDs after the v0.3.9-3 test.
     separate doodle-jump clone. Snowy Tower owns that niche.
 
 ## 3D shelf (low priority — owner: "i will focus more on 2D anyway")
+- **3d-zombie-fps-rogue-like** (owner, v0.3.9-5 round) — FIRST-PERSON,
+  3D, rogue-like: the character STANDS AND HOLDS THE LINE while the
+  zombies RUN AT HIM from every direction - shoot them down before they
+  arrive, stage after stage, WAVE after wave, the classic standing-shooter
+  Android shape (the owner: "like those android games where the character
+  stands and zombies running toward him and he should shoot them and
+  there is different stages and many waves"). The runs climb, the guns
+  talk, the horde never learns mercy.
 - **rubiks-cube-3d** — the cube thing (owner: "rupik or rupic, you got it"):
   a real 3D Rubik's cube you twist and turn with swipes, scramble it,
   solve it. Layer turns, timer, maybe a solver hint later.
 - **helix-jump-like** — owner described it precisely: a long cylindrical
   tower, platforms spiral around it, the ball bounces down and SHATTERS the
   platforms it lands on — avoid the black segments.
+  - **THE STACK BALL NOTE** (owner, v0.3.9-5 round, added "under it"): this
+    one may wear TWO MODES - the first is the CLASSIC stack-ball smash,
+    the second is inspired by the game **Neon Tower** from Gamesnacks; and
+    the shape of the run itself is undecided in the owner's head on
+    purpose: ENDLESS (no end at all) or WITH ends whose lengths and
+    colors stay DYNAMIC. Both live here until the GDD picks.
 - **stress-ball-3d-like** — stabilize the wobbly 3D ball, keep it steady.
 - **crowd runner** — that walking low-poly blue character that gets
   multiplied and divided through gates (count-masters-like).
@@ -411,6 +470,12 @@ balloon connect + circle connect were mined from My Talking Angela 2).
 - **MSN Games** — the owner's v0.3.3-p5 add: the classic MSN Games vault
   (board/card/puzzle casual classics) - study the shelf and mine the
   evergreen shapes.
+- **OLD FLASH GAMES — Miniclip + Yeti Sports** (owner, v0.3.9-5 round):
+  the web's golden arcade age, mined the same way the CN box was. MINICLIP
+  - the whole portal catalog is a name mine (the puzzlers, the sport
+  minis, the one-button arcade shelf). YETI SPORTS - the OG one-tap timing
+  family (the penguin swing and its siblings): how ONE input stretched
+  into nine games. Mine both for shapes GOGABox is missing.
 - **gamesnacks** — the owner's v0.3.3-p5 add (craze caves' home): Google's
   quick-play casual snack site - study HOW each game stays one-thumb +
   instant-resume, and mine the catalog.

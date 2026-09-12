@@ -83,6 +83,25 @@ const WEAPONS := {
 const WEAPON_ORDER := ["smg", "shotgun", "rifle", "laser", "cannon", "frost",
         "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "molotov",
         "cleaver"]
+
+## THE HEAVY KICK (v0.3.9-5, the owner: "making heavy weapons/shots have
+## like a weapon-shake effect where the shot goes slightly out of line by
+## specific angle from shot to shot and happens after rapid firing like a
+## real thing"): the big single shells lose their line when the barrel
+## heats - every shot pours HEAT in, every second cools some out, and the
+## aim walks a cone that grows with the heat. Slow firing keeps the cone
+## microscopic; rapid fire (adrenaline, high cadence tiers) shakes it.
+## kick = the max cone half-angle (rad) at full heat.
+const HEAVY_KICK := {
+        "rifle":   {"kick": 0.055},
+        "cannon":  {"kick": 0.095},
+        "rail":    {"kick": 0.075},
+        "fryer":   {"kick": 0.105},
+        "gravity": {"kick": 0.085},
+        "molotov": {"kick": 0.095},
+}
+const KICK_HEAT := 0.22   # heat poured per shot (full heat in ~5 fast shots)
+const KICK_COOL := 0.30   # heat shed per second of not spamming
 ## the 3 weapons every new player owns (the owner: "starts with only 3")
 const START_WEAPONS := ["smg", "shotgun", "rifle"]
 ## THE VARIED HOLSTER LAW (v0.3.4-5, the owner: "it is weird how all types of
@@ -476,6 +495,8 @@ const SKILLS := {
                 "desc": "every 6s lightning zaps the 3 nearest enemies"},
         "twin_tail": {"name": "TWIN TAIL", "cost": 2,
                 "desc": "a ghost gun guards your back - every volley fires backwards at 40%"},
+        "split_sight": {"name": "SPLIT SIGHT", "cost": 2,
+                "desc": "TWO weapons each pick their own prey (by range and distance) - the rest hunt together"},
         "adrenaline": {"name": "ADRENALINE ROOT", "cost": 1,
                 "desc": "a dodge revs +80% attack speed for 2s"},
         "golden_gut": {"name": "GOLDEN GUT", "cost": 1,
@@ -485,7 +506,7 @@ const SKILLS := {
 }
 const SKILL_ORDER := ["shattered_shield", "leech_aura", "frost_aura",
         "ghost_round", "starch_rage", "static_burst", "twin_tail",
-        "adrenaline", "golden_gut", "magnetic_skin"]
+        "split_sight", "adrenaline", "golden_gut", "magnetic_skin"]
 
 ## v0.3.8-2 THE SKILL DEPTHS (the owner: "make both skills and stats to have
 ## 5 upgrades each one with higher points and gives extra stuff, design
@@ -539,6 +560,11 @@ const SKILL_LEVELS := {
                 "frac": [0.4, 0.5, 0.6, 0.7, 0.85],
                 "melee_r": [0.6, 0.65, 0.7, 0.75, 0.8],
                 "pierce": [0, 0, 0, 1, 2]},
+        "split_sight": {"lvs": ["TWO weapons each pick their own prey - the rest hunt together",
+                        "THREE weapons spread their fire", "FOUR weapons spread their fire",
+                        "FIVE weapons spread their fire",
+                        "SIX weapons spread their fire - the whole holster hunts alone"],
+                "guns": [2, 3, 4, 5, 6]},
         "adrenaline": {"lvs": ["a dodge revs +80% attack speed for 2s",
                         "the rev hits +95% for 2.3s", "the rev hits +110% for 2.6s - and heals 3 HP",
                         "the rev hits +130% for 3s",

@@ -66,7 +66,10 @@ there. the current game is little good".
 - the physical snowfall: 110 flakes, global wind, per-platform snow caps,
   the ball's top-cap catchment (a flake only sticks where snow actually
   lands), per-character stick/shed multipliers
-- the four characters: Snowball (rolls), Ice Cube (tumbles in exact
+- the four characters: Balldozer (rolls — renamed from "Snowball" in the
+  v0.3.9-5 round, the owner's cross-game character law: this is THE ball
+  that travels through every GOGABox world; its lore lives in the dot
+  eater GDD), Ice Cube (tumbles in exact
   90-degree steps, sluggish, sheds on landing), Shard (glass-light,
   floaty, snow barely sticks), Eggy (wobbles, slides forever, snow loves
   it) — eyes for everyone, mouth for NOBODY

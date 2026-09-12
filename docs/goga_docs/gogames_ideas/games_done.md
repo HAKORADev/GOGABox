@@ -5,7 +5,7 @@ order — when a game's idea or origin matters, the paper trail lives in
 this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 
 1. Snake
-2. PONG
+2. PING-PONG
 3. Space Dash
 4. Fruit Slasher
 5. Snowy Tower
