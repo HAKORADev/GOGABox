@@ -28,6 +28,11 @@ func _ready() -> void:
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame
+        # RIG_D lands AFTER the boot: _goga_setup (inside add_child)
+        # resets size_id to "4"/the equipped size and would clobber any
+        # pre-set (the rig filmed 4x4 forever while wearing the 6/8 ask)
+        if rig_d != "":
+                g._apply_size(rig_d)
         _soft_reset(11)
 
 func _soft_reset(seed_v: int) -> void:

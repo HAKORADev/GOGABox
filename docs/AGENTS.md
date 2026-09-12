@@ -623,3 +623,26 @@ rig actually drove. Bonus seat: moving a widget AFTER the widget it
 follows means its own removal SHIFTS every later index - compute the
 insert seat from live indices (the squares goals card landed behind the
 coins chip twice before the shift correction landed).
+
+**23. THE LIVING LAYER (v0.3.9-4) - a layer whose art reads the clock
+repaints on the TICK, not on events.**
+The owner tested v0.3.9-3 and reported the square-complete color
+transition "broken - after each drawn line, the animations moves a
+frame". Root cause: law 22's half-truth. The mutators DID repaint what
+they mutate (`box_l.queue_redraw()` inside `_place` when a box falls) -
+but the box wash's alpha is a function of the GAME CLOCK, and the tick
+only repainted `line_l` + `fx_l`. So the wash rendered its age-0 frame
+at the claim and then SAT THERE, frozen, until the next event (the next
+line placement) repainted the layer one frame forward. One frame per
+event, exactly what the owner saw. The fix: the tick repaints every
+animated layer every frame (`box_l` joined `line_l`/`fx_l` in
+`_goga_tick`). Event-driven repaints are for EVENT-driven art (the
+mutator law survives); time-driven art needs the heartbeat. Rule of
+thumb: if a draw function reads `_time` (or any clock), its layer
+belongs to the tick's repaint list - or the animation only moves when
+something else happens. (The same round pinned two more squares truths:
+the guide lattice - a board of naked dots reads BLANK, give every
+playable edge a visible gray placeholder, the ink covers it when drawn;
+and the HBoxContainer seat - `move_child(x, chip.get_index())` seats x
+BEFORE the chip, `get_index() + 1` seats it after. The old index
+gymnastics had been masking the wrong insert seat.)

@@ -1,8 +1,25 @@
 extends GogaGame
-## SQUARES - v0.3.9-3, the dots-and-boxes classic graduates from the
-## workshop (the teaser DOTS is renamed SQUARES by the owner's order; the
-## brain's honest ancestor is KDE's KSquares - draw lines between the dots,
-## close a box to claim it, close one and you go again, most boxes wins).
+## SQUARES - v0.3.9-4, the dots-and-boxes classic (graduated v0.3.9-3; the
+## teaser DOTS was renamed SQUARES by the owner's order; the brain's
+## honest ancestor is KDE's KSquares - draw lines between the dots, close
+## a box to claim it, close one and you go again, most boxes wins).
+##
+## Owner round v0.3.9-4 (the test report):
+##   - THE GUIDE LATTICE: the board "looks blank with dots, not with the
+##     lines that shows where a thing should go" - every edge now wears
+##     a visible GRAY dashed guide (the old paper-grain stripes were the
+##     "literally invisible" lines the owner reported; they are gone)
+##   - THE OUTLINE LAW: "the ones at the edge are supposed to be literally
+##     at the board outlines for real as same as KSquares" - the slab rim
+##     is a thin breathing margin now, the outer dots sit ON the outline,
+##     and the outer edge ring reads as the board's own frame
+##   - THE LIVING LAYER: "after each drawn line, the animations moves a
+##     frame" - the box wash only repainted when the next line landed
+##     (an event-driven layer under a time-based fade); the tick repaints
+##     every animated layer now, the fades breathe on their own
+##   - THE TALLY SEAT: the squares widget lives UNDER the goals cards
+##     (not beside them) and the D panel is GONE - "this game has no
+##     draws as i told you" - the goals row reads W | L only
 ##
 ## Owner contract (v0.3.9-3):
 ##   - VERTICAL ONLY (the xo law: no position ask, no horizontal table)
@@ -400,7 +417,8 @@ var rounds := 0
 var done_rounds := 0
 var wins := 0
 var losses := 0
-var draws := 0                  # the W/D/L card seat - always 0 (no draws)
+var draws := 0                  # kept for the framework's sake - no draws
+                                # can exist here (the D card is gone)
 var streak := 0
 
 # the chain-scar memory (the xo law)
@@ -535,14 +553,27 @@ func _draw_bg() -> void:
         bg_l.draw_rect(Rect2(0, fy - 3.0, vp.x, 3.0),
                         (th["floor"] as Color).lightened(0.12))
 
+## v0.3.9-4 THE OUTLINE LAW: the rim is a THIN breathing margin - the
+## outer dots sit literally ON the board's outlines (the owner: "the ones
+## at the edge are supposed to be literally at the board outlines for
+## real as same as KSquares ... making it to be like literal outlines
+## will feel more cooler"). The old 0.42-cell pad pushed the lattice
+## inward - gone.
+func _slab_rim() -> float:
+        return maxf(10.0, cell * 0.14)
+
 func _slab_rect() -> Rect2:
         var span := float(dots_n - 1) * cell
-        var pad := cell * 0.42
-        return Rect2(board_origin - Vector2(pad, pad),
-                        Vector2(span + pad * 2.0, span + pad * 2.0))
+        var rim := _slab_rim()
+        return Rect2(board_origin - Vector2(rim, rim),
+                        Vector2(span + rim * 2.0, span + rim * 2.0))
 
-## THE BOARD: the paper slab, the ink dots (the grain bands are
-## PRE-BLENDED opaque - the alpha law)
+## THE BOARD: the paper slab + THE GUIDE LATTICE + the ink dots. The
+## owner (v0.3.9-4): "the board looks blank with dots, not with the lines
+## that shows where a thing should go" - every edge wears a visible GRAY
+## dashed guide (striped + alpha, the owner's own taste), the outer ring
+## draws solid as the board's frame, the old grain stripes are GONE (they
+## were the "literally invisible" lines the owner reported).
 func _draw_board() -> void:
         var th := _theme()
         var r := _slab_rect()
@@ -551,22 +582,34 @@ func _draw_board() -> void:
         board_l.draw_rect(r, th["board"])
         board_l.draw_rect(Rect2(r.position.x, r.end.y - 10.0, r.size.x,
                         10.0), th["board_dark"])
-        # the paper grain: faint horizontal bands, pre-blended opaque
-        var band := 0
-        var yy := r.position.y + cell * 0.5
-        while yy < r.end.y:
-                if band % 3 != 2:
-                        var tone: Color = th["board_dark"]
-                        var base: Color = th["board"]
-                        board_l.draw_rect(Rect2(r.position.x + 6.0, yy,
-                                        r.size.x - 12.0, 2.0),
-                                        Color(tone.r * 0.22 + base.r * 0.78,
-                                        tone.g * 0.22 + base.g * 0.78,
-                                        tone.b * 0.22 + base.b * 0.78))
-                yy += cell * 0.86
-                band += 1
+        # the hint gray: between the paper and the ink, plainly visible,
+        # still gray - and the drawn ink lines cover it whole later
+        var hint: Color = (th["line"] as Color).lerp(th["board"], 0.62)
+        var gw := maxf(2.0, cell * 0.028)
+        var dashes := 5
+        for e in edges_total(dots_n):
+                var seg := _edge_seg(e)
+                for k in dashes:
+                        var f0 := (float(k) + 0.25) / float(dashes)
+                        var f1 := (float(k) + 0.8) / float(dashes)
+                        board_l.draw_line(seg[0].lerp(seg[1], f0),
+                                        seg[0].lerp(seg[1], f1),
+                                        Color(hint, 0.9), gw, true)
+        # the outline ring: the OUTER edges draw solid and a touch wider
+        # - the rim dots literally wear the board's outline
+        var ow := gw * 1.3
+        for c in dots_n - 1:
+                var st := _edge_seg(idx_h(c, 0, dots_n))
+                var sb := _edge_seg(idx_h(c, dots_n - 1, dots_n))
+                board_l.draw_line(st[0], st[1], Color(hint, 1.0), ow, true)
+                board_l.draw_line(sb[0], sb[1], Color(hint, 1.0), ow, true)
+        for rr in dots_n - 1:
+                var sl := _edge_seg(idx_v(0, rr, dots_n))
+                var sr := _edge_seg(idx_v(dots_n - 1, rr, dots_n))
+                board_l.draw_line(sl[0], sl[1], Color(hint, 1.0), ow, true)
+                board_l.draw_line(sr[0], sr[1], Color(hint, 1.0), ow, true)
         # the dots (the board's whole skeleton)
-        var dr := maxf(3.0, cell * 0.075)
+        var dr := maxf(3.0, cell * 0.08)
         for c in dots_n:
                 for rr in dots_n:
                         board_l.draw_circle(dot_at(c, rr), dr, th["line"])
@@ -649,18 +692,20 @@ func _draw_lines() -> void:
                                                 pc.b + (ink.b - pc.b) * k)
                                 a = 1.0
                 line_l.draw_line(seg[0], seg[1], Color(col, a), w, true)
-        # THE STANDBY (THE HOLD LAW): dashed, translucent, it breathes
+        # THE STANDBY (THE HOLD LAW): dashed, translucent, it breathes -
+        # v0.3.9-4: brighter and chunkier, it must read at a glance over
+        # the gray lattice
         if ghost_edge >= 0 and state == "play" and turn == 1:
                 var seg := _edge_seg(ghost_edge)
-                var pulse := 0.42 + 0.16 * sin(_time * 6.0)
+                var pulse := 0.62 + 0.22 * sin(_time * 6.0)
                 var gc := Color(RED_P, pulse)
-                var dashes := 6
+                var dashes := 5
                 for k in dashes:
                         var f0 := float(k) / float(dashes)
-                        var f1 := (float(k) + 0.55) / float(dashes)
+                        var f1 := (float(k) + 0.62) / float(dashes)
                         line_l.draw_line(seg[0].lerp(seg[1], f0),
                                         seg[0].lerp(seg[1], f1), gc,
-                                        w * 1.15, true)
+                                        w * 1.4, true)
 
 func _draw_fx() -> void:
         # the coin (the xo coin law, seated inside its box)
@@ -704,8 +749,10 @@ func _layout(vp: Vector2) -> void:
         # THE SLAB FIT LAW: the slab stays inside the screen - the paper
         # never kisses the edges
         var span := float(dots_n - 1)
-        cell = minf((vp.x - 36.0) / (span + 0.84),
-                        (vp.y - top - bot) / (span + 0.84))
+        # the fit wears the OUTLINE LAW's own rim (0.14*cell a side ->
+        # +0.28 of a cell) plus the shadow's breathing room
+        cell = minf((vp.x - 44.0) / (span + 0.28),
+                        (vp.y - top - bot - 30.0) / (span + 0.28))
         cell = minf(cell, 112.0)
         cell = maxf(cell, 30.0)
         var side := span * cell
@@ -726,38 +773,35 @@ func _place_texts(vp: Vector2) -> void:
                 turn_lbl.custom_minimum_size = Vector2(vp.x, 44)
         if verdict_lbl != null:
                 verdict_lbl.position = Vector2(0,
-                                board_origin.y + span + cell * 0.42 + 20.0)
+                                board_origin.y + span
+                                + maxf(26.0, cell * 0.14) + 22.0)
                 verdict_lbl.custom_minimum_size = Vector2(vp.x, 50)
 
 # ------------------------------------------------- the widget row
 
 func _build_widgets(vp: Vector2) -> void:
-        # THE W-D-L CARDS (the dominoes widget verbatim - and on this
-        # board the D card is furniture: no draws can exist)
+        # THE W-L CARDS (v0.3.9-4, the owner: "remove the D panel (draws)
+        # because this game has no draws as i told you") - W | L only
         goals_row = Control.new()
-        goals_row.custom_minimum_size = Vector2(108.0 * 3.0 + 8.0 * 2.0,
-                        64.0)
+        goals_row.custom_minimum_size = Vector2(108.0 * 2.0 + 8.0, 64.0)
         goals_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         goals_row.draw.connect(_draw_goal_cards.bind(goals_row))
         _hud_row.add_child(goals_row)
         var score_chip: Control = _score_label.get_parent().get_parent()
-        _hud_row.move_child(goals_row, score_chip.get_index())
-        # THE SQUARES WIDGET (the owner's seat law): RED nn | BLUE nn,
-        # seated AFTER the score chip and BEFORE the goals cards (the
-        # index law: seat by the OUTER container, always)
+        # insert AFTER the score chip (at its index + 1 - inserting AT the
+        # chip's index seats the cards BEFORE it, the qa caught that)
+        _hud_row.move_child(goals_row, score_chip.get_index() + 1)
+        # THE TALLY SEAT (v0.3.9-4, the owner: "the widget of squares count
+        # i guess it should be under the goals widget instead of being next
+        # to it"): RED nn | BLUE nn rides UNDER the W/L cards as the goals
+        # card's own child - it follows the card's seat wherever the row
+        # puts it, and the old row-index gymnastics died with the D panel
         squares_row = Control.new()
-        squares_row.custom_minimum_size = Vector2(64.0 * 2.0 + 8.0, 64.0)
         squares_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         squares_row.draw.connect(_draw_squares_cards.bind(squares_row))
-        _hud_row.add_child(squares_row)
-        _hud_row.move_child(squares_row, score_chip.get_index() + 1)
-        # the goals cards follow the squares widget - and a widget's own
-        # removal SHIFTS every index after it (the seat that landed the
-        # goals cards behind the coins chip twice): compute the insert
-        # seat from the LIVE indices, shift-corrected
-        var gi := goals_row.get_index()
-        var si := squares_row.get_index()
-        _hud_row.move_child(goals_row, si if gi < si else si + 1)
+        goals_row.add_child(squares_row)
+        squares_row.position = Vector2((224.0 - 136.0) * 0.5, 68.0)
+        squares_row.size = Vector2(136.0, 46.0)
         turn_lbl = Arc.label("", 30, Color(1, 1, 1, 0.95))
         turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         world.add_child(turn_lbl)
@@ -810,19 +854,21 @@ func _draw_goal_cards(c: Control) -> void:
         var cw := 108.0
         var ch := 46.0
         var gapw := 8.0
-        var cols := [Color("58c470"), Color("8b93a1"), Color("e8574a")]
-        var letters := ["W", "D", "L"]
+        # v0.3.9-4: W | L - the D card is gone (the owner: this game has
+        # no draws, "as i told you")
+        var cols := [Color("58c470"), Color("e8574a")]
+        var letters := ["W", "L"]
         var f := ThemeDB.fallback_font
         var mid_y := c.size.y * 0.5
         var x0 := c.size.x * 0.5
-        for i in 3:
+        for i in 2:
                 var x: float = (cw + gapw) * (i - 1) + x0
                 var r := Rect2(x - cw * 0.5, mid_y - ch * 0.5, cw, ch)
                 c.draw_rect(Rect2(r.position + Vector2(4, 4), r.size),
                                 Color(0.09, 0.05, 0.02, 0.85))
                 c.draw_rect(r, Color(1, 1, 1, 0.95))
                 c.draw_rect(r, cols[i], false, 5.0)
-                var num: int = [wins, draws, losses][i]
+                var num: int = [wins, losses][i]
                 c.draw_string(f, Vector2(x - cw * 0.5 + 10.0,
                                 mid_y + 15.0), letters[i],
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, 26, cols[i])
@@ -1174,7 +1220,6 @@ func _goga_tick(delta: float) -> void:
                 clock += delta
                 if glow_t >= 0.0:
                         glow_t = minf(1.2, glow_t + delta * 1.4)
-                        box_l.queue_redraw()
                 if clock >= 2.2:
                         _new_round()
         # retire the fade entries past their windows (tiny dicts)
@@ -1192,6 +1237,12 @@ func _goga_tick(delta: float) -> void:
                 for b in stale:
                         box_anim.erase(b)
         coin_t += delta
+        # THE LIVING LAYER LAW (v0.3.9-4): every layer whose art reads the
+        # clock repaints on the TICK - an event-driven repaint freezes a
+        # time-based fade between events (the owner: "after each drawn
+        # line, the animations moves a frame" - the box wash only moved
+        # when the next line landed). The fades breathe on their own now.
+        box_l.queue_redraw()
         line_l.queue_redraw()
         fx_l.queue_redraw()
 

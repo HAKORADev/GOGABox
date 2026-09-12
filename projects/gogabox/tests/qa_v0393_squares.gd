@@ -39,15 +39,17 @@ func _boot() -> void:
         # the player opens round 1, so the board is LIVE with no hand-set
         fails += _check(g.state == "play" and g.turn == 1,
                 "sq: THE STATE LAW - the player-open round is live")
-        # THE WIDGET SEAT LAW (the owner: after the score, before the goals)
-        var row := g._hud_row
+        # THE WIDGET SEAT LAW (v0.3.9-4: the tally lives UNDER the goals
+        # cards and the D panel is gone - W | L only)
         var score_chip: Control = g._score_label.get_parent().get_parent()
-        fails += _check(g.squares_row.get_index() \
-                        == score_chip.get_index() + 1,
-                "sq: the squares widget sits right after the score chip")
         fails += _check(g.goals_row.get_index() \
-                        == g.squares_row.get_index() + 1,
-                "sq: the goals cards sit right after the squares widget")
+                        == score_chip.get_index() + 1,
+                "sq: the goals cards sit right after the score chip")
+        fails += _check(g.squares_row.get_parent() == g.goals_row,
+                "sq: the squares tally rides UNDER the goals cards")
+        fails += _check(g.squares_row.position.y >= 64.0,
+                "sq: the tally is below the cards, not beside them (y=%s)"
+                                % g.squares_row.position.y)
         # THE CONTROLS LAW (v0.3.9-1): a real press+release through
         # _goga_input draws the line on the nearest edge
         var edge: int = int(SQ.idx_h(1, 1, g.dots_n))
@@ -218,7 +220,46 @@ func _boot() -> void:
                 "sq: THE KSQUARES LAW - the claimer keeps the brush")
         fails += _check(_red(g.boxes) == 1,
                 "sq: the box wears the RED pen")
+        # THE LIVING LAYER LAW (v0.3.9-4): the TICK repaints the box wash -
+        # probe_steps alone move the fade, no manual queue_redraw nudge
+        # (the owner: "after each drawn line, the animations moves a frame")
+        var img7: Image = g.get_viewport().get_texture().get_image()
+        if img7 != null:
+                var bc0 := board_mid(g, 0, 0)
+                var p0: Color = img7.get_pixel(int(bc0.x), int(bc0.y))
+                for i in 6:
+                        g.probe_step(0.045)      # ~0.27s of fade, no nudges
+                await get_tree().process_frame
+                await get_tree().process_frame
+                var img8: Image = g.get_viewport().get_texture() \
+                                .get_image()
+                var p1: Color = img8.get_pixel(int(bc0.x), int(bc0.y))
+                fails += _check(p1.g < p0.g - 0.1 \
+                                and p1.r > p1.g + 0.1,
+                        "sq: THE LIVING LAYER - the wash fades on the tick alone (%s -> %s)"
+                                        % [p0, p1])
+                # THE GUIDE LATTICE (v0.3.9-4): the board is never blank -
+                # an undrawn edge reads as visible gray dashes (this frame
+                # is pre-claim, the box is still bare paper here, so the
+                # same image serves the census on a fresh edge)
+                var lseg: Array = g._edge_seg(int(SQ.idx_h(1, 2,
+                                g.dots_n)))
+                var gray_hits := 0
+                for k in 24:
+                        var lf := (float(k) + 0.5) / 24.0
+                        var lp: Vector2 = lseg[0].lerp(lseg[1], lf)
+                        var lpx: Color = img8.get_pixel(int(lp.x),
+                                        int(lp.y))
+                        var mx: float = maxf(lpx.r, maxf(lpx.g, lpx.b))
+                        var mn: float = minf(lpx.r, minf(lpx.g, lpx.b))
+                        if mx < 0.91 and mx > 0.31 and mx - mn < 0.18:
+                                gray_hits += 1
+                fails += _check(gray_hits >= 8,
+                        "sq: the guide lattice is visible gray (%d of 24 samples)"
+                                        % gray_hits)
         # THE PIXEL TRUTH of the claimed box: its center is red-washed
+        # (v0.3.9-4: the LIVING LAYER does the repainting - the manual
+        # nudge below stays only as belt-and-braces for the rig)
         var img5: Image = g.get_viewport().get_texture().get_image()
         if img5 != null:
                 # drive the fade to its rest (age > BOX_A: full alpha)

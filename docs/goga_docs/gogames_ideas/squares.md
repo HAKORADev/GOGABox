@@ -111,3 +111,29 @@ box_sides / closers / safe_edges / greedy_run / hands_run / winner_of /
 cpu_pick / remember / adapt` drive headless laws without the scene (the
 bovo contract). The scene probes ride `probe_reset(seed, dots)` +
 `probe_step(dt)`.
+
+## The owner round v0.3.9-4 (the test report)
+
+The owner tested the graduate and dominoes read clean ("now it works
+as it should"); squares wore four fixes, all shipped:
+
+- THE GUIDE LATTICE — the board "looks blank with dots, not with the
+  lines that shows where a thing should go". Every playable edge now
+  wears a visible GRAY dashed guide (striped + alpha, the owner's own
+  taste); the drawn ink lines cover the guide whole when an edge is
+  taken. The old paper-grain stripes — the "literally invisible" lines
+  the owner reported — are GONE.
+- THE OUTLINE LAW — "the ones at the edge are supposed to be literally
+  at the board outlines for real as same as KSquares". The slab rim
+  shrank from 0.42*cell to a thin breathing margin (max(10, 0.14*cell)):
+  the outer dots sit ON the board's outline, and the outer edge ring
+  draws solid + slightly wider as the frame.
+- THE LIVING LAYER — "after each drawn line, the animations moves a
+  frame". The box wash is clock-driven but its layer only repainted on
+  placement events; the tick now repaints every animated layer, the
+  fades breathe on their own (AGENTS.md law 23).
+- THE TALLY SEAT — the RED|BLUE squares widget moved UNDER the goals
+  cards (it is the goals card's own child now, seated wherever the row
+  puts the cards), and the D panel is gone: the goals row reads W | L
+  only — "this game has no draws as i told you". The standby ghost also
+  grew brighter and chunkier so it reads at a glance over the lattice.
