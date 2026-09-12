@@ -54,11 +54,14 @@ func _squares() -> void:
         _check(absf((row_r.size.x - (cw * 2.0 + 8.0))) < 0.5,
                         "sq: the goals row wears exactly two cards wide (%.0f)"
                         % row_r.size.x)
-        # the chip sits LEFT of the cards, coins right of them: order law
+        # THE SEAT LAW (v0.3.9-6 round 2, the owner: "score widget should
+        # be at the left side from the gogacoins widget, others comes
+        # later"): the cards sit LEFT of the score chip, the score hugs
+        # the coins: goals | score | coins
         var coins_chip: Control = g._coins_label.get_parent().get_parent()
-        _check(chip_r.position.x < row_r.position.x \
-                        and row_r.position.x < coins_chip.get_global_rect().position.x,
-                        "sq: the HUD order reads score | goals | coins")
+        _check(row_r.position.x < chip_r.position.x \
+                        and chip_r.position.x < coins_chip.get_global_rect().position.x,
+                        "sq: the HUD order reads goals | score | coins")
 
         # THE DUST LIFE: the pips move and age on the tick (the firework)
         var d := dots_n_box(g)

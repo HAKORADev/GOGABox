@@ -139,3 +139,59 @@ default roller seat in this same round — renamed from "Snowball").
   pacman_drive autopilot: the dense 35x17 maze, the BLUE rush armed,
   real greedy swipes) cooled by `tools/v0396_pacman_thumb.py` — bloom,
   vignette, saturation. No baked text.
+
+## THE REPAIRS II (v0.3.9-6 ROUND 2, the owner's second report)
+
+- **THE HONEST TARGET (the movement corruption, root-caused by the
+  flight recorder)**: the owner filmed a swipe sending Balldozer
+  sweeping DIAGONALLY across the board to a cell OFF it, then frozen
+  there with the face turned - "movement is still corrupted". Root
+  cause: every flight takeoff read `to = c + _wrap_to(c, dir)`, but
+  `_wrap_to` already RETURNS the next cell, so the body flew to
+  `2c + dir` (from the spawn (7,7) a right-swipe targeted (15,14) -
+  outside the 15x9 grid). Every later `is_open` at the OOB seat pushed
+  an error and read the storm's null as a wall: the run froze, the
+  mouth kept chewing, swipes did nothing. TEN sites wore the shape
+  (the player's takeoff/turn/continue, the arrivals, the eaters' takeoff
+  and their AI distance math). All ten read `to = _wrap_to(c, dir)`
+  now, and `is_open` wears THE BOUNDS LAW (an out-of-grid cell is never
+  open - no error storms, ever). The eaters chase honestly again too.
+- **THE WALL FACE LAW**: the old arrival AUTO-REVERSED out of every
+  stem - the body bounced back the way it came at every dead-straight
+  junction (the recorder filmed it oscillating between two cells, "the
+  character goes to a weird side" all over again). The classic's
+  patience is back: a blocked arrival WAITS facing the wall; any open
+  way (the reversal swipe included) starts instantly.
+- **THE FIRST-SWIPE LAW**: a STOPPED body wears a stale face (the spawn
+  face, the wall face) - the old `dir == pd` early-return ate a swipe
+  along that face whole, so the very first swipe of a run could die on
+  the floor. It starts the run now.
+- **THE READY STASH**: the 1.3s READY beat used to swallow every swipe
+  (the supervisor taps to start, swipes immediately, nothing happens).
+  One slot now stashes the order and applies it the moment the run
+  starts - the classic accepts input during READY! too.
+- **THE SPEED LAW**: "i guess original pacman has speed multiplier, we
+  should make one where speed increases by x1.10 after each level and
+  maximum is x3" - Balldozer compounds x1.10 per maze, x3.00 is the
+  ceiling, the rush's x1.32 still stacks on top. The speed widget wears
+  the snake/geometry/ping-pong seat: after the score one, at the left
+  of the coins (`dots | lives | rush | SCORE | speed | coins`).
+- **THE SEAT LAW (squares too)**: "score widget should be at the left
+  side from the gogacoins widget, others comes later" - in squares the
+  W/L goals cards had slipped BETWEEN the score and the coins; they
+  seat LEFT of the score chip now (the row reads goals | score |
+  coins), and in the dot eater the dots/lives/rush chips moved left of
+  the score the same way.
+- **THE SILENT GATE**: "the tap anywhere to start shows too many
+  helpful stuff" - the gate says its ONE sentence (TAP ANYWHERE TO
+  START); the title, the tagline and the controls talk are gone (the
+  controls' place is the guide, not the gate).
+- **THE FLIGHT RECORDER** (tests/de_flight_rec.gd): the owner's video
+  stand-in - REAL finger gestures through the engine queue while a
+  sampler classifies every swipe (APPLIED / BUFFERED / REVERSED /
+  NO-OP with the reason) and flags OOB seats, dishonest flights and
+  pixel teleports, exit 1 on any. It caught the double-add in one run
+  after the dir-asserting qa suites had missed it for two rounds.
+- **Version**: the owner's law - "put it under v039-6 round 2, same
+  exact version, because the fixes are for problems that were supposed
+  to be already fixed". versionName stays 0.3.9-6.

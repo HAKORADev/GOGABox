@@ -809,9 +809,12 @@ func _build_widgets(vp: Vector2) -> void:
         goals_row.draw.connect(_draw_goal_cards.bind(goals_row))
         _hud_row.add_child(goals_row)
         var score_chip: Control = _score_label.get_parent().get_parent()
-        # insert AFTER the score chip (at its index + 1 - inserting AT the
-        # chip's index seats the cards BEFORE it, the qa caught that)
-        _hud_row.move_child(goals_row, score_chip.get_index() + 1)
+        # THE SEAT LAW (v0.3.9-6 round 2, the owner: "score widget should
+        # be at the left side from the gogacoins widget, others comes
+        # later"): the cards seat BEFORE the score chip - the row reads
+        # goals | SCORE | coins, the score hugs the gogacoins it banks
+        # into (the old +1 seat slipped the cards BETWEEN score and coins)
+        _hud_row.move_child(goals_row, score_chip.get_index())
         # THE TALLY SEAT (v0.3.9-4, the owner: "the widget of squares count
         # i guess it should be under the goals widget instead of being next
         # to it"): RED nn | BLUE nn rides UNDER the W/L cards as the goals

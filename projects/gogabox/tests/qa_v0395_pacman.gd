@@ -212,6 +212,130 @@ func _boot() -> void:
         fails += _check(kinds.size() == 4,
                 "de: four drives - hunter, ambusher, flanker, mood")
 
+        # ============ v0.3.9-6 ROUND 2: THE HONEST FLIGHT LAWS ============
+        # THE FLIGHT RECORDER'S LAWS (the owner filmed a diagonal sweep to
+        # a cell OFF the board: `_start_move` double-added the target - the
+        # body flew to 2c+dir, the run froze on an OOB error storm, the
+        # face turned while the body sat). The flight is HONEST now.
+        g.probe_reset(4242)
+        g.probe_step(1.5)
+        fails += _check(g.phase == "run", "r2: the probe run breathes")
+        # 1. a started flight lands on the NEXT cell (never 2c+dir)
+        var seat := Vector2i(3, 5)
+        _seat_stopped(seat)
+        seat = g.player["cell"]
+        g._swipe_dir(Vector2i(1, 0), Vector2())
+        if g.player["moving"] and g.player["dir"] == Vector2i(1, 0):
+                var want_to: Vector2i = g._wrap_to(seat, Vector2i(1, 0))
+                fails += _check(g.player["to"] == want_to,
+                        "r2: a started flight targets the NEXT cell (%s, not 2c+dir)"
+                                        % str(want_to))
+        else:
+                # the seat may face a wall - step RIGHT-open seats only
+                fails += _check(true, "r2: (seat %s not right-open - skipped)"
+                                % str(seat))
+        # 2. every arrival continues honestly: adjacency or the wrap pair
+        var honest := true
+        for i in 240:
+                g.probe_step(1.0 / 60.0)
+                var f: Vector2i = g.player["from"]
+                var t: Vector2i = g.player["to"]
+                var inb: bool = f.x >= 0 and f.y >= 0 and f.x < g.cols \
+                                and f.y < g.rows and t.x >= 0 and t.y >= 0 \
+                                and t.x < g.cols and t.y < g.rows
+                var adj: bool = (absi(f.x - t.x) + absi(f.y - t.y)) == 1
+                var wrap: bool = f.y == t.y \
+                                and ((f.x == 0 and t.x == g.cols - 1) \
+                                or (f.x == g.cols - 1 and t.x == 0))
+                var rest: bool = f == t and not g.player["moving"]
+                if not inb or not (adj or wrap or rest):
+                        honest = false
+                        break
+        fails += _check(honest,
+                "r2: 240 driven frames wear ONLY honest flights (adj/wrap/rest)")
+        # 3. THE WALL FACE LAW: a blocked arrival WAITS (no auto-bounce)
+        _seat_corridor(Vector2i(3, 5), Vector2i(1, 0), 0.0)
+        var face := Vector2i(-1, -1)
+        for yy in range(1, g.rows - 1):
+                for xx in range(1, g.cols - 1):
+                        if PM.is_open(g.g, g.cols, xx, yy, Vector2i(1, 0)) \
+                                        and not PM.is_open(g.g, g.cols, xx, yy,
+                                        Vector2i(0, 1)) \
+                                        and not PM.is_open(g.g, g.cols, xx, yy,
+                                        Vector2i(0, -1)) \
+                                        and not PM.is_open(g.g, g.cols, xx, yy,
+                                        Vector2i(-1, 0)):
+                                face = Vector2i(xx, yy)
+                                break
+                if face.x >= 0:
+                        break
+        if face.x >= 0:
+                _seat_corridor(face, Vector2i(1, 0), 0.99)
+                g.buf = Vector2i.ZERO
+                g.probe_step(0.2)
+                fails += _check(not g.player["moving"]
+                                and g.player["dir"] == Vector2i(1, 0)
+                                and g.player["cell"] == face,
+                        "r2: the wall face WAITS facing the wall (no bounce)")
+        # 4. THE STOPPED-FACE SWIPE: the first swipe of the run applies
+        _seat_stopped(Vector2i(7, 7))
+        var face_dir := Vector2i(-1, 0)      # the stale spawn face
+        if PM.is_open(g.g, g.cols, 7, 7, face_dir):
+                g._swipe_dir(face_dir, Vector2())
+                fails += _check(g.player["moving"]
+                                and g.player["dir"] == face_dir,
+                        "r2: a swipe ALONG the stopped face starts the run")
+        # 5. THE READY STASH: a swipe during the READY beat opens the run
+        g.probe_reset(77)
+        fails += _check(g.phase == "ready", "r2: the READY beat waits")
+        # an OPEN way at the spawn (the maze is random - UP may be walled)
+        var open_dir := Vector2i.ZERO
+        for nd in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, 0),
+                        Vector2i(-1, 0)]:
+                if PM.is_open(g.g, g.cols, g.player["cell"].x,
+                                g.player["cell"].y, nd):
+                        open_dir = nd
+                        break
+        g._swipe_dir(open_dir, Vector2())
+        fails += _check(g.pre_dir == open_dir,
+                "r2: a swipe during READY is stashed, not eaten")
+        g.probe_step(1.5)
+        fails += _check(g.phase == "run" and g.player["dir"] == open_dir
+                        and g.pre_dir == Vector2i.ZERO,
+                "r2: the stashed order applies the moment the run starts")
+        # 6. THE SPEED LAW: x1.10 a maze, x3.00 the ceiling, the widget rides
+        g.maze_i = 0
+        fails += _check(absf(g._speed_mult() - 1.0) < 0.001,
+                "r2: maze 1 rolls at x1.00")
+        g.maze_i = 1
+        fails += _check(absf(g._speed_mult() - 1.1) < 0.001,
+                "r2: the next maze rolls x1.10 (the owner's step)")
+        g.maze_i = 2
+        fails += _check(absf(g._speed_mult() - 1.21) < 0.001,
+                "r2: two mazes deep = x1.21 (compounding)")
+        g.maze_i = 40
+        fails += _check(absf(g._speed_mult() - PM.SPEED_MULT_MAX) < 0.001,
+                "r2: x3.00 is the ceiling (maze 40 stays x3.00)")
+        g.maze_i = 1
+        g._new_maze()
+        fails += _check(g.speed_lbl.text == "x1.10",
+                "r2: the speed widget reads the live multiplier (%s)"
+                                % g.speed_lbl.text)
+        # 7. THE SEAT LAW: dots | lives | rush | SCORE | speed | coins
+        var row := g._hud_row
+        var i_score := g._score_chip_ref().get_index()
+        var i_speed: int = g.speed_lbl.get_parent().get_parent().get_index()
+        var i_coins: int = g._coins_chip_ref().get_index()
+        var i_dots: int = g._chip_of(g.dots_lbl).get_index()
+        var i_lives: int = g._chip_of(g.lives_lbl).get_index()
+        var i_rush: int = g.rush_chip.get_index()
+        fails += _check(i_dots < i_lives and i_lives < i_rush \
+                        and i_rush < i_score and i_score < i_speed \
+                        and i_speed < i_coins,
+                "r2: the HUD reads dots|lives|rush|SCORE|speed|coins "
+                + "(%d|%d|%d|%d|%d|%d)" % [i_dots, i_lives, i_rush, i_score,
+                        i_speed, i_coins])
+
         print("=== qa_v0395_pacman: %s ===" % ("PASS" if fails == 0
                         else "%d FAILS" % fails))
         get_tree().quit(0 if fails == 0 else 1)

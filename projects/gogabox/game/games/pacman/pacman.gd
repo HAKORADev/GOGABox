@@ -130,6 +130,15 @@ const EYES_SPEED := 7.5              # the eaten run home fast
 const BUF_WINDOW := 2.5              # cells: the owner's "7-8 of 10"
 const RUSH_TIME := 7.0               # the magical dot's "amount of time"
 
+# THE SPEED LAW (the owner, v0.3.9-6 round 2: "i guess original pacman
+# has speed multiplier, we should make one where speed increases by
+# x1.10 after each level and maximum is x3 i guess for now, the logic
+# of speed widget should be like the rest of the games like snake,
+# geometry flash, ping pong"): Balldozer rolls x1.10 faster EVERY maze,
+# the widget wears the live multiplier, x3.00 is the ceiling.
+const SPEED_LEVEL_STEP := 1.10
+const SPEED_MULT_MAX := 3.0
+
 # --------------------------------------------------------------- the lives
 const START_LIVES := 3               # "the game will start with 3 life points"
 const DOTS_PER_LIFE := 500           # "collecting 500 will give one extra life"
@@ -504,8 +513,14 @@ static func reach(g: Array, cols: int, start: Vector2i) -> Dictionary:
                         q.append(nx)
         return seen
 
-## is the wall toward `dir` open at cell (c, r)? (the wrap edges read open)
+## is the wall toward `dir` open at cell (c, r)? (the wrap edges read
+## open). THE BOUNDS LAW (v0.3.9-6 round 2): a cell outside the grid is
+## NEVER open - the old raw read pushed an OOB error storm and read the
+## storm's null as a wall face, freezing the run (the flight-recorder
+## caught the whole class after one corrupt seat).
 static func is_open(g: Array, cols: int, c: int, r: int, dir: Vector2i) -> bool:
+        if c < 0 or r < 0 or r > g.size() - 1 or c > cols - 1:
+                return false
         var cell: Dictionary = g[r][c]
         if dir == Vector2i(1, 0):
                 if c == cols - 1 and cell["wrap"]:
@@ -571,6 +586,8 @@ var dot_icon: TextureRect = null   # the dot counter's live dot icon
 var lives_lbl: Label = null
 var rush_lbl: Label = null
 var rush_chip: Control = null
+var speed_lbl: Label = null        # the x1.10-a-maze speed widget
+var pre_dir := Vector2i.ZERO       # a swipe stashed during the READY beat
 var death_t := 0.0
 var clear_t := 0.0
 var _fx: Array = []             # [{x, y, vx, vy, life, max, s, col}]
@@ -647,6 +664,10 @@ func _build_world() -> void:
         char_layer.draw.connect(_draw_chars)
         add_child(char_layer)
 
+## THE SPEED LAW: x1.10 per maze, x3.00 the ceiling (the owner's numbers)
+func _speed_mult() -> float:
+        return minf(SPEED_MULT_MAX, pow(SPEED_LEVEL_STEP, float(maze_i)))
+
 func _apply_theme() -> void:
         var t := _theme()
         bg_mat.set_shader_parameter("col_top", t["bg_top"])
@@ -710,6 +731,20 @@ func _build_hud_extra() -> void:
         rush_lbl = add_hud_chip("7.0")
         rush_chip = rush_lbl.get_parent().get_parent() as Control
         rush_chip.visible = false
+        # THE SPEED WIDGET (the speed law: the snake seat - it reads x1.00
+        # at the patrol pace and climbs x1.10 a maze to the x3.00 ceiling)
+        speed_lbl = add_hud_chip("x1.00")
+        # THE SEAT LAW (the owner, v0.3.9-6 round 2: "score widget should
+        # be at the left side from the gogacoins widget, others comes
+        # later" - the snake/geometry/ping-pong look): the dots/lives/rush
+        # chips move LEFT of the score chip, the speed chip rides the
+        # snake seat right after the score one, the row reads
+        # dots | lives | rush | SCORE | speed | coins.
+        var score_chip := _score_chip_ref()
+        if score_chip != null:
+                for chip in [_chip_of(dots_lbl), _chip_of(lives_lbl),
+                                rush_chip]:
+                        _hud_row.move_child(chip, score_chip.get_index())
         # the flash banner (READY / MAZE CLEAR / the deaths' verdict)
         banner_lbl = Arc.label("", 62, Color(1, 1, 1, 0))
         banner_lbl.set_anchors_preset(Control.PRESET_TOP_WIDE)
@@ -717,6 +752,14 @@ func _build_hud_extra() -> void:
         banner_lbl.offset_bottom = 230.0 * us
         banner_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         _hud.add_child(banner_lbl)
+
+## the chip Control behind one of this game's HUD chip labels (the seat
+## law's mover)
+func _chip_of(lbl: Label) -> Control:
+        if lbl == null or lbl.get_parent() == null \
+                        or lbl.get_parent().get_parent() == null:
+                return null
+        return lbl.get_parent().get_parent() as Control
 
 func _flash(txt: String, col := Color(1, 1, 1, 1)) -> void:
         banner_lbl.text = txt
@@ -789,6 +832,9 @@ func _new_maze(first := false) -> void:
         dots_left = dots.size()
         _seat_actors()
         maze_layer.queue_redraw()
+        # THE SPEED WIDGET: the live multiplier reads the new maze's rung
+        if speed_lbl != null and is_instance_valid(speed_lbl):
+                speed_lbl.text = "x%.2f" % _speed_mult()
 
 func _in_plaza(c: Vector2i) -> bool:
         return absi(c.x - plaza.x) <= 1 and absi(c.y - plaza.y) <= 1
@@ -805,6 +851,7 @@ func _seat_actors() -> void:
         player["dir"] = Vector2i(-1, 0)
         player["mouth"] = 0.0
         buf = Vector2i.ZERO
+        pre_dir = Vector2i.ZERO       # a fresh maze owes no stale order
         eaters = []
         for def in EATER_DEFS:
                 var e := {"id": String(def["id"]), "kind": String(def["kind"]),
@@ -837,6 +884,14 @@ func _ready_beat(txt := "READY!") -> void:
 ##   dist >  BUF_WINDOW -> too early: not recorded.
 ##   slot full  -> not recorded (one at a time, the owner's law).
 func _swipe_dir(dir: Vector2i, _at: Vector2 = Vector2.ZERO) -> void:
+        # THE READY STASH (round 2): a swipe during the READY beat is the
+        # supervisor's FIRST order - the old build swallowed it (the whole
+        # 1.3s beat ate every swipe and the run opened deaf). One slot,
+        # the buffer law's shape; it applies the moment the run starts.
+        if phase == "ready" and not paused and not over:
+                if dir != player["dir"]:
+                        pre_dir = dir
+                return
         if phase != "run" or paused or over:
                 return
         var pd: Vector2i = player["dir"]
@@ -845,8 +900,11 @@ func _swipe_dir(dir: Vector2i, _at: Vector2 = Vector2.ZERO) -> void:
         if dir == -pd:
                 _reverse_now(dir)
                 return
-        # swiping the way you already go costs nothing
-        if dir == pd:
+        # swiping the way you already go costs nothing WHILE GOING - but
+        # a STOPPED body wears a stale face (the spawn face, the wall
+        # face): the old early-return ate that swipe whole (the flight
+        # recorder's S1: the first swipe of the run, dead on the floor)
+        if dir == pd and player["moving"]:
                 return
         # standing still (a wall face): any open way starts instantly
         if not player["moving"]:
@@ -926,11 +984,15 @@ func _junction_info() -> Dictionary:
 ## apply a turn AT a cell (the flight to the next cell starts clean).
 ## THE MID-FLIGHT TRUTH: an instant turn at the decision point lands the
 ## arrival here - the dot at that cell is eaten NOW, not never.
+## THE HONEST TARGET (round 2): _wrap_to RETURNS the next cell - the old
+## `c + _wrap_to(c, dir)` double-added it and the body flew to 2c+dir
+## (the owner's video: a diagonal sweep to a cell off the board, the run
+## frozen on an OOB error storm, the face turned while the body sat).
 func _turn_at(c: Vector2i, dir: Vector2i) -> void:
         _eat_at(c)
         player["cell"] = c
         player["from"] = c
-        player["to"] = c + _wrap_to(c, dir)
+        player["to"] = _wrap_to(c, dir)
         player["t"] = 0.0
         player["moving"] = true
         player["dir"] = dir
@@ -948,7 +1010,7 @@ func _wrap_to(c: Vector2i, dir: Vector2i) -> Vector2i:
 func _start_move(dir: Vector2i) -> void:
         var c: Vector2i = player["cell"]
         player["from"] = c
-        player["to"] = c + _wrap_to(c, dir)
+        player["to"] = _wrap_to(c, dir)
         player["t"] = 0.0
         player["moving"] = true
         player["dir"] = dir
@@ -996,6 +1058,11 @@ func _goga_tick(delta: float) -> void:
                         ready_t -= delta
                         if ready_t <= 0.0:
                                 phase = "run"
+                                # THE READY STASH: the first order applies
+                                if pre_dir != Vector2i.ZERO:
+                                        var d := pre_dir
+                                        pre_dir = Vector2i.ZERO
+                                        _swipe_dir(d)
                 "dying":
                         death_t -= delta
                         _death_anim(delta)
@@ -1043,7 +1110,10 @@ func _tick_run(delta: float) -> void:
         _check_collisions()
 
 func _player_speed() -> float:
-        return PLAYER_SPEED * (RUSH_PLAYER_MULT if rush_left > 0.0 else 1.0)
+        # THE SPEED LAW: the maze multiplier (x1.10 a maze, x3.00 the cap)
+        # rides the patrol pace; the rush still stacks its own x1.32
+        return PLAYER_SPEED * _speed_mult() \
+                        * (RUSH_PLAYER_MULT if rush_left > 0.0 else 1.0)
 
 func _tick_player(delta: float) -> void:
         if not player["moving"]:
@@ -1062,24 +1132,26 @@ func _tick_player(delta: float) -> void:
                         player["t"] = 0.0
                         break
                 player["from"] = cell
-                player["to"] = cell + _wrap_to(cell, player["dir"])
+                player["to"] = _wrap_to(cell, player["dir"])
 
-## the arrival: eat, then THE BUFFER APPLIES (the owner's "at 10")
+## the arrival: eat, then THE BUFFER APPLIES (the owner's "at 10").
+## THE WALL FACE LAW (round 2): the corridor ends -> the chomp WAITS,
+## the classic's own patience - the old auto-reverse bounced the body
+## back out of every stem (the recorder filmed it oscillating between
+## two cells, "the character goes to a weird side" all over again).
+## The way out is the supervisor's finger: any open way starts instantly
+## (_swipe_dir's standing branch), the reversal swipe included.
 func _arrive(cell: Vector2i) -> void:
         _eat_at(cell)
         # the buffered turn - the single slot spends itself here
         if buf != Vector2i.ZERO and _dir_open_at(cell, buf):
                 player["dir"] = buf
                 buf = Vector2i.ZERO
-                player["to"] = cell + _wrap_to(cell, player["dir"])
+                player["to"] = _wrap_to(cell, player["dir"])
                 return
         buf = Vector2i.ZERO            # a turn that never fit dies at 10
         if _dir_open_at(cell, player["dir"]):
-                player["to"] = cell + _wrap_to(cell, player["dir"])
-                return
-        if _dir_open_at(cell, -player["dir"]):
-                player["dir"] = -player["dir"]
-                player["to"] = cell + _wrap_to(cell, player["dir"])
+                player["to"] = _wrap_to(cell, player["dir"])
                 return
         player["moving"] = false       # the wall face: the chomp waits
 
@@ -1174,7 +1246,7 @@ func _tick_eaters(delta: float) -> void:
                                 e["t"] = 0.0
                                 break
                         e["from"] = cell
-                        e["to"] = cell + _wrap_to(cell, e["dir"])
+                        e["to"] = _wrap_to(cell, e["dir"])
 
 ## the eater's arrival: the next leg is chosen by its drive
 func _eater_arrive(e: Dictionary, cell: Vector2i) -> void:
@@ -1226,7 +1298,7 @@ func _eater_pick(e: Dictionary) -> void:
                 var best_d := -1.0
                 var best_dir := Vector2i(9, 9)
                 for o in non_rev:
-                        var nxt := cell + _wrap_to(cell, o)
+                        var nxt := _wrap_to(cell, o)
                         var dd := float(absi(nxt.x - player["cell"].x)
                                         + absi(nxt.y - player["cell"].y))
                         if dd > best_d:
@@ -1251,7 +1323,7 @@ func _pick_dir(opts: Array, cell: Vector2i, target: Vector2i,
         var best := Vector2i(9, 9)
         var best_d := -1.0
         for o in opts:
-                var nxt := cell + _wrap_to(cell, o)
+                var nxt := _wrap_to(cell, o)
                 var dd := float(absi(nxt.x - target.x) + absi(nxt.y - target.y))
                 var better := (dd > best_d) if maximize else \
                                 (best_d < 0.0 or dd < best_d)
@@ -1305,7 +1377,7 @@ func _start_eater_move(e: Dictionary, dir: Vector2i) -> void:
                 push_error("EATER OOB seat: %s cell=%s dir=%s state=%s"
                                 % [e["id"], c, dir, e["state"]])
         e["from"] = c
-        e["to"] = c + _wrap_to(c, dir)
+        e["to"] = _wrap_to(c, dir)
         e["t"] = 0.0
         e["moving"] = true
         e["dir"] = dir
@@ -1689,22 +1761,14 @@ func _build_gate() -> void:
         vb.set_anchors_preset(Control.PRESET_CENTER)
         vb.add_theme_constant_override("separation", 18)
         gate_ui.add_child(vb)
-        var t := Arc.label("DOT EATER", 58, Color(1.0, 0.82, 0.30))
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(t)
-        var bal := Arc.label("BALLDOZER  vs  THE FOUR BALL-EATERS", 22,
-                        Color(1, 1, 1, 0.8))
-        bal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(bal)
+        # THE SILENT GATE (the owner, v0.3.9-6 round 2: the gate "shows too
+        # many helpful stuff, remove the title from it and the word at the
+        # top and the one at the bottom, there is controls talk, it's place
+        # is the guide, not to be here") - the gate says its ONE sentence:
         var l := Arc.label("TAP ANYWHERE TO START", 46, Color(1, 1, 1, 0.95))
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(l)
-        var hint := Arc.label("SWIPE to steer - the bite runs the whole "
-                        + "corridor\nthe BLUE dot is the RUSH: faster, and "
-                        + "they are edible", 19, Color(1, 1, 1, 0.55), false)
-        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(hint)
-        vb.position = _vp() * 0.5 - Vector2(300, 160)
+        vb.position = _vp() * 0.5 - Vector2(300, 40)
         vb.custom_minimum_size = Vector2(600, 0)
         add_child(gate_ui)
         gate_ui.visible = true

@@ -678,3 +678,25 @@ closer (invaders `_story_pair`/`_story_down`) - for sheets that must
 never answer the back button. Mixing half of each is the bug class.
 Probe it with a REAL finger event on the button (qa_v0396_round): assert
 the pair is empty, the tree unpaused, and the next state appeared.
+
+**26. THE HONEST TARGET LAW (v0.3.9-6 round 2) - a step helper returns a
+STEP; add it ONCE. And a movement bug is found by DRIVING, not by
+asserting dirs.**
+The owner filmed the dot eater's movement "corrupted": the body swept
+DIAGONALLY to a cell off the board, froze there with its face turned
+(the OOB error storm read every further `is_open` as null/wall), and
+every later swipe pushed another error. Root cause: ONE shape copied
+ten times - `to = c + _wrap_to(c, dir)` - but `_wrap_to` RETURNS the
+next cell (`c + dir`, x-wrapped), so the flight targeted `2c + dir`.
+The qa suite never caught it because it asserted `player["dir"]` and
+`buf` - never `player["to"]` - and its seat helpers set `from`/`to` by
+hand, bypassing every real takeoff. Two cures landed together: (a) every
+flight site reads `to = _wrap_to(c, dir)` (the helper's return IS the
+target), plus the BOUNDS LAW inside `is_open` (an out-of-grid cell is
+never open - no error storms, ever); (b) THE FLIGHT RECORDER
+(tests/de_flight_rec.gd): REAL finger gestures through the engine queue
+while a sampler classifies every swipe's disposition and flags OOB
+seats, dishonest flights (from/to not adjacent/wrap/rest), and pixel
+teleports - exit 1 on any. Rule of thumb: a movement law is proven by
+POSITIONS over time, not by the direction enum after the fact; and when
+a helper returns "the next X", the call site adds NOTHING.

@@ -39,12 +39,14 @@ func _boot() -> void:
         # the player opens round 1, so the board is LIVE with no hand-set
         fails += _check(g.state == "play" and g.turn == 1,
                 "sq: THE STATE LAW - the player-open round is live")
-        # THE WIDGET SEAT LAW (v0.3.9-4: the tally lives UNDER the goals
-        # cards and the D panel is gone - W | L only)
+        # THE WIDGET SEAT LAW (v0.3.9-6 round 2, the owner: "score widget
+        # should be at the left side from the gogacoins widget, others
+        # comes later"): the cards seat LEFT of the score chip - the tally
+        # still lives UNDER the goals cards, the D panel stays gone
         var score_chip: Control = g._score_label.get_parent().get_parent()
         fails += _check(g.goals_row.get_index() \
-                        == score_chip.get_index() + 1,
-                "sq: the goals cards sit right after the score chip")
+                        == score_chip.get_index() - 1,
+                "sq: the goals cards sit right BEFORE the score chip")
         fails += _check(g.squares_row.get_parent() == g.goals_row,
                 "sq: the squares tally rides UNDER the goals cards")
         fails += _check(g.squares_row.position.y >= 64.0,
