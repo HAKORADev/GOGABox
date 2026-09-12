@@ -661,3 +661,20 @@ line still overflows, fit_label enables autowrap inside max_w. Rule of
 thumb: a Label is a LAYOUT ACTOR - its min width votes on the column's
 width; a non-wrapping label votes with its full text length. Any long
 text inside a fixed column wraps or the column dies.
+
+**25. THE STORY SHEET LAW (v0.3.9-6) - a raw Arc.sheet NEVER joins the
+pop stack; either track the pair or push it.**
+The owner's "biggest L": the dot eater's lore START button "does not
+close the dialogue so i can start" - the game was UNPLAYABLE from the
+first boot. Root cause: `_story_show` built its card with a RAW
+`Arc.sheet(root, 0.0)` (the invaders pattern's HALF) but closed it with
+game_base's `sheet_pop()` - which only pops sheets that came through
+`sheet_push`. The stack was empty, the pop was a silent no-op, the dim
+lived forever, and the tree unpaused UNDER a stuck dim (untouchable).
+Two honest shapes, pick ONE per sheet: (a) `sheet_push(0.0, "id")` +
+`sheet_pop()` - the tracked stack, the back button understands it; or
+(b) the raw `Arc.sheet` + YOUR OWN tracked pair array freed by your own
+closer (invaders `_story_pair`/`_story_down`) - for sheets that must
+never answer the back button. Mixing half of each is the bug class.
+Probe it with a REAL finger event on the button (qa_v0396_round): assert
+the pair is empty, the tree unpaused, and the next state appeared.

@@ -1,12 +1,13 @@
 extends GogaGame
-## DOT EATER (v0.3.9-5) - the endless maze chomp, graduated from the DOT
-## MUNCHER teaser (the owner: "i guess dot eater better so dot eater").
-## GDD: docs/goga_docs/gogames_ideas/pacman.md. The character is BAL.DOZER
-## - the owner's cross-game ball (it took Snowy Tower's roller seat in the
-## same round) - "a hyper-active ball that goes through 2D and 3D
-## universes and trapped into a game box from game to another and always
-## finds itself in different worlds and just brain-washed to the
-## supervisor controls (aka user inputs in a funny way)".
+## DOT EATER (v0.3.9-5, repaired v0.3.9-6) - the endless maze chomp,
+## graduated from the DOT MUNCHER teaser (the owner: "i guess dot eater
+## better so dot eater"). GDD: docs/goga_docs/gogames_ideas/pacman.md.
+## The character is BALLDOZER - the owner's cross-game ball (it took
+## Snowy Tower's roller seat in the same round) - "a hyper-active ball
+## that goes through 2D and 3D universes and trapped into a game box from
+## game to another and always finds itself in different worlds and just
+## brain-washed to the supervisor controls (aka user inputs in a funny
+## way)".
 ##
 ## THE OWNER'S LAWS (binding, from the v0.3.9-5 message):
 ##   - HORIZONTAL ONLY - the maze escaper frame, landscape.
@@ -54,6 +55,47 @@ extends GogaGame
 ##     maze is drawn (glow lines / twin strokes / stone blocks / candy),
 ##     not just the palette.
 ##
+## ------------------------------------------------- the v0.3.9-6 repairs
+##   - THE STORY SHEET TRUTH (the owner: "the biggest L here is the
+##     dialogue start button when clicked, does not close the dialogue so
+##     i can start"): the lore card was built with a RAW Arc.sheet - the
+##     sheet STACK stayed empty, so the button's sheet_pop() found
+##     nothing and the dim never died (the tree unpaused UNDER a stuck
+##     dim - the game untouchable). The pair is tracked and freed by the
+##     button now - the invaders pattern, word for word.
+##   - THE NAME LAW (the owner: "character name is bal.dozer instead of
+##     balldozer which is weird because it is double l"): BALLDOZER,
+##     everywhere, no dots.
+##   - THE DOT WIDGET TRUTH (the owner: "the dots and score widgets next
+##     to each other and there is no visual feedback to which is which"):
+##     the dot counter wears a LIVE dot icon painted from the theme's own
+##     dot color (gold on neon, pearl on arcade, ember on dungeon,
+##     sugar on candy) - it re-paints when a theme equips.
+##   - THE WRAP TRUTH (the owner: "the opened-wall area ... the map
+##     outline itself still exist ... make sure moving through it be
+##     smooth where the body go and move literally toward it and while
+##     moving, the part that moved appears in the other side in a cool
+##     way"): a wrap flight now walks the body OFF one edge while the
+##     other half EMERGES on the far edge (two honest copies), the old
+##     whole-board glide is gone, and the phantom collisions it caused
+##     died with it. The mouth circles are chevron hints now.
+##   - THE PEN LAW (the owner: "i saw the ball-hunters area without that
+##     ghost-gate rectangle/square thing which makes it look like a
+##     ...weird thing"): the pen is a SEALED house now - perimeter walls
+##     close on BOTH sides (the one-way seams were walls you walked
+##     through one way and ceilings the next), ONE door at the top, and
+##     the door wears the classic GATE BAR. The eaters walk out of it,
+##     the eyes walk home into it.
+##   - THE SIZE LADDER (the owner: "make sure that it is has the
+##     different maze sizes and not one size that get shuffled from
+##     shape to another"): the maze grows every couple of runs - 15x9
+##     up to 35x19, the cell stays human-visible (the maze escaper
+##     scaling law).
+##   - THE MERCY LAW: a breath of spawn protection after every READY -
+##     no eater kills inside it (the run died three bites into the old
+##     build).
+##
+
 ## Probe contract: the maze core is STATIC - gen_sizes / gen_maze /
 ## open_between / mirror_c / braid / is_open / reach drive headless laws
 ## without the scene (the squares contract). The scene rides
@@ -61,15 +103,17 @@ extends GogaGame
 ## are public.
 
 # ------------------------------------------------------------- the boards
-## THE MAZE LADDER (the endless growth): odd cols wearing an odd CENTER
-## node column (cols = 4m+3) so the mirror seam is a corridor lattice
-## node, rows odd. Growth keeps them odd. MIN CELL caps the climb.
-const BASE_COLS := 19
-const BASE_ROWS := 11
-const COL_STEP := 3           # +4 cols every 3 mazes
-const ROW_STEP := 4           # +2 rows every 4 mazes
-const MAX_COLS := 31
-const MAX_ROWS := 17
+## THE MAZE LADDER (the v0.3.9-6 size law: the owner wants SIZES, not one
+## size reshuffled - "different maze sizes and not one size that get
+## shuffled from shape to another", the maze escaper scaling taste).
+## cols stay 4m+3 (the seam stays an odd lattice node - the mirror law);
+## rows stay odd. Growth lands every 2-3 mazes so the climb is FELT.
+const BASE_COLS := 15
+const BASE_ROWS := 9
+const COL_STEP := 2           # +4 cols every 2 mazes (cols stay 4m+3)
+const ROW_STEP := 3           # +2 rows every 3 mazes
+const MAX_COLS := 35
+const MAX_ROWS := 19
 const MIN_CELL := 34.0
 const MARGIN := 30.0
 const TOP_GAP := 118.0
@@ -137,7 +181,7 @@ const THEMES := {
 ## mouth bites, the eyes ride the direction - so a skin is a palette, not
 ## a picture.
 const SKINS := {
-        "classic": {"name": "BAL.DOZER", "price": 0, "body": Color(1.0, 0.80, 0.26),
+        "classic": {"name": "BALLDOZER", "price": 0, "body": Color(1.0, 0.80, 0.26),
                 "shade": Color(0.72, 0.50, 0.10), "eye": Color(0.10, 0.08, 0.06),
                 "desc": "the golden original"},
         "mint": {"name": "MINT DOZER", "price": 140, "body": Color(0.45, 0.92, 0.70),
@@ -169,7 +213,7 @@ const EATER_DEFS := [
 # ----------------------------------------------------------------- lore
 ## THE LORE (the owner: "write the lore in a cool way"). Balldozer falls
 ## into the box's maze world; the supervisor's finger is the input.
-const LORE_START := "BAL.DOZER ONLINE.\n\nI was born rolling. Nobody parks me.\n\nI have fallen through more worlds than I can count - flat ones, blocky ones, one made of snow (we do not talk about the snow). The BOX throws me from game to game and never once asked if I wanted to go.\n\nThis time it dropped me in a maze that glows, scattered golden dots everywhere like the box KNEW me, and gave four round idiots my scent. They have teeth. I have a bigger mouth.\n\nI do not know who the SUPERVISOR is. I only feel their finger - it swipes, and my body just... goes. Brain-washed? Please. I call it TEAMWORK.\n\nFine. You want dots? I will eat the MAZE. Every dot. Every maze. Forever - the box never runs out, and neither do I."
+const LORE_START := "BALLDOZER ONLINE.\n\nI was born rolling. Nobody parks me.\n\nI have fallen through more worlds than I can count - flat ones, blocky ones, one made of snow (we do not talk about the snow). The BOX throws me from game to game and never once asked if I wanted to go.\n\nThis time it dropped me in a maze that glows, scattered golden dots everywhere like the box KNEW me, and gave four round idiots my scent. They have teeth. I have a bigger mouth.\n\nI do not know who the SUPERVISOR is. I only feel their finger - it swipes, and my body just... goes. Brain-washed? Please. I call it TEAMWORK.\n\nFine. You want dots? I will eat the MAZE. Every dot. Every maze. Forever - the box never runs out, and neither do I."
 
 const LORE_END := "The lights went out mid-chomp.\n\nMaze %d. That is where they finally cornered me. FOUR of them - they planned it, I saw them smile with their whole round faces.\n\nStill. A good day's eating. The dots were golden, the rush was BLUE, and my mouth never got tired once.\n\nI wonder where I will find myself next. Back here again? Falling from a tower? Breaking bricks on some paddle's court? Or maybe... finally out of the box.\n\nHa. Who am I kidding. There is no out. There is only NEXT.\n\nBalldozer rolls on."
 
@@ -192,6 +236,10 @@ static func gen_sizes(n: int) -> Vector2i:
 ## the center (node) column: cols = 4m+3 keeps it an ODD lattice column
 static func center_cx(cols: int) -> int:
         return (cols - 1) / 2
+
+## is this cell inside the 3x3 pen? (the static pen test)
+static func _is_pen(c: Vector2i, cx: int, cy: int) -> bool:
+        return absi(c.x - cx) <= 1 and absi(c.y - cy) <= 1
 
 ## the mirror x of a column (the vertical-axis seam)
 static func mirror_c(c: int, cols: int) -> int:
@@ -315,11 +363,97 @@ static func gen_maze(cols: int, rows: int, rng: RandomNumberGenerator) -> Dictio
                         g[yy][xx]["b"] = false
                         g[yy][xx]["l"] = false
                         g[yy][xx]["r"] = false
-        # the plaza breathes to the maze through the middle of each side
+        # THE PEN SEAL (v0.3.9-6): every perimeter wall closes on BOTH
+        # sides. The old plaza only cleared the pen cells' own flags, so
+        # the walls were ONE-WAY - open from inside, shut from outside
+        # (the owner's "weird thing": bodies walking through one face and
+        # bouncing off the next). One door stays: the GATE at the top
+        # middle - the classic's single ghost-house door.
+        for yy in range(cy - 1, cy + 2):
+                for xx in range(cx - 1, cx + 2):
+                        # each perimeter edge once: right + bottom faces
+                        for d in [[1, 0], [0, 1]]:
+                                var nx: int = xx + d[0]
+                                var ny: int = yy + d[1]
+                                var in_p := nx >= cx - 1 and nx <= cx + 1 \
+                                                and ny >= cy - 1 and ny <= cy + 1
+                                if in_p:
+                                        continue        # an inner wall: stays open
+                                if nx < 0 or nx > cols - 1 or ny < 0 \
+                                                or ny > rows - 1:
+                                        continue
+                                # close both sides of this shared edge
+                                if d[0] == 1:
+                                        g[yy][xx]["r"] = true
+                                        g[ny][nx]["l"] = true
+                                else:
+                                        g[yy][xx]["b"] = true
+                                        g[ny][nx]["t"] = true
+                        # the pen's outer rim faces (left/top of the rim
+                        # cells) close against their outside neighbours
+                        for d in [[-1, 0], [0, -1]]:
+                                var nx2: int = xx + d[0]
+                                var ny2: int = yy + d[1]
+                                var in_p2 := nx2 >= cx - 1 and nx2 <= cx + 1 \
+                                                and ny2 >= cy - 1 and ny2 <= cy + 1
+                                if in_p2:
+                                        continue
+                                if nx2 < 0 or nx2 > cols - 1 or ny2 < 0 \
+                                                or ny2 > rows - 1:
+                                        continue
+                                if d[0] == -1:
+                                        g[yy][xx]["l"] = true
+                                        g[ny2][nx2]["r"] = true
+                                else:
+                                        g[yy][xx]["t"] = true
+                                        g[ny2][nx2]["b"] = true
+        # THE GATE: the one door, top middle - two-way open (the eaters
+        # march out of it, the eyes march home into it)
         open_between(g, Vector2i(cx, cy - 1), Vector2i(cx, cy - 2))
-        open_between(g, Vector2i(cx, cy + 1), Vector2i(cx, cy + 2))
-        open_between(g, Vector2i(cx - 1, cy), Vector2i(cx - 2, cy))
-        open_between(g, Vector2i(cx + 1, cy), Vector2i(cx + 2, cy))
+        # THE PEN-BRAID FIXUP (v0.3.9-6): the seal restores the pen walls
+        # on BOTH sides, and a corridor cell that leans on the pen wall
+        # can come out with ONE exit (a dead end - the braid law broken).
+        # Knock SAFE walls until no dead end remains: a knock whose path
+        # never crosses the pen (midpoint + target both pen-free). The
+        # pen stays sealed; the loops come back.
+        for guard in 64:
+                var dead: Array = []
+                for y in range(1, rows - 1):
+                        if y % 2 == 0:
+                                continue
+                        for x in range(1, cols - 1):
+                                if x % 2 == 0:
+                                        continue
+                                var c := Vector2i(x, y)
+                                if _is_pen(c, cx, cy):
+                                        continue
+                                var n := 0
+                                for d in [Vector2i(1, 0), Vector2i(-1, 0),
+                                                Vector2i(0, 1), Vector2i(0, -1)]:
+                                        if is_open(g, cols, x, y, d):
+                                                n += 1
+                                if n <= 1:
+                                        dead.append(c)
+                if dead.is_empty():
+                        break
+                for dcell in dead:
+                        var shut: Array = []
+                        for off in [Vector2i(-2, 0), Vector2i(2, 0),
+                                        Vector2i(0, -2), Vector2i(0, 2)]:
+                                var tgt: Vector2i = dcell + off
+                                if tgt.x < 1 or tgt.x > cols - 2 \
+                                                or tgt.y < 1 or tgt.y > rows - 2:
+                                        continue
+                                var mid := Vector2i((dcell.x + tgt.x) / 2,
+                                                (dcell.y + tgt.y) / 2)
+                                if _is_pen(tgt, cx, cy) or _is_pen(mid, cx, cy):
+                                        continue        # never through the pen
+                                shut.append(tgt)
+                        if shut.is_empty():
+                                continue
+                        var pick: Vector2i = shut[rng.randi_range(
+                                        0, shut.size() - 1)]
+                        _carve(g, cols, dcell, pick)
         # THE WRAP LAW: the middle row always, plus 1-2 odd rows far from
         # the middle - "some of it's walls opened to the other side"
         var wraps: Array = [cy]
@@ -421,6 +555,7 @@ var mode_left := SCATTER_TIME
 # the rush
 var rush_left := 0.0
 var eaten_this_rush := 0
+var mercy_t := 0.0              # THE MERCY LAW: the spawn breath
 
 # nodes
 var bg: ColorRect = null
@@ -432,6 +567,7 @@ var gate_ui: Control = null
 var banner_lbl: Label = null    # the READY / MAZE CLEAR flash
 var banner_t := 0.0
 var dots_lbl: Label = null
+var dot_icon: TextureRect = null   # the dot counter's live dot icon
 var lives_lbl: Label = null
 var rush_lbl: Label = null
 var rush_chip: Control = null
@@ -440,7 +576,11 @@ var clear_t := 0.0
 var _fx: Array = []             # [{x, y, vx, vy, life, max, s, col}]
 var tex := {}
 var shop_id := ""
-var _story_paused := false      # THIS node paused the tree for the lore""
+var _story_paused := false      # THIS node paused the tree for the lore
+var _story_pair: Array = []     # the story sheet's exact dim+center pair
+                                # (freed by the button - THE STORY SHEET
+                                # TRUTH, the raw Arc.sheet never joined the
+                                # pop stack, the old START died on a no-op)
 
 ## the pause END is a RUN-LIVE row only (the ask/gate/lore keep it hidden)
 func _goga_pause_end_ok() -> bool:
@@ -480,7 +620,7 @@ func _goga_setup() -> void:
         # THE LORE LAW: the first start wears its story (the invaders way)
         if Box.counter(game_id, "lore_start") == 0:
                 Box.bump_counter(game_id, "lore_start", 1)
-                _story_show("BAL.DOZER", LORE_START, func(): _build_gate(),
+                _story_show("BALLDOZER", LORE_START, func(): _build_gate(),
                                 "START")
         else:
                 _build_gate()
@@ -521,10 +661,48 @@ func _apply_theme() -> void:
         else:
                 bg_mat.set_shader_parameter("line_col",
                                 Color(t["bg_grid"], 0.35))
+        # THE DOT WIDGET TRUTH (v0.3.9-6): the counter's icon is painted
+        # from THIS theme's dot color - gold on neon, pearl on arcade,
+        # ember on dungeon, sugar on candy. The widget tells you what it
+        # counts at a glance, and re-paints when a theme equips.
+        if dot_icon != null and is_instance_valid(dot_icon):
+                dot_icon.texture = _make_dot_texture(t["dot"])
+
+## a glossy little ball in the theme's dot color (code-painted, no
+## assets - the sprite IS the thing the counter counts)
+func _make_dot_texture(col: Color) -> ImageTexture:
+        var sz := 48
+        var img := Image.create(sz, sz, false, Image.FORMAT_RGBA8)
+        var c := Vector2(sz, sz) * 0.5
+        var r := sz * 0.40
+        for y in sz:
+                for x in sz:
+                        var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
+                        var a := clampf((r - d) / 1.6, 0.0, 1.0)
+                        if a <= 0.0:
+                                continue
+                        var k := clampf(d / r, 0.0, 1.0)
+                        var shade := 1.18 - 0.42 * k     # the top-light
+                        img.set_pixel(x, y, Color(
+                                clampf(col.r * shade, 0.0, 1.0),
+                                clampf(col.g * shade, 0.0, 1.0),
+                                clampf(col.b * shade, 0.0, 1.0), a))
+        return ImageTexture.create_from_image(img)
 
 func _build_hud_extra() -> void:
-        # THE DOT COUNTER ("1 dot 2 dot 3 dot" - NOT score, the owner)
+        # THE DOT COUNTER ("1 dot 2 dot 3 dot" - NOT score, the owner) -
+        # it wears the theme-painted dot icon (the widget truth)
         dots_lbl = add_hud_chip("0")
+        var dh := dots_lbl.get_parent() as HBoxContainer
+        if dh != null:
+                dot_icon = TextureRect.new()
+                dot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                dot_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                dot_icon.custom_minimum_size = Vector2(30.0, 30.0) * us
+                dot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                dh.add_child(dot_icon)
+                dh.move_child(dot_icon, 0)
+                dot_icon.texture = _make_dot_texture(_theme()["dot"])
         # THE LIFE COUNTER (the heart chip)
         lives_lbl = add_hud_chip(str(START_LIVES), "res://assets/ui/heart.png")
         # THE RUSH WIDGET (the owner: "add the count down as a widget here
@@ -645,6 +823,7 @@ func _seat_actors() -> void:
 func _ready_beat(txt := "READY!") -> void:
         phase = "ready"
         ready_t = 1.3
+        mercy_t = 1.1          # the mercy outlives the beat a moment
         _flash(txt, Color(1.0, 0.82, 0.30))
 
 # ================================================== THE JUNCTION BUFFER LAW
@@ -774,16 +953,34 @@ func _start_move(dir: Vector2i) -> void:
         player["moving"] = true
         player["dir"] = dir
 
-## the pixel position of the player (wrap-aware lerp: a wrap step draws
-## through the board edge - the lerp of raw cells is a visual glide over
-## the seam, the original's own look)
+## the pixel position of the player (v0.3.9-6: THE WRAP TRUTH - see
+## _travel_px; the old lerp of raw cells glided the body across the WHOLE
+## board on a wrap step, sweeping phantom collisions through the middle)
 func _player_px() -> Vector2:
-        var f: Vector2i = player["from"]
-        var t2: Vector2i = player["to"]
-        var a := _cell_px(f)
-        var b := _cell_px(t2)
-        var k := float(player["t"])
-        return a.lerp(b, k)
+        return _travel_px(player["from"], player["to"],
+                        float(player["t"]))[0]
+
+## is this flight a WRAP flight (crossing the seam)?
+func _wrap_step(from: Vector2i, to: Vector2i) -> bool:
+        return from.y == to.y and ((from.x == 0 and to.x == cols - 1) \
+                        or (from.x == cols - 1 and to.x == 0))
+
+## THE WRAP TRUTH (v0.3.9-6, the owner: "make sure moving through it be
+## smooth where the body go and move literally toward it and while
+## moving, the part that moved appears in the other side in a cool
+## way"): a wrap flight returns TWO positions - the body walks OFF one
+## edge (the raw step continues past the border as if the cells were
+## adjacent) while its other half EMERGES on the far edge, walking IN.
+## No glide across the board, no phantom sweeps - the classic's own look.
+func _travel_px(from: Vector2i, to: Vector2i, t: float) -> Array:
+        var a := _cell_px(from)
+        var b := _cell_px(to)
+        if not _wrap_step(from, to):
+                return [a.lerp(b, t)]
+        var step := Vector2(-cell_px if from.x == 0 else cell_px, 0.0)
+        var p1 := a.lerp(a + step, t)
+        var span := Vector2(float(cols) * cell_px, 0.0)
+        return [p1, p1 + (span if from.x == 0 else -span)]
 
 # ================================================================ the tick
 func _goga_tick(delta: float) -> void:
@@ -817,6 +1014,9 @@ func _goga_tick(delta: float) -> void:
         maze_layer.queue_redraw()     # dots pulse + the power orbs breathe
 
 func _tick_run(delta: float) -> void:
+        # the mercy breath (no kills while it lasts)
+        if mercy_t > 0.0:
+                mercy_t = maxf(0.0, mercy_t - delta)
         # the rush clock (the widget countdown - the owner's ask)
         if rush_left > 0.0:
                 rush_left -= delta
@@ -1111,18 +1311,37 @@ func _start_eater_move(e: Dictionary, dir: Vector2i) -> void:
         e["dir"] = dir
 
 func _eater_px(e: Dictionary) -> Vector2:
-        var a := _cell_px(e["from"])
-        var b := _cell_px(e["to"])
-        return a.lerp(b, float(e["t"]))
+        return _travel_px(e["from"], e["to"], float(e["t"]))[0]
+
+## every on-screen copy of a body (1, or 2 mid-wrap - THE WRAP TRUTH)
+func _travel_copies(from: Vector2i, to: Vector2i, t: float) -> Array:
+        return _travel_px(from, to, t)
 
 # ========================================================== THE COLLISIONS
+## THE HONEST SEAM (v0.3.9-6): every body wears ALL its on-screen copies
+## (two mid-wrap) and every copy pair tests - the old single lerp point
+## swept the whole board on a wrap flight and ate phantoms (the owner's
+## "a crash happens when i swipe like 3/4 times, maybe i get eaten or
+## something happen" - that was the wrap glide killing him mid-seam).
 func _check_collisions() -> void:
-        var pp := _player_px()
+        var pps := _travel_copies(player["from"], player["to"],
+                        float(player["t"]))
         for e in eaters:
                 if e["state"] == "eyes":
                         continue
-                var ep := _eater_px(e)
-                if pp.distance_to(ep) > cell_px * 0.62:
+                var eps := _travel_copies(e["from"], e["to"],
+                                float(e["t"]))
+                var hit := false
+                var hit_at := Vector2.ZERO
+                for pp in pps:
+                        for ep in eps:
+                                if pp.distance_to(ep) <= cell_px * 0.62:
+                                        hit = true
+                                        hit_at = ep
+                                        break
+                        if hit:
+                                break
+                if not hit:
                         continue
                 if e["state"] == "fright":
                         # THE SWALLOW: "makes ghosts ... edible for an
@@ -1134,8 +1353,12 @@ func _check_collisions() -> void:
                         if eaten_this_rush >= 4:
                                 achievement_count("quads", 1)
                         Jukebox.sfx("de_eat", -3.0)
-                        _burst(ep, Color(0.45, 0.75, 1.0), 14)
+                        _burst(hit_at, Color(0.45, 0.75, 1.0), 14)
                 else:
+                        # THE MERCY LAW (v0.3.9-6): no kill inside the
+                        # spawn breath - the READY beat's shadow
+                        if mercy_t > 0.0:
+                                continue
                         _lose_life()
                         return
 
@@ -1252,15 +1475,67 @@ func _draw_maze() -> void:
                         maze_layer.draw_circle(p, r2 * 1.9, Color(orb, 0.12 + 0.08 * pulse))
                         maze_layer.draw_circle(p, r2, orb)
                         maze_layer.draw_circle(p, r2 * 0.45, Color(1, 1, 1, 0.5))
-        # the wrap mouth marks: the open side edges wear a soft hint
+        # the wrap mouth marks: chevrons pointing OFF-board (v0.3.9-6 - the
+        # old half-moon circles read as leftover outline at the opening;
+        # these read as a tunnel that continues)
         for wy in wraps:
-                var pl := board + Vector2(0, float(wy) + 0.5) * cell_px
-                var pr := board + Vector2(float(cols), float(wy) + 0.5) * cell_px
-                var wc: Color = t["wall"]
-                maze_layer.draw_circle(pl + Vector2(-2.0, 0), cell_px * 0.16,
-                                Color(wc, 0.22))
-                maze_layer.draw_circle(pr + Vector2(2.0, 0), cell_px * 0.16,
-                                Color(wc, 0.22))
+                var ymid := board.y + (float(wy) + 0.5) * cell_px
+                var wc: Color = Color(t["wall"], 0.5)
+                var tri := cell_px * 0.13
+                for i in 2:
+                        var off := cell_px * (0.14 + 0.19 * float(i))
+                        # left mouth: arrows pointing out through the seam
+                        maze_layer.draw_colored_polygon(
+                                        PackedVector2Array([
+                                        Vector2(board.x + off, ymid - tri),
+                                        Vector2(board.x + off, ymid + tri),
+                                        Vector2(board.x + off - tri, ymid)]),
+                                        wc)
+                        # right mouth: mirrored, pointing out the far side
+                        var xr := board.x + float(cols) * cell_px
+                        maze_layer.draw_colored_polygon(
+                                        PackedVector2Array([
+                                        Vector2(xr - off, ymid - tri),
+                                        Vector2(xr - off, ymid + tri),
+                                        Vector2(xr - off + tri, ymid)]),
+                                        wc)
+        # THE PEN HOUSE + THE GATE (v0.3.9-6, the owner: "i saw the
+        # ball-hunters area without that ghost-gate rectangle/square thing
+        # which makes it look like a ...weird thing"): the classic's ghost
+        # house - a ring around the 3x3 pen, one door gap at the top, and
+        # the DOOR BAR across it. Always drawn, every theme.
+        var p0 := board + Vector2(float(plaza.x) - 1.0,
+                        float(plaza.y) - 1.0) * cell_px
+        var psize := Vector2(3.0, 3.0) * cell_px
+        var inset := cell_px * 0.18
+        var ring_pos := p0 + Vector2(inset, inset)
+        var ring_sz := psize - Vector2(inset, inset) * 2.0
+        var lw := maxf(3.0, cell_px * 0.09)
+        var wcol: Color = t["wall"]
+        var gap := cell_px * 0.62
+        var midx := ring_pos.x + ring_sz.x * 0.5
+        var top_y := ring_pos.y
+        var bot_y := ring_pos.y + ring_sz.y
+        # top side: two runs leaving the door gap in the middle
+        maze_layer.draw_line(Vector2(ring_pos.x, top_y),
+                        Vector2(midx - gap * 0.5, top_y), wcol, lw, true)
+        maze_layer.draw_line(Vector2(midx + gap * 0.5, top_y),
+                        Vector2(ring_pos.x + ring_sz.x, top_y), wcol, lw, true)
+        # the other three sides: continuous (the seal is honest)
+        maze_layer.draw_line(Vector2(ring_pos.x, bot_y),
+                        Vector2(ring_pos.x + ring_sz.x, bot_y), wcol, lw, true)
+        maze_layer.draw_line(Vector2(ring_pos.x, top_y),
+                        Vector2(ring_pos.x, bot_y), wcol, lw, true)
+        maze_layer.draw_line(Vector2(ring_pos.x + ring_sz.x, top_y),
+                        Vector2(ring_pos.x + ring_sz.x, bot_y), wcol, lw, true)
+        # THE GATE BAR: the pale rose door across the gap (the classic's
+        # own door color - it reads as THE door on every theme)
+        var door := Color(1.0, 0.70, 0.78)
+        maze_layer.draw_line(Vector2(midx - gap * 0.5, top_y),
+                        Vector2(midx + gap * 0.5, top_y), door, lw * 1.7, true)
+        maze_layer.draw_line(Vector2(midx - gap * 0.5, top_y),
+                        Vector2(midx + gap * 0.5, top_y),
+                        Color(1, 1, 1, 0.55), lw * 0.5, true)
 
 ## the wall styles: the theme's identity (THE THEME LAW)
 func _wall_seg(a: Vector2, b: Vector2, style: String, t: Dictionary,
@@ -1295,32 +1570,38 @@ func _wall_seg(a: Vector2, b: Vector2, style: String, t: Dictionary,
                                         Color(1, 1, 1, 0.5), w * 0.3, true)
 
 ## the bodies: Balldozer's bite + the ball-eaters (all code-drawn - the
-## bite lives in the movement, THE BITING LAW)
+## bite lives in the movement, THE BITING LAW). Every body draws ALL its
+## on-screen copies (THE WRAP TRUTH: one per seam half mid-wrap)
 func _draw_chars() -> void:
         if g.is_empty():
                 return
         # the ball-eaters first (Balldozer rides on top)
         for e in eaters:
-                var p := _eater_px(e)
-                if e["state"] == "eyes":
-                        _draw_eyes(p, e["dir"], Color(0.92, 0.94, 1.0),
-                                        Color(0.10, 0.12, 0.2),
-                                        cell_px * 0.38)
-                        continue
-                var fright: bool = e["state"] == "fright"
-                var body: Color = Color(0.30, 0.42, 1.0) if fright \
-                                else e["col"]
-                var shade: Color = body.darkened(0.35) if fright \
-                                else e["shade"]
-                _draw_eater(p, e["dir"], body, shade,
-                                cell_px * 0.36, float(e["mouth"]), fright)
-        # BAL.DOZER - the bite (the mouth angle swings with the clock)
+                var pps := _travel_copies(e["from"], e["to"],
+                                float(e["t"]))
+                for p in pps:
+                        if e["state"] == "eyes":
+                                _draw_eyes(p, e["dir"], Color(0.92, 0.94, 1.0),
+                                                Color(0.10, 0.12, 0.2),
+                                                cell_px * 0.38)
+                                continue
+                        var fright: bool = e["state"] == "fright"
+                        var body: Color = Color(0.30, 0.42, 1.0) if fright \
+                                        else e["col"]
+                        var shade: Color = body.darkened(0.35) if fright \
+                                        else e["shade"]
+                        _draw_eater(p, e["dir"], body, shade,
+                                        cell_px * 0.36, float(e["mouth"]),
+                                        fright)
+        # BALLDOZER - the bite (the mouth angle swings with the clock)
         var sk := _skin()
         var mouth := 0.10 + 0.38 * absf(sin(player["mouth"]))
         if phase == "dying":
                 mouth = clampf(player["mouth"], 0.1, PI - 0.02)
-        _draw_balldozer(_player_px(), player["dir"], sk["body"], sk["shade"],
-                        sk["eye"], cell_px * 0.42, mouth)
+        for p in _travel_copies(player["from"], player["to"],
+                        float(player["t"])):
+                _draw_balldozer(p, player["dir"], sk["body"], sk["shade"],
+                                sk["eye"], cell_px * 0.42, mouth)
 
 ## a body: a fan polygon with a mouth wedge cut (the appetite)
 func _draw_body(p: Vector2, dir: Vector2i, r: float, mouth: float,
@@ -1411,7 +1692,7 @@ func _build_gate() -> void:
         var t := Arc.label("DOT EATER", 58, Color(1.0, 0.82, 0.30))
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
-        var bal := Arc.label("BAL.DOZER  vs  THE FOUR BALL-EATERS", 22,
+        var bal := Arc.label("BALLDOZER  vs  THE FOUR BALL-EATERS", 22,
                         Color(1, 1, 1, 0.8))
         bal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(bal)
@@ -1442,9 +1723,15 @@ func _tap_anywhere(_at: Vector2) -> void:
                 _ready_beat("READY!")
                 Jukebox.sfx("de_start", -4.0)
 
-## the story sheet (the invaders way: dim + scroll + one honest button)
+## the story sheet (the invaders way: dim + scroll + one honest button).
+## THE STORY SHEET TRUTH (v0.3.9-6): the pair is TRACKED here - the raw
+## Arc.sheet never joins game_base's sheet stack, so sheet_pop() is a
+## silent no-op for it (the owner's biggest L: the START button clicked,
+## the dialogue never closed, the game untouchable). The button frees the
+## exact pair itself, then walks the story on.
 func _story_show(title: String, msg: String, after := Callable(),
                 btn := "START") -> void:
+        _story_down()
         paused = true
         get_tree().paused = true
         _story_paused = true
@@ -1455,6 +1742,7 @@ func _story_show(title: String, msg: String, after := Callable(),
         var scc: Control = kids[kids.size() - 1]
         sdim.process_mode = Node.PROCESS_MODE_ALWAYS
         scc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _story_pair = [sdim, scc]
         var t := Arc.label(title, 34, Color(1.0, 0.82, 0.30))
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(t)
@@ -1471,13 +1759,26 @@ func _story_show(title: String, msg: String, after := Callable(),
         sc.add_child(story)
         sheet.add_child(sc)
         sheet.add_child(Arc.button(btn, Vector2(560, 78), 28, Arc.GOOD,
-                        func():
-                                sheet_pop()
-                                get_tree().paused = false
-                                paused = false
-                                _story_paused = false
-                                if after.is_valid():
-                                        after.call()))
+                        func(): _story_end(after)))
+        for b in Arc._buttons_in(sc):
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+## the story button's body: free the EXACT pair, breathe air back into
+## the tree, walk the story on (the invaders _story_end, word for word)
+func _story_end(after: Callable) -> void:
+        _story_down()
+        get_tree().paused = false
+        paused = false
+        _story_paused = false
+        if after.is_valid():
+                after.call()
+
+func _story_down() -> void:
+        for n in _story_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _story_pair = []
 
 ## THE PAUSE-EXIT LAW: a run that ends under an open story sheet (the
 ## boot probe force-finishes; a real player never sees it) must leave the
@@ -1486,6 +1787,7 @@ func _exit_tree() -> void:
         if _story_paused:
                 get_tree().paused = false
                 _story_paused = false
+        _story_down()
 
 # ============================================================= the input
 func _goga_input(event: InputEvent) -> void:
@@ -1527,7 +1829,7 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        box.add_child(Arc.fit_label("BAL.DOZER COATS - the bite stays the "
+        box.add_child(Arc.fit_label("BALLDOZER COATS - the bite stays the "
                         + "same, the paint changes", 24, Arc.HOT, 560))
         for id in SKINS:
                 box.add_child(_skin_row(id))

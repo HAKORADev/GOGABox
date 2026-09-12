@@ -48,6 +48,11 @@ var _capturing := false
 var _frames := 0
 
 func _ready() -> void:
+        # THE PAUSE-PROOF RIG (v0.3.9-6): a game whose boot wears a pausing
+        # story sheet (dot eater's lore) paused the TREE - this node's default
+        # INHERIT mode stopped with it and the drive never ran (the capture
+        # hung). The rig films THROUGH pauses, like every rec rig does.
+        process_mode = Node.PROCESS_MODE_ALWAYS
         _args = _parse_args()
         _out = String(_args.get("out", _out))
         _every = float(_args.get("every", "0.5"))

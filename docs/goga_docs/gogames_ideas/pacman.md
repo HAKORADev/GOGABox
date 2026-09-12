@@ -95,3 +95,47 @@ default roller seat in this same round — renamed from "Snowball").
   candy walls, sugar pearls).
 - **The guide, the rate-limits, the entry, the achievements**: the house
   standard — fee 8, price 450, bonus /3, banner on, landscape only.
+
+## THE REPAIRS (v0.3.9-6, the owner's first-test report)
+
+- **THE STORY SHEET TRUTH**: the lore card was built with a raw
+  `Arc.sheet` — the game_base sheet STACK stayed empty, so the START
+  button's `sheet_pop()` was a silent no-op: the dialogue never closed,
+  the dim ate every tap, the game could not start AT ALL ("the biggest
+  L here"). The sheet's exact dim+center pair is tracked and freed by
+  the button now (the invaders `_story_pair` pattern, word for word).
+  The Xvfb rig presses the START button with a real finger event and
+  proves the dialogue dies + the gate appears + the tap starts the run.
+- **THE NAME LAW**: "character name is bal.dozer instead of balldozer
+  which is weird because it is double l" — BALLDOZER everywhere, no
+  dots (the skin, the lore, the gate, the shop headers).
+- **THE DOT WIDGET TRUTH**: "the dots and score widgets next to each
+  other and there is no visual feedback to which is which" — the dot
+  counter wears a LIVE dot icon painted from the theme's own dot color
+  (gold on neon, pearl on arcade, ember on dungeon, sugar on candy);
+  it re-paints when a theme equips. The score chip stays as-is.
+- **THE WRAP TRUTH**: the opened-wall area now reads REALLY open — the
+  old half-moon mouth circles are chevron arrows pointing off-board,
+  and a wrap flight walks the body OFF one edge while its other half
+  EMERGES on the far edge (two honest copies, `_travel_px`). The old
+  whole-board glide swept phantom collisions through the middle — the
+  owner's "crash when i swipe 3/4 times, maybe i get eaten" was the
+  seam glide killing him mid-board. Every body draws and collides on
+  ALL its copies now.
+- **THE PEN LAW**: "i saw the ball-hunters area without that
+  ghost-gate rectangle/square thing" — the pen is a sealed HOUSE: the
+  perimeter walls close on BOTH sides (the old plaza opened the pen
+  cells' flags only — ONE-WAY walls: walk out through a face, bounce
+  off the next), ONE door at the top middle, and the door wears the
+  classic pale-rose GATE BAR, drawn on every theme. A pen-safe braid
+  fixup re-loops any corridor the seal stranded.
+- **THE SIZE LADDER**: "different maze sizes and not one size that get
+  shuffled from shape to another" — the maze grows every 2-3 runs:
+  15x9 up to 35x19 (cols stay 4m+3 for the mirror seam), the cell
+  floor keeps everything human-visible (the maze escaper scaling law).
+- **THE MERCY LAW**: a 1.1s spawn breath after every READY — no eater
+  kills inside it (the old run could die three bites in).
+- **The thumbnail**: in-game capture (the thumb_capture rig + a
+  pacman_drive autopilot: the dense 35x17 maze, the BLUE rush armed,
+  real greedy swipes) cooled by `tools/v0396_pacman_thumb.py` — bloom,
+  vignette, saturation. No baked text.

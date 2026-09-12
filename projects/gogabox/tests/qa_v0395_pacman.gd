@@ -237,6 +237,12 @@ func _seat_stopped(cell: Vector2i) -> void:
         g.player["to"] = cell
         g.player["t"] = 0.0
         g.player["moving"] = false
+        # a KNOWN stale face (v0.3.9-6): the seat keeps whatever dir the
+        # previous phase left - on the new size ladder that stale dir can BE
+        # the swiped dir, and the `dir == pd` no-op swallowed the swipe (the
+        # old 19x11 seed never collided; the 15x9 one does). The stand-at-a-
+        # wall law is what this probe tests - seat the face honestly.
+        g.player["dir"] = Vector2i(-1, 0)
         g.phase = "run"
 
 ## a horizontal corridor whose right run reaches a junction 4+ cells on

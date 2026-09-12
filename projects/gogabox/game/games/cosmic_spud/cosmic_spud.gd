@@ -1169,7 +1169,8 @@ func _refresh_hud() -> void:
                         _hp_disp = f
                 var col := _hp_color(f) if f > 0.0 else CS_RED
                 hp_meter.get_meta("set_ratio").call(_hp_disp, col)
-                hp_txt.text = "%d / %d" % [int(ceilf(p_hp)), int(p_max_hp)]
+                hp_txt.text = "%d / %d" % [int(ceilf(maxf(0.0, p_hp))),
+                                int(p_max_hp)]
                 hp_txt.position = Vector2((300.0 - hp_txt.size.x) * 0.5, 4.0)
         if xp_meter != null and is_instance_valid(xp_meter):
                 # THE HONEST XP LAW: the true ratio of THIS level's progress;
@@ -1230,7 +1231,9 @@ func _refresh_hud() -> void:
                                 var br := clampf(float(e["hp"]) / float(e["max_hp"]), 0.0, 1.0)
                                 _boss_disp = lerpf(_boss_disp, br, _step)
                                 boss_meter.get_meta("set_ratio").call(_boss_disp)
-                                boss_txt.text = "%s  %d%%" % [e["name"], int(100.0 * float(e["hp"]) / float(e["max_hp"]))]
+                                boss_txt.text = "%s  %d%%" % [e["name"],
+                                                maxi(0, int(100.0 * float(e["hp"])
+                                                / float(e["max_hp"])))]
                                 boss_txt.position = Vector2((430.0 - boss_txt.size.x) * 0.5, 1.0)
                                 break
                 if not found:
@@ -2703,7 +2706,12 @@ func _hurt_player(dmg: float, src: Variant, contact := false) -> void:
         if guard_cut > 0.0:
                 dmg *= 1.0 - guard_cut
         var actual: float = maxf(1.0, dmg - float(stats["armor"]))
-        p_hp -= actual
+        # THE FLOOR LAW (v0.3.9-6, the owner: "if my health was like 5 and
+        # an attack dealt 10 damage, my health will get visualized as -5
+        # while it should stick with 0 as the minimum number"): the hp
+        # pool NEVER reads negative - the bar and its number stay honest,
+        # the death check below fires on the same tick either way.
+        p_hp = maxf(0.0, p_hp - actual)
         p_iframe = 0.28 if contact else IFRAME
         _dmg_number(p_pos, actual, false, Color(1, 0.5, 0.5))
         Jukebox.sfx("cs_hurt", -4.0)

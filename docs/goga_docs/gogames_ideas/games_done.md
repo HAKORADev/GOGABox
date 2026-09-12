@@ -23,3 +23,4 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 17. FOUR IN LINE
 18. FIVE IN ROW
 19. SQUARES
+20. DOT EATER

@@ -21,6 +21,22 @@ extends GogaGame
 ##     (not beside them) and the D panel is GONE - "this game has no
 ##     draws as i told you" - the goals row reads W | L only
 ##
+## Owner round v0.3.9-6 (the test report):
+##   - THE TWO-CARD SEAT: "the score widget is gone from it's place"
+##     - the D card's removal kept the THREE-card center spacing, each
+##     surviving card hung HALF OFF the row and the W card landed right
+##     on top of the score chip (the place "remained empty" - it was
+##     COVERED). Two cards tile the row from its center now.
+##   - THE DUST LIFE: "internal firework-like effect that is still
+##     freeze-frame where it should work with the transition and end
+##     with it" - the burst pips were never integrated or aged (one
+##     frozen frame); the tick owns them now: velocity, gravity, aging,
+##     retirement, and their lives end WITH the box fade (BOX_A).
+##   - THE STRIPE TRUTH: "the board outlines/edges stripes are not real
+##     stripes like the rest of the board, they are gray lines" - the
+##     v0.3.9-4 outline ring drew the rim SOLID; gone. EVERY edge wears
+##     the same dashed guide now, rim included.
+##
 ## Owner contract (v0.3.9-3):
 ##   - VERTICAL ONLY (the xo law: no position ask, no horizontal table)
 ##   - the colors are FIXED: the user is RED, the enemy is BLUE - not for
@@ -595,19 +611,12 @@ func _draw_board() -> void:
                         board_l.draw_line(seg[0].lerp(seg[1], f0),
                                         seg[0].lerp(seg[1], f1),
                                         Color(hint, 0.9), gw, true)
-        # the outline ring: the OUTER edges draw solid and a touch wider
-        # - the rim dots literally wear the board's outline
-        var ow := gw * 1.3
-        for c in dots_n - 1:
-                var st := _edge_seg(idx_h(c, 0, dots_n))
-                var sb := _edge_seg(idx_h(c, dots_n - 1, dots_n))
-                board_l.draw_line(st[0], st[1], Color(hint, 1.0), ow, true)
-                board_l.draw_line(sb[0], sb[1], Color(hint, 1.0), ow, true)
-        for rr in dots_n - 1:
-                var sl := _edge_seg(idx_v(0, rr, dots_n))
-                var sr := _edge_seg(idx_v(dots_n - 1, rr, dots_n))
-                board_l.draw_line(sl[0], sl[1], Color(hint, 1.0), ow, true)
-                board_l.draw_line(sr[0], sr[1], Color(hint, 1.0), ow, true)
+        # THE STRIPE TRUTH (v0.3.9-6, the owner: "the board outlines/edges
+        # stripes are not real stripes like the rest of the board, they are
+        # gray lines, they should be striped like the rest of the board
+        # lines"): the v0.3.9-4 outline ring drew the rim edges SOLID -
+        # gone. EVERY edge wears the same dashed guide now, rim included;
+        # the drawn ink covers it whole when a line lands there.
         # the dots (the board's whole skeleton)
         var dr := maxf(3.0, cell * 0.08)
         for c in dots_n:
@@ -874,7 +883,14 @@ func _draw_goal_cards(c: Control) -> void:
         var mid_y := c.size.y * 0.5
         var x0 := c.size.x * 0.5
         for i in 2:
-                var x: float = (cw + gapw) * (i - 1) + x0
+                # THE TWO-CARD SEAT (v0.3.9-6): the D card's removal kept
+                # the THREE-card center spacing (x0 -/+ (cw+gap)) - each
+                # surviving card hung HALF OFF the row, the W card landed
+                # right on top of the score chip (the owner: "the score
+                # widget is gone from its place ... the place remained
+                # empty"). Two cards tile the row from its own center:
+                # centers at x0 -/+ (cw+gap)*0.5, no spill, chip visible.
+                var x: float = (cw + gapw) * (float(i) - 0.5) + x0
                 var r := Rect2(x - cw * 0.5, mid_y - ch * 0.5, cw, ch)
                 c.draw_rect(Rect2(r.position + Vector2(4, 4), r.size),
                                 Color(0.09, 0.05, 0.02, 0.85))
@@ -1249,6 +1265,21 @@ func _goga_tick(delta: float) -> void:
                 for b in stale:
                         box_anim.erase(b)
         coin_t += delta
+        # THE DUST LIFE (v0.3.9-6): the firework pips live on the clock
+        # like every other time-based art - integrate + age on the tick,
+        # retire the dead ones. Their lives end with the box fade (BOX_A),
+        # so the burst plays WITH the transition and ends WITH it.
+        if not _dust.is_empty():
+                var alive := []
+                for p in _dust:
+                        p["life"] = float(p["life"]) - delta
+                        if float(p["life"]) <= 0.0:
+                                continue
+                        p["x"] = float(p["x"]) + float(p["vx"]) * delta
+                        p["y"] = float(p["y"]) + float(p["vy"]) * delta
+                        p["vy"] = float(p["vy"]) + 420.0 * delta
+                        alive.append(p)
+                _dust = alive
         # THE LIVING LAYER LAW (v0.3.9-4): every layer whose art reads the
         # clock repaints on the TICK - an event-driven repaint freezes a
         # time-based fade between events (the owner: "after each drawn
@@ -1260,6 +1291,14 @@ func _goga_tick(delta: float) -> void:
 
 # ------------------------------------------------------------ dust + coin
 
+## THE DUST LIFE (v0.3.9-6, the owner: "there is internal firework-like
+## effect that is still freeze-frame where it should work with the
+## transition and end with it"): the burst pips were BORN finished - the
+## array filled, but nothing ever integrated or aged it, so the sprinkle
+## painted one frozen frame over the box. The tick owns them now:
+## gravity, velocity, aging, retirement - and the pip life ends when the
+## box's own color fade (BOX_A) ends, firework and transition breathe
+## together.
 func _dust_burst(at: Vector2, col: Color, n := 6) -> void:
         for i in n:
                 _dust.append({
@@ -1267,10 +1306,10 @@ func _dust_burst(at: Vector2, col: Color, n := 6) -> void:
                                         cell * 0.2),
                         "y": at.y + _rng.randf_range(-cell * 0.1,
                                         cell * 0.12),
-                        "vx": _rng.randf_range(-80.0, 80.0),
-                        "vy": _rng.randf_range(-120.0, -20.0),
-                        "life": _rng.randf_range(0.26, 0.46),
-                        "max": 0.46,
+                        "vx": _rng.randf_range(-90.0, 90.0),
+                        "vy": _rng.randf_range(-140.0, -30.0),
+                        "life": _rng.randf_range(BOX_A * 0.55, BOX_A),
+                        "max": BOX_A,
                         "s": _rng.randf_range(2.0, 4.5),
                         "col": col,
                 })

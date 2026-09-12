@@ -83,7 +83,10 @@ world pours in) played on a VERTICAL corridor map - wave after wave, the
 screen filling with bodies, the weapons doing the talking. (Owner: "a
 vertical rogue-like game that is inspired from gamesnacks's zombie hunter
 game that is not horizontal like cosmic spud with different gameplay that
-feels like the game alien shooter".)
+feels like the game alien shooter".) (DEDUP NOTE, v0.3.9-6: this one and
+the 3d-zombie-fps-rogue-like in the 3D shelf are SIBLINGS, not
+duplicates - that one is the FIRST-PERSON 3D standing-shooter, this one
+is the vertical 2D corridor take. Both stay.)
 
 Twelfth dump - the v0.3.9-2 patch round (2026-09-11, DOC ONLY alongside the
 dominoes board-law fixes): +1 (the death-worm-like), plus TWO grow-notes on
@@ -130,6 +133,34 @@ below): "I may do it with two modes - the first is the classic and the
 second will be inspired by the game Neon Tower from Gamesnacks. I think
 I will make the game endless without an end, or maybe with ends that
 carry dynamic lengths and colors."
+
+Fifteenth dump - the v0.3.9-6 round (2026-09-13, DOC ONLY alongside the
+dot eater repair round): +6 names and one grow-note, each parked in its
+shelf below. THE WIK-LIKE ("Wik and the Fable of Souls" energy): a weird
+creature whose whole movement kit lives in its MOUTH - tongue-grapple,
+swing, gulp - and the bugs it collects feed the hungry creature it owes.
+THE FARMING GAME: maybe 2D, maybe 3D, the loop is orders - take the
+order, grow/raise the stock, fill the farm market (a cross-shelf cousin
+of the kitchen shelf's serving loops, but YOU run the fields). THE FISH
+GROW-NOTE: the crazy fishing-like below may wear TWO play modes - mode
+one like We Bare Bears Crazy Fishing (cast, snag, haul), mode two like
+the PC game FISHING CRAZE; dedup-checked, nothing similar exists on the
+shelf yet. THE CUT-THE-ROPE PAIR - one concept worn two ways, TWO
+DIFFERENT GAMES: (a) the thing travels THROUGH the contraptions to
+reach the someone (the classic delivery), (b) the SOMEONE ITSELF has to
+reach the thing (the creature moves, the prize waits). THE MERGE TD:
+rogue-like tower defense where the towers START SMALL and same-level
+MERGES make them stronger - arena, horizontal, vertical, or all of
+them. THE GOLD MINER: the claw swings, grabs the good gold, leaves the
+rocks behind - same concept, GOGABox cut.
+THE ZOMBIE DEDUP CHECK (owner, same round): "for the zombie-shooter-like
+you wrote, I guess we earlier wrote something similar so make sure there
+is no duplications there somehow too" - CHECKED: the shelf holds TWO
+zombie shooters and they are SIBLINGS, NOT duplicates - the eleventh
+dump's vertical rogue-like (gamesnacks Zombie Hunter energy, the 2D
+vertical corridor where hordes stream in) and the fourteenth dump's
+3d-zombie-fps-rogue-like (FIRST-PERSON 3D standing-shooter stages). Both
+notes now carry the cross-reference so the next agent never merges them.
 
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
@@ -180,6 +211,12 @@ carry dynamic lengths and colors."
 - **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
   chain, match 3 of a color, pop the run - never let the chain reach the
   hole.
+- **gold-miner-like** (owner, v0.3.9-6 round) — the Gold Miner CONCEPT:
+  someone with a thing (the claw on a cable) that COLLECTS THE GOOD
+  GOLD and lets the rocks fall behind - swing, drop, grab, reel, spend
+  the haul. Timing-and-value arcade, same concept, GOGABox cut.
+  (Dedup-checked: craze-caves-like digs with its own body through caves
+  - this one never moves, the CLAW does all the work.)
 - **knife circle** — throw a knife at a moving/rotating circle without
   hitting another knife. ("yes that type")
 - **tomb-of-the-mask-old-maze-like** — the owner's "tomb of the mask: old
@@ -207,6 +244,13 @@ carry dynamic lengths and colors."
   path, swoop the collectibles, thread the hazards.
 - **crazy fishing-like** — We Bare Bears Crazy Fishing: cast the hook, snag
   the fish, dodge the stingers, haul the catch up.
+  - **THE TWO MODES NOTE** (owner, v0.3.9-6 round, added "under it"): two
+    play modes could happen - the FIRST is like the We Bare Bears one
+    (the cast-snag-haul above), the SECOND is like the PC game FISHING
+    CRAZE. Dedup-checked at the owner's request: the closest shelf mates
+    are fish-eats-fish-like (you ARE the fish) and good-stuff-catcher
+    (the falling-items rain) - neither is a hook game, this one stays
+    unique.
 - **good-stuff-catcher** — the falling-things collector: good things fall,
   catch them; bad things fall, dodge them. (Owner: "a game with concept of
   collecting good falling things and not collect the bad things".)
@@ -271,6 +315,16 @@ carry dynamic lengths and colors."
   energy): drop fruits into the jar, two same fruits merge into the next
   bigger fruit, chain merges for score, never overflow the jar. (the
   owner's v0.3.3 dump: "a suiska-like game ... i guess it called suika")
+- **cut-the-rope-like, two games** (owner, v0.3.9-6 round) — the Cut the
+  Rope CONCEPT, and the owner split it into TWO DIFFERENT THINGS on
+  purpose: (a) the thing has to go THROUGH things - cut ropes, ride
+  contraptions, thread hazards - to REACH SOMEONE waiting in different
+  places and different ways (the classic candy delivery), and (b) the
+  OTHER DIRECTION: that someone ITSELF has to reach the thing (the
+  creature moves through the machinery, the prize waits). One physics
+  family, two directions of longing. (Dedup-checked: where-water and
+  happy-glass dig/draw for LIQUIDS, this one cuts for delivery - no
+  overlap.)
 - **angry-birds-like** - the slingshot destroyer: pull back, aim the arc,
   release, and bring the whole tower down on the pigs - each bird its own
   trick, wood/glass/stone each breaking its own way.
@@ -328,6 +382,12 @@ carry dynamic lengths and colors."
   behind this card, yes".)
 - **red-ball-4-like** — rolling-ball physics platformer; owner wants BOTH the
   movement AND the style vibe of it.
+- **wik-fable-of-souls-like** (owner, v0.3.9-6 round) — "Wik and the
+  Fable of Souls" energy: a WEIRD CREATURE that jumps and moves via
+  MOUTH TRICKS - the tongue grapples, the gulp yanks, the swing carries
+  - through a storybook world, COLLECTING BUGS to give to the creature
+  it owes (the hungry one you feed is the whole point). Physics-swing
+  platformer, GOGABox cut.
 - **get-over-it-2d** — Getting Over It + Only Up mashed into 2D: one brutal
   vertical climb, falling loses everything, keep going anyway. (rage game)
 
@@ -344,6 +404,13 @@ carry dynamic lengths and colors."
   the correct pad WITHOUT crashing: thrust taps, gravity, the pad that
   keeps moving its demands; maybe collectables and a survival flavor on
   top. The lunar-lander energy, GOGABox-cut.
+- **farming-orders-like** (owner, v0.3.9-6 round) — FARMING, maybe some
+  3D and maybe some 2D (the owner left the dimension open on purpose):
+  the loop works as MAKING ORDERS somehow - take the order, grow and
+  raise the stock, FILL THE FARM MARKET and like that. The fields are
+  yours, the orders drive the pace. (Cross-shelf note: the kitchen shelf
+  below serves COOKED dishes - this one grows the RAW goods; the
+  order-fulfilment STUDY note (Good Pizza Great Pizza) feeds both.)
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
@@ -365,6 +432,15 @@ carry dynamic lengths and colors."
   tactical hunting instead of raw shooting - plan the trap, bait the horde,
   catch quiet, flee loud; the owner wants that sneaky hunter loop
   ("some Stealth and tactical and like that").
+- **merge-tower-defense-rogue-like** (owner, v0.3.9-6 round) — ROGUE-LIKE
+  tower defense wearing the MERGE concept: the defenders START SMALL and
+  the more SAME-LEVEL merges happen, the STRONGER the merged unit gets
+  - merge your way up the tiers while the waves climb. The SHAPE is
+  open on purpose: it could be ARENA, HORIZONTAL, VERTICAL, or ALL of
+  them. (Dedup-checked: the PvZ-like / vertical-lanes-td pair is
+  lane-and-economy defense, pop_siege is the shipped pop-the-wave -
+  nobody merges; the suika-like merges FRUITS in a jar, not a battle
+  line.)
 - **swamp-attack-like** — Swamp Attack, the owner: "a game like swamp attack
   in that concept/type of tower-defense in a different way": defend the
   porch, tap-to-shoot the horde, reload rhythm + power-ups - tower defense
@@ -416,7 +492,9 @@ carry dynamic lengths and colors."
   Android shape (the owner: "like those android games where the character
   stands and zombies running toward him and he should shoot them and
   there is different stages and many waves"). The runs climb, the guns
-  talk, the horde never learns mercy.
+  talk, the horde never learns mercy. (DEDUP NOTE, v0.3.9-6: SIBLING of
+  the eleventh dump's vertical rogue-like up top - that one is the 2D
+  VERTICAL corridor take, this one is the 3D FPS; both stay.)
 - **rubiks-cube-3d** — the cube thing (owner: "rupik or rupic, you got it"):
   a real 3D Rubik's cube you twist and turn with swipes, scramble it,
   solve it. Layer turns, timer, maybe a solver hint later.
