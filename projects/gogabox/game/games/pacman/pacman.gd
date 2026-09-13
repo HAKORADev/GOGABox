@@ -95,11 +95,52 @@ extends GogaGame
 ##     no eater kills inside it (the run died three bites into the old
 ##     build).
 ##
+## ------------------------------------------------- the v0.3.9-6 repairs
+##   (round 3 - the owner's third report round)
+##   - THE TUNNEL LAW: the wrap seam cells open INTO the maze now - the
+##     old pockets walled their inner edge (the carve and the braid never
+##     touch the even filler columns), so the "tunnel" was an isolated
+##     2-cell island: crossing the seam landed the body in a 1-cell dead
+##     end (the owner: "the opened walls are not actual pass-through
+##     yet") and those pocket walls drew the stray outline line at every
+##     opening. One open_between pair per side, mirrored, and the tunnel
+##     FLOWS.
+##   - THE WALL SEAT: the wall-face stop left from/to STALE, so the drawn
+##     body sat at the flight's START - the owner: "when hit a wall,
+##     instead of waiting in-place, it returns one step behind". A
+##     blocked arrival seats from=to=cell now: the body waits pressed to
+##     the wall, one honest pixel.
+##   - THE HONEST EYES: eaten eyes flew by GREEDY MANHATTAN - wall-blind
+##     - so they ping-ponged in a basin beside the sealed pen forever
+##     (the probe: 25s bouncing between two cells) until a re-seat
+##     snapped them home "instantly". Every body now steers by BFS steps
+##     (wall-aware, wrap-aware): the eyes beeline the gate, walk in, and
+##     the round body re-appears AT ITS SEAT.
+##   - THE PEN-EXIT LAW: live eaters inside the pen walked the wall the
+##     player leaned on (the probe: one pressed the sealed bottom for 20s
+##     straight). BFS sees the gate as the only way out, a HOUSE BAN
+##     keeps live bodies from re-entering, and the pen empties.
+##   - THE SEAT LAW II: the four eaters sit at the pen's four CORNERS
+##     (top-left, top-right, bottom-left, bottom-right) - no more
+##     overlapping bodies in the middle (the owner's ask).
+##   - THE DEATH SEQUENCE: the old catch froze the world for 1.5s while
+##     a mouth opened. Now: the catch turns EVERY eater to eyes at once,
+##     the eyes fly home and the bodies re-seat - THEN Balldozer's own
+##     eyes walk to the start place and the body re-appears into the
+##     READY beat (the owner's exact order). The world keeps breathing
+##     the whole way.
+##   - THE ORDER RAIL: the junction buffer recorded only inside a 2.5-cell
+##     window AND died at the first mid-corridor arrival, so its honest
+##     window was ~1 cell - "it feels it wants sub-second reflexes". The
+##     rail takes an order ANYWHERE ahead, holds TWO (build orders),
+##     rides plain corridor, and spends each at the first decision cell
+##     that fits (the owner's "dies at 10" survives; the instant corner
+##     swipe and the instant reversal survive).
 
 ## Probe contract: the maze core is STATIC - gen_sizes / gen_maze /
 ## open_between / mirror_c / braid / is_open / reach drive headless laws
 ## without the scene (the squares contract). The scene rides
-## probe_reset(seed) + probe_step(dt); player / eaters / buf / dots_left
+## probe_reset(seed) + probe_step(dt); player / eaters / rail / dots_left
 ## are public.
 
 # ------------------------------------------------------------- the boards
@@ -127,7 +168,7 @@ const EATER_MAZE_STEP := 0.018       # + per maze (the climb)
 const EATER_MAX_SPEED := 5.0
 const RUSH_EATER_MULT := 0.55        # "makes ghosts slower"
 const EYES_SPEED := 7.5              # the eaten run home fast
-const BUF_WINDOW := 2.5              # cells: the owner's "7-8 of 10"
+const RAIL_SLOTS := 2                # the order rail: build two orders
 const RUSH_TIME := 7.0               # the magical dot's "amount of time"
 
 # THE SPEED LAW (the owner, v0.3.9-6 round 2: "i guess original pacman
@@ -479,6 +520,16 @@ static func gen_maze(cols: int, rows: int, rng: RandomNumberGenerator) -> Dictio
                 g[y][0]["wrap"] = true
                 g[y][cols - 1]["r"] = false
                 g[y][cols - 1]["wrap"] = true
+                # THE TUNNEL LAW (round 3): the seam cells open INTO the
+                # maze. The carve and the braid never touch the even filler
+                # columns (x=0 / x=cols-1 inner edges), so the old wrap was
+                # an isolated 2-cell pocket - crossing the seam dead-ended
+                # one cell later and the pocket walls drew the stray
+                # outline at the opening. Open both, mirrored, and the
+                # tunnel is an actual pass-through.
+                open_between(g, Vector2i(0, y), Vector2i(1, y))
+                open_between(g, Vector2i(cols - 2, y),
+                                Vector2i(cols - 1, y))
         return {"g": g, "plaza": Vector2i(cx, cy), "wraps": wraps}
 
 ## the reachability map (BFS over open walls, wrap edges included) -
@@ -512,6 +563,32 @@ static func reach(g: Array, cols: int, start: Vector2i) -> Dictionary:
                         seen[nx] = true
                         q.append(nx)
         return seen
+
+## THE HONEST DISTANCE (round 3): BFS steps from `src` over open edges,
+## wrap included. The greedy Manhattan ruler is wall-blind - it read the
+## sealed pen's basin as "the way home" and the eyes ping-ponged in place
+## forever (the owner's round-3 video). Every body steers by this now.
+static func bfs_steps(g: Array, cols: int, src: Vector2i) -> Dictionary:
+        var dist: Dictionary = {src: 0}
+        var q: Array = [src]
+        var i := 0
+        while i < q.size():
+                var cur: Vector2i = q[i]
+                i += 1
+                for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
+                                Vector2i(0, -1)]:
+                        if not is_open(g, cols, cur.x, cur.y, d):
+                                continue
+                        var nx: Vector2i = cur + d
+                        if nx.x < 0:
+                                nx.x = cols - 1
+                        elif nx.x > cols - 1:
+                                nx.x = 0
+                        if dist.has(nx):
+                                continue
+                        dist[nx] = int(dist[cur]) + 1
+                        q.append(nx)
+        return dist
 
 ## is the wall toward `dir` open at cell (c, r)? (the wrap edges read
 ## open). THE BOUNDS LAW (v0.3.9-6 round 2): a cell outside the grid is
@@ -560,7 +637,16 @@ var _time := 0.0                # the game clock (the living layer law)
 var player := {"cell": Vector2i.ZERO, "dir": Vector2i(1, 0),
         "from": Vector2i.ZERO, "to": Vector2i.ZERO, "t": 0.0,
         "moving": false, "mouth": 0.0, "alive": true}
-var buf := Vector2i.ZERO        # THE JUNCTION BUFFER - one slot, the law
+var rail: Array = []           # THE ORDER RAIL (round 3) - two slots,
+                               # FIFO: an order recorded ANYWHERE ahead
+                               # rides plain corridor and spends itself
+                               # at the first decision cell that fits
+
+# the death sequence (round 3): the ghosts' eyes home first, then
+# Balldozer's own eyes walk to the start place
+var dying_phase := ""          # "ghosts" | "player"
+var dying_guard := 0.0         # the sequence's safety clock
+var player_eyes_home := false
 
 # the ball-eaters
 var eaters: Array = []
@@ -588,9 +674,9 @@ var rush_lbl: Label = null
 var rush_chip: Control = null
 var speed_lbl: Label = null        # the x1.10-a-maze speed widget
 var pre_dir := Vector2i.ZERO       # a swipe stashed during the READY beat
-var death_t := 0.0
 var clear_t := 0.0
 var _fx: Array = []             # [{x, y, vx, vy, life, max, s, col}]
+var _bfs_maps := {}             # target -> the BFS step map (per tick)
 var tex := {}
 var shop_id := ""
 var _story_paused := false      # THIS node paused the tree for the lore
@@ -789,6 +875,7 @@ func _new_maze(first := false) -> void:
         g = m["g"]
         plaza = m["plaza"]
         wraps = m["wraps"]
+        _bfs_maps.clear()      # a fresh maze owes no stale step maps
         # THE DOTS: every reachable corridor cell wears one (the plaza
         # stays clean); the corners of the maze wear the four BLUE ones
         dots = {}
@@ -840,9 +927,13 @@ func _in_plaza(c: Vector2i) -> bool:
         return absi(c.x - plaza.x) <= 1 and absi(c.y - plaza.y) <= 1
 
 ## the actors to their seats (a fresh maze, or a life lost - the maze
-## keeps its eaten dots, the original's mercy)
+## keeps its eaten dots, the original's mercy). THE SEAT LAW II (round 3,
+## the owner: "making one to be at the top left, the other top right, the
+## other two at the bottom left and right, will eliminate the unwanted
+## overlapping"): the four eaters sit at the pen's four CORNERS, facing
+## the gate.
 func _seat_actors() -> void:
-        var spawn := Vector2i(plaza.x, plaza.y + 2)
+        var spawn := _spawn_cell()
         player["cell"] = spawn
         player["from"] = spawn
         player["to"] = spawn
@@ -850,15 +941,16 @@ func _seat_actors() -> void:
         player["moving"] = false
         player["dir"] = Vector2i(-1, 0)
         player["mouth"] = 0.0
-        buf = Vector2i.ZERO
+        rail = []                     # a fresh seat owes no stale orders
         pre_dir = Vector2i.ZERO       # a fresh maze owes no stale order
         eaters = []
         for def in EATER_DEFS:
+                var seat: Vector2i = plaza + Vector2i(def["corner"])
                 var e := {"id": String(def["id"]), "kind": String(def["kind"]),
                         "col": def["col"], "shade": def["shade"],
                         "corner": def["corner"],
-                        "cell": plaza, "from": plaza, "to": plaza, "t": 0.0,
-                        "dir": Vector2i(1, 0), "moving": false,
+                        "cell": seat, "from": seat, "to": seat, "t": 0.0,
+                        "dir": Vector2i(0, -1), "moving": false,
                         "state": "pen", "pen_t": 1.2 + 0.6 * float(eaters.size()),
                         "mouth": 0.0}
                 eaters.append(e)
@@ -873,21 +965,25 @@ func _ready_beat(txt := "READY!") -> void:
         mercy_t = 1.1          # the mercy outlives the beat a moment
         _flash(txt, Color(1.0, 0.82, 0.30))
 
-# ================================================== THE JUNCTION BUFFER LAW
-## The owner's mechanic, word for word: "we have a long path, and the
-## next way is at 10 and we are at 5, doing the move will not be
-## recorded, doing the move at 7-8 will be recorded to be applied at 10,
-## doing it at 10 will do it instantly, doing one at 7-8 then doing
-## another before going through 10 will not record it".
-##   dist 0.0   -> AT the junction: the turn happens NOW.
-##   dist <= BUF_WINDOW -> inside the window: the slot takes it (if free).
-##   dist >  BUF_WINDOW -> too early: not recorded.
-##   slot full  -> not recorded (one at a time, the owner's law).
+# ==================================== THE ORDER RAIL LAW (round 3)
+## The owner's original buffer: "we have a long path, and the next way is
+## at 10 and we are at 5, doing the move will not be recorded, doing the
+## move at 7-8 will be recorded to be applied at 10, doing it at 10 will
+## do it instantly". Round 3's report: "when i try to build move orders,
+## it feels it wants sub-second reflexes ... fix the design of it
+## somehow". The probe found why: the slot died at the FIRST mid-corridor
+## arrival, so the honest window was ~1 cell. THE RAIL keeps the owner's
+## shape and removes the reflex tax:
+##   - an order is recorded ANYWHERE ahead (no window to miss),
+##   - TWO slots, FIFO - orders are BUILT (the newest wins the seat when
+##     full - nothing is silently dropped),
+##   - the rail RIDES plain corridor and spends each order at the first
+##     decision cell that fits (a turn that never fit dies at that corner
+##     - the owner's own "dies at 10"),
+##   - "doing it at 10" is still instant, the reversal still instant.
 func _swipe_dir(dir: Vector2i, _at: Vector2 = Vector2.ZERO) -> void:
         # THE READY STASH (round 2): a swipe during the READY beat is the
-        # supervisor's FIRST order - the old build swallowed it (the whole
-        # 1.3s beat ate every swipe and the run opened deaf). One slot,
-        # the buffer law's shape; it applies the moment the run starts.
+        # supervisor's FIRST order - it applies the moment the run starts.
         if phase == "ready" and not paused and not over:
                 if dir != player["dir"]:
                         pre_dir = dir
@@ -896,35 +992,32 @@ func _swipe_dir(dir: Vector2i, _at: Vector2 = Vector2.ZERO) -> void:
                 return
         var pd: Vector2i = player["dir"]
         # THE MERCY: reversal is always instant (the original lets you
-        # flip mid-corridor; the buffer law is for TURNS ahead)
+        # flip mid-corridor). The rail clears with it: the built orders
+        # were for the junctions ahead of the OLD heading.
         if dir == -pd:
                 _reverse_now(dir)
                 return
         # swiping the way you already go costs nothing WHILE GOING - but
         # a STOPPED body wears a stale face (the spawn face, the wall
-        # face): the old early-return ate that swipe whole (the flight
-        # recorder's S1: the first swipe of the run, dead on the floor)
+        # seat): any open way starts instantly, the face swipe included
         if dir == pd and player["moving"]:
                 return
-        # standing still (a wall face): any open way starts instantly
+        # standing still: any open way starts instantly
         if not player["moving"]:
                 if is_open(g, cols, player["cell"].x, player["cell"].y, dir):
                         _start_move(dir)
                 return
+        # AT the decision point: "doing it at 10" - instantly
         var info := _junction_info()
         var dist := float(info["d"])
         var dcell: Vector2i = info["cell"]
-        if dist < 0.0 or not _dir_open_at(dcell, dir):
-                return          # no decision ahead (or the way is a wall)
-        if dist <= 0.05:
-                # AT the decision point: "doing it at 10" - instantly
+        if dist >= 0.0 and dist <= 0.05 and _dir_open_at(dcell, dir):
                 _turn_at(dcell, dir)
                 return
-        if dist > BUF_WINDOW:
-                return                      # "at 5" - not recorded
-        if buf != Vector2i.ZERO:
-                return                      # the slot is full - not recorded
-        buf = dir                           # "at 7-8" - recorded for 10
+        # THE RAIL: recorded wherever the finger is, rides until it fits
+        if rail.size() >= RAIL_SLOTS:
+                rail.pop_front()          # the newest order wins the seat
+        rail.append(dir)
 
 ## the reverse, mid-corridor: swap the flight, keep the progress
 func _reverse_now(dir: Vector2i) -> void:
@@ -934,10 +1027,10 @@ func _reverse_now(dir: Vector2i) -> void:
                 player["to"] = f
                 player["t"] = 1.0 - float(player["t"])
                 player["dir"] = dir
-                buf = Vector2i.ZERO
+                rail = []
         elif is_open(g, cols, player["cell"].x, player["cell"].y, dir):
                 _start_move(dir)
-                buf = Vector2i.ZERO
+                rail = []
 
 ## the upcoming decision cell (where a turn may happen next)
 func _decision_cell() -> Vector2i:
@@ -996,7 +1089,6 @@ func _turn_at(c: Vector2i, dir: Vector2i) -> void:
         player["t"] = 0.0
         player["moving"] = true
         player["dir"] = dir
-        buf = Vector2i.ZERO
 
 ## the wrap-aware step target
 func _wrap_to(c: Vector2i, dir: Vector2i) -> Vector2i:
@@ -1064,10 +1156,7 @@ func _goga_tick(delta: float) -> void:
                                         pre_dir = Vector2i.ZERO
                                         _swipe_dir(d)
                 "dying":
-                        death_t -= delta
-                        _death_anim(delta)
-                        if death_t <= 0.0:
-                                _after_death()
+                        _tick_dying(delta)
                 "clear":
                         clear_t -= delta
                         if clear_t <= 0.0:
@@ -1134,26 +1223,49 @@ func _tick_player(delta: float) -> void:
                 player["from"] = cell
                 player["to"] = _wrap_to(cell, player["dir"])
 
-## the arrival: eat, then THE BUFFER APPLIES (the owner's "at 10").
-## THE WALL FACE LAW (round 2): the corridor ends -> the chomp WAITS,
-## the classic's own patience - the old auto-reverse bounced the body
-## back out of every stem (the recorder filmed it oscillating between
-## two cells, "the character goes to a weird side" all over again).
-## The way out is the supervisor's finger: any open way starts instantly
-## (_swipe_dir's standing branch), the reversal swipe included.
+## the arrival: eat, then THE RAIL APPLIES (the owner's "at 10").
+## THE WALL SEAT LAW (round 3): the corridor ends -> the chomp WAITS AT
+## THE CELL IT ARRIVED AT, from=to=cell - the old stop left from/to
+## STALE, and the drawn body sat one full cell BEHIND the arrival (the
+## owner: "instead of waiting in-place, it returns one step behind" -
+## the probe filmed an 118px snap-back). The way out is the supervisor's
+## finger: any open way starts instantly (_swipe_dir's standing branch),
+## the reversal swipe included.
 func _arrive(cell: Vector2i) -> void:
         _eat_at(cell)
-        # the buffered turn - the single slot spends itself here
-        if buf != Vector2i.ZERO and _dir_open_at(cell, buf):
-                player["dir"] = buf
-                buf = Vector2i.ZERO
-                player["to"] = _wrap_to(cell, player["dir"])
-                return
-        buf = Vector2i.ZERO            # a turn that never fit dies at 10
+        # the rail: the head order spends itself at the first decision
+        # cell that fits; on plain corridor it just rides along
+        while not rail.is_empty():
+                var d: Vector2i = rail[0]
+                if _dir_open_at(cell, d):
+                        rail.pop_front()
+                        player["dir"] = d
+                        player["to"] = _wrap_to(cell, d)
+                        return
+                if _is_decision_cell(cell):
+                        rail.pop_front()   # the order dies at this corner
+                        continue
+                break                      # plain corridor: the order rides
         if _dir_open_at(cell, player["dir"]):
                 player["to"] = _wrap_to(cell, player["dir"])
                 return
-        player["moving"] = false       # the wall face: the chomp waits
+        player["moving"] = false           # the wall seat: the chomp waits
+        player["from"] = cell
+        player["to"] = cell
+        player["t"] = 0.0
+
+## is this arrival a DECISION cell? (the rail's spending rule: a cell
+## with an open way perpendicular to the run, or the corridor's end -
+## the same shape _junction_info walks to)
+func _is_decision_cell(c: Vector2i) -> bool:
+        var pd: Vector2i = player["dir"]
+        for nd in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, 0),
+                        Vector2i(-1, 0)]:
+                if nd == pd or nd == -pd:
+                        continue
+                if _dir_open_at(c, nd):
+                        return true
+        return not _dir_open_at(c, pd)
 
 func _eat_at(cell: Vector2i) -> void:
         if not dots.has(cell):
@@ -1253,38 +1365,55 @@ func _eater_arrive(e: Dictionary, cell: Vector2i) -> void:
         e["cell"] = cell
         _eater_pick(e)
 
-## THE DRIVE LAW: pick the next direction at a cell (the classic's rule -
-## never reverse, minimize the distance to the target, ties read
-## up-left-down-right). FRIGHT maximizes instead. EYES ignore the ban.
+## THE HONEST STOP (round 3): a body that stops seats from=to=cell - the
+## stale from/to drew the body one cell behind its arrival (the same
+## disease as the player's wall step-back)
+func _eater_stop(e: Dictionary) -> void:
+        e["moving"] = false
+        e["from"] = e["cell"]
+        e["to"] = e["cell"]
+        e["t"] = 0.0
+
+## THE DRIVE LAW (round 3: THE HONEST STEER) - pick the next direction at
+## a cell: never reverse, and measure by BFS STEPS (wall-aware, wrap-aware)
+## to the target, ties reading up-left-down-right. FRIGHT maximizes the
+## steps from Balldozer. EYES fly to their own pen seat. THE HOUSE BAN: a
+## live body never re-enters the pen (the eyes alone walk home into it) -
+## the pen empties and stays empty (the owner's round-3 law).
 func _eater_pick(e: Dictionary) -> void:
         var cell: Vector2i = e["cell"]
         var opts: Array = []
         for nd in [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 1),
                         Vector2i(1, 0)]:
-                if _dir_open_at(cell, nd):
-                        opts.append(nd)
+                if not _dir_open_at(cell, nd):
+                        continue
+                if e["state"] != "eyes" and not _in_plaza(cell) \
+                                and _in_plaza(_wrap_to(cell, nd)):
+                        continue          # the house ban
+                opts.append(nd)
         if opts.is_empty():
-                e["moving"] = false
+                _eater_stop(e)
                 return
         var rev: Vector2i = -Vector2i(e["dir"])
         if e["state"] == "eyes":
-                if _in_plaza(cell):
-                        # the eyes are home: the round body returns
-                        e["state"] = "roam" if rush_left <= 0.0 else "fright"
-                        e["moving"] = false
+                var seat: Vector2i = plaza + Vector2i(e["corner"])
+                if cell == seat:
+                        # the eyes are home: the round body returns. During
+                        # the death sequence the reborn body SITS (pen)
+                        # until the re-seat; in play it hunts again.
+                        _eater_stop(e)
+                        if phase == "dying":
+                                e["state"] = "pen"
+                                e["pen_t"] = 9999.0
+                        else:
+                                e["state"] = "roam" if rush_left <= 0.0 \
+                                                else "fright"
                         return
-                var tgt := plaza
-                var best := _pick_dir(opts, cell, tgt, false)
+                var best := _pick_bfs(opts, cell, seat)
                 if best != Vector2i(9, 9):
                         _start_eater_move(e, best)
-                        return
-                # the eyes are home: reborn (the round body returns)
-                e["state"] = "roam" if rush_left <= 0.0 else "fright"
-                e["cell"] = cell
-                e["from"] = cell
-                e["to"] = cell
-                e["t"] = 0.0
-                e["moving"] = false
+                else:
+                        _eater_stop(e)
                 return
         var non_rev: Array = []
         for o in opts:
@@ -1292,30 +1421,30 @@ func _eater_pick(e: Dictionary) -> void:
                         non_rev.append(o)
         if non_rev.is_empty():
                 non_rev = opts
-        var target := _eater_target(e)
         if e["state"] == "fright":
-                # flee: the FARTHEST open way from Balldozer
-                var best_d := -1.0
+                # flee: the open way FARTHEST from Balldozer (BFS steps)
+                var pmap: Dictionary = _bfs_map(player["cell"])
+                var best_d := -1
                 var best_dir := Vector2i(9, 9)
                 for o in non_rev:
-                        var nxt := _wrap_to(cell, o)
-                        var dd := float(absi(nxt.x - player["cell"].x)
-                                        + absi(nxt.y - player["cell"].y))
+                        var nxt: Vector2i = _wrap_to(cell, o)
+                        var dd: int = int(pmap.get(nxt, 0))
                         if dd > best_d:
                                 best_d = dd
                                 best_dir = o
                 if best_dir != Vector2i(9, 9):
                         _start_eater_move(e, best_dir)
                 else:
-                        e["moving"] = false
+                        _eater_stop(e)
                 return
-        var pick := _pick_dir(non_rev, cell, target, false)
-        if pick == Vector2i(9, 9) and not opts.is_empty():
+        var target := _eater_target(e)
+        var pick := _pick_bfs(non_rev, cell, target)
+        if pick == Vector2i(9, 9):
                 pick = opts[0]
         if pick != Vector2i(9, 9):
                 _start_eater_move(e, pick)
         else:
-                e["moving"] = false
+                _eater_stop(e)
 
 ## the min-distance dir picker (the tie order lives in the caller's opts)
 func _pick_dir(opts: Array, cell: Vector2i, target: Vector2i,
@@ -1331,6 +1460,30 @@ func _pick_dir(opts: Array, cell: Vector2i, target: Vector2i,
                         best_d = dd
                         best = o
         return best
+
+## THE HONEST STEP (round 3): the open dir whose next cell sits closest
+## to `target` by the BFS step map. A shortest path's steps strictly
+## decrease the distance, so NO basin can ping-pong a body in place
+## forever - the greedy Manhattan disease is gone.
+func _pick_bfs(opts: Array, cell: Vector2i, target: Vector2i) -> Vector2i:
+        var map: Dictionary = _bfs_map(target)
+        var best := Vector2i(9, 9)
+        var bd := 1 << 30
+        for o in opts:
+                var nxt: Vector2i = _wrap_to(cell, o)
+                var dd: int = int(map.get(nxt, 1 << 29))
+                if dd < bd:
+                        bd = dd
+                        best = o
+        return best
+
+## the BFS step map for one target, computed at most once per tick
+func _bfs_map(target: Vector2i) -> Dictionary:
+        if _bfs_maps.has(target):
+                return _bfs_maps[target]
+        var m: Dictionary = bfs_steps(g, cols, target)
+        _bfs_maps[target] = m
+        return m
 
 ## the personality targets (the quartet's drives)
 func _eater_target(e: Dictionary) -> Vector2i:
@@ -1431,21 +1584,125 @@ func _check_collisions() -> void:
                         # spawn breath - the READY beat's shadow
                         if mercy_t > 0.0:
                                 continue
+                        _burst(hit_at, Color(1.0, 0.42, 0.36), 18)
                         _lose_life()
                         return
 
 # ============================================================= THE DEATHS
+## Balldozer's start place (below the pen - the seat law's anchor)
+func _spawn_cell() -> Vector2i:
+        return Vector2i(plaza.x, plaza.y + 2)
+
+## THE DEATH SEQUENCE (round 3, the owner's exact order): "after it got
+## eaten, make all ghosts die and their eyes move to the ghosts place,
+## then do that pacman one part". The catch SWALLOWS Balldozer on the
+## spot and turns EVERY eater to eyes at once; the eyes fly home and
+## each body re-appears at its seat - THEN Balldozer's own eyes walk to
+## the start place and the body re-appears into the READY beat. The
+## world keeps breathing the whole way - the old 1.5s world freeze is
+## GONE (the owner: "it stalls the game then appear again without cool
+## smooth animating").
 func _lose_life() -> void:
         lives -= 1
         lives_lbl.text = str(maxi(0, lives))
         phase = "dying"
-        death_t = 1.5
+        dying_phase = "ghosts"
+        dying_guard = 0.0
+        player_eyes_home = false
+        rail = []                  # a death owes no stale orders
+        pre_dir = Vector2i.ZERO
+        # THE SWALLOW SEATING: the body stops dead at the catch cell -
+        # from/to seat honestly (no stale flight drawing a ghost body)
+        player["moving"] = false
+        player["from"] = player["cell"]
+        player["to"] = player["cell"]
+        player["t"] = 0.0
+        # THE CATCH LAW: every eater dies AT ONCE - even a pen body - and
+        # every pair of eyes flies to its OWN seat (the eyes alone may
+        # cross the house ban)
+        for e in eaters:
+                if e["state"] == "eyes":
+                        continue
+                e["state"] = "eyes"
+                e["moving"] = false
+                e["from"] = e["cell"]
+                e["to"] = e["cell"]
+                e["t"] = 0.0
         Jukebox.sfx("de_hurt", -2.0)
 
-## the classic's exit: the mouth opens until the body is gone
-func _death_anim(_delta: float) -> void:
-        var k := 1.0 - clampf(death_t / 1.5, 0.0, 1.0)
-        player["mouth"] = k * PI    # the bite opens wide, wider, gone
+## the dying tick: phase one walks every eater's eyes home, phase two
+## walks Balldozer's own eyes to the start place. No freeze anywhere.
+func _tick_dying(delta: float) -> void:
+        if player_eyes_home:
+                return           # the sequence is done (the gate owns it)
+        dying_guard += delta       # the sequence's safety clock
+        _tick_eaters(delta)        # the eyes keep flying, world alive
+        if dying_phase == "ghosts":
+                var busy := false
+                for e in eaters:
+                        if e["state"] == "eyes":
+                                busy = true
+                                break
+                if not busy or dying_guard > 12.0:
+                        # every body is home: Balldozer's turn
+                        dying_phase = "player"
+                        dying_guard = 0.0
+                        player["moving"] = false
+                        player["t"] = 0.0
+                return
+        # "player": the eyes walk to the start place by BFS steps
+        if not player["moving"]:
+                _player_eyes_step()
+                return
+        player["t"] += EYES_SPEED * delta
+        while player["t"] >= 1.0 and player["moving"]:
+                player["t"] -= 1.0
+                player["cell"] = player["to"]
+                player["from"] = player["cell"]
+                player["t"] = 0.0
+                _player_eyes_step()
+                return
+
+## one honest BFS step of Balldozer's eyes toward the start place - the
+## same wall-aware, wrap-aware steer the eaters' eyes use (no greedy
+## ping-pong, no teleport: the journey is the show)
+func _player_eyes_step() -> void:
+        var home := _spawn_cell()
+        if player["cell"] == home:
+                player["moving"] = false
+                player["from"] = home
+                player["to"] = home
+                player["t"] = 0.0
+                player_eyes_home = true
+                _after_death()
+                return
+        var map: Dictionary = _bfs_map(home)
+        var best := Vector2i(9, 9)
+        var bd := 1 << 30
+        for nd in [Vector2i(0, -1), Vector2i(-1, 0),
+                        Vector2i(0, 1), Vector2i(1, 0)]:
+                if not _dir_open_at(player["cell"], nd):
+                        continue
+                var nxt: Vector2i = _wrap_to(player["cell"], nd)
+                var dd: int = int(map.get(nxt, 1 << 29))
+                if dd < bd:
+                        bd = dd
+                        best = nd
+        if best == Vector2i(9, 9) or dying_guard > 8.0:
+                # boxed in (never on this maze): the journey ends here
+                player["cell"] = home
+                player["moving"] = false
+                player["from"] = home
+                player["to"] = home
+                player["t"] = 0.0
+                player_eyes_home = true
+                _after_death()
+                return
+        player["dir"] = best
+        player["from"] = player["cell"]
+        player["to"] = _wrap_to(player["cell"], best)
+        player["t"] = 0.0
+        player["moving"] = true
 
 func _after_death() -> void:
         if lives <= 0:
@@ -1667,9 +1924,20 @@ func _draw_chars() -> void:
                                         fright)
         # BALLDOZER - the bite (the mouth angle swings with the clock)
         var sk := _skin()
-        var mouth := 0.10 + 0.38 * absf(sin(player["mouth"]))
         if phase == "dying":
-                mouth = clampf(player["mouth"], 0.1, PI - 0.02)
+                # THE DEATH SEQUENCE (round 3): the body is SWALLOWED the
+                # moment the catch lands (gone while every eater's eyes
+                # fly home); in the player's own turn only the eyes walk
+                # to the start place, and the body re-appears at the seat
+                # when the READY beat opens.
+                if dying_phase == "player":
+                        for p in _travel_copies(player["from"],
+                                        player["to"], float(player["t"])):
+                                _draw_eyes(p, player["dir"],
+                                                Color(0.97, 0.96, 0.92),
+                                                sk["eye"], cell_px * 0.40)
+                return
+        var mouth := 0.10 + 0.38 * absf(sin(player["mouth"]))
         for p in _travel_copies(player["from"], player["to"],
                         float(player["t"])):
                 _draw_balldozer(p, player["dir"], sk["body"], sk["shade"],

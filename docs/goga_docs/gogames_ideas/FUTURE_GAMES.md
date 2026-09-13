@@ -162,6 +162,27 @@ vertical corridor where hordes stream in) and the fourteenth dump's
 3d-zombie-fps-rogue-like (FIRST-PERSON 3D standing-shooter stages). Both
 notes now carry the cross-reference so the next agent never merges them.
 
+Sixteenth dump - the v0.3.9-6 round 3 (2026-09-13, DOC ONLY alongside the
+dot eater round-3 repair work): +3 names. THE ROCKET-MANIA-LIKE (PopCap
+energy): rotate the pipe pieces so the line connects from the left side
+across to the other side and lights the rocket - when a connection
+completes, the rocket LAUNCHES, and there is a clock breathing on the
+whole thing - same game concept where pipes go from side to side. THE
+MELEE SIDE-SCROLLER ROGUE-LIKE (the owner: "in the area of fighting
+games, there is a game with this tag I guess 'side-scroller rogue-like'
+which is a melee shadow fighting -like where the character moves and
+attack bunch of enemies") - the shadow-fight combat worn as a sideways
+run. AND THE GUN ONE, parked right next to it by the owner's own hand:
+a fire-weapons side-scroller rogue-like that is "like cosmic spud but
+sideways environment" - the fighter shelf's FIRST FIREARM.
+DEDUP-CHECKED: the melee run is siblings-not-duplicates with
+side-scroll-sword-fighter (the wave brawler, no rogue structure) and
+ronin-samurai-rogue-like (the arena horde survivors); the gun run is
+the SIDEWAYS twin of the eleventh dump's VERTICAL zombie-hunter
+rogue-like (that one pours hordes down a vertical corridor, this one
+runs the screen left-to-right with the Cosmic Spud loop inside). All
+stay.
+
 ## Board & classics
 - **dominoes** — the tile classic. Owner: maybe 2D or 3D, or two versions
   "because why not"; 3D dominoes is also fine. **SHIPPED v0.3.8** as
@@ -328,6 +349,12 @@ notes now carry the cross-reference so the next agent never merges them.
 - **angry-birds-like** - the slingshot destroyer: pull back, aim the arc,
   release, and bring the whole tower down on the pigs - each bird its own
   trick, wood/glass/stone each breaking its own way.
+- **rocket-mania-like** (owner, v0.3.9-6 round 3) - the PopCap pipe
+  puzzle: rotate the pipe pieces so the line connects from the left side
+  across to the other side and lights the rocket - a completed connection
+  LAUNCHES its rocket, and a clock breathes on every decision. Same game
+  concept where pipes go from side to side. (The knetwalk-like above is
+  the rotate-to-WIRE cousin - this one is rotate-to-IGNITE.)
 
 ## The v0.3.1 dump (the owner's list, kept verbatim-ish)
 
@@ -477,6 +504,24 @@ notes now carry the cross-reference so the next agent never merges them.
   shooting" - the run-based horde survivors loop, but every weapon is a
   blade (katana arcs, dash-slashes, parry windows), pick sword perks
   between waves.
+- **melee-side-scroller-rogue-like** (owner, v0.3.9-6 round 3) — the
+  owner: "in the area of fighting games, there is a game with this tag I
+  guess 'side-scroller rogue-like' which is a melee shadow fighting
+  -like where the character moves and attack bunch of enemies". The
+  shadow-fight combat worn as a sideways RUN: advance, get jumped by a
+  bunch, brawl through, keep going, draft between stretches. SIBLINGS on
+  this shelf, NOT duplicates: side-scroll-sword-fighter is the wave
+  brawler (no rogue structure), ronin-samurai-rogue-like is the arena
+  horde survivors - this one is the rogue-structured sideways melee run.
+- **gun-side-scroller-rogue-like** (owner, v0.3.9-6 round 3) — parked
+  right next to the melee one on purpose - THE SHELF'S FIRST FIREARM: a
+  fire-weapons side-scroller rogue-like that is "like cosmic spud but
+  sideways environment". Cosmic Spud is the shipped TOP-DOWN arena
+  shooter; this one takes that rogue-like loop (waves, drafts, the gun
+  ladder) and runs it through a SIDEWAYS world - a running gun fight
+  left-to-right. The sideways twin of the eleventh dump's VERTICAL
+  zombie-hunter rogue-like (that one holds a vertical corridor, this one
+  crosses the screen); siblings, not duplicates.
 
 ## Ports & redesigns
 - **the rest of the python game box games** — carried over with proper

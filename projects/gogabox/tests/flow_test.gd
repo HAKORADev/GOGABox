@@ -561,8 +561,8 @@ func _t_registry() -> int:
         ok += _check(int(PM.RUSH_TIME) == 7 and float(PM.RUSH_PLAYER_MULT) > 1.0 \
                         and float(PM.RUSH_EATER_MULT) < 1.0,
                 "the RUSH is accurate: 7s, you faster, them slower")
-        ok += _check(float(PM.BUF_WINDOW) > 0.0 and float(PM.BUF_WINDOW) < 10.0,
-                "the junction buffer wears the owner's window")
+        ok += _check(int(PM.RAIL_SLOTS) == 2,
+                "the order rail wears the round-3 build law (2 slots, the owner's rail)")
         # THE MAZE LAWS (static, deterministic): mirrored, braided, wrapped
         var mrng := RandomNumberGenerator.new()
         for seed_v in [11, 42, 777, 31337]:
