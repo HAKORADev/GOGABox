@@ -1023,15 +1023,78 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Court's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
         },
-        {"id": "jumpcube", "title": "CUBE OVERFLOW",
-                "tag": "grow and spill",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+        {"id": "jumpcube", "title": "CONQUER DICE", "tag": "grow and spill",
+                "script": "res://game/games/jumpcube/jumpcube.gd",
+                "thumb": "res://assets/thumbs/jumpcube.png",
+                # v0.3.9-9 THE GRADUATION ... the teaser CUBE OVERFLOW renamed
+                # CONQUER DICE by the owner's order; the honest ancestor is
+                # KDE's KJumpingCube (cloned + studied - the cascade law, the
+                # cap law and the total-conquest verdict are the original's).
+                # VERTICAL ONLY (the xo law) ... THE OWNER'S ECONOMY: win +1 /
+                # lose -1, run bonus /2, NO DRAWS (total conquest cannot tie)
+                # ... the dice pens: the user wears RED, the enemy BLUE by
+                # default - the shop sells 5 THEMES (room + board wall +
+                # neutral dice + enemy + each theme's own SFX voice) and the
+                # DICE SKINS that re-ink ONLY the user's dice ("theme is
+                # everything except user-owned dices" - B&W: you white, the
+                # enemy black) + the 3 board sizes (the 2048 mechanic: bought
+                # in the shop, applied from the options).
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 2, "price": 450, "fee": 8, "shop": true,
+                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 14,
                         "needs_games": 15},
-                "desc": "tap cells to grow their value, overflow spills "
-                        + "into the neighbors, capture the board - the "
-                        + "workshop version is baking"},
+                "desc": "the jumping-dice war: every die holds dots, tap a "
+                        + "neutral or your own die to grow it by one, and a "
+                        + "die with one dot too many SPILLS - a dot flies "
+                        + "into every neighbor, flipping them all to your "
+                        + "color while the chain spreads. Conquer the whole "
+                        + "board to take the round. The honest ancestor is "
+                        + "KDE's KJumpingCube, redressed for the box: five "
+                        + "themes, dice skins, three board sizes and one "
+                        + "four-mood CPU that learns from its spills.",
+                "controls": [
+                        "TAP ANYWHERE TO START - hold a die to feel the "
+                        + "gray-out press, release to grow it by one dot",
+                        "tap a NEUTRAL or YOUR OWN die - the enemy's dice "
+                        + "are solid",
+                        "a die holds as many dots as it has neighbors: "
+                        + "corner 2, edge 3, middle 4",
+                        "one dot TOO MANY and the die SPILLS - a dot flies "
+                        + "into every neighbor, flipping them to you, and "
+                        + "the chain spreads (the sounds rise as it grows)",
+                        "drag the press to another die to move it; release "
+                        + "OFF the board and nothing lands",
+                        "own EVERY die on the board and the round is yours: "
+                        + "win +1 score, loss -1, run bonus /2",
+                        "after every 3 rounds a GOGACoin rests on a neutral "
+                        + "die - whoever conquers that die takes it (the CPU "
+                        + "races you)",
+                        "the loser opens the next round; the CPU wears four "
+                        + "hidden moods and remembers your biggest spill",
+                        "themes, dice skins and board sizes live in the SHOP "
+                        + "- sizes apply from the OPTIONS",
+                ],
+                "genres": {"main": ["strategy", "puzzle"],
+                        "sub": ["turnbased", "competitive", "singleplayer"]},
+                "ach": [
+    {"id": "score_t1", "title": "Warm Dice", "desc": "Reach a score of 10", "tier": 1, "rule": {"k": "score", "key": "", "v": 10}},
+    {"id": "score_t2", "title": "The appetite", "desc": "Reach a score of 25", "tier": 2, "rule": {"k": "score", "key": "", "v": 25}},
+    {"id": "score_t3", "title": "Bottomless", "desc": "Reach a score of 50", "tier": 3, "rule": {"k": "score", "key": "", "v": 50}},
+    {"id": "wins_t1", "title": "First Conquest", "desc": "Win 1 round", "tier": 1, "rule": {"k": "cnt", "key": "wins", "v": 1}},
+    {"id": "wins_t2", "title": "Dice Collector", "desc": "Win 25 rounds", "tier": 2, "rule": {"k": "cnt", "key": "wins", "v": 25}},
+    {"id": "wins_t3", "title": "The Board's Owner", "desc": "Win 100 rounds", "tier": 3, "rule": {"k": "cnt", "key": "wins", "v": 100}},
+    {"id": "streak_t1", "title": "Unbroken", "desc": "Win 5 rounds in a row", "tier": 2, "rule": {"k": "max", "key": "streak", "v": 5}},
+    {"id": "streak_t2", "title": "The Machine", "desc": "Win 10 rounds in a row", "tier": 3, "rule": {"k": "max", "key": "streak", "v": 10}},
+    {"id": "dice_t1", "title": "Pip Pusher", "desc": "Conquer 500 dice total", "tier": 1, "rule": {"k": "cnt", "key": "dice", "v": 500}},
+    {"id": "dice_t2", "title": "The Flood", "desc": "Conquer 5000 dice total", "tier": 2, "rule": {"k": "cnt", "key": "dice", "v": 5000}},
+    {"id": "chain_t1", "title": "The Big Spill", "desc": "One spill of 8+ dice", "tier": 2, "rule": {"k": "max", "key": "chain", "v": 8}},
+    {"id": "chain_t2", "title": "The Avalanche", "desc": "One spill of 16+ dice", "tier": 3, "rule": {"k": "max", "key": "chain", "v": 16}},
+    {"id": "coins_t1", "title": "Coin Snatcher", "desc": "Take 5 GOGACoins off the board", "tier": 1, "rule": {"k": "cnt", "key": "coins", "v": 5}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
         {"id": "ludo", "title": "LUDO ROAD", "tag": "the dice race",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",
                 "price": 450, "fee": 8,

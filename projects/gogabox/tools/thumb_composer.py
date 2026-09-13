@@ -1967,6 +1967,99 @@ def scene_brick(spec=BRICK_SPEC):
     return sc.render()
 
 
+def scene_jumpcube():
+    """CONQUER DICE (v0.3.9-9): IN-GAME FOOTAGE - the wooden table
+    mid-war: red holds a corner pocket, blue holds two, the neutrals
+    wear their pips, one red die is mid-SPILL (dots flying into the
+    neighbors), and the GOGACoin rests on a neutral die both sides
+    want. The owner's game: KJumpingCube redressed for the box."""
+    sc = Scene()
+    sc.backdrop((42, 33, 20), (31, 24, 14))
+    n = 5          # 5x5 dice, mid-war on the 4x4 default
+    cell = 96
+    bw = n * cell
+    ox = W // 2 - bw // 2
+    oy = (H - bw) // 2 + 8
+    pad = int(cell * 0.30)
+    wall = (138, 90, 46)
+    wall_dk = (110, 69, 34)
+    die_c = (243, 226, 192)
+    die_dk = (220, 199, 156)
+    ink = (58, 42, 20)
+    red = (224, 83, 63)
+    red_ink = (58, 18, 8)
+    blue = (65, 121, 223)
+    blue_ink = (242, 246, 255)
+    # the slab + shadow (the board wall)
+    bx0, by0 = ox - pad, oy - pad
+    bx1, by1 = ox + bw + pad, oy + bw + pad
+    sc.rect([bx0 + 9, by0 + 13, bx1 + 9, by1 + 13], fill=(0, 0, 0, 85))
+    sc.rect([bx0, by0, bx1, by1], fill=wall + (255,))
+    sc.rect([bx0, by1 - 10, bx1, by1], fill=wall_dk + (255,))
+    # the grid seams
+    for k in range(1, n):
+        p = ox + k * cell
+        sc.line([p, oy, p, oy + bw], fill=wall_dk + (255,), width=2)
+        sc.line([ox, oy + k * cell, ox + bw, oy + k * cell],
+                fill=wall_dk + (255,), width=2)
+
+    def pips(cx, cy, v, col, r=9):
+        # the pip seats (the game's own PIPS law)
+        seats = {1: [(0, 0)],
+                 2: [(-0.2, -0.2), (0.2, 0.2)],
+                 3: [(-0.2, -0.2), (0, 0), (0.2, 0.2)],
+                 4: [(-0.2, -0.2), (0.2, -0.2), (-0.2, 0.2), (0.2, 0.2)],
+                 5: [(-0.2, -0.2), (0.2, -0.2), (0, 0), (-0.2, 0.2),
+                     (0.2, 0.2)]}[v]
+        for sx, sy in seats:
+            sc.ellipse([cx + sx * cell - r, cy + sy * cell - r,
+                        cx + sx * cell + r, cy + sy * cell + r],
+                       fill=col + (255,))
+
+    def die(gc, gr, col, pip_col, v=1, shading=die_dk):
+        x0, y0 = ox + gc * cell + 5, oy + gr * cell + 5
+        x1, y1 = ox + (gc + 1) * cell - 5, oy + (gr + 1) * cell - 5
+        sc.rect([x0 + 3, y0 + 5, x1 + 3, y1 + 5], fill=(0, 0, 0, 70))
+        sc.rect([x0, y0, x1, y1], fill=shading + (255,))
+        sc.rect([x0, y0, x1, y1 - 8], fill=col + (255,))
+        pips((x0 + x1) // 2, (y0 + y1) // 2 - 3, v, pip_col)
+
+    # ownership: red corner pocket + one raider, blue pair, rest neutral
+    reds = [(0, 0, 2), (1, 0, 1), (0, 1, 1), (2, 2, 1)]
+    blues = [(4, 4, 2), (3, 4, 1), (4, 3, 1)]
+    for (gc, gr, v) in reds:
+        die(gc, gr, red, red_ink, v, (170, 48, 34))
+    for (gc, gr, v) in blues:
+        die(gc, gr, blue, blue_ink, v, (44, 84, 168))
+    neutrals = [(gc, gr) for gc in range(n) for gr in range(n)
+                if (gc, gr) not in [(a, b) for a, b, _ in reds + blues]]
+    for (gc, gr) in neutrals:
+        die(gc, gr, die_c, ink, 1)
+    # the mid-SPILL die (2,1): red, over its cap, dots flying out
+    die(2, 1, red, red_ink, 4, (170, 48, 34))
+    sc.layer()          # THE ALPHA LAW: the glow + flyers ride fresh layers
+    # the spill flyers: dots leaving the popping die for its neighbors
+    src = (ox + 2 * cell + cell // 2, oy + 1 * cell + cell // 2)
+    for (dx, dy, f) in [(-1, 0, 0.55), (1, 0, 0.35), (0, -1, 0.5),
+                        (0, 1, 0.3)]:
+        tx = src[0] + dx * cell * f
+        ty = src[1] + dy * cell * f - 14
+        sc.ellipse([tx - 9, ty - 9, tx + 9, ty + 9], fill=red + (235,))
+        sc.ellipse([tx - 4, ty - 4, tx + 4, ty + 4],
+                   fill=red_ink + (235,))
+    # the popping die's glow ring (the out)
+    sc.ellipse([src[0] - cell * 0.62, src[1] - cell * 0.62,
+                src[0] + cell * 0.62, src[1] + cell * 0.62],
+               outline=(255, 220, 160, 160), width=5)
+    # the GOGACoin on a contested neutral die (3,1)
+    cx = ox + 3 * cell + cell // 2
+    cy = oy + 1 * cell + cell // 2
+    sc.ellipse([cx - 34, cy - 34 + 6, cx + 34, cy + 34 + 6],
+               fill=(0, 0, 0, 70))
+    sc.stamp(load_sprite("ui/coin.png"), cx, cy - 4, scale=0.42)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1987,6 +2080,7 @@ SCENES = {
     "squares": scene_squares,
     "pacman": scene_pacman,
     "brickbreaker": scene_brick,
+    "jumpcube": scene_jumpcube,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

@@ -646,3 +646,38 @@ law (never a shooting platform). The owner's own brick-breaker asset pack
 (Google Drive) fed the audio verbatim + the thumbnail + the palette study.
 GDD: docs/goga_docs/gogames_ideas/brickbreaker.md. The workshop's next
 first is CUBE OVERFLOW.
+
+Eighteenth dump - the v0.3.9-9 graduation (2026-09-14): CUBE OVERFLOW left
+the workshop and shipped as **CONQUER DICE** (the owner's rename law; the
+machine id stays `jumpcube`). The honest ancestor is KDE's KJumpingCube -
+cloned from invent.kde.org and studied (the cascade law, the cap law =
+neighbor count, the re-push law and the total-conquest verdict with the
+mid-cascade early exit are the original's, ported word for word; the QA
+SOAK caught what a port must also carry: the re-push law in the LIVE
+pipeline, and the original's habit of ABANDONING the cascade the moment
+the win is read - a finished board never keeps popping). Full spec:
+vertical only; 4x4/6x6/8x8 sizes (the 2048 mechanic: bought in the shop,
+applied from the options); win +1 / lose -1, run bonus /2, no draws; the
+GOGACoin rides a neutral die after every 3 rounds, its conqueror takes
+it; the loser opens the next round; 4 hidden CPU moods + the spill-scar
+memory (lose to a 6+ chain and the CPU plays feed-aware for 2 rounds);
+5 themes (WOOD default, BLACK & WHITE - you white, the enemy black -
+PIXEL, NEON, CANDY) owning the room + the board wall + the neutral dice +
+the enemy + EACH THEME'S OWN SFX VOICE; and the DICE SKINS that re-ink
+ONLY the user's dice ("theme is everything except user-owned dices").
+GDD: this dump + the game header are the spec.
+
+THE WHO-PLAYS-FIRST SCREEN (the owner's idea, v0.3.9-9 round - a SYSTEM
+for every versus game, parked until a future patch): before a versus
+round, a screen asks who plays first and sells the answer in three
+options - (1) THE OPPONENT, free; (2) RANDOM, 1 GOGACoin - picks randomly
+between the other two options; (3) THE PLAYER, 5 GOGACoins. The player
+option is marked BLUE, the opponent RED, random GRAY - and the random
+option FLICKERS the other two options' colors from gray-out to full
+color to make sense of the action; picking one plays it. The owner's
+note: this means another system (per-game purchase state for a first-move
+right), so it is parked here whole until a versus game asks for it. Until
+then the house law stands: the user opens the first round, the loser
+opens the rest. It pairs with the LOCAL-NETWORK multiplayer direction
+(see the "1 2 3 4 player games" mine above): on a real opponent the
+first-move right is the coin sink that makes sense.

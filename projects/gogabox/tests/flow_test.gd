@@ -20,6 +20,7 @@ func _ready() -> void:
         fails += _test("fourline: drop CPU sanity", _t_fourline_ai())
         fails += _test("bovo: five-in-row CPU sanity", _t_bovo_ai())
         fails += _test("squares: dots-and-boxes CPU sanity", _t_squares_ai())
+        fails += _test("jumpcube: conquer dice CPU sanity", _t_jumpcube_ai())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -309,8 +310,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 21,
-                "21 playable games (brick breaker joined, v0.3.9-7)")
+        var ok := _check(GameReg.playable().size() == 22,
+                "22 playable games (conquer dice joined, v0.3.9-9)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -318,8 +319,8 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
-        ok += _check(GameReg.workshop().size() == 3,
-                "3 workshop teasers (brick breaker graduated, v0.3.9-7)")
+        ok += _check(GameReg.workshop().size() == 2,
+                "2 workshop teasers (conquer dice graduated, v0.3.9-9)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -535,10 +536,10 @@ func _t_registry() -> int:
         ok += _check(int(SQ.boxes_total(4)) == 9 and int(SQ.boxes_total(6)) == 25 \
                         and int(SQ.boxes_total(8)) == 49,
                 "the no-draw arithmetic: 9 / 25 / 49 boxes - all ODD")
-        ok += _check(String(GameReg.get_game("jumpcube")["title"]) == "CUBE OVERFLOW" \
+        ok += _check(String(GameReg.get_game("jumpcube")["title"]) == "CONQUER DICE" \
                         and String(GameReg.get_game("ludo")["title"]) == "LUDO ROAD" \
                         and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
-                "the next three teasers are parked (jumpcube..snl)")
+                "the teasers wear the owner's names (jumpcube graduated, ludo..snl parked)")
         # v0.3.9-5: DOT EATER graduates (the teaser DOT MUNCHER renamed)
         var pg: Dictionary = GameReg.get_game("pacman")
         ok += _check(not bool(pg.get("coming_soon", false)) \
@@ -701,6 +702,49 @@ func _t_registry() -> int:
         ok += _check(absf(float(BB.ice_chance(1))) < 0.0001 \
                         and float(BB.ice_chance(30)) > 0.15,
                 "the ice climbs after L3 and caps by L30")
+        # v0.3.9-9: CONQUER DICE graduates (the teaser CUBE OVERFLOW renamed)
+        var jg_reg: Dictionary = GameReg.get_game("jumpcube")
+        ok += _check(not bool(jg_reg.get("coming_soon", false)) \
+                        and String(jg_reg["orientation"]) == "portrait",
+                "conquer dice is PLAYABLE now: portrait only (the vertical law)")
+        ok += _check(String(jg_reg["title"]) == "CONQUER DICE",
+                "the teaser CUBE OVERFLOW ships as CONQUER DICE (rename law)")
+        ok += _check(int(jg_reg["coin_div"]) == 2 and int(jg_reg["fee"]) == 8,
+                "conquer dice wears the owner's economy (bonus /2, fee 8)")
+        ok += _check(bool(jg_reg["shop"]) and bool(jg_reg["banner"]),
+                "conquer dice wears the shop + the banner")
+        ok += _check(jg_reg["ach"].size() == 15,
+                "conquer dice wears the tiered ladder (15)")
+        var JC: GDScript = load("res://game/games/jumpcube/jumpcube.gd")
+        ok += _check(int(JC.COIN_EVERY) == 3,
+                "conquer dice pays a GOGACoin after each 3 rounds (owner)")
+        ok += _check(JC.THEMES.size() == 5 \
+                        and int(JC.THEMES["wood"]["price"]) == 0,
+                "5 themes with WOOD the free default (the owner's first)")
+        ok += _check(JC.THEMES.has("mono") and JC.THEMES.has("pixel") \
+                        and JC.THEMES.has("neon") and JC.THEMES.has("candy"),
+                "B&W + pixel + neon + candy ride the shelf (the owner's ART ask)")
+        ok += _check(JC.SKINS.size() == 7 \
+                        and int(JC.SKINS["theme"]["price"]) == 0,
+                "the default skin wears the theme's own color (free)")
+        ok += _check(JC.SIZES.size() == 3 \
+                        and int(JC.SIZES["4"]["price"]) == 0 \
+                        and int(JC.SIZES["6"]["price"]) == 1800 \
+                        and int(JC.SIZES["8"]["price"]) == 3600,
+                "the 4/6/8 ladder (medium free, big 1800, too big 3600)")
+        ok += _check(JC.PROFILES.size() == 4,
+                "the CPU wears the four moods (the xo law)")
+        # the per-theme SFX voice law: every theme's in/out files exist
+        var sfx_ok := true
+        for tk in JC.THEMES:
+                var vk := String(JC.THEMES[tk]["sfx"])
+                sfx_ok = sfx_ok \
+                        and ResourceLoader.exists("res://assets/audio/sfx/cd_in_"
+                                        + vk + ".wav") \
+                        and ResourceLoader.exists("res://assets/audio/sfx/cd_out_"
+                                        + vk + ".wav")
+        ok += _check(sfx_ok,
+                "every theme wears its own in/out SFX voice (the owner's ask)")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -1330,6 +1374,200 @@ func _t_squares_ai() -> int:
         ok += _check(legal, "picks stay legal on every profile")
         return ok
 
+# --------------------------------------------------- conquer dice CPU
+
+## v0.3.9-9: CONQUER DICE - the KJC laws on the static core (the bovo
+## contract): the cap law, the pure move (growth, spill, the re-push,
+## pip conservation), the total-conquest win, the mood pipeline's eye,
+## the spill-scar memory, the mood rotation.
+func _t_jumpcube_ai() -> int:
+        var ok := 0
+        var JC: GDScript = load("res://game/games/jumpcube/jumpcube.gd")
+        # THE CAP LAW: corner 2, edge 3, middle 4 - and every die's
+        # neighbor count equals its cap, everywhere
+        ok += _check(int(JC.max_of(0, 4)) == 2 and int(JC.max_of(1, 4)) == 3 \
+                        and int(JC.max_of(5, 4)) == 4,
+                "4x4 caps: corner 2, edge 3, middle 4")
+        ok += _check(int(JC.max_of(0, 6)) == 2 and int(JC.max_of(12, 6)) == 3 \
+                        and int(JC.max_of(14, 6)) == 4 \
+                        and int(JC.max_of(21, 6)) == 4 \
+                        and int(JC.max_of(35, 6)) == 2,
+                "6x6 caps follow the same law at every ring")
+        var caps_ok := true
+        for s in [4, 6, 8]:
+                for i in s * s:
+                        caps_ok = caps_ok \
+                                        and JC.neighbors_of(i, s).size() \
+                                        == int(JC.max_of(i, s))
+        ok += _check(caps_ok, "every die's neighbor count wears its cap")
+        # THE PURE MOVE: an illegal tap is refused, a legal tap grows
+        var ow := []
+        var va := []
+        for i in 16:
+                ow.append(0)
+                va.append(1)
+        ow[3] = 2     # a foe die
+        ok += _check(JC.do_move(ow, va, 4, 1, 3).is_empty(),
+                "an enemy die refuses the tap (the solidity law)")
+        ow[3] = 0
+        var mv: Dictionary = JC.do_move(ow, va, 4, 1, 0)
+        ok += _check(not mv.is_empty() and int(mv["values"][0]) == 2 \
+                        and int(mv["owners"][0]) == 1 \
+                        and (mv["steps"] as Array).is_empty(),
+                "the tap grows the die by one and takes it (no spill)")
+        # THE SPILL LAW: a corner at its cap pops - the cap leaves, the
+        # neighbors grow and flip, and the PIPS CONSERVE (+1 for the tap)
+        var ow2 := []
+        var va2 := []
+        for i in 16:
+                ow2.append(0)
+                va2.append(1)
+        va2[0] = 2    # the corner sits at its cap
+        var sum0 := 0
+        for v in va2:
+                sum0 += int(v)
+        var mv2: Dictionary = JC.do_move(ow2, va2, 4, 1, 0)
+        var sum2 := 0
+        for v in mv2["values"]:
+                sum2 += int(v)
+        ok += _check((mv2["steps"] as Array).size() == 1,
+                "the capped corner pops (one step)")
+        ok += _check(int(mv2["values"][0]) == 1,
+                "the popped die wears the cap's remainder (2+1-2 = 1)")
+        ok += _check(int(mv2["values"][1]) == 2 and int(mv2["owners"][1]) == 1 \
+                        and int(mv2["values"][4]) == 2 \
+                        and int(mv2["owners"][4]) == 1,
+                "the spill's dots land in the neighbors and flip them")
+        ok += _check(sum2 == sum0 + 1,
+                "the pips conserve: sum + 1 for the tap (%d -> %d)"
+                                % [sum0, sum2])
+        # THE RE-PUSH LAW: a middle die at its cap with all four
+        # neighbors capped - the cascade pours back and the die pops
+        # twice; the board settles with NO die over its cap. The storm
+        # runs on an 8x8 with a neutral far row (the original's
+        # early-exit law would otherwise abandon it - see the next pin)
+        var ow3 := []
+        var va3 := []
+        for i in 64:
+                ow3.append(1)
+                va3.append(1)
+        for i in range(56, 64):
+                ow3[i] = 0          # the far row stays neutral
+        va3[27] = 4                 # (3,3) at its cap
+        for nb in JC.neighbors_of(27, 8):
+                va3[nb] = int(JC.max_of(nb, 8))   # every neighbor capped
+        var mv3: Dictionary = JC.do_move(ow3, va3, 8, 1, 27)
+        var settled := true
+        for i in 64:
+                if int(mv3["values"][i]) > int(JC.max_of(i, 8)):
+                        settled = false
+        ok += _check((mv3["steps"] as Array).size() == 6 and settled,
+                "the re-push cascade pops 6 and settles clean (%d pops)"
+                                % (mv3["steps"] as Array).size())
+        var sum3a := 0
+        for v in va3:
+                sum3a += int(v)
+        var sum3b := 0
+        for v in mv3["values"]:
+                sum3b += int(v)
+        ok += _check(sum3b == sum3a + 1,
+                "even the storm conserves pips (%d -> %d)" % [sum3a, sum3b])
+        # THE ORIGINAL'S EARLY EXIT: on a fully-owned board the cascade
+        # is ABANDONED the moment the win is read - the board is decided
+        var ow6 := []
+        var va6 := []
+        for i in 16:
+                ow6.append(1)
+                va6.append(1)
+        va6[5] = 4
+        for nb in JC.neighbors_of(5, 4):
+                va6[nb] = int(JC.max_of(nb, 4))
+        var mv6: Dictionary = JC.do_move(ow6, va6, 4, 1, 5)
+        ok += _check(bool(mv6["won"]),
+                "a decided board stops the cascade at once (the early exit)")
+        # THE VERDICT: total conquest - the last neutral die falls, won
+        var ow4 := []
+        var va4 := []
+        for i in 16:
+                ow4.append(1)
+                va4.append(1)
+        ow4[15] = 0
+        var mv4: Dictionary = JC.do_move(ow4, va4, 4, 1, 15)
+        ok += _check(bool(mv4["won"]),
+                "owning EVERY die is the win (the original's law)")
+        ok += _check(int(JC.count_owned(mv4["owners"], 1)) == 16,
+                "the count reads the whole board")
+        # the reply eye: a foe with no legal die reads 0.0 (no threats)
+        ok += _check(absf(float(JC.best_reply(mv4["owners"], mv4["values"],
+                        4, 2))) < 0.0001,
+                "a conquered foe has no reply (0.0)")
+        # THE MOODS: the eye takes the immediate spill; the fumbles stay
+        # real but bounded; the picks stay legal on every board
+        var ow5 := []
+        var va5 := []
+        for i in 16:
+                ow5.append(0)
+                va5.append(1)
+        ow5[0] = 2    # the CPU's corner at its cap
+        va5[0] = 2
+        ow5[1] = 1
+        ow5[4] = 1    # both neighbors are the player's (a juicy spill)
+        var rng := RandomNumberGenerator.new()
+        var takes := 0
+        rng.seed = 913
+        for t in 200:
+                if int(JC.cpu_pick(ow5, va5, 4, 2, "sage", false, rng)) == 0:
+                        takes += 1
+        ok += _check(takes >= 150,
+                "the sage's eye takes the spill (%d/200)" % takes)
+        var legal_all := true
+        rng.seed = 914
+        for pr in JC.PROFILES.keys():
+                for t in 20:
+                        var pick: int = JC.cpu_pick(ow5, va5, 4, 2, pr,
+                                        false, rng)
+                        legal_all = legal_all and pick >= 0 and pick < 16 \
+                                        and bool(JC.legal_at(ow5, pick, 2))
+        ok += _check(legal_all, "every mood's picks stay legal")
+        # the miss is real: with a capped die present the blind spot
+        # sometimes fires - the CPU is beatable, never broken
+        var eyes := 0
+        rng.seed = 915
+        for t in 200:
+                if int(JC.cpu_pick(ow5, va5, 4, 2, "rusher", false, rng)) == 0:
+                        eyes += 1
+        ok += _check(eyes > 100 and eyes < 200,
+                "the rusher takes the spill most of the time, not always "
+                                + "(%d/200)" % eyes)
+        # THE MEMORY LAW: the spill scar - a 6+ mass loss wakes the eye
+        var mem: Array = JC.remember([], {"mass": 7, "result": 2})
+        ok += _check(bool(JC.adapt(mem)["alert"]),
+                "the spill scar wakes the CPU (the memory law)")
+        ok += _check(not bool(JC.adapt(JC.remember([], {"mass": 5,
+                        "result": 2}))["alert"]),
+                "a 5-die spill is no scar (the bar is 6+)")
+        ok += _check(not bool(JC.adapt(JC.remember([], {"mass": 9,
+                        "result": 1}))["alert"]),
+                "a win is never a scar (the scar needs the loss)")
+        var mem2: Array = JC.remember(mem, {"mass": 1, "result": 1})
+        ok += _check(mem2.size() == 2 and int(mem2[0]["mass"]) == 7,
+                "the memory wears 2 rounds (the xo window)")
+        var mem3: Array = JC.remember(mem2, {"mass": 2, "result": 1})
+        ok += _check(mem3.size() == 2 and int(mem3[0]["mass"]) == 1,
+                "the window forgets the oldest (FIFO)")
+        # THE ROTATION: the moods walk in order, forever
+        var rot_ok := true
+        var idx := 0
+        var seen_moods := {}
+        for t in 8:
+                var pn: Array = JC.profile_next(idx)
+                rot_ok = rot_ok and JC.PROFILES.has(String(pn[0]))
+                seen_moods[String(pn[0])] = true
+                idx = int(pn[1])
+        ok += _check(rot_ok and seen_moods.size() == 4,
+                "the rotation walks all four moods in order")
+        return ok
+
 # ------------------------------------------------------------------ roadmap
 
 func _t_roadmap() -> int:
@@ -1706,8 +1944,8 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 3,
-                "the next three are the workshop (brick breaker graduated)")
+        ok += _check(GameReg.workshop().size() == 2,
+                "the next two are the workshop (conquer dice graduated)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -1716,8 +1954,8 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "jumpcube",
-                        "the SOON block wears jumpcube first (%s)" % [ids.slice(soon_first_at)])
+                ok += _check(String(ids[soon_first_at]) == "ludo",
+                        "the SOON block wears ludo first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:
