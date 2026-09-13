@@ -1877,6 +1877,89 @@ def scene_pacman():
     return sc.render()
 
 
+# ------------------------------------------------------------------- brick
+
+# v0.3.9-7 BRICK BREAKER - the posed court: a fat mirrored PYRAMID wall of
+# real brick sprites (the generator's own shape; tiers deepen toward the
+# top like the hp band), two rows wearing the ICE SHELL, the GOGACoin
+# resting in a broken slot, the multiball capsule dropping on the right,
+# and the classic bat catching the pearl ball mid-bounce (the motion
+# trail). No baked text (rule R2).
+BRICK_SPEC = dict(
+    cols=13,
+    rows=6,
+    cell=(68, 34),
+    wall_x0=0.065,                 # wall left margin (W fraction)
+    wall_y0=0.10,                  # wall top (H fraction)
+    frozen_rows=(1, 4),            # the rows wearing the ice shell
+    broken_slots=((3, 2), (9, 2)), # the carved gaps (one holds the coin)
+    coin=(9, 2),
+    capsule=(0.865, 0.63, 1.1),    # (fx, fy, scale)
+    ball=(0.36, 0.72, 1.15),       # (fx, fy, scale)
+    paddle=(0.5, 0.885, 1.25),     # (fx, fy, scale)
+)
+
+
+def scene_brick(spec=BRICK_SPEC):
+    sc = Scene()
+    # the sky-day court (the default theme's fat joyful tone)
+    sc.backdrop((88, 146, 214), (176, 214, 244))
+    for cx, cy, r in ((0.16, 0.17, 48), (0.84, 0.20, 40), (0.52, 0.07, 32)):
+        sc.ellipse([W * cx - r, H * cy - r * 0.55, W * cx + r,
+                    H * cy + r * 0.55], fill=(255, 255, 255, 110))
+    bricks = {n: load_sprite("games/brickbreaker/brick_%s.png" % n)
+              for n in ("blue", "green", "yellow", "pink")}
+    tier = ["blue", "green", "yellow", "pink"]
+    cols, rows, (cw, chh) = spec["cols"], spec["rows"], spec["cell"]
+    x0, y0 = spec["wall_x0"] * W, spec["wall_y0"] * H
+    frozen = set(spec["frozen_rows"])
+    for r in range(rows):
+        half = (rows - r) * 1.35
+        for c in range(cols):
+            dc = abs(c - (cols - 1) / 2.0)
+            if dc > half:
+                continue
+            if (c, r) in spec["broken_slots"]:
+                continue
+            cx = x0 + c * cw + cw / 2.0
+            cy = y0 + r * chh + chh / 2.0
+            sc.stamp(bricks[tier[min(3, (rows - 1 - r) // 2)]], cx, cy)
+            if r in frozen:
+                # THE ICE SHELL: the crystalline plate over the brick
+                sc.rect([cx - cw * 0.46, cy - chh * 0.44,
+                         cx + cw * 0.46, cy + chh * 0.44], r=8,
+                        fill=(190, 228, 252, 95),
+                        outline=(255, 255, 255, 200), width=3)
+                sc.polygon([(cx - cw * 0.30, cy + chh * 0.20),
+                            (cx - cw * 0.05, cy - chh * 0.30),
+                            (cx + cw * 0.12, cy + chh * 0.25)],
+                           fill=(255, 255, 255, 80))
+    # the GOGACoin resting in its broken slot
+    ccx = x0 + spec["coin"][0] * cw + cw / 2.0
+    ccy = y0 + spec["coin"][1] * chh + chh / 2.0
+    sc.glow(ccx, ccy, 52, (255, 200, 90), 120)
+    sc.stamp("ui/coin.png", ccx, ccy, scale=cw * 0.62 / 128.0)
+    # the multiball capsule dropping
+    fx, fy, fs = spec["capsule"]
+    sc.glow(W * fx, H * fy, 60, (110, 255, 160), 90)
+    sc.stamp("games/brickbreaker/pow_multi.png", W * fx, H * fy, scale=fs)
+    # the pearl ball mid-bounce (the motion trail behind it)
+    fx, fy, fs = spec["ball"]
+    bx, by = W * fx, H * fy
+    for k in range(4):
+        tr = 26 - k * 6
+        sc.ellipse([bx - 46 - k * 34 - tr, by + 26 + k * 20 - tr,
+                    bx - 46 - k * 34 + tr, by + 26 + k * 20 + tr],
+                   fill=(255, 255, 255, 120 - k * 28))
+    sc.glow(bx, by, 58, (150, 220, 255), 100)
+    sc.stamp("games/brickbreaker/ball.png", bx, by, scale=fs)
+    # the bat catching it
+    fx, fy, fs = spec["paddle"]
+    sc.stamp("games/brickbreaker/bat.png", W * fx, H * fy, scale=fs)
+    sc.vignette(80)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -1896,6 +1979,7 @@ SCENES = {
     "bovo": scene_bovo,
     "squares": scene_squares,
     "pacman": scene_pacman,
+    "brickbreaker": scene_brick,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

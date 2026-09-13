@@ -929,15 +929,80 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Maze's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
         },
-        {"id": "brickbreaker", "title": "BRICK STORM",
-                "tag": "paddle and the wall",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+        # v0.3.9-7: BRICK STORM graduated (the owner's rename law: "brick
+        # breaker is a genre and not a trademark name") - the full game
+        # lives in game/games/brickbreaker/brickbreaker.gd now.
+        {"id": "brickbreaker", "title": "BRICK BREAKER",
+                "tag": "the paddle and the wall",
+                "script": "res://game/games/brickbreaker/brickbreaker.gd",
+                "thumb": "res://assets/thumbs/brickbreaker.png",
+                # THE HORIZONTAL LAW (the owner: "the game is horizontal
+                # only for now (for extra space for more bricks)")
+                "orientation": "landscape", "dim": "2d",
+                # THE SCORE LAW (the owner: "each level cleared gives 1
+                # score point, score bonus is /3") - the dot eater shape.
+                "coin_div": 3, "price": 450, "fee": 8, "shop": true,
+                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 13,
                         "needs_games": 14},
-                "desc": "the paddle, the ball and the brick wall (and a "
-                        + "BBTAN sibling waiting in the notes) - the "
-                        + "workshop version is baking"},
+                "desc": "The infinite paddle court: endless levels, every "
+                        + "one a fresh mirrored pattern (the tent, the "
+                        + "fortress, the twin towers, the tunnels - never "
+                        + "'one more line'), with fat 3 and 10 hit bricks, "
+                        + "frozen ice shells that crack open, unbreakable "
+                        + "steel decor to bounce off, and a FAIR TIMER "
+                        + "computed from the level's own size, bricks and "
+                        + "hits. Brick points are the hearts' currency: 3 "
+                        + "hearts to start, +1 heart every 1000 points, a "
+                        + "life lost only when ALL balls are out. Every "
+                        + "300th brick hides a GOGACoin; 2% of the bricks "
+                        + "wear powerups that wake after 40% of the wall "
+                        + "falls - paddle wide/small, ball fast/slow, ball "
+                        + "big/small (x0.25..x5, all capped), multiball, "
+                        + "the 15s METAL clang and the 15s FIRE burn - "
+                        + "bought in the shop, reset every level. No "
+                        + "weapon platform, ever (the owner's law).",
+                "controls": ["TAP ANYWHERE TO START - then TAP again to "
+                        + "launch the served ball",
+                        "HOLD anywhere and the paddle follows the finger "
+                        + "along its axis - the ping-pong glide, a far "
+                        + "flick closes fast, a small drag tracks tight",
+                        "brick points = hits: a 3-hit brick pays 3, a "
+                        + "10-hit brick pays 10; every 1000 points grant "
+                        + "one heart",
+                        "the ice shell takes the extra hit first - crack "
+                        + "it to reveal the brick under it",
+                        "the timer is fair, not kind: time out costs a "
+                        + "heart and resets the clock; a lost ball keeps "
+                        + "the clock running",
+                        "powerups drop from 2% of the bricks after 40% "
+                        + "falls - only the kinds you BOUGHT can drop; "
+                        + "they reset every level (metal/fire wear 15s)",
+                        "after each 300 bricks a GOGACoin hides in one "
+                        + "brick - break that brick to take it",
+                        "the shop sells paddle + ball skins, 5 world "
+                        + "themes (sky-blue joyful default, NEON court) "
+                        + "and the powerups themselves"],
+                "genres": {"main": ["arcade"], "sub": ["breakout",
+                        "singleplayer", "endless"]},
+                "ach": [
+    {"id": "lvl_t1", "title": "Warm Hands", "desc": "Clear 5 levels in one run", "tier": 1, "rule": {"k": "max", "key": "max_levels", "v": 5}},
+    {"id": "lvl_t2", "title": "The Wall Eater", "desc": "Clear 15 levels in one run", "tier": 2, "rule": {"k": "max", "key": "max_levels", "v": 15}},
+    {"id": "lvl_t3", "title": "BRICK STORM", "desc": "Clear 30 levels in one run", "tier": 3, "rule": {"k": "max", "key": "max_levels", "v": 30}},
+    {"id": "lvl_t4", "title": "The Court's Owner", "desc": "Clear 60 levels in one run", "tier": 4, "rule": {"k": "max", "key": "max_levels", "v": 60}},
+    {"id": "pts_t1", "title": "Point Collector", "desc": "Bank 3000 brick points in one run", "tier": 1, "rule": {"k": "max", "key": "max_pts", "v": 3000}},
+    {"id": "pts_t2", "title": "The Brick Accountant", "desc": "Bank 10000 brick points in one run", "tier": 2, "rule": {"k": "max", "key": "max_pts", "v": 10000}},
+    {"id": "pts_t3", "title": "The 30k Vault", "desc": "Bank 30000 brick points in one run", "tier": 3, "rule": {"k": "max", "key": "max_pts", "v": 30000}},
+    {"id": "clear_t1", "title": "Level Walker", "desc": "Clear 25 levels total", "tier": 1, "rule": {"k": "cnt", "key": "clears", "v": 25}},
+    {"id": "clear_t2", "title": "The Ladder Climber", "desc": "Clear 150 levels total", "tier": 2, "rule": {"k": "cnt", "key": "clears", "v": 150}},
+    {"id": "bricks_t1", "title": "Demolition Beginner", "desc": "Break 500 bricks total", "tier": 1, "rule": {"k": "cnt", "key": "bricks", "v": 500}},
+    {"id": "bricks_t2", "title": "The Wrecking Ball", "desc": "Break 5000 bricks total", "tier": 2, "rule": {"k": "cnt", "key": "bricks", "v": 5000}},
+    {"id": "coins_t1", "title": "Coin Digger", "desc": "Take 5 GOGACoins from bricks", "tier": 1, "rule": {"k": "cnt", "key": "coins", "v": 5}},
+    {"id": "coins_t2", "title": "The Brick Vault", "desc": "Take 30 GOGACoins from bricks", "tier": 2, "rule": {"k": "cnt", "key": "coins", "v": 30}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Court's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
         {"id": "jumpcube", "title": "CUBE OVERFLOW",
                 "tag": "grow and spill",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",

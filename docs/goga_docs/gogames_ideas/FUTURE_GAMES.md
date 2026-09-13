@@ -605,3 +605,17 @@ balloon connect + circle connect were mined from My Talking Angela 2).
 - **google play casual games** — the owner's v0.3.3-p5 add: the Play Store
   casual section and "any games" there - walk the charts regularly, mine
   what's trending and what holds.
+
+Seventeenth dump - the v0.3.9-7 graduation (2026-09-13): BRICK STORM left
+the workshop and shipped as **BRICK BREAKER** (the owner's rename law:
+"brick breaker is a genre and not a trademark name"). The full spec
+landed in one message: infinite mirrored-archetype levels, hearts on
+brick points (3 + 1 per 1000), the 300-brick GOGACoin, the 2%/40% drop
+law, the two-sided bundles (paddle/speed/size, x0.25..x5 caps), the 15s
+metal + fire, the fair timer computed from the level's own numbers, the
+frozen ice shells, the unbreakable steel decor, 5 paddle + 5 ball skins,
+5 world themes (sky-blue fat joyful default, NEON court) and the NO-WEAPON
+law (never a shooting platform). The owner's own brick-breaker asset pack
+(Google Drive) fed the audio verbatim + the thumbnail + the palette study.
+GDD: docs/goga_docs/gogames_ideas/brickbreaker.md. The workshop's next
+first is CUBE OVERFLOW.

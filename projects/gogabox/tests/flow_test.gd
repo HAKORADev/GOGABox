@@ -309,8 +309,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 20,
-                "20 playable games (dot eater joined, v0.3.9-5)")
+        var ok := _check(GameReg.playable().size() == 21,
+                "21 playable games (brick breaker joined, v0.3.9-7)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -318,8 +318,8 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
-        ok += _check(GameReg.workshop().size() == 4,
-                "4 workshop teasers (dot eater graduated)")
+        ok += _check(GameReg.workshop().size() == 3,
+                "3 workshop teasers (brick breaker graduated, v0.3.9-7)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -535,11 +535,10 @@ func _t_registry() -> int:
         ok += _check(int(SQ.boxes_total(4)) == 9 and int(SQ.boxes_total(6)) == 25 \
                         and int(SQ.boxes_total(8)) == 49,
                 "the no-draw arithmetic: 9 / 25 / 49 boxes - all ODD")
-        ok += _check(String(GameReg.get_game("brickbreaker")["title"]) == "BRICK STORM" \
-                        and String(GameReg.get_game("jumpcube")["title"]) == "CUBE OVERFLOW" \
+        ok += _check(String(GameReg.get_game("jumpcube")["title"]) == "CUBE OVERFLOW" \
                         and String(GameReg.get_game("ludo")["title"]) == "LUDO ROAD" \
                         and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
-                "the next four teasers are parked (brickbreaker..snl)")
+                "the next three teasers are parked (jumpcube..snl)")
         # v0.3.9-5: DOT EATER graduates (the teaser DOT MUNCHER renamed)
         var pg: Dictionary = GameReg.get_game("pacman")
         ok += _check(not bool(pg.get("coming_soon", false)) \
@@ -607,6 +606,99 @@ func _t_registry() -> int:
                                         dead_ends += 1
                 ok += _check(dead_ends == 0,
                         "seed %d: the braid law holds (0 dead ends)" % seed_v)
+        # v0.3.9-7: BRICK BREAKER graduates (the teaser BRICK STORM renamed)
+        var bg_reg: Dictionary = GameReg.get_game("brickbreaker")
+        ok += _check(not bool(bg_reg.get("coming_soon", false)) \
+                        and String(bg_reg["orientation"]) == "landscape",
+                "brick breaker is PLAYABLE now: landscape only (the horizontal law)")
+        ok += _check(String(bg_reg["title"]) == "BRICK BREAKER",
+                "the teaser BRICK STORM ships as BRICK BREAKER (rename law)")
+        ok += _check(int(bg_reg["coin_div"]) == 3 and int(bg_reg["fee"]) == 8,
+                "brick breaker wears the owner's economy (bonus /3, fee 8)")
+        ok += _check(bool(bg_reg["shop"]) and bool(bg_reg["banner"]),
+                "brick breaker wears the shop + the banner")
+        ok += _check(bg_reg["ach"].size() == 15,
+                "brick breaker wears the tiered ladder (15)")
+        var BB: GDScript = load("res://game/games/brickbreaker/brickbreaker.gd")
+        ok += _check(int(BB.START_LIVES) == 3 and int(BB.PTS_PER_LIFE) == 1000,
+                "brick breaker wears the heart law (3 hearts, +1 per 1000 pts)")
+        ok += _check(int(BB.BRICKS_PER_COIN) == 300,
+                "brick breaker pays a GOGACoin after each 300 bricks (owner)")
+        ok += _check(absf(float(BB.POW_CHANCE) - 0.02) < 0.0001 \
+                        and absf(float(BB.POW_GATE) - 0.40) < 0.0001,
+                "the drop law wears the owner's numbers (2% of bricks, 40% gate)")
+        ok += _check(int(BB.METAL_TIME) == 15 and int(BB.FIRE_TIME) == 15,
+                "metal + fire wear the 15 second timers (owner)")
+        ok += _check(absf(float(BB.SPEED_MAX) - 5.0) < 0.0001 \
+                        and absf(float(BB.SPEED_MIN) - 0.5) < 0.0001,
+                "the speed caps: fast to x5, the hard slowness floor x0.5")
+        ok += _check(absf(float(BB.SIZE_MIN) - 0.25) < 0.0001 \
+                        and absf(float(BB.SIZE_MAX) - 5.0) < 0.0001,
+                "the size caps: x0.25 down, x5 up (the pixel ceiling holds too)")
+        ok += _check(BB.THEMES.size() == 5 and BB.THEMES.has("sky") \
+                        and int(BB.THEMES["sky"]["price"]) == 0,
+                "5 themes with SKY DAY the free default (the fat joyful law)")
+        ok += _check(BB.THEMES.has("neon"),
+                "NEON is one of the themes (the owner's ask)")
+        ok += _check(BB.SKINS.size() == 5 and BB.BALLS.size() == 5,
+                "5 paddle skins + 5 ball skins")
+        ok += _check(int(BB.SKINS["classic"]["price"]) == 0 \
+                        and int(BB.BALLS["pearl"]["price"]) == 0,
+                "the first skin of each shelf is the free default")
+        ok += _check(BB.POWS.size() == 6,
+                "6 powerup rows - the two-sided laws sell as bundles")
+        # THE GENERATOR LAWS (static, deterministic): sizes, flood, carriers
+        var brng := RandomNumberGenerator.new()
+        var arch_seen := {}
+        for seed_v in [7, 23, 101, 777, 9001]:
+                brng.seed = seed_v
+                var lv: int = 1 + (seed_v % 30)
+                var bl: Dictionary = BB.gen_level(lv, brng)
+                var dims2: Vector2i = Vector2i(int(bl["cols"]),
+                                int(bl["rows"]))
+                ok += _check(dims2 == BB.gen_sizes(lv) \
+                                and int(bl["breakable"]) > 0,
+                        "seed %d L%d: the grid wears the ladder + bricks exist (%d)"
+                                        % [seed_v, lv, int(bl["breakable"])])
+                arch_seen[String(bl["arch"])] = true
+                # THE FLOOD LAW: the passable model - breakables fall and
+                # open the way, only the steel seals forever
+                var blocked := {}
+                for key in bl["cells"].keys():
+                        if bool(bl["cells"][key]["decor"]):
+                                blocked[key] = true
+                var seen2: Dictionary = BB.flood_open(dims2.x, dims2.y,
+                                blocked)
+                var reach_ok := true
+                for key in bl["cells"].keys():
+                        if bool(bl["cells"][key]["decor"]):
+                                continue
+                        if not seen2.has(key):
+                                reach_ok = false
+                ok += _check(reach_ok,
+                        "seed %d L%d: every brick face reachable (the flood law)"
+                                        % [seed_v, lv])
+                # THE CARRIER LAW: 2% of the bricks wear powerups (min 1)
+                var want_c := maxi(1, int(round(
+                                float(bl["breakable"]) * 0.02)))
+                ok += _check(bl["carriers"].size() == want_c,
+                        "seed %d L%d: the carriers wear the 2%% law (%d)"
+                                        % [seed_v, lv, bl["carriers"].size()])
+                # THE FAIR TIMER: inside the honest band
+                var tt: float = BB.timer_for(int(bl["breakable"]),
+                                int(bl["hits"]), 1852.0, 800.0, 560.0, lv,
+                                false)
+                ok += _check(tt >= 30.0 and tt <= 300.0,
+                        "seed %d L%d: the timer sits in the fair band (%.0fs)"
+                                        % [seed_v, lv, tt])
+        ok += _check(arch_seen.size() >= 3,
+                "the archetypes actually rotate (%s)" % [arch_seen.keys()])
+        ok += _check(BB.hp_band(1) == Vector2i(1, 1) \
+                        and BB.hp_band(35) == Vector2i(3, 10),
+                "the hp band climbs (1 at L1, up to 10 late)")
+        ok += _check(absf(float(BB.ice_chance(1))) < 0.0001 \
+                        and float(BB.ice_chance(30)) > 0.15,
+                "the ice climbs after L3 and caps by L30")
         var ok2 := true
         for g in GameReg.GAMES:
                 if g.get("coming_soon", false):
@@ -1612,8 +1704,8 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 4,
-                "the next four are the workshop (dot eater graduated)")
+        ok += _check(GameReg.workshop().size() == 3,
+                "the next three are the workshop (brick breaker graduated)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -1622,8 +1714,8 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "brickbreaker",
-                        "the SOON block wears brickbreaker first (%s)" % [ids.slice(soon_first_at)])
+                ok += _check(String(ids[soon_first_at]) == "jumpcube",
+                        "the SOON block wears jumpcube first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

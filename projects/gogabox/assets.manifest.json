@@ -130,6 +130,13 @@
    "license": "STUDY-ONLY (docs/DECOMPILATION.md THE USAGE LAW) - zero bytes ship",
    "pulled": "2026-09-09 via tools/study/fetch_apkpure.py + decompile_apk.py",
    "used_for": "v0.3.8 study lessons only: the dominoes tile anatomy (ivory rounded body, center divider, separate colored pips - our tiles are drawn in-game by domino.gd, our own body/pip/edge colors per skin); the dominoes table felt/wood theme vocabulary (ours are procedurally quilted felts); the chess.com sound LENGTHS (move 0.26s / capture 0.19s - our knock family is synthesized fresh by tools/v038_domino_chess_sfx.py); the chess.com PERSONALITY ARCHITECTURE (14 polyglot opening books, one per bot - our six profiles carry their own public-theory books written in chess.gd, the Jobava London included per the owner). Nothing from either APK is committed or shipped."
+  },
+  {
+   "id": "owner-brickbreaker-pack",
+   "name": "Brick breaker asset pack (owner-provided, uploaded via Google Drive to the session)",
+   "url": "owner upload (GameMaker brick-breaker package: 403 sprites + 10 mp3 - ball, bat, 5 brick colors, boundaries, buttons, powerup capsules, hit FX, menu/ingame music, brick/wall/bat hits, powerup spawn/pickup, ball spawn, clicks)",
+   "license": "owner-provided for GOGABox use",
+   "used_for": "assets/audio/sfx/bb_brickhit.mp3 + bb_break.mp3 + bb_bathit.mp3 + bb_wall.mp3 + bb_pow_spawn.mp3 + bb_pow.mp3 + bb_serve.mp3 + bb_click.mp3 (verbatim, renamed) and assets/audio/music/bb_theme.mp3 + bb_menu.mp3 (the loops); assets/games/brickbreaker/brick_blue|green|pink|grey|yellow.png + ball.png + bat.png (recolored to the classic court palette) + pow_life|pow_multi|pow_size.png (the thumbnail stamps). The game art itself is CODE-DRAWN (the box law); the pack fed the palette study (brick tiers cyan/green/amber/pink, the steel grey) and the thumbnail."
   }
  ],
  "audit": {
