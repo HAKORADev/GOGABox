@@ -663,7 +663,8 @@ var bg: ColorRect = null
 var bg_mat: ShaderMaterial = null
 var maze_layer: Node2D = null   # walls + dots (event+time driven)
 var char_layer: Node2D = null   # the bodies (time driven - the bite)
-var fx_layer: Node2D = null     # bursts + the coin
+var fx_layer: Node2D = null     # bursts + the coin burst
+var _coin_tex: Texture2D = null # THE GOGACOIN ICON (the real one)
 var gate_ui: Control = null
 var banner_lbl: Label = null    # the READY / MAZE CLEAR flash
 var banner_t := 0.0
@@ -710,6 +711,7 @@ func _goga_setup() -> void:
         game_id = "pacman"
         var vp := _vp()
         us = vp.y / 1080.0
+        _coin_tex = load("res://assets/ui/coin.png")
         tk.tapped.connect(_tap_anywhere)
         tk.swiped.connect(_swipe_dir)
         _build_world()
@@ -1804,6 +1806,28 @@ func _draw_maze() -> void:
                         maze_layer.draw_circle(p, r2 * 1.9, Color(orb, 0.12 + 0.08 * pulse))
                         maze_layer.draw_circle(p, r2, orb)
                         maze_layer.draw_circle(p, r2 * 0.45, Color(1, 1, 1, 0.5))
+                elif kind == "c":
+                        # THE GOGACOIN (v0.3.9-8 - the owner caught it: the
+                        # coin cell was placed and eaten but never DRAWN;
+                        # "the gogacoin should use the gogacoin icon itself")
+                        # the real icon, breathing like the rush orb
+                        var gold := Color(1.0, 0.82, 0.30)
+                        var cr := cell_px * (0.30 + 0.035 * pulse)
+                        maze_layer.draw_circle(p, cr * 1.75,
+                                        Color(gold, 0.15 + 0.10 * pulse))
+                        if _coin_tex != null:
+                                var cs := cr * 2.0 \
+                                                / float(_coin_tex.get_width())
+                                maze_layer.draw_set_transform(p, 0.0,
+                                                Vector2(cs, cs))
+                                maze_layer.draw_texture(_coin_tex,
+                                                -_coin_tex.get_size() * 0.5)
+                                maze_layer.draw_set_transform(Vector2.ZERO,
+                                                0.0, Vector2.ONE)
+                        else:
+                                maze_layer.draw_circle(p, cr, gold)
+                                maze_layer.draw_circle(p, cr * 0.45,
+                                                Color(1.0, 0.95, 0.6, 0.9))
         # the wrap mouth marks: chevrons pointing OFF-board (v0.3.9-6 - the
         # old half-moon circles read as leftover outline at the opening;
         # these read as a tunnel that continues)

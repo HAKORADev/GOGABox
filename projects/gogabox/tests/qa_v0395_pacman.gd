@@ -45,7 +45,9 @@ func _boot() -> void:
         fails += _check(g.rush_chip != null and not g.rush_chip.visible,
                 "de: the rush countdown widget hides while calm")
 
-        # ---------------- THE JUNCTION BUFFER LAW ----------------
+        # ---------------- THE ORDER RAIL LAW (v0.3.9-6 round 3; the
+        # old junction-buffer window is GONE by design - the rail takes
+        # an order ANYWHERE, holds TWO, the newest wins the seat) --------
         # find a REAL straight corridor with a junction 4+ cells ahead
         # (walking OPEN edges only - a seat inside a wall is a lie)
         var hall := _find_corridor()
@@ -53,33 +55,48 @@ func _boot() -> void:
                 "de: the probe found a real corridor (from %s)" % str(hall))
         if hall.x >= 0:
                 var jx := _junction_x(hall)
-                # "we are at 5" of a 10-long path: a swipe is NOT recorded
-                _seat_corridor(Vector2i(hall.x, hall.y), Vector2i(1, 0), 0.0)
-                g.buf = Vector2i.ZERO
                 var far_dir := Vector2i(0, -1)
                 if PM.is_open(g.g, g.cols, jx, hall.y, Vector2i(0, 1)):
                         far_dir = Vector2i(0, 1)
+                # a mid-corridor swipe SEATS into the rail (the rail's
+                # whole point: orders ride from anywhere)
+                _seat_corridor(Vector2i(hall.x, hall.y), Vector2i(1, 0), 0.0)
+                g.rail = []
                 g._swipe_dir(far_dir, Vector2())
-                fails += _check(g.buf == Vector2i.ZERO,
-                        "de: a swipe too far from the corner is not recorded")
-                # "at 7-8": seat two cells before the corner, mid-cell
-                _seat_corridor(Vector2i(jx - 2, hall.y), Vector2i(1, 0), 0.2)
-                var want_d := 2.0 - 0.2
-                g.buf = Vector2i.ZERO
-                g._swipe_dir(far_dir, Vector2())
-                fails += _check(g.buf == far_dir,
-                        "de: a swipe in the window is recorded (dist %.1f)" % want_d)
-                # "one at 7-8 then another": the slot stays single
+                fails += _check(g.rail.size() == 1 and g.rail[0] == far_dir,
+                        "de: a mid-corridor swipe rides the rail (slot 1)")
+                # the second slot takes the next order
                 g._swipe_dir(-far_dir, Vector2())
-                fails += _check(g.buf == far_dir,
-                        "de: a second swipe while the slot is full is not recorded")
-                # the slot spends itself AT the corner: the turn applies
-                var dir_before: Vector2i = g.player["dir"]
-                for i in 12:
-                        g.probe_step(0.2)
-                fails += _check(g.player["dir"] == far_dir,
-                                "de: the buffered turn applies at the corner")
-                g.buf = Vector2i.ZERO
+                fails += _check(g.rail.size() == 2 \
+                                and g.rail[1] == -far_dir,
+                        "de: the rail's second slot takes the next order")
+                # the third pops the OLDEST (the newest wins the seat)
+                g._swipe_dir(far_dir, Vector2())
+                fails += _check(g.rail.size() == 2 \
+                                and g.rail[0] == -far_dir \
+                                and g.rail[1] == far_dir,
+                        "de: the third order pops the oldest (newest wins)")
+                # the rail spends itself: seat the body 2 cells before the
+                # junction, load the rail, ride - the SHORT ride is the
+                # honest one (a long ride feeds the body to the eaters:
+                # the pen empties after ~1.2s and the catch re-seats the
+                # machine - the death sequence owns the rail then)
+                _seat_corridor(Vector2i(jx - 2, hall.y), Vector2i(1, 0), 0.0)
+                g.rail = []
+                g._swipe_dir(far_dir, Vector2())
+                g._swipe_dir(-far_dir, Vector2())
+                g._swipe_dir(far_dir, Vector2())
+                var turned := false
+                for i in 24:
+                        g.probe_step(0.1)
+                        if g.player["dir"] == far_dir \
+                                        or g.player["dir"] == -far_dir:
+                                turned = true
+                                break
+                fails += _check(turned,
+                        "de: the railed order spent at the decision cell (dir %s)"
+                                        % g.player["dir"])
+                g.rail = []
         # "doing it at 10 instantly": swiping INTO an open way while
         # standing turns now
         _seat_stopped(Vector2i(3, 5))
@@ -153,7 +170,13 @@ func _boot() -> void:
         g.probe_step(1.5)
         fails += _check(g.lives == 3, "de: still 3 lives before the bite")
         g._lose_life()
-        g.probe_step(1.6)
+        # the DEATH SEQUENCE (v0.3.9-6 round 3): the eyes fly home and
+        # the body re-appears into the READY beat - the flight takes its
+        # own seconds, the old 1.6s window predated it
+        for i in 60:
+                g.probe_step(0.2)
+                if g.phase == "ready":
+                        break
         fails += _check(g.lives == 2 and g.phase == "ready",
                 "de: a catch costs a life and the READY beat re-seats")
         # the 500th dot grants one

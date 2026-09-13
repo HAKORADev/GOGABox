@@ -9,6 +9,8 @@ uniform vec3 line_col : source_color = vec3(0.14, 0.20, 0.42);
 uniform float scroll_x = 0.0;
 uniform float time_s = 0.0;
 uniform float pulse = 0.0; // 0..1 the soft beat
+uniform float line_str = 1.0; // 0 = the pure gradient (v0.3.9-8: the sky's
+                              // owner ask - "simpler with gradient")
 
 void fragment() {
         vec2 uv = UV;
@@ -21,9 +23,9 @@ void fragment() {
         vec2 g2 = vec2(uv.x * 6.0 - scroll_x * 0.0016, uv.y * 3.4);
         vec2 f2 = abs(fract(g2) - 0.5);
         float l2 = smoothstep(0.46, 0.5, max(f2.x, f2.y));
-        col += line_col * (l1 * 0.16 + l2 * 0.30) * (0.55 + 0.45 * pulse);
+        col += line_col * (l1 * 0.16 + l2 * 0.30) * line_str * (0.55 + 0.45 * pulse);
         // the breathing band mid-screen
         float band = exp(-pow((uv.y - 0.5 - 0.16 * sin(time_s * 0.35)), 2.0) * 16.0);
-        col += line_col * band * (0.045 + 0.06 * pulse);
+        col += line_col * band * line_str * (0.045 + 0.06 * pulse);
         COLOR = vec4(col, 1.0);
 }

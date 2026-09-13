@@ -126,10 +126,10 @@ func _process(delta: float) -> void:
         for p in ripe:
                 pend.erase(p)
                 var after := _snap()
-                _log("[%6.2fs]   -> %s   (dir=%s moving=%s t=%.2f buf=%s cell=%s)"
+                _log("[%6.2fs]   -> %s   (dir=%s moving=%s t=%.2f rail=%s cell=%s)"
                                 % [T, _classify(p["before"], after, p["dir"]),
                                 after["dir"], after["moving"], after["t"],
-                                after["buf"], after["cell"]])
+                                after["rail"], after["cell"]])
 
         # the sampler: teleports + THE HONEST FLIGHT LAW + the bounds law
         if g.phase == "run":
@@ -156,7 +156,15 @@ func _process(delta: float) -> void:
                 if px_prev_valid:
                         var jump := px.distance_to(px_prev)
                         var maxstep: float = g.cell_px * 1.35
-                        if jump > maxstep:
+                        # THE WRAP EXEMPTION (the recorder's own wrap law,
+                        # v0.3.9-8: the seam's two honest copies read as a
+                        # board-wide jump - the body LEFT one edge and
+                        # EMERGED on the other, the legal crossing)
+                        var wrap_jump: bool = absf(px.y - px_prev.y) \
+                                        < g.cell_px * 0.5 \
+                                        and jump >= float(g.cols - 1) \
+                                        * g.cell_px * 0.9
+                        if jump > maxstep and not wrap_jump:
                                 anomalies += 1
                                 _log("[%6.2fs] !! TELEPORT %.0fpx (> %.0f) at %s"
                                                 % [T, jump, maxstep, px])
@@ -177,15 +185,15 @@ func _fire_gesture(dir: Vector2i) -> void:
 func _snap() -> Dictionary:
         return {"cell": g.player["cell"], "dir": g.player["dir"],
                 "moving": g.player["moving"], "t": g.player["t"],
-                "buf": g.buf, "phase": g.phase, "lives": g.lives}
+                "rail": g.rail.size(), "phase": g.phase, "lives": g.lives}
 
 ## classify what the swipe DID one gesture later (the finger is honest,
 ## the disposition is the game's)
 func _classify(before: Dictionary, after: Dictionary, dir: Vector2i) -> String:
         if String(before["phase"]) != "run":
                 return "NO-OP(phase=%s)" % before["phase"]
-        if after["buf"] == dir and before["buf"] != dir:
-                return "BUFFERED"
+        if int(after["rail"]) > int(before["rail"]):
+                return "RAILED"
         if after["dir"] == dir and bool(after["moving"]) \
                         and (not bool(before["moving"])
                         or Vector2i(before["dir"]) != dir):

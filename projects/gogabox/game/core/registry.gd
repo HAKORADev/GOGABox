@@ -947,29 +947,46 @@ const GAMES := [
                         "needs_games": 14},
                 "desc": "The infinite paddle court: endless levels, every "
                         + "one a fresh mirrored pattern (the tent, the "
-                        + "fortress, the twin towers, the tunnels - never "
-                        + "'one more line'), with fat 3 and 10 hit bricks, "
-                        + "frozen ice shells that crack open, unbreakable "
-                        + "steel decor to bounce off, and a FAIR TIMER "
-                        + "computed from the level's own size, bricks and "
-                        + "hits. Brick points are the hearts' currency: 3 "
-                        + "hearts to start, +1 heart every 1000 points, a "
-                        + "life lost only when ALL balls are out. Every "
-                        + "300th brick hides a GOGACoin; 2% of the bricks "
-                        + "wear powerups that wake after 40% of the wall "
-                        + "falls - paddle wide/small, ball fast/slow, ball "
-                        + "big/small (x0.25..x5, all capped), multiball, "
-                        + "the 15s METAL clang and the 15s FIRE burn - "
-                        + "bought in the shop, reset every level. No "
-                        + "weapon platform, ever (the owner's law).",
-                "controls": ["TAP ANYWHERE TO START - then TAP again to "
-                        + "launch the served ball",
+                        + "fortress, the twin towers, the crown - never "
+                        + "'one more line') on a field of small bricks "
+                        + "with walls that MOVE per level, fat 3 and 10 "
+                        + "hit bricks, frozen ice shells that crack open, "
+                        + "unbreakable steel decor to bounce off, and a "
+                        + "FAIR TIMER computed from the level's own size, "
+                        + "bricks and hits. Brick points are the hearts' "
+                        + "currency: 3 hearts to start, +1 heart every "
+                        + "1000 points, a life lost only when ALL balls "
+                        + "are out - the lost platform shatters, flickers "
+                        + "back, and waits for the launch. The serve is a "
+                        + "POWER SERVE: hold to dip the platform and "
+                        + "charge, release to smack the ball faster - it "
+                        + "settles back to base speed. Every 300th brick "
+                        + "hides a GOGACoin that pops out and falls at its "
+                        + "proper scale; powerup bricks stay a SURPRISE. "
+                        + "2% of the bricks wear powerups that wake after "
+                        + "40% of the wall falls - paddle wide/small, ball "
+                        + "fast/slow, ball big/small (x0.25..x5, all "
+                        + "capped), multiball, the 15s METAL clang and the "
+                        + "15s FIRE burn (x3 damage per brick it passes - "
+                        + "one state at a time: fire replaces metal and "
+                        + "the other way) - bought in the shop, reset "
+                        + "every level. No weapon platform, ever (the "
+                        + "owner's law).",
+                "controls": ["TAP ANYWHERE TO START - then HOLD and "
+                        + "RELEASE to launch: the held finger dips the "
+                        + "platform and charges the power serve, the "
+                        + "release smacks the ball faster for the first "
+                        + "aim (it settles back to base speed); a quick "
+                        + "tap is a plain launch",
                         "HOLD anywhere and the paddle follows the finger "
                         + "along its axis - the ping-pong glide, a far "
                         + "flick closes fast, a small drag tracks tight",
                         "brick points = hits: a 3-hit brick pays 3, a "
                         + "10-hit brick pays 10; every 1000 points grant "
                         + "one heart",
+                        "when a life is gone the platform shatters and "
+                        + "flickers back - the stall serve waits for your "
+                        + "next hold-and-release launch",
                         "the ice shell takes the extra hit first - crack "
                         + "it to reveal the brick under it",
                         "the timer is fair, not kind: time out costs a "
@@ -977,9 +994,12 @@ const GAMES := [
                         + "the clock running",
                         "powerups drop from 2% of the bricks after 40% "
                         + "falls - only the kinds you BOUGHT can drop; "
-                        + "they reset every level (metal/fire wear 15s)",
+                        + "they reset every level (metal/fire wear 15s, "
+                        + "one state at a time, fire burns x3 per brick "
+                        + "it passes)",
                         "after each 300 bricks a GOGACoin hides in one "
-                        + "brick - break that brick to take it",
+                        + "brick - break that brick and catch the coin "
+                        + "as it falls",
                         "the shop sells paddle + ball skins, 5 world "
                         + "themes (sky-blue joyful default, NEON court) "
                         + "and the powerups themselves"],

@@ -84,15 +84,35 @@ extends GogaGame
 # =========================================================== THE LADDER
 ## THE SIZE LAW (the owner: "different sizes ... so it can really scale
 ## far away" + the maze escaper scaling taste): the grid grows with the
-## level - cols 9..17, rows 5..12 - and the bricks SPAN THE FULL ARENA
-## WIDTH ("the design of the levels should use the horizontal view, all
-## of the pixels").
-const BASE_COLS := 9
-const BASE_ROWS := 5
-const MAX_COLS := 17
-const MAX_ROWS := 12
-const COL_STEP := 3            # +1 col every 3 levels
-const ROW_STEP := 4            # +1 row every 4 levels
+## level and the bricks SPAN THE FULL ARENA WIDTH ("the design of the
+## levels should use the horizontal view, all of the pixels").
+## v0.3.9-8 THE SMALL BRICK (the owner: "the scale is too bad, it's too
+## big, it should be very very smaller ... like 3-5 times smaller? so you
+## can put way more bricks"): the grid is native-small now - cols
+## 25..43, rows 11..19 - a L1 brick is ~4.3x smaller on the side than
+## the v039-7 one and the levels carry 3-5x MORE bricks (mass-capped so
+## the work per level stays human).
+const BASE_COLS := 25
+const BASE_ROWS := 11
+const MAX_COLS := 43
+const MAX_ROWS := 19
+const COL_STEP := 2            # +1 col every 2 levels
+const ROW_STEP := 3            # +1 row every 3 levels
+
+# THE MASS CAP (the small bricks invite fat counts - the work per level
+# must stay human): any level thinned past this many bricks by the
+# generator's own sprinkle
+const MASS_CAP := 260
+
+# THE WALL LAW (v0.3.9-8, the owner: "control level walls to be
+# bigger/smaller so you make big levels and small levels, not to let the
+# walls always big then modify the size of the bricks"): every level
+# seeds its own arena WIDTH FRACTION - the walls move per level.
+const WALL_BASE := 0.66        # the smallest court's share of the view
+const WALL_CLIMB := 0.24       # the climb to the big courts (by L11)
+const WALL_JIT := 0.10         # the seeded wobble
+const WALL_MIN := 0.56
+const WALL_MAX := 1.0
 
 # ------------------------------------------------------------ the core
 const START_LIVES := 3         # "the game will start with 3 hearts"
@@ -126,6 +146,29 @@ const SPEED_STEP_SLOW := 0.82
 const BALL_BASE_SPEED := 560.0 # design px/s at level 1
 const BALL_LEVEL_STEP := 1.025 # the climb (+2.5% a level, the run breathes)
 const BALL_LEVEL_CAP := 1.60
+
+# ------------------------------------------------- the launch + the revive
+## THE LAUNCH LAW (v0.3.9-8, the owner: "holding for longer makes it go a
+## little down and releasing the finger makes the platform hit the ball
+## to make it go faster for the first aim then it slows down to it's base
+## speed, this thing should happen also when a life point is gone"):
+## the served ball WAITS on the paddle; holding dips the platform and
+## charges; releasing smacks the ball with a boost that decays to base.
+const CHARGE_TIME := 0.75      # hold seconds to full charge
+const LAUNCH_BOOST := 0.55     # +55% speed at full charge
+const BOOST_DECAY := 2.4       # seconds back to the base speed
+const DIP_MAX := 30.0          # the dip depth (design px)
+## THE REVIVE LAW (the owner: "when life point is gone, it should destroy
+## user platform then make it appear using that flickering revive effect
+## with the stall state waiting for the launch")
+const REVIVE_HIDE := 0.55      # the destroyed beat (the paddle is gone)
+const REVIVE_TIME := 1.45      # the full revive (the flicker lands it)
+## THE FIRE LAW (the owner: "making the fire ball do x3 damage for each
+## brick it passes through it is better than making it melting everything
+## from one pass")
+const FIRE_DMG := 3
+## THE CONTACT LAW (the 2-hit bug): one damage event per ball per window
+const HIT_CD := 0.045
 
 # ----------------------------------------------------------- the layout
 const WALL_T := 12.0           # the frame's thickness (design px)
@@ -250,9 +293,11 @@ const POWS := {
                 "desc": "one more ball, up to 6 - a life is lost only "
                         + "when ALL balls are out"},
         "metal": {"name": "METAL BALL", "price": 300,
-                "desc": "double hits for 15s - the clang tone"},
+                "desc": "double hits for 15s - the clang tone (the fire "
+                        + "catch replaces it - one state at a time)"},
         "fire": {"name": "FIRE BALL", "price": 340,
-                "desc": "pass-through for 15s - burns through bricks"},
+                "desc": "pass-through for 15s - x3 damage to every brick "
+                        + "it burns through (the metal catch replaces it)"},
 }
 
 # ========================================================== THE GENERATOR
@@ -271,21 +316,24 @@ static func gen_sizes(level: int) -> Vector2i:
         var rows: int = mini(BASE_ROWS + (level - 1) / ROW_STEP, MAX_ROWS)
         return Vector2i(cols, rows)
 
-## the hp band for level #n (1-based): the climb the owner wants felt
+## the hp band for level #n (1-based): the climb the owner wants felt.
+## v0.3.9-8: the levels carry 3-6x more bricks, so the band climbs much
+## slower - the weighted pick keeps 1-hit bricks common and the fat
+## tiers (5, 7, 8, the 10-hit story) sprinkled, and the TOTAL work per
+## level stays inside the fair timer's reach. The 10-hit bodies still
+## exist late (the fortress shell wears the band's top).
 static func hp_band(level: int) -> Vector2i:
         if level <= 2:
                 return Vector2i(1, 1)
-        if level <= 5:
+        if level <= 6:
                 return Vector2i(1, 2)
-        if level <= 9:
+        if level <= 12:
                 return Vector2i(1, 3)
-        if level <= 14:
-                return Vector2i(2, 4)
-        if level <= 19:
-                return Vector2i(2, 6)
-        if level <= 29:
-                return Vector2i(3, 7)
-        return Vector2i(3, 10)
+        if level <= 20:
+                return Vector2i(1, 5)
+        if level <= 32:
+                return Vector2i(1, 7)
+        return Vector2i(2, 8)
 
 ## the frozen-layer chance for level #n (the ice climbs, then caps)
 static func ice_chance(level: int) -> float:
@@ -305,16 +353,37 @@ static func pick_hp(level: int, rng: RandomNumberGenerator) -> int:
                         pool.append(v)
         return pool[rng.randi_range(0, pool.size() - 1)]
 
+## THE WALL FRACTION (the owner's walls law, v0.3.9-8): every level
+## seeds its own court width - small courts early, both sizes later, the
+## walls never sit in the same place twice in a row. Static + seeded so
+## the level stays deterministic (the probe contract).
+static func wall_frac(level: int, rng: RandomNumberGenerator) -> float:
+        var climb := minf(float(level - 1) / 10.0, 1.0)
+        var base := WALL_BASE + WALL_CLIMB * climb
+        return clampf(base + rng.randf_range(-WALL_JIT, WALL_JIT),
+                        WALL_MIN, WALL_MAX)
+
 ## one archetype cell pass: returns "b" (brick) / "d" (decor) / ""
+## v0.3.9-8: the rules are tuned for the NATIVE-SMALL grid (25..49 cols
+## x 11..21 rows) - every archetype wears an honest density so a level
+## lands in the 90..300 brick band instead of a 275-cell solid slab.
 static func _arch_cell(arch: String, c: int, r: int, cols: int, rows: int) -> String:
         var cc := (cols - 1) * 0.5
         var dc := absf(float(c) - cc)   # the mirror distance (symmetry free)
         match arch:
                 "filled":
+                        # THE BRICK COURSE (was a solid slab - too fat at
+                        # the small scale): running-bond courses with
+                        # mortar joints, ~62% density
+                        if r % 4 == 3:
+                                return ""       # the horizontal mortar
+                        var row_band := r / 4
+                        if (c + row_band * 3) % 7 == 6:
+                                return ""       # the vertical joint
                         return "b"
                 "checker":
-                        # the classic checkerboard (mirrored by parity)
-                        return "b" if (c + r) % 2 == 0 else ""
+                        # the classic checkerboard in 2x2 blocks
+                        return "b" if (c / 2 + r / 2) % 2 == 0 else ""
                 "pyramid":
                         # fat top, narrow waist (the tent)
                         var hw := (float(r) + 1.0) * (cc + 0.5) / float(rows)
@@ -326,45 +395,55 @@ static func _arch_cell(arch: String, c: int, r: int, cols: int, rows: int) -> St
                                         + absf(float(r) - rr + 0.5) / rr) <= 1.0 \
                                         else ""
                 "arch":
-                        # the block with a hall: brick everywhere except the
-                        # center arch (rows 1..rows-2); steel pillars hold it
-                        if r >= 1 and r <= rows - 2 and dc < cc * 0.45:
-                                return ""
-                        if (r == 1 or r == rows - 2) \
-                                        and dc < cc * 0.45 + 1.0 \
-                                        and dc >= cc * 0.45:
-                                return "d"      # the pillars
-                        return "b"
+                        # the block with a hall: the arch BAND up top, the
+                        # pillars at the sides, a hatched roof inside
+                        if r <= 1:
+                                return "b"      # the band
+                        if r >= rows - 2:
+                                return "b"      # the feet
+                        if dc >= cc * 0.78:
+                                return "b"      # the sides
+                        # the hall: a light lattice roof (the ball weaves)
+                        return "b" if (c + r) % 3 == 0 else ""
                 "fortress":
                         # the shell (thick, strong) around a soft core
                         if r == 0 or r == rows - 1 or dc >= cc - 1.0:
                                 return "b"      # the shell (hp set later)
                         if (r == 1 or r == rows - 2) and dc >= cc - 2.0:
                                 return "d"      # the inner keep walls
-                        return "b"
+                        # the courtyard: a sparse fountain grid
+                        return "b" if (c % 3 == 1 and r % 3 == 1) else ""
                 "rain":
-                        # the columns: even columns full height, odd stubs
-                        if c % 2 == 0:
+                        # the columns: slats of width 2 with 2-gaps, some
+                        # stubs between (the curtain)
+                        if c % 4 < 2:
                                 return "b"
-                        return "b" if r < ceili(float(rows) * 0.45) else ""
+                        return "b" if r < ceili(float(rows) * 0.35) \
+                                        and c % 4 == 2 else ""
                 "ring":
-                        # the rectangle ring with a yard inside
-                        if r <= 1 or r >= rows - 2 or dc >= cc - 0.5:
+                        # the double ring with a yard inside
+                        if r <= 1 or r >= rows - 2 or dc >= cc - 1.0:
                                 return "b"
-                        if absf(float(r) - (float(rows) - 1.0) * 0.5) < 0.6 \
-                                        and dc < 1.2:
+                        if absf(float(r) - (float(rows) - 1.0) * 0.5) < 1.2 \
+                                        and dc < 1.6:
                                 return "d"      # the yard's stone
-                        return ""
+                        # the yard wears a faint diamond of bricks
+                        var rr2 := float(rows) * 0.5
+                        return "b" if (dc / (cc * 0.55) \
+                                        + absf(float(r) - rr2 + 0.5) \
+                                                        / (rr2 * 0.8)) <= 1.0 \
+                                        else ""
                 "zigzag":
                         # the woven bands (symmetric via the mirror distance)
-                        var k := float(r) + dc * 0.9
-                        return "b" if int(k) % 3 != 2 else ""
+                        var k := float(r) + dc * 1.3
+                        return "b" if int(k) % 4 < 2 else ""
                 "towers":
-                        # two strong towers + a thin sky bridge
-                        if dc >= cc - 2.5:
-                                return "b"
+                        # two strong towers (windows punched) + a sky bridge
+                        if dc >= cc - 1.5:
+                                return "" if (r % 5 == 2 and (c % 2) == 0) \
+                                                else "b"
                         if r <= 1:
-                                return "b"
+                                return "b"      # the bridge
                         return ""
                 "tunnels":
                         # brick bands with steel shelf rows between them
@@ -377,16 +456,47 @@ static func _arch_cell(arch: String, c: int, r: int, cols: int, rows: int) -> St
                                         < third * 0.14 and dc > 1.5:
                                 return "d"      # the steel shelves
                         return "b"
+                "bubbles":
+                        # NEW (v0.3.9-8): the polka clusters - fat dots on
+                        # a lattice, the joyful one
+                        var oc := c % 4
+                        var orc := r % 4
+                        if oc == 1 and orc == 1:
+                                return "b"
+                        if oc == 3 and orc == 3:
+                                return "b"
+                        if oc == 1 and orc == 2:
+                                return "b"
+                        if oc == 3 and orc == 0:
+                                return "b"
+                        return ""
+                "crown":
+                        # NEW (v0.3.9-8): the crown - a band + three spikes
+                        # (the center one tall, the sides half-height)
+                        if r >= rows - 2:
+                                return "b"      # the band
+                        var tt := float(rows) - 2.0     # the spike zone
+                        if dc <= cc * 0.16 + (float(r) / tt) * cc * 0.10:
+                                return "b"      # the center spike
+                        if float(r) >= tt * 0.5:
+                                var sd := absf(dc - cc * 0.5)
+                                var shw := cc * 0.10 \
+                                                + ((float(r) - tt * 0.5) \
+                                                / (tt * 0.5)) * cc * 0.08
+                                if sd <= shw:
+                                        return "b"      # the side spikes
+                        return ""
         return "b"
 
 ## the archetype pool for a level (the early levels teach, the rest roll)
 static func _arch_pool(level: int) -> Array:
         if level <= 2:
-                return ["filled", "checker"]
+                return ["filled", "checker", "rain"]
         if level <= 4:
-                return ["filled", "checker", "pyramid", "rain"]
+                return ["filled", "checker", "pyramid", "rain", "bubbles"]
         return ["filled", "checker", "pyramid", "diamond", "arch",
-                "fortress", "rain", "ring", "zigzag", "towers", "tunnels"]
+                "fortress", "rain", "ring", "zigzag", "towers", "tunnels",
+                "bubbles", "crown"]
 
 ## the FLOOD LAW: which open cells connect to the bottom air (the ball's
 ## world). `blocked` = brick or decor cells. Returns the flooded set.
@@ -421,6 +531,9 @@ static func flood_open(cols: int, rows: int, blocked: Dictionary) -> Dictionary:
 static func gen_level(level: int, rng: RandomNumberGenerator) -> Dictionary:
         var cols := gen_sizes(level).x
         var rows := gen_sizes(level).y
+        # THE WALL LAW: the court's own width is part of the level's DNA
+        # (drawn FIRST - the draw order is the determinism contract)
+        var wall := wall_frac(level, rng)
         var pool := _arch_pool(level)
         var arch: String = pool[rng.randi_range(0, pool.size() - 1)]
         for attempt in 8:
@@ -464,7 +577,10 @@ static func gen_level(level: int, rng: RandomNumberGenerator) -> Dictionary:
                                 dead.append(key)
                 for key in dead:
                         cells.erase(key)
-                # the count + the totals (ice wears the extra hit)
+                # THE MASS CAP: the small-brick grid invites fat counts -
+                # sprinkle voids into the overshoot (a worn-wall look,
+                # the pattern stays honest, the work stays human). The
+                # hash sprinkle is deterministic (the probe contract).
                 var breakable := 0
                 var hits := 0
                 for key in cells.keys():
@@ -472,7 +588,24 @@ static func gen_level(level: int, rng: RandomNumberGenerator) -> Dictionary:
                                 continue
                         breakable += 1
                         hits += int(cells[key]["hp"]) \
-                                        + (1 if bool(cells[key]["ice"]) else 0)
+                                        + (1 if bool(cells[key]["ice"]) \
+                                        else 0)
+                if breakable > MASS_CAP:
+                        var keep := float(MASS_CAP) / float(breakable)
+                        for key in cells.keys():
+                                if breakable <= MASS_CAP:
+                                        break
+                                var c3: Dictionary = cells[key]
+                                if bool(c3["decor"]):
+                                        continue
+                                var j: int = (int(key.x) * 7 \
+                                                + int(key.y) * 13) % 97
+                                if float(j) / 97.0 > keep:
+                                        cells.erase(key)
+                                        breakable -= 1
+                                        hits -= int(c3["hp"]) \
+                                                        + (1 if bool(c3[
+                                                        "ice"]) else 0)
                 if breakable > 0:
                         # THE CARRIERS: the 2% of bricks that wear a
                         # powerup (the DROP LAW spreads the first one at
@@ -494,6 +627,7 @@ static func gen_level(level: int, rng: RandomNumberGenerator) -> Dictionary:
                                 if not bool(cells[key]["decor"]):
                                         carriers.append(key)
                         return {"cols": cols, "rows": rows, "arch": arch,
+                                "wall": wall,
                                 "cells": cells, "carriers": carriers,
                                 "breakable": breakable, "hits": hits}
                 # the attempt drowned in decor: roll a fresh archetype
@@ -505,36 +639,36 @@ static func gen_level(level: int, rng: RandomNumberGenerator) -> Dictionary:
                         cells2[Vector2i(c, r)] = {"decor": false,
                                 "hp": pick_hp(level, rng), "ice": false}
         return {"cols": cols, "rows": rows, "arch": "filled",
+                "wall": wall,
                 "cells": cells2, "carriers": [],
                 "breakable": cols * rows,
                 "hits": cols * rows * int(hp_band(level).x)}
 
 ## THE FAIR TIMER (the owner's formula inputs: "size of level, numbers of
 ## bricks, number of required hits, any powerups pre-calculated"). The
-## CALIBRATION is the sim's own truth (the qa rig plays real levels): a
-## paddle round-trip crosses the field TWICE and touches only a few
-## bricks - hpc models the FIELD DEPTH (rows), not the arena width, and
-## the efficiency reads what the rig actually achieved. The mercy eases
-## the first levels; the clamp keeps every level in the honest band.
-## "Logically possible to beat, not too easy to spam" - the idle ball
-## pays the clock, the aimed ball beats it.
+## v0.3.9-8 CALIBRATION: the small-brick levels carry 3-6x the work, so
+## the rate wears the work units (0.45s a brick + 0.6s a hit); the
+## TRIP SCALE keeps the owner's fairness (a slower ball buys more bank,
+## a faster one buys less); the mercy eases the first levels; the clamp
+## holds the honest band; the owned-powerup credit discounts the FINAL
+## bank. "Logically possible to beat, not too easy to spam."
 static func timer_for(breakable: int, hits: int, arena_w: float,
                 arena_h: float, ball_speed: float, level: int,
                 owns_pows: bool) -> float:
         var trip := 2.0 * arena_h / maxf(1.0, ball_speed)
-        var hpc := clampf(float(gen_sizes(level).y) * 0.85, 2.5, 10.0)
-        var t := 8.0 + 0.32 * float(breakable) \
-                        + (float(hits) / hpc) * trip / 0.42
-        var mercy := 1.30
-        if level >= 4:
-                mercy = 1.15
-        if level >= 8:
+        var scale := clampf(trip / 2.86, 0.75, 1.60)
+        var t := 8.0 + 0.45 * float(breakable) \
+                        + 0.60 * float(hits) * scale
+        var mercy := 1.40
+        if level >= 3:
+                mercy = 1.20
+        if level >= 6:
                 mercy = 1.0
-        var out := clampf(t * mercy, 30.0, 300.0)
+        var out := clampf(t * mercy, 40.0, 540.0)
         if owns_pows:
                 # the pre-calculated powerup credit discounts the FINAL
                 # bank (before the clamp it would vanish at the ceiling)
-                out = maxf(30.0, out * 0.95)
+                out = maxf(40.0, out * 0.94)
         return out
 
 # ============================================================ THE SCENE
@@ -570,6 +704,10 @@ var fire_t := 0.0
 var pad_x := 960.0
 var pad_target := 960.0
 var pad_squash := 0.0
+var pad_dip := 0.0              # THE LAUNCH LAW: the hold dips the platform
+var pad_charge := 0.0           # 0..1 (the release turns it into the boost)
+var spd_boost := 1.0            # the launch boost (decays to 1.0)
+var revive_t := 0.0             # THE REVIVE LAW's clock (phase "revive")
 var _held := -1                  # THE HELD FINGER (the rally law)
 var _auto := false               # the qa auto-paddle (the simulation)
 var _auto_t := 0.0
@@ -607,12 +745,13 @@ var pad_chip: Control = null
 var metal_chip: Control = null
 var fire_chip: Control = null
 var _fx: Array = []              # [{x, y, vx, vy, life, max, s, col}]
+var coins_fx: Array = []         # the falling coins (the proper-scale drop)
 var shop_id := ""
 var tex := {}                    # the painted mini icons
 
 ## the pause END is a RUN-LIVE row only (the gate/intro keep it hidden)
 func _goga_pause_end_ok() -> bool:
-        return phase == "play" or phase == "serve"
+        return phase == "play" or phase == "serve" or phase == "revive"
 
 func _vp() -> Vector2:
         return get_viewport_rect().size
@@ -659,8 +798,14 @@ func _layout() -> void:
         var vp := _vp()
         us = vp.y / 1080.0
         var bot := vp.y - banner_bottom()
-        arena = Rect2(SIDE_GAP * us, TOP_GAP * us,
-                        vp.x - SIDE_GAP * 2.0 * us,
+        # THE WALL LAW: the level's own court width - the walls MOVE per
+        # level (small courts and big courts, the owner's ask). The court
+        # stays centered; the frame follows the arena.
+        var frac: float = 1.0
+        if ld.has("wall"):
+                frac = clampf(float(ld["wall"]), WALL_MIN, WALL_MAX)
+        var aw := (vp.x - SIDE_GAP * 2.0 * us) * frac
+        arena = Rect2((vp.x - aw) * 0.5, TOP_GAP * us, aw,
                         bot - TOP_GAP * us - 40.0 * us)
         paddle_y = bot - PAD_Y_UP * us
         lose_y = bot + 24.0 * us
@@ -674,7 +819,11 @@ func _pad_w() -> float:
 
 func _ball_speed() -> float:
         var lm := minf(BALL_LEVEL_CAP, pow(BALL_LEVEL_STEP, float(level_i - 1)))
-        return BALL_BASE_SPEED * us * lm * spd_mult
+        # THE LAUNCH LAW's boost rides here and decays to the base speed;
+        # the ABSOLUTE ceiling stays the x5 law's own
+        var boost := maxf(1.0, spd_boost)
+        return minf(BALL_BASE_SPEED * us * lm * spd_mult * boost,
+                        BALL_BASE_SPEED * us * lm * SPEED_MAX)
 
 func _ball_r() -> float:
         var sm := clampf(size_mult, SIZE_MIN, SIZE_MAX)
@@ -711,12 +860,19 @@ func _apply_theme() -> void:
         if style == "glow":
                 bg_mat.set_shader_parameter("line_col", t["bg_grid"])
                 bg_mat.set_shader_parameter("pulse", 0.22)
+                bg_mat.set_shader_parameter("line_str", 1.0)
         else:
                 # the shader ADDS line_col.rgb (alpha ignored) - the flat
-                # pages wear a grid tinted INTO their own air (the sky's
-                # breeze lines, the arcade's near-black whispers)
+                # pages wear a grid tinted INTO their own air (the arcade's
+                # near-black whispers)
                 bg_mat.set_shader_parameter("line_col", t["bg_grid"])
                 bg_mat.set_shader_parameter("pulse", 0.12)
+                # THE SKY'S PURE GRADIENT (v0.3.9-8, the owner: the sky bg
+                # "has many lines that makes it look too much, it should
+                # be simpler with gradient maybe?") - the sky draws NO
+                # grid; the other flat pages keep a whisper
+                bg_mat.set_shader_parameter("line_str",
+                                0.0 if style == "fat" else 0.55)
         for key in tex.keys():
                 tex.erase(key)
         _paint_icons()
@@ -901,8 +1057,9 @@ func _flash(txt: String, col := Color(1, 1, 1, 1)) -> void:
 
 func _new_level(n: int, first := false) -> void:
         level_i = n
-        _layout()
+        # the level's DNA FIRST (the wall frac rides it), then the seat
         ld = gen_level(n, rng)
+        _layout()
         # the shipped-at tier (the crack lines read it back) + the gate's
         # 40% anchor (the level's ORIGINAL count - the shrinking live
         # count would walk the mark earlier every break)
@@ -911,9 +1068,17 @@ func _new_level(n: int, first := false) -> void:
                 if not bool(c0["decor"]):
                         c0["hp0"] = int(c0["hp"])
         ld["total0"] = int(ld["breakable"])
+        # THE DROP LAW (the honest 2%): the gen's seeded carriers SHIP IN
+        # the wall - a pre-gate break BANKS its capsule (the gate then
+        # pays 1 + the bank). v039-7 picked the list but never marked
+        # the cells - the carriers were phantoms until the forced mark.
+        for ck in ld["carriers"]:
+                if ld["cells"].has(ck) \
+                                and not bool(ld["cells"][ck]["decor"]):
+                        ld["cells"][ck]["carrier"] = true
         bw = arena.size.x / float(ld["cols"])
         var zone := arena.size.y - 250.0 * us
-        bh = minf(bw * BRICK_ASPECT, 96.0 * us)
+        bh = minf(bw * BRICK_ASPECT, 42.0 * us)
         if float(ld["rows"]) * bh > zone:
                 bh = zone / float(ld["rows"])
         brick_zone_h = float(ld["rows"]) * bh
@@ -925,6 +1090,7 @@ func _new_level(n: int, first := false) -> void:
         drops = []
         balls = []
         _fx = []
+        coins_fx = []
         # THE FAIR TIMER (the owner's formula, the level's own numbers)
         level_time = timer_for(int(ld["breakable"]), int(ld["hits"]),
                         arena.size.x, arena.size.y, BALL_BASE_SPEED * us,
@@ -945,6 +1111,9 @@ func _reset_effects() -> void:
         size_mult = 1.0
         metal_t = 0.0
         fire_t = 0.0
+        spd_boost = 1.0
+        pad_charge = 0.0
+        pad_dip = 0.0
         _sync_effect_chips()
 
 func _owns_any_pow() -> bool:
@@ -957,11 +1126,16 @@ func _spawn_serve_ball() -> void:
         balls = [{
                 "x": pad_x, "y": paddle_y - PAD_H * us * 0.5 - _ball_r(),
                 "dx": 0.0, "dy": 0.0, "r": _ball_r(), "stuck": true,
-                "trail": []}]
+                "trail": [], "hit_cd": 0.0, "burned": {}}]
+        pad_charge = 0.0
+        pad_dip = 0.0
+        spd_boost = 1.0
         phase = "serve"
         Jukebox.sfx("bb_serve", -6.0)
 
-func _launch_ball(b: Dictionary) -> void:
+## THE LAUNCH LAW (v0.3.9-8): the charge buys the first-aim boost - the
+## ball flies fast, then the tick decays it back to the base speed
+func _launch_ball(b: Dictionary, charge := 0.0) -> void:
         var ang := -PI * 0.5 + rng.randf_range(-0.24, 0.24)
         # THE AUTO SERVE: the simulation aims its launch at the nearest
         # alive brick (a human aims; the random serve is the player's)
@@ -986,10 +1160,45 @@ func _launch_ball(b: Dictionary) -> void:
                         var up := -PI * 0.5
                         var lim := PI / 3.0
                         ang = clampf(want, up - lim, up + lim)
+        spd_boost = 1.0 + LAUNCH_BOOST * charge
         var spd := _ball_speed()
         b["dx"] = cos(ang) * spd
         b["dy"] = sin(ang) * spd
         b["stuck"] = false
+        b["hit_cd"] = 0.0
+        b["burned"] = {}
+
+## THE LAUNCH LAW: the release IS the launch. The held finger wrote the
+## charge while it dipped the platform; the release springs the platform
+## up into the served ball - a tap is a plain serve, a HOLD is the power
+## serve ("faster for the first aim, then it slows to its base speed")
+func _serve_release() -> void:
+        if phase != "serve" or paused or over:
+                return
+        var charge := pad_charge
+        pad_charge = 0.0
+        pad_dip = 0.0
+        pad_squash = 1.0
+        var launched := false
+        for b in balls:
+                if bool(b["stuck"]):
+                        _launch_ball(b, charge)
+                        launched = true
+        if launched:
+                phase = "play"
+                Jukebox.sfx("bb_serve", -2.0)
+                if charge >= 0.35:
+                        # the smack: the spring's own burst under the ball
+                        _burst(Vector2(pad_x, paddle_y - PAD_H * us * 0.5),
+                                        Color(1, 1, 1, 0.9), 10)
+
+## the hold writes the charge (the dip follows it) - serve phase only
+func _tick_charge(delta: float) -> void:
+        if _held != -1:
+                pad_charge = minf(1.0, pad_charge + delta / CHARGE_TIME)
+        else:
+                pad_charge = maxf(0.0, pad_charge - delta * 3.0)
+        pad_dip = pad_charge * DIP_MAX * us
 
 func _level_clear() -> void:
         # THE SCORE LAW: each level cleared gives 1 score point
@@ -1035,6 +1244,7 @@ func _lose_life(reason := "BALL LOST") -> void:
         _reset_effects()
         drops = []
         balls = []
+        coins_fx = []
         if lives <= 0:
                 _run_over()
                 return
@@ -1042,8 +1252,25 @@ func _lose_life(reason := "BALL LOST") -> void:
                 time_left = level_time      # the fresh clock (the mercy)
                 time_lbl.modulate = Color(1, 1, 1, 1)
                 _set_time_chip()
-        # the same layout, the eaten bricks stay eaten, the clock runs on
-        _spawn_serve_ball()
+        # THE REVIVE LAW (the owner: "when life point is gone, it should
+        # destroy user platform then make it appear using that flickering
+        # revive effect with the stall state waiting for the launch"):
+        # the platform SHATTERS, the flicker rebuilds it, then the serve.
+        phase = "revive"
+        revive_t = 0.0
+        pad_charge = 0.0
+        pad_dip = 0.0
+        var sk := _skin()
+        for i in 14:
+                _fx.append({"x": pad_x + rng.randf_range(
+                                                -_pad_w() * 0.5, _pad_w() * 0.5),
+                        "y": paddle_y,
+                        "vx": rng.randf_range(-170.0, 170.0) * us,
+                        "vy": rng.randf_range(-330.0, -60.0) * us,
+                        "life": rng.randf_range(0.4, 0.7), "max": 0.7,
+                        "s": rng.randf_range(4.0, 9.0) * us,
+                        "col": sk["body"]})
+        fx_layer.queue_redraw()
 
 # ==================================================== the drop machinery
 ## THE DROP LAW: 2% of bricks carry a powerup; the first one appears AT
@@ -1080,11 +1307,19 @@ func _on_broken(key: Vector2i) -> void:
         if bool(c.get("coin", false)):
                 c["coin"] = false
                 coin_pending = maxi(0, coin_pending - 1)
-                add_run_coins(1)
+                add_run_coins(1)            # the grant is instant (the law)
                 achievement_count("coins", 1)
-                Jukebox.sfx("c_coin", -2.0)
-                _burst(_cell_rect(key).get_center(),
-                                Color(1.0, 0.80, 0.30), 16)
+                Jukebox.sfx("bb_pow_spawn", -4.0)
+                # THE COIN DROP (v0.3.9-8, the owner: "it should make the
+                # platform normally as is but when dropped, it should be
+                # at proper scale"): the coin pops out of the brick as a
+                # proper-scale body and falls - the paddle's catch is the
+                # sparkle (the grant already landed)
+                var cr := _cell_rect(key)
+                coins_fx.append({"x": cr.get_center().x,
+                        "y": cr.get_center().y,
+                        "vx": rng.randf_range(-40.0, 40.0) * us,
+                        "vy": -190.0 * us, "t": 0.0, "spin": rng.randf() * TAU})
 
 func _promote_carrier() -> void:
         var pool: Array = []
@@ -1130,7 +1365,10 @@ func _spawn_drop(key: Vector2i) -> void:
                 "vy": 250.0 * us, "kind": kind, "t": rng.randf() * TAU})
         Jukebox.sfx("bb_pow_spawn", -4.0)
 
-## the catch: the bundle law picks the side, the caps hold the line
+## the catch: the bundle law picks the side, the caps hold the line.
+## THE OVERRIDE LAW (v0.3.9-8, the owner: "the ball can be whether fire
+## or metal but not both as example"): the newest state WINS, the other
+## burns out on the spot.
 func _apply_pow(kind: String) -> void:
         Jukebox.sfx("bb_pow", -3.0)
         match kind:
@@ -1169,11 +1407,14 @@ func _apply_pow(kind: String) -> void:
                                         "dx": cos(ang) * spd,
                                         "dy": sin(ang) * spd,
                                         "r": _ball_r(), "stuck": false,
-                                        "trail": []})
+                                        "trail": [], "hit_cd": 0.0,
+                                        "burned": {}})
                 "metal":
                         metal_t = METAL_TIME
+                        fire_t = 0.0            # THE OVERRIDE LAW: metal wins
                 "fire":
                         fire_t = FIRE_TIME
+                        metal_t = 0.0           # THE OVERRIDE LAW: fire wins
         _sync_effect_chips()
 
 func _sync_effect_chips() -> void:
@@ -1210,7 +1451,16 @@ func _goga_tick(delta: float) -> void:
                 "serve":
                         _ride_paddle()
                         _move_pad(delta)
+                        _tick_charge(delta)  # THE LAUNCH LAW: the hold charges
                         char_layer.queue_redraw()
+                "revive":
+                        # THE REVIVE LAW: the flicker rebuilds the platform,
+                        # then the stall serve waits for the launch
+                        revive_t += delta
+                        _tick_brick_fx(delta)
+                        char_layer.queue_redraw()
+                        if revive_t >= REVIVE_TIME:
+                                _spawn_serve_ball()
                 "play":
                         _move_pad(delta)
                         _tick_timers(delta)
@@ -1221,11 +1471,13 @@ func _goga_tick(delta: float) -> void:
                         if phase != "play":
                                 return      # the physics door may end the run
                         _tick_drops(delta)
+                        _tick_coins_fx(delta)
                         char_layer.queue_redraw()
                         brick_layer.queue_redraw()
                 "clear":
                         clear_t -= delta
                         _tick_brick_fx(delta)
+                        _tick_coins_fx(delta)   # the drop's celebration ends
                         char_layer.queue_redraw()
                         brick_layer.queue_redraw()
                         if clear_t <= 0.0:
@@ -1293,9 +1545,10 @@ func _auto_think(delta: float) -> void:
         if span > 0.0:
                 var k := fposmod(px - lo, span * 2.0)
                 px = lo + (k if k <= span else span * 2.0 - k)
-        # the steering: the arriving COLUMN decides - nearest x wins,
-        # and the TOP of the field wins the tie (drill the channel up:
-        # an open ceiling rakes the whole row)
+        # the steering: the arriving COLUMN decides - the weakest WINDOW
+        # wins (the drill instinct: a human aims where the wall is thin,
+        # one pass rakes 3-5 bricks through a soft channel; the TOP of
+        # the field breaks the tie - an open ceiling rakes the whole row)
         var aim := px
         var bd := 1 << 30
         for key in ld["cells"].keys():
@@ -1308,6 +1561,21 @@ func _auto_think(delta: float) -> void:
                                 + cr.get_center().y * 0.25)
                 if dd < bd:
                         bd = int(dd)
+                        aim = cr.get_center().x
+        # THE DRILL READ: the weight of the ±1-cell window around the
+        # candidate column - the softest channel near the landing seat
+        var best_w := 1 << 30
+        for key in ld["cells"].keys():
+                var c: Dictionary = ld["cells"][key]
+                if bool(c["decor"]) or int(c["hp"]) <= 0 \
+                                or c.has("dying"):
+                        continue
+                var cr := _cell_rect(key)
+                if absf(cr.get_center().x - px) > cr.size.x * 1.6:
+                        continue
+                var w := int(cr.get_center().y) * 3 + int(c["hp"]) * 40
+                if w < best_w:
+                        best_w = w
                         aim = cr.get_center().x
         var hw := _pad_w() * 0.5
         var off := clampf((aim - px) / maxf(1.0, hw), -1.0, 1.0)
@@ -1323,8 +1591,15 @@ func _ride_paddle() -> void:
                         b["x"] = pad_x
                         b["y"] = paddle_y - PAD_H * us * 0.5 - float(b["r"])
 
-## THE FAIR TIMER: it breathes only in play (the serve is free)
+## THE FAIR TIMER: it breathes only in play (the serve is free). The
+## LAUNCH LAW's boost decays here too - "faster for the first aim, then
+## it slows down to it's base speed"
 func _tick_timers(delta: float) -> void:
+        if spd_boost > 1.0:
+                spd_boost = maxf(1.0, spd_boost - delta * LAUNCH_BOOST \
+                                / BOOST_DECAY)
+        if pad_dip > 0.0:
+                pad_dip = maxf(0.0, pad_dip - delta * DIP_MAX * us * 7.0)
         if metal_t > 0.0:
                 metal_t = maxf(0.0, metal_t - delta)
         if fire_t > 0.0:
@@ -1392,6 +1667,11 @@ func _tick_balls(delta: float) -> void:
                 var ux := float(b["dx"]) / maxf(1.0, spd)
                 var uy := float(b["dy"]) / maxf(1.0, spd)
                 for step in steps:
+                        # THE CONTACT LAW: the per-ball damage cooldown
+                        # breathes with the substeps (the 2-hit bug's cure)
+                        b["hit_cd"] = maxf(0.0,
+                                        float(b.get("hit_cd", 0.0)) \
+                                        - ds / maxf(1.0, spd))
                         b["x"] += ux * ds
                         b["y"] += uy * ds
                         if _collide_walls(b) or _collide_paddle(b):
@@ -1458,14 +1738,27 @@ func _collide_paddle(b: Dictionary) -> bool:
         return true
 
 ## the bricks: circle-rect resolve against every cell the ball touches.
-## FIRE passes through (no bounce, burns all); METAL hits for 2.
+## THE CONTACT LAW (v0.3.9-8, the 2-hit bug's cure): the ball damages at
+## most once per HIT_CD window - the old rig penetrated TWO cells in a
+## seam, bounced out of one, and the next substep re-damaged the other
+## (a 2-hit brick died to one contact). THE FIRE LAW (v0.3.9-8): the
+## pass deals FIRE_DMG (x3) per brick ONCE per pass (the burned map),
+## not the old melt-everything full burn.
 func _collide_bricks(b: Dictionary) -> void:
         var r := float(b["r"])
         var fire := fire_t > 0.0
         var metal := metal_t > 0.0 and not fire
+        # THE CONTACT LAW: a fresh bounce mutes the damage window (the
+        # fire lives on its burned map instead)
+        if float(b.get("hit_cd", 0.0)) > 0.0 and not fire:
+                return
         var c0 := _cell_at(float(b["x"]) - r, float(b["y"]) - r)
         var c1 := _cell_at(float(b["x"]) + r, float(b["y"]) + r)
         var bounced := false
+        var best_rect := Rect2()
+        var best_close := Vector2.ZERO
+        var best_depth := -1.0
+        var touched := false
         for cc in range(maxi(0, c0.x), mini(int(ld["cols"]) - 1, c1.x) + 1):
                 for rr in range(maxi(0, c0.y),
                                 mini(int(ld["rows"]) - 1, c1.y) + 1):
@@ -1485,6 +1778,7 @@ func _collide_bricks(b: Dictionary) -> void:
                                         .distance_to(close)
                         if d > r:
                                 continue
+                        touched = true
                         if bool(cell["decor"]):
                                 # THE DECOR LAW: the steel only bounces
                                 if not fire and not bounced:
@@ -1494,13 +1788,54 @@ func _collide_bricks(b: Dictionary) -> void:
                                         _burst(close, Color(0.8, 0.85, 0.9),
                                                         4)
                                 continue
-                        # the damage: fire burns through (no bounce),
-                        # metal deals the double hit
+                        # THE FIRE PASS MAP: one x3 burn per brick per pass
+                        if fire:
+                                if not b.has("burned"):
+                                        b["burned"] = {}
+                                var burned: Dictionary = b["burned"]
+                                if burned.has(key):
+                                        continue
+                                burned[key] = true
+                                _damage_cell(key, FIRE_DMG, true)
+                                continue
+                        # the damage: the metal deals the double hit
                         var dmg := 2 if metal else 1
-                        _damage_cell(key, dmg, fire)
-                        if not fire and not bounced:
-                                _bounce_off(b, rect, close)
-                                bounced = true
+                        _damage_cell(key, dmg, false)
+                        # the deepest penetration wins the bounce (the
+                        # seam-jam case bounces out of the cell it truly
+                        # entered, not the first one the loop met)
+                        var depth := minf(r - absf(float(b["x"]) - close.x),
+                                        r - absf(float(b["y"]) - close.y))
+                        if depth > best_depth:
+                                best_depth = depth
+                                best_rect = rect
+                                best_close = close
+        if not fire and not bounced and best_depth >= 0.0:
+                _bounce_off(b, best_rect, best_close)
+                bounced = true
+        if bounced and not fire:
+                b["hit_cd"] = HIT_CD
+        if fire and touched:
+                # THE PASS MAP's exit sweep: a brick the ball LEFT may
+                # burn again on the next pass
+                if not b.has("burned"):
+                        b["burned"] = {}
+                var burned2: Dictionary = b["burned"]
+                var gone: Array = []
+                for key2 in burned2.keys():
+                        if not _in_cells(key2):
+                                gone.append(key2)
+                                continue
+                        var rect2 := _cell_rect(key2)
+                        var close2 := Vector2(clampf(float(b["x"]),
+                                        rect2.position.x, rect2.end.x),
+                                        clampf(float(b["y"]),
+                                        rect2.position.y, rect2.end.y))
+                        if Vector2(float(b["x"]), float(b["y"])) \
+                                        .distance_to(close2) > r + 2.0:
+                                gone.append(key2)
+                for key2 in gone:
+                        burned2.erase(key2)
 
 ## the honest bounce: reflect on the SHALLOWER penetration axis
 func _bounce_off(b: Dictionary, rect: Rect2, close: Vector2) -> void:
@@ -1547,7 +1882,8 @@ func _bounce_off(b: Dictionary, rect: Rect2, close: Vector2) -> void:
 
 ## THE DAMAGE + THE POINT LAW: damage dealt = points paid, live. The
 ## ice layer takes the hit first (THE FROZEN LAW), the body under it
-## shows its own cracks as the damage grows.
+## shows its own cracks as the damage grows. The fire's x3 rides the
+## dmg the caller hands in (the burn is a NUMBER now, not a melt).
 func _damage_cell(key: Vector2i, dmg: int, fire: bool) -> void:
         var cell: Dictionary = ld["cells"][key]
         if bool(cell["decor"]) or cell.has("dying"):
@@ -1564,8 +1900,6 @@ func _damage_cell(key: Vector2i, dmg: int, fire: bool) -> void:
                                 8)
         if dmg > 0:
                 var hp := int(cell["hp"])
-                if fire:
-                        dmg = hp          # THE BURN: the fire takes it all
                 var take := mini(dmg, hp)
                 cell["hp"] = hp - take
                 dealt += take
@@ -1599,6 +1933,39 @@ func _break_cell(key: Vector2i) -> void:
                 _level_clear()
 
 # ================================================================ DROPS
+## the falling coins (THE COIN DROP): a gravity body, a paddle catch,
+## a soft poof at the lose line - the grant rode the break (the law)
+func _tick_coins_fx(delta: float) -> void:
+        var dead: Array = []
+        for cf in coins_fx:
+                cf["t"] = float(cf["t"]) + delta
+                cf["spin"] = float(cf["spin"]) + delta * 7.0
+                cf["vy"] += 620.0 * us * delta     # the gravity
+                cf["x"] = float(cf["x"]) + float(cf["vx"]) * delta
+                cf["y"] = float(cf["y"]) + float(cf["vy"]) * delta
+                var top := paddle_y - PAD_H * us * 0.5
+                var hw := _pad_w() * 0.5
+                if float(cf["vy"]) > 0.0 and float(cf["y"]) >= top \
+                                and float(cf["y"]) <= paddle_y + PAD_H * us \
+                                and float(cf["x"]) >= pad_x - hw - 14.0 * us \
+                                and float(cf["x"]) <= pad_x + hw + 14.0 * us:
+                        # THE CATCH: the sparkle + the coin tone
+                        Jukebox.sfx("c_coin", -2.0)
+                        _burst(Vector2(float(cf["x"]), top),
+                                        Color(1.0, 0.80, 0.30), 12)
+                        dead.append(cf)
+                        continue
+                if float(cf["y"]) - 12.0 * us > lose_y:
+                        # the soft poof (the coin was granted at the break)
+                        _burst(Vector2(float(cf["x"]), lose_y),
+                                        Color(1.0, 0.85, 0.45, 0.7), 6)
+                        dead.append(cf)
+        for cf in dead:
+                coins_fx.erase(cf)
+        if not coins_fx.is_empty():
+                char_layer.queue_redraw()
+
+# ============================================================ DROPS (pows)
 func _tick_drops(delta: float) -> void:
         var dead: Array = []
         for d in drops:
@@ -1622,6 +1989,8 @@ func _tick_drops(delta: float) -> void:
                 drops.erase(d)
 
 # ============================================================ THE INPUT
+## the gate's door only - THE LAUNCH moved to the held finger's RELEASE
+## (the launch law: a tap is a plain serve, a hold is the power serve)
 func _tap_anywhere(_at: Vector2) -> void:
         if over:
                 return
@@ -1630,17 +1999,10 @@ func _tap_anywhere(_at: Vector2) -> void:
                 _gate_down()
                 phase = "intro"
                 intro_t = 0.0
-                return
-        if phase == "serve" and not paused:
-                # THE LAUNCH: the tap sends the served ball up
-                for b in balls:
-                        if bool(b["stuck"]):
-                                _launch_ball(b)
-                phase = "play"
-                Jukebox.sfx("bb_serve", -2.0)
 
 ## THE HELD FINGER (the rally law, word for word): the touch that took
-## the paddle owns it; its drags write the TARGET; its release frees it.
+## the paddle owns it; its drags write the TARGET; its release frees it
+## - and on the serve, the release IS the launch (the launch law).
 func _goga_input(event: InputEvent) -> void:
         if over:
                 return
@@ -1651,6 +2013,7 @@ func _goga_input(event: InputEvent) -> void:
                         _follow_finger(t.position)
                 elif not t.pressed and t.index == _held:
                         _held = -1
+                        _serve_release()    # THE LAUNCH LAW: the release
                 # the gate also answers raw touches (the tap-anywhere law)
                 if t.pressed and phase == "boot":
                         _tap_anywhere(t.position)
@@ -1670,26 +2033,40 @@ func _build_gate() -> void:
         if gate_ui != null and is_instance_valid(gate_ui):
                 gate_ui.queue_free()
         gate_ui = Control.new()
-        gate_ui.position = Vector2.ZERO
-        gate_ui.size = _vp()
+        # THE ANCHOR SEAT (v0.3.9-8, the owner: "the tap anywhere to start
+        # text literally out of screen ... at the bottom right"): the old
+        # gate read _vp() ONCE at build time - a canvas that settles later
+        # left the label stranded off-screen. Anchors track the LIVE
+        # canvas: full-rect fill + a centered box, no absolute pixels.
+        gate_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
         gate_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
         var dim := ColorRect.new()
         dim.color = Color(0, 0, 0, 0.45)
-        dim.position = Vector2.ZERO
-        dim.size = _vp()
+        dim.set_anchors_preset(Control.PRESET_FULL_RECT)
         dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
         gate_ui.add_child(dim)
         var vb := VBoxContainer.new()
-        vb.set_anchors_preset(Control.PRESET_CENTER)
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
         vb.add_theme_constant_override("separation", 18)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
         gate_ui.add_child(vb)
-        # THE SILENT GATE: its ONE sentence
+        # THE SILENT GATE: its ONE sentence (seated at the upper-center
+        # third - the paddle's court stays readable under it)
         var l := Arc.label("TAP ANYWHERE TO START", 46, Color(1, 1, 1, 0.95))
         l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(l)
-        vb.position = _vp() * 0.5 - Vector2(320, 40)
-        vb.custom_minimum_size = Vector2(640, 0)
-        add_child(gate_ui)
+        l.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        var seat := Control.new()
+        seat.custom_minimum_size = Vector2(0, 96.0)
+        seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(seat)          # the push-down: the label sits above
+        vb.add_child(l)             # the court's middle, never off-screen
+        # THE SCREEN-SPACE SEAT (v0.3.9-8, the owner: "the tap anywhere to
+        # start text literally out of screen"): the gate lives in the HUD
+        # CanvasLayer - a CanvasLayer child anchors to the REAL viewport,
+        # not to a game-root Control whose rect some hosts never size
+        # (the root-offset class that stranded the label bottom-right)
+        _hud.add_child(gate_ui)
         gate_ui.visible = true
 
 func _gate_down() -> void:
@@ -1857,8 +2234,13 @@ func _draw_bricks() -> void:
                 else:
                         body = _brick_color(maxi(1, hp))
                 if dying_t >= 0.0:
+                        # THE BREAK FADE (v0.3.9-8, the owner: "it should
+                        # get smaller and fades out, not to get a little
+                        # bigger"): the body SHRINKS into its own center
                         a *= 1.0 - dying_t
-                        r2 = r2.grow(4.0 * us * dying_t)
+                        var shrink := minf(7.0 * us * dying_t,
+                                        minf(r2.size.x, r2.size.y) * 0.45)
+                        r2 = r2.grow(-shrink)
                 var draw_col := Color(body, a)
                 match style:
                         "fat":
@@ -1883,29 +2265,12 @@ func _draw_bricks() -> void:
                 # THE FROZEN LAW: the external ice layer rides the brick
                 if not decor and bool(cell.get("ice", false)):
                         _draw_ice(r2, off, a, pulse)
-                # THE COIN LAW's shine + the carrier's hum
-                if not decor and hp > 0:
-                        if bool(cell.get("coin", false)):
-                                var cc := r2.get_center() + off
-                                var rr := minf(r2.size.x, r2.size.y) * 0.30 \
-                                                * (1.0 + 0.10 * pulse)
-                                brick_layer.draw_circle(cc, rr * 1.8,
-                                                Color(1.0, 0.80, 0.30,
-                                                                0.20 * a))
-                                brick_layer.draw_circle(cc, rr,
-                                                Color(1.0, 0.82, 0.30, a))
-                                brick_layer.draw_circle(cc, rr * 0.55,
-                                                Color(1.0, 0.95, 0.6,
-                                                                0.9 * a))
-                        elif bool(cell.get("carrier", false)):
-                                var cc2 := r2.get_center() + off
-                                brick_layer.draw_arc(cc2,
-                                                minf(r2.size.x, r2.size.y) \
-                                                                * 0.42,
-                                                0, TAU, 20,
-                                                Color(1, 1, 1, 0.35 + 0.25 \
-                                                                * pulse * a),
-                                                2.5 * us)
+                # THE SURPRISE LAW (v0.3.9-8, the owner: "i do not want
+                # the bricks that contains powerups to show that circle
+                # inside them, let it a surprise" - and the coin brick
+                # "should make the platform normally as is"): the carriers
+                # and the coin carriers wear NOTHING - the wall reads
+                # honest, the drops and the pops are the reveal.
 
 func _brick_max_hp(key: Vector2i) -> int:
         # the tier the brick shipped at (the crack count reads it back)
@@ -1915,9 +2280,12 @@ func _brick_max_hp(key: Vector2i) -> int:
 func _brick_fat(r2: Rect2, off: Vector2, col: Color, flash: float,
                 decor: bool, a: float) -> void:
         var rr := minf(r2.size.x, r2.size.y) * 0.32
-        # the soft drop shadow (the fat joyful depth)
-        brick_layer.draw_rect(Rect2(r2.position + off + Vector2(0, 3.5) * us,
-                        r2.size), Color(0.1, 0.15, 0.3, 0.25 * a))
+        # the soft drop shadow (ROUNDED now - the old square rect's
+        # corners were the "rectangle edges" the owner saw under the
+        # curved body)
+        _round_rect(brick_layer, r2.position + off
+                        + Vector2(0, 3.5) * us, r2.size, rr,
+                        Color(0.1, 0.15, 0.3, 0.25 * a))
         _round_rect(brick_layer, r2.position + off, r2.size, rr,
                         Color(col, 1.0))
         # the gloss streak
@@ -2058,14 +2426,31 @@ func _draw_ice(r2: Rect2, off: Vector2, a: float, pulse: float) -> void:
 
 func _round_rect(cv: CanvasItem, p: Vector2, sz: Vector2, rr: float,
                 col: Color) -> void:
-        cv.draw_rect(Rect2(p + Vector2(rr, 0), Vector2(sz.x - rr * 2.0,
-                        sz.y)), col)
-        cv.draw_rect(Rect2(p + Vector2(0, rr), Vector2(sz.x,
-                        sz.y - rr * 2.0)), col)
-        cv.draw_circle(p + Vector2(rr, rr), rr, col)
-        cv.draw_circle(p + Vector2(sz.x - rr, rr), rr, col)
-        cv.draw_circle(p + Vector2(rr, sz.y - rr), rr, col)
-        cv.draw_circle(p + Vector2(sz.x - rr, sz.y - rr), rr, col)
+        # v0.3.9-8: ONE honest polygon (the old rect+circles composite
+        # double-blended under alpha - the square edges the owner saw on
+        # the sky bricks). The radius clamps to the shorter half-side.
+        var r := maxf(0.0, minf(rr, minf(sz.x, sz.y) * 0.5))
+        if r <= 0.5:
+                cv.draw_rect(Rect2(p, sz), col)
+                return
+        var steps := 6
+        var pts := PackedVector2Array()
+        for i in steps + 1:
+                var a := -PI * 0.5 + PI * 0.5 * float(i) / float(steps)
+                pts.append(p + Vector2(sz.x - r, r) + Vector2(cos(a),
+                                sin(a)) * r)
+        for i in steps + 1:
+                var a := PI * 0.5 * float(i) / float(steps)
+                pts.append(p + Vector2(sz.x - r, sz.y - r) + Vector2(cos(a),
+                                sin(a)) * r)
+        for i in steps + 1:
+                var a := PI * 0.5 + PI * 0.5 * float(i) / float(steps)
+                pts.append(p + Vector2(r, sz.y - r) + Vector2(cos(a),
+                                sin(a)) * r)
+        for i in steps + 1:
+                var a := PI + PI * 0.5 * float(i) / float(steps)
+                pts.append(p + Vector2(r, r) + Vector2(cos(a), sin(a)) * r)
+        cv.draw_colored_polygon(pts, col)
 
 func _round_rect_outline(cv: CanvasItem, p: Vector2, sz: Vector2,
                 rr: float, col: Color, w: float) -> void:
@@ -2095,23 +2480,38 @@ func _draw_chars() -> void:
         for d in drops:
                 _draw_capsule(Vector2(float(d["x"]), float(d["y"])),
                                 String(d["kind"]))
-        # THE PADDLE (the skin, the squash, the caps)
+        # the falling coins (THE COIN DROP: proper scale, the spin)
+        for cf in coins_fx:
+                _draw_coin(Vector2(float(cf["x"]), float(cf["y"])),
+                                float(cf["spin"]))
+        # THE PADDLE (the skin, the squash, the caps, the LAUNCH LAW's
+        # dip, THE REVIVE LAW's destroy + flicker)
         var sk := _skin()
+        var pad_a := 1.0
+        if phase == "revive":
+                if revive_t < REVIVE_HIDE:
+                        return          # the destroyed beat: the paddle is
+                else:                   # GONE - only its crumbs fly
+                        # the flicker rebuild (the honest alpha, the new
+                        # polygon fill blends it clean)
+                        pad_a = 0.30 + 0.70 * (0.5 + 0.5 \
+                                        * sin(revive_t * 26.0))
         var hw := _pad_w() * 0.5
         var sq := 1.0 + 0.22 * pad_squash
         var ph := PAD_H * us / sq
-        var p0 := Vector2(pad_x - hw, paddle_y - ph * 0.5)
+        var py := paddle_y + pad_dip    # the hold dips the platform
+        var p0 := Vector2(pad_x - hw, py - ph * 0.5)
         var psz := Vector2(hw * 2.0, ph)
         var rr := ph * 0.5
         char_layer.draw_rect(Rect2(p0 + Vector2(0, 3.0) * us, psz),
-                        Color(0.1, 0.15, 0.3, 0.25))
-        _round_rect(char_layer, p0, psz, rr, Color(sk["edge"], 1.0))
+                        Color(0.1, 0.15, 0.3, 0.25 * pad_a))
+        _round_rect(char_layer, p0, psz, rr, Color(sk["edge"], pad_a))
         _round_rect(char_layer, p0 + Vector2(3.0 * us, 3.0 * us),
                         psz - Vector2(6.0 * us, 6.0 * us), rr * 0.8,
-                        Color(sk["body"], 1.0))
+                        Color(sk["body"], pad_a))
         _round_rect(char_layer, p0 + Vector2(hw * 0.4, 4.0 * us),
                         Vector2(hw * 1.2, ph * 0.28), rr * 0.3,
-                        Color(1, 1, 1, 0.4))
+                        Color(1, 1, 1, 0.4 * pad_a))
         # THE BALLS (the skin, the trail, the fire, the metal)
         var bs := _ball_skin()
         for b in balls:
@@ -2153,6 +2553,24 @@ func _draw_chars() -> void:
                                         Vector2(bp.x + 10.0 * us, ay),
                                         Vector2(bp.x, ay - 16.0 * us)]),
                                         Color(1, 1, 1, 0.5))
+
+## the coin body (THE COIN DROP): a proper-scale golden disc with the
+## shine ring and the spin glint - never the thumbnail's giant medallion
+func _draw_coin(p: Vector2, spin: float) -> void:
+        var r := 13.0 * us
+        var sq := absf(cos(spin))          # the coin's wobble spin
+        var gold := Color(1.0, 0.82, 0.30)
+        char_layer.draw_circle(p + Vector2(0, 2.0) * us, r,
+                        Color(0.35, 0.22, 0.05, 0.3))
+        char_layer.draw_circle(p, r, gold)
+        char_layer.draw_circle(p, r * 0.78, Color(1.0, 0.90, 0.45))
+        # the glint rides the spin (a lit edge, a flat face, back again)
+        var gx := cos(spin) * r * 0.55
+        char_layer.draw_line(p - Vector2(gx, r * 0.45),
+                        p - Vector2(gx, r * 0.45) + Vector2(0, r * 0.9),
+                        Color(1.0, 0.98, 0.75, 0.5 + 0.5 * sq), 2.2 * us)
+        char_layer.draw_arc(p, r, 0, TAU, 20,
+                        Color(0.85, 0.62, 0.16), 1.6 * us)
 
 ## the capsule: a rounded pill with the kind's glyph (code-drawn)
 func _draw_capsule(p: Vector2, kind: String) -> void:
@@ -2437,7 +2855,13 @@ func probe_reset(seed_v: int) -> void:
         coin_pending = 0
         run_coins = 0
         _fx = []
+        coins_fx = []
         _auto = false
+        # a FRESH run owes a live machine (the state law: the probe's
+        # entry door seats the whole state - an `over` latched by an
+        # earlier test made _serve_release refuse every launch)
+        over = false
+        paused = false
         _new_level(1)
         balls = []
         phase = "serve"
@@ -2448,6 +2872,12 @@ func probe_step(dt: float) -> void:
 
 ## the probe's helpers (the laws stay drivable without UI surgery)
 func probe_launch() -> void:
+        # THE HONEST DOOR: the serve launches through the release law
+        # (charge 0 - the probe's finger is already up); other phases
+        # keep the old defensive walk (the hand-seated states)
+        if phase == "serve":
+                _serve_release()
+                return
         for b in balls:
                 if bool(b["stuck"]):
                         _launch_ball(b)

@@ -33,6 +33,11 @@ func _check(cond: bool, why := "") -> void:
 # ---------------------------------------------------------------- the rig
 var g: GogaGame = null
 
+func _mk_rng(seed_v: int) -> RandomNumberGenerator:
+        var r := RandomNumberGenerator.new()
+        r.seed = seed_v
+        return r
+
 func _scene_game() -> void:
         if g != null and is_instance_valid(g):
                 g.queue_free()
@@ -98,6 +103,9 @@ func _ready() -> void:
         _t_drop_law()
         _t_caps_and_resets()
         _t_life_law()
+        _t_contact_and_fire()
+        if OS.get_environment("BB_CAL") == "1":
+                await _t_calibration()      # the print-only pace fit
         await _t_simulation()
         await _t_powered_soak()
         print("=== qa_v0397_brick: %s (%d fails) ===" \
@@ -107,19 +115,55 @@ func _ready() -> void:
 # ------------------------------------------------------- 1. the generator
 func _t_generator() -> void:
         print("-- the generator")
-        # the ladder: monotonic, odd, capped
+        # the ladder: monotonic, odd, capped (the v0.3.9-8 SMALL BRICK:
+        # 25..49 x 11..21 - the owner's 3-5x smaller bricks)
         var ok_ladder := true
         var last := Vector2i.ZERO
         for lv in range(1, 61):
                 var s: Vector2i = BB.gen_sizes(lv)
-                if s.x % 2 == 0 or s.x < 9 or s.x > 17 or s.y < 5 \
-                                or s.y > 12:
+                if s.x % 2 == 0 or s.x < BB.BASE_COLS or s.x > BB.MAX_COLS \
+                                or s.y < BB.BASE_ROWS or s.y > BB.MAX_ROWS:
                         ok_ladder = false
                 if s.x < last.x or s.y < last.y:
                         ok_ladder = false
                 last = s
         _check(ok_ladder,
-                "the ladder grows, stays odd and inside 9..17 x 5..12")
+                "the ladder grows, stays odd and inside %d..%d x %d..%d" \
+                                % [BB.BASE_COLS, BB.MAX_COLS, BB.BASE_ROWS,
+                                BB.MAX_ROWS])
+        # THE SMALL BRICK: the L1 brick must sit in the owner's band
+        # (~3-5x smaller than the v039-7 bricks: bw 28..80 design px)
+        var small_ok := true
+        for lv in range(1, 41):
+                var dims: Vector2i = BB.gen_sizes(lv)
+                var full_w := 1852.0
+                var bw: float = full_w * BB.wall_frac(lv,
+                                _mk_rng(900 + lv)) / float(dims.x)
+                if bw < 26.0 or bw > 82.0:
+                        small_ok = false
+        _check(small_ok,
+                "the small-brick band holds (bw 26..82 design px at L1..40)")
+        # THE WALL LAW: the walls really move - the fracs spread, the
+        # climb lifts the average, every level keeps its own seat
+        var wmin := 10.0
+        var wmax := 0.0
+        var wsum := 0.0
+        for lv in range(1, 31):
+                for k in 4:
+                        var wf: float = BB.wall_frac(lv, _mk_rng(lv * 10 + k))
+                        wmin = minf(wmin, wf)
+                        wmax = maxf(wmax, wf)
+                        wsum += wf
+        _check(wmax - wmin > 0.2,
+                "the wall fracs spread (min %.2f max %.2f)" % [wmin, wmax])
+        var w_early := 0.0
+        var w_late := 0.0
+        for k in 6:
+                w_early += float(BB.wall_frac(1, _mk_rng(k))) / 6.0
+                w_late += float(BB.wall_frac(20, _mk_rng(k))) / 6.0
+        _check(w_late > w_early + 0.1,
+                "the walls climb (L1 avg %.2f < L20 avg %.2f)" % [w_early,
+                                w_late])
         # determinism: the same seed twice, the same level
         var r1 := RandomNumberGenerator.new()
         r1.seed = 4242
@@ -195,16 +239,17 @@ func _t_generator() -> void:
 # ------------------------------------------------------------ 2. the timer
 func _t_timer() -> void:
         print("-- the fair timer")
-        var t1: float = BB.timer_for(40, 55, 1852.0, 800.0, 560.0, 1, false)
-        var t2: float = BB.timer_for(120, 300, 1852.0, 800.0, 560.0, 10, false)
-        var t3: float = BB.timer_for(200, 1100, 1852.0, 800.0, 560.0, 30, false)
-        _check(t1 >= 30.0 and t2 > t1 and t3 >= t2,
+        var t1: float = BB.timer_for(138, 138, 1852.0, 800.0, 560.0, 1, false)
+        var t2: float = BB.timer_for(240, 520, 1852.0, 800.0, 560.0, 10, false)
+        var t3: float = BB.timer_for(260, 780, 1852.0, 800.0, 560.0, 30, false)
+        _check(t1 >= 40.0 and t2 > t1 and t3 >= t2,
                 "the timer grows with the work (%.0f -> %.0f -> %.0f)" \
                                 % [t1, t2, t3])
-        _check(t3 <= 300.0, "the clamp holds the ceiling (300s)")
-        var tp: float = BB.timer_for(120, 300, 1852.0, 800.0, 560.0, 10, true)
+        _check(t3 <= 540.0, "the clamp holds the ceiling (540s)")
+        var tp: float = BB.timer_for(240, 520, 1852.0, 800.0, 560.0, 10, true)
         _check(tp < t2, "the owned-powerup credit discounts the bank")
-        var tslow: float = BB.timer_for(40, 55, 1852.0, 800.0, 380.0, 1, false)
+        var tslow: float = BB.timer_for(138, 138, 1852.0, 800.0, 380.0, 1,
+                        false)
         _check(tslow > t1, "a slower ball buys MORE time (the fairness)")
 
 # --------------------------------------------------- 3. the gate + states
@@ -236,9 +281,10 @@ func _t_gate_and_states() -> void:
 func _t_paddle_finger() -> void:
         print("-- the ping-pong control")
         _fresh(11)
-        g.phase = "serve" if g.phase != "serve" else g.phase
-        g.balls = [{"x": g.pad_x, "y": g.paddle_y - 40.0, "dx": 0.0,
-                "dy": 0.0, "r": 15.0, "stuck": true, "trail": []}]
+        # a CLEAN bench: the serve phase (the ball waits, nothing dies,
+        # the revive never freezes the glide mid-read)
+        g.phase = "serve"
+        g._spawn_serve_ball()
         # THE REAL-FINGER RIG: true events through the engine queue
         var press := InputEventScreenTouch.new()
         press.position = Vector2(700, 900)
@@ -272,20 +318,61 @@ func _t_paddle_finger() -> void:
         Input.parse_input_event(rel)
         await get_tree().process_frame
         _check(g._held == -1, "the release frees the paddle")
+        # NOTE: the release ALSO launched the served ball (the launch
+        # law) - re-arm a fresh serve bench for the glide reads
+        g.phase = "serve"
+        g._spawn_serve_ball()
         # the glide is distance-proportional: a far flick closes FASTER
-        g.pad_x = 300.0
-        g.pad_target = 1700.0
+        # (the seats live INSIDE the paddle's reachable span - the clamp
+        # sits at end.x - hw, a target past it would pin both reads)
+        var alo: float = g.arena.position.x
+        var ahi: float = g.arena.end.x
+        var reach: float = ahi - g._pad_w() * 0.5 - 20.0
+        var far_from: float = alo + 40.0
+        g.pad_x = far_from
+        g.pad_target = reach
         for i in 12:
                 g.probe_step(1.0 / 60.0)
-        var d1: float = 1700.0 - g.pad_x
-        g.pad_x = 1500.0
-        g.pad_target = 1700.0
+        var d1: float = g.pad_x - far_from
+        var near_from: float = reach - 300.0
+        g.pad_x = near_from
+        g.pad_target = reach
         for i in 12:
                 g.probe_step(1.0 / 60.0)
-        var d2: float = 1700.0 - g.pad_x
+        var d2: float = g.pad_x - near_from
         _check(absf(d1) > absf(d2) * 2.0,
                 "the far gap closes faster (left %.0f vs near %.0f)" \
                                 % [absf(d1), absf(d2)])
+        # THE LAUNCH LAW: the hold dips the platform, the release boosts
+        g.phase = "serve"
+        g._spawn_serve_ball()
+        _check(g.pad_charge == 0.0 and g.pad_dip == 0.0,
+                "the fresh serve carries no charge")
+        g._held = 4                      # a held finger (the sim's hand)
+        for i in 30:
+                g.probe_step(1.0 / 60.0)
+        _check(g.pad_charge > 0.5,
+                "the hold writes the charge (%.2f)" % g.pad_charge)
+        _check(g.pad_dip > 6.0,
+                "the hold dips the platform (%.1f px)" % g.pad_dip)
+        var b0: Dictionary = g.balls[0]
+        g._held = -1
+        g._serve_release()
+        _check(g.phase == "play" and g.spd_boost > 1.2,
+                "the release launches POWERED (boost %.2f)" % g.spd_boost)
+        _check(bool(b0["stuck"]) == false, "the served ball flew")
+        _check(g.pad_dip == 0.0, "the spring release cleared the dip")
+        # the boost DECAYS back to the base speed (the owner's law)
+        var fast: float = g._ball_speed()
+        for i in int(g.BOOST_DECAY * 60.0) + 10:
+                g.probe_step(1.0 / 60.0)
+                if g.phase != "play":
+                        break
+        _check(g.spd_boost == 1.0,
+                "the boost decayed to the base (%.2f)" % g.spd_boost)
+        _check(g._ball_speed() < fast,
+                "the speed settled slower than the first aim (%.0f -> %.0f)" \
+                                % [fast, g._ball_speed()])
 
 # ------------------------------------------------------------- 5. physics
 func _t_physics() -> void:
@@ -319,7 +406,7 @@ func _t_physics() -> void:
                         bounced_wall = true
                 last_vx = float(g.balls[0]["dx"])
         _check(contained, "x5 speed: the ball never leaves the arena (the sweep holds)")
-        _check(g.phase == "play" or g.phase == "serve",
+        _check(g.phase == "play" or g.phase == "serve" or g.phase == "revive",
                 "the x5 run lives or dies HONESTLY (bottom loss, no freeze: %s)"
                                 % g.phase)
         g.spd_mult = 1.0
@@ -356,10 +443,11 @@ func _t_points_and_hearts() -> void:
         for k in g.ld["cells"].keys():
                 var c: Dictionary = g.ld["cells"][k]
                 if not bool(c["decor"]) and int(c["hp"]) >= 2 \
+                                and not bool(c.get("ice", false)) \
                                 and not c.has("dying"):
                         key = k
                         break
-        _check(key.x >= 0, "L12 wears fat bricks (hp >= 2)")
+        _check(key.x >= 0, "L12 wears fat bricks (hp >= 2, uniced)")
         var cell: Dictionary = g.ld["cells"][key]
         var hp0 := int(cell["hp"])
         var pts0: int = g.pts
@@ -376,6 +464,7 @@ func _t_points_and_hearts() -> void:
         for k in g.ld["cells"].keys():
                 var c: Dictionary = g.ld["cells"][k]
                 if not bool(c["decor"]) and int(c["hp"]) >= 2 \
+                                and not bool(c.get("ice", false)) \
                                 and not c.has("dying") and k != key:
                         mkey = k
                         break
@@ -583,7 +672,8 @@ func _t_caps_and_resets() -> void:
         _check(g.fire_t < g.FIRE_TIME and g.metal_t < g.METAL_TIME,
                 "the timers tick down (%.1f / %.1f)" % [g.fire_t, g.metal_t])
         g.phase = "serve"
-        # THE RESET LAW: a life loss wipes the effects
+        # THE RESET LAW: a life loss wipes the effects, the REVIVE door
+        # walks to the stall serve
         g.pad_mult = 2.0
         g.size_mult = 3.0
         g.spd_mult = 2.0
@@ -593,7 +683,10 @@ func _t_caps_and_resets() -> void:
                         and g.spd_mult == 1.0 and g.metal_t == 0.0 \
                         and g.fire_t == 0.0,
                 "the life loss resets EVERY effect")
-        _check(g.phase == "serve", "the life loss re-serves (same layout)")
+        _check(g.phase == "revive",
+                "the life loss enters the REVIVE (the paddle rebuilds)")
+        _run(g.REVIVE_TIME + 0.1)
+        _check(g.phase == "serve", "the revive lands into the stall serve")
         # THE RESET LAW: the level clear wipes them too (hearts stay)
         g.lives = 5
         g.pad_mult = 2.0
@@ -626,11 +719,13 @@ func _t_life_law() -> void:
         g.balls[0]["y"] = g.lose_y + 60.0
         g.balls[0]["dy"] = 400.0
         g.probe_step(1.0 / 60.0)
-        _check(g.lives == 2 and g.phase == "serve",
+        _check(g.lives == 2 and g.phase == "revive",
                 "the lost ball costs ONE heart (lives=%d, phase=%s)" \
                                 % [g.lives, g.phase])
-        _check(g.balls.size() == 1 and bool(g.balls[0]["stuck"]),
-                "the fresh serve waits on the paddle")
+        _run(g.REVIVE_TIME + 0.1)
+        _check(g.phase == "serve" and g.balls.size() == 1 \
+                        and bool(g.balls[0]["stuck"]),
+                "the flicker revive lands the stall serve (ball on pad)")
         # the clock KEPT its spent time (no reset - the tension law): the
         # value continues from where it was, never reborn
         _check(g.time_left < g.level_time - 0.5 \
@@ -653,6 +748,145 @@ func _t_life_law() -> void:
         g.probe_step(0.1)
         _check(g.phase == "over" and g.over,
                 "the last heart ends the run (the host banks it)")
+
+# ----------------------------------------- 10b. the contact + fire laws
+## THE 2-HIT BUG HUNT (the owner: "some of the 2-hits got broken from 1
+## hit, worth testing so you know why this happen") + THE FIRE x3 LAW +
+## THE OVERRIDE LAW - all deterministic, all live-physics where it counts
+func _t_contact_and_fire() -> void:
+        print("-- the contact law + the fire law + the override law")
+        _fresh(97)
+        g._new_level(12)
+        var key := Vector2i(-1, -1)
+        for k in g.ld["cells"].keys():
+                var c: Dictionary = g.ld["cells"][k]
+                if not bool(c["decor"]) and int(c["hp"]) == 2 \
+                                and not bool(c.get("ice", false)) \
+                                and not c.has("dying"):
+                        key = k
+                        break
+        _check(key.x >= 0,
+                "a fresh UNICED 2-hit brick exists (the rig's target)")
+        # ONE honest contact: the ball flies straight up into the body -
+        # the FIRST observed hp must be 1, never 0 (the old rig's seam
+        # re-damage broke 2-hit bodies in one contact)
+        g.phase = "serve"
+        g._spawn_serve_ball()
+        g.probe_launch()
+        var b: Dictionary = g.balls[0]
+        var cr: Rect2 = g._cell_rect(key)
+        b["x"] = cr.get_center().x
+        b["y"] = cr.end.y + float(b["r"]) + 2.0
+        b["dx"] = 0.0
+        b["dy"] = -g._ball_speed()       # UP into the body (the screen's
+                                        # down is +y - the launch climbs)
+        var saw := -1
+        for i in 40:
+                g.probe_step(1.0 / 60.0)
+                if g.ld["cells"].has(key):
+                        saw = int(g.ld["cells"][key]["hp"])
+                else:
+                        saw = 0          # the body broke and erased
+                if saw != 2:
+                        break
+                if g.phase != "play":
+                        g.phase = "serve"
+                        g._spawn_serve_ball()
+                        g.probe_launch()
+                        b = g.balls[0]
+                        b["x"] = cr.get_center().x
+                        b["y"] = cr.end.y + float(b["r"]) + 2.0
+                        b["dx"] = 0.0
+                        b["dy"] = -g._ball_speed()
+        _check(saw == 1,
+                "ONE contact takes the 2-hit body to hp 1 (saw %s)" % saw)
+        # THE FIRE x3 LAW: the burn is a NUMBER - a fat body loses
+        # exactly FIRE_DMG per pass (L24's band (1,7) wears hp >= 6)
+        g._new_level(24)
+        var fkey := Vector2i(-1, -1)
+        for k in g.ld["cells"].keys():
+                var c2: Dictionary = g.ld["cells"][k]
+                if not bool(c2["decor"]) and int(c2["hp"]) >= 6 \
+                                and not bool(c2.get("ice", false)) \
+                                and not c2.has("dying"):
+                        fkey = k
+                        break
+        if fkey.x >= 0:
+                var hp0 := int(g.ld["cells"][fkey]["hp"])
+                var pts0: int = g.pts
+                g.fire_t = 10.0
+                g.metal_t = 0.0
+                g.probe_damage(fkey, BB.FIRE_DMG, true)
+                _check(int(g.ld["cells"][fkey]["hp"]) == hp0 - BB.FIRE_DMG,
+                        "the fire pass deals exactly x%d (hp %d -> %d)" \
+                                        % [BB.FIRE_DMG, hp0,
+                                        int(g.ld["cells"][fkey]["hp"])])
+                _check(g.pts == pts0 + BB.FIRE_DMG,
+                        "the fire pays what it burns (+%d pts)" % BB.FIRE_DMG)
+                g.fire_t = 0.0
+        else:
+                _check(false, "a fat (hp>=6) brick exists for the fire read")
+        # THE OVERRIDE LAW: the newest state wins, the other burns out
+        g._apply_pow("metal")
+        _check(g.metal_t > 0.0 and g.fire_t == 0.0,
+                "the metal catch arms alone")
+        g._apply_pow("fire")
+        _check(g.fire_t > 0.0 and g.metal_t == 0.0,
+                "the fire catch REPLACED the metal (fire %.0fs, metal %.0fs)" \
+                                % [g.fire_t, g.metal_t])
+        g._apply_pow("metal")
+        _check(g.metal_t > 0.0 and g.fire_t == 0.0,
+                "the metal catch REPLACED the fire (fire %.0fs, metal %.0fs)" \
+                                % [g.fire_t, g.metal_t])
+        g.metal_t = 0.0
+        g.fire_t = 0.0
+
+# ------------------------------------------------- 11b. the calibration
+## THE PACE FIT (print-only; BB_CAL=1 turns the asserts on): the
+## auto-paddle plays real levels and the run reports the rig's pace
+## against the fair bank - the numbers the timer constants are fitted to
+func _t_calibration() -> void:
+        print("-- the calibration (the rig's pace vs the bank)")
+        for lv in [1, 3, 6, 10, 15]:
+                Box.reset_all()
+                Box.bump_counter("brickbreaker", "lore_start", 1)
+                Box.bump_counter("brickbreaker", "lore_end", 1)
+                await _scene_game()
+                g.probe_reset(2024 + lv)
+                g._new_level(lv)
+                g._tap_anywhere(Vector2.ZERO)
+                g._auto = true
+                var t := 0.0
+                var expiries := 0
+                var last_bank: float = g.level_time
+                var in_clear := false
+                while t < 60.0 * 14.0 and not g.over:
+                        g.probe_step(1.0 / 30.0)
+                        t += 1.0 / 30.0
+                        if g.phase == "serve":
+                                in_clear = false
+                                g.probe_launch()
+                        if g.phase == "clear" and not in_clear:
+                                in_clear = true
+                                break
+                        if g.time_left > g.level_time - 0.6 \
+                                        and t > 1.0 and last_bank \
+                                        == g.level_time:
+                                # the clock was reborn: a TIME UP happened
+                                last_bank = g.level_time
+                                expiries += 1
+                var brk := int(g.ld["total0"]) - int(g.ld["breakable"])
+                if g.phase == "clear" or in_clear:
+                        print("  CAL L%d: CLEARED in %.0fs sim (bank %.0fs, "
+                                        % [lv, t, g.level_time]
+                                        + "bricks %d, expiries %d, lives %d)"
+                                        % [brk, expiries, g.lives])
+                else:
+                        print("  CAL L%d: STALLED at %.0fs (bricks %d/%d, "
+                                        % [lv, t, brk,
+                                        int(g.ld["total0"])]
+                                        + "expiries %d, lives %d, over %s)"
+                                        % [expiries, g.lives, g.over])
 
 # ------------------------------------------------------- 11. the SIMULATION
 ## THE BEATABLE PROOF: the auto-paddle plays real levels start to finish

@@ -432,12 +432,19 @@ stay.
   keeps moving its demands; maybe collectables and a survival flavor on
   top. The lunar-lander energy, GOGABox-cut.
 - **farming-orders-like** (owner, v0.3.9-6 round) — FARMING, maybe some
-  3D and maybe some 2D (the owner left the dimension open on purpose):
+  3D and maybe some 2D (the owner left the dimension open on purpose:
+  "it could be 2D or 3D or both"):
   the loop works as MAKING ORDERS somehow - take the order, grow and
   raise the stock, FILL THE FARM MARKET and like that. The fields are
   yours, the orders drive the pace. (Cross-shelf note: the kitchen shelf
   below serves COOKED dishes - this one grows the RAW goods; the
   order-fulfilment STUDY note (Good Pizza Great Pizza) feeds both.)
+  THE LORE (owner, v0.3.9-8): the farm MANAGER is a BOY who manages
+  other businesses too - the cooking games and the rest of the shelf's
+  shops - while the PLAYABLE character is a GIRL, and she can be a
+  different girl from game to game (each game wears its own one). The
+  boy runs the empire from behind the counter; the girl works each
+  game's field.
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
@@ -491,6 +498,26 @@ stay.
   will be an idle restaurant under the study idle games" - tables earn
   while away, hire cooks/waiters, unlock recipes; the idle-games study
   shelf applies.
+
+### The pizza pair (the owner's v0.3.9-8 dump: two styles, one oven)
+- **turbo-pizza-like** — the TURBO PIZZA style: the fast-paced delivery
+  kitchen - orders pop on tickets, assemble each pizza to its ticket
+  against the clock, the oven queue burns, combos for chained fast
+  service, day targets and counter upgrades between days. The
+  arcade-pressure end of the pizza shelf. (Dedup note: cooking-fever-like
+  is the multi-station restaurant panic and cooking-dash-like is the
+  seat-cook-serve dash - this one is the SINGLE-FOCUS pizza assembly
+  under a stopwatch; the oven is the star.)
+- **good-pizza-great-pizza-like** — the GOOD PIZZA GREAT PIZZA style:
+  the SLOW cozy precision craft - customers order in fuzzy natural
+  words ("half pepperoni, half olives, light on the sauce, well done"),
+  YOU place every topping by hand on the halves/quarters, sauce-spread
+  and bake-timing matter, a karma/reputation meter remembers sloppy
+  work, the shop upgrades the counter and the rival pizzeria drives the
+  story chapters. (Dedup note: this is the PRECISION-PLACEMENT craft
+  game - neither the fever panic, nor the dash, nor the turbo
+  stopwatch; the study area already wears its GPGP study note and the
+  farming-orders entry shares its order-fulfilment taste.)
 
 ## The fighter shelf (the owner's v0.3.3-p5 dump: three swords, zero guns)
 - **shadow-fight-like** — Shadow Fight 1v1: silhouette fighters, the

@@ -684,18 +684,20 @@ func _t_registry() -> int:
                 ok += _check(bl["carriers"].size() == want_c,
                         "seed %d L%d: the carriers wear the 2%% law (%d)"
                                         % [seed_v, lv, bl["carriers"].size()])
-                # THE FAIR TIMER: inside the honest band
+                # THE FAIR TIMER: inside the honest band (v0.3.9-8: the
+                # small-brick work wears the 40..540 band)
                 var tt: float = BB.timer_for(int(bl["breakable"]),
                                 int(bl["hits"]), 1852.0, 800.0, 560.0, lv,
                                 false)
-                ok += _check(tt >= 30.0 and tt <= 300.0,
+                ok += _check(tt >= 40.0 and tt <= 540.0,
                         "seed %d L%d: the timer sits in the fair band (%.0fs)"
                                         % [seed_v, lv, tt])
         ok += _check(arch_seen.size() >= 3,
                 "the archetypes actually rotate (%s)" % [arch_seen.keys()])
         ok += _check(BB.hp_band(1) == Vector2i(1, 1) \
-                        and BB.hp_band(35) == Vector2i(3, 10),
-                "the hp band climbs (1 at L1, up to 10 late)")
+                        and BB.hp_band(35) == Vector2i(2, 8),
+                "the hp band climbs (1 at L1, up to 8 late - the " \
+                        + "small-brick work stays human)")
         ok += _check(absf(float(BB.ice_chance(1))) < 0.0001 \
                         and float(BB.ice_chance(30)) > 0.15,
                 "the ice climbs after L3 and caps by L30")

@@ -57,9 +57,18 @@ func _drag(from: Vector2, to: Vector2) -> void:
 func _ready() -> void:
         Box.reset_all()
         Box.bump_counter("brickbreaker", "lore_start", 1)
+        # THE BARE-RIG LAW (agents law 11): a bare boot skips the menu
+        # governor - without the ScaleRule the 1920x1080 window keeps a
+        # PORTRAIT canvas and the landscape court films in a column
         var BB: GDScript = load("res://game/games/brickbreaker/brickbreaker.gd")
         g = BB.new()
         g.game_id = "brickbreaker"
+        g.start_orientation = "landscape"
+        # the project's default window is PORTRAIT (1080x1920) and the
+        # WM-less Xvfb ignores set_size - seat the LANDSCAPE design canvas
+        # directly (what ScaleRule.apply would compute for a real
+        # landscape window)
+        get_window().content_scale_size = Vector2i(1920, 1080)
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame

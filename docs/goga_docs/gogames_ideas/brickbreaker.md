@@ -126,3 +126,60 @@ designed, random noise reads broken):
   tunnel shells) - they never seal the play field (floodfill-verified)
 - every level is validated: breakable count > 0, the ball can REACH every
   breakable brick (open-cell floodfill), the serve lane is clear
+
+## THE v0.3.9-8 REPAIRS (the owner's first test-report round)
+
+The owner played v039-7 and filed the report; this round wears all of it.
+
+1. THE SMALL BRICK (the scale law): the grid is native-small now -
+   cols 25..43, rows 11..19, a L1 brick ~47px wide (the old one was
+   ~205px = 4.4x bigger) with a MASS CAP that thins any level past 260
+   bricks (the worn-wall sprinkle). "3-5 times smaller, so you can put
+   way more bricks."
+2. THE WALL LAW: every level seeds its own ARENA WIDTH FRACTION
+   (0.56..1.0 of the view, a climb + a wobble) - the walls MOVE per
+   level, small courts and big courts, the paddle and the frame follow.
+3. THE LAUNCH LAW: the serve WAITS - the ball rides the paddle; holding
+   dips the platform and charges (0.75s to full); the release smacks
+   the ball up to +55% faster and the boost decays to base over ~2.4s.
+   A quick tap is a plain launch.
+4. THE REVIVE LAW: a life lost SHATTERS the platform (its own crumb
+   burst), the flicker rebuilds it (~0.9s), then the stall serve waits
+   for the launch. (hearts never reset)
+5. THE CONTACT LAW (the 2-hit bug): the old rig could penetrate TWO
+   bricks in a seam, bounce out of one, and the next substep re-damage
+   the other - a 2-hit body died to one contact. The cure: a per-ball
+   damage cooldown (45ms) + the bounce resolves against the DEEPEST
+   penetration cell. The qa wears a live reproduction rig now.
+6. THE FIRE LAW: the burn is a NUMBER - x3 damage per brick per pass
+   (the burned map: one burn per brick per pass), NOT the old
+   melt-everything full burn.
+7. THE OVERRIDE LAW: fire and metal are ONE state - the newest catch
+   wins, the other burns out on the spot.
+8. THE SURPRISE LAW: carrier bricks (powerups AND coins) look NORMAL -
+   no circle, no shine. The drops and the pops are the reveal.
+9. THE COIN DROP: the coin pops out of its brick as a proper-scale
+   golden body, falls with gravity and spin; the paddle's catch is the
+   sparkle; the grant rode the break (the economy never changes).
+10. THE SKY'S PURE GRADIENT: the sky theme draws NO grid lines
+    (the shader's line_str uniform; the other flat pages keep a
+    whisper).
+11. THE HONEST ROUNDED BRICK: the rounded-rect helper is ONE polygon
+    now (the old rect+circles composite double-blended under alpha and
+    read as square edges), and the fat shadow is rounded with it.
+12. THE BREAK FADE: the dying brick SHRINKS into its center while it
+    fades (the old one zoomed IN - the owner: "it should get smaller").
+13. THE SCREEN-SPACE GATE: the gate lives in the HUD CanvasLayer now -
+    the old gate anchored to a game-root Control whose rect some hosts
+    never size, and the label landed off-screen bottom-right.
+14. THE GENERATOR, retuned for the small grid: the running-bond wall
+    (was a solid slab), 2x2 checker, the thinned arch/rain/towers, two
+    NEW archetypes (the BUBBLES polka clusters, the CROWN with three
+    spikes), the hp band climbs slower (1-1 .. 2-8, the 10-hit bodies
+    still exist late), the fair timer wears work units
+    (8 + 0.45/brick + 0.60/hit, the trip scale keeps the slow-ball
+    fairness, mercy 1.40/1.20/1.0, clamp 40..540) - calibrated against
+    the auto-paddle sim at the new scale.
+15. THE DOT EATER'S COIN (the pacman round): the GogaCoin after each 3
+    mazes was placed and eaten but NEVER DRAWN - it wears the real
+    coin icon now (the gold pulse like the rush orb).
