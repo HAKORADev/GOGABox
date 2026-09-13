@@ -65,9 +65,11 @@ func _ready() -> void:
         await get_tree().process_frame
         await get_tree().create_timer(0.6).timeout
         await _snap("01_gate")
-        # the gate tap -> the intro
+        # the gate tap -> the intro (the fade frame is SET deterministically
+        # - the Xvfb software frames are too slow to catch it live)
         await _tap(Vector2(960, 540))
-        await get_tree().create_timer(0.12).timeout
+        g.phase = "intro"
+        g.intro_t = 0.16
         await _snap("02_intro_rows")
         await get_tree().create_timer(1.6).timeout
         await _snap("03_serve")
@@ -108,6 +110,14 @@ func _ready() -> void:
         g._apply_theme()
         await get_tree().create_timer(0.4).timeout
         await _snap("09_neon")
+        Box.buy_item("brickbreaker", "theme", "sky", 0)
         Box.equip_item("brickbreaker", "theme", "sky")
+        g._apply_theme()
+        # THE SHOP LAW: the sheet, the coin rows, the gray-out
+        g._shop_open()
+        await get_tree().create_timer(0.7).timeout
+        await _snap("10_shop")
+        g.sheet_pop()
+        await get_tree().create_timer(0.4).timeout
         print("FILM DONE: %d shots" % shots)
         get_tree().quit(0)
