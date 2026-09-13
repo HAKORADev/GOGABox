@@ -99,6 +99,7 @@ func _ready() -> void:
         _t_caps_and_resets()
         _t_life_law()
         await _t_simulation()
+        await _t_powered_soak()
         print("=== qa_v0397_brick: %s (%d fails) ===" \
                         % ["ALL PASS" if fails == 0 else "FAILED", fails])
         get_tree().quit(0 if fails == 0 else 1)
@@ -696,3 +697,69 @@ func _t_simulation() -> void:
                 "the score wears the level law (score=%d)" % g.score)
         _check(not g.over or g.lives <= 0,
                 "the run survives the early ladder (lives=%d)" % g.lives)
+
+# -------------------------------------------------- 12. the powered soak
+## THE LIVE ECONOMY: the run OWNS the whole shelf (the shop law's other
+## face) - capsules fall, the paddle catches, the bundles land, the
+## multiball splits, the 15s timers burn. Nothing here may hang, crash
+## or cap-bust in live play.
+func _t_powered_soak() -> void:
+        print("-- the powered soak (drops live, chips hot)")
+        Box.reset_all()
+        Box.bump_counter("brickbreaker", "lore_start", 1)
+        Box.bump_counter("brickbreaker", "lore_end", 1)
+        Box.earn(5000)
+        var bought := true
+        for id in BB.POWS.keys():
+                if not Box.buy_item("brickbreaker", "powerup", String(id),
+                                int(BB.POWS[id]["price"])):
+                        bought = false
+        _check(bought, "the whole shelf bought (6 rows)")
+        await _scene_game()
+        g.probe_reset(777)
+        g._tap_anywhere(Vector2.ZERO)
+        g._auto = true
+        var drops_frames := 0
+        var multi_seen := false
+        var metal_ran := false
+        var fire_ran := false
+        var pad_moved := false
+        var t := 0.0
+        var in_clear := false
+        var cleared := 0
+        while t < 60.0 * 12.0 and cleared < 3 and not g.over:
+                g.probe_step(1.0 / 30.0)
+                t += 1.0 / 30.0
+                if g.phase == "serve":
+                        in_clear = false
+                        g.probe_launch()
+                if g.phase == "clear" and not in_clear:
+                        in_clear = true
+                        cleared += 1
+                if g.drops.size() > 0:
+                        drops_frames += 1
+                if g.balls.size() >= 2:
+                        multi_seen = true
+                if g.metal_t > 0.0:
+                        metal_ran = true
+                if g.fire_t > 0.0:
+                        fire_ran = true
+                if absf(g.pad_mult - 1.0) > 0.01:
+                        pad_moved = true
+                # the caps hold UNDER FIRE (the chips never bust)
+                if g.spd_mult > g.SPEED_MAX + 0.001 \
+                                or g.size_mult > g.SIZE_MAX + 0.001:
+                        _check(false, "A CAP BUSTED LIVE (spd %.2f size %.2f)"
+                                        % [g.spd_mult, g.size_mult])
+                        return
+        _check(drops_frames > 0,
+                "capsules fell in live play (%d frames)" % drops_frames)
+        _check(multi_seen or pad_moved or metal_ran or fire_ran,
+                "a catch LANDED (multi=%s pad=%s metal=%s fire=%s)" \
+                                % [multi_seen, pad_moved, metal_ran,
+                                fire_ran])
+        _check(cleared >= 1,
+                "the powered run still clears (%d cleared, lives=%d)" \
+                                % [cleared, g.lives])
+        _check(not g.over or g.lives <= 0,
+                "the powered soak survives (lives=%d)" % g.lives)

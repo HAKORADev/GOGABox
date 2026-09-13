@@ -1264,6 +1264,21 @@ func _auto_think(delta: float) -> void:
                         by = float(b["y"])
                         best = b
         if best.is_empty():
+                # no ball coming down: chase the lowest capsule instead
+                # (the catch instinct - the powered soak needs it)
+                var low: Dictionary = {}
+                var lowy := -1.0
+                for d in drops:
+                        if float(d["y"]) > lowy:
+                                lowy = float(d["y"])
+                                low = d
+                if low.is_empty():
+                        return
+                pad_target = clampf(float(low["x"]), arena.position.x,
+                                arena.end.x)
+                var step2 := 2300.0 * us * delta
+                pad_target = clampf(pad_target, pad_x - step2,
+                                pad_x + step2)
                 return
         # the landing prediction: fold the straight path off the walls
         var bx := float(best["x"])
