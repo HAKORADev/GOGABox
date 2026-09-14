@@ -612,6 +612,17 @@ func _exit_tree() -> void:
                 _cc_sync()    # THE PURSE LAW: no exit without a checkpoint
         get_tree().paused = false     # THE UNFREEZE LAW
 
+## ============================================== THE CHARACTER (v0.3.9-13)
+## COSMIC SHADOW - the first game where the shadow speaks. The box's
+## cast rule, pinned here once: the shadow IS whatever body it falls
+## into, and its one power is exactly that - to BE whatever the next
+## world needs (the fighting rings, the shooting skies, this spud). The
+## lore law: a story at the VERY FIRST START, a story at the VERY FIRST
+## DEATH (the invaders/pacman way), the shared box story card.
+const CS_SHADOW_LORE := "A shadow fell into this arena before I did. Or maybe I AM the shadow - even I stopped keeping track.\n\nListen, because I will not say it twice: I am not a potato. I am what wears the potato. COSMIC SHADOW, they will call me - the thing that lands in a body and becomes it, completely, until the box moves me along. A square once (the little escaper knows me). A fighter in a ring of sticks. A gunner in a sky of birds. Shapes are just coats.\n\nThis time the coat is a SPUD. Round. Armed. Surrounded. And the power stays the same under every coat: I can be WHATEVER the next world needs. That is the whole trick. That is the whole curse.\n\nThe SUPERVISOR's finger points, and this body pulls the trigger. I do not mind. Every world I wear teaches me one more way to survive the box.\n\nFine, spud. Let us wear you well."
+const CS_SHADOW_LORE_END := "The coat broke.\n\nThe spud is done - and I am not. I am never done. That is the point of me. I will slip out of this one the way I slipped out of the ring, the sky, the square. The box keeps a shadow on file; it re-casts the role.\n\nA good body, this one. Small, angry, well-armed. If you come back here, supervisor, I will be wearing it again. Or wearing you. I have not decided.\n\nThe shadow moves on."
+const CS_SHADOW_INK := Color("b04fd8")
+
 func _goga_setup() -> void:
         meta = CSMeta.load_meta()
         # v0.3.8-2 THE PURSE LAW: the wallet opens where the last session left it
@@ -641,7 +652,14 @@ func _goga_setup() -> void:
         # run still reads (slots, second wind, the lab) - bought in the shop.
         var theme: Dictionary = CSData.THEMES[theme_id]
         Jukebox.music(theme["night_music"] if night else theme["day_music"])
-        _optionals_open()
+        # THE LORE LAW (v0.3.9-13): the shadow speaks first - once ever
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("COSMIC SHADOW", CS_SHADOW_LORE,
+                                func(): _optionals_open(), "CONTINUE",
+                                CS_SHADOW_INK)
+        else:
+                _optionals_open()
 
 # ------------------------------------------------------------------ ground
 func _build_ground() -> void:
@@ -4847,7 +4865,15 @@ func _die() -> void:
                 achievement_count("cs_merge", run_merges)
         achievement_count("cs_runs", 1)
         check_achievements()
-        _finish_cs(gained)
+        # THE LORE LAW (v0.3.9-13): the FIRST death wears the shadow's
+        # goodbye (the once-ever counter; every later death banks straight)
+        if Box.counter(game_id, "lore_end") == 0:
+                Box.bump_counter(game_id, "lore_end", 1)
+                box_story_show("THE SHADOW SLIPS", CS_SHADOW_LORE_END,
+                                func(): _finish_cs(gained), "CONTINUE",
+                                CS_SHADOW_INK)
+        else:
+                _finish_cs(gained)
 
 func _finish_cs(gained_levels: int) -> void:
         var msg := "wave %d  -  %d kills  -  the vault holds %d CC" % [run_wave - 1, run_kills, run_ccoins]

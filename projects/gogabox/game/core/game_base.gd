@@ -416,3 +416,132 @@ func _process(delta: float) -> void:
         if _ach_clock >= 3.0:
                 _ach_clock = 0.0
                 check_achievements()
+
+# ============================================== THE BOX STORY (v0.3.9-13)
+## THE CHARACTERS' POP-UP DIALOGUE - the one shared lore card every new
+## character rides (the owner: "make each character in their games to
+## have a proper Pop-up dialogue/text design with proper look with
+## proper timing and proper text lines so it appears in other games and
+## feel....something alive!"). The invaders/pacman story sheet, grown a
+## face: the character name wears ITS OWN color, a name bar seats under
+## it, and the words TYPE IN (the typewriter beat - alive, skippable).
+## THE STORY SHEET LAW (law 25) shape (a): the raw Arc.sheet + THE
+## TRACKED PAIR freed by our own closer - it never joins the sheet
+## stack, the back button never eats it. First-start / first-end hooks
+## ride `Box.counter` + `Box.bump_counter` (the once-ever law).
+
+var _box_story_pair: Array = []      # the exact dim+card pair
+var _box_story_paused := false       # THIS story paused the tree
+var _box_story_tween: Tween = null   # the typewriter's hand
+var _box_story_typing := false
+
+func box_story_show(title: String, msg: String, after := Callable(),
+        btn := "CONTINUE", tint := Color(1.0, 0.82, 0.30)) -> void:
+        box_story_down()
+        paused = true
+        get_tree().paused = true
+        _box_story_paused = true
+        var root := _overlay_root_ref()
+        var sheet := Arc.sheet(root, 0.0)
+        var kids := root.get_children()
+        var sdim: Control = kids[kids.size() - 2]
+        var scc: Control = kids[kids.size() - 1]
+        sdim.process_mode = Node.PROCESS_MODE_ALWAYS
+        scc.process_mode = Node.PROCESS_MODE_ALWAYS
+        _box_story_pair = [sdim, scc]
+        # THE NAME PLATE: the character's own color carries the card
+        var t := Arc.label(title, 34, tint)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var bar := ColorRect.new()
+        bar.custom_minimum_size = Vector2(220, 5)
+        bar.color = Color(tint, 0.75)
+        bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(bar)
+        # THE WORDS: the scroll body, then the typewriter beat
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.44, 240.0,
+                        470.0))
+        var story := Arc.label(msg, 22, Arc.INK, false)
+        story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        story.custom_minimum_size = Vector2(540, 0)
+        story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(story)
+        sheet.add_child(sc)
+        sheet.add_child(Arc.button(btn, Vector2(560, 78), 28, Arc.GOOD,
+                        func(): _box_story_btn(after)))
+        for b in Arc._buttons_in(sc):
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+        # the typewriter (runs THROUGH the pause - TWEEN_PAUSE_PROCESS):
+        # ~55 glyphs a second, the beat the characters talk at
+        story.visible_characters = 0
+        var total := msg.length()
+        _box_story_typing = true
+        _box_story_tween = story.create_tween()
+        _box_story_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+        _box_story_tween.tween_property(story, "visible_characters",
+                        total, maxf(0.6, total / 55.0))
+        _box_story_tween.finished.connect(func(): _box_story_typing = false)
+
+## the story button: first press hears the REST of the line (skip the
+## typing), the next press walks the story on
+func _box_story_btn(after: Callable) -> void:
+        if _box_story_typing:
+                _box_story_typing = false
+                if _box_story_tween != null and _box_story_tween.is_valid():
+                        _box_story_tween.kill()
+                for n in _box_story_pair:
+                        if n != null and is_instance_valid(n):
+                                for lbl in (n as Control).find_children("*",
+                                                "Label", true, false):
+                                        if lbl is Label and (lbl as Label) \
+                                                        .visible_characters >= 0:
+                                                (lbl as Label) \
+                                                                .visible_characters = -1
+                return
+        box_story_end(after)
+
+func box_story_end(after: Callable) -> void:
+        box_story_down()
+        get_tree().paused = false
+        paused = false
+        _box_story_paused = false
+        if after.is_valid():
+                after.call()
+
+func box_story_down() -> void:
+        if _box_story_tween != null and _box_story_tween.is_valid():
+                _box_story_tween.kill()
+        _box_story_tween = null
+        _box_story_typing = false
+        for n in _box_story_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _box_story_pair = []
+
+## THE SESSION SEAT (the flow rig's law, v0.3.9-13): is a character
+## story card open right now? - the shared card, or the legacy
+## invaders/pacman pair (those games own their own card).
+func box_story_open() -> bool:
+        if not _box_story_pair.is_empty():
+                return true
+        return "_story_pair" in self and not (_story_pair_ref() as Array) \
+                        .is_empty()
+
+## the session's hand: whatever character story is open ends NOW - the
+## quit path calls it so a first-boot lore (the player quits instead of
+## tapping through) never carries the tree pause into the next launch
+func box_story_dismiss() -> void:
+        if not _box_story_pair.is_empty():
+                box_story_end(Callable())
+                return
+        if "_story_pair" in self and has_method("story_down"):
+                call("story_down")
+
+func _story_pair_ref() -> Array:
+        var v: Variant = get("_story_pair")
+        return v if v is Array else []

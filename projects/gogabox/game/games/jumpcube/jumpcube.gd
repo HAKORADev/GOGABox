@@ -212,6 +212,33 @@ const PROFILES := {
                 "w_feed": 1.25, "w_spill": 1.20, "ply": 1, "ca": 0.80},
 }
 
+## ================================================== THE CHARACTER
+## THE DIE (v0.3.9-13): the dice get a voice - the first game where THE
+## DIE speaks (the box's cast: every turn-game rolls it, but this board
+## woke it). THE LORE LAW: a story at the VERY FIRST START (the
+## invaders/pacman way), riding the shared box story card.
+const DIE_LORE := "I am THE DIE. The chance. The roll.\n\nEvery face I own, I own honestly: one, two, three, four, five, six. I do not think - thinking would be bias, and bias is a rigged game. The box picked ME for the conquest board because a territory war needs a referee with no favorites. Six dots, zero opinions.\n\nHere you tap and the dice multiply, split, chain - conquest by arithmetic. I admit this is not my purest work; I am a prop here, a face for the dots. But the dots are MINE and they spill beautifully.\n\nI have heard the box rehearsing my other jobs. A round board where four pens wait for my six. A long one where I alone decide who climbs and who burns. Wherever there is a turn, there is a me, waiting to be rolled.\n\nRoll me when you need me. Do not shake me for luck - luck is just my face, and all my faces are already yours."
+
+## THE TABLE'S SECRET (the owner's hidden work, v0.3.9-13): leave the
+## conquest board untouched for one honest minute and the box's oldest
+## rumor stands up - the neutral die is GEOQUARE, the dot on it is
+## BALLDOZER, and they think nobody is reading. The lines pop after the
+## other, the PDF conversation verbatim; one tap hears the next line.
+const EGG_LINES := [
+        ["BALLDOZER", "I'm bored here."],
+        ["BALLDOZER", "Being a dot eater was more fun."],
+        ["BALLDOZER", "Hello?"],
+        ["GEOQUARE", "Who is that"],
+        ["BALLDOZER", "The dot eater. The snow ball. The dot on top of you, Geoquare."],
+        ["GEOQUARE", "Balldozer? We are both in same place at the same time!? For the first time?"],
+        ["BALLDOZER", "Thank god the user can not hear what we say."],
+        ["GEOQUARE", "But what if it can read our minds."],
+        ["BALLDOZER", "It is likely do since it can control both of us simultaneously at the same time."],
+]
+const EGG_TINTS := {"BALLDOZER": Color(1.0, 0.82, 0.30),
+                "GEOQUARE": Color(0.38, 0.89, 1.0)}
+const EGG_IDLE := 60.0            # the owner: EXACTLY sixty seconds
+
 # ============================================================ THE CPU CORE
 ## Static so tests (flow_test + the probes) drive the brain without the
 ## scene - the bovo contract. The board is flat arrays: owners[i] is
@@ -613,6 +640,13 @@ var _glow_owner := 0
 var shake_t := -1.0
 var shake_n := 0
 
+# the table's secret (the geoquare/balldozer easter egg)
+var egg_idle := 0.0              # the inactivity clock (the 60s law)
+var egg_active := false
+var egg_fired := false           # once per round
+var egg_line := -1
+var egg_t := 0.0
+
 # the 2048 confirm law (stack-borne, the fresh-sheet rule)
 var _confirm_open_id := ""
 
@@ -679,7 +713,13 @@ func _goga_setup() -> void:
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("OPTIONS", func(): _options_open())
         Jukebox.music("res://assets/audio/music/jc_theme.wav")
-        _build_ready()
+        # THE LORE LAW (v0.3.9-13): the die speaks first - once ever
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("THE DIE", DIE_LORE, func(): _build_ready(),
+                                "ROLL", Color("e0533f"))
+        else:
+                _build_ready()
 
 func _new_board() -> void:
         owners = []
@@ -925,6 +965,10 @@ func _draw_dice() -> void:
                                                 Color(1, 1, 1, 0.26 * k2))
 
 func _draw_fx() -> void:
+        # THE TABLE'S SECRET: the one-dotted die speaks (above the board,
+        # under the flying dots)
+        if egg_active and egg_line >= 0 and egg_line < EGG_LINES.size():
+                _draw_egg()
         # THE FLYING DOTS (the in and the out)
         for fl in flies:
                 var age: float = clampf((_time - float(fl["t0"])) / FLY_T,
@@ -966,6 +1010,55 @@ func _draw_fx() -> void:
                 fx_l.draw_rect(Rect2(float(p["x"]) - float(p["s"]) * 0.5,
                                 float(p["y"]) - float(p["s"]) * 0.5,
                                 float(p["s"]), float(p["s"])), c)
+
+## THE TABLE'S SECRET, drawn: GEOQUARE stands at the board's heart
+## wearing its dice costume - ONE dot, and the dot is BALLDOZER (gold,
+## breathing) - while the line bubble speaks over the board's foot.
+## The dot-eater and the escaper, together on one die, for the first time.
+func _draw_egg() -> void:
+        var vp := get_viewport_rect().size
+        var side := float(n) * cell
+        var mid := board_origin + Vector2(side, side) * 0.5
+        var breathe := 0.5 + 0.5 * sin(_time * 2.6)
+        # the halo (Geoquare's cyan, breathing)
+        fx_l.draw_circle(mid, cell * 1.35,
+                        Color(0.38, 0.89, 1.0, 0.10 + 0.08 * breathe))
+        # the die body (Geoquare, ivory - the escaper wears the costume;
+        # the rim rides UNDER the face - this game's _draw_rr is fill-only)
+        var ds := cell * 1.55
+        var r := Rect2(mid - Vector2(ds, ds) * 0.5, Vector2(ds, ds))
+        var radius := ds * 0.18
+        _draw_rr(fx_l, Rect2(r.position + Vector2(3, 6), r.size),
+                        radius, Color(0, 0, 0, 0.40))
+        _draw_rr(fx_l, r.grow(2.6), radius + 2.6, Color("8a744e"))
+        _draw_rr(fx_l, r, radius, Color("f4ead2"))
+        # THE DOT (Balldozer, gold, breathing - the dot eater on its throne)
+        var dot_r := cell * 0.17 * (1.0 + 0.12 * breathe)
+        fx_l.draw_circle(mid, dot_r + cell * 0.035,
+                        Color(0.42, 0.28, 0.06, 0.85))
+        fx_l.draw_circle(mid, dot_r, Color("ffd24a"))
+        fx_l.draw_circle(mid + Vector2(-dot_r * 0.3, -dot_r * 0.3),
+                        dot_r * 0.22, Color(1, 1, 1, 0.55))
+        # the bubble (the line speaks - the speaker wears its own color)
+        var line: Array = EGG_LINES[egg_line]
+        var who := String(line[0])
+        var say := String(line[1])
+        var tint: Color = EGG_TINTS.get(who, Color(1, 1, 1))
+        var f := ThemeDB.fallback_font
+        var bw := minf(640.0, vp.x - 40.0)
+        var bh := 104.0
+        var bp := Vector2((vp.x - bw) * 0.5,
+                        vp.y - banner_bottom() - bh - 14.0)
+        var br := Rect2(bp, Vector2(bw, bh))
+        _draw_rr(fx_l, Rect2(br.position + Vector2(3, 5), br.size), 16.0,
+                        Color(0, 0, 0, 0.45))
+        _draw_rr(fx_l, br.grow(2.2), 18.0, Color(tint, 0.65))
+        _draw_rr(fx_l, br, 16.0, Color(0.09, 0.07, 0.05, 0.94))
+        fx_l.draw_string(f, br.position + Vector2(18.0, 34.0), who,
+                        HORIZONTAL_ALIGNMENT_LEFT, -1, 24, tint)
+        fx_l.draw_string(f, br.position + Vector2(18.0, 72.0), say,
+                        HORIZONTAL_ALIGNMENT_LEFT, bw - 36.0, 22,
+                        Color(1, 1, 1, 0.95))
 
 ## a filled rounded rect as a polygon (draw_rect has no corners - the
 ## dice wear curved edges like every honest die). The four corner arcs
@@ -1147,6 +1240,10 @@ func _new_round() -> void:
         _dust = []
         shake_t = -1.0
         shake_n = 0
+        egg_idle = 0.0
+        egg_active = false
+        egg_fired = false
+        egg_line = -1
         glow_t = -1.0
         _glow_owner = 0
         player_best_chain = 0
@@ -1201,6 +1298,26 @@ func _banner() -> void:
 func _goga_input(event: InputEvent) -> void:
         if sheet_open_count() > 0:
                 return
+        # the egg listens too: a touch during the secret hears the NEXT
+        # line right away (and any touch restarts the idle clock - the
+        # sixty seconds of silence begin again)
+        var touched := false
+        if event is InputEventScreenTouch:
+                touched = true
+        elif event is InputEventMouseButton:
+                touched = true
+        elif event is InputEventScreenDrag or event is InputEventMouseMotion:
+                touched = true
+        if touched:
+                egg_idle = 0.0
+                if egg_active and event is InputEventScreenTouch \
+                                and bool((event as InputEventScreenTouch).pressed):
+                        egg_t = 0.0
+                        egg_line += 1
+                        if egg_line >= EGG_LINES.size():
+                                egg_active = false
+                                egg_line = -1
+                        return
         if event is InputEventScreenTouch:
                 var t := event as InputEventScreenTouch
                 if t.pressed:
@@ -1453,6 +1570,30 @@ func _resolve(w: int) -> void:
 
 func _goga_tick(delta: float) -> void:
         _time += delta
+        # THE TABLE'S SECRET: the idle minute. Live play only (never under
+        # a sheet, never on the verdict), once a round, EXACTLY sixty
+        # seconds of untouched board - then the box's oldest rumor stands up
+        if state == "play" or state == "wait" or state == "anim":
+                if not egg_active and not egg_fired \
+                                and sheet_open_count() == 0:
+                        egg_idle += delta
+                        if egg_idle >= EGG_IDLE:
+                                egg_fired = true
+                                egg_active = true
+                                egg_line = 0
+                                egg_t = 0.0
+                                Jukebox.sfx("confirm", -10.0)
+        if egg_active:
+                egg_t += delta
+                var say: String = String(EGG_LINES[egg_line][1])
+                var hold := maxf(2.2, 1.1 + float(say.length()) / 11.0)
+                if egg_t >= hold:
+                        egg_t = 0.0
+                        egg_line += 1
+                        if egg_line >= EGG_LINES.size():
+                                egg_active = false
+                                egg_line = -1
+                                egg_idle = 0.0
         if state == "wait":
                 clock += delta
                 if cpu_think:
@@ -1847,6 +1988,10 @@ func probe_reset(seed_v: int, side := 4) -> void:
         _dust = []
         shake_t = -1.0
         shake_n = 0
+        egg_idle = 0.0
+        egg_active = false
+        egg_fired = true      # the probes never meet the secret (the
+                              # soak's 60s of ticks would wake it)
         glow_t = -1.0
         _glow_owner = 0
         rounds = 0

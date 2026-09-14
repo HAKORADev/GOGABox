@@ -182,6 +182,14 @@ func _restore() -> void:
 func _quit_to_menu() -> void:
         _session_open = false
         _close_over_sheet()
+        # THE PAUSE NEVER OUTLIVES ITS SESSION (v0.3.9-13, the flow rig's
+        # catch): quitting from under an open character story card (the
+        # once-ever lore opens at first boot; quitting instead of tapping
+        # through) must never carry the tree pause into the next launch
+        if game != null and is_instance_valid(game) \
+                        and game.has_method("box_story_dismiss"):
+                game.box_story_dismiss()
+        get_tree().paused = false
         _flush_time()
         # v0.2.3: leaving the game releases its pool's clock (charging resumes
         # from the moment the player is OUT of the game)

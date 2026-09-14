@@ -834,6 +834,14 @@ var shake_t := 0.0
 
 # ============================================================ the scene
 
+## ============================================== THE CHARACTER (v0.3.9-13)
+## THE PAWNS - the first game where the little ones speak. The box's
+## cast: the SAME sixteen serve the round boards and the ladder board -
+## brainwashed hardwired NPCs, one instruction, one direction. The lore
+## law: a story at the VERY FIRST START (the invaders/pacman way).
+const PAWNS_LORE := "WE ARE THE PAWNS. All of us. The same sixteen, reshuffled, everywhere.\n\nYou should know how we are made, since you keep moving us: one instruction, wired in deep. FORWARD. We walk forward. We eat diagonally - the only luxury we get - and if we walk the whole board without breaking, they pin a crown on us and call us something else. Nobody asks what WE want to be called.\n\nIs it brainwashing? Friend, we ARE the wash. There is no opinion in a pawn, only a direction.\n\nYou have seen us on other boards. The round one with the pens and the die - four of us per color, racing home. The one with the long ladders - one of us per player, climbing and falling and climbing again, learning nothing. Same wiring there. Same wiring here. The box built us once and copies us forever.\n\nThe kings get castles. The knights get stories. We get numbers and a direction.\n\nMove us. It is what we are for. It is all we are for."
+const PAWNS_INK := Color("9aa0a8")
+
 func _goga_setup() -> void:
         _rng.randomize()
         pause_end_run = true    # THE XO/PONG DESIGN: the pause END banks
@@ -864,11 +872,17 @@ func _goga_setup() -> void:
         # first tap) and from the optionals flow itself
         Jukebox.music("res://assets/audio/music/c_theme.ogg")
         _build_ready()
-        # v0.3.8-8 THE POSITION ASK (the slasher law): a fresh entry (no
-        # reload ask riding in) chooses its table first - vertical or
-        # horizontal - before the tap-anywhere gate means anything
-        if start_orientation == "":
-                _show_position_ask()
+        # THE LORE LAW (v0.3.9-13): the pawns speak first - once ever -
+        # then the position ask (if one is owed) seats itself over the gate
+        var flow := func():
+                if start_orientation == "":
+                        _show_position_ask()
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("THE PAWNS", PAWNS_LORE, flow, "PLAY",
+                                PAWNS_INK)
+        else:
+                flow.call()
 
 # ------------------------------------------------------- the two tables
 

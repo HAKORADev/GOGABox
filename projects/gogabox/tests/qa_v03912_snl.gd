@@ -49,11 +49,13 @@ func _drain(max_ticks := 900) -> void:
         g.probe_drain(max_ticks)
 
 ## the gate tap -> the mode sheet -> the pick (the real start flow)
+## the v0.3.9-13 flow: the ask opens the game (it is already up at
+## setup), the pick seats the TAP ANYWHERE gate, the gate tap starts
 func _start(players: int) -> void:
-        g._gate_down()
-        g._mode_sheet()
-        await get_tree().process_frame
         g._pick_mode(players)
+        await get_tree().process_frame
+        g._gate_down()
+        g._new_round()
         await get_tree().process_frame
 
 ## roll for the user and settle the theater
@@ -355,10 +357,11 @@ func _t_shelf_law() -> int:
         await _scene_game(2)
         g._shop_open()
         await get_tree().process_frame
-        # the sheet's labels in order: TOKEN SKINS above THEMES
+        # the sheet's labels in order: TOKEN SKINS above THEMES (the TOP
+        # sheet - the v0.3.9-13 flow keeps the mode ask under it)
         var labels := []
         if g.sheet_open_count() > 0:
-                var cc: Control = g._sheet_stack[0]["cc"]
+                var cc: Control = g._sheet_stack[g._sheet_stack.size() - 1]["cc"]
                 var stack := [cc]
                 while not stack.is_empty():
                         var n: Node = stack.pop_front()

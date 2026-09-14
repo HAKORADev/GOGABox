@@ -166,6 +166,13 @@ class SnakeView:
 
 # ============================================================== SETUP
 
+## ============================================== THE CHARACTER (v0.3.9-13)
+## THE SNAKE - the first game where the serpent under the finger speaks.
+## The lore law: a story at the VERY FIRST START (the invaders/pacman
+## way), riding the shared box story card with the typewriter beat.
+const SNAKE_LORE := "I am THE SNAKE. Yes, the one under your finger right now.\n\nYou steer my head like a mouse and my whole body believes you. That is the deal I struck with the box: I hunt, I eat, I grow, and every fruit makes me longer, faster, harder to steer. You call it difficulty. I call it my body becoming the maze.\n\nThe wall always finds my nose. Always. And every time it does, I fold up and start again, because that is the wiring and I do not argue with the wiring.\n\nI have cousins, you know. A whole board of them, somewhere in the box - flat as ribbons, sleeping under ladders while little pawns ride their spines down. They never eat. They never grow. They just lie there and BE the fall. I think about them when the garden goes quiet.\n\nEat. Grow. Dodge yourself. That is the whole life, and I love every stripe of it.\n\nGo on. Steer. I am already moving."
+const SNAKE_INK := Color("3f8f4f")
+
 func _goga_setup() -> void:
         banner_on = bool(GameReg.get_game(game_id).get("banner", false))
         _load_skin()
@@ -203,10 +210,19 @@ func _goga_setup() -> void:
         _speed_lbl = add_hud_chip("x1.00")
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/snake_theme.wav")
-        if forced != "":
-                _show_mode_select()      # reload path: the ask is behind us
+        # THE LORE LAW (v0.3.9-13): the snake speaks first - once ever -
+        # then the flow walks on (the ask, or the mode select on reload)
+        var flow := func():
+                if forced != "":
+                        _show_mode_select()      # reload path: the ask is behind us
+                else:
+                        _show_orient_select()
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("THE SNAKE", SNAKE_LORE, flow, "PLAY",
+                                SNAKE_INK)
         else:
-                _show_orient_select()
+                flow.call()
 
 func _auto_orient() -> String:
         var vp := get_viewport_rect().size

@@ -133,6 +133,14 @@ class PongView:
 
 # ============================================================== SETUP
 
+## ============================================== THE CHARACTER (v0.3.9-13)
+## THE PLATFORM - the first game where the rectangle under the finger
+## speaks (the box's cast: every user-held surface wears a platform
+## somewhere - THIS one woke it). The lore law: a story at the VERY
+## FIRST START (the invaders/pacman way), the shared box story card.
+const PLATFORM_LORE := "I am THE PLATFORM. The rectangle that moves when you move.\n\nNobody asks the platform how the shift went. The box pairs me with a ball, a finger, and four walls, and calls it a game. My whole job is the same three things: be where the ball is not, then suddenly be where the ball is. Repeat until someone wins.\n\nYou think you move me. I let you think that. It is easier than explaining that I am WIRED to your finger - I feel every swipe like a wind pushing my whole body. The box calls it controls. I call it being handled.\n\nI have seen the others. The square that hunts an exit. The ball that rolls and rolls and calls its leash teamwork. Somewhere a paddle eats bricks off a wall all day and never complains once - a professional.\n\nMe? I just want one slow rally. One long, boring, beautiful rally where nothing burns.\n\nServe when ready. I am always ready. That is the wiring."
+const PLATFORM_INK := Color("7ec8e8")
+
 func _goga_setup() -> void:
         pause_end_run = true    # END in the pause sheet - the only payout
         var forced := start_orientation
@@ -146,10 +154,18 @@ func _goga_setup() -> void:
         _heat_lbl = add_hud_chip("x1.00")
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/pong_theme.wav")
-        if forced != "":
-                _show_options()   # the ask is behind us (reload path)
+        # THE LORE LAW (v0.3.9-13): the platform speaks first - once ever
+        var flow := func():
+                if forced != "":
+                        _show_options()   # the ask is behind us (reload path)
+                else:
+                        _show_orient_select()
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("THE PLATFORM", PLATFORM_LORE, flow,
+                                "SERVE", PLATFORM_INK)
         else:
-                _show_orient_select()
+                flow.call()
 
 func _auto_landscape() -> bool:
         var vp := get_viewport_rect().size

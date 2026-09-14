@@ -513,7 +513,11 @@ stay.
   your weapons AND defend the house as long as possible without getting
   destroyed, staying alive by DODGING enemy shots to keep your life
   points. Waves climb, upgrades PERSIST between runs, the shape is open
-  on purpose (horizontal, vertical, or both). (Dedup: pop_siege is
+  on purpose (horizontal, vertical, or both). THE INSPIRATION NOTE (the
+  owner, v0.3.9-13): "somehow inspired from **Revenge of the Chicken**"
+  - that game is not that known and the connection is VERY little, but
+  the note stays pinned here anyway - the dodge-and-defend loop is where
+  the scent comes from. (Dedup: pop_siege is
   lane-and-economy defense with no walker; merge-tower-defense-rogue-like
   merges defenders and never moves them; cosmic_spud is the arena shooter
   with no house to lose; vehicle-horde-rogue-like drives - HERE the
@@ -657,6 +661,15 @@ balloon connect + circle connect were mined from My Talking Angela 2).
 - **tap the frog** — the owner's add (the v0.2.5 round, while Snowy Tower
   was being rebuilt): a whole box of quick tap-timing mini-games around one
   frog. Mine it for reflex/timing mini-game shapes.
+  - **FROGGY-INSTANT LIVES HERE (the owner, v0.3.9-13)** — the box's own
+    frog is **Froggy-Instant**, a twitch-reaction character who appears in
+    the games that demand high-speed reflexes. Fail the timing and the
+    ALIEN VACUUM takes him: he drops down from space and ends up prisoned
+    with the aliens (the SAME alien faction the SSDs fight - see the crew
+    table in `invaders.md` - Froggy's world and the SSDs' war share the
+    one enemy). His home shelf is THIS study: when the tap-the-frog
+    energy graduates into GOGABox, Froggy-Instant is the character wearing
+    it.
 - **MSN Games** — the owner's v0.3.3-p5 add: the classic MSN Games vault
   (board/card/puzzle casual classics) - study the shelf and mine the
   evergreen shapes.

@@ -149,6 +149,16 @@ const W_ACC_MAX := 150000.0  # px/s^2 clamp (a slide's ease spikes)
 
 # ============================================================ setup / layout
 
+## ============================================== THE CHARACTER (v0.3.9-13)
+## BOARDYBARD - the board itself, awake. The box's cast: XO, dominoes,
+## chess, the conquest dice, the ladders - every table game happens ON
+## boardybard, and 2048 is where it first speaks (the sliding tiles were
+## its first shift). The lore law: a story at the VERY FIRST START and a
+## story at the VERY FIRST END (the invaders/pacman way).
+const BOARDYBARD_LORE := "I am BOARDYBARD. The table. The felt. The squares under everyone's feet.\n\nEvery XO that ever scratched itself into me, every domino that clattered down, every war of kings and pawns - they all happened ON me. I do not move. I do not score. I hold. That is the whole noble job.\n\nSo when the box dropped me into 2048 of all places, I laughed. No pieces. No pawns. Just little numbered tiles SLIDING across my back all day, crashing into their own twins. Is this a board game? The box says yes. The box also says a potato can carry a gun, so.\n\nBut I will tell you a secret, supervisor: I can feel the other tables waiting. A checkered one with pens and pawns. A ladder one with serpents sleeping under it. My family. My FLOORS.\n\nUntil then - slide your little numbers on me. I have held worse.\n\nI am the board. Where else would the games LIVE?"
+const BOARDYBARD_LORE_END := "The tiles stop sliding. The grid goes quiet.\n\nThat is the thing they never thank the board for: when a game ends, I am still here. I hold every ending. Every rage-quit, every victory screen, every last tile - all of it landed ON me first.\n\n2048 was a strange first shift for a board. No pieces to host, no dice to rattle, no squares to guard. Just sliding. But a table takes the work the box gives it, and the work gave me you, pushing tiles at three in the morning.\n\nI have hosted worse players than you. Fewer, but worse.\n\nRest now. Somewhere out there, a chessboard is being polished, and I intend to be it."
+const BOARDYBARD_INK := Color("c88a4a")
+
 func _goga_setup() -> void:
         _rng.randomize()
         pause_end_run = true    # v0.3.8-8 (owner: a 2048 run "could last
@@ -194,6 +204,11 @@ func _goga_setup() -> void:
         _spawn_random()
         _spawn_random()
         Jukebox.sfx("confirm", -14.0)
+        # THE LORE LAW (v0.3.9-13): the board speaks first - once ever
+        if Box.counter(game_id, "lore_start") == 0:
+                Box.bump_counter(game_id, "lore_start", 1)
+                box_story_show("BOARDYBARD", BOARDYBARD_LORE, Callable(),
+                                "PLAY", BOARDYBARD_INK)
 
 ## THE SIZE LAW (owner v0.2.8): the equipped board size decides grid_n and
 ## the run bonus. div 0 = use the registry coin_div (4x4 stays the
@@ -818,7 +833,18 @@ func _game_over() -> void:
         tw2.tween_callback(func():
                         animating = false
                         check_achievements()
-                        finish_run(score))
+                        _merge_over())
+
+## the run's last word: the FIRST game-over wears boardybard's end story
+## (the lore law), every other one banks straight away
+func _merge_over() -> void:
+        if Box.counter(game_id, "lore_end") == 0:
+                Box.bump_counter(game_id, "lore_end", 1)
+                box_story_show("BOARDYBARD RESTS", BOARDYBARD_LORE_END,
+                                func(): finish_run(score), "CONTINUE",
+                                BOARDYBARD_INK)
+        else:
+                finish_run(score)
 
 func _win_burst(at: Vector2) -> void:
         Jukebox.sfx("achievement", -2.0)

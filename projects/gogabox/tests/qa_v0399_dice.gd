@@ -467,6 +467,9 @@ func _t_soak() -> int:
 
 func _ready() -> void:
         JC = load("res://game/games/jumpcube/jumpcube.gd")
+        # the lore never blocks a probe (the counter is the gate, the
+        # pacman rig's pattern) - the die's first words stay out of the rig
+        Box.bump_counter("jumpcube", "lore_start", 1)
         print("=== qa_v0399_dice: CONQUER DICE laws ===")
         fails += await _err("state law", _t_state_law)
         fails += await _err("gate hush", _t_gate_hush)

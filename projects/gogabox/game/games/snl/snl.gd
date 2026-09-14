@@ -4,6 +4,39 @@ extends GogaGame
 ## pure RNG!" - no opponent intelligence, no moods, no memory: the die is
 ## the only mind at the table.
 ##
+## Owner contract (v0.3.9-13, the test-report round):
+##   - THE STAIRS: "ladders need to have extra stairs, currently they are
+##     not too much and they have too wide stairs" - the rails pinch in
+##     (gap 0.10 cell) and the rungs come every 0.30 cell (twice as many)
+##   - THE STAR, NOTHING ELSE: cell 100 wears the bold gold star only -
+##     "just make it the star only without circles or sun rays" (the
+##     medallion + the rotating rays are gone; the board layer is static
+##     art now and stops repainting every tick)
+##   - THE WIDE BADGE: "make it wider by let's say x2 so the dice to the
+##     pawn home distance has enough space" - the tray seat doubles
+##     (420 cap, the 0.48 board cap keeps the pair apart); THE QUIET
+##     TRAY: the THINKING words are gone - "keeping it same size but
+##     removing the text and keeping just the highlight on it" - and the
+##     die's breathing seat stays INSIDE the tray (the flicker fix)
+##   - THE BARE TOKEN: "remove the number that is written inside the
+##     pawn" - the tray's numeral is the mark
+##   - THE PROPER SNAKE (the owner: "see the snake game, it may help you
+##     make a proper snake face and tail end and turns"): the body is
+##     STAMPED along the drawn path with an OUTLINE pass (the turns round
+##     themselves), the head wears the snake game's own face - the
+##     forward eyes, the pupils, the forked tongue - and the tail closes
+##     in a capped point
+##   - THE JUNGLE ROUND ("the jungle theme is just the default theme with
+##     poor modifications"): the vine snake is BRIGHT BROWN with dark
+##     body dots ("at least make the snake be bright brown with dots on
+##     it's body"), the ladders sprout LEAVES at both ends ("maybe add
+##     some leaves on the ladders")
+##   - THE FLOW LAW: "you showed first the 'tap anywhere' then showed the
+##     optionals, it should be the opposite" - the ask opens the game and
+##     wears its ONE short title ("HOW MANY PLAYERS" - law 28's
+##     v0.3.9-13 note: not-too-helpful never meant write-nothing), the
+##     pick seats the gate, the gate's tap starts the round
+##
 ## Owner contract (v0.3.9-12, verbatim intent):
 ##   - 10x10 board, 100 steps; players 2..4 (2 = 1v1, 3 = 1v2, 4 = 1v3,
 ##     the CPUs are pure RNG). One figure each; the figures wait OUT of
@@ -162,11 +195,18 @@ const THEMES := {
                 "sq_a": Color("e6d9a8"), "sq_b": Color("c9b878"),
                 "sq_line": Color("7a6a3c"), "num_ink": Color("3d3212"),
                 "ladder": Color("d4a94a"), "ladder_dark": Color("96722a"),
-                "snake": Color("2f8f5f"), "snake_belly": Color("c8e8b0"),
+                ## THE JUNGLE ROUND (the owner: "the jungle theme is just
+                ## the default theme with poor modifications, at least
+                ## make the snake be bright brown with dots on it's body
+                ## ... maybe add some leaves on the ladders"): the vine
+                ## snake wears BRIGHT BROWN with dark body dots, the
+                ## ladders sprout leaves at both ends
+                "snake": Color("c07f3e"), "snake_belly": Color("ecd9a0"),
+                "snake_spot": Color("5f3a16"),
                 "tray_ink": Color(0, 0, 0, 0.45),
                 "armies": [Color("e8604f"), Color("3fbf7f"),
                         Color("ffd24a"), Color("8f7fe8")],
-                "glow": false},
+                "glow": false, "spots": true, "leaves": true},
 }
 
 # ------------------------------------------------------- the token skins
@@ -278,7 +318,10 @@ func _goga_setup() -> void:
         _build_widgets(vp)
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/snl_theme.wav")
-        _build_ready()
+        ## THE FLOW LAW (the owner: "it should be the opposite") - the
+        ## optionals ask opens the game FIRST, the TAP ANYWHERE gate
+        ## seats after the pick
+        _mode_sheet()
 
 func _fresh_poss() -> void:
         poss = [0, 0, 0, 0]
@@ -461,10 +504,13 @@ func _place_texts(vp: Vector2) -> void:
                 verdict_lbl.custom_minimum_size = Vector2(vp.x, 56)
 
 ## the tray seats: 1 top-left, 2 top-right, 3 bottom-right, 4 bottom-left
-## (the ludo table's own corners - the house law)
+## (the ludo table's own corners - the house law). THE WIDE BADGE (the
+## owner's v0.3.9-13 round: "make it wider by let's say x2 so the dice
+## to the pawn home distance has enough space to fit whatever without
+## getting the overlaps") - the tray doubles its seat, the 0.48 cap
+## keeps the top pair from ever touching.
 func _tray_rect(p: int) -> Rect2:
-        var vp := get_viewport_rect().size
-        var tw := minf(210.0, board_side * 0.46)
+        var tw := minf(420.0, board_side * 0.48)
         var th := 74.0
         var top_y := 96.0
         var banner := banner_bottom()
@@ -484,10 +530,13 @@ func _tray_rect(p: int) -> Rect2:
         return Rect2(0, 0, 0, 0)
 
 ## the die window inside a tray - ALSO the roll button (the waiting die
-## IS the button, the v0.3.9-11 law)
+## IS the button, the v0.3.9-11 law). THE FLICKER FIX (the owner's
+## v0.3.9-13 round: the breathing ring was poking past the tray's rim
+## and fighting the badge highlight) - a smaller die keeps its whole
+## breathing seat INSIDE the tray.
 func _die_rect(p: int) -> Rect2:
         var tr := _tray_rect(p)
-        var s := minf(58.0, tr.size.y * 0.78)
+        var s := minf(50.0, tr.size.y * 0.66)
         return Rect2(tr.position.x + tr.size.x - s - 12.0,
                         tr.position.y + (tr.size.y - s) * 0.5, s, s)
 
@@ -679,36 +728,41 @@ func _draw_cell_specials() -> void:
                         cell * 0.36), str(1), HORIZONTAL_ALIGNMENT_CENTER,
                         -1, int(maxf(11.0, cell * 0.24)),
                         Color(1, 1, 1, 0.95))
-        # THE CROWN CELL (100): the gold medallion with its rays
+        # THE CROWN CELL (100): THE STAR, NOTHING ELSE (the owner's
+        # v0.3.9-13 round: "just make it the star only without circles
+        # or sun rays, will be much cooler btw") - one bold gold star
+        # with a deep outline, seated straight on the checker
         var c100 := _cell_point(LAST)
-        var rad := cell * 0.40
-        var rays := 12
-        for k in rays:
-                var ang := TAU * float(k) / float(rays) + _time * 0.35
-                var a := c100 + Vector2(cos(ang), sin(ang)) \
-                                * rad * 1.12
-                var b := c100 + Vector2(cos(ang), sin(ang)) \
-                                * rad * 1.38
-                board_l.draw_line(a, b, Color("ffd24a"), cell * 0.035)
-        board_l.draw_circle(c100, rad * 1.05, Color(0, 0, 0, 0.25))
-        board_l.draw_circle(c100, rad, Color("ffd24a"))
-        board_l.draw_circle(c100, rad, Color("8a5a1e"), false,
-                        cell * 0.03)
-        board_l.draw_circle(c100, rad * 0.72, Color("ffe89a"))
-        # the star on the medallion
+        var rad := cell * 0.36
         var star := PackedVector2Array()
         for k in 10:
                 var ang := -PI * 0.5 + PI * float(k) / 5.0
-                var rr := rad * (0.52 if k % 2 == 0 else 0.22)
+                var rr := rad * (1.0 if k % 2 == 0 else 0.42)
                 star.append(c100 + Vector2(cos(ang), sin(ang)) * rr)
-        board_l.draw_colored_polygon(star, Color("e8a41e"))
+        var outline := PackedVector2Array()
+        for p in star:
+                outline.append(c100 + (p - c100).normalized() \
+                                * ((p - c100).length() + cell * 0.045))
+        board_l.draw_colored_polygon(outline, Color("8a5a1e"))
+        board_l.draw_colored_polygon(star, Color("ffd24a"))
+        # the inner glint (a smaller star face, one shade up)
+        var glint := PackedVector2Array()
+        for k in 10:
+                var ang := -PI * 0.5 + PI * float(k) / 5.0
+                var rr := rad * (0.62 if k % 2 == 0 else 0.26)
+                glint.append(c100 + Vector2(cos(ang), sin(ang)) * rr \
+                                + Vector2(0, -cell * 0.02))
+        board_l.draw_colored_polygon(glint, Color("ffe89a"))
         board_l.draw_string(f, c100 + Vector2(-cell * 0.5,
                         cell * 0.44), str(LAST),
                         HORIZONTAL_ALIGNMENT_CENTER, -1,
-                        int(maxf(11.0, cell * 0.24)), Color("3d2a08"))
+                        int(maxf(11.0, cell * 0.24)), th["num_ink"])
 
 ## THE LADDERS: two honest rails + the rungs between them, straight
-## lanes from base to top (the owner: "ladders should be....ladders")
+## lanes from base to top (the owner: "ladders should be....ladders").
+## THE STAIR ROUND (v0.3.9-13: "ladders need to have extra stairs,
+## currently they are not too much and they have too wide stairs") -
+## the rails pinch in and the rungs come TWICE as often.
 func _draw_ladders() -> void:
         var th := _theme()
         for base in LADDERS:
@@ -716,7 +770,7 @@ func _draw_ladders() -> void:
                 var b := _cell_point(int(LADDERS[base]))
                 var dir := (b - a).normalized()
                 var perp := Vector2(-dir.y, dir.x)
-                var gap := cell * 0.17
+                var gap := cell * 0.10
                 var rail_a := [a + perp * gap, b + perp * gap]
                 var rail_b := [a - perp * gap, b - perp * gap]
                 # the rails: shadow pass, body pass
@@ -724,86 +778,136 @@ func _draw_ladders() -> void:
                         board_l.draw_line(rail[0] + Vector2(2, 3),
                                         rail[1] + Vector2(2, 3),
                                         Color(0, 0, 0, 0.28),
-                                        cell * 0.10)
+                                        cell * 0.075)
                         board_l.draw_line(rail[0], rail[1],
-                                        th["ladder"], cell * 0.10)
+                                        th["ladder"], cell * 0.075)
                         board_l.draw_line(rail[0], rail[1],
-                                        th["ladder_dark"], cell * 0.022)
-                # the rungs: every cell*0.62 along the lane
+                                        th["ladder_dark"], cell * 0.018)
+                # the rungs: every cell*0.30 along the lane (the extra
+                # stairs - twice as many as before)
                 var length := a.distance_to(b)
-                var rungs := maxi(2, int(length / (cell * 0.62)))
+                var rungs := maxi(3, int(length / (cell * 0.30)))
                 for k in range(rungs + 1):
                         var f := float(k) / float(rungs)
                         var p0 := a.lerp(b, f) + perp * gap
                         var p1 := a.lerp(b, f) - perp * gap
                         board_l.draw_line(p0, p1, th["ladder_dark"],
-                                        cell * 0.062)
+                                        cell * 0.042)
+                # THE JUNGLE LEAVES (the owner's ask): the ladder grows
+                # out of the canopy - a leaf pair at both ends
+                if bool(th.get("leaves", false)):
+                        for end in [a, b]:
+                                var inward := -dir if end == a else dir
+                                _draw_leaf(end + perp * (gap + cell * 0.10),
+                                                (inward * 0.55 + perp * 0.45) \
+                                                .normalized())
+                                _draw_leaf(end - perp * (gap + cell * 0.10),
+                                                (inward * 0.55 - perp * 0.45) \
+                                                .normalized())
 
-## THE SNAKES: a tapered body along the drawn path (the path IS the
-## fall - one truth), a belly line, a head with eyes (the owner:
-## "snake should be....snake? ofc")
+## one jungle leaf: a pointed teardrop with a stem line, angled along
+## `dir` (the jungle theme's ladder dressing)
+func _draw_leaf(at: Vector2, dir: Vector2) -> void:
+        var green := Color("3f8f3f")
+        var perp := Vector2(-dir.y, dir.x)
+        var L := cell * 0.34
+        var W := cell * 0.12
+        board_l.draw_line(at - dir * cell * 0.05, at,
+                        green.darkened(0.3), cell * 0.028)
+        var pts := PackedVector2Array([
+                at + dir * L,
+                at + perp * W + dir * L * 0.28,
+                at,
+                at - perp * W + dir * L * 0.28,
+        ])
+        board_l.draw_colored_polygon(pts, green)
+        board_l.draw_line(at, at + dir * L * 0.8,
+                        green.darkened(0.3), cell * 0.016)
+
+## THE SNAKES (the v0.3.9-13 redesign, the owner: "snake design and
+## edges look bad, see the snake game, it may help you make a proper
+## snake face and tail end and turns without being that ugly") - the
+## body is STAMPED along the drawn path (overlapping discs, tapering
+## head to tail): the turns round themselves, no seams, no jagged
+## joints. An OUTLINE pass keeps the edges clean on any checker, the
+## belly rides the same stamps, and the head wears the snake game's own
+## face - the forward eyes with pupils, the forked tongue. The jungle's
+## vine wears bright brown with dark body dots (the spots law).
 func _draw_snakes() -> void:
         var th := _theme()
+        var spots: bool = bool(th.get("spots", false))
+        var spot_c: Color = th.get("snake_spot", Color("5f3a16"))
+        var ink: Color = (th["snake"] as Color).darkened(0.45)
         for head in SNAKES:
                 var pts: PackedVector2Array = _paths[int(head)]
                 if pts.size() < 2:
                         continue
-                # the body: segment by segment, the width tapers
-                # head -> tail; the glow themes wear a soft under-stroke
                 var n := pts.size()
-                if bool(th["glow"]):
-                        for i in range(n - 1):
-                                board_l.draw_line(pts[i], pts[i + 1],
-                                                Color(th["snake"], 0.16),
-                                                cell * 0.46)
-                for i in range(n - 1):
-                        var f := float(i) / float(n - 1)
-                        var w := lerpf(cell * 0.30, cell * 0.07, f)
-                        board_l.draw_line(pts[i], pts[i + 1],
-                                        th["snake"], w)
-                        board_l.draw_line(pts[i], pts[i + 1],
-                                        th["snake"].darkened(0.3),
-                                        w * 0.18)
-                # the belly: a lighter inner line riding the same path
-                for i in range(n - 1):
-                        var f := float(i) / float(n - 1)
-                        var w := lerpf(cell * 0.14, cell * 0.03, f)
-                        board_l.draw_line(pts[i], pts[i + 1],
-                                        th["snake_belly"], w)
-                # the head: a round skull at the START of the path, eyes
-                # looking along the body's exit
+                # the OUTLINE pass (a hair wider than the body)
+                for i in n:
+                        var f0 := float(i) / float(n - 1)
+                        board_l.draw_circle(pts[i],
+                                        lerpf(cell * 0.27, cell * 0.05, f0)
+                                        + cell * 0.030, ink)
+                # the BODY pass: the stamped discs taper head -> tail
+                for i in n:
+                        var f1 := float(i) / float(n - 1)
+                        board_l.draw_circle(pts[i],
+                                        lerpf(cell * 0.27, cell * 0.05, f1),
+                                        th["snake"])
+                # the BELLY: a lighter stripe riding the same stamps
+                for i in n:
+                        var f2 := float(i) / float(n - 1)
+                        board_l.draw_circle(pts[i],
+                                        lerpf(cell * 0.115, cell * 0.02, f2),
+                                        th["snake_belly"])
+                # THE JUNGLE DOTS: dark spots every few stamps, shrinking
+                # with the body
+                if spots:
+                        for i in range(2, n - 1, 4):
+                                var f3 := float(i) / float(n - 1)
+                                board_l.draw_circle(pts[i],
+                                        lerpf(cell * 0.06, cell * 0.012, f3),
+                                        spot_c)
+                # the tail end: a small rounded cap (the body closes
+                # in a point, the outline holds it)
+                board_l.draw_circle(pts[n - 1], cell * 0.045, ink)
+                # THE HEAD (the snake game's own face): a rimmed skull,
+                # the eyes look ALONG the crawl, the tongue forks ahead
                 var hp := pts[0]
-                var hn := pts[mini(3, n - 1)]
+                var hn := pts[mini(4, n - 1)]
                 var hdir := (hp - hn).normalized()
                 var perp := Vector2(-hdir.y, hdir.x)
-                board_l.draw_circle(hp + Vector2(2, 3), cell * 0.21,
+                var hr := cell * 0.24
+                board_l.draw_circle(hp + Vector2(2, 3), hr,
                                 Color(0, 0, 0, 0.25))
-                board_l.draw_circle(hp, cell * 0.21, th["snake"])
-                board_l.draw_circle(hp, cell * 0.21,
-                                th["snake"].darkened(0.3), false,
-                                cell * 0.022)
+                board_l.draw_circle(hp, hr + cell * 0.028, ink)
+                board_l.draw_circle(hp, hr, th["snake"])
                 for s: float in [-1.0, 1.0]:
-                        var eye := hp + hdir * cell * 0.07 \
-                                        + perp * s * cell * 0.10
-                        board_l.draw_circle(eye, cell * 0.055,
-                                        Color(1, 1, 1, 0.95))
-                        board_l.draw_circle(eye, cell * 0.026,
-                                        Color(0.05, 0.05, 0.05))
-                # the tongue: a small forked flick ahead of the head
-                var tip := hp + hdir * cell * 0.30
-                board_l.draw_line(hp + hdir * cell * 0.18, tip,
-                                Color("e8574a"), cell * 0.03)
-                board_l.draw_line(tip, tip + (hdir + perp * 0.5) \
-                                .normalized() * cell * 0.07,
-                                Color("e8574a"), cell * 0.025)
-                board_l.draw_line(tip, tip + (hdir - perp * 0.5) \
-                                .normalized() * cell * 0.07,
-                                Color("e8574a"), cell * 0.025)
+                        var eye := hp + hdir * hr * 0.30 \
+                                        + perp * s * hr * 0.50
+                        board_l.draw_circle(eye, hr * 0.34,
+                                        Color(1, 1, 1, 0.96))
+                        board_l.draw_circle(eye + hdir * hr * 0.10,
+                                        hr * 0.16, Color(0.05, 0.05, 0.05))
+                # the tongue: base -> tip -> the two forks
+                var tb := hp + hdir * hr * 0.85
+                var tt := hp + hdir * hr * 1.7
+                board_l.draw_line(tb, tt, Color("e8574a"), cell * 0.028)
+                board_l.draw_line(tt, tt + (hdir * 0.45 + perp * 0.55) \
+                                .normalized() * cell * 0.10,
+                                Color("e8574a"), cell * 0.024)
+                board_l.draw_line(tt, tt + (hdir * 0.45 - perp * 0.55) \
+                                .normalized() * cell * 0.10,
+                                Color("e8574a"), cell * 0.024)
 
-## THE TOKENS: a pawn disc with its ring, a specular dot and the
-## player's numeral - the walkers and the riders drawn on top. THE
-## WAITING TOKENS live in the fx pass (they sit INSIDE the trays - the
-## tray paint would bury them here; the rig's film caught that).
+## THE TOKENS: a pawn disc with its ring and a specular dot - the
+## walkers and the riders drawn on top. THE BARE PAWN (the owner's
+## v0.3.9-13 round: "remove the number that is written inside the pawn,
+## will be better") - the tray's numeral is the mark, the pawn itself
+## stays clean. THE WAITING TOKENS live in the fx pass (they sit INSIDE
+## the trays - the tray paint would bury them here; the rig's film
+## caught that).
 func _draw_tokens() -> void:
         var walker_p := -1
         if state == "walking" and not walk.is_empty():
@@ -833,12 +937,6 @@ func _draw_token(c: CanvasItem, at: Vector2, p: int, scale := 1.0) \
         # the specular dot (the token is a polished pawn)
         c.draw_circle(at + Vector2(-r * 0.32, -r * 0.34),
                         r * 0.20, Color(1, 1, 1, 0.5))
-        # the numeral: the player's mark (adaptive ink - the B&W round)
-        var f := ThemeDB.fallback_font
-        var num_ink := ink
-        c.draw_string(f, at + Vector2(-r, r * 0.42), str(p),
-                        HORIZONTAL_ALIGNMENT_CENTER, -1,
-                        int(maxf(10.0, r * 0.95)), num_ink)
 
 func _walk_point() -> Vector2:
         var pts: PackedVector2Array = walk["pts"]
@@ -918,7 +1016,8 @@ func _draw_trays() -> void:
                 _draw_rr(fx_l, dr.grow(7.0), 12.0,
                                 Color(1, 1, 1, 0.14), false, 1.6)
                 # THE WAITING DIE: grayed out at its seat, breathing -
-                # the user taps IT to roll
+                # the user taps IT to roll (the breath stays INSIDE the
+                # tray now - the flicker fix)
                 if active and int(p) == 1 and state == "roll_wait" \
                                 and not die_alive:
                         var breath := 0.5 + 0.5 * sin(_time * 3.4)
@@ -926,26 +1025,22 @@ func _draw_trays() -> void:
                                         if (fill as Color).v <= 0.5 \
                                         else Color(0.1, 0.1, 0.1,
                                         0.3 + 0.25 * breath)
-                        _draw_rr(fx_l, dr.grow(9.0 + 3.0 * breath), 14.0,
+                        _draw_rr(fx_l, dr.grow(7.0 + 2.5 * breath), 11.0,
                                         ring, false, 2.6)
                         _draw_waiting_die(dr)
-                # THE MARK: the bare numeral + WHO (the ludo tray law)
+                # THE MARK: the bare numeral + WHO (the ludo tray law),
+                # seated in the badge's middle air (the wide-badge round:
+                # the die and the pawn home keep their distance)
                 var who := "YOU" if int(p) == 1 else "CPU"
                 fx_l.draw_string(f, tr.position + Vector2(
-                                12.0 + cell * 0.60 + 8.0,
+                                12.0 + cell * 0.60 + 22.0,
                                 tr.size.y * 0.52), str(p),
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, 34, word)
                 fx_l.draw_string(f, tr.position + Vector2(
-                                12.0 + cell * 0.60 + 30.0,
+                                12.0 + cell * 0.60 + 52.0,
                                 tr.size.y * 0.40), who,
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
                                 word_soft)
-                if active and turn_note != "":
-                        fx_l.draw_string(f, tr.position + Vector2(
-                                        12.0 + cell * 0.60 + 30.0,
-                                        tr.size.y * 0.82), turn_note,
-                                        HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-                                        word_soft)
         # the die itself (the theater)
         if die_alive:
                 _draw_die()
@@ -1098,9 +1193,17 @@ func _goga_input(event: InputEvent) -> void:
                 return
         _tap_msec = now
         _tap_at = at
+        ## THE FLOW LAW (the owner's v0.3.9-13 round: "you showed first
+        ## the 'tap anywhere' then showed the optionals, it should be
+        ## the opposite") - the ask opens the game, the pick seats the
+        ## TAP ANYWHERE gate, the gate's tap opens the round
         if state == "ready":
                 _gate_down()
                 _mode_sheet()
+                return
+        if state == "gate":
+                _gate_down()
+                _new_round()
                 return
         _tap(at)
 
@@ -1115,10 +1218,15 @@ func _tap(at: Vector2) -> void:
 # ------------------------------------------------------- the mode sheet
 
 func _mode_sheet() -> void:
-        ## THE HOUSE OPTIONALS LAW (law 28): the owner's "then shows
-        ## 2,3,4" - three equal cards, ONE color, one tap starts the
-        ## round. No title, no hint, no talk.
+        ## THE HOUSE OPTIONALS LAW (law 28, the v0.3.9-13 correction:
+        ## the ask wears ONE short title - "do not write too helpful AI
+        ## slop things" never meant "do not write anything") - the
+        ## owner's own example words, then the three equal cards, ONE
+        ## color, one tap seats the gate
         var sheet := sheet_push(0.0, "mode")
+        var t := Arc.label("HOW MANY PLAYERS", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 14)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1135,12 +1243,12 @@ func _pick_mode(m: int) -> void:
         playing = []
         for p in m:
                 playing.append(p + 1)
-        # off "ready" BEFORE the pop - the pop-callback rebuilds the gate
-        # only when the sheet was closed without a pick (the back button)
-        state = "handoff"
+        # the pick seats the TAP ANYWHERE gate (the flow law) - the
+        # round opens on the gate's tap, not on the pick
+        state = "gate"
         clock = -1.0
         sheet_pop()
-        _new_round()
+        _build_ready()
 
 func _goga_sheet_popped(id: String) -> void:
         if id == "shop":
@@ -1148,11 +1256,12 @@ func _goga_sheet_popped(id: String) -> void:
                 get_tree().paused = false
                 paused = false
                 _repaint()
-                if state == "ready" and ready_ui != null \
+                if state in ["ready", "gate"] and ready_ui != null \
                                 and is_instance_valid(ready_ui):
                         ready_ui.visible = true
         elif id == "mode" and state == "ready":
                 # the back button closed the mode ask - the gate returns
+                # so its tap re-opens the ask (the flow law)
                 _build_ready()
 
 # ============================================================ the rounds
@@ -1182,18 +1291,12 @@ func _start_turn() -> void:
         _banner()
 
 func _banner() -> void:
-        ## the active tray's status note (the tray speaks, the die
-        ## speaks for itself - the v0.3.9-11 tray redesign)
-        if state == "round_over":
-                turn_note = ""
-                return
-        var dots := ".".repeat(int(_time * 2.5) % 3 + 1)
-        if state == "roll_wait":
-                turn_note = "" if turn == 1 else "THINKING %s" % dots
-        elif state == "rolling":
-                turn_note = "..."
-        else:
-                turn_note = ""
+        ## THE QUIET TRAY (the owner's v0.3.9-13 round: "keeping it same
+        ## size but removing the text and keeping just the highlight on
+        ## it while it is it's turn will be cooler fix") - the tray
+        ## speaks through its highlight alone; no THINKING words, no
+        ## dots (guide 29: the state lives in the die and the glow)
+        turn_note = ""
 
 # ============================================================ the theater
 
@@ -1500,7 +1603,8 @@ func _goga_tick(delta: float) -> void:
                         alive2.append(p)
                 _dust = alive2
         # THE LIVING LAYER LAW: the animated layers repaint on the tick
-        board_l.queue_redraw()
+        # (the BOARD is static art now - the crown star lost its rays,
+        # so the board layer only repaints on layout/theme changes)
         token_l.queue_redraw()
         fx_l.queue_redraw()
 

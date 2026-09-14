@@ -2174,11 +2174,8 @@ def scene_ludo():
             rr = 10 if k % 2 == 0 else 4.5
             pts.append((cx + math.cos(ang) * rr, cy + math.sin(ang) * rr))
         sc.polygon(pts, ink + (215,))
-    # the medallion behind the home triangles
-    mid = cp(7, 7)
-    sc.ellipse([mid[0] - cell * 1.26, mid[1] - cell * 1.26,
-                mid[0] + cell * 1.26, mid[1] + cell * 1.26],
-               fill=(252, 246, 232, 255))
+    # the four home triangles point in - NOTHING under them (the
+    # v0.3.9-13 round: the medallion circle under the square is gone)
     tri = {2: [(6, 6), (8, 6), (7, 7)], 3: [(8, 6), (8, 8), (7, 7)],
            4: [(8, 8), (6, 8), (7, 7)], 1: [(6, 8), (6, 6), (7, 7)]}
     for a, pts in tri.items():
@@ -2432,7 +2429,8 @@ def scene_snl():
         sc.text(str(n), 11, int(ox + gx * cell + 12),
                 int(oy + (9 - gy + 1) * cell - 13),
                 fill=ink + (190,), shadow=False)
-    # THE START MAT (cell 1) + THE CROWN (cell 100)
+    # THE START MAT (cell 1) + THE CROWN (cell 100, the STAR ONLY - the
+    # v0.3.9-13 round: no circles, no sun rays, one bold star)
     c1 = cc(1)
     m = cell * 0.36
     sc.rect([c1[0] - m, c1[1] - m, c1[0] + m, c1[1] + m],
@@ -2440,21 +2438,26 @@ def scene_snl():
     sc.polygon([(c1[0], c1[1] - 11), (c1[0] + 10, c1[1] + 3),
                 (c1[0] - 10, c1[1] + 3)], (255, 255, 255, 235))
     c100 = cc(100)
-    rad = cell * 0.40
-    sc.ellipse([c100[0] - rad, c100[1] - rad, c100[0] + rad,
-                c100[1] + rad], fill=(255, 210, 74, 255))
-    sc.ellipse([c100[0] - rad, c100[1] - rad, c100[0] + rad,
-                c100[1] + rad], outline=(138, 90, 30, 255), width=3)
-    sc.ellipse([c100[0] - rad * 0.7, c100[1] - rad * 0.7,
-                c100[0] + rad * 0.7, c100[1] + rad * 0.7],
-               fill=(255, 232, 154, 255))
+    rad = cell * 0.36
+    star_out = []
     star = []
     for k in range(10):
         ang = -math.pi / 2 + math.pi * k / 5.0
-        rr = rad * (0.5 if k % 2 == 0 else 0.21)
+        rr = rad * (1.0 if k % 2 == 0 else 0.42)
         star.append((c100[0] + math.cos(ang) * rr,
                      c100[1] + math.sin(ang) * rr))
-    sc.polygon(star, (232, 164, 30, 255))
+        rr2 = rr + cell * 0.045
+        star_out.append((c100[0] + math.cos(ang) * rr2,
+                         c100[1] + math.sin(ang) * rr2))
+    sc.polygon(star_out, (138, 90, 30, 255))
+    sc.polygon(star, (255, 210, 74, 255))
+    glint = []
+    for k in range(10):
+        ang = -math.pi / 2 + math.pi * k / 5.0
+        rr3 = rad * ((0.62 if k % 2 == 0 else 0.26))
+        glint.append((c100[0] + math.cos(ang) * rr3,
+                      c100[1] + math.sin(ang) * rr3 - cell * 0.02))
+    sc.polygon(glint, (255, 232, 154, 255))
 
     # the snakes: the drawn body IS the fall (the game's one truth)
     def snake_pts(head, tail):
@@ -2503,40 +2506,66 @@ def scene_snl():
         if head == 54:
             fall_pts = pts
         n = len(pts)
-        for i in range(n - 1):
+        # the STAMPED body (the v0.3.9-13 redesign): overlapping discs,
+        # the outline pass keeps the edges clean, the turns round
+        # themselves - the snake game's own look
+        for i in range(n):
             f = i / float(n - 1)
-            w = max(2, int((0.30 - 0.23 * f) * cell))
-            sc.line([pts[i], pts[i + 1]],
-                    tuple(int(c * 0.7) for c in snake_c) + (255,),
-                    width=max(2, w // 5))
-            sc.line([pts[i], pts[i + 1]], snake_c + (255,), width=w)
-        for i in range(n - 1):
+            w = (0.27 - 0.22 * f) * cell
+            er = w + cell * 0.030
+            sc.ellipse([pts[i][0] - er, pts[i][1] - er,
+                        pts[i][0] + er, pts[i][1] + er],
+                       fill=tuple(int(c * 0.55) for c in snake_c) + (255,))
+        for i in range(n):
             f = i / float(n - 1)
-            w = max(1, int((0.13 - 0.10 * f) * cell))
-            sc.line([pts[i], pts[i + 1]], snake_belly + (200,),
-                    width=w)
-        # the head: skull + eyes + forked tongue
-        hp, hn = pts[0], pts[min(3, n - 1)]
+            w = (0.27 - 0.22 * f) * cell
+            sc.ellipse([pts[i][0] - w, pts[i][1] - w,
+                        pts[i][0] + w, pts[i][1] + w], fill=snake_c + (255,))
+        for i in range(n):
+            f = i / float(n - 1)
+            w = (0.115 - 0.095 * f) * cell
+            sc.ellipse([pts[i][0] - w, pts[i][1] - w,
+                        pts[i][0] + w, pts[i][1] + w],
+                       fill=snake_belly + (210,))
+        # the head: rimmed skull + FORWARD eyes (the snake game's face)
+        # + the forked tongue
+        hp, hn = pts[0], pts[min(4, n - 1)]
         hx, hy = hp[0] - hn[0], hp[1] - hn[1]
         hl = math.hypot(hx, hy) or 1.0
         hx, hy = hx / hl, hy / hl
         pxp, pyp = -hy, hx
-        hr = cell * 0.21
+        hr = cell * 0.24
+        ser = hr + cell * 0.028
+        sc.ellipse([hp[0] - ser, hp[1] - ser, hp[0] + ser, hp[1] + ser],
+                   fill=tuple(int(c * 0.55) for c in snake_c) + (255,))
         sc.ellipse([hp[0] - hr, hp[1] - hr, hp[0] + hr, hp[1] + hr],
                    fill=snake_c + (255,))
         for s in (-1, 1):
-            ex = hp[0] + hx * cell * 0.07 + pxp * s * cell * 0.10
-            ey = hp[1] + hy * cell * 0.07 + pyp * s * cell * 0.10
-            er = cell * 0.055
+            ex = hp[0] + hx * hr * 0.30 + pxp * s * hr * 0.50
+            ey = hp[1] + hy * hr * 0.30 + pyp * s * hr * 0.50
+            er = hr * 0.34
             sc.ellipse([ex - er, ey - er, ex + er, ey + er],
-                       fill=(255, 255, 255, 245))
-            er2 = cell * 0.026
-            sc.ellipse([ex - er2, ey - er2, ex + er2, ey + er2],
+                       fill=(255, 255, 255, 250))
+            er2 = hr * 0.16
+            sc.ellipse([ex - er2 + hx * hr * 0.10,
+                        ey - er2 + hy * hr * 0.10,
+                        ex + er2 + hx * hr * 0.10,
+                        ey + er2 + hy * hr * 0.10],
                        fill=(12, 12, 12, 255))
-        tip = (hp[0] + hx * cell * 0.30, hp[1] + hy * cell * 0.30)
-        sc.line([hp, tip], (232, 87, 74, 255), width=2)
+        tb = (hp[0] + hx * hr * 0.85, hp[1] + hy * hr * 0.85)
+        tt = (hp[0] + hx * hr * 1.7, hp[1] + hy * hr * 1.7)
+        sc.line([tb, tt], (232, 87, 74, 255), width=3)
+        for sgn in (-1, 1):
+            fx = hx * 0.45 + pxp * 0.55 * sgn
+            fy = hy * 0.45 + pyp * 0.55 * sgn
+            fl = math.hypot(fx, fy) or 1.0
+            sc.line([tt, (tt[0] + fx / fl * cell * 0.10,
+                          tt[1] + fy / fl * cell * 0.10)],
+                    (232, 87, 74, 255), width=2)
 
-    # the ladders: rails + rungs (the straight lane IS the ride)
+    # the ladders: rails + rungs (the straight lane IS the ride) - the
+    # v0.3.9-13 STAIR ROUND: the rails pinch in, the rungs come twice
+    # as often
     ladders = {4: 25, 13: 46, 33: 49, 42: 63, 50: 69, 62: 81, 74: 92}
     climb_ab = None
     for base, top in ladders.items():
@@ -2544,7 +2573,7 @@ def scene_snl():
         dx, dy = b[0] - a[0], b[1] - a[1]
         ln = math.hypot(dx, dy) or 1.0
         pxp, pyp = -dy / ln, dx / ln
-        gap = cell * 0.17
+        gap = cell * 0.10
         if base == 50:
             climb_ab = (a, b, pxp, pyp, gap)
         ra = [(a[0] + pxp * gap, a[1] + pyp * gap),
@@ -2552,15 +2581,15 @@ def scene_snl():
         rb = [(a[0] - pxp * gap, a[1] - pyp * gap),
               (b[0] - pxp * gap, b[1] - pyp * gap)]
         for rail in (ra, rb):
-            sc.line(rail, ladder + (255,), width=max(3, int(cell * 0.10)))
+            sc.line(rail, ladder + (255,), width=max(3, int(cell * 0.075)))
             sc.line(rail, ladder_dk + (255,), width=2)
-        rungs = max(2, int(math.hypot(dx, dy) / (cell * 0.62)))
+        rungs = max(3, int(math.hypot(dx, dy) / (cell * 0.30)))
         for k in range(rungs + 1):
             f = k / float(rungs)
             p0 = (a[0] + dx * f + pxp * gap, a[1] + dy * f + pyp * gap)
             p1 = (a[0] + dx * f - pxp * gap, a[1] + dy * f - pyp * gap)
             sc.line([p0, p1], ladder_dk + (255,),
-                    width=max(2, int(cell * 0.06)))
+                    width=max(2, int(cell * 0.042)))
 
     def token(cx, cy, col, scale=1.0):
         r = cell * 0.30 * scale
@@ -2574,9 +2603,8 @@ def scene_snl():
         sc.ellipse([cx - r * 0.32 - sr, cy - r * 0.34 - sr,
                     cx - r * 0.32 + sr, cy - r * 0.34 + sr],
                    fill=(255, 255, 255, 130))
-        sc.text(str(1 if col == red else 2 if col == green else
-                    3 if col == gold else 4), int(r * 0.95), int(cx),
-                int(cy), fill=(255, 255, 255, 240), shadow=False)
+        # THE BARE PAWN (the v0.3.9-13 round): the numeral is gone -
+        # the tray carries the number, the pawn stays clean
 
     # the cast: a red walker on a plain cell, the gold rider MID-LADDER,
     # the blue token falling the 54->31 body's turns
@@ -2598,9 +2626,9 @@ def scene_snl():
                fall_pts[i][1] + (fall_pts[i + 1][1] - fall_pts[i][1]) * fr)
         token(mid[0], mid[1], blue, 0.94)
 
-    # THE TRAY CARDS (the game's own trays): YOU with the settled 5 at
-    # its die pad, CPU with the empty pad
-    tray_w, tray_h = 190, 64
+    # THE TRAY CARDS (the game's own WIDE badges, the v0.3.9-13 round):
+    # YOU with the settled 5 at its die pad, CPU with the empty pad
+    tray_w, tray_h = 300, 64
     for (tx, ty, col, who, num, die_face) in [
             (636, 120, red, "YOU", 1, 5),
             (636, 206, green, "CPU", 2, 0)]:

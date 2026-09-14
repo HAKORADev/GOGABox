@@ -46,12 +46,13 @@ func _scene_game(mode := 1) -> void:
 func _drain(max_ticks := 600) -> void:
         g.probe_drain(max_ticks)
 
-## the gate tap -> the mode sheet -> the pick (the real start flow)
+## the mode ask -> the pick seats the TAP ANYWHERE gate -> the gate tap
+## opens the round (THE v0.3.9-13 FLOW LAW: the ask comes first)
 func _start(mode: int) -> void:
-        g._gate_down()
-        g._mode_sheet()
-        await get_tree().process_frame
         g._pick_mode(mode)
+        await get_tree().process_frame
+        g._gate_down()
+        g._new_round()
         await get_tree().process_frame
 
 ## roll for the user army and settle the theater

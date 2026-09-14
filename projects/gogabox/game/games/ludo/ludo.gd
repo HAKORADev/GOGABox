@@ -6,6 +6,32 @@ extends GogaGame
 ## "i played many ludos ... actually to me, the original one dice is the
 ## better choice, two dices are used just to speed up gameplay".
 ##
+## Owner contract (v0.3.9-13, the test-report round):
+##   - THE SEAT TRUTH: the yard seats mirrored WRONG for armies 2/3/4
+##     ("the pawns ... in their house/holding area are accurate for
+##     player 1 which is user, but all others have inaccurate positions")
+##     - the seat origins are the base origin +1.95/+4.05 now, every
+##     army's four seats sit ON its own plate's corners
+##   - THE BARE CENTER: "the winning area has a circle under the square,
+##     remove that circle" - the home medallion is gone; the four
+##     triangles point into the bare slab
+##   - THE TACTICAL CPU (supersedes the v0.3.9-10 pure-RNG law): "there
+##     can be many possibile ways to play the next move, like moving
+##     forward to win or release extra pawn or eat an opponent's pawn,
+##     there is logic that needs profiles and accurate working on it i
+##     mean to make it actually tactical!" - FOUR hidden moods (racer /
+##     hunter / guard / chaos) weight ONE scorer over the POST-move
+##     board (win 10x, eat 7x, drop 5x, the flee, the wall, the risk);
+##     the mood redraws every round
+##   - THE FLOW LAW: the mode ask opens the game, the pick seats the
+##     TAP ANYWHERE gate, the gate tap starts the round (the snakes
+##     board's correction, the house keeps one flow) - and the ask wears
+##     its ONE short title ("CHOOSE MODE", law 28's v0.3.9-13 note)
+##   - THE CROWN CATCH (the probe's endgame soak): the home square is
+##     THE CROWN - the 2-pawn cap lives on the LANE cells only; a cap on
+##     the home square refused a 3rd arriving pawn FOREVER (a round no
+##     one could ever win)
+##
 ## Owner contract (v0.3.9-10, verbatim intent):
 ##   - VERTICAL: "the board is squared, making a square in vertical
 ##     position takes proper place instead of the horizontal which will
@@ -250,16 +276,27 @@ static func legal_moves(poss: Array, army: int, roll: int,
                                 out.append({"piece": p, "np": np,
                                         "eats": lc["eats"]})
                 else:
-                        # the lane (51..55) and the home square (56): the
-                        # army's private road wears the same 2-pawn cap
-                        var cap := 0
-                        for q in 4:
-                                var qp := int(poss[(army - 1) * 4 + q])
-                                if qp == np:
-                                        cap += 1
-                        if cap < 2:
+                        # the lane (51..55) wears the 2-pawn cap (the
+                        # blockade law in miniature); the home square (56)
+                        # is THE CROWN - every pawn of the team rests
+                        # there, all four complete. THE v0.3.9-13 CATCH:
+                        # the cap on the home square strangled the
+                        # round's end (a 3rd arriving pawn was refused
+                        # FOREVER - the probe's endgame soak caught a
+                        # round no one could ever win)
+                        if np == int(PATH_LEN):
                                 out.append({"piece": p, "np": np,
                                         "eats": []})
+                        else:
+                                var cap := 0
+                                for q in 4:
+                                        var qp := int(poss[(army - 1) * 4 \
+                                                        + q])
+                                        if qp == np:
+                                                cap += 1
+                                if cap < 2:
+                                        out.append({"piece": p, "np": np,
+                                                "eats": []})
         return out
 
 ## the pure result of one move: the mover walks, the eaten go home (no
@@ -320,6 +357,132 @@ static func crosses_coin(army: int, from_pos: int, np: int,
                 if ring_at(army, k) == coin_ring:
                         return true
         return false
+
+# ==================================================== THE TACTICAL CPU
+## THE OWNER'S UPGRADE (v0.3.9-13, verbatim: "the opponent intelligence
+## in this game i feel it is weak, i mean there can be many possibile
+## ways to play the next move, like moving forward to win or release
+## extra pawn or eat an opponent's pawn, there is logic that needs
+## profiles and accurate working on it i mean to make it actually
+## tactical!") - FOUR hidden moods (the dice game's hidden-mood law)
+## weight ONE scorer; every legal move is scored on the POST-move board
+## (the threat that matters is the threat AFTER the walk). Each CPU
+## army draws its mood fresh at every round's start.
+const CPU_MOODS := {
+        "racer": {"win": 9.0, "eat": 2.0, "safe": 1.4, "drop": 1.8,
+                "block": 0.8, "flee": 1.6, "risk": 0.9, "lane": 2.2,
+                "step": 1.0, "jit": 0.6},
+        "hunter": {"win": 7.0, "eat": 5.0, "safe": 1.0, "drop": 2.4,
+                "block": 1.0, "flee": 0.9, "risk": 0.6, "lane": 1.2,
+                "step": 0.7, "jit": 0.6},
+        "guard": {"win": 7.0, "eat": 2.4, "safe": 2.6, "drop": 1.2,
+                "block": 2.6, "flee": 2.2, "risk": 1.7, "lane": 1.6,
+                "step": 0.7, "jit": 0.5},
+        "chaos": {"win": 6.0, "eat": 3.0, "safe": 1.6, "drop": 1.8,
+                "block": 1.4, "flee": 1.2, "risk": 0.8, "lane": 1.6,
+                "step": 0.8, "jit": 2.4},
+}
+
+## is the ring cell `ring` threatened for `army`? (a FOE lands there
+## with a raw 1..6). The guarded cells are calm, and the team's own
+## TWO-pawn block refuses every landing - a wall cannot be eaten.
+## `board` is the board the threat is read on (the post-move board for
+## the landing check, the live board for the flee check).
+static func threatened(board: Array, army: int, ring: int,
+        teams: Dictionary) -> bool:
+        if ring < 0 or is_safe_ring(ring):
+                return false
+        var my_team := int(teams[army])
+        var occ := ring_occ(board, ring, teams)
+        var my_n := 0
+        for t in occ:
+                if int(t) == my_team:
+                        my_n += (occ[t] as Array).size()
+        if my_n >= 2:
+                return false    # our own wall - nobody lands here
+        for fa in teams:
+                if int(teams[fa]) == my_team:
+                        continue
+                for p in 4:
+                        var fp := int(board[(int(fa) - 1) * 4 + p])
+                        if fp < 0 or fp > 50:
+                                continue
+                        for k in range(1, 7):
+                                if ring_at(int(fa), fp + k) == ring:
+                                        return true
+        return false
+
+## THE SCORER: one move's worth in the mood's own eyes. Every check
+## reads the POST-move board (apply_move's result) - the truth after
+## the walk, not the guess before it.
+static func cpu_score(poss: Array, army: int, m: Dictionary,
+        teams: Dictionary, w: Dictionary) -> float:
+        var piece := int(m["piece"])
+        var np := int(m["np"])
+        var pos := int(poss[(army - 1) * 4 + piece])
+        var res := apply_move(poss, army, piece, np, teams)
+        var npos: Array = res["poss"]
+        var s := 0.0
+        # THE WIN: the walk's whole point
+        if np == int(PATH_LEN):
+                s += 10.0 * float(w["win"])
+        # THE EAT: send them home (each extra eater pays more)
+        var eats_n := (m["eats"] as Array).size()
+        if eats_n > 0:
+                s += (7.0 + 2.0 * float(eats_n - 1)) * float(w["eat"])
+        # THE DROP: a fresh pawn on the road (the start cell is guarded)
+        if pos < 0:
+                s += 5.0 * float(w["drop"])
+        # THE LANE: the private road - nobody eats you there
+        if np > 50 and np < int(PATH_LEN):
+                s += 4.0 * float(w["lane"])
+        # THE SAFE CELL: the guarded rest
+        if np <= 50 and is_safe_ring(ring_at(army, np)):
+                s += 3.0 * float(w["safe"])
+        # THE WALL: pairing up on the landing cell (post-move truth)
+        if np <= 50 and is_block_at(npos, ring_at(army, np), teams):
+                s += 3.0 * float(w["block"])
+        # THE FLEE: standing threatened, landing calm
+        if pos >= 0 and pos <= 50:
+                var here := ring_at(army, pos)
+                if threatened(poss, army, here, teams):
+                        var calm: bool = np > 50 \
+                                        or not threatened(npos, army,
+                                        ring_at(army, np), teams)
+                        if calm:
+                                s += 5.0 * float(w["flee"])
+        # THE RISK: walking into a foe's 1..6 reach (the post-move board
+        # - a threat we just ate no longer counts)
+        if np <= 50 and threatened(npos, army, ring_at(army, np), teams):
+                s -= 6.0 * float(w["risk"])
+        # THE BROKEN WALL: leaving our own pair behind
+        if pos >= 0 and pos <= 50 \
+                        and is_block_at(poss, ring_at(army, pos), teams) \
+                        and not (np <= 50 and is_block_at(npos,
+                        ring_at(army, np), teams)):
+                s -= 2.5 * float(w["block"])
+        # THE STEP: forward is forward (the tie breaker)
+        s += float(np) * 0.03 * float(w["step"])
+        return s
+
+## the mood's pick: the best-scoring legal move under its own weights,
+## the jitter keeping every CPU its own creature
+static func cpu_pick(poss: Array, army: int, roll: int,
+        teams: Dictionary, mood: String,
+        rng: RandomNumberGenerator) -> Dictionary:
+        var moves := legal_moves(poss, army, roll, teams)
+        if moves.is_empty():
+                return {}
+        var w: Dictionary = CPU_MOODS.get(mood, CPU_MOODS["chaos"])
+        var best: Dictionary = moves[0]
+        var best_s := -1e12
+        for m in moves:
+                var sc := cpu_score(poss, army, m, teams, w)
+                sc += rng.randf_range(-float(w["jit"]), float(w["jit"]))
+                if sc > best_s:
+                        best_s = sc
+                        best = m
+        return best
 
 # ============================================================ the themes
 ## 5 themes, the first is the default (the owner's law). A theme owns
@@ -437,6 +600,8 @@ var wins := 0
 var losses := 0
 var streak := 0
 var done := false             # the run's over flag (host owns the rest)
+var cpu_moods := {}           # army -> mood key (THE TACTICAL CPU: the
+                              # hidden profile, redrawn every round)
 
 # the dice theater (one die, it travels to the turn army's tray)
 var die_face := 1
@@ -506,7 +671,10 @@ func _goga_setup() -> void:
         _build_widgets(vp)
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/ludo_theme.wav")
-        _build_ready()
+        ## THE FLOW LAW: the optionals ask opens the game FIRST, the
+        ## TAP ANYWHERE gate seats after the pick (the snakes board's
+        ## own correction, the house keeps one flow)
+        _mode_sheet()
 
 func _fresh_poss() -> void:
         poss = []
@@ -603,9 +771,14 @@ func _socket_point(a: int, piece: int) -> Vector2:
         ## chess-like are wrong, they should be at the internal edges of
         ## the square") - the classic yard: a centered inner plate (3x3)
         ## and the four seats AT ITS CORNERS, not a loose 2x2 floating
-        ## near the outer corner
-        var bx := 1.95 if a == 1 or a == 4 else 10.05
-        var by := 1.95 if a == 1 or a == 2 else 10.05
+        ## near the outer corner. THE SEAT TRUTH (the owner's v0.3.9-13
+        ## round: player 1's seats were accurate but the other three
+        ## armies' seats sat OUTSIDE their plates - the mirrored bases
+        ## need the mirrored offsets: the seat x/y are the base origin
+        ## +1.95/+4.05, never a raw 10.05 which lands left of the
+        ## right-side plates)
+        var bx := 1.95 if a == 1 or a == 4 else 10.95
+        var by := 1.95 if a == 1 or a == 2 else 10.95
         var dx := 2.1 * float(piece % 2)
         var dy := 2.1 * float(piece / 2)
         return board_origin + Vector2((bx + dx) * cell, (by + dy) * cell)
@@ -912,15 +1085,10 @@ func _draw_board() -> void:
                                 cell * 0.24), str(army),
                                 HORIZONTAL_ALIGNMENT_CENTER, cell * 1.2,
                                 int(cell * 1.05), mark_col)
-        # THE HOME: a soft medallion behind the four triangles pointing in
-        var mid := board_origin + Vector2(board_side, board_side) * 0.5
-        var med: Color = th["tile"]
-        med = med.lightened(0.25) if (med as Color).v <= 0.5 \
-                        else med.lightened(0.12)
-        board_l.draw_circle(mid, cell * 1.26, med)
-        board_l.draw_circle(mid, cell * 1.26, th["lane_ink"], false, 2.0)
-        # the center's four triangles pointing in (the medallion sits
-        # behind them)
+        # THE HOME: the four triangles pointing in, NOTHING under them
+        # (the owner's v0.3.9-13 round: "the winning area has a circle
+        # under the square, remove that circle" - the medallion is gone,
+        # the tiles' own cream reads behind the triangles)
         var tri := [
                 {"army": 2, "pts": [Vector2i(6, 6), Vector2i(8, 6),
                         Vector2i(7, 7)]},
@@ -1433,9 +1601,18 @@ func _goga_input(event: InputEvent) -> void:
                 return
         _tap_msec = now
         _tap_at = at
+        ## THE FLOW LAW (the owner's v0.3.9-13 round on the snakes board:
+        ## "you showed first the 'tap anywhere' then showed the
+        ## optionals, it should be the opposite") - the ask opens the
+        ## game, the pick seats the TAP ANYWHERE gate, the gate's tap
+        ## opens the round
         if state == "ready":
                 _gate_down()
                 _mode_sheet()
+                return
+        if state == "gate":
+                _gate_down()
+                _new_round()
                 return
         _tap(at)
 
@@ -1494,12 +1671,14 @@ func _tap(at: Vector2) -> void:
 # ------------------------------------------------------- the mode sheet
 
 func _mode_sheet() -> void:
-        ## THE HOUSE OPTIONALS LAW (the owner's v0.3.9-11 round: "make it
-        ## like the snake one where it shows them as side by side options,
-        ## like fruit slasher too, no need to explain what each mode is,
-        ## this is the guide work") - three equal cards, ONE color, one
-        ## tap starts the round. No title, no hint, no talk.
+        ## THE HOUSE OPTIONALS LAW (law 28, the v0.3.9-13 correction:
+        ## the ask wears ONE short title - the snake sheet's own
+        ## "CHOOSE MODE" words) - three equal cards, ONE color, one tap
+        ## seats the gate
         var sheet := sheet_push(0.0, "mode")
+        var t := Arc.label("CHOOSE MODE", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 14)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1517,12 +1696,12 @@ func _pick_mode(m: int) -> void:
         mode = m
         teams = teams_of(m)
         playing = [1, 2] if m == 1 else [1, 2, 3, 4]
-        # off "ready" BEFORE the pop - the pop-callback rebuilds the gate
-        # only when the sheet was closed without a pick (the back button)
-        state = "handoff"
+        # the pick seats the TAP ANYWHERE gate (the flow law) - the
+        # round opens on the gate's tap, not on the pick
+        state = "gate"
         clock = -1.0
         sheet_pop()
-        _new_round()
+        _build_ready()
 
 func _goga_sheet_popped(id: String) -> void:
         if id == "shop":
@@ -1530,11 +1709,12 @@ func _goga_sheet_popped(id: String) -> void:
                 get_tree().paused = false
                 paused = false
                 _repaint()
-                if state == "ready" and ready_ui != null \
+                if state in ["ready", "gate"] and ready_ui != null \
                                 and is_instance_valid(ready_ui):
                         ready_ui.visible = true
         elif id == "mode" and state == "ready":
                 # the back button closed the mode ask - the gate returns
+                # so its tap re-opens the ask (the flow law)
                 _build_ready()
 
 func _repaint() -> void:
@@ -1549,6 +1729,15 @@ func _new_round() -> void:
         _fresh_poss()
         rounds += 1
         verdict_lbl.visible = false
+        # THE TACTICAL CPU: every rival draws its hidden mood for the
+        # round (the profiles the owner asked for - the dice game's
+        # hidden-mood law, the ludo dialect)
+        cpu_moods.clear()
+        var mood_keys := CPU_MOODS.keys()
+        for a in playing:
+                if not _is_user_army(int(a)):
+                        cpu_moods[int(a)] = mood_keys[_rng.randi() \
+                                        % mood_keys.size()]
         # THE OPENER LAW: round 1 is the user's; after that the LOSER's
         # team opens (no draws on this board)
         turn_army = opener
@@ -1861,11 +2050,18 @@ func _goga_tick(delta: float) -> void:
                 "picking":
                         if not _is_user_army(turn_army) \
                                         and clock >= CPU_PICK:
-                                # THE PURE RNG (the owner's own law): the
-                                # CPU picks uniformly among its legal moves
-                                var m: Dictionary = legal[_rng.randi() \
-                                                % legal.size()]
-                                _start_move(int(m["piece"]), int(m["np"]))
+                                # THE TACTICAL PICK (the owner's upgrade:
+                                # "logic that needs profiles and accurate
+                                # working on it") - the mood scores every
+                                # legal move on the post-move board; the
+                                # jitter keeps it a creature, not a solver
+                                var m: Dictionary = cpu_pick(poss,
+                                                turn_army, roll, teams,
+                                                String(cpu_moods.get(
+                                                turn_army, "chaos")), _rng)
+                                if not m.is_empty():
+                                        _start_move(int(m["piece"]),
+                                                        int(m["np"]))
                 "walking":
                         if not walk.is_empty():
                                 var pts_n: int = (walk["pts"] as \

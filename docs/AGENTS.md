@@ -742,13 +742,19 @@ the house layout, never a bespoke one.**
 The owner: a game's options menu "looks completely unrelated" when an
 agent invents a new layout per game. Every mode/optional ask follows
 the same bones: a dim + centered panel (Arc.sheet or the slasher
-overlay), the choices as EQUAL side-by-side cards/buttons in one
-HBoxContainer row (snake's mode row, fruit slasher's produce row, the
-ludo X1/X2/X4 row), ONE shared action color, NO title, NO hint line,
-NO explanation of what each mode is - "this is the guide work". Per-
-game differences are allowed only in the labels/icons themselves, not
-in the layout's bones. And the state stays visible: a selected choice
-reads ON (law 27a's spirit, in options too).
+overlay), ONE short TITLE that states the ask, the choices as EQUAL
+side-by-side cards/buttons in one HBoxContainer row (snake's mode row,
+fruit slasher's produce row, the ludo X1/X2/X4 row), ONE shared action
+color, NO hint line, NO explanation of what each mode is - "this is the
+guide work". (THE v0.3.9-13 CORRECTION: the owner caught the title-less
+optionals sheet - "i have even gave you an example what a title to
+write" - and pinned the rule: not-too-helpful NEVER meant write-
+nothing. A mode ask carries its question in one short line, the
+owner's own examples: "HOW MANY PLAYERS" (snl), "CHOOSE MODE" (ludo,
+snake). No second line, no explanations, no talk under the title.)
+Per-game differences are allowed only in the labels/icons themselves,
+not in the layout's bones. And the state stays visible: a selected
+choice reads ON (law 27a's spirit, in options too).
 
 **29. THE GUIDE CARRIES THE WORDS (v0.3.9-11) - "too helpful" text has
 exactly one home.**
@@ -761,3 +767,35 @@ and NOWHERE else. In-game surfaces (gates, trays, HUD, sheets) carry
 at most ONE short state line the moment needs ("THINKING", "(ON)",
 "TAP ANYWHERE TO START"). If you find yourself writing a second
 comma, you are writing guide text in the wrong place.
+
+**30. THE PAUSE NEVER OUTLIVES ITS SESSION (v0.3.9-13) - a quit must
+leave the tree breathing.**
+The flow rig caught the cascade: the character lore cards pause the
+tree (`get_tree().paused = true`), and a game quit from UNDER an open
+card (the once-ever lore opens at first boot; the player quits instead
+of tapping through) carried the pause into EVERY later launch - the
+loader's outro tween is pause-bound, so the next game never finished
+loading and the whole shelf looked dead. The fix lives in the HOST
+(host_node._quit_to_menu): dismiss any open story card
+(`game.box_story_dismiss()` - the shared card AND the legacy
+invaders/pacman pair, duck-typed) and set `get_tree().paused = false`
+before the session ends. Rule of thumb: ANYTHING a game pauses, the
+host's quit path must unpause; a modal that outlives its scene is a
+dead box.
+
+**31. THE BOX STORY LAWS (v0.3.9-13) - the cast's dialogue has one
+shape and one seat.**
+The characters speak (docs/goga_docs/CHARACTERS.md is the bible):
+(a) **THE ONCE-EVER LAW**: a story beat fires once ever per game -
+`Box.counter` + `Box.bump_counter` with "lore_start"/"lore_end".
+Replays never re-tell. (b) **THE SHARED CARD LAW**: new dialogue rides
+`box_story_show` in game_base.gd (the name in the character's own
+color, the name bar, the typewriter beat at ~55 glyphs/s, first tap
+completes the line, next tap continues - TWEEN_PAUSE_PROCESS so it
+types under the pause). NEVER build a raw Arc.sheet for a new story
+(law 25). (c) **THE SEAT LAW**: first-start lore opens at the END of
+`_goga_setup` and chains the game's own first screen through its
+`after` callable; a first-end lore opens where the run ends and chains
+`finish_run`. (d) **THE EASTER-EGG LAW**: ambient dialogue (the table's
+secret, jumpcube's 60s idle) NEVER pauses - it draws over live play,
+auto-advances, and a tap skips ahead.
