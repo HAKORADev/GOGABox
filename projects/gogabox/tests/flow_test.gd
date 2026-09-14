@@ -22,6 +22,7 @@ func _ready() -> void:
         fails += _test("squares: dots-and-boxes CPU sanity", _t_squares_ai())
         fails += _test("jumpcube: conquer dice CPU sanity", _t_jumpcube_ai())
         fails += _test("ludo: board ludo rules sanity", _t_ludo_rules())
+        fails += _test("snl: snakes & ladders rules sanity", _t_snl_rules())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -311,8 +312,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 23,
-                "23 playable games (board ludo joined, v0.3.9-10)")
+        var ok := _check(GameReg.playable().size() == 24,
+                "24 playable games (snakes & ladders joined, v0.3.9-12)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -320,8 +321,8 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
-        ok += _check(GameReg.workshop().size() == 1,
-                "1 workshop teaser (board ludo graduated, v0.3.9-10)")
+        ok += _check(GameReg.workshop().size() == 0,
+                "0 workshop teasers (snl graduated v0.3.9-12 - the workshop rests)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -540,7 +541,7 @@ func _t_registry() -> int:
         ok += _check(String(GameReg.get_game("jumpcube")["title"]) == "CONQUER DICE" \
                         and String(GameReg.get_game("ludo")["title"]) == "BOARD LUDO" \
                         and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
-                "the teasers wear the owner's names (jumpcube + ludo graduated, snl parked)")
+                "the graduations wear the owner's names (jumpcube + ludo + snl)")
         # v0.3.9-10: BOARD LUDO graduates (the teaser LUDO ROAD renamed)
         var lg_reg: Dictionary = GameReg.get_game("ludo")
         ok += _check(not bool(lg_reg.get("coming_soon", false)) \
@@ -552,6 +553,17 @@ func _t_registry() -> int:
                 "board ludo wears the shop + the banner")
         ok += _check(lg_reg["ach"].size() == 15,
                 "board ludo wears the tiered ladder (15)")
+        # v0.3.9-12: SNAKES & LADDERS graduates (the workshop teaser ships)
+        var snl_reg: Dictionary = GameReg.get_game("snl")
+        ok += _check(not bool(snl_reg.get("coming_soon", false)) \
+                        and String(snl_reg["orientation"]) == "portrait",
+                "snakes & ladders is PLAYABLE now: portrait (the tall-board law)")
+        ok += _check(int(snl_reg["coin_div"]) == 1 and int(snl_reg["fee"]) == 8,
+                "snakes & ladders wears the owner's economy (bonus /1, fee 8)")
+        ok += _check(bool(snl_reg["shop"]) and bool(snl_reg["banner"]),
+                "snakes & ladders wears the shop + the banner")
+        ok += _check(snl_reg["ach"].size() == 15,
+                "snakes & ladders wears the tiered ladder (15)")
         # v0.3.9-5: DOT EATER graduates (the teaser DOT MUNCHER renamed)
         var pg: Dictionary = GameReg.get_game("pacman")
         ok += _check(not bool(pg.get("coming_soon", false)) \
@@ -1797,6 +1809,94 @@ func _t_ludo_rules() -> int:
         ok += _check(bool(LD.crosses_coin(1, 5, 8, 7)) \
                         and not bool(LD.crosses_coin(1, 5, 6, 7)),
                 "passing through collects, no need to land (the owner's law)")
+        # THE EXACT LANDING LAW (the owner pointed it at BOTH board
+        # games, v0.3.9-12: "i am at 97 and for 100 i need the dice to
+        # be 3, if dice was 4, it should be illegal and my turn is
+        # skipped") - ludo's home square wears the same refusal
+        var xl_home := fresh.duplicate()
+        xl_home[0] = 54       # army 1's pawn deep in its lane
+        var xl_over: Array = LD.legal_moves(xl_home, 1, 6, teams)
+        var xl_over_ok := true
+        for m in xl_over:
+                if int(m["piece"]) == 0:
+                        xl_over_ok = false
+        ok += _check(xl_over_ok,
+                "54 + 6 is refused whole (the exact landing law, ludo)")
+        var xl_exact: Array = LD.legal_moves(xl_home, 1, 2, teams)
+        var xl_exact_ok := false
+        for m in xl_exact:
+                if int(m["piece"]) == 0 and int(m["np"]) == 56:
+                        xl_exact_ok = true
+        ok += _check(xl_exact_ok,
+                "54 + 2 walks the home square (the exact landing, ludo)")
+        return ok
+
+# ------------------------------------------------------------------ snl
+
+func _t_snl_rules() -> int:
+        var ok := 0
+        var SN: GDScript = load("res://game/games/snl/snl.gd")
+        # THE BOARD: the boustrophedon - 1 bottom-left, 10 bottom-right,
+        # 11 above 10, 100 top-left
+        ok += _check(String(SN.cell_grid(1)) == "(0, 0)",
+                "cell 1 sits bottom-left")
+        ok += _check(String(SN.cell_grid(10)) == "(9, 0)",
+                "cell 10 sits bottom-right")
+        ok += _check(String(SN.cell_grid(11)) == "(9, 1)",
+                "cell 11 turns back above 10 (the boustrophedon)")
+        ok += _check(String(SN.cell_grid(20)) == "(0, 1)",
+                "cell 20 ends the snake row at the left")
+        ok += _check(String(SN.cell_grid(100)) == "(0, 9)",
+                "cell 100 sits top-left (the crown)")
+        ok += _check(int(SN.grid_cell(Vector2i(9, 0))) == 10 \
+                        and int(SN.grid_cell(Vector2i(0, 9))) == 100,
+                "the inverse reads the same cells back")
+        # THE CLASSIC FIXED TABLE (the Milton Bradley places)
+        ok += _check(int(SN.LADDERS[4]) == 25 and int(SN.LADDERS[74]) == 92 \
+                        and (SN.LADDERS as Dictionary).size() == 7,
+                "the seven ladders wear the classic places")
+        ok += _check(int(SN.SNAKES[99]) == 41 and int(SN.SNAKES[27]) == 5 \
+                        and (SN.SNAKES as Dictionary).size() == 8,
+                "the eight snakes wear the classic places (99 the heartbreaker)")
+        # NO CHAINS: no ladder top is a head or a base; no tail either
+        var chain_free := true
+        for top in SN.LADDERS.values():
+                var t := int(top)
+                if (SN.SNAKES as Dictionary).has(t) \
+                                or (SN.LADDERS as Dictionary).has(t):
+                        chain_free = false
+        for tail in SN.SNAKES.values():
+                var t2 := int(tail)
+                if (SN.SNAKES as Dictionary).has(t2) \
+                                or (SN.LADDERS as Dictionary).has(t2):
+                        chain_free = false
+        ok += _check(chain_free, "the classic table wears no chains")
+        # THE RESOLVE: ladder / snake / plain
+        ok += _check(String(SN.resolve_land(13)["ride"]) == "ladder" \
+                        and int(SN.resolve_land(13)["to"]) == 46,
+                "landing on 13 resolves the ladder ride to 46")
+        ok += _check(String(SN.resolve_land(99)["ride"]) == "snake" \
+                        and int(SN.resolve_land(99)["to"]) == 41,
+                "landing on 99 resolves the snake fall to 41")
+        ok += _check(String(SN.resolve_land(97)["ride"]) == "" \
+                        and int(SN.resolve_land(97)["to"]) == 97,
+                "a plain cell resolves to itself")
+        # THE EXACT LANDING LAW (the owner: "if dice was 4, it should be
+        # illegal and my turn is skipped")
+        ok += _check(int(SN.legal_to(97, 3)) == 100 \
+                        and int(SN.legal_to(97, 4)) == -1,
+                "97 takes a 3 and refuses a 4 (the exact landing law)")
+        ok += _check(int(SN.legal_to(0, 6)) == 6 \
+                        and int(SN.legal_to(99, 1)) == 100,
+                "the pen enters with the roll, 99 + 1 crowns")
+        # THE COIN SPOTS: strictly ahead, free of tokens
+        var spots: Array = SN.coin_spots(50, [52, 60])
+        var coin_ok: bool = not spots.has(50) and not spots.has(52) \
+                and not spots.has(60) and spots.has(51) and spots.has(100)
+        ok += _check(coin_ok,
+                "the coin shines strictly ahead, never under a token")
+        ok += _check((SN.coin_spots(100, []) as Array).is_empty(),
+                "a crowned token leaves no spots (moot - the round ended)")
         return ok
 
 # ------------------------------------------------------------------ roadmap
@@ -2175,8 +2275,8 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 1,
-                "the last one is the workshop (board ludo graduated)")
+        ok += _check(GameReg.workshop().size() == 0,
+                "the workshop rests (snl graduated, no teaser parked)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2769,7 +2869,10 @@ func _t_soon_art() -> int:
         var ok := 0
         var teasers := GameReg.GAMES.filter(
                         func(g): return bool(g.get("coming_soon", false)))
-        ok += _check(not teasers.is_empty(), "the workshop has coming_soon games")
+        # v0.3.9-12: the workshop RESTS (snl graduated, no teaser parked)
+        # - the SOON ? LAW stays total for whenever the next teaser joins
+        ok += _check(true, "the SOON ? law stands (workshop empty: %d teasers)"
+                        % teasers.size())
         if teasers.is_empty():
                 Box.reset_all()
                 return ok

@@ -24,3 +24,7 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 18. FIVE IN ROW
 19. SQUARES
 20. DOT EATER
+21. BRICK BREAKER
+22. CONQUER DICE
+23. BOARD LUDO
+24. SNAKES & LADDERS

@@ -299,6 +299,14 @@ stay.
   outspin / outsmash / ring-out / burst the rival top. Clashes, sparks,
   stamina drains, a stadium that fights back. (Owner: "a game with beyblade
   battling concept".)
+- **moorhuhn-like** (owner, v0.3.9-12 round) — the classic shooting
+  gallery: birds keep crossing the sky at every height and speed, the
+  crosshair tracks the finger, every trigger pull spends a shot, every
+  bird down pays its points - hunt the sky against the clock. The
+  Moorhuhn/Crazy Chicken energy. (Dedup: cosmic_spud is the top-down
+  arena shooter ON FOOT, swamp-attack-like is the porch horde defense,
+  pop_siege pops lanes - THIS one is a stationary crosshair gallery, the
+  sky is the target sheet.)
 
 ## Puzzle
 - **klickety-like** - KDE Klickety (SameGame/Clickomania energy): a board
@@ -500,6 +508,17 @@ stay.
   in that concept/type of tower-defense in a different way": defend the
   porch, tap-to-shoot the horde, reload rhythm + power-ups - tower defense
   re-skinned as a point-and-hold shooter.
+- **house-hold-rogue-like** (owner, v0.3.9-12 round) — ONE controlled
+  character in a TOP-DOWN rogue-like tower defense: kill the enemies with
+  your weapons AND defend the house as long as possible without getting
+  destroyed, staying alive by DODGING enemy shots to keep your life
+  points. Waves climb, upgrades PERSIST between runs, the shape is open
+  on purpose (horizontal, vertical, or both). (Dedup: pop_siege is
+  lane-and-economy defense with no walker; merge-tower-defense-rogue-like
+  merges defenders and never moves them; cosmic_spud is the arena shooter
+  with no house to lose; vehicle-horde-rogue-like drives - HERE the
+  character is on foot, the house is the health bar, and the dodge is a
+  skill.)
 - (the beyblade-like above also leans here - parts loadout before the
   match is a strategy layer on top of an arcade battle.)
 
@@ -687,6 +706,27 @@ PIXEL, NEON, CANDY) owning the room + the board wall + the neutral dice +
 the enemy + EACH THEME'S OWN SFX VOICE; and the DICE SKINS that re-ink
 ONLY the user's dice ("theme is everything except user-owned dices").
 GDD: this dump + the game header are the spec.
+
+Nineteenth dump - the v0.3.9-12 graduation (2026-09-14): the SNAKES &
+LADDERS teaser left the workshop and shipped whole (the owner's own
+spec, one message). PURE RNG - "ludo has a little logic but this one is
+literally pure RNG!"; 10x10 / 100 steps, players 2..4 (2 = 1v1, 3 =
+1v2, 4 = 1v3, one token each waiting OUT of the board in its tray);
+the die and the W/L law ride over from ludo (the waiting-die roll
+button, win +1 / lose -1, bonus /1, the loser opens); THE CLASSIC FIXED
+TABLE (Milton Bradley: ladders 4/13/33/42/50/62/74, snakes
+27/40/43/54/66/76/89/99 - "same places of snakes and ladders"); THE
+EXACT LANDING LAW (97 needs a 3 for 100 - a 4 is refused and the turn
+skips, pinned for BOTH board games); the ladder ride slides the lanes
+between the rails, the snake fall follows the drawn body's turns (the
+drawn path IS the ride); the 1,2,1,2 checker; the START mat + the crown
+medallion dress cells 1 and 100; a GOGACoin every 5 minutes strictly
+ahead of the user; 5 skins + 5 themes (mountain / neon / candy / B&W /
+jungle - the 5th the owner left open, NOT pixelated); code-drawn art
+end to end. The same round parked TWO new ideas (the moorhuhn-like +
+the house-hold rogue-like TD, both dedup-checked above). GDD:
+docs/goga_docs/gogames_ideas/snl.md. The workshop now RESTS - no teaser
+parked until the owner names the next one.
 
 THE WHO-PLAYS-FIRST SCREEN (the owner's idea, v0.3.9-9 round - a SYSTEM
 for every versus game, parked until a future patch): before a versus

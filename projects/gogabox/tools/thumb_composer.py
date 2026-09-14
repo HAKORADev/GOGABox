@@ -2367,6 +2367,295 @@ SCENES = {
     "ludo": scene_ludo,
 }
 
+
+def scene_snl():
+    """SNAKES & LADDERS (v0.3.9-12): the game's own board drawn 1:1 -
+    the 1,2 checker, the classic fixed table, the START mat, the crown
+    medallion, a token mid-ladder, a token falling the snake body's
+    turns, the tray cards (the grayed waiting die + the settled 5) and
+    the GOGACoin shining on a cell."""
+    sc = Scene()
+    sc.backdrop((51, 42, 28), (36, 29, 16))
+    side = 520
+    cell = side / 10.0
+    ox, oy = 62, 60
+    frame = (110, 74, 38)
+    frame_dk = (84, 55, 28)
+    sq_a = (243, 234, 210)
+    sq_b = (220, 197, 155)
+    line = (138, 116, 78)
+    ink = (74, 58, 28)
+    ladder = (138, 90, 46)
+    ladder_dk = (95, 60, 28)
+    snake_c = (63, 143, 79)
+    snake_belly = (191, 224, 176)
+    red = (224, 83, 63)
+    green = (47, 158, 85)
+    gold = (232, 178, 58)
+    blue = (65, 121, 223)
+
+    def cgrid(n):
+        i = n - 1
+        r, c = divmod(i, 10)
+        if r % 2 == 1:
+            c = 9 - c
+        return (c, r)
+
+    def gpt(g):
+        return (ox + (g[0] + 0.5) * cell, oy + (9 - g[1] + 0.5) * cell)
+
+    def cc(n):
+        return gpt(cgrid(n))
+
+    # the slab + shadow
+    pad = 12
+    sc.rect([ox - pad + 7, oy - pad + 10, ox + side + pad + 7,
+             oy + side + pad + 10], fill=(0, 0, 0, 90))
+    sc.rect([ox - pad, oy - pad, ox + side + pad, oy + side + pad],
+            fill=frame + (255,), r=12)
+    sc.rect([ox - pad, oy + side + pad - 10, ox + side + pad,
+             oy + side + pad], fill=frame_dk + (255,))
+    sc.rect([ox - 2, oy - 2, ox + side + 2, oy + side + 2],
+            fill=line + (255,), r=6)
+    # THE CHECKER (the owner's 1,2,1,2)
+    for n in range(1, 101):
+        gx, gy = cgrid(n)
+        x0 = ox + gx * cell + 1.6
+        y0 = oy + (9 - gy) * cell + 1.6
+        x1 = ox + (gx + 1) * cell - 1.6
+        y1 = oy + (9 - gy + 1) * cell - 1.6
+        fill = sq_a if n % 2 == 1 else sq_b
+        sc.rect([x0, y0, x1, y1], fill=fill + (255,))
+    # the numerals (the classic board wears its numbers)
+    for n in range(1, 101):
+        gx, gy = cgrid(n)
+        sc.text(str(n), 11, int(ox + gx * cell + 12),
+                int(oy + (9 - gy + 1) * cell - 13),
+                fill=ink + (190,), shadow=False)
+    # THE START MAT (cell 1) + THE CROWN (cell 100)
+    c1 = cc(1)
+    m = cell * 0.36
+    sc.rect([c1[0] - m, c1[1] - m, c1[0] + m, c1[1] + m],
+            fill=snake_c + (255,), r=8)
+    sc.polygon([(c1[0], c1[1] - 11), (c1[0] + 10, c1[1] + 3),
+                (c1[0] - 10, c1[1] + 3)], (255, 255, 255, 235))
+    c100 = cc(100)
+    rad = cell * 0.40
+    sc.ellipse([c100[0] - rad, c100[1] - rad, c100[0] + rad,
+                c100[1] + rad], fill=(255, 210, 74, 255))
+    sc.ellipse([c100[0] - rad, c100[1] - rad, c100[0] + rad,
+                c100[1] + rad], outline=(138, 90, 30, 255), width=3)
+    sc.ellipse([c100[0] - rad * 0.7, c100[1] - rad * 0.7,
+                c100[0] + rad * 0.7, c100[1] + rad * 0.7],
+               fill=(255, 232, 154, 255))
+    star = []
+    for k in range(10):
+        ang = -math.pi / 2 + math.pi * k / 5.0
+        rr = rad * (0.5 if k % 2 == 0 else 0.21)
+        star.append((c100[0] + math.cos(ang) * rr,
+                     c100[1] + math.sin(ang) * rr))
+    sc.polygon(star, (232, 164, 30, 255))
+
+    # the snakes: the drawn body IS the fall (the game's one truth)
+    def snake_pts(head, tail):
+        h = cgrid(head)
+        t = cgrid(tail)
+        dx, dy = t[0] - h[0], t[1] - h[1]
+        dist = abs(dx) + abs(dy)
+        segs = max(3, min(7, int(dist / 2.6) + 2))
+        ln = math.hypot(dx, dy) or 1.0
+        dxn, dyn = dx / ln, dy / ln
+        pxp, pyp = -dyn, dxn
+        ctrl = [h]
+        for i in range(1, segs):
+            f = i / float(segs)
+            bx, by = h[0] + dx * f, h[1] + dy * f
+            side = 1 if i % 2 == 1 else -1
+            amp = (0.55 + 0.35 * math.sin(f * math.pi)) * (1 - 0.35 * f)
+            ctrl.append((bx + pxp * amp * side, by + pyp * amp * side))
+        ctrl.append(t)
+        pts = []
+        for i in range(len(ctrl) - 1):
+            p0 = ctrl[max(0, i - 1)]
+            p1 = ctrl[i]
+            p2 = ctrl[i + 1]
+            p3 = ctrl[min(len(ctrl) - 1, i + 2)]
+            for k in range(7):
+                tt = k / 7.0
+                t2 = tt * tt
+                t3 = t2 * tt
+                x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * tt
+                           + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0])
+                           * t2
+                           + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
+                y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * tt
+                           + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1])
+                           * t2
+                           + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+                pts.append((x, y))
+        pts.append(t)
+        return [gpt(p) for p in pts]
+
+    snakes = {27: 5, 40: 3, 43: 18, 54: 31, 66: 45, 76: 58, 89: 53, 99: 41}
+    fall_pts = None
+    for head, tail in snakes.items():
+        pts = snake_pts(head, tail)
+        if head == 54:
+            fall_pts = pts
+        n = len(pts)
+        for i in range(n - 1):
+            f = i / float(n - 1)
+            w = max(2, int((0.30 - 0.23 * f) * cell))
+            sc.line([pts[i], pts[i + 1]],
+                    tuple(int(c * 0.7) for c in snake_c) + (255,),
+                    width=max(2, w // 5))
+            sc.line([pts[i], pts[i + 1]], snake_c + (255,), width=w)
+        for i in range(n - 1):
+            f = i / float(n - 1)
+            w = max(1, int((0.13 - 0.10 * f) * cell))
+            sc.line([pts[i], pts[i + 1]], snake_belly + (200,),
+                    width=w)
+        # the head: skull + eyes + forked tongue
+        hp, hn = pts[0], pts[min(3, n - 1)]
+        hx, hy = hp[0] - hn[0], hp[1] - hn[1]
+        hl = math.hypot(hx, hy) or 1.0
+        hx, hy = hx / hl, hy / hl
+        pxp, pyp = -hy, hx
+        hr = cell * 0.21
+        sc.ellipse([hp[0] - hr, hp[1] - hr, hp[0] + hr, hp[1] + hr],
+                   fill=snake_c + (255,))
+        for s in (-1, 1):
+            ex = hp[0] + hx * cell * 0.07 + pxp * s * cell * 0.10
+            ey = hp[1] + hy * cell * 0.07 + pyp * s * cell * 0.10
+            er = cell * 0.055
+            sc.ellipse([ex - er, ey - er, ex + er, ey + er],
+                       fill=(255, 255, 255, 245))
+            er2 = cell * 0.026
+            sc.ellipse([ex - er2, ey - er2, ex + er2, ey + er2],
+                       fill=(12, 12, 12, 255))
+        tip = (hp[0] + hx * cell * 0.30, hp[1] + hy * cell * 0.30)
+        sc.line([hp, tip], (232, 87, 74, 255), width=2)
+
+    # the ladders: rails + rungs (the straight lane IS the ride)
+    ladders = {4: 25, 13: 46, 33: 49, 42: 63, 50: 69, 62: 81, 74: 92}
+    climb_ab = None
+    for base, top in ladders.items():
+        a, b = cc(base), cc(top)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        ln = math.hypot(dx, dy) or 1.0
+        pxp, pyp = -dy / ln, dx / ln
+        gap = cell * 0.17
+        if base == 50:
+            climb_ab = (a, b, pxp, pyp, gap)
+        ra = [(a[0] + pxp * gap, a[1] + pyp * gap),
+              (b[0] + pxp * gap, b[1] + pyp * gap)]
+        rb = [(a[0] - pxp * gap, a[1] - pyp * gap),
+              (b[0] - pxp * gap, b[1] - pyp * gap)]
+        for rail in (ra, rb):
+            sc.line(rail, ladder + (255,), width=max(3, int(cell * 0.10)))
+            sc.line(rail, ladder_dk + (255,), width=2)
+        rungs = max(2, int(math.hypot(dx, dy) / (cell * 0.62)))
+        for k in range(rungs + 1):
+            f = k / float(rungs)
+            p0 = (a[0] + dx * f + pxp * gap, a[1] + dy * f + pyp * gap)
+            p1 = (a[0] + dx * f - pxp * gap, a[1] + dy * f - pyp * gap)
+            sc.line([p0, p1], ladder_dk + (255,),
+                    width=max(2, int(cell * 0.06)))
+
+    def token(cx, cy, col, scale=1.0):
+        r = cell * 0.30 * scale
+        sc.ellipse([cx - r + 2, cy - r + 4, cx + r + 2, cy + r + 4],
+                   fill=(0, 0, 0, 70))
+        sc.ellipse([cx - r, cy - r, cx + r, cy + r], fill=col + (255,))
+        sc.ellipse([cx - r, cy - r, cx + r, cy + r],
+                   outline=tuple(int(c * 0.55) for c in col) + (255,),
+                   width=3)
+        sr = r * 0.2
+        sc.ellipse([cx - r * 0.32 - sr, cy - r * 0.34 - sr,
+                    cx - r * 0.32 + sr, cy - r * 0.34 + sr],
+                   fill=(255, 255, 255, 130))
+        sc.text(str(1 if col == red else 2 if col == green else
+                    3 if col == gold else 4), int(r * 0.95), int(cx),
+                int(cy), fill=(255, 255, 255, 240), shadow=False)
+
+    # the cast: a red walker on a plain cell, the gold rider MID-LADDER,
+    # the blue token falling the 54->31 body's turns
+    token(*cc(45), red, 1.0)
+    if climb_ab is not None:
+        a, b, pxp, pyp, gap = climb_ab
+        f = 0.48
+        mid = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+        sc.ellipse([mid[0] - cell * 0.30, mid[1] - cell * 0.30,
+                    mid[0] + cell * 0.30, mid[1] + cell * 0.30],
+                   fill=(255, 255, 255, 60))
+        token(mid[0], mid[1] - 6, gold, 1.07)
+    if fall_pts is not None:
+        n = len(fall_pts)
+        fk = 0.52 * (n - 1)
+        i = int(fk)
+        fr = fk - i
+        mid = (fall_pts[i][0] + (fall_pts[i + 1][0] - fall_pts[i][0]) * fr,
+               fall_pts[i][1] + (fall_pts[i + 1][1] - fall_pts[i][1]) * fr)
+        token(mid[0], mid[1], blue, 0.94)
+
+    # THE TRAY CARDS (the game's own trays): YOU with the settled 5 at
+    # its die pad, CPU with the empty pad
+    tray_w, tray_h = 190, 64
+    for (tx, ty, col, who, num, die_face) in [
+            (636, 120, red, "YOU", 1, 5),
+            (636, 206, green, "CPU", 2, 0)]:
+        sc.rect([tx + 4, ty + 5, tx + tray_w + 4, ty + tray_h + 5],
+                fill=(0, 0, 0, 85))
+        sc.rect([tx, ty, tx + tray_w, ty + tray_h],
+                fill=tuple(int(c * 0.72) for c in col) + (255,), r=13)
+        sc.rect([tx + 1, ty + 1, tx + tray_w - 1, ty + tray_h - 1],
+                outline=(0, 0, 0, 110), width=2, r=13)
+        sc.text(str(num), 28, tx + 24, ty + 37,
+                fill=(255, 255, 255, 245))
+        sc.text(who, 14, tx + 64, ty + 26, fill=(255, 255, 255, 205))
+        # the token pad (the waiting token for the CPU; the YOU token
+        # is ON the board already)
+        pad0 = (tx + 10, ty + 10, tx + 10 + cell * 0.6, ty + tray_h - 10)
+        sc.rect([pad0[0], pad0[1], pad0[2], pad0[3]],
+                fill=(0, 0, 0, 55), r=9)
+        if who == "CPU":
+            token(pad0[0] + cell * 0.3, pad0[1] + (tray_h - 20) / 2 + 2,
+                  col, 0.9)
+        else:
+            # the YOU token is on the board - the empty pad wears a soft
+            # ring so it reads as a seat, not a hole
+            sc.rect([pad0[0] + 3, pad0[1] + 3, pad0[2] - 3, pad0[3] - 3],
+                    outline=(255, 255, 255, 80), width=2, r=7)
+        # the die pad
+        dx0, dy0, ds = tx + tray_w - 40, ty + tray_h / 2, 46
+        sc.rect([dx0 - ds / 2 + 3, dy0 - ds / 2 + 4, dx0 + ds / 2 + 3,
+                 dy0 + ds / 2 + 4], fill=(0, 0, 0, 60), r=10)
+        if die_face > 0:
+            sc.rect([dx0 - ds / 2, dy0 - ds / 2, dx0 + ds / 2,
+                     dy0 + ds / 2], fill=(255, 255, 255, 250), r=10)
+            pips5 = [(-0.26, -0.26), (0.26, -0.26), (0, 0),
+                     (-0.26, 0.26), (0.26, 0.26)]
+            for (fx, fy) in pips5:
+                sc.ellipse([dx0 + fx * ds - 5, dy0 + fy * ds - 5,
+                            dx0 + fx * ds + 5, dy0 + fy * ds + 5],
+                           fill=ink + (255,))
+        else:
+            sc.rect([dx0 - ds / 2, dy0 - ds / 2, dx0 + ds / 2,
+                     dy0 + ds / 2], fill=(219, 219, 219, 235), r=10)
+            sc.rect([dx0 - ds / 2, dy0 - ds / 2, dx0 + ds / 2,
+                     dy0 + ds / 2], outline=(77, 77, 77, 220), width=2,
+                    r=10)
+    # THE GOGACOIN on a free cell, glowing
+    sc.layer()
+    ccx, ccy = cc(78)
+    sc.glow(ccx, ccy, 40, (255, 240, 190), 90)
+    sc.stamp(load_sprite("ui/coin.png"), ccx, ccy, scale=0.20)
+    sc.vignette(80)
+    return sc.render()
+
+
+SCENES["snl"] = scene_snl
+
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks
 # as games leave the workshop - dario/xo left in v0.1.7, spud in v0.3.4.
 SOON_NAMES = {"hen": "HEN INVADERS",

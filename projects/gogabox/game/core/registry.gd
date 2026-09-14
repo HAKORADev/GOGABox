@@ -1188,13 +1188,95 @@ const GAMES := [
         },
         {"id": "snl", "title": "SNAKES & LADDERS",
                 "tag": "climb and slide",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+                "script": "res://game/games/snl/snl.gd",
+                "thumb": "res://assets/thumbs/snl.png",
+                # v0.3.9-12 THE GRADUATION ... the workshop teaser ships as
+                # SNAKES & LADDERS (the generic classic). PURE RNG - the
+                # owner: "ludo has a little logic but this one is literally
+                # pure RNG!" 10x10, 100 steps, players 2..4 (the user is 1,
+                # the rivals are CPUs; 2 = 1v1, 3 = 1v2, 4 = 1v3). ONE
+                # token each, waiting OUT of the board in its owner's tray
+                # until the die brings it in. The die is ludo's die: the
+                # grayed waiting die IS the roll button, the theater (fade,
+                # shuffle, settle). THE CLASSIC FIXED TABLE (Milton
+                # Bradley): ladders 4-25, 13-46, 33-49, 42-63, 50-69, 62-81,
+                # 74-92; snakes 27-5, 40-3, 43-18, 54-31, 66-45, 76-58,
+                # 89-53, 99-41 - "same places of snakes and ladders" every
+                # round. THE EXACT LANDING LAW (the owner pointed it at
+                # BOTH board games): 97 needs a 3 for 100 - a 4 is illegal
+                # and the turn is skipped. THE RIDES: a ladder lifts the
+                # token in a STRAIGHT lane between the rails; a snake falls
+                # following the drawn body's turns (the drawn path IS the
+                # fall). The 1,2,1,2 checker; the START mat and the crown
+                # medallion dress cells 1 and 100. THE COIN CLOCK: one
+                # GOGACoin after each 5 in-game minutes in a legal area
+                # (strictly ahead of the user's token) - whoever steps on
+                # it takes it. Win +1 / lose -1, run bonus /1, no draws,
+                # the loser opens the next round. VERTICAL.
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 1, "price": 450, "fee": 8, "shop": true,
+                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 16,
                         "needs_games": 17},
-                "desc": "roll the dice, climb the ladders, slide down the "
-                        + "snakes, first token home wins - the workshop "
-                        + "version is baking"},
+                "desc": "the pure-RNG classic, redressed for the box: roll "
+                        + "the die, hop your token up the 1,2 checker, "
+                        + "ride every ladder you land on and slip down "
+                        + "every snake you wake. Land on 97 needing a 3 "
+                        + "and a 4 refuses you - the exact landing wins "
+                        + "the crown cell. One token each, two to four "
+                        + "players at the table, and the CPUs wear no "
+                        + "brain at all: the die is the only mind here. "
+                        + "A GOGACoin shines ahead of you every five "
+                        + "minutes - step on it first.",
+                "controls": [
+                        "TAP ANYWHERE TO START, then pick the table: 2, 3 "
+                        + "or 4 players - you are always player 1, the "
+                        + "rest are the box's dice-rollers",
+                        "on your turn your tray shows the die grayed out "
+                        + "and waiting - tap it and the die fades in, "
+                        + "shuffles, and settles",
+                        "your token hops the board square by square; the "
+                        + "first roll brings it out of its tray onto the "
+                        + "board",
+                        "land on a ladder base and your token slides UP "
+                        + "the rails in a straight lane; land on a snake "
+                        + "head and it falls following the body's turns",
+                        "the classic fixed board: ladders at 4, 13, 33, "
+                        + "42, 50, 62, 74; snakes at 27, 40, 43, 54, 66, "
+                        + "76, 89 and 99",
+                        "THE EXACT LANDING: the crown cell 100 takes only "
+                        + "the exact roll - overshoot and the move is "
+                        + "refused, your turn is skipped",
+                        "first token on 100 wins the round: win +1 score, "
+                        + "loss -1, run bonus /1, no draws",
+                        "the loser opens the next round",
+                        "a GOGACoin appears every 5 minutes on a cell "
+                        + "ahead of you - whoever steps on it first takes "
+                        + "it",
+                        "token skins and board themes live in the SHOP - "
+                        + "the skins re-ink YOUR token on any theme",
+                ],
+                "genres": {"main": ["board", "family"],
+                        "sub": ["turnbased", "classic",
+                                "singleplayer"]},
+                "ach": [
+    {"id": "score_t1", "title": "First Steps", "desc": "Reach a score of 10", "tier": 1, "rule": {"k": "score", "key": "", "v": 10}},
+    {"id": "score_t2", "title": "The Long Climb", "desc": "Reach a score of 25", "tier": 2, "rule": {"k": "score", "key": "", "v": 25}},
+    {"id": "score_t3", "title": "The Summit Route", "desc": "Reach a score of 50", "tier": 3, "rule": {"k": "score", "key": "", "v": 50}},
+    {"id": "wins_t1", "title": "The Crown Cell", "desc": "Win 1 round", "tier": 1, "rule": {"k": "cnt", "key": "wins", "v": 1}},
+    {"id": "wins_t2", "title": "The Board's regular", "desc": "Win 25 rounds", "tier": 2, "rule": {"k": "cnt", "key": "wins", "v": 25}},
+    {"id": "wins_t3", "title": "The Mountain King", "desc": "Win 100 rounds", "tier": 3, "rule": {"k": "cnt", "key": "wins", "v": 100}},
+    {"id": "streak_t1", "title": "Back to Back", "desc": "Win 3 rounds in a row", "tier": 2, "rule": {"k": "max", "key": "streak", "v": 3}},
+    {"id": "streak_t2", "title": "The Golden Streak", "desc": "Win 5 rounds in a row", "tier": 3, "rule": {"k": "max", "key": "streak", "v": 5}},
+    {"id": "climbs_t1", "title": "The Ladder Fan", "desc": "Ride 25 ladders", "tier": 1, "rule": {"k": "cnt", "key": "climbs", "v": 25}},
+    {"id": "climbs_t2", "title": "The Rails Master", "desc": "Ride 250 ladders", "tier": 2, "rule": {"k": "cnt", "key": "climbs", "v": 250}},
+    {"id": "falls_t1", "title": "Snake Food", "desc": "Ride 25 snakes down", "tier": 1, "rule": {"k": "cnt", "key": "falls", "v": 25}},
+    {"id": "falls_t2", "title": "The Serpent's Favorite", "desc": "Ride 150 snakes down", "tier": 2, "rule": {"k": "cnt", "key": "falls", "v": 150}},
+    {"id": "coins_t1", "title": "The Board's Toll", "desc": "Take 10 GOGACoins off the board", "tier": 1, "rule": {"k": "cnt", "key": "coins", "v": 10}},
+    {"id": "plays_t1", "title": "The Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
 
 ]
 
