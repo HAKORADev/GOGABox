@@ -74,3 +74,67 @@ NEXT (pass 1):
   heavywar_meta.gd) + registry entry + the GogaGame contract fit.
 - THE ROAD + THE TANK + THE GUN + THE SKY skeleton with stand-in shapes,
   then the art tool paints the real slots (pass 1.5).
+
+---
+
+## Pass 1 — 2026-09-15 — THE ROAD + THE TANK + THE GUN + THE SKY
+
+DONE:
+- `heavywar_data.gd` born: 21 enemies (ours-named, the 11-fry/10-specials
+  point law 1 / 10..100), 10 places (palette + exclusive + 180-360s), 5
+  wave tiers x 4-7 recipes, 10 boss faces + the comeback formula
+  (armor x2.2^cb, fire x0.85^cb, speed x1.06^cb), the six stats with their
+  per-level reads, the drop table + caps, the shop prices (provisional).
+- `heavywar_meta.gd` born: banked points, raise/lower with the LOCK + CAP
+  laws, run records into counters (hw_kills/hw_score/hw_places/
+  hw_bosses_run), the lore-once flag.
+- `heavywar.gd` pass-1 playable: three-zone multi-touch (left swipe / right
+  hold / middle nuke + the emulation-twin debounce), the spawn director
+  (tier = places/2 + exclusives ride in), 12 enemy brains, the weapon set
+  (dumb/guided/frag/armored/atom bombs, guns, missiles, rpg arcs, orbital
+  laser), shells vs enemies vs boss parts (MIRROR front-shield + PLOWMAN
+  plow armor laws), shields-eat-first with per-layer hp, the iframe gate
+  INSIDE _hurt_tank, nukes (aegis blast width), the friend helicopter +
+  crate chain (caps 3/3/3, the every-3-places coin crate), the laser
+  megabeam, tunnels (clear hostiles + THE WAVE QUEUE + drops; calm both
+  sides), shuffle-per-lap place queue, the boss cadence (every 5 places,
+  1 permanent point, the armory sheet opens), the BACK-LAW sheet sync
+  (_goga_sheet_popped), death -> record_run -> finish_run.
+- Registry entry: heavywar (landscape/shop/banner, coin_div 500 = the
+  owner's /500 law, price 600 fee 20 charge 300 reveal 8/11 - all
+  provisional until ship), 12 achievements.
+- hw_probe: **85 checks, 0 fails** headless (tests/hw_probe.tscn).
+
+THE BATTERY CAUGHT (the brutal + critical part working):
+1. the iframe gate was only in _hits_tank - direct callers bypassed it.
+   Now it lives in _hurt_tank (defense in depth).
+2. the director ROLLED WAVES during the tunnel (state guard missing).
+3. the armory sheet desynced from the state when closed by the back path
+   - the _goga_sheet_popped hook now closes the state loop.
+4. a leftover wave volley survived the tunnel and popped into the calm -
+   _enter_tunnel now kills the queue too.
+
+LEARNED:
+- Godot 4.7.2 headless: `--check-only` does not register autoloads or the
+  global class cache - always `--import` first, then judge only parse
+  errors, then prove with a live probe run.
+- The sandbox needs: addons staged as `addons/<name> = plugins/<name>/addon`
+  (NOT the plugin root - the autoload path is res://addons/<name>/<name>.gd).
+- Godot 4.7.2 editor zip from GitHub releases + standalone 7zz both live in
+  the sandbox cache now (godot at /home/z/.cache/godot/bin/godot).
+
+WRONG (avoid repeating):
+- Probe cheat order: `all_owned` was set in _boot BEFORE the meta lock law
+  - the cheat owns every shelf, so the lock refused to refuse. The meta
+  laws now run BEFORE the cheat, and _boot no longer sets it.
+- boss_stats(11) is the DREADNOUGHT's comeback 1, not the gunship - the
+  comeback count is boss_i / 10, the face is boss_i % 10. The probe now
+  pins both faces.
+
+NEXT (pass 2):
+- THE ART TOOL (pass 1.5): tools/v040_hw_art.py paints every sprite slot
+  the sim already reads (spr_enemy_*, spr_tank, spr_boom, spr_crate,
+  spr_heli, spr_boss_*...) into assets/games/heavywar/ - original toy-
+  military art at the pack's frame sizes, zero traced bytes.
+- Then the place art layers (bg silhouettes per place) + the war room
+  pass over the widgets.
