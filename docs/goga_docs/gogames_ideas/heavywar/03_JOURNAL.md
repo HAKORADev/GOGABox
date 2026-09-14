@@ -250,3 +250,10 @@ THE LAW GOING FORWARD:
 - Redirect accidents (`cmd > file` typos landing at cwd) are a real
   failure class in long sessions - the .gitignore gap closed it at
   the net, the pre-push scan closes it at the source.
+
+RESOLUTION (same session, ~30 min after the fix push):
+- Fix commit 6c33ed5 -> run 34902547635 -> ALL GREEN. Cache restore
+  clean, bootstrap succ on both archs, both exports done.
+- Artifacts live: gogabox-arm64-v8a-release 76.3MB +
+  gogabox-armeabi-v7a-release 77.6MB. Release job skipped is by design
+  (manual dispatch only). The owner can download and test v040.
