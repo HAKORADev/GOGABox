@@ -331,6 +331,39 @@ func _run() -> void:
         ck(G.sheet_open_count() == 0, "the pair died clean")
         Box.dev_set_cheat("all_owned", 1)   # the cheat returns for later laws
 
+        # ------------------------------------------------ the boss marathon
+        ## every face ticks its real brain for ~6 simulated seconds and
+        ## dies paying - the ten-brain crash hunt
+        await _boot()
+        _tap(0, Vector2(960, 540), true)
+        _tap(0, Vector2(960, 540), false)
+        await _wait(0.1)
+        var marathon_ok := true
+        var marathon_why := ""
+        for bi in HWData.BOSS_ORDER.size():
+                G.run["bosses_met"] = bi     # the face index drives the pick
+                G._enter_boss()
+                if G.boss == null or String(G.boss["id"]) != HWData.BOSS_ORDER[bi]:
+                        marathon_ok = false
+                        marathon_why = "face %d did not enter" % bi
+                        break
+                for f in 360:                # 6 simulated seconds at 60hz
+                        G._boss_tick(1.0 / 60.0)
+                        G._ebombs_tick(1.0 / 60.0)
+                        G._fx_tick(1.0 / 60.0)
+                G.boss["hp"] = 0
+                G._boss_die()
+                if G.state != G.GS.ARMORY:
+                        marathon_ok = false
+                        marathon_why = "face %d death opened no armory" % bi
+                        break
+                G.sheet_pop()
+                await _wait(0.05)
+                G.state = G.GS.PLACE
+        ck(marathon_ok, "THE MARATHON LAW: all ten faces fight and pay (%s)"
+                % marathon_why)
+        ck(meta.pts_banked() >= 10, "ten bosses minted ten points")
+
         # ------------------------------------------------ the shuffle law
         await _boot()
         _tap(0, Vector2(960, 540), true)

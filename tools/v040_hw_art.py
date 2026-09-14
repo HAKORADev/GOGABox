@@ -785,3 +785,32 @@ if os.environ.get("HW_PLACES", "1") == "1":
         place_bg(pid)
         place_ground(pid)
     print("ALL PLACE LAYERS PAINTED")
+
+# ==================================================== the boss projectiles
+def boss_shots():
+    # meteor
+    img, d = canvas(60, 60)
+    poly(d, [(30, 4), (52, 30), (40, 54), (14, 50), (6, 24)], (150, 96, 60, 255))
+    poly(d, [(24, 14), (40, 30), (30, 46), (16, 40)], (190, 132, 84, 255))
+    ell(d, (24, 22, 36, 34), (240, 150, 60, 255))
+    save(img, "eshot_meteor")
+    # wreck ball
+    img, d = canvas(90, 90)
+    ell(d, (6, 6, 84, 84), (86, 86, 96, 255))
+    ell(d, (20, 20, 54, 56), (130, 130, 142, 255))
+    save(img, "eshot_ball")
+    # boulder
+    img, d = canvas(80, 64)
+    poly(d, [(8, 40), (20, 14), (48, 6), (70, 26), (66, 52), (26, 58)], (120, 108, 92, 255))
+    poly(d, [(22, 30), (40, 18), (56, 32), (40, 42)], (156, 142, 120, 255))
+    save(img, "eshot_boulder")
+    # barrel
+    img, d = canvas(44, 56)
+    rrect(d, (6, 8, 38, 50), 6, (190, 70, 50, 255))
+    rrect(d, (6, 18, 38, 26), 2, (140, 46, 34, 255))
+    rrect(d, (6, 34, 38, 42), 2, (140, 46, 34, 255))
+    ell(d, (12, 2, 32, 14), (160, 130, 70, 255))
+    save(img, "eshot_barrel")
+
+boss_shots()
+print("BOSS SHOTS PAINTED")

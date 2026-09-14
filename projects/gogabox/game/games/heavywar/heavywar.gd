@@ -637,7 +637,22 @@ func _enemy_shot(at: Vector2, vel: Vector2, kind: String) -> void:
         n.position = at
         n.rotation = vel.angle()
         shot_layer.add_child(n)
-        ebombs.append({"n": n, "vel": vel, "kind": kind, "grav": 0.0, "hp": 1,
+        # the family gravities: bullets fly flat, the heavies fall
+        var grav := 0.0
+        match kind:
+                "rpg":
+                        grav = 500.0
+                "fraglet":
+                        grav = 420.0
+                "meteor":
+                        grav = 420.0
+                "ball":
+                        grav = 900.0
+                "boulder":
+                        grav = 460.0
+                "barrel":
+                        grav = 520.0
+        ebombs.append({"n": n, "vel": vel, "kind": kind, "grav": grav, "hp": 1,
                 "armed": true})
         if kind == "missile":
                 ebombs[-1]["homing"] = true
@@ -765,8 +780,18 @@ func _ebombs_tick(dt: float) -> void:
                         continue
                 if n.position.y > ROAD_Y + 20.0 or n.position.x < -60.0 \
                                 or n.position.x > W + 80.0:
-                        if b.has("atom"):
-                                _nuke_blast_at(n.position.x, 0.6)
+                        match String(b["kind"]):
+                                "atom":
+                                        _nuke_blast_at(n.position.x, 0.6)
+                                "ball":
+                                        _fx_ring(Vector2(n.position.x, ROAD_Y),
+                                                Color("ffb020"), 120.0, 0.45)
+                                        Jukebox.sfx("hw_bigboom", -4.0, 0.85)
+                                        if absf(tank.position.x - n.position.x) < 150.0:
+                                                _hurt_tank(tank.position)
+                                "meteor", "boulder", "barrel":
+                                        _fx_boom(Vector2(n.position.x, ROAD_Y), 0.8)
+                                        Jukebox.sfx("hw_boom", -8.0, 1.1)
                         dead.append(b)
                         continue
                 if _hits_tank(n.position):
@@ -1137,7 +1162,7 @@ func _enter_boss() -> void:
                 ent_layer.add_child(pn)
                 parts.append({"id": pid, "n": pn, "w": 90.0, "h": 60.0,
                         "hp": int(ceil(int(pd["hp"]) * st["hp_mul"])),
-                        "fire": float(pd["fire"]) * fm, "fire_t": 1.0,
+                        "fire": float(pd.get("fire", 0.0)) * fm, "fire_t": 1.0,
                         "vuln": true})
         boss = {"n": n, "id": String(st["id"]), "hp": int(st["hp"]),
                 "maxhp": int(st["hp"]), "parts": parts,
@@ -1157,25 +1182,33 @@ func _boss_tick(dt: float) -> void:
                         boss["entered"] = true
                 _boss_parts_follow()
                 return
-        # the skeleton fight: hover + aimed volleys from the parts
-        n.position.x = W * 0.72 + sin(t_state * 0.5) * 220.0
-        n.position.y = 280.0 + sin(t_state * 0.8) * 70.0
+        t_state += dt
+        # THE FACES: each kind drives its own fight brain (pass 3).
+        match String(boss["id"]):
+                "gunship":
+                        _brain_gunship(n, dt)
+                "dreadnought":
+                        _brain_dreadnought(n, dt)
+                "skystealer":
+                        _brain_skystealer(n, dt)
+                "wreckball":
+                        _brain_wreckball(n, dt)
+                "warhead":
+                        _brain_warhead(n, dt)
+                "kongo":
+                        _brain_kongo(n, dt)
+                "eyebot":
+                        _brain_eyebot(n, dt)
+                "mechworm":
+                        _brain_mechworm(n, dt)
+                "warbot":
+                        _brain_warbot(n, dt)
+                "secretfist":
+                        _brain_secretfist(n, dt)
         _boss_parts_follow()
-        boss["fire_t"] = float(boss["fire_t"]) - dt
-        if float(boss["fire_t"]) <= 0.0:
-                boss["fire_t"] = 1.6 * float(boss["spd_mul"])
-                for p in boss["parts"]:
-                        var pn: Node2D = p["n"]
-                        _enemy_shot(pn.position,
-                                (tank.position - pn.position).normalized() * 560.0,
-                                "bullet")
-        for p in boss["parts"]:
-                p["fire_t"] = float(p["fire_t"]) - dt
-                if float(p["fire_t"]) <= 0.0:
-                        p["fire_t"] = float(p["fire"])
-                        _enemy_shot((p["n"] as Node2D).position,
-                                (tank.position - (p["n"] as Node2D).position)
-                                        .normalized() * 620.0, "missile")
+        # the vuln law: when every part is dead the body bleeds from shells
+        if (boss["parts"] as Array).is_empty():
+                boss["vuln"] = true
 
 func _boss_parts_follow() -> void:
         if boss == null:
@@ -1187,6 +1220,194 @@ func _boss_parts_follow() -> void:
                 pn.position = n.position + Vector2(
                         sin(now * 1.7 + pn.position.x * 0.01) * 100.0,
                         95.0 + cos(now * 1.3 + pn.position.y * 0.01) * 32.0)
+
+# =====================================================
+# THE TEN BRAINS - each face fights its own war.
+# Numbers ride the comeback multipliers already baked into the parts.
+# =====================================================
+## the shared hover: a lazy figure the bodies ride
+func _boss_hover(n: Node2D, t: float, cx := 0.72, amp := 200.0) -> void:
+        n.position.x = W * cx + sin(t * 0.5) * amp
+        n.position.y = 280.0 + sin(t * 0.8) * 70.0
+
+## parts fire their aimed missile volley on their own clocks
+func _parts_fire_missiles(dt: float) -> void:
+        for p in boss["parts"]:
+                if float(p.get("fire", 0.0)) <= 0.0:
+                        continue
+                p["fire_t"] = float(p["fire_t"]) - dt
+                if float(p["fire_t"]) <= 0.0:
+                        p["fire_t"] = float(p["fire"])
+                        _enemy_shot((p["n"] as Node2D).position,
+                                (tank.position - (p["n"] as Node2D).position)
+                                        .normalized() * 620.0, "missile")
+
+## aimed gun burst from a world position
+func _boss_burst(at: Vector2, count: int, spread := 0.22, spd := 600.0) -> void:
+        for i in count:
+                var a := (tank.position - at).angle() \
+                        + randf_range(-spread, spread)
+                _enemy_shot(at, Vector2.from_angle(a) * spd, "bullet")
+
+func _brain_gunship(n: Node2D, dt: float) -> void:
+        _boss_hover(n, t_state)
+        _parts_fire_missiles(dt)
+        # the turret sprays a fan of bullets at the tank
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 2.2 * float(boss["spd_mul"])
+                _boss_burst(n.position + Vector2(0, 90), 5, 0.3)
+
+func _brain_dreadnought(n: Node2D, dt: float) -> void:
+        # the hull crawls one way, then the other, guns in sequence
+        var dir := 1.0 if sin(t_state * 0.22) > 0.0 else -1.0
+        n.position.x = clampf(n.position.x + dir * 120.0 * dt, W * 0.34, W - 240.0)
+        n.position.y = 340.0 + sin(t_state * 0.7) * 26.0
+        _parts_fire_missiles(dt)   # the launcher only (its fire > 0)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 2.6 * float(boss["spd_mul"])
+                for p in boss["parts"]:
+                        if String(p["id"]).begins_with("t"):
+                                _boss_burst((p["n"] as Node2D).position, 3, 0.16, 660.0)
+
+func _brain_skystealer(n: Node2D, dt: float) -> void:
+        _boss_hover(n, t_state, 0.6, 130.0)
+        # THE TRACTOR CYCLE: the dish dips, rains meteors, retracts
+        var cycle := fmod(t_state, 14.0)
+        var dipping := cycle > 6.0 and cycle < 12.0
+        n.position.y += (40.0 if dipping else -30.0) * dt
+        n.position.y = clampf(n.position.y, 200.0, 420.0)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if dipping and float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 0.55 / float(boss["spd_mul"])
+                var mx := randf_range(80.0, W - 80.0)
+                _enemy_shot(Vector2(mx, n.position.y + 140.0),
+                        Vector2(0, 160.0), "meteor")
+        elif not dipping:
+                boss["fire_t"] = minf(float(boss["fire_t"]), 0.4)
+
+func _brain_wreckball(n: Node2D, dt: float) -> void:
+        # the walker strides and swings the ball on its chain
+        _boss_hover(n, t_state, 0.62, 240.0)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 2.8 * float(boss["spd_mul"])
+                # the ball slams down at the tank's x
+                _enemy_shot(Vector2(tank.position.x, 60.0),
+                        Vector2(0, 900.0), "ball")
+
+func _brain_warhead(n: Node2D, dt: float) -> void:
+        _boss_hover(n, t_state, 0.78, 90.0)
+        _parts_fire_missiles(dt)
+        # THE CHARGE: every ~6s it lunges across, bombing the whole road
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 0.09 / float(boss["spd_mul"])
+                var phase := fmod(t_state, 7.0)
+                if phase > 5.2:
+                        n.position.x -= 900.0 * dt
+                        if randf() < 0.5:
+                                _drop_bomb(Vector2(n.position.x - 60.0,
+                                        n.position.y + 60.0), "dumb")
+                        if n.position.x < 200.0:
+                                n.position.x = W + 160.0
+                else:
+                        _boss_hover(n, t_state, 0.78, 90.0)
+
+func _brain_kongo(n: Node2D, dt: float) -> void:
+        # the ape: throws, then leaps and STOMPS a shockwave
+        var phase := fmod(t_state, 9.0)
+        if phase < 6.0:
+                _boss_hover(n, t_state, 0.72, 180.0)
+                boss["fire_t"] = float(boss["fire_t"]) - dt
+                if float(boss["fire_t"]) <= 0.0:
+                        boss["fire_t"] = 1.5 / float(boss["spd_mul"])
+                        _enemy_shot(n.position + Vector2(-60, 40),
+                                Vector2(-520.0, -260.0), "barrel")
+        else:
+                # the leap: arc to the tank and slam
+                var lp := (phase - 6.0) / 3.0
+                var sx := n.position.x if not boss.has("leap_x") \
+                        else float(boss["leap_x"])
+                if lp < 0.05:
+                        boss["leap_x"] = n.position.x
+                        sx = n.position.x
+                n.position.x = lerpf(sx, tank.position.x, minf(lp * 1.6, 1.0))
+                n.position.y = 500.0 - sin(lp * PI) * 380.0
+                if lp >= 0.98:
+                        boss.erase("leap_x")
+                        _fx_ring(Vector2(n.position.x, ROAD_Y - 20.0),
+                                Color("ffb020"), 140.0, 0.5)
+                        Jukebox.sfx("hw_bigboom", -2.0, 0.8)
+                        if absf(tank.position.x - n.position.x) < 200.0:
+                                _hurt_tank(tank.position)
+
+func _brain_eyebot(n: Node2D, dt: float) -> void:
+        _boss_hover(n, t_state, 0.74, 150.0)
+        # the hand pod spits; the eye sweeps a bolt
+        _parts_fire_missiles(dt)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 1.4 / float(boss["spd_mul"])
+                _boss_burst(n.position + Vector2(0, 40), 4, 0.12, 700.0)
+
+func _brain_mechworm(n: Node2D, dt: float) -> void:
+        # dives under, tunnels, bursts up under the tank, spits boulders
+        var cycle := fmod(t_state, 10.0)
+        if cycle < 5.0:
+                _boss_hover(n, t_state, 0.7, 220.0)
+                boss["fire_t"] = float(boss["fire_t"]) - dt
+                if float(boss["fire_t"]) <= 0.0:
+                        boss["fire_t"] = 0.7 / float(boss["spd_mul"])
+                        var bx := tank.position.x + randf_range(-160, 160)
+                        _enemy_shot(Vector2(bx, 40.0), Vector2(0, 520.0), "boulder")
+        else:
+                # submerged: a sand ripple chases the tank, then the breach
+                var lp := (cycle - 5.0) / 5.0
+                n.position.x = lerpf(n.position.x, tank.position.x, 2.4 * dt)
+                n.position.y = ROAD_Y + 120.0 - sin(lp * PI) * 560.0
+                if lp >= 0.9 and lp < 0.95:
+                        _fx_ring(Vector2(n.position.x, ROAD_Y),
+                                Color(0.7, 0.6, 0.4, 0.8), 90.0, 0.4)
+
+func _brain_warbot(n: Node2D, dt: float) -> void:
+        # strafes, missiles from the pod, then THE EYE BEAM telegraphed
+        _boss_hover(n, t_state, 0.66, 260.0)
+        _parts_fire_missiles(dt)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 3.2 / float(boss["spd_mul"])
+                var col := ColorRect.new()
+                col.color = Color(1.0, 0.3, 0.25, 0.0)
+                col.size = Vector2(60, tank.position.y - n.position.y)
+                col.position = Vector2(tank.position.x - 30.0, n.position.y)
+                fx_layer.add_child(col)
+                fx.append({"n": col, "t": 0.0, "life": 0.8, "kind": "oburn",
+                        "hit_at": 0.45})
+                Jukebox.sfx("hw_lasergo", -6.0, 0.8)
+
+func _brain_secretfist(n: Node2D, dt: float) -> void:
+        # the final fist: everything at once, slower rhythm
+        _boss_hover(n, t_state, 0.5, 150.0)
+        _parts_fire_missiles(dt)
+        boss["fire_t"] = float(boss["fire_t"]) - dt
+        if float(boss["fire_t"]) <= 0.0:
+                boss["fire_t"] = 1.9 / float(boss["spd_mul"])
+                var pick := randi() % 3
+                if pick == 0:
+                        _drop_bomb(Vector2(tank.position.x, n.position.y + 80.0),
+                                "atom")
+                elif pick == 1:
+                        _boss_burst(n.position + Vector2(0, 60), 6, 0.4, 640.0)
+                else:
+                        var col := ColorRect.new()
+                        col.color = Color(1.0, 0.35, 0.2, 0.0)
+                        col.size = Vector2(70, tank.position.y - n.position.y)
+                        col.position = Vector2(tank.position.x - 35.0, n.position.y)
+                        fx_layer.add_child(col)
+                        fx.append({"n": col, "t": 0.0, "life": 0.7,
+                                "kind": "oburn", "hit_at": 0.4})
 
 func _boss_damage_part(p: Dictionary, dmg: float) -> void:
         if bool(p.get("core", false)):
