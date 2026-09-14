@@ -1,5 +1,12 @@
 # ---- Arsenal toolchain cache (Godot / Android SDK / JDK downloads) ----
-.cache/
+# NOTE: pattern WITHOUT the trailing slash on purpose - it must also catch a
+# plain FILE named .cache (a stray shell-redirect artifact got committed in
+# v040 pass work and CI died on `mkdir .cache: File exists` in bootstrap).
+.cache
+
+# ---- Python bytecode (study tools run locally; the .pyc files are noise) ----
+__pycache__/
+*.pyc
 
 # ---- Build outputs ----
 dist/

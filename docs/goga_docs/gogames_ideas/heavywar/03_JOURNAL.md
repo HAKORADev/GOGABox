@@ -214,3 +214,39 @@ NEXT (post-test passes):
 - Music loop (CC0 or synth) — the game is SFX-only by design for now.
 - Comeback count polish: after every 2nd comeback a face gains a new
   behavior (noted in 01_STUDY §4, not yet built).
+
+## PASS 4 - THE SHIP-BLOCKER LESSON (the .cache file killed CI)
+
+THE OWNER'S CATCH: the first v040 push failed the GitHub Actions build,
+and a new file `.cache` appeared in the repo. Both the same accident.
+
+WHAT HAPPENED:
+- During the v040 work session a stray shell redirect wrote a 14-byte
+  FILE named `.cache` at the repo root (contents: the text
+  `/home/z/.cache`). It got swept into a commit by an add-all.
+- The .gitignore already had `.cache/` - but the TRAILING SLASH makes
+  the pattern match directories ONLY. A plain file named `.cache`
+  walked right past it.
+- CI needs `.cache/` as a DIRECTORY (build-android.yml caches
+  .cache/jdk, .cache/android-sdk, .cache/godot there). Checkout
+  created the file instead, the toolchain-cache tar restore died with
+  `tar: .cache: Cannot mkdir: File exists`, and tools/bootstrap.sh
+  then failed with `mkdir: cannot create directory ... File exists`.
+  Both arch jobs red before Godot even ran.
+
+THE FIX (same-session patch):
+- `git rm --cached .cache` + delete the file.
+- Also untracked tools/study/__pycache__/*.pyc (same class of junk,
+  tracked since the study-pipeline commit).
+- .gitignore: `.cache/` -> `.cache` (no slash - catches file AND dir)
+  plus `__pycache__/` + `*.pyc`.
+- The fix commit re-triggers the build; watch it to green before the
+  owner downloads.
+
+THE LAW GOING FORWARD:
+- Before every push: `git status` AND a quick scan of the staged file
+  list for dotfiles at the repo root. Anything that is not
+  .gitignore/.github/docs/projects/config/tools must justify itself.
+- Redirect accidents (`cmd > file` typos landing at cwd) are a real
+  failure class in long sessions - the .gitignore gap closed it at
+  the net, the pre-push scan closes it at the source.
