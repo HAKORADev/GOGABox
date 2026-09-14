@@ -583,6 +583,52 @@ const GAMES := [
         },
 
 
+        # v0.4.0 HEAVY WAR - graduated from the SOON shelf's first name (the
+        # owner's GDD, docs/goga_docs/gogames_ideas/heavywar.md): the
+        # rogue-like horizontal tank siege. One endless run, ALL the places
+        # shuffled every lap, tunnels with calm zones between, the friend
+        # helicopter's crates, a boss every 5 places paying 1 permanent
+        # point into the 6x5 armory, kills = score, /500 bonus (the owner's
+        # law), 3 lives / 3 shields / 3 nukes. The original pack studied
+        # under THE USAGE LAW - zero original bytes (docs .../01_STUDY.md).
+        {
+                "id": "heavywar", "title": "Heavy War", "tag": "the tank that never stops",
+                "script": "res://game/games/heavywar/heavywar.gd",
+                "thumb": "res://assets/thumbs/heavywar.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 500, "price": 600, "fee": 20, "shop": true,
+                "banner": true,
+                "charge_unlock": 300,
+                "reveal": {"kind": "direct", "appear_after": 8,
+        "needs_games": 11},
+                "desc": "THE TANK THAT NEVER STOPS: one endless war through every place the enemy owns - snow, coast, oilfields, the nuclear flats, jungle, gothic hills, ash, dunes, the city, the IRONHOLD - SHUFFLED every run, joined by tunnels where nothing spawns and the tank just rolls. Swipe the left half to roll, hold the right half to fire, tap the dead middle to burn a nuke. The friend helicopter crates in shield layers, nukes, laser parts, spare lives - and GOGACoins after every 3 places survived. Every 5 places a boss face returns (comebacks fire faster, act harder) and dies paying 1 PERMANENT upgrade point into the armory: 6 stats x 5 levels, spend or rebalance after every boss. Kills are the score; the ten specials pay 10 to 100; every 1000 score pays a life back. The shop sells tank skins, the four locked stats and - at a price that hurts - THE LASER.",
+                "controls": [
+                        "tap anywhere to start the war",
+                        "swipe left-right on the LEFT half: the tank rolls where your thumb drags",
+                        "tap or HOLD the RIGHT half: the gun fires while the finger stays",
+                        "tap the DEAD MIDDLE: launch a nuke - everything in the blast dies",
+                        "catch the helicopter's crates: shields (3 layers max), nukes (3), laser parts, a life (3 max), GOGACoins after every 3 places",
+                        "every 5 places survived a BOSS returns - kill it for 1 permanent armory point and rebalance your six stats",
+                        "each shield layer eats hits by your ARMOR level; each life lost is gone until the score pays it back (every 1000, max 3)",
+                ],
+                "genres": {"main": ["shooter", "action"], "sub": ["roguelite", "survival"]},
+                "ach": [
+    {"id": "kills_t1", "title": "First Blood", "desc": "Destroy 500 enemies total", "tier": 1, "rule": {"k": "cnt", "key": "hw_kills", "v": 500}},
+    {"id": "kills_t2", "title": "The Meat Grinder", "desc": "Destroy 2000 enemies total", "tier": 2, "rule": {"k": "cnt", "key": "hw_kills", "v": 2000}},
+    {"id": "kills_t3", "title": "The War's Toll", "desc": "Destroy 6000 enemies total", "tier": 3, "rule": {"k": "cnt", "key": "hw_kills", "v": 6000}},
+    {"id": "place_t1", "title": "Rolling Thunder", "desc": "Survive 5 places in one run", "tier": 1, "rule": {"k": "max", "key": "hw_places", "v": 5}},
+    {"id": "place_t2", "title": "The Long Convoy", "desc": "Survive 15 places in one run", "tier": 2, "rule": {"k": "max", "key": "hw_places", "v": 15}},
+    {"id": "place_t3", "title": "The Endless Column", "desc": "Survive 30 places in one run", "tier": 3, "rule": {"k": "max", "key": "hw_places", "v": 30}},
+    {"id": "boss_t1", "title": "Face Breaker", "desc": "Kill your first boss", "tier": 1, "rule": {"k": "cnt", "key": "hw_boss_bank", "v": 1}},
+    {"id": "boss_t2", "title": "The Comeback Killer", "desc": "Kill 3 bosses in one run", "tier": 2, "rule": {"k": "max", "key": "hw_bosses_run", "v": 3}},
+    {"id": "score_t1", "title": "War Bonds", "desc": "Score 1000 in one run", "tier": 1, "rule": {"k": "max", "key": "hw_score", "v": 1000}},
+    {"id": "score_t2", "title": "The Big Board", "desc": "Score 5000 in one run", "tier": 2, "rule": {"k": "max", "key": "hw_score", "v": 5000}},
+    {"id": "score_t3", "title": "History Written", "desc": "Score 15000 in one run", "tier": 3, "rule": {"k": "max", "key": "hw_score", "v": 15000}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+],
+        },
+
+
         # (the old "Pop TD" teaser graduated into POP SIEGE above - the PGB
         # port is real now)
         # v0.2.3 patch: the teaser waited in the workshop; v0.3.6 THE
