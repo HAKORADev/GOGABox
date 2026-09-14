@@ -29,13 +29,16 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 23. BOARD LUDO — done
 24. SNAKES & LADDERS — done
 
-## SOON — the next five (the owner's v0.3.9-13 order: the five parked
-## concepts that graduate next; each wears its full spec in
-## `FUTURE_GAMES.md` until its GDD picks it up)
+## SOON — the next five (the file's order law, the thirteenth dump's rule:
+## the first five un-shipped names walking `FUTURE_GAMES.md` top to bottom;
+## each wears its full spec there until its GDD picks it up. CORRECTED in
+## the v0.3.9-13 round - the first write parked the NEWEST dump entries
+## instead of the file's order; the owner caught it, the wrong five went
+## back to their shelves, nothing was lost.)
 
-25. LINE RACER — soon
-26. VEHICLE HORDE ROGUE-LIKE — soon
-27. NAVAL ROGUE-LIKE — soon
-28. SKY HUNTER (the moorhuhn-like) — soon
-29. HOUSE-HOLD ROGUE-LIKE — soon
+25. HEAVY WEAPON-LIKE — soon
+26. CRAZE CAVES-LIKE — soon
+27. DEATH WORM-LIKE — soon
+28. ZUMA-LIKE — soon
+29. GOLD MINER-LIKE — soon
 
