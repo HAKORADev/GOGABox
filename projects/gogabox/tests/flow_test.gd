@@ -21,6 +21,7 @@ func _ready() -> void:
         fails += _test("bovo: five-in-row CPU sanity", _t_bovo_ai())
         fails += _test("squares: dots-and-boxes CPU sanity", _t_squares_ai())
         fails += _test("jumpcube: conquer dice CPU sanity", _t_jumpcube_ai())
+        fails += _test("ludo: board ludo rules sanity", _t_ludo_rules())
         fails += _test("roadmap: reveal state machine", _t_roadmap())
         fails += _test("roadmap: mystery queue cap 4", _t_mystery_queue())
         fails += _test("roadmap: GOGACharges meters", _t_charging())
@@ -310,8 +311,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 22,
-                "22 playable games (conquer dice joined, v0.3.9-9)")
+        var ok := _check(GameReg.playable().size() == 23,
+                "23 playable games (board ludo joined, v0.3.9-10)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -319,8 +320,8 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
-        ok += _check(GameReg.workshop().size() == 2,
-                "2 workshop teasers (conquer dice graduated, v0.3.9-9)")
+        ok += _check(GameReg.workshop().size() == 1,
+                "1 workshop teaser (board ludo graduated, v0.3.9-10)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -537,9 +538,20 @@ func _t_registry() -> int:
                         and int(SQ.boxes_total(8)) == 49,
                 "the no-draw arithmetic: 9 / 25 / 49 boxes - all ODD")
         ok += _check(String(GameReg.get_game("jumpcube")["title"]) == "CONQUER DICE" \
-                        and String(GameReg.get_game("ludo")["title"]) == "LUDO ROAD" \
+                        and String(GameReg.get_game("ludo")["title"]) == "BOARD LUDO" \
                         and String(GameReg.get_game("snl")["title"]) == "SNAKES & LADDERS",
-                "the teasers wear the owner's names (jumpcube graduated, ludo..snl parked)")
+                "the teasers wear the owner's names (jumpcube + ludo graduated, snl parked)")
+        # v0.3.9-10: BOARD LUDO graduates (the teaser LUDO ROAD renamed)
+        var lg_reg: Dictionary = GameReg.get_game("ludo")
+        ok += _check(not bool(lg_reg.get("coming_soon", false)) \
+                        and String(lg_reg["orientation"]) == "portrait",
+                "board ludo is PLAYABLE now: portrait only (the square-board law)")
+        ok += _check(int(lg_reg["coin_div"]) == 1 and int(lg_reg["fee"]) == 8,
+                "board ludo wears the owner's economy (bonus /1, fee 8)")
+        ok += _check(bool(lg_reg["shop"]) and bool(lg_reg["banner"]),
+                "board ludo wears the shop + the banner")
+        ok += _check(lg_reg["ach"].size() == 15,
+                "board ludo wears the tiered ladder (15)")
         # v0.3.9-5: DOT EATER graduates (the teaser DOT MUNCHER renamed)
         var pg: Dictionary = GameReg.get_game("pacman")
         ok += _check(not bool(pg.get("coming_soon", false)) \
@@ -1566,6 +1578,225 @@ func _t_jumpcube_ai() -> int:
                 idx = int(pn[1])
         ok += _check(rot_ok and seen_moods.size() == 4,
                 "the rotation walks all four moods in order")
+        # v0.3.9-10 THE HARDNESS PASS: every mood carries the counter-
+        # attack eye; the appetite reads the whole chain; the ammunition
+        # eye counts the gifts; the RESULT LAW breathes the failures
+        ok += _check(int(JC.gain_of(ow5, va5, 4, 2, 0)) == 2,
+                "the appetite reads the true take (the tap flips 2: gain 2)")
+        var ow7 := []
+        var va7 := []
+        for i in 16:
+                ow7.append(0)
+                va7.append(1)
+        ow7[0] = 1      # the player's corner AT ITS CAP
+        va7[0] = 2
+        ow7[1] = 2      # the CPU sits right next to it
+        ok += _check(int(JC.exposed_of(ow7, va7, 4, 2)) == 1,
+                "the ammunition eye sees the gift (one CPU die by a cap)")
+        ow7[0] = 0
+        va7[0] = 1
+        ok += _check(int(JC.exposed_of(ow7, va7, 4, 2)) == 0,
+                "an unloaded neighbor is no gift (the bar is the cap)")
+        var r2 := RandomNumberGenerator.new()
+        r2.seed = 410
+        var eased: Dictionary = JC.adapt_pick(
+                JC.remember([], {"mass": 0, "result": 2, "profile": "sage"}),
+                r2)
+        ok += _check(float(eased["miss_mul"]) > 1.0 \
+                        and float(eased["err_mul"]) > 1.0 \
+                        and String(eased["profile"]) != "sage",
+                "a CPU win eases the next hand and swaps the mood")
+        var tight: Dictionary = JC.adapt_pick(
+                JC.remember([], {"mass": 0, "result": 1, "profile": "wall"}),
+                r2)
+        ok += _check(float(tight["miss_mul"]) < 1.0 \
+                        and float(tight["err_mul"]) < 1.0,
+                "a user win tightens the next hand")
+        var benched_mem: Array = JC.remember(
+                JC.remember([], {"mass": 0, "result": 1, "profile": "trick"}),
+                {"mass": 0, "result": 1, "profile": "trick"})
+        var benched := true
+        for t in 12:
+                var bp: Dictionary = JC.adapt_pick(benched_mem, r2)
+                benched = benched and String(bp["profile"]) != "trick"
+        ok += _check(benched,
+                "a mood the user solved twice is benched (the bench law)")
+        # THE COUNTER-ATTACK: with the spill on the table, the eye moods
+        # HUNT it - the squares law (take, then move again)
+        var hunts := 0
+        r2.seed = 411
+        for t in 200:
+                if int(JC.cpu_pick(ow5, va5, 4, 2, "trick", false, r2)) == 0:
+                        hunts += 1
+        ok += _check(hunts >= 165,
+                "the trick hunts the counter (%d/200)" % hunts)
+        return ok
+
+# ------------------------------------------------------------------ ludo
+
+func _t_ludo_rules() -> int:
+        var ok := 0
+        var LD: GDScript = load("res://game/games/ludo/ludo.gd")
+        # THE TRACK: 52 unique cells, clockwise, classic start seats
+        var ring: Array = LD.build_track()
+        ok += _check(ring.size() == 52, "the ring wears 52 cells")
+        var uniq := {}
+        for g in ring:
+                uniq[str(g)] = true
+        ok += _check(uniq.size() == 52, "every ring cell is unique")
+        var starts_ok: bool = (ring[0] as Vector2i).x == 1 \
+                        and (ring[0] as Vector2i).y == 6 \
+                        and (ring[13] as Vector2i).x == 8 \
+                        and (ring[13] as Vector2i).y == 1 \
+                        and (ring[26] as Vector2i).x == 13 \
+                        and (ring[26] as Vector2i).y == 8 \
+                        and (ring[39] as Vector2i).x == 6 \
+                        and (ring[39] as Vector2i).y == 13
+        ok += _check(starts_ok,
+                "the four starts wear the classic seats (1,6)(8,1)(13,8)(6,13)")
+        # THE LANES: five private cells each, entering the center
+        var lanes: Dictionary = LD.build_lanes()
+        var lanes_ok: bool = lanes.size() == 4
+        for a in lanes:
+                lanes_ok = lanes_ok and (lanes[a] as Array).size() == 5
+        lanes_ok = lanes_ok and (lanes[1][0] as Vector2i).x == 1 \
+                        and (lanes[1][0] as Vector2i).y == 7
+        ok += _check(lanes_ok, "the four lanes wear five cells each")
+        # THE WALK: ring_at wraps the starts; past the ring it is -1
+        ok += _check(int(LD.ring_at(1, 0)) == 0 \
+                        and int(LD.ring_at(2, 0)) == 13 \
+                        and int(LD.ring_at(3, 0)) == 26 \
+                        and int(LD.ring_at(4, 0)) == 39,
+                "every army steps off at its own start")
+        ok += _check(int(LD.ring_at(2, 10)) == 23 \
+                        and int(LD.ring_at(1, 50)) == 50 \
+                        and int(LD.ring_at(1, 51)) == -1 \
+                        and int(LD.ring_at(1, 56)) == -1,
+                "the walk leaves the ring for its lane (51+ is -1)")
+        # THE TEAMS (the ally law): x2 marries 1+3 and 2+4
+        var t2: Dictionary = LD.teams_of(2)
+        ok += _check(int(t2[1]) == 1 and int(t2[3]) == 1 \
+                        and int(t2[2]) == 2 and int(t2[4]) == 2,
+                "x2 wears the 1-3 / 2-4 marriage (the ally law)")
+        var t1: Dictionary = LD.teams_of(1)
+        ok += _check(t1.size() == 2 and not t1.has(3),
+                "x1 seats only the two armies at the table")
+        var t4: Dictionary = LD.teams_of(4)
+        ok += _check(t4.size() == 4 and int(t4[3]) == 3,
+                "x4 is the chaos: every army its own team")
+        # THE DROP: a fresh board refuses 3, answers only the 6
+        var fresh := []
+        for i in 16:
+                fresh.append(-1)
+        var teams: Dictionary = LD.teams_of(1)
+        ok += _check((LD.legal_moves(fresh, 1, 3, teams) as Array).is_empty(),
+                "no 6, no drop (the one-die law)")
+        var six: Array = LD.legal_moves(fresh, 1, 6, teams)
+        var six_ok: bool = six.size() == 4
+        for m in six:
+                six_ok = six_ok and int(m["np"]) == 0
+        ok += _check(six_ok,
+                "the 6 offers every nest pawn its drop onto the start cell")
+        # THE EAT: landing on a lone foe takes it - it goes home
+        var battle := fresh.duplicate()
+        battle[0] = 5        # army 1's pawn at ring 5
+        battle[4] = 45       # army 2's pawn at ring 6 ((13+45)%52=6)
+        var eats: Array = LD.legal_moves(battle, 1, 1, teams)
+        var eat_found := false
+        for m in eats:
+                if int(m["piece"]) == 0 and int(m["np"]) == 6:
+                        eat_found = (m["eats"] as Array).size() == 1
+        ok += _check(eat_found,
+                "landing on the lone foe reads the eat")
+        var applied: Dictionary = LD.apply_move(battle, 1, 0, 6, teams)
+        ok += _check(int(applied["poss"][0]) == 6 \
+                        and int(applied["poss"][4]) == -1 \
+                        and (applied["eaten"] as Array).size() == 1,
+                "the eat sends the foe all the way home (no bonus moves)")
+        # THE GUARDED LAW: the star cell coexists, nobody is eaten there
+        var guarded := fresh.duplicate()
+        guarded[0] = 7       # army 1 at ring 7, one step from its star
+        guarded[4] = 47      # army 2 AT the star ((13+47)%52=8)
+        var star_moves: Array = LD.legal_moves(guarded, 1, 1, teams)
+        var star_safe := false
+        for m in star_moves:
+                if int(m["np"]) == 8:
+                        star_safe = (m["eats"] as Array).is_empty()
+        ok += _check(star_safe,
+                "the guarded star refuses the eat (the coexist law)")
+        # THE BLOCKADE: two foe pawns refuse the pass AND the landing;
+        # the team's own pair is a free road but no third pawn joins
+        var wall := fresh.duplicate()
+        wall[4] = 49         # army 2's pawn at ring 10
+        wall[5] = 49         # a second one: THE BLOCK
+        wall[0] = 8          # army 1 at ring 8, the block right ahead
+        var pass_moves: Array = LD.legal_moves(wall, 1, 3, teams)
+        var pass_blocked := true
+        for m in pass_moves:
+                if int(m["piece"]) == 0:
+                        pass_blocked = false    # np 11 crosses ring 10
+        ok += _check(pass_blocked,
+                "the foe blockade refuses the pass (the squares law's shadow)")
+        var land_moves: Array = LD.legal_moves(wall, 1, 2, teams)
+        var land_ok := true
+        for m in land_moves:
+                if int(m["np"]) == 10:
+                        land_ok = false
+        ok += _check(land_ok,
+                "the foe blockade refuses the landing")
+        var own_pair := fresh.duplicate()
+        own_pair[0] = 10     # army 1's own pair at ring 10
+        own_pair[1] = 10
+        own_pair[2] = 8      # a third friend two steps back
+        var third_moves: Array = LD.legal_moves(own_pair, 1, 2, teams)
+        var third_refused := true
+        for m in third_moves:
+                if int(m["piece"]) == 2 and int(m["np"]) == 10:
+                        third_refused = false
+        ok += _check(third_refused,
+                "the third pawn can never land in (the owner's own law)")
+        own_pair[2] = 8
+        var over_moves: Array = LD.legal_moves(own_pair, 1, 3, teams)
+        var own_pass := false
+        for m in over_moves:
+                if int(m["piece"]) == 2 and int(m["np"]) == 11:
+                        own_pass = true
+        ok += _check(own_pass,
+                "the team passes its own blockade freely")
+        # THE EXACT HOME: 56 is the last step; overshoot is refused
+        var near_home := fresh.duplicate()
+        near_home[0] = 54
+        ok += _check(not (LD.legal_moves(near_home, 1, 1, teams) \
+                        as Array).is_empty(),
+                "54 + 1 walks the lane")
+        var home_moves: Array = LD.legal_moves(near_home, 1, 2, teams)
+        var home_ok := false
+        for m in home_moves:
+                if int(m["np"]) == 56:
+                        home_ok = true
+        ok += _check(home_ok, "the exact 2 lands home")
+        ok += _check((LD.legal_moves(near_home, 1, 3, teams) as Array) \
+                        .is_empty(),
+                "the overshoot is refused (the exact landing law)")
+        # THE COIN SPOTS: reachable-ahead only, never behind
+        var coin_board := fresh.duplicate()
+        coin_board[0] = 5
+        var spots: Array = LD.coin_spots(coin_board, [1], teams)
+        var spot_ok: bool = not spots.is_empty()
+        var has_ahead := false
+        var has_behind := false
+        for r in spots:
+                if int(r) == 6 or int(r) == 30:
+                        has_ahead = true
+                if int(r) == 4 or int(r) == 0:
+                        has_behind = true
+        spot_ok = spot_ok and has_ahead and not has_behind
+        ok += _check(spot_ok,
+                "the coin only shines where a pawn can still reach")
+        # THE PASS-THROUGH COLLECTION
+        ok += _check(bool(LD.crosses_coin(1, 5, 8, 7)) \
+                        and not bool(LD.crosses_coin(1, 5, 6, 7)),
+                "passing through collects, no need to land (the owner's law)")
         return ok
 
 # ------------------------------------------------------------------ roadmap
@@ -1944,8 +2175,8 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 2,
-                "the next two are the workshop (conquer dice graduated)")
+        ok += _check(GameReg.workshop().size() == 1,
+                "the last one is the workshop (board ludo graduated)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -1954,8 +2185,8 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "ludo",
-                        "the SOON block wears ludo first (%s)" % [ids.slice(soon_first_at)])
+                ok += _check(String(ids[soon_first_at]) == "snl",
+                        "the SOON block wears snl first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

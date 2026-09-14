@@ -1095,13 +1095,93 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
         },
-        {"id": "ludo", "title": "LUDO ROAD", "tag": "the dice race",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+        {"id": "ludo", "title": "BOARD LUDO", "tag": "roll and run home",
+                "script": "res://game/games/ludo/ludo.gd",
+                "thumb": "res://assets/thumbs/ludo.png",
+                # v0.3.9-10 THE GRADUATION ... the teaser LUDO ROAD ships as
+                # BOARD LUDO (the owner: "the word ludo itself is
+                # trademarked from pachisi, call it board ludo"). ONE die -
+                # the original ("to me, the original one dice is the better
+                # choice"): a 6 drops a pawn and rolls again. THE MODES (the
+                # owner's own split, asked at the START, no options button):
+                # x1 = one army each (user 1 vs CPU 2), x2 = the user plays
+                # armies 1 AND 3 vs the CPU's 2 AND 4 ("they should behave
+                # like if they were from same square" - the ALLY LAW),
+                # x4 = every side a real opponent ("cool chaos"). THE GUARDED
+                # DROPS: the colored start cells + the four stars are safe.
+                # THE BLOCKADE: two pawns of one team stop the foes cold,
+                # the team passes, a third pawn can never land in. Eat = the
+                # pawn slides ALL the way back home - and NO bonus moves
+                # ("we do not need these bad stuff here"). THE CPU IS PURE
+                # RNG ("there is no AI or profiles here"). THE COIN CLOCK:
+                # one GOGACoin after each 6 in-game minutes on a cell the
+                # player can still reach; passing through collects it. Loser
+                # opens the next round; no draws; run bonus /1 ("ludo turns
+                # always takes too long anyway"). VERTICAL - the square
+                # board seats proper in portrait.
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 1, "price": 450, "fee": 8, "shop": true,
+                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 15,
                         "needs_games": 16},
-                "desc": "roll, run the loop, climb your color's arm, get "
-                        + "all four home - the workshop version is baking"},
+                "desc": "the classic one-die ludo, redressed for the box: "
+                        + "roll a 6 to drop a pawn and roll again, run the "
+                        + "loop clockwise, climb your color's arm and bring "
+                        + "all four pawns home before the rival does. Start "
+                        + "cells and stars are guarded, two of your pawns "
+                        + "block the foes cold, and a landed-on pawn slides "
+                        + "all the way back to its base. Three ways to play: "
+                        + "one army each, the 1-and-3 double, or four-army "
+                        + "chaos. The CPU wears no brain here - the die is "
+                        + "the only mind at the table.",
+                "controls": [
+                        "TAP ANYWHERE TO START, then pick the way to play: "
+                        + "x1 one army each, x2 you field armies 1 AND 3 "
+                        + "against 2 AND 4, x4 every side is a rival",
+                        "on your turn tap ROLL at your tray - the die fades "
+                        + "in, shuffles, and settles",
+                        "roll a 6 to drop a pawn onto your start cell, and "
+                        + "a 6 always rolls again",
+                        "tap a pawn with an arrow to see its legal landings, "
+                        + "tap a landing to walk it - hop by hop",
+                        "land on a rival pawn to eat it - it slides all the "
+                        + "way back to its base; no bonus moves, ever",
+                        "your start cell and the four stars are GUARDED - "
+                        + "nobody gets eaten there",
+                        "two of your pawns on one cell are a BLOCKADE - "
+                        + "rivals cannot pass or land, you pass freely, and "
+                        + "a third pawn can never join",
+                        "walk the full loop, climb your color's arm, land "
+                        + "every pawn home - first full team wins the round",
+                        "a GOGACoin appears every 6 minutes on a cell you "
+                        + "can still reach - walk through it to take it "
+                        + "(the CPU steals it too)",
+                        "the loser opens the next round; win +1 score, "
+                        + "loss -1, run bonus /1",
+                        "piece skins and themes live in the SHOP - the skins "
+                        + "re-ink YOUR pawns on any theme",
+                ],
+                "genres": {"main": ["board", "family"],
+                        "sub": ["turnbased", "competitive",
+                                "singleplayer"]},
+                "ach": [
+    {"id": "score_t1", "title": "First Lap", "desc": "Reach a score of 10", "tier": 1, "rule": {"k": "score", "key": "", "v": 10}},
+    {"id": "score_t2", "title": "The Marathon", "desc": "Reach a score of 25", "tier": 2, "rule": {"k": "score", "key": "", "v": 25}},
+    {"id": "score_t3", "title": "Bottom of the Ninth", "desc": "Reach a score of 50", "tier": 3, "rule": {"k": "score", "key": "", "v": 50}},
+    {"id": "wins_t1", "title": "First Home", "desc": "Win 1 round", "tier": 1, "rule": {"k": "cnt", "key": "wins", "v": 1}},
+    {"id": "wins_t2", "title": "The Board Walker", "desc": "Win 25 rounds", "tier": 2, "rule": {"k": "cnt", "key": "wins", "v": 25}},
+    {"id": "wins_t3", "title": "The Ludo Throne", "desc": "Win 100 rounds", "tier": 3, "rule": {"k": "cnt", "key": "wins", "v": 100}},
+    {"id": "streak_t1", "title": "Back to Back", "desc": "Win 3 rounds in a row", "tier": 2, "rule": {"k": "max", "key": "streak", "v": 3}},
+    {"id": "streak_t2", "title": "The Triple Crown", "desc": "Win 5 rounds in a row", "tier": 3, "rule": {"k": "max", "key": "streak", "v": 5}},
+    {"id": "captures_t1", "title": "The Eater", "desc": "Eat 25 rival pawns", "tier": 1, "rule": {"k": "cnt", "key": "captures", "v": 25}},
+    {"id": "captures_t2", "title": "The Table's Terror", "desc": "Eat 250 rival pawns", "tier": 2, "rule": {"k": "cnt", "key": "captures", "v": 250}},
+    {"id": "homes_t1", "title": "The Conductor", "desc": "Bring 50 pawns home", "tier": 1, "rule": {"k": "cnt", "key": "homes", "v": 50}},
+    {"id": "homes_t2", "title": "The Full Fleet", "desc": "Bring 500 pawns home", "tier": 2, "rule": {"k": "cnt", "key": "homes", "v": 500}},
+    {"id": "coins_t1", "title": "The Path's Toll", "desc": "Take 10 GOGACoins off the board", "tier": 1, "rule": {"k": "cnt", "key": "coins", "v": 10}},
+    {"id": "plays_t1", "title": "The Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
+],
+        },
         {"id": "snl", "title": "SNAKES & LADDERS",
                 "tag": "climb and slide",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",

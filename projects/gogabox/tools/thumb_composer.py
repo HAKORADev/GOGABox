@@ -2060,6 +2060,213 @@ def scene_jumpcube():
     return sc.render()
 
 
+def scene_ludo():
+    """BOARD LUDO (v0.3.9-10): IN-GAME FOOTAGE - the classic one-die
+    table mid-race: a red pawn walks the loop, a green raider runs, a
+    red raider is mid-SLIDE home after being eaten, one die shows its 6
+    and the GOGACoin waits on a contested cell. The owner's table:
+    pachisi's honest grandchild, one die, no bonus moves."""
+    sc = Scene()
+    sc.backdrop((42, 33, 20), (31, 24, 14))
+    # the board geometry (the 15x15 classic, drawn small and proud)
+    side = 566
+    cell = side / 15.0
+    ox = 250
+    oy = (H - side) // 2
+    frame = (138, 90, 46)
+    frame_dk = (110, 69, 34)
+    tile = (243, 233, 212)
+    tile_line = (184, 163, 124)
+    red = (224, 83, 63)
+    green = (47, 158, 85)
+    yellow = (232, 178, 58)
+    blue = (65, 121, 223)
+    armies = {1: red, 2: green, 3: yellow, 4: blue}
+    # the slab + shadow
+    pad = 14
+    sc.rect([ox - pad + 8, oy - pad + 12, ox + side + pad + 8,
+             oy + side + pad + 12], fill=(0, 0, 0, 85))
+    sc.rect([ox - pad, oy - pad, ox + side + pad, oy + side + pad],
+            fill=frame + (255,), r=10)
+    sc.rect([ox - pad, oy + side + pad - 10, ox + side + pad,
+             oy + side + pad], fill=frame_dk + (255,))
+    # the room floor seam (the game's own room law)
+    sc.rect([0, H - 96, W, H], fill=(31, 24, 14, 255))
+
+    def cp(gx, gy):
+        return (ox + (gx + 0.5) * cell, oy + (gy + 0.5) * cell)
+
+    def tile_r(gx, gy, fill, shrink=2.4):
+        x0 = ox + gx * cell + shrink
+        y0 = oy + gy * cell + shrink
+        x1 = ox + (gx + 1) * cell - shrink
+        y1 = oy + (gy + 1) * cell - shrink
+        sc.rect([x0, y0, x1, y1], fill=fill + (255,), r=4)
+
+    # the track tiles (the cross)
+    track = []
+    for x in range(1, 6):
+        track.append((x, 6))
+    for y in range(5, -1, -1):
+        track.append((6, y))
+    track.append((7, 0))
+    for y in range(0, 6):
+        track.append((8, y))
+    for x in range(9, 15):
+        track.append((x, 6))
+    track.append((14, 7))
+    for x in range(14, 8, -1):
+        track.append((x, 8))
+    for y in range(9, 15):
+        track.append((8, y))
+    track.append((7, 14))
+    for y in range(14, 8, -1):
+        track.append((6, y))
+    for x in range(5, -1, -1):
+        track.append((x, 8))
+    track.append((0, 7))
+    lane_of = {1: [(1, 7), (2, 7), (3, 7), (4, 7), (5, 7)],
+               2: [(7, 1), (7, 2), (7, 3), (7, 4), (7, 5)],
+               3: [(13, 7), (12, 7), (11, 7), (10, 7), (9, 7)],
+               4: [(7, 13), (7, 12), (7, 11), (7, 10), (7, 9)]}
+    painted = set()
+    for a in lane_of:
+        for g in lane_of[a]:
+            painted.add(g)
+    starts = {(1, 6): 1, (8, 1): 2, (13, 8): 3, (6, 13): 4}
+    stars = [(6, 2), (12, 6), (8, 12), (2, 8)]
+    for g in track:
+        if g in painted:
+            continue
+        fill = tile
+        if g in starts:
+            base = armies[starts[g]]
+            fill = tuple(min(255, int(c * 0.55 + 255 * 0.45))
+                         for c in base)
+        tile_r(g[0], g[1], fill)
+    for a in lane_of:
+        for g in lane_of[a]:
+            base = armies[a]
+            fill = tuple(min(255, int(c * 0.55 + 255 * 0.45))
+                         for c in base)
+            tile_r(g[0], g[1], fill)
+    # the stars (the guarded cells)
+    for g in stars:
+        cx, cy = cp(g[0], g[1])
+        pts = []
+        for k in range(8):
+            import math
+            ang = math.pi * 0.25 * k - math.pi / 2
+            rr = 10 if k % 2 == 0 else 4.5
+            pts.append((cx + math.cos(ang) * rr, cy + math.sin(ang) * rr))
+        sc.polygon(pts, tile_line + (220,))
+    # the bases (rounds + nests + numerals)
+    base_at = {1: (0, 0), 2: (9, 0), 3: (9, 9), 4: (0, 9)}
+    for a, (bx, by) in base_at.items():
+        col = armies[a]
+        x0 = ox + bx * cell + 5
+        y0 = oy + by * cell + 5
+        x1 = ox + (bx + 6) * cell - 5
+        y1 = oy + (by + 6) * cell - 5
+        light = tuple(min(255, int(c * 0.42 + 255 * 0.58)) for c in col)
+        sc.rect([x0, y0, x1, y1], fill=light + (255,), r=16)
+        sc.rect([x0 + 14, y0 + 14, x1 - 14, y1 - 14], fill=col + (255,),
+                r=12)
+        for p in range(4):
+            sx = (bx + 1.5 + (p % 2) * 2.0) * cell + ox
+            sy = (by + 1.5 + (p // 2) * 2.0) * cell + oy
+            sc.ellipse([sx - 11, sy - 11, sx + 11, sy + 11],
+                       fill=(255, 255, 255, 130))
+        import math
+        sc.text(str(a), 30, int(x0 + (x1 - x0) / 2),
+                int(y0 + (y1 - y0) / 2), fill=(255, 255, 255, 235))
+    # the home triangles
+    tri = {2: [(6, 6), (8, 6), (7, 7)], 3: [(8, 6), (8, 8), (7, 7)],
+           4: [(8, 8), (6, 8), (7, 7)], 1: [(6, 8), (6, 6), (7, 7)]}
+    for a, pts in tri.items():
+        sc.polygon([cp(g[0], g[1]) for g in pts], armies[a] + (255,))
+    # the pawns (the chess-like figures)
+
+    def pawn(cx, cy, col, scale=1.0):
+        bw = 30 * scale
+        hr = 9.5 * scale
+        bh = 20 * scale
+        sc.ellipse([cx - bw / 2 + 2, cy + 9 * scale + 2,
+                    cx + bw / 2 + 2, cy + 17 * scale + 2],
+                   fill=(0, 0, 0, 60))
+        sc.ellipse([cx - bw / 2, cy + 9 * scale, cx + bw / 2,
+                    cy + 17 * scale],
+                   fill=tuple(int(c * 0.75) for c in col) + (255,))
+        sc.polygon([(cx - hr * 0.7, cy - bh * 0.45 + hr * 0.6),
+                    (cx + hr * 0.7, cy - bh * 0.45 + hr * 0.6),
+                    (cx + bw * 0.26, cy + 10 * scale),
+                    (cx - bw * 0.26, cy + 10 * scale)], col + (255,))
+        sc.ellipse([cx - hr, cy - bh * 0.45 - hr, cx + hr,
+                    cy - bh * 0.45 + hr], fill=col + (255,))
+        sc.ellipse([cx - hr * 0.55, cy - bh * 0.45 - hr * 0.85,
+                    cx - hr * 0.1, cy - bh * 0.45 - hr * 0.35],
+                   fill=(255, 255, 255, 120))
+
+    # red: four home dots in its triangle, one walker on the loop
+    for k in range(4):
+        hx = cp(6.33, 7.0)[0]
+        hy = cp(6.33, 7.0)[1] + (k - 1.5) * 13
+        sc.ellipse([hx - 6, hy - 6, hx + 6, hy + 6], fill=red + (255,))
+    walk_at = cp(2, 6)
+    pawn(walk_at[0], walk_at[1] - 4, red, 1.0)
+    # green raider on the right arm
+    pawn(*(cp(11, 6)), green, 1.0)
+    # yellow + blue resting in their nests
+    pawn(*cp(10.5, 10.5), yellow, 0.92)
+    pawn(*cp(12.5, 12.5), yellow, 0.92)
+    pawn(*cp(1.5, 12.5), blue, 0.92)
+    # THE MID-SLIDE: the eaten blue pawn ghosting back to its base
+    sc.layer()
+    import math
+    sx, sy = cp(4, 8)
+    ex, ey = cp(2.5, 11.5)
+    for k in range(4):
+        f = k / 3.0
+        gx = sx + (ex - sx) * f
+        gy = sy + (ey - sy) * f - math.sin(f * math.pi) * 30
+        sc.ellipse([gx - 2, gy - 2, gx + 2, gy + 2],
+                   fill=(255, 255, 255, 150 - k * 35))
+        if k > 0:
+            pawn(gx, gy, blue, 0.9 - k * 0.16)
+    pawn(ex, ey, blue, 0.62)
+    # dust at the bite point
+    for (dx, dy) in [(-14, -10), (10, -14), (16, 6), (-6, 14)]:
+        sc.rect([sx + dx - 3, sy + dy - 3, sx + dx + 3, sy + dy + 3],
+                fill=(255, 236, 200, 210))
+    # THE DIE: a big 6 near the right tray, mid-theater glow
+    sc.layer()
+    dx0, dy0, ds = 880, 240, 84
+    sc.rect([dx0 - ds / 2 + 5, dy0 - ds / 2 + 7, dx0 + ds / 2 + 5,
+             dy0 + ds / 2 + 7], fill=(0, 0, 0, 80))
+    sc.rect([dx0 - ds / 2, dy0 - ds / 2, dx0 + ds / 2, dy0 + ds / 2],
+            fill=(255, 255, 255, 255), r=16)
+    for (fx, fy) in [(-0.24, -0.24), (0.24, -0.24), (-0.24, 0),
+                     (0.24, 0), (-0.24, 0.24), (0.24, 0.24)]:
+        px = dx0 + fx * ds
+        py = dy0 + fy * ds
+        sc.ellipse([px - 7, py - 7, px + 7, py + 7],
+                   fill=(58, 42, 20, 255))
+    sc.glow(dx0, dy0, 74, (255, 240, 200), 90)
+    # the tray chips: YOU / CPU marks
+    sc.rect([836, 120, 952, 190], fill=(224, 83, 63, 255), r=14)
+    sc.text("YOU 1", 22, 894, 162, fill=(255, 255, 255, 245))
+    sc.rect([836, 470, 952, 540], fill=(34, 80, 40, 255), r=14)
+    sc.text("CPU 2", 22, 894, 512, fill=(255, 255, 255, 245))
+    # the GOGACoin on a contested track cell
+    sc.layer()
+    ccx, ccy = cp(9, 6)
+    sc.ellipse([ccx - 26, ccy - 22, ccx + 26, ccy + 30],
+               fill=(0, 0, 0, 70))
+    sc.stamp(load_sprite("ui/coin.png"), ccx, ccy + 2, scale=0.34)
+    sc.vignette(78)
+    return sc.render()
+
+
 SCENES = {
     "snake": scene_snake,
     "rally": scene_rally,
@@ -2081,6 +2288,7 @@ SCENES = {
     "pacman": scene_pacman,
     "brickbreaker": scene_brick,
     "jumpcube": scene_jumpcube,
+    "ludo": scene_ludo,
 }
 
 # SOON tiles keep the v0.1.6 placeholder design (rule R4). This list shrinks

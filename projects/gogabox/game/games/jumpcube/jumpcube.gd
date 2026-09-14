@@ -42,11 +42,24 @@ extends GogaGame
 ##     ownership change crossfades the color, and the cascade's sounds
 ##     rise in pitch as the chain grows ("out will usually make from 2
 ##     to 4 ins so...it has to feel satisfying in a cool way")
-##   - ONE opponent, FOUR moods (the xo rotation, one name "CPU") with
-##     programmed failures everywhere, and the spill-scar memory (the
-##     2-round window): lose a round where the player swallowed a chain
-##     of 6+ dice in one breath and the CPU plays feed-aware for the
-##     window - it learns the way it lost
+##   - ONE opponent, FOUR moods (the xo rotation, one name "CPU"), every
+##     mood HARD or VERY HARD (the owner v0.3.9-10: "all profiles are
+##     made as hard/very hard but not impossible and also not just
+##     medium/easy") with programmed failures everywhere. THE RESULT LAW:
+##     "each profile changes based on how the user responded to each one
+##     whether won or lost" - the user's wins tighten the hand, the
+##     user's losses ease it, a mood the user solved twice is benched.
+##     THE COUNTER-ATTACK (the squares law, the dice dialect): "as in
+##     squares it takes opportunities to take a square then make another
+##     move" - the moods that carry the eye HUNT the biggest flip when a
+##     spill is on the table (not always - in the profiles).
+##     THE SPILL-SCAR MEMORY (the 2-round window): lose a round where the
+##     player swallowed a chain of 6+ dice in one breath and the CPU
+##     plays feed-aware for the window - it learns the way it lost
+##     (v0.3.9-10 also fixed the ply eye's SIGN: the old eye ADDED the
+##     foe's best reply to a lowest-wins score, so the smart moods were
+##     actively hunting the moves that gift the foe the strongest answer
+##     - the honest root of the "semi-random" feel)
 ##   - TAP ANYWHERE TO START (the gate, HUD index 0), pause_end_run (the
 ##     pong END bank)
 ##
@@ -174,25 +187,29 @@ const SKINS := {
 }
 
 # ------------------------------------------------------------- the profiles
-## THE FOUR MOODS (the xo law: invisible rotation, one name). The KJC
-## dialect of the programmed failures:
+## THE FOUR MOODS (the xo law: invisible rotation, one name), v0.3.9-10
+## HARDNESS PASS (the owner: hard/very hard, never impossible, never
+## easy). The KJC dialect of the programmed failures:
 ##   miss_take - the chance it fails to SEE an immediate spill (the
 ##               whole capped set goes blind for the turn)
 ##   err_risk  - the chance it fumbles a random legal die outright
-##   w_feed    - how much it fears feeding a foe's loaded dice
-##   w_spill   - how much it loves a spill NOW
-##   ply       - the reply eye: simulates the foe's best answer (trick
-##               and sage only)
+##   w_feed    - how much it fears the ammunition it leaves the foe
+##   w_spill   - how much it loves a spill NOW (and its own take)
+##   ply       - the reply eye: simulates the foe's best answer (the
+##               sign is HONEST since v0.3.9-10: a strong reply is feared)
+##   ca        - THE COUNTER-ATTACK: when a spill is right there, the
+##               chance the mood HUNTS the biggest flip instead of
+##               scoring (the squares law: take, then move again)
 ##   noise     - the feel jitter (the same board never plays the same)
 const PROFILES := {
-        "wall": {"miss_take": 0.10, "err_risk": 0.10, "noise": 1.10,
-                "w_feed": 1.45, "w_spill": 0.85},
-        "trick": {"miss_take": 0.07, "err_risk": 0.10, "noise": 0.85,
-                "w_feed": 1.00, "w_spill": 1.00, "ply": 1},
-        "rusher": {"miss_take": 0.13, "err_risk": 0.16, "noise": 1.70,
-                "w_feed": 0.55, "w_spill": 1.55},
-        "sage": {"miss_take": 0.05, "err_risk": 0.06, "noise": 0.55,
-                "w_feed": 1.10, "w_spill": 1.15, "ply": 1},
+        "wall": {"miss_take": 0.06, "err_risk": 0.05, "noise": 0.40,
+                "w_feed": 1.60, "w_spill": 0.95, "ply": 1, "ca": 0.60},
+        "trick": {"miss_take": 0.05, "err_risk": 0.05, "noise": 0.32,
+                "w_feed": 1.15, "w_spill": 1.10, "ply": 1, "ca": 0.88},
+        "rusher": {"miss_take": 0.09, "err_risk": 0.11, "noise": 0.60,
+                "w_feed": 0.70, "w_spill": 1.50, "ca": 0.70},
+        "sage": {"miss_take": 0.04, "err_risk": 0.03, "noise": 0.24,
+                "w_feed": 1.25, "w_spill": 1.20, "ply": 1, "ca": 0.80},
 }
 
 # ============================================================ THE CPU CORE
@@ -332,18 +349,53 @@ static func best_reply(owners: Array, values: Array, size: int,
                         first = false
         return best
 
-## THE MOVE PIPELINE (the xo pipeline on a dice board):
+## THE APPETITE (the counter-attack's ruler, the sim eye): how many dice
+## the move TAKES - the tap's own flip + the whole chain's flips. The
+## flat eval cannot see a cascade; the sim can.
+static func gain_of(owners: Array, values: Array, size: int,
+        player: int, i: int) -> int:
+        var sim := do_move(owners, values, size, player, i)
+        if sim.is_empty():
+                return 0
+        return count_owned(sim["owners"], player) \
+                        - count_owned(owners, player)
+
+## THE AMMUNITION: how many of MY dice sit next to a FOE die at its cap -
+## every one of them is a gift the foe's next spill would take (the
+## squares law's shadow: never leave the triple-cross waiting)
+static func exposed_of(owners: Array, values: Array, size: int,
+        me: int) -> int:
+        var n := 0
+        for i in owners.size():
+                if int(owners[i]) != me:
+                        continue
+                for nb in neighbors_of(i, size):
+                        if int(owners[nb]) != me \
+                                        and int(values[nb]) \
+                                        >= max_of(nb, size):
+                                n += 1
+                                break
+        return n
+
+## THE MOVE PIPELINE (the xo pipeline on a dice board, v0.3.9-10):
 ##   1. an immediate spill is RIGHT THERE - taken unless the blind spot
-##      rolls (miss_take; the scar wakes the eye)
-##   2. the fumble: err_risk plays a random legal die outright
-##   3. the scored pick: every legal die wears score_cube (+ the reply
-##      eye for the ply moods), the lowest total wins; noise jitters it
+##      rolls (miss_take * the result mood; the scar wakes the eye)
+##   2. THE COUNTER-ATTACK: the moods that carry the eye HUNT the
+##      biggest flip across the whole capped set (the squares law)
+##   3. the fumble: err_risk * the result mood plays a random legal die
+##   4. the scored pick: the flat feel + the SIM terms (the appetite -
+##      the move's true take - and the ammunition it leaves) + the reply
+##      eye (HONEST sign: a strong foe reply is FEARED, the old eye's
+##      plus-sign hunted the gifting moves) ; noise jitters it
+##   miss_mul / err_mul breathe with the results (the RESULT LAW: the
+##   user's wins tighten, the user's losses ease)
 static func cpu_pick(owners_in: Array, values_in: Array, size: int,
         player: int, profile_id: String, alert: bool,
-        rng: RandomNumberGenerator) -> int:
+        rng: RandomNumberGenerator, miss_mul := 1.0, err_mul := 1.0) -> int:
         var p: Dictionary = PROFILES[profile_id]
         var w_feed := float(p["w_feed"])
-        var miss := float(p["miss_take"])
+        var miss := float(p["miss_take"]) * maxf(0.2, miss_mul)
+        var err := float(p["err_risk"]) * maxf(0.2, err_mul)
         if alert:
                 w_feed = minf(2.2, w_feed * 1.5)
                 miss *= 0.5
@@ -363,22 +415,48 @@ static func cpu_pick(owners_in: Array, values_in: Array, size: int,
                 for i in capped:
                         blinded[i] = true      # THE BLIND SPOT: the whole
                 capped = []                    # capped set stays unseen
-        if rng.randf() < float(p["err_risk"]):
+        # 2. THE COUNTER-ATTACK (the squares law, the dice dialect): a
+        # spill is on the table and the eye profiles HUNT the biggest
+        # flip - "take a square, then make another move"
+        if not capped.is_empty():
+                var ca := float(p.get("ca", 0.0))
+                if alert:
+                        ca = minf(0.95, ca * 1.3)
+                if ca > 0.0 and rng.randf() < ca:
+                        var hunt := -1
+                        var hunt_g := -1
+                        for i in capped:
+                                var g := gain_of(owners_in, values_in,
+                                                size, player, i)
+                                if g > hunt_g:
+                                        hunt_g = g
+                                        hunt = i
+                        if hunt >= 0:
+                                return hunt
+        if rng.randf() < err:
                 return int(legal[rng.randi() % legal.size()])
-        # 3. the scored pick
+        # 4. the scored pick
         var use_ply: bool = p.has("ply")
+        var w_spill := float(p["w_spill"])
         var best := INF
         var picks := []
         for i in legal:
                 if blinded.has(i):
                         continue
                 var s := score_cube(owners_in, values_in, size, player, i,
-                                w_feed, float(p["w_spill"]))
-                if use_ply:
-                        var sim: Dictionary = do_move(owners_in, values_in,
-                                        size, player, i)
-                        if not sim.is_empty():
-                                s += REPLY_W * float(best_reply(
+                                w_feed, w_spill)
+                # the sim eye: the true take + the ammunition left
+                var sim := do_move(owners_in, values_in, size, player, i)
+                if not sim.is_empty():
+                        var g := count_owned(sim["owners"], player) \
+                                        - count_owned(owners_in, player)
+                        s -= (0.55 + 0.5 * w_spill) * float(g)
+                        s += 0.55 * float(exposed_of(sim["owners"],
+                                        sim["values"], size, player))
+                        if use_ply:
+                                # THE HONEST REPLY EYE: a strong foe answer
+                                # RAISES my score - the move is feared
+                                s -= REPLY_W * float(best_reply(
                                         sim["owners"], sim["values"], size,
                                         3 - player))
                 s += rng.randf() * float(p["noise"])
@@ -393,12 +471,14 @@ static func cpu_pick(owners_in: Array, values_in: Array, size: int,
         return int(picks[rng.randi() % picks.size()])
 
 ## THE MEMORY LAW (the xo law, the dice dialect): the record is the
-## player's biggest spill of the round + the result
+## player's biggest spill of the round + the result + THE MOOD that wore
+## the round (the RESULT LAW reads it - a solved mood is benched)
 static func remember(mem_in: Array, record: Dictionary) -> Array:
         var m := mem_in.duplicate()
         m.append({
                 "mass": int(record.get("mass", 0)),
                 "result": int(record.get("result", 0)),
+                "profile": String(record.get("profile", "")),
         })
         while m.size() > MEM_ROUNDS:
                 m.pop_front()
@@ -413,6 +493,48 @@ static func adapt(mem_in: Array) -> Dictionary:
                 if int(e["result"]) == 2 and int(e["mass"]) >= 6:
                         out["alert"] = true
         return out
+
+## THE RESULT LAW (the owner v0.3.9-10: "each profile changes based on
+## how the user responded to each one whether won or lost") - the moods
+## breathe with the scoreboard:
+##   - the user's win TIGHTENS the next hand (the failures shrink)
+##   - the user's loss EASES it (the failures widen - the chance to win
+##     is the owner's own law, never an always-lose machine)
+##   - a mood the user solved TWICE in a row is benched for the round
+##   - never the same mood twice in a row (the rotation lives)
+static func adapt_pick(mem_in: Array, rng: RandomNumberGenerator) \
+                -> Dictionary:
+        var miss_mul := 1.0
+        var err_mul := 1.0
+        var last_r := -1
+        var run := 0
+        if not mem_in.is_empty():
+                last_r = int(mem_in[-1]["result"])
+                for k in range(mem_in.size() - 1, -1, -1):
+                        if int(mem_in[k]["result"]) == last_r:
+                                run += 1
+                        else:
+                                break
+        if last_r == 2 and run > 0:
+                # the CPU just took it (maybe twice) - ease the hand
+                miss_mul += 0.55 * mini(run, 2)
+                err_mul += 0.45 * mini(run, 2)
+        elif last_r == 1 and run > 0:
+                # the user just took it - tighten
+                miss_mul -= 0.22 * mini(run, 2)
+                err_mul -= 0.18 * mini(run, 2)
+        var pool := PROFILES.keys()
+        var last_p := ""
+        if not mem_in.is_empty():
+                last_p = String(mem_in[-1].get("profile", ""))
+        if last_r == 1 and last_p != "" and mem_in.size() >= 2 \
+                        and int(mem_in[-2]["result"]) == 1 \
+                        and String(mem_in[-2].get("profile", "")) == last_p:
+                pool.erase(last_p)   # THE BENCH: the user solved this mood
+        if last_p != "" and pool.size() > 1:
+                pool.erase(last_p)   # the variety: never the same twice
+        return {"profile": String(pool[rng.randi() % pool.size()]),
+                "miss_mul": miss_mul, "err_mul": err_mul}
 
 static func profile_next(i: int) -> Array:
         return [PROFILES.keys()[i % PROFILES.size()], i + 1]
@@ -447,10 +569,14 @@ var last_opener := 1
 var coin_cell := -1
 var coin_t := 0.0
 
-# the round's profile
+# the round's profile (THE RESULT LAW: adapt_pick reads the memory -
+# the user's wins tighten, the user's losses ease, the solved mood is
+# benched; the rotation is still invisible - one name, "CPU")
 var profile_order: Array = ["wall", "trick", "rusher", "sage"]
 var profile_i := 0
 var profile := "sage"
+var miss_mul := 1.0           # the RESULT LAW's breathing failures
+var err_mul := 1.0
 
 # the move pipeline (the in and the out)
 var cascade: Array = []        # the overloaded dice waiting to pop
@@ -617,9 +743,20 @@ func _die_ink(o: int) -> Color:
         return _theme()["ink"]
 
 ## THE THEME SFX LAW (the owner: "SFXs should differ from theme to
-## another") - the in/out voices wear the theme's own timbre
+## another") - the in/out voices wear the theme's own timbre. THE
+## v0.3.9-10 HONESTY FIX: the old call played "cd_in" / "cd_out" - the
+## files are cd_in_<voice> / cd_out_<voice>, so every theme's in/out was
+## 100% SILENT (the owner heard the truth and told us). The shared
+## voices (denied / win / lose / coin / press) keep their bare names.
 func _tsfx(base: String, vol := 0.0, pitch := 1.0) -> void:
-        Jukebox.sfx("cd_" + base, vol, pitch)
+        var name_ := "cd_" + base
+        if base == "in" or base == "out":
+                var voice := "wood"
+                var th: Dictionary = _theme()
+                if th.has("sfx"):
+                        voice = String(th["sfx"])
+                name_ += "_" + voice
+        Jukebox.sfx(name_, vol, pitch)
 
 func _load_meta() -> void:
         bg_l.queue_redraw()
@@ -1020,10 +1157,13 @@ func _new_round() -> void:
         last_opener = next_opener
         turn = next_opener
         clock = 0.0
-        # the mood rotation (the xo law): the invisible round-robin
-        var pn := profile_next(profile_i)
-        profile = pn[0]
-        profile_i = pn[1]
+        # the mood pick (THE RESULT LAW, v0.3.9-10): the memory's results
+        # choose the next mood and breathe the failures - not a blind
+        # round-robin anymore
+        var pick := adapt_pick(mem, _rng)
+        profile = pick["profile"]
+        miss_mul = float(pick["miss_mul"])
+        err_mul = float(pick["err_mul"])
         # THE COIN LAW: after every 3 completed rounds the next round
         # opens with a GOGACoin resting ON a neutral die - whoever
         # conquers that die takes it (the CPU races you)
@@ -1261,7 +1401,7 @@ func _ai_move() -> void:
                         ^ (rounds * 7919) ^ (owners.hash() & 0xffff)
         var flags := adapt(mem)
         var i := cpu_pick(owners, values, n, 2, profile,
-                        bool(flags["alert"]), rng)
+                        bool(flags["alert"]), rng, miss_mul, err_mul)
         if i >= 0 and legal_at(owners, i, 2):
                 _place(i, 2)
 
@@ -1273,7 +1413,8 @@ func _resolve(w: int) -> void:
         glow_t = 0.0
         _glow_owner = w
         done_rounds += 1
-        mem = remember(mem, {"mass": player_best_chain, "result": w})
+        mem = remember(mem, {"mass": player_best_chain, "result": w,
+                        "profile": profile})
         if w == 1:
                 wins += 1
                 streak += 1
@@ -1591,15 +1732,19 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
+        # THE SHELF ORDER LAW (the owner v0.3.9-10: "you literally swapped
+        # positions of themes with the skins, usually skins at the top and
+        # themes under them in all other games") - the DICE SKINS seat
+        # first, the themes under them, the sizes last
+        box.add_child(_shop_label("DICE SKINS - the color only you wear, "
+                        + "on any theme"))
+        for id in SKINS:
+                box.add_child(_skin_row(id))
         box.add_child(_shop_label("THEMES - the room, the board wall, the "
                         + "neutral dice, the enemy and each theme's own "
                         + "sound. YOUR dice are never theirs."))
         for id in THEMES:
                 box.add_child(_theme_row(id))
-        box.add_child(_shop_label(
-                        "YOUR DICE - the color only you wear, on any theme"))
-        for id in SKINS:
-                box.add_child(_skin_row(id))
         box.add_child(_shop_label(
                         "BOARD SIZES - bigger boards, bought first"))
         for id in SIZES:
