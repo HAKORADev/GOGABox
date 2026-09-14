@@ -26,20 +26,18 @@ comebacks), each boss pays 1 upgrade point and opens the in-run upgrade menu
 (6 upgrades x 5 levels, 30 points total, permanent). Score = kills. Shop =
 tank skins + 4 locked upgrades + the laser. Controls: left half swipes the
 tank, right half shoots, middle tap = nuke. The original's pack (art / SFX /
-music / bare-XML logic) is the study source — BLOCKED at Google Drive
-(ToS flag), re-upload pending; the build continues with data-driven
-stand-ins until the pack lands.
+music / bare-XML logic) is the study source — landed 2026-09-14 (owner's
+re-upload); studied under THE USAGE LAW: zero original bytes ship.
 
 ## The state of the pack (updated per pass — READ ME FIRST)
 
-- **2026-09-14: DRIVE LINK BLOCKED.** `drive.google.com/file/d/15YApMycQamq_6uHru_HV9ZO3TR-U3DHz`
-  returns Google's hard wall: "sorry, this item violates our Terms of Service"
-  (server-side flag on the FILE — not a bot wall, not our IP alone; the
-  anonymous endpoints `/view` = 403, `uc?export=download` = 404).
-  **Nobody with the link can download it.** The owner was asked to re-upload
-  (GitHub upload into the repo = the sure path; a re-zipped fresh Drive copy
-  or another host as alternatives).
-- Until the pack lands: the game builds **data-driven** (every enemy, place,
-  boss, drop table and value lives in `heavywar_data.gd` / the study tables),
-  with house-style code-drawn art + synthesized SFX as the interim layer.
-  The pack's arrival becomes a SWAP + TUNE pass, not a rewrite.
+- **2026-09-14: PACK LANDED.** The owner re-uploaded (new Drive id
+  `19fK-_fDEruxL6VlzrPZ6-JdBN_ancROJ`, 7z, password "heavy"). Downloaded via
+  `drive.usercontent.google.com/download?...&confirm=t` (20.5 MB), extracted
+  with the standalone 7zz binary (py7zr choked on its LZMA variant) to
+  `heavywar_src/extracted/` — 999 files, OUTSIDE the repo.
+- Full study digest done -> `01_STUDY.md` (craft/waves/bosses/places/anims/
+  art slots/sounds). THE USAGE LAW in force: zero original bytes enter the
+  repo or the APK; art redrawn, audio synthesized, XML logic rewritten.
+- The build proceeds data-driven per `02_PLAN.md`, with the pack's numbers
+  as the starting tuning.
