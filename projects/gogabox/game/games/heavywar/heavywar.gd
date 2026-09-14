@@ -64,6 +64,8 @@ func _goga_setup() -> void:
         _run_reset()
         _build_world()
         _build_war_room()
+        add_hud_button("SHOP", func(): _shop_open())
+        _apply_skin()
         _enter_intro()
 
 # =================================================================
@@ -119,8 +121,7 @@ func _build_world() -> void:
         tank = Node2D.new()
         tank.position = Vector2(W * 0.35, TANK_Y)
         add_child(tank)
-        var body := _art_sprite("tank", Vector2(96, 60), Color("5a6e3a"))
-        tank.add_child(body)
+        tank.add_child(_skin_node())
         tank.set_meta("skin", "olive")
 
         heli = Node2D.new()
@@ -226,6 +227,26 @@ func _layout_layers() -> void:
         (gnd["node"] as Node2D).position.y = H - 200.0
         var road: Dictionary = world.get_meta("road")
         (road["node"] as Node2D).position.y = ROAD_Y - 14.0
+
+## THE SKIN SLOT: olive is the base sprite; the shop's skins are the
+## recolored tanks the art tool painted. One rebuild point, live-swappable.
+func _skin_id() -> String:
+        var s := Box.skin_on(game_id)
+        return "olive" if s.is_empty() else s
+
+func _skin_node() -> Node2D:
+        var sid := _skin_id()
+        return _art_sprite("tank" if sid == "olive" else "tank_" + sid,
+                Vector2(96, 60), Color("5a6e3a"))
+
+func _apply_skin() -> void:
+        if tank == null or not is_instance_valid(tank):
+                return
+        var old := tank.get_child(0)
+        if old != null:
+                old.queue_free()
+        tank.add_child(_skin_node())
+        tank.set_meta("skin", _skin_id())
 
 ## THE ART INDIRECTION: real texture when the art pass has painted it,
 ## an honest colored slab when it has not. One point of swap, forever.
@@ -1290,12 +1311,6 @@ func _armory_closed() -> void:
         run["calm_t"] = 3.0
         _war_refresh()
 
-## THE BACK LAW sync: the HUD/Android back path pops the sheet through the
-## base - hear it here so the state never desyncs from the stack
-func _goga_sheet_popped(id: String) -> void:
-        if id == "armory" and state == GS.ARMORY:
-                _armory_closed()
-
 # =================================================================
 # THE OVER - the run ends where the tank dies
 # =================================================================
@@ -1428,3 +1443,131 @@ func _goga_tick(dt: float) -> void:
         # the boss dies when its hp does (checked here: parts AND body)
         if boss != null and int(boss["hp"]) <= 0:
                 _boss_die()
+
+# =================================================================
+# THE SHOP - skins + the four locked stats + THE LASER. THE SHEET STACK
+# LAW (v0.3.3-p2 doctrine): the shop rides sheet_push/sheet_pop so the
+# back button and the Android back both close it, the pair dies exactly,
+# and the state hears the pop. No optionals menu exists (the GDD).
+# =================================================================
+func _shop_open() -> void:
+        if state in [GS.PLACE, GS.CALM, GS.BOSS, GS.TUNNEL] and not paused:
+                paused = true
+                get_tree().paused = true
+        var vb := sheet_push(0.0, "shop")
+        var t := Arc.label("HEAVY WAR SHOP", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        vb.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.52, 300.0, 640.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        vb.add_child(sc)
+        # ---- TANK SKINS ----
+        box.add_child(_shop_lbl("TANK SKINS"))
+        for id in HWData.SKINS:
+                box.add_child(_shop_skin_row(id))
+        # ---- THE ARMORY LOCKS ----
+        box.add_child(_shop_lbl("ARMORY UNLOCKS"))
+        for sid in HWData.UPGRADES:
+                if bool(HWData.UPGRADES[sid]["open"]):
+                        continue
+                box.add_child(_shop_stat_row(sid))
+        # ---- THE LASER ----
+        box.add_child(_shop_lbl("THE SECRET WEAPON"))
+        box.add_child(_shop_laser_row())
+        box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
+                        func(): _shop_close()))
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+## both exits (the CLOSE button and the back path) land here through
+## sheet_pop -> _goga_sheet_popped
+func _shop_close() -> void:
+        sheet_pop()
+
+func _shop_reopen() -> void:
+        # a rebuy refreshes the SAME window (the house refresh law)
+        if not _sheet_stack.is_empty() \
+                        and String(_sheet_stack[-1].get("id", "")) == "shop":
+                sheet_pop()
+                _shop_open()
+
+func _shop_lbl(txt: String) -> Label:
+        return Arc.fit_label(txt, 24, Arc.HOT, 560)
+
+func _shop_price_btn(txt: String, price: int, cb: Callable) -> Button:
+        var b := Arc.coin_button("%s  %d" % [txt, price], Vector2(560, 64),
+                22, Arc.ACCENT, cb)
+        if Box.coins() < price:
+                b.disabled = true
+        return b
+
+func _shop_skin_row(id: String) -> Control:
+        var sk: Dictionary = HWData.SKINS[id]
+        var owned := Box.skin_owned(game_id, id) or int(sk["price"]) == 0
+        var on := Box.skin_on(game_id) == id \
+                or (int(sk["price"]) == 0 and Box.skin_on(game_id) == "")
+        if on:
+                var l := Arc.fit_label("%s  (ON)" % sk["name"], 22,
+                        Arc.GOOD, 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        if owned:
+                return Arc.button(String(sk["name"]), Vector2(560, 60), 22,
+                        Arc.ACCENT, func():
+                                Box.equip_skin(game_id, id)
+                                Jukebox.sfx("hw_pickup", -4.0)
+                                _apply_skin()
+                                _shop_reopen())
+        return _shop_price_btn(String(sk["name"]), int(sk["price"]), func():
+                if Box.buy_skin(game_id, id, int(sk["price"])):
+                        Jukebox.sfx("hw_coin", -4.0)
+                        _apply_skin()
+                _shop_reopen())
+
+func _shop_stat_row(sid: String) -> Control:
+        var u: Dictionary = HWData.UPGRADES[sid]
+        if meta.stat_open(sid):
+                var l := Arc.fit_label("%s  - IN THE ARMORY" % u["name"], 22,
+                        Arc.GOOD, 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        return _shop_price_btn(String(u["name"]), int(u["shop_price"]), func():
+                if Box.buy_item(game_id, "upg", sid, int(u["shop_price"])):
+                        Jukebox.sfx("hw_pickup", -4.0)
+                _shop_reopen())
+
+func _shop_laser_row() -> Control:
+        if Box.item_owned(game_id, "rig", "laser"):
+                var l := Arc.fit_label("THE LASER  - IN THE WAR", 22,
+                        Arc.GOOD, 560)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                return l
+        return _shop_price_btn("THE LASER", HWData.LASER_PRICE, func():
+                if Box.buy_item(game_id, "rig", "laser", HWData.LASER_PRICE):
+                        Jukebox.sfx("hw_lasergo", -2.0)
+                _shop_reopen())
+
+## the shop's state sync through the back law (and the CLOSE button)
+func _goga_sheet_popped(id: String) -> void:
+        if id == "armory" and state == GS.ARMORY:
+                _armory_closed()
+        elif id == "shop":
+                if paused:
+                        paused = false
+                        get_tree().paused = false
+                _apply_skin()
+                _war_refresh()
+                Jukebox.sfx("hw_click", -6.0)

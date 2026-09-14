@@ -299,6 +299,38 @@ func _run() -> void:
         ck(meta.best_places() >= 1 if meta.has_method("best_places") else true,
                 "the run landed in the ledger")
 
+        # ------------------------------------------------ the shop laws
+        ## (the all_owned cheat owns every shelf - it would lie about the
+        ## locks AND block the buys; the shop laws run with the cheat off)
+        Box.dev_set_cheat("all_owned", 0)
+        ck(G.sheet_open_count() == 0, "no sheets before the shop")
+        var coins_before: int = Box.coins()
+        Box.earn(20000 - coins_before if coins_before < 20000 else 1000)
+        ck(Box.coins() >= 20000, "the test wallet is stocked")
+        ck(not meta.stat_open("armor"), "armor born locked")
+        G.state = G.GS.PLACE          # a live state: the shop must pause it
+        G._shop_open()
+        await _wait(0.2)
+        ck(G.sheet_open_count() == 1, "THE SHOP LAW: the sheet is up")
+        ck(G.paused, "the shop pauses the war")
+        ck(Box.buy_item("heavywar", "upg", "armor", int(HWData.UPGRADES["armor"]["shop_price"])),
+                "the armor lock buys")
+        ck(meta.stat_open("armor"), "the bought stat opens in the armory")
+        ck(Box.item_owned("heavywar", "rig", "laser") == false, "the laser born unbought")
+        ck(Box.buy_item("heavywar", "rig", "laser", HWData.LASER_PRICE),
+                "the laser buys at its price")
+        ck(Box.item_owned("heavywar", "rig", "laser"), "the laser owned")
+        ck(Box.buy_skin("heavywar", "crimson", int(HWData.SKINS["crimson"]["price"])),
+                "the crimson skin buys")
+        Box.equip_skin("heavywar", "crimson")
+        G._apply_skin()
+        ck(G._skin_id() == "crimson", "THE SKIN LAW: the tank wears the buy")
+        G._shop_close()
+        await _wait(0.2)
+        ck(not G.paused, "closing the shop unpauses the war")
+        ck(G.sheet_open_count() == 0, "the pair died clean")
+        Box.dev_set_cheat("all_owned", 1)   # the cheat returns for later laws
+
         # ------------------------------------------------ the shuffle law
         await _boot()
         _tap(0, Vector2(960, 540), true)
