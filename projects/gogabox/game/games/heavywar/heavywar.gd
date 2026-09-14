@@ -144,11 +144,14 @@ func _mk_layer(h: float, scroll: float) -> Dictionary:
 func _layer_roll(l: Dictionary, speed: float, dx: float) -> void:
         l["off"] = fmod(l["off"] + dx * float(l["scroll"]), W + 4.0)
         var x: float = -float(l["off"])
-        (l["a"] as ColorRect).position.x = x
-        (l["b"] as ColorRect).position.x = x + W + 4.0
+        for k in ["a", "b"]:
+                var leaf: CanvasItem = l[k]
+                if is_instance_valid(leaf):
+                        leaf.position.x = x if k == "a" else x + W + 4.0
 
-## paint the parallax slots with the place's palette (the art pass drops
-## real textures into these same slots - the sim never changes)
+## paint the parallax slots with the place's palette; when the art pass
+## has painted the place's layers they load through the same slots - the
+## sim never changes either way
 func _dress_place(pi: int) -> void:
         place = HWData.PLACES[pi if pi < HWData.PLACES.size() else 0]
         var sky: Dictionary = world.get_meta("sky")
@@ -159,29 +162,68 @@ func _dress_place(pi: int) -> void:
         (sky["b"] as ColorRect).color = place["sky"][1]
         (sky["b"] as ColorRect).size = Vector2(W + 4.0, sky["h"] - 200.0)
         (sky["b"] as ColorRect).position = Vector2(0, 200)
-        var far: Dictionary = world.get_meta("far")
-        (far["a"] as ColorRect).color = place["far"]
-        (far["b"] as ColorRect).color = place["far"]
+        _skin_layer("far", "bg_" + String(place["id"]), place["far"], 600.0,
+                H - 140.0 - 600.0 + 66.0)
         var near: Dictionary = world.get_meta("near")
         (near["a"] as ColorRect).color = place["near"]
         (near["b"] as ColorRect).color = place["near"]
-        var gnd: Dictionary = world.get_meta("ground")
-        (gnd["a"] as ColorRect).color = place["ground"]
-        (gnd["b"] as ColorRect).color = place["ground"]
+        var gnd_ok := _skin_layer("ground", "ground_" + String(place["id"]),
+                place["ground"], 180.0, H - 200.0)
         var road: Dictionary = world.get_meta("road")
-        (road["a"] as ColorRect).color = place["road"]
-        (road["b"] as ColorRect).color = place["road"]
+        (road["node"] as Node2D).visible = not gnd_ok
+        if not gnd_ok:
+                (road["a"] as ColorRect).color = place["road"]
+                (road["b"] as ColorRect).color = place["road"]
         _layout_layers()
+
+## swap a layer's two leaves to a texture when it exists (fallback: the
+## honest colored slabs). Returns true when the texture took over.
+func _skin_layer(key: String, tex_name: String, tint: Color, h: float,
+        y: float) -> bool:
+        var l: Dictionary = world.get_meta(key)
+        var holder: Node2D = l["node"]
+        holder.position.y = y
+        for c in holder.get_children():
+                c.queue_free()
+        var path := ART + "spr_" + tex_name + ".png"
+        var tex := true
+        if ResourceLoader.exists(path):
+                l["a"] = _layer_leaf(holder, load(path), h, Vector2.ZERO)
+                l["b"] = _layer_leaf(holder, load(path), h, Vector2(W + 4.0, 0))
+        else:
+                tex = false
+                l["a"] = _layer_leaf(holder, null, h, Vector2.ZERO, tint)
+                l["b"] = _layer_leaf(holder, null, h, Vector2(W + 4.0, 0), tint)
+        return tex
+
+func _layer_leaf(holder: Node2D, tex: Texture2D, h: float, at: Vector2,
+        tint := Color.WHITE) -> CanvasItem:
+        if tex != null:
+                var sp := Sprite2D.new()
+                sp.texture = tex
+                var ts: Vector2 = tex.get_size()
+                var sc := (W + 4.0) / ts.x
+                sp.scale = Vector2(sc, sc)
+                sp.centered = false
+                sp.position = at + Vector2(0, h - ts.y * sc)
+                holder.add_child(sp)
+                return sp
+        var r := ColorRect.new()
+        r.color = tint
+        r.size = Vector2(W + 4.0, h)
+        r.position = at
+        holder.add_child(r)
+        return r
 
 func _layout_layers() -> void:
         var sky: Dictionary = world.get_meta("sky")
         (sky["node"] as Node2D).position.y = 0
         var far: Dictionary = world.get_meta("far")
-        (far["node"] as Node2D).position.y = H - 140.0 - far["h"] - 130.0
+        (far["node"] as Node2D).position.y = H - 140.0 - 600.0 + 66.0
         var near: Dictionary = world.get_meta("near")
         (near["node"] as Node2D).position.y = H - 140.0 - near["h"] - 20.0
         var gnd: Dictionary = world.get_meta("ground")
-        (gnd["node"] as Node2D).position.y = H - 140.0
+        (gnd["node"] as Node2D).position.y = H - 200.0
         var road: Dictionary = world.get_meta("road")
         (road["node"] as Node2D).position.y = ROAD_Y - 14.0
 
