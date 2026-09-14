@@ -221,6 +221,11 @@ stay.
 - **heavy-weapon-like** - PopCap's Heavy Weapon (the owner's "heavy tank
   (or tank war, i forgot the real name)"): side-scrolling tank WAR, hold to
   aim and spray, waves of planes, the nuke when it all gets too much.
+  **GRADUATED v0.4.0 as HEAVY WAR** (the owner's name law: "calling it
+  tank war takes a different name that we may do somehow a game called
+  tank wars later and this game is not tank wars, you only play as a tank
+  in a war") — the owner's full rogue-like rework, GDD:
+  gogames_ideas/heavywar.md, the working brain in gogames_ideas/heavywar/.
 - **craze-caves-like** — Gamesnacks' Craze Caves, same concept (the owner's
   v0.3.3-p5 dump): dig/drill your way through the caves, grab everything
   shiny, don't get crushed - the one-thumb dig-and-collect loop.
