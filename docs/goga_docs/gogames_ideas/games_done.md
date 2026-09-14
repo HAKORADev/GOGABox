@@ -28,6 +28,7 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 22. CONQUER DICE — done
 23. BOARD LUDO — done
 24. SNAKES & LADDERS — done
+25. HEAVY WAR — done (the heavy-weapon-like graduated, v0.4.0)
 
 ## SOON — the next five (the file's order law, the thirteenth dump's rule:
 ## the first five un-shipped names walking `FUTURE_GAMES.md` top to bottom;
@@ -36,7 +37,7 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 ## instead of the file's order; the owner caught it, the wrong five went
 ## back to their shelves, nothing was lost.)
 
-25. HEAVY WEAPON-LIKE — soon
+25. HEAVY WEAPON-LIKE — shipped as HEAVY WAR (v0.4.0)
 26. CRAZE CAVES-LIKE — soon
 27. DEATH WORM-LIKE — soon
 28. ZUMA-LIKE — soon

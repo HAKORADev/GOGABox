@@ -138,3 +138,79 @@ NEXT (pass 2):
   military art at the pack's frame sizes, zero traced bytes.
 - Then the place art layers (bg silhouettes per place) + the war room
   pass over the widgets.
+
+---
+
+## Pass 2 — 2026-09-15 — THE VOICE AND THE LEDGER
+
+DONE:
+- `tools/v040_hw_sfx.py`: all 20 event sounds synthesized from numpy
+  (fire, boom/bigboom, the nuke's double crack, bombfall whistle,
+  shieldhit, tankhit, rico, pickup/coin dings, heli rotor, lasergo+laser,
+  tunnel whoosh, start horn, bossgo, bossdie cascade+jingle, gameover,
+  click, crate) — 100% ours.
+- The tank wears the shop's skin (live `_apply_skin`).
+- THE SHOP on the sheet-stack law: 6 skins, the 4 armory locks, THE LASER
+  at 5000. The back button and Android back both close it; the rebuy
+  refresh reopens the same window; pause rides with it.
+- Probe: 99 checks 0 fails.
+
+LEARNED:
+- The `all_owned` cheat both LIES about locks and BLOCKS buys — the shop
+  laws must run cheat-off.
+- The shop rides `sheet_push` (the v0.3.3-p2 doctrine), NOT the older
+  lanes-style pair juggling — the back law closes it for free.
+
+---
+
+## Pass 3 — 2026-09-15 — THE TEN FACES FIGHT
+
+DONE:
+- All 10 boss brains (gunship fan-sprays, dreadnought crawling broadsides,
+  skystealer's dipping tractor + meteor rain, wreckball's shadow slams,
+  warhead's cross-screen bombing lunge, kongo's throw + LEAP STOMP,
+  eyebot's pod + tight fans, mechworm's boulder rain + road breach,
+  warbot's telegraphed eye beam, secretfist's atom/fan/beam mix).
+- The new projectile family: meteor/ball/boulder/barrel with a gravity
+  table + ground-impact behaviors (the ball hurts by radius) + sprites.
+- Probe: THE MARATHON LAW — 101 checks 0 fails (all ten faces tick 6
+  simulated seconds each and die paying their point).
+
+WRONG (avoid repeating):
+- The warbot's `arm` part carries no `fire` key — parts default it now.
+  Data files may be ragged; every reader defaults.
+
+---
+
+## Pass 4 — 2026-09-15 — THE SHIP PREP
+
+DONE:
+- `tools/v040_hw_thumb.py`: the 480x320 thumbnail from the game's own
+  sprites (snow place, tank, scout formation, gunship, boom, stencil box).
+- flow_test updated: 25 playable games, heavywar's economy pinned
+  (title law, /500, fee 20, landscape). RESULT: ALL TESTS PASSED.
+- config/projects.json: version_name 0.4.0, code base 31100
+  (arm32 31101, arm64 31102 ride the build).
+- games_done.md: HEAVY WAR on the shipped shelf (#25), the SOON shelf
+  corrected (heavy-weapon-like shipped, four names wait).
+- The final film verified: GULFGATE combat (darts + raiders diving, the
+  lighthouse, the tank, the war room strip, the SHOP button).
+
+THE STATE AT PUSH:
+- Playable end to end: intro tap -> shuffled places -> waves -> tunnel
+  calm -> bosses every 5 -> armory points -> death banks the run.
+- The GDD's laws all land: horizontal only, all places per run via
+  tunnels with calm, shuffles every lap, exclusives per place, the
+  helicopter's caps (3/3/3) + the every-3-places coin law, 6x5 armory
+  with the rebalance menu, kills = score with the 10..100 specials and
+  the life-per-1000 cap 3, the three-zone controls, no optionals,
+  skins+4-locks+laser shop, the accurate war room strip.
+- The owner tunes the numbers after the first device test — every value
+  lives in heavywar_data.gd on purpose.
+
+NEXT (post-test passes):
+- The owner's device test -> the tuning pass (data file only).
+- The laser's art pass (the megabeam is a ColorRect — worth a sprite).
+- Music loop (CC0 or synth) — the game is SFX-only by design for now.
+- Comeback count polish: after every 2nd comeback a face gains a new
+  behavior (noted in 01_STUDY §4, not yet built).

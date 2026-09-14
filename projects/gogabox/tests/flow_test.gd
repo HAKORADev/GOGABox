@@ -312,8 +312,8 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 24,
-                "24 playable games (snakes & ladders joined, v0.3.9-12)")
+        var ok := _check(GameReg.playable().size() == 25,
+                "25 playable games (heavy war joined, v0.4.0)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -321,6 +321,7 @@ func _t_registry() -> int:
         # v0.3.9: FOUR IN LINE + FIVE IN ROW graduated
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
+        # v0.4.0: HEAVY WAR graduated (the SOON shelf's first name)
         ok += _check(GameReg.workshop().size() == 0,
                 "0 workshop teasers (snl graduated v0.3.9-12 - the workshop rests)")
         ok += _check(GameReg.get_game("keys").is_empty(),
@@ -345,6 +346,14 @@ func _t_registry() -> int:
                 "cosmic spud wears the owner's economy (bonus /200, fee 50)")
         ok += _check(String(GameReg.get_game("cosmic_spud")["orientation"]) == "landscape",
                 "cosmic spud is landscape (the camera law)")
+        # v0.4.0: heavy war wears the owner's GDD economy (bonus /500, fee 20)
+        ok += _check(String(GameReg.get_game("heavywar")["title"]) == "Heavy War",
+                "the SOON shelf's first name ships as HEAVY WAR (the name law)")
+        ok += _check(int(GameReg.get_game("heavywar")["coin_div"]) == 500
+                        and int(GameReg.get_game("heavywar")["fee"]) == 20,
+                "heavy war wears the owner's economy (bonus /500, fee 20)")
+        ok += _check(String(GameReg.get_game("heavywar")["orientation"]) == "landscape",
+                "heavy war is landscape (the horizontal law)")
         # v0.3.9-5: THE SPLIT SIGHT + THE HEAVY KICK (the owner's patch-5)
         var CSData: GDScript = load("res://game/games/cosmic_spud/cs_data.gd")
         ok += _check(CSData.SKILLS.has("split_sight") \
