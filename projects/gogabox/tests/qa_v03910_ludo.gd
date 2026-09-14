@@ -426,9 +426,10 @@ func _sheet_labels(root: Node) -> Array:
 func _t_shop_order_law() -> int:
         var ok := 0
         # THE SHELF ORDER LAW (the owner caught the dice game swapping):
-        # jumpcube: DICE SKINS above THEMES. ludo: PIECE SKINS above THEMES.
-        for pair in [["jumpcube", "DICE SKINS", "THEMES -"],
-                     ["ludo", "PIECE SKINS", "THEMES -"]]:
+        # jumpcube: DICE SKINS above THEMES. ludo: PAWN SKINS above
+        # THEMES - and the SHELF TRUTH LAWS: no dash talk anywhere.
+        for pair in [["jumpcube", "DICE SKINS", "THEMES"],
+                     ["ludo", "PAWN SKINS", "THEMES"]]:
                 var gid: String = pair[0]
                 var first_tag: String = pair[1]
                 var second_tag: String = pair[2]
@@ -461,6 +462,94 @@ func _t_shop_order_law() -> int:
                 await get_tree().process_frame
         return ok
 
+# -------------------------------------------------- the v0.3.9-11 laws
+
+## THE WAITING DIE LAW (the owner's tray redesign): no ROLL pill exists
+## any more - the grayed die at the user's tray IS the button; tapping
+## it rolls, the pill rect helper is gone.
+func _t_waiting_die_law() -> int:
+        var ok := 0
+        await _scene_game(1)
+        await _start(1)
+        _drain(300)
+        ok += _check(!g.has_method("_roll_btn_rect"),
+                "the ROLL pill helper is gone (the die is the button)")
+        ok += _check(g.state == "roll_wait" and g._is_user_army(g.turn_army),
+                "the user's roll_wait is on")
+        ok += _check(not g.die_alive,
+                "the die is not alive yet (the grayed waiting die shows)")
+        var dr: Rect2 = g._die_rect(g.turn_army)
+        ok += _check(dr.size.x > 20.0,
+                "the waiting die has a real tap seat (%s)" % dr)
+        var before: bool = g.die_alive
+        g._tap(Vector2(10, 10))     # a tap far from the die: no roll
+        ok += _check(g.die_alive == before,
+                "a tap off the die never rolls")
+        g._tap(dr.get_center())     # the die tap rolls
+        ok += _check(g.state == "rolling" and g.die_alive,
+                "tapping the grayed die rolls (state=rolling)")
+        return ok
+
+## THE SELECTION LAWS (the owner's critical round): a pawn tap MAKES IT
+## CHOSEN (sel_piece + sel_moves answer), an off-board tap deselects,
+## and a landing tap walks - all through the game's own _tap seats.
+func _t_selection_law() -> int:
+        var ok := 0
+        await _scene_game(1)
+        await _start(1)
+        # craft a sure table: pawn 0 mid-track, pawn 1 behind it, the
+        # die seeded to a real roll that moves pawn 0
+        var guard := 0
+        var chosen := false
+        while guard < 60 and not chosen:
+                guard += 1
+                _drain(300)
+                if g.state == "roll_wait" and g._is_user_army(g.turn_army):
+                        g.poss[0] = 5
+                        g.poss[1] = -1
+                        g.poss[2] = -1
+                        g.poss[3] = -1
+                        g.poss[4] = 45
+                        g._rng.seed = 9700 + guard * 13
+                        g.probe_roll()
+                        _drain(200)
+                if g.state == "picking" and g._is_user_army(g.turn_army) \
+                                and not g.legal.is_empty():
+                        var m: Dictionary = g.legal[0]
+                        var pk := int(m["piece"])
+                        var ppt: Vector2 = g._pawn_point(g.turn_army, pk)
+                        # 1. the pawn tap answers
+                        g._tap(ppt)
+                        ok += _check(g.sel_piece == pk
+                                        and g.sel_moves.size() >= 1,
+                                "the pawn tap MAKES IT CHOSEN (piece %d, "
+                                % g.sel_piece + "%d landings)"
+                                % g.sel_moves.size())
+                        # 2. a far tap deselects (the owner: tapping out of
+                        # board rests the choice)
+                        g._tap(Vector2(5.0, 5.0))
+                        ok += _check(g.sel_piece == -1
+                                        and g.sel_moves.is_empty(),
+                                "an off-board tap deselects")
+                        # 3. choose again, then tap the LANDING: it walks
+                        g._tap(ppt)
+                        var dest: Vector2 = g.pos_point(g.turn_army,
+                                        int(g.sel_moves[0]["np"]),
+                                        int(g.sel_moves[0]["piece"]))
+                        var np := int(g.sel_moves[0]["np"])
+                        g._tap(dest)
+                        ok += _check(g.state == "walking"
+                                        and int(g.walk["np"]) == np,
+                                "the landing tap walks the pawn (np=%d)" % np)
+                        while g.state == "walking":
+                                g.probe_step(0.05)
+                        chosen = true
+                elif g.state == "roll_wait" \
+                                and not g._is_user_army(g.turn_army):
+                        _drain(100)
+        ok += _check(chosen, "the selection hunt found a real pick")
+        return ok
+
 # ------------------------------------------------------------------ main
 
 func _ready() -> void:
@@ -475,6 +564,8 @@ func _ready() -> void:
         fails += await _t_verdict_law()
         fails += await _t_soak()
         fails += await _t_shop_order_law()
+        fails += await _t_waiting_die_law()
+        fails += await _t_selection_law()
         print("RESULT: %s" % ("ALL LAWS PASS" if fails == 0
                         else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)

@@ -423,6 +423,13 @@ stay.
   the user DRAWS THE LINES under it: draw the ramp, catch the fall, ride
   the slope you made - power-ups, enemies and collectables ride along.
   The draw-to-save-the-roller (the happy-glass family, physics flavor).
+- **line racer** (owner, v0.3.9-11 round) — the line-rider-like's world
+  worn as a RACING game: nobody draws the lines - YOU DRIVE the vehicle
+  along them (accelerate, steer, brake like a racer), the track rolls
+  under you, rivals and hazards ride the same slopes. The owner's own
+  naming note: "it may be called line racer? that concept anyway".
+  (Sibling of the line-rider-like above - one wears the pencil, one
+  wears the steering wheel; both stay distinct games.)
 - **golf-two-modes** (owner, v0.3.9-5 round) — the putting classic worn
   twice in one game: mode one is the NORMAL TOP-DOWN minigolf view, mode
   two is the SIDE-SCROLLER view (the hill you read, the arc you feel);
@@ -448,6 +455,20 @@ stay.
 - **hill-climb-like** — physics car over hills, fuel, flips, coins.
 - **earn-to-die-like** — drive through the horde, scrap, upgrade between
   runs. (companion piece to the hill-climb-like above)
+- **vehicle-horde-rogue-like** (owner, v0.3.9-11 round) — the earn-to-die
+  side-scroller's SIBLING in TOP-DOWN: you control vehicle(s), upgrade
+  them between waves, and the opponents come BOTH ways - walkers with
+  weapons AND other vehicles. The owner's signature feel, verbatim: "it
+  should have tons of enemies and that feel of being surrounded by
+  thousands of enemies so you can not even accelerate the vehicle".
+  (Dedup: cosmic_spud is the top-down arena shooter on foot; pop_siege
+  is lane-and-economy defense; THIS one is DRIVING - the car IS the
+  character and the crowd is the mechanic.)
+- **naval-rogue-like** (owner, v0.3.9-11 round) — the same rogue-like
+  hunger on WATER: ships and navies, enemy ships and boats, big hideouts
+  to raid or to hide in - the sea, the fleet, the loot loop. (Dedup:
+  lanes is the lane-dodger wearing a ship skin; THIS one is naval
+  combat - maneuvering, broadsides, hideouts, a world, not lanes.)
 - **traffic-drifter-like** - 2D car IN the traffic: weave moving cars with
   DRIFTS and TURNS, the road bends, splits and branches - NOT one straight
   endless lane. (Owner: "2D car driving mid-trafic game with drifts and turns

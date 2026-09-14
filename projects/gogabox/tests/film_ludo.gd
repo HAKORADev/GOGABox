@@ -14,6 +14,15 @@ var g: GogaGame = null
 var LD: GDScript
 var shots := 0
 
+class TapSpy extends Node:
+        func _unhandled_input(ev: InputEvent) -> void:
+                if ev is InputEventMouseButton or ev is InputEventScreenTouch:
+                        var pp: Vector2 = (ev as InputEventMouse).position \
+                                        if ev is InputEventMouse \
+                                        else (ev as InputEventScreenTouch).position
+                        print("SPY got ", ev.get_class(), " pos=", pp,
+                                        " pressed=", ev.is_pressed())
+
 func _snap(tag: String) -> void:
         await get_tree().process_frame
         await get_tree().process_frame
@@ -73,6 +82,10 @@ func _ready() -> void:
         add_child(g)
         await get_tree().process_frame
         await get_tree().process_frame
+        add_child(TapSpy.new())
+        print("FILMDEBUG: win=", get_window().size, " content=",
+                        get_window().content_scale_size, " visrect=",
+                        get_viewport().get_visible_rect().size)
         await get_tree().create_timer(0.6).timeout
         await _snap("01_gate")
         # the gate tap -> the mode sheet
@@ -88,16 +101,21 @@ func _ready() -> void:
         await get_tree().create_timer(0.3).timeout
         await get_tree().create_timer(0.4).timeout
         await _snap("03_table")
-        # THE ROLL PILL at army 1's tray (top-left)
+        # THE WAITING DIE at army 1's tray (the grayed die IS the roll
+        # button now - the v0.3.9-11 tray redesign)
         _wait_user_roll()
-        var pill: Rect2 = g._roll_btn_rect(1)
-        await _snap("04_pill")
-        # tap the pill - catch the shuffle mid-air
-        await _tap(pill.get_center())
+        var wait_die: Rect2 = g._die_rect(1)
+        await _snap("04_wait_die")
+        # tap the die - catch the shuffle mid-air
+        await _tap(wait_die.get_center())
         await get_tree().create_timer(0.35).timeout
         await _snap("05_shuffle")
-        # the settle: a fresh board denies 5 faces of 6 (nothing can
-        # move) - roll until a real picking state shows the arrows
+        # the settle: place a pawn mid-track so EVERY face moves - the
+        # selection film never depends on dice luck
+        g.poss[0] = 10
+        g.poss[1] = -1
+        g.poss[2] = -1
+        g.poss[3] = -1
         var k := 0
         var roll_tries := 0
         while roll_tries < 14:
@@ -113,10 +131,34 @@ func _ready() -> void:
         await get_tree().create_timer(0.2).timeout
         await _snap("06_arrows")
         if g.state == "picking":
-                # THE HOP WALK: play the first legal move, catch a hop
-                var m: Dictionary = g.legal[0]
-                g._start_move(int(m["piece"]), int(m["np"]))
-                await get_tree().create_timer(0.24).timeout
+                # THE SELECTION ANSWER (the owner's critical round): tap a
+                # movable pawn with a REAL finger - the chosen pawn must
+                # lift and the landings must light up
+                var mov := int(g.legal[0]["piece"])
+                var ppt: Vector2 = g._pawn_point(g.turn_army, mov)
+                print("FILMDEBUG: before tap state=%s army=%d user=%s "
+                                % [g.state, g.turn_army,
+                                g._is_user_army(g.turn_army)]
+                                + "piece=%d ppt=%s cell=%.1f legal=%d"
+                                % [mov, ppt, g.cell, g.legal.size()])
+                await _tap(ppt)
+                await get_tree().create_timer(0.25).timeout
+                await _snap("06b_chosen")
+                print("FILMDEBUG: sel_piece=%d sel_moves=%d"
+                                % [g.sel_piece, g.sel_moves.size()])
+                if g.sel_piece >= 0 and not g.sel_moves.is_empty():
+                        var dest: Vector2 = g.pos_point(g.turn_army,
+                                        int(g.sel_moves[0]["np"]),
+                                        int(g.sel_moves[0]["piece"]))
+                        await _tap(dest)
+                        await get_tree().create_timer(0.12).timeout
+                        print("FILMDEBUG: after dest tap state=%s (want "
+                                        % g.state + "walking)")
+                else:
+                        var m: Dictionary = g.legal[0]
+                        g._start_move(int(m["piece"]), int(m["np"]))
+                # THE HOP WALK: catch a hop
+                await get_tree().create_timer(0.12).timeout
                 await _snap("07_hop")
                 # the landing (the drop on the start cell when it is one)
                 while g.state == "walking":
@@ -233,6 +275,22 @@ func _ready() -> void:
         g._resolve(int(g.teams[1]))
         await get_tree().create_timer(0.7).timeout
         await _snap("12_verdict")
+        # THE X4 TABLE (the v0.3.9-11 slab-seat law: the bottom trays sit
+        # BELOW the frame slab + shadow - no overlap on the biggest cells)
+        g._resolve(int(g.teams[2]))      # a loss flips the opener, keeps books
+        await get_tree().create_timer(1.2).timeout
+        g.probe_reset(4, 3310)
+        _wait_user_roll()
+        await get_tree().create_timer(0.3).timeout
+        await _snap("13_x4table")
+        # THE B&W THEME (the v0.3.9-11 contrast round)
+        Box.reset_all()
+        Box.earn(5000)
+        Box.buy_item("ludo", "theme", "mono", 260)
+        Box.equip_item("ludo", "theme", "mono")
+        g._repaint()
+        await get_tree().create_timer(0.3).timeout
+        await _snap("14_mono")
         print("FILM: done shots=%d captures=%d" % [shots,
                         Box.counter("ludo", "captures")])
         get_tree().quit(0)

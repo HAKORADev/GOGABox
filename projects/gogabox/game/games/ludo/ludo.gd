@@ -325,29 +325,36 @@ static func crosses_coin(army: int, from_pos: int, np: int,
 ## 5 themes, the first is the default (the owner's law). A theme owns
 ## EVERYTHING except the user's pawns: the room, the frame, the tiles,
 ## the four army pens, the die, the arrow and the feel. The B&W theme is
-## the owner's standing ask ("me as white and enemy black").
+## the owner's standing ask ("me as white and enemy black"). Each theme
+## also carries "aim" (the selection/landing marker color - hard
+## contrast against its own tiles) and "tray_ink" (the tray border -
+## the v0.3.9-11 contrast round: a black tray on a black room must
+## still read).
 const THEMES := {
         "table": {"name": "THE TABLE", "price": 0, "style": "round",
                 "room": Color("2a2114"), "floor": Color("1f1808"),
                 "frame": Color("8a5a2e"), "frame_dark": Color("6e4522"),
                 "tile": Color("f3e9d4"), "tile_line": Color("b8a37c"),
-                "lane_ink": Color("3a2a14"),
+                "lane_ink": Color("3a2a14"), "aim": Color("0e6f5c"),
+                "tray_ink": Color(0, 0, 0, 0.4),
                 "armies": [Color("e0533f"), Color("2f9e55"),
                         Color("e8b23a"), Color("4179df")],
                 "desc": "the warm wooden classic - red, green, yellow, blue"},
         "mono": {"name": "BLACK & WHITE", "price": 260, "style": "mono",
-                "room": Color("101010"), "floor": Color("050505"),
-                "frame": Color("e8e8e8"), "frame_dark": Color("c4c4c4"),
-                "tile": Color("d9d9d9"), "tile_line": Color("9a9a9a"),
-                "lane_ink": Color("1c1c1c"),
-                "armies": [Color("f7f7f7"), Color("7d7d7d"),
-                        Color("4a4a4a"), Color("1a1a1a")],
+                "room": Color("181818"), "floor": Color("0c0c0c"),
+                "frame": Color("f2f2f2"), "frame_dark": Color("cfcfcf"),
+                "tile": Color("e4e4e4"), "tile_line": Color("6f6f6f"),
+                "lane_ink": Color("111111"), "aim": Color("111111"),
+                "tray_ink": Color(1, 1, 1, 0.8),
+                "armies": [Color("ffffff"), Color("a6a6a6"),
+                        Color("474747"), Color("050505")],
                 "desc": "you are WHITE, the rivals wear the grays and black"},
         "pixel": {"name": "PIXEL", "price": 320, "style": "pixel",
                 "room": Color("1a1c2c"), "floor": Color("10121e"),
                 "frame": Color("29366f"), "frame_dark": Color("1d2752"),
                 "tile": Color("c4b287"), "tile_line": Color("8a7a52"),
-                "lane_ink": Color("29366f"),
+                "lane_ink": Color("29366f"), "aim": Color("1a1c2c"),
+                "tray_ink": Color("141733"),
                 "armies": [Color("e64539"), Color("38b764"),
                         Color("efc94c"), Color("3b9dd6")],
                 "desc": "the 8-bit board - hard edges, hard miles"},
@@ -355,7 +362,8 @@ const THEMES := {
                 "room": Color("060913"), "floor": Color("03050c"),
                 "frame": Color("0e1430"), "frame_dark": Color("090d20"),
                 "tile": Color("141d3a"), "tile_line": Color("27407a"),
-                "lane_ink": Color("7ee8ff"),
+                "lane_ink": Color("7ee8ff"), "aim": Color("7ee8ff"),
+                "tray_ink": Color("27407a"),
                 "armies": [Color("ff3860"), Color("3dff8e"),
                         Color("ffd23d"), Color("37c8ff")],
                 "desc": "the glowing circuit - pawns of light on the dark"},
@@ -363,7 +371,8 @@ const THEMES := {
                 "room": Color("f6d7e0"), "floor": Color("eebfcf"),
                 "frame": Color("fff4f7"), "frame_dark": Color("f3dce6"),
                 "tile": Color("ffffff"), "tile_line": Color("e3bfcf"),
-                "lane_ink": Color("8a4a63"),
+                "lane_ink": Color("8a4a63"), "aim": Color("d4508c"),
+                "tray_ink": Color(0.55, 0.28, 0.4, 0.55),
                 "armies": [Color("ff6fa5"), Color("63d1a8"),
                         Color("ffc93c"), Color("9a8cf2")],
                 "desc": "the sugar board - soft pawns, sweet miles"},
@@ -550,8 +559,12 @@ func _pawn_col(a: int) -> Color:
         return col
 
 func _pawn_ink(a: int) -> Color:
-        var th: Array = _theme()["armies"]
-        var ink: Color = (th[(a - 1) % 4] as Color).darkened(0.55)
+        var col := _pawn_col(a)
+        ## THE CONTRAST LAW (the B&W round): a dark pawn wears a PALE ring
+        ## (a dark ring on a black pawn is invisible), a light pawn wears
+        ## the deep one - the outline always reads
+        var ink: Color = col.darkened(0.55) if col.v > 0.4 \
+                        else col.lightened(0.78)
         if _is_user_army(a):
                 var sid := _skin_id()
                 if sid != "theme":
@@ -586,11 +599,15 @@ func _cell_point(g: Vector2i) -> Vector2:
                         (float(g.y) + 0.5) * cell)
 
 func _socket_point(a: int, piece: int) -> Vector2:
-        ## the four nests inside the army's base (2x2, the classic look)
-        var bx := 1.5 if a == 1 or a == 4 else 10.5
-        var by := 1.5 if a == 1 or a == 2 else 10.5
-        var dx := 2.0 * float(piece % 2)
-        var dy := 2.0 * float(piece / 2)
+        ## THE NEST (the owner's v0.3.9-11 round: "the 4 places of a
+        ## chess-like are wrong, they should be at the internal edges of
+        ## the square") - the classic yard: a centered inner plate (3x3)
+        ## and the four seats AT ITS CORNERS, not a loose 2x2 floating
+        ## near the outer corner
+        var bx := 1.95 if a == 1 or a == 4 else 10.05
+        var by := 1.95 if a == 1 or a == 2 else 10.05
+        var dx := 2.1 * float(piece % 2)
+        var dy := 2.1 * float(piece / 2)
         return board_origin + Vector2((bx + dx) * cell, (by + dy) * cell)
 
 func _cell_rect(g: Vector2i) -> Rect2:
@@ -604,7 +621,14 @@ func _layout(vp: Vector2) -> void:
         var top_y := 96.0
         var tray_h := 74.0
         var bot_y := vp.y - banner - 6.0
-        var avail := (bot_y - tray_h - 12.0) - (top_y + tray_h + 14.0)
+        ## THE SLAB SEAT LAW (the owner: "the position of players 3,4
+        ## badge is slightly overlapped with the board"): the frame slab +
+        ## its shadow reach past board_side by up to ~48px on the biggest
+        ## cells - the bottom trays seat BELOW that overhang, and the
+        ## layout reserves the room for it
+        const SLAB_SEAT := 62.0
+        var avail := (bot_y - tray_h - SLAB_SEAT) \
+                        - (top_y + tray_h + 14.0)
         board_side = minf(vp.x - 14.0, avail)
         board_side = maxf(board_side, 220.0)
         cell = board_side / 15.0
@@ -631,7 +655,9 @@ func _tray_rect(a: int) -> Rect2:
         var th := 74.0
         var top_y := 96.0
         var banner := banner_bottom()
-        var by := board_origin.y + board_side + 12.0
+        ## the slab overhang (frame + shadow) - the trays never sit under it
+        var slab_ext := maxf(10.0, cell * 0.5) + 12.0
+        var by := board_origin.y + board_side + slab_ext + 10.0
         match a:
                 1:
                         return Rect2(board_origin.x, top_y, tw, th)
@@ -645,19 +671,13 @@ func _tray_rect(a: int) -> Rect2:
                         return Rect2(board_origin.x, by, tw, th)
         return Rect2(0, 0, 0, 0)
 
-## the die window inside a tray (THE BIGGER PLACE - the owner's ask)
+## the die window inside a tray (THE BIGGER PLACE - the owner's ask);
+## it is ALSO the roll button now (the grayed waiting die is the button)
 func _die_rect(a: int) -> Rect2:
         var tr := _tray_rect(a)
         var s := minf(58.0, tr.size.y * 0.78)
         return Rect2(tr.position.x + tr.size.x - s - 12.0,
                         tr.position.y + (tr.size.y - s) * 0.5, s, s)
-
-func _roll_btn_rect(a: int) -> Rect2:
-        var tr := _tray_rect(a)
-        var s := minf(58.0, tr.size.y * 0.78)
-        return Rect2(tr.position.x + tr.size.x - s - 124.0,
-                        tr.position.y + (tr.size.y - 44.0) * 0.5,
-                        112.0, 44.0)
 
 # --------------------------------------------------------- the widget row
 
@@ -795,11 +815,18 @@ func _draw_board() -> void:
                         painted[g] = true
                         var lr := _cell_rect(g)
                         var shrink := cell * 0.07
-                        _draw_rr(board_l, Rect2(
-                                        lr.position + Vector2(shrink, shrink),
-                                        lr.size - Vector2(shrink, shrink) * 2),
-                                radius * 0.5,
-                                (_army_col(a + 1) as Color).lightened(0.28))
+                        var lac: Color = _army_col(a + 1)
+                        lac = lac.lightened(0.28) if lac.v <= 0.8 \
+                                        else lac.darkened(0.05)
+                        var lrr := Rect2(lr.position
+                                        + Vector2(shrink, shrink),
+                                        lr.size - Vector2(shrink, shrink) * 2)
+                        _draw_rr(board_l, lrr, radius * 0.5, lac)
+                        ## THE LANE RIM: the lane reads even when its fill
+                        ## sits close to the tile (the B&W round)
+                        _draw_rr(board_l, lrr, radius * 0.5,
+                                        (_army_col(a + 1) as Color)
+                                        .darkened(0.25), false, 2.0)
         for i in _track.size():
                 var g: Vector2i = _track[i]
                 if painted.has(g):
@@ -807,16 +834,23 @@ func _draw_board() -> void:
                 var r := _cell_rect(g)
                 var shrink := cell * 0.07
                 var tile_col: Color = th["tile"]
+                var guarded := false
                 # the guarded drops wear their army's pen (the owner's
                 # "guarded areas of drop point")
                 for a in RING_STARTS:
                         if int(RING_STARTS[a]) == i:
-                                tile_col = (_army_col(a) as Color) \
-                                                .lightened(0.34)
-                _draw_rr(board_l, Rect2(
-                                r.position + Vector2(shrink, shrink),
-                                r.size - Vector2(shrink, shrink) * 2),
-                        radius * 0.5, tile_col)
+                                var ac: Color = _army_col(a)
+                                tile_col = ac.lightened(0.34) if ac.v <= 0.8 \
+                                                else ac.darkened(0.05)
+                                guarded = true
+                var gr := Rect2(r.position + Vector2(shrink, shrink),
+                                r.size - Vector2(shrink, shrink) * 2)
+                _draw_rr(board_l, gr, radius * 0.5, tile_col)
+                if guarded:
+                        ## THE GUARD RIM: a white start cell on cream tiles
+                        ## still reads as guarded (the B&W round)
+                        _draw_rr(board_l, gr, radius * 0.5,
+                                        th["lane_ink"], false, 2.2)
         # the grid lines over the cross (the tiles read as one board)
         var line_c: Color = th["tile_line"]
         line_c.a = 0.5
@@ -826,12 +860,15 @@ func _draw_board() -> void:
         for a in 4:
                 for g in _lanes[a + 1]:
                         board_l.draw_rect(_cell_rect(g), line_c, false, 1.2)
-        # THE STARS: the four guarded mid cells (the classic board's marks)
+        # THE STARS: the four guarded mid cells (the classic board's
+        # marks) - drawn in the lane ink so they hold on every theme
         for i in [8, 21, 34, 47]:
                 var g3: Vector2i = _track[i]
                 var c3 := _cell_point(g3)
-                _draw_star(c3, cell * 0.24, (th["tile_line"] as Color))
-        # THE BASES: four 6x6 rounds with their nests + the numeral marks
+                _draw_star(c3, cell * 0.26, (th["lane_ink"] as Color))
+        # THE BASES: four 6x6 yards - the slab, the centered inner PLATE
+        # (the classic paper square) and the four seats at the plate's
+        # corners (the owner's internal-edges round, v0.3.9-11)
         for a in 4:
                 var army := a + 1
                 var bx0 := 0 if army == 1 or army == 4 else 9
@@ -849,22 +886,41 @@ func _draw_board() -> void:
                 _draw_rr(board_l, Rect2(br.position + Vector2(cell * 0.9,
                                 cell * 0.9), br.size - Vector2(cell * 1.8,
                                 cell * 1.8)), cell * 0.7, base_col)
-                # the nests
+                # THE PLATE: the classic inner paper square (1.5..4.5)
+                var plate := Rect2(br.position + Vector2(cell * 1.5,
+                                cell * 1.5), Vector2(cell * 3, cell * 3))
+                _draw_rr(board_l, plate, cell * 0.42, th["tile"])
+                _draw_rr(board_l, plate, cell * 0.42,
+                                (base_col as Color).darkened(0.15),
+                                false, 2.4)
+                # the four seats AT THE PLATE'S CORNERS
                 for p in 4:
                         var sp := _socket_point(army, p)
                         board_l.draw_circle(sp, cell * 0.30,
-                                        Color(1, 1, 1, 0.55))
+                                        Color(1, 1, 1, 0.65))
                         board_l.draw_circle(sp, cell * 0.30,
                                         (base_col as Color).darkened(0.2),
-                                        false, 2.0)
-                # THE MARK: the bare numeral, the owner's "1,2,3,4" law
+                                        false, 2.4)
+                # THE MARK: the bare numeral, seated mid-plate (the
+                # owner's "1,2,3,4" law)
                 var f := ThemeDB.fallback_font
-                var nc := br.position + br.size * 0.5
+                var nc := plate.get_center()
+                var mark_col: Color = (base_col as Color).darkened(0.3)
+                if (mark_col as Color).v < 0.35:
+                        mark_col = (base_col as Color).lightened(0.62)
                 board_l.draw_string(f, nc + Vector2(-cell * 0.6,
-                                cell * 0.55), str(army),
+                                cell * 0.24), str(army),
                                 HORIZONTAL_ALIGNMENT_CENTER, cell * 1.2,
-                                int(cell * 1.5), Color(1, 1, 1, 0.9))
-        # THE HOME: the center's four triangles pointing in
+                                int(cell * 1.05), mark_col)
+        # THE HOME: a soft medallion behind the four triangles pointing in
+        var mid := board_origin + Vector2(board_side, board_side) * 0.5
+        var med: Color = th["tile"]
+        med = med.lightened(0.25) if (med as Color).v <= 0.5 \
+                        else med.lightened(0.12)
+        board_l.draw_circle(mid, cell * 1.26, med)
+        board_l.draw_circle(mid, cell * 1.26, th["lane_ink"], false, 2.0)
+        # the center's four triangles pointing in (the medallion sits
+        # behind them)
         var tri := [
                 {"army": 2, "pts": [Vector2i(6, 6), Vector2i(8, 6),
                         Vector2i(7, 7)]},
@@ -1006,7 +1062,16 @@ func _draw_pawns() -> void:
                         if pos == int(PATH_LEN):
                                 _draw_home_dot(army, p)
                                 continue
-                        _draw_pawn(pawn_l, _pawn_point(army, p), army)
+                        var pt := _pawn_point(army, p)
+                        ## THE CHOSEN LIFT: the tapped pawn rises and grows
+                        ## - the tap ANSWERS (the v0.3.9-11 round)
+                        if state == "picking" and army == turn_army \
+                                        and _is_user_army(army) \
+                                        and int(sel_piece) == p:
+                                _draw_pawn(pawn_l, pt + Vector2(0,
+                                                -cell * 0.14), army, 1.12)
+                                continue
+                        _draw_pawn(pawn_l, pt, army)
         # the walker rides its own path (THE HOP WALK)
         if walker_key != "":
                 var at := _walk_point()
@@ -1066,56 +1131,88 @@ func _slide_point(s: Dictionary) -> Vector2:
 # ------------------------------------------------- the trays + the fx
 
 ## THE DICE THEATER: each tray wears its numeral, its glow when the turn
-## is there, and either the ROLL pill (the user's turn) or the die itself
-## (the theater: fade in, shuffle, settle - then fade out when done)
+## is there, the die's own pad, and the die itself (the theater: fade in,
+## shuffle, settle - then fade out when done). THE WAITING DIE (the
+## owner's v0.3.9-11 redesign: "instead of roll show the dice grayed-out
+## like it's waiting, when user tap it, the thing will happen") - the old
+## ROLL pill is gone; the grayed die IS the button.
 func _draw_trays() -> void:
         var f := ThemeDB.fallback_font
+        var tink: Color = _theme()["tray_ink"]
         for army in playing:
                 var tr := _tray_rect(army)
                 var active: bool = army == turn_army \
                                 and state != "round_over"
                 var col := _army_col(army)
-                # the tray
+                # the tray: shadow, fill, the theme's rim (a black tray on
+                # a black room must still read - the B&W round)
+                var fill: Color = (col as Color).darkened(0.42) if not active \
+                                else (col as Color).darkened(0.18)
                 fx_l.draw_rect(Rect2(tr.position + Vector2(4, 5), tr.size),
                                 Color(0, 0, 0, 0.30))
-                _draw_rr(fx_l, tr, 12.0,
-                                (col as Color).darkened(0.42) if not active
-                                else (col as Color).darkened(0.18))
+                _draw_rr(fx_l, tr, 12.0, fill)
+                _draw_rr(fx_l, tr.grow(-1), 11.0, tink, false, 2.0)
+                ## THE ADAPTIVE TRAY INK: white words on a light tray
+                ## (mono's white army) are invisible - the ink follows
+                ## the fill
+                var word: Color = Color(0.07, 0.07, 0.08, 0.95) \
+                                if (fill as Color).v > 0.5 \
+                                else Color(1, 1, 1, 0.95)
+                var word_soft: Color = Color(0.07, 0.07, 0.08, 0.75) \
+                                if (fill as Color).v > 0.5 \
+                                else Color(1, 1, 1, 0.75)
                 if active:
                         var pulse := 0.5 + 0.5 * sin(_time * 5.0)
                         _draw_rr(fx_l, tr.grow(2.0), 13.0,
                                         Color(1, 1, 1, 0.10 + 0.10 * pulse))
+                # THE DIE PAD: the die's own seat (a soft inset plate -
+                # the die rests somewhere, always)
+                var dr := _die_rect(army)
+                _draw_rr(fx_l, dr.grow(7.0), 12.0, Color(0, 0, 0, 0.22))
+                _draw_rr(fx_l, dr.grow(7.0), 12.0,
+                                Color(1, 1, 1, 0.14), false, 1.6)
+                # THE WAITING DIE: grayed out at its seat, breathing -
+                # the user taps IT to roll
+                if active and _is_user_army(army) and state == "roll_wait" \
+                                and not die_alive:
+                        var breath := 0.5 + 0.5 * sin(_time * 3.4)
+                        var ring: Color = Color(1, 1, 1, 0.26 + 0.24 * breath) \
+                                        if (fill as Color).v <= 0.5 \
+                                        else Color(0.1, 0.1, 0.1,
+                                        0.3 + 0.25 * breath)
+                        _draw_rr(fx_l, dr.grow(9.0 + 3.0 * breath), 14.0,
+                                        ring, false, 2.6)
+                        _draw_waiting_die(dr)
                 # THE MARK: the bare numeral (the owner's "1,2,3,4" law)
                 var who := "YOU" if _is_user_army(army) else "CPU"
                 fx_l.draw_string(f, tr.position + Vector2(12.0,
                                 tr.size.y * 0.52), str(army),
-                                HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color(1, 1, 1, 0.95))
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, 34, word)
                 fx_l.draw_string(f, tr.position + Vector2(34.0,
                                 tr.size.y * 0.40), who,
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
-                                Color(1, 1, 1, 0.75))
+                                word_soft)
                 if active and turn_note != "":
                         fx_l.draw_string(f, tr.position + Vector2(34.0,
                                         tr.size.y * 0.82), turn_note,
                                         HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-                                        Color(1, 1, 1, 0.92))
-                # the ROLL pill (only on a user army's roll_wait)
-                if active and _is_user_army(army) and state == "roll_wait" \
-                                and not die_alive:
-                        var br := _roll_btn_rect(army)
-                        var bp := 0.5 + 0.5 * sin(_time * 4.0)
-                        _draw_rr(fx_l, br, 22.0,
-                                        (col as Color).lightened(0.25))
-                        _draw_rr(fx_l, br, 22.0,
-                                        Color(1, 1, 1, 0.25 + 0.2 * bp),
-                                        false, 2.5)
-                        fx_l.draw_string(f, br.position + Vector2(0,
-                                        br.size.y * 0.68), "ROLL",
-                                        HORIZONTAL_ALIGNMENT_CENTER,
-                                        br.size.x, 24, Color(1, 1, 1, 0.98))
+                                        word_soft)
         # the die itself (the theater)
         if die_alive:
                 _draw_die()
+
+## the grayed die at rest - an honest EMPTY face (no pips: no face has
+## settled yet), sitting quietly at its pad
+func _draw_waiting_die(dr: Rect2) -> void:
+        var style: String = _theme()["style"]
+        var radius := dr.size.x * 0.2
+        if style == "pixel":
+                radius = 0.0
+        _draw_rr(fx_l, Rect2(dr.position + Vector2(2, 4), dr.size),
+                        radius, Color(0, 0, 0, 0.30))
+        _draw_rr(fx_l, dr, radius, Color(0.86, 0.86, 0.86, 0.94))
+        _draw_rr(fx_l, dr, radius, Color(0.30, 0.30, 0.30, 0.85),
+                        false, 2.0)
 
 func _draw_die() -> void:
         # the die sits in its tray's window - big, but never over the HUD
@@ -1164,44 +1261,65 @@ func _draw_die_face(r: Rect2, jitter: Vector2, face_n: int,
                                 float(seat[1]) * rr.size.y)
                 fx_l.draw_circle(c, pr, Color(ink, alpha))
 
-## the arrows (the owner: "a differ arrow that will look different from
-## theme to another"): the movable pawns wear the bouncing one, the
-## tapped pawn's landings wear the landing rings
+## the arrows + THE LANDING MARKS (the owner's v0.3.9-11 round: tapping a
+## chess-like must ANSWER - the tapped pawn lifts and glows, every legal
+## landing wears a big bold marker in the theme's aim color, an eat wears
+## the danger red; "a differ arrow that will look different from theme to
+## another" stays the law)
 func _draw_arrows() -> void:
-        var th := _theme()
-        var style: String = th["style"]
-        var ink: Color = th["lane_ink"]
         if state != "picking":
                 return
-        # the movable pawns' bouncing arrows
+        var style: String = _theme()["style"]
+        var aim: Color = _theme()["aim"]
+        var danger := Color("e8574a")
+        # the movable pawns' bouncing arrows (the chosen one lifts instead)
         var seen := {}
         for m in legal:
                 var pk := int(m["piece"])
                 if seen.has(pk):
                         continue
                 seen[pk] = true
+                if int(sel_piece) == pk:
+                        continue
                 # the arrow rides the pawn's head
                 var at := _pawn_point(turn_army, pk)
                 var bob := sin(_time * 6.0) * cell * 0.10
-                var top := at + Vector2(0, -cell * 0.52 + bob)
-                _draw_arrow(top, PI * 0.5, ink, style)
-        # the selected pawn's landings
+                var top := at + Vector2(0, -cell * 0.62 + bob)
+                _draw_arrow(top, PI * 0.5, aim, style, 1.3)
+        # THE CHOSEN PAWN: a pulsing glow ring on its floor seat + the
+        # pawn itself lifts (drawn in _draw_pawns)
         if sel_piece >= 0:
+                var pulse := 0.5 + 0.5 * sin(_time * 6.5)
+                var sat := _pawn_point(turn_army, int(sel_piece))
+                fx_l.draw_circle(sat, cell * 0.5,
+                                Color(aim, 0.16 + 0.14 * pulse))
+                fx_l.draw_circle(sat, cell * 0.5, Color(aim, 0.95),
+                                false, 3.0)
+                # THE LANDINGS: big bold markers - the answer the owner
+                # asked for ("show me where to go"); an eat lands in red
                 for m in sel_moves:
                         var dest: Vector2 = pos_point(turn_army,
                                         int(m["np"]), int(m["piece"]))
-                        var pulse := 0.5 + 0.5 * sin(_time * 7.0)
-                        fx_l.draw_circle(dest, cell * (0.34 + 0.05 * pulse),
-                                        Color(ink, 0.30), false,
-                                        2.5 + 1.5 * pulse)
+                        var eats: bool = not (m["eats"] as Array) \
+                                        .is_empty()
+                        var mc: Color = danger if eats else aim
+                        fx_l.draw_circle(dest, cell * 0.44,
+                                        Color(mc, 0.32 + 0.12 * pulse))
+                        fx_l.draw_circle(dest, cell * 0.44,
+                                        Color(mc, 0.98), false, 4.5)
+                        fx_l.draw_circle(dest, cell * 0.27,
+                                        Color(1, 1, 1, 0.85), false, 2.0)
+                        fx_l.draw_circle(dest, cell * 0.10,
+                                        Color(mc, 0.98))
                         _draw_arrow(dest + Vector2(0,
-                                        -cell * 0.44 - pulse * 3.0),
-                                        PI * 0.5, ink, style)
+                                        -cell * 0.66 - pulse * 4.0),
+                                        PI * 0.5, mc, style, 1.15)
 
-func _draw_arrow(at: Vector2, dir: float, ink: Color, style: String) -> void:
+func _draw_arrow(at: Vector2, dir: float, ink: Color, style: String,
+                scale := 1.0) -> void:
         ## a small chevron arrow pointing along `dir` (down by default);
         ## the theme's hand shows in its body
-        var s := cell * 0.20
+        var s := cell * 0.20 * scale
         var pts := PackedVector2Array()
         var back := dir + PI
         var wing := 0.62
@@ -1282,6 +1400,10 @@ func _dust_burst(at: Vector2, col: Color, cnt := 6) -> void:
 
 # ============================================================ the input
 
+# the double-delivery shield (see _goga_input)
+var _tap_msec := -100000
+var _tap_at := Vector2(-9999, -9999)
+
 func _goga_input(event: InputEvent) -> void:
         if sheet_open_count() > 0:
                 return
@@ -1299,17 +1421,37 @@ func _goga_input(event: InputEvent) -> void:
                 return
         if not pressed:
                 return
+        ## THE DOUBLE-DELIVERY SHIELD (the owner's critical report,
+        ## reproduced on the rig): the engine walks ONE physical tap as
+        ## a synthesized touch AND the original mouse (the reverse on
+        ## Android) - the same tap arrived twice, and a toggle law
+        ## selected-then-deselected with nothing but the sfx left ("it
+        ## makes an SFX but there is nothing happens"). One tap per
+        ## spot per heartbeat wins.
+        var now := Time.get_ticks_msec()
+        if now - _tap_msec < 80 and _tap_at.distance_to(at) < 14.0:
+                return
+        _tap_msec = now
+        _tap_at = at
         if state == "ready":
                 _gate_down()
                 _mode_sheet()
                 return
         _tap(at)
 
-## THE TAP: the ROLL pill, the pawns, the landings - each its own seat
+## THE TAP: the waiting die, the pawns, the landings - each its own seat.
+## THE SELECTION LAWS (the owner's critical round: "tapping a chess-like
+## make it chosen and tapping out of board deselect it so user can tap
+## another chess-like"):
+##   1. a landing of the chosen pawn walks it (a fat finger seat)
+##   2. a movable pawn tap MAKES IT CHOSEN - it lifts, the landings light;
+##      tapping the chosen pawn again rests it
+##   3. anywhere else - off the board included - deselects, so another
+##      pawn can be tapped right away
 func _tap(at: Vector2) -> void:
         if state == "roll_wait" and _is_user_army(turn_army) \
                         and not die_alive:
-                if _roll_btn_rect(turn_army).has_point(at):
+                if _die_rect(turn_army).grow(14.0).has_point(at):
                         _do_roll()
                         return
         if state != "picking":
@@ -1321,7 +1463,7 @@ func _tap(at: Vector2) -> void:
                 for m in sel_moves:
                         var dest := pos_point(turn_army, int(m["np"]),
                                         int(m["piece"]))
-                        if at.distance_to(dest) <= cell * 0.55:
+                        if at.distance_to(dest) <= cell * 0.95:
                                 _start_move(int(m["piece"]), int(m["np"]))
                                 return
         # 2. a movable pawn of the turn army (armies of the user's team
@@ -1333,9 +1475,11 @@ func _tap(at: Vector2) -> void:
                 if not movable.has(p):
                         continue
                 var pp := _pawn_point(turn_army, p)
-                if at.distance_to(pp) <= cell * 0.5:
+                if at.distance_to(pp) <= cell * 0.8:
                         if sel_piece == p:
-                                continue
+                                sel_piece = -1
+                                sel_moves = []     # the chosen one rests
+                                return
                         sel_piece = p
                         sel_moves = []
                         for m in legal:
@@ -1343,32 +1487,27 @@ func _tap(at: Vector2) -> void:
                                         sel_moves.append(m)
                         Jukebox.sfx("ld_select", -6.0)
                         return
-        # 3. anywhere else: the selection rests
+        # 3. anywhere else: the selection rests (the deselect law)
         sel_piece = -1
         sel_moves = []
 
 # ------------------------------------------------------- the mode sheet
 
 func _mode_sheet() -> void:
+        ## THE HOUSE OPTIONALS LAW (the owner's v0.3.9-11 round: "make it
+        ## like the snake one where it shows them as side by side options,
+        ## like fruit slasher too, no need to explain what each mode is,
+        ## this is the guide work") - three equal cards, ONE color, one
+        ## tap starts the round. No title, no hint, no talk.
         var sheet := sheet_push(0.0, "mode")
-        var t := Arc.label("PICK THE WAY TO PLAY", 32, Arc.INK)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sheet.add_child(t)
-        var hint := Arc.fit_label("one die, the classic rules - who "
-                        + "brings every pawn home first takes the round",
-                        19, Arc.HOT, 560)
-        hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sheet.add_child(hint)
-        sheet.add_child(Arc.button("X1 - ONE ARMY EACH\nyou vs one CPU",
-                        Vector2(560, 92), 24,
-                        Color("4a5ab8"), func(): _pick_mode(1)))
-        sheet.add_child(Arc.button("X2 - THE DOUBLE\nyou field 1 AND 3 vs "
-                        + "2 AND 4", Vector2(560, 92), 24, Color("2a7a68"),
-                        func(): _pick_mode(2)))
-        sheet.add_child(Arc.button("X4 - THE CHAOS\nevery side a real rival",
-                        Vector2(560, 92), 24,
-                        Color("8a5aa8"), func(): _pick_mode(4)))
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 14)
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        sheet.add_child(row)
+        for m in [[1, "X1"], [2, "X2"], [4, "X4"]]:
+                var mode_v: int = m[0]
+                row.add_child(Arc.button(String(m[1]), Vector2(164, 92),
+                                30, Arc.ACCENT, func(): _pick_mode(mode_v)))
         # THE CONFIRM-SHEET LAW (the 2048 law): plain sheet buttons keep
         # their default mouse filter - no BoxScroll router lives here, and
         # an IGNORE filter makes the cards DEAD to taps (the film rig
@@ -1441,7 +1580,9 @@ func _banner() -> void:
                 return
         var dots := ".".repeat(int(_time * 2.5) % 3 + 1)
         if state == "roll_wait":
-                turn_note = "TAP ROLL" if _is_user_army(turn_army) \
+                ## the waiting die speaks for itself (no TAP ROLL talk -
+                ## the v0.3.9-11 tray redesign)
+                turn_note = "" if _is_user_army(turn_army) \
                                 else "THINKING %s" % dots
         elif state == "picking":
                 turn_note = "PICK A PAWN" if _is_user_army(turn_army) \
@@ -1633,6 +1774,11 @@ func _resolve(winner_team: int) -> void:
         achievement_max("max_score", score)
         _refresh_widget()
         verdict_lbl.visible = true
+        ## THE SMOOTH VERDICT: the line rises in instead of snapping
+        verdict_lbl.modulate.a = 0.0
+        var tw := verdict_lbl.create_tween().set_parallel(true)
+        tw.tween_property(verdict_lbl, "modulate:a", 1.0, 0.38) \
+                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
         turn_note = ""       # the tray goes quiet (the verdict speaks)
         check_achievements()
 
@@ -1805,14 +1951,13 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        # THE SHELF ORDER LAW: the skins seat first, the themes under
-        box.add_child(_shop_label("PIECE SKINS - the pawns only you field, "
-                        + "on any theme"))
+        # THE SHELF ORDER LAW: the skins seat first, the themes under.
+        # THE SHELF TRUTH LAWS (v0.3.9-11): short section names, no dash
+        # talk; the equipped row keeps its seat and says ON.
+        box.add_child(_shop_label("PAWN SKINS"))
         for id in SKINS:
                 box.add_child(_skin_row(id))
-        box.add_child(_shop_label("THEMES - the room, the board, the die, "
-                        + "the rival pens and the feel. YOUR pawns are "
-                        + "never theirs."))
+        box.add_child(_shop_label("THEMES"))
         for id in THEMES:
                 box.add_child(_theme_row(id))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
@@ -1842,17 +1987,16 @@ func _theme_row(id: String) -> Control:
                         or (int(c["price"]) == 0
                         and Box.item_on(game_id, "theme") == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"],
-                                c["desc"]], 22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                ## THE ON ROW LAW: the equipped row keeps its full seat and
+                ## plainly says ON - never a small green description label
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - PLAY ON IT" % c["name"],
-                        Vector2(560, 60), 22, Color("2a7a68"), func():
+                return Arc.button(c["name"], Vector2(560, 64), 22,
+                        Arc.ACCENT, func():
                                 Box.equip_item(game_id, "theme", id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("2a7a68"),
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT,
                         func():
                                 if Box.buy_item(game_id, "theme", id,
                                                 int(c["price"])):
@@ -1866,17 +2010,14 @@ func _skin_row(id: String) -> Control:
                         or int(s["price"]) == 0
         var on: bool = _skin_id() == id
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [s["name"],
-                                s["desc"]], 22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % s["name"])
         if owned:
-                return Arc.button("%s - FIELD THEM" % s["name"],
-                        Vector2(560, 60), 22, Color("8a5aa8"), func():
+                return Arc.button(s["name"], Vector2(560, 64), 22,
+                        Arc.ACCENT, func():
                                 Box.equip_item(game_id, "skin", id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())
-        return _price_btn(s["name"], int(s["price"]), Color("8a5aa8"),
+        return _price_btn(s["name"], int(s["price"]), Arc.ACCENT,
                         func():
                                 if Box.buy_item(game_id, "skin", id,
                                                 int(s["price"])):

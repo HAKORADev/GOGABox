@@ -215,3 +215,24 @@ JS-gated to bots), reviewed with contact sheets, and vendored:
 - assets/thumbs/invaders.png - recomposed (tools/thumb_composer.py
   scene_invaders): fixed-scale formation, the Invader looming, dash-sized
   coin, readable items, no streak lines.
+
+## v0.3.9-11 the dessert shelf + the veggie redraw (2026-09)
+- `assets/games/slasher/dessert_*.png` (6 desserts x whole + 2 real cut
+  halves) - BAKED from the studied Cake Slice Ninja build
+  (gamesnacks, PlayCanvas 3D; study copy in `study_out/` outside the
+  repo, per THE USAGE LAW) by `tools/v03911_dessert_bake.py`: the real
+  meshes are orthographically rendered offscreen with a tiny software
+  rasterizer (per-triangle affine texture mapping + a soft lambert
+  light), then MODIFIED before entering the repo - one consistent
+  236px content box (the slasher's scale law), a gentle saturation and
+  contrast lift to match the box's palette, clean alpha trims. The
+  owner's ask: the Cake Slice Ninja desserts as the third produce skin,
+  "with some color and size modifications ofc so they could get in".
+- `assets/games/slasher/v_*.png` + the new `v_*_h1/h2.png` - REDRAWN
+  by `tools/v03911_veg_art.py`: the six vegetables rebuilt in the fruit
+  set's own language (silhouette, outline, radial shading, honest
+  specular; corn and pepper redrawn wholesale - the old husk read like
+  a green M and the pepper read like a pumpkin), plus REAL cut halves
+  wearing each vegetable's flesh face (tomato jelly, carrot core,
+  broccoli pale stem, corn milk, pepper ribs) - the old
+  "two small vegs" wedge-squash slice is dead.

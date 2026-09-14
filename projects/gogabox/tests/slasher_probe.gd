@@ -25,7 +25,8 @@ func _run() -> void:
         # ---- registry sanity (the owner's economy) ----
         var sr: Dictionary = GameReg.get_game("slasher")
         _check(not sr.is_empty(), "slasher is in the registry")
-        _check(int(sr["coin_div"]) == 15, "slasher run bonus = score/15 (owner)")
+        _check(int(sr["coin_div"]) == 30,
+                "slasher run bonus = score/30 (the owner's v0.3.8-7 ask)")
         _check(String(sr["orientation"]) == "auto",
                 "the POSITION ASK is on (orientation auto, like snake)")
         _check(bool(sr["shop"]), "slasher wears a shop (the vegetables)")
@@ -331,8 +332,155 @@ func _run() -> void:
         _check(not g4.items.has(ap6),
                 "a real crossing fed through the REAL TouchKit still CUTS")
 
+        # ================================================================
+        # v0.3.9-11: THE DESSERT SHELF, THE REAL VEG CUTS, THE CONTENT
+        # SCALE, THE FRENZY, THE SHOP
+        # ================================================================
+        var g5: GogaGame = SL.new()
+        g5.game_id = "slasher"
+        add_child(g5)
+        await get_tree().process_frame
+        g5._orient_choice("vertical")
+        g5._start_run()
+        g5.set_score(0)
+        # ---- the dessert textures + their REAL halves ----
+        var desserts_ok := true
+        for d in SL.DESSERTS:
+                if g5._texs.get(d) == null or g5._half_a.get(d) == null \
+                                or g5._half_b.get(d) == null:
+                        desserts_ok = false
+        _check(desserts_ok,
+                "all %d desserts wear a whole + two real halves" % SL.DESSERTS.size())
+        Box.equip_item("slasher", "produce", "desserts")
+        g5.mode_id = "desserts"
+        var des_ok := true
+        for i in 20:
+                if not SL.DESSERTS.has(String(g5._item_kind())):
+                        des_ok = false
+        _check(des_ok, "the dessert toggle feeds DESSERTS")
+        # a cut dessert splits into its two halves (the real slice path)
+        var halves0: int = g5.halves.size()
+        g5._cut_item(_make_live(g5, "cake", Vector2(400, 300)),
+                        Vector2(340, 300), Vector2(460, 300))
+        _check(g5.halves.size() == halves0 + 2,
+                "a cut CAKE becomes two flying halves (the real slice)")
+        var half_texs := {}
+        for h in g5.halves:
+                half_texs[(h["node"] as Sprite2D).texture] = true
+        _check(half_texs.size() == 2,
+                "the two cake halves wear DIFFERENT textures (h1/h2)")
+        # ---- the veg REAL halves (the fake wedge-squash is dead) ----
+        var veg_halves_ok := true
+        for v in SL.VEGGIES:
+                if g5._half_a.get(v) == null or g5._half_b.get(v) == null:
+                        veg_halves_ok = false
+                elif (g5._half_a[v] as Texture2D).resource_path \
+                                == (g5._texs[v] as Texture2D).resource_path:
+                        veg_halves_ok = false
+        _check(veg_halves_ok,
+                "every vegetable wears REAL cut halves (no more two small vegs)")
+        halves0 = g5.halves.size()
+        g5._cut_item(_make_live(g5, "tomato", Vector2(400, 300)),
+                        Vector2(340, 300), Vector2(460, 300))
+        _check(g5.halves.size() == halves0 + 2,
+                "a cut TOMATO becomes two real halves with flesh faces")
+        # ---- THE CONTENT SCALE LAW: produce draws its CONTENT at 122px ----
+        var scale_ok := true
+        for kind in ["apple", "carrot", "tomato", "cake", "donut", "corn"]:
+                var tex: Texture2D = g5._texs[kind]
+                var sc: float = g5._item_scale(kind, tex)
+                var fr: Vector2 = g5._frac_of(tex)
+                var content_w: float = float(tex.get_width()) * sc * fr.x
+                if absf(content_w - 122.0) > 2.0:
+                        scale_ok = false
+                        print("    scale off for %s: %.1f" % [kind, content_w])
+        _check(scale_ok,
+                "CONTENT SCALE: every produce draws ~122px of real content")
+        var carr: Texture2D = g5._texs["carrot"]
+        var old_way: float = 150.0 / float(carr.get_width()) * float(carr.get_width())
+        var new_way: float = float(carr.get_width()) * g5._item_scale("carrot", carr) * g5._frac_of(carr).x
+        _check(new_way > old_way * 0.75,
+                "the veg draw grew past the fat-margin lie (%.0f -> %.0f)" % [old_way, new_way])
+        # ---- THE FRENZY (the owner: rain every 30-60s, 10s long) ----
+        _check(float(SL.FRENZY_LEN) == 10.0 and float(SL.FRENZY_MIN) == 30.0 \
+                        and float(SL.FRENZY_MAX) == 60.0,
+                "the frenzy knobs: 10s rain, 30-60s quiet")
+        g5.frenzy_t = -1.0
+        g5.frenzy_clock = 0.05
+        probe_beat(g5, 0.1)
+        _check(g5.frenzy_t > 0.0, "the quiet ends -> THE RAIN starts")
+        # during the rain every pattern is a WAVE (many things at once)
+        var wave_ok := true
+        for i in 24:
+                for it in g5.items.duplicate():
+                        g5.items.erase(it)
+                        it["node"].queue_free()
+                g5._spawn_pattern()
+                if g5.items.size() < 2:
+                        wave_ok = false
+        _check(wave_ok,
+                "the rain only pours WAVES (2+ things per pattern)")
+        g5.frenzy_t = 0.02
+        probe_beat(g5, 0.05)
+        _check(g5.frenzy_t < 0.0 and g5.frenzy_clock >= float(SL.FRENZY_MIN) \
+                        and g5.frenzy_clock <= float(SL.FRENZY_MAX),
+                "the rain ends and re-arms a fresh 30-60s quiet")
+        # ---- THE SHOP (the buy law: the shop sells, options apply) ----
+        Box.reset_all()
+        Box.earn(50000)
+        g5._shop_open()
+        await get_tree().process_frame
+        var labels := _sheet_texts(g5)
+        _check(labels.has("FRUIT SLASHER SHOP"), "the slasher shop opens")
+        var has_rows := 0
+        for want in ["FRUITS", "VEGETABLES", "DESSERTS"]:
+                var hit := _has_button_text(g5, want)
+                if not hit:
+                        for t in labels:
+                                if String(t).begins_with(want):
+                                        hit = true
+                if hit:
+                        has_rows += 1
+        _check(has_rows == 3,
+                "the shop shelves all three produce rows")
+        g5.sheet_pop()
+        await get_tree().process_frame
+
         print("== slasher_probe done: %s ==" % ("ALL PASS" if fails == 0 else "%d FAIL" % fails))
         get_tree().quit(1 if fails > 0 else 0)
+
+## one game tick driven by the probe (the clock truth: the rig drives)
+func probe_beat(g2: GogaGame, dt: float) -> void:
+        g2._goga_tick(dt)
+
+func _sheet_texts(g2: GogaGame) -> Dictionary:
+        var out := {}
+        if g2.sheet_open_count() == 0:
+                return out
+        var cc: Control = g2._sheet_stack[0]["cc"]
+        var stack := [cc]
+        while not stack.is_empty():
+                var n: Node = stack.pop_front()
+                if n is Label:
+                        out[String((n as Label).text)] = true
+                if n is Button:
+                        out[String((n as Button).text)] = true
+                for c in n.get_children():
+                        stack.append(c)
+        return out
+
+func _has_button_text(g2: GogaGame, want: String) -> bool:
+        if g2.sheet_open_count() == 0:
+                return false
+        var cc: Control = g2._sheet_stack[0]["cc"]
+        var stack := [cc]
+        while not stack.is_empty():
+                var n: Node = stack.pop_front()
+                if n is Button and String((n as Button).text).begins_with(want):
+                        return true
+                for c in n.get_children():
+                        stack.append(c)
+        return false
 
 func _make_live(g: GogaGame, kind: String, pos: Vector2) -> Dictionary:
         var s := Sprite2D.new()

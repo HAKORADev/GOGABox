@@ -112,3 +112,44 @@ comes from the board, not from a brain.
   desc + controls for the pre-play ? menu, thumb via the composer.
 - Audio: one synthesized theme song + the satisfying set (roll shuffle,
   drop, hops, the eat-slide, the block, home arrival, coin, win/lose).
+
+## v0.3.9-11 — the owner's polish round
+
+The owner tested v0.3.9-10 and filed the report; every point landed.
+
+- **THE CRITICAL TAP BUG (the "biggest L")**: tapping a movable pawn
+  played the select SFX but nothing visibly answered. Root causes were
+  TWO: the old destination markers were nearly invisible (tiny rings at
+  alpha 0.3 in the dark lane ink), and — reproduced on the film rig —
+  the engine DOUBLE-DELIVERS one physical tap (a synthesized touch plus
+  the original mouse; the reverse on Android), so the new toggle law
+  selected-then-deselected within one frame, leaving nothing but the
+  sound. Fixes: THE DOUBLE-DELIVERY SHIELD (one tap per spot per 80ms
+  heartbeat wins), the chosen pawn now LIFTS and glows, every legal
+  landing wears a big bold marker in the theme's own aim color (an eat
+  lands in red), hit seats grew to 0.8/0.95 cells, and tapping the
+  chosen pawn again (or anywhere else) rests the choice so another pawn
+  can be picked at once.
+- **THE WAITING DIE**: the ROLL pill is gone. The die sits GRAYED OUT at
+  its pad in the user's tray while it waits (an honest empty face,
+  breathing); tapping it rolls. The tray keeps its active glow.
+- **THE NESTS**: the four seats moved to the corners of a centered
+  paper plate — the classic yard look the owner asked for ("they should
+  be at the internal edges of the square").
+- **THE TRAY OVERLAP**: the bottom trays (3/4) sat under the frame slab
+  + shadow; the layout now reserves the slab overhang and the trays
+  seat below it (certified on the x4 rig: slab ends y=1507, trays start
+  y=1508).
+- **THE B&W CONTRAST**: the mono theme re-paletted, every tray wears a
+  theme rim, dark pawns wear pale ink rings (and light pawns dark
+  ones), guarded start cells wear the guard rim, lanes wear rims, the
+  stars and the tray words follow an adaptive ink so a white army's
+  tray stays readable.
+- **THE MODE SHEET**: three equal side-by-side cards (X1 / X2 / X4),
+  one color, no title, no hint — the house optionals law.
+- **THE SHOP**: PAWN SKINS above THEMES, the equipped row keeps its
+  full-size seat and plainly says (ON) (Arc.on_row), the dash-talk
+  descriptions are gone, one action color. The same law swept EVERY
+  game's shop (see AGENTS.md laws 27–29).
+- **THE POLISH**: the center medallion, the smoother verdict rise-in,
+  the die pad in every tray, the aim-colored arrows.

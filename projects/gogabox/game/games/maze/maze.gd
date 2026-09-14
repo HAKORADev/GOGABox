@@ -977,14 +977,14 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        box.add_child(_shop_label("SQUARES - the escapee's skin"))
+        box.add_child(_shop_label("SQUARES"))
         for id in SKINS:
                 box.add_child(_skin_row(id))
         # v0.3.7-1 TAILS: the ribbon shelf (item 12)
-        box.add_child(_shop_label("TAILS - the light you leave behind"))
+        box.add_child(_shop_label("TAILS"))
         for id in TAILS:
                 box.add_child(_tail_row(id))
-        box.add_child(_shop_label("MAZE THEMES - the light of the walls"))
+        box.add_child(_shop_label("MAZE THEMES"))
         for id in THEMES:
                 box.add_child(_theme_row(id))
         box.add_child(_shop_label("HELPERS"))
@@ -1027,19 +1027,16 @@ func _skin_row(id: String) -> Control:
         var on: bool = Box.skin_on(game_id) == id \
                 or (int(c["price"]) == 0 and Box.skin_on(game_id) == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
-                        Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - WEAR" % c["name"], Vector2(560, 60), 22,
-                        Color("4a5ab8"), func():
+                return Arc.button(c["name"], Vector2(560, 60), 22,
+                        Arc.ACCENT, func():
                                 Box.equip_skin(game_id, id)
                                 player["skin"] = id
                                 Jukebox.sfx("confirm", -4.0)
                                 pspr.texture = _tex("skin_%s.png" % id)
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("4a5ab8"), func():
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT, func():
                 if Box.buy_skin(game_id, id, int(c["price"])):
                         Jukebox.sfx("buy")
                         Box.equip_skin(game_id, id)
@@ -1055,19 +1052,16 @@ func _tail_row(id: String) -> Control:
         var on: bool = Box.item_on(game_id, "tail") == id \
                 or (int(c["price"]) == 0 and Box.item_on(game_id, "tail") == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
-                                Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s  -  WEAR" % c["name"], Vector2(560, 60), 22,
-                                Color("8a4ab8"), func():
+                return Arc.button(c["name"], Vector2(560, 60), 22,
+                                Arc.ACCENT, func():
                                                 Box.equip_item(game_id, "tail", id)
                                                 Jukebox.sfx("confirm", -4.0)
                                                 _load_meta()
                                                 _shop_reopen())
-        return _price_btn("%s - %s" % [c["name"], c["desc"]], int(c["price"]),
-                        Color("8a4ab8"), func():
+        return _price_btn(c["name"], int(c["price"]),
+                        Arc.ACCENT, func():
                                         if Box.buy_item(game_id, "tail", id, int(c["price"])):
                                                         Jukebox.sfx("buy")
                                                         Box.equip_item(game_id, "tail", id)
@@ -1080,19 +1074,16 @@ func _theme_row(id: String) -> Control:
         var on: bool = Box.item_on(game_id, "theme") == id \
                 or (int(c["price"]) == 0 and Box.item_on(game_id, "theme") == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]], 22,
-                        Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - LIGHT IT" % c["name"], Vector2(560, 60), 22,
-                        Color("2a7a68"), func():
+                return Arc.button(c["name"], Vector2(560, 60), 22,
+                        Arc.ACCENT, func():
                                 Box.equip_item(game_id, "theme", id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _apply_theme()
                                 maze_layer.queue_redraw()
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("2a7a68"), func():
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT, func():
                 if Box.buy_item(game_id, "theme", id, int(c["price"])):
                         Jukebox.sfx("buy")
                         Box.equip_item(game_id, "theme", id)
@@ -1102,11 +1093,8 @@ func _theme_row(id: String) -> Control:
 
 func _finder_row() -> Control:
         if Box.item_owned(game_id, "finder", "finder"):
-                var l := Arc.fit_label("%s  (OWNED) - %s" % [FINDER["name"],
-                        FINDER["desc"]], 22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
-        return _price_btn("%s - %s" % [FINDER["name"], FINDER["desc"]],
+                return Arc.on_row("%s  (OWNED)" % FINDER["name"])
+        return _price_btn(FINDER["name"],
                 int(FINDER["price"]), Color("b8583a"), func():
                         if Box.buy_item(game_id, "finder", "finder", int(FINDER["price"])):
                                 Jukebox.sfx("buy")

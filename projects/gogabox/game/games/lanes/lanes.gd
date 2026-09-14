@@ -464,18 +464,18 @@ func _shop_open() -> void:
         sc.add_child(box)
         sheet.add_child(sc)
         # ---- SHIP SKINS ----
-        box.add_child(_shop_label("SHIP SKINS - real hulls"))
+        box.add_child(_shop_label("SHIP SKINS"))
         for id in SKINS:
                 box.add_child(_skin_row(id))
         # ---- WEAPONS (buying puts them in the LOOT pool) ----
-        box.add_child(_shop_label("WEAPONS - they join the loot drops"))
+        box.add_child(_shop_label("WEAPONS"))
         for id in SHOP_WEAPONS:
                 box.add_child(_weapon_row(id))
         # ---- SHIELD ----
         box.add_child(_shop_label("POWER"))
         box.add_child(_shield_row())
         # ---- SPACES ----
-        box.add_child(_shop_label("SPACES - the deep sky"))
+        box.add_child(_shop_label("SPACES"))
         for id in SPACES:
                 box.add_child(_space_row(id))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
@@ -509,13 +509,13 @@ func _skin_row(id: String) -> Control:
                 return l
         var txt: String = String(sk["name"])
         if owned:
-                return Arc.button(txt + "  - EQUIP", Vector2(560, 60), 22,
-                                Color("4a5ab8"), func():
+                return Arc.button(txt, Vector2(560, 60), 22,
+                                Arc.ACCENT, func():
                                         Box.equip_skin(game_id, id)
                                         Jukebox.sfx("confirm", -4.0)
                                         _rebuild_ship_skin()
                                         _shop_open())
-        var b := _price_btn(txt, int(sk["price"]), Color("4a5ab8"), func():
+        var b := _price_btn(txt, int(sk["price"]), Arc.ACCENT, func():
                 if Box.buy_skin(game_id, id, int(sk["price"])):
                         Jukebox.sfx("buy")
                         _rebuild_ship_skin()
@@ -525,11 +525,11 @@ func _skin_row(id: String) -> Control:
 func _weapon_row(id: String) -> Control:
         var w: Dictionary = SHOP_WEAPONS[id]
         if Box.item_owned(game_id, "weapons", id):
-                var l := Arc.fit_label("%s  - IN THE LOOT" % w["name"], 22,
+                var l := Arc.fit_label(w["name"], 22,
                                 Color("58c470"), 560)
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 return l
-        return _price_btn(w["name"], int(w["price"]), Color("8a4ab8"), func():
+        return _price_btn(w["name"], int(w["price"]), Arc.ACCENT, func():
                 if Box.buy_item(game_id, "weapons", id, int(w["price"])):
                         Jukebox.sfx("buy")
                 _shop_open())
@@ -559,14 +559,14 @@ func _space_row(id: String) -> Control:
                 l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 return l
         if owned:
-                return Arc.button(sp["name"] + "  - EQUIP", Vector2(560, 60),
-                                22, Color("2a7a68"), func():
+                return Arc.button(sp["name"], Vector2(560, 60),
+                                22, Arc.ACCENT, func():
                                         Box.equip_item(game_id, "space", id)
                                         _apply_space(bg_rect.material
                                                         as ShaderMaterial, id)
                                         Jukebox.sfx("confirm", -4.0)
                                         _shop_open())
-        return _price_btn(sp["name"], int(sp["price"]), Color("2a7a68"), func():
+        return _price_btn(sp["name"], int(sp["price"]), Arc.ACCENT, func():
                 if Box.buy_item(game_id, "space", id, int(sp["price"])):
                         Jukebox.sfx("buy")
                         _apply_space(bg_rect.material as ShaderMaterial, id)

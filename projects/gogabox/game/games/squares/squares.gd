@@ -1379,8 +1379,8 @@ func _size_row(id: String, in_shop := false) -> Control:
         var owned := Box.item_owned(game_id, "size", id) \
                         or int(sz["price"]) == 0
         var on := size_id == id
-        var head := Arc.label("%s%s - %s" % [sz["name"],
-                        "  (ON)" if on else "", sz["desc"]], 19,
+        var head := Arc.label("%s%s" % [sz["name"],
+                        "  (ON)" if on else ""], 19,
                         Color("58c470") if on else Arc.INK, false)
         head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         head.custom_minimum_size = Vector2(560, 0)
@@ -1401,7 +1401,7 @@ func _size_row(id: String, in_shop := false) -> Control:
                         v.add_child(ol)
                         return v
                 v.add_child(Arc.button("SWITCH", Vector2(560, 56), 22,
-                                Color("4a5ab8"), func(): _size_confirm(id)))
+                                Arc.ACCENT, func(): _size_confirm(id)))
                 return v
         if not in_shop:
                 var lk := Arc.button("LOCKED - %d IN THE SHOP"
@@ -1414,7 +1414,7 @@ func _size_row(id: String, in_shop := false) -> Control:
                 v.add_child(lk)
                 return v
         var b := Arc.coin_button("BUY  %d" % int(sz["price"]),
-                        Vector2(560, 56), 22, Color("4a5ab8"), func():
+                        Vector2(560, 56), 22, Arc.ACCENT, func():
                                         if Box.buy_item(game_id, "size", id,
                                                         int(sz["price"])):
                                                 Jukebox.sfx("buy")
@@ -1565,17 +1565,14 @@ func _theme_row(id: String) -> Control:
                         or (int(c["price"]) == 0
                         and Box.item_on(game_id, "theme") == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"],
-                                c["desc"]], 22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - DRAW ON IT" % c["name"],
-                        Vector2(560, 60), 22, Color("2a7a68"), func():
+                return Arc.button(c["name"],
+                        Vector2(560, 60), 22, Arc.ACCENT, func():
                                 Box.equip_item(game_id, "theme", id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("2a7a68"),
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT,
                         func():
                                 if Box.buy_item(game_id, "theme", id,
                                                 int(c["price"])):

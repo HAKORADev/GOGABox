@@ -539,7 +539,7 @@ func _show_mode_select() -> void:
                                 wrap_mode = true
                                 Box.set_progress(game_id, "mode_nowalls", true)
                                 _show_ready_card()))
-        var ot := Arc.label("OPTIONALS", 26, Color("6a5ab8"))
+        var ot := Arc.label("OPTIONALS", 26, Arc.ACCENT)
         ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(ot)
         vb.add_child(_build_optionals_strip())
@@ -2022,8 +2022,6 @@ func _shop_fill(v: VBoxContainer) -> void:
                                 else Color("4aa8d8") if entry["id"] == "ice" else Color("d8b020")
                 if on:
                         txt += "  (ON)"
-                elif owned:
-                        txt += "  - EQUIP"
                 var b: Button
                 if owned:
                         b = Arc.button(txt, Vector2(560, 66), 22, col,
@@ -2036,7 +2034,7 @@ func _shop_fill(v: VBoxContainer) -> void:
                 v.add_child(b)
 
         # ---- PLACES (the gardens) ----
-        v.add_child(_section_label("PLACES - the garden you play in"))
+        v.add_child(_section_label("PLACES"))
         for pid in ["classic", "day", "night"]:
                 var pl: Dictionary = SnakeFruits.PLACES[pid]
                 var price := int(pl["price"])
@@ -2045,8 +2043,6 @@ func _shop_fill(v: VBoxContainer) -> void:
                 var txt2 := String(pl["name"])
                 if on2:
                         txt2 += "  (ON)"
-                elif owned2:
-                        txt2 += "  - VISIT"
                 var col2: Color = pl["field"] if pid == "day" else pl["wall"]
                 var b2: Button
                 if owned2:
@@ -2060,16 +2056,22 @@ func _shop_fill(v: VBoxContainer) -> void:
                 v.add_child(b2)
 
         # ---- FRUITS ----
-        v.add_child(_section_label("FRUITS - your edible wardrobe"))
+        v.add_child(_section_label("FRUITS"))
         for id in SnakeFruits.FRUITS:
                 var f: Dictionary = SnakeFruits.FRUITS[id]
                 var price := int(f["price"])
                 var owned3: bool = price == 0 or Box.item_owned(game_id, "fruit", id)
-                var b3: Button
+                var b3: Control
                 if owned3:
-                        b3 = Arc.button("%s  - OWNED" % String(f["name"]).to_upper(),
-                                        Vector2(560, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1))
-                        b3.disabled = true
+                        ## THE ON ROW LAW: an owned fruit wears the green
+                        ## card, inked in its own body color
+                        var fcard := Arc.on_row(
+                                        String(f["name"]).to_upper(),
+                                        Vector2(560, 62), 20)
+                        (fcard.get_child(0) as Label).add_theme_color_override(
+                                        "font_color",
+                                        SnakeFruits.fruit_body(id).darkened(0.2))
+                        b3 = fcard
                 else:
                         b3 = Arc.coin_button("%s  %d" % [String(f["name"]).to_upper(), price],
                                         Vector2(560, 62), 20, SnakeFruits.fruit_body(id).darkened(0.1),
@@ -2078,29 +2080,29 @@ func _shop_fill(v: VBoxContainer) -> void:
                 v.add_child(b3)
 
         # ---- POWER-UPS ----
-        v.add_child(_section_label("POWER-UPS - aura fruits"))
+        v.add_child(_section_label("POWER-UPS"))
         v.add_child(_unlock_row("POWER FRUITS",
                         "slower / faster / ghost / magnet / golden / wither / sprint / slog",
                         "powerups", PRICE_POWERUPS))
 
         # ---- BUGS ----
-        v.add_child(_section_label("BUGS - they bite, never kill"))
+        v.add_child(_section_label("BUGS"))
         v.add_child(_unlock_row("BUGS", "two beetles roam and steal fruit",
                         "bugs", PRICE_BUGS))
 
         # ---- OBSTACLES ----
-        v.add_child(_section_label("OBSTACLES - deadly for everyone"))
+        v.add_child(_section_label("OBSTACLES"))
         v.add_child(_unlock_row("OBSTACLES", "three block clusters per round",
                         "obstacles", PRICE_OBSTACLES))
 
         # ---- JUMPING FRUITS (owner v0.2.2) ----
-        v.add_child(_section_label("JUMPING FRUITS - the snack won't wait"))
+        v.add_child(_section_label("JUMPING FRUITS"))
         v.add_child(_unlock_row("JUMPING FRUITS",
                         "the fruit lives a random window, vanishes, reappears elsewhere",
                         "jump", PRICE_JUMP))
 
         # ---- ENEMIES ----
-        v.add_child(_section_label("ENEMIES - the pack"))
+        v.add_child(_section_label("ENEMIES"))
         var pack_owned := Box.unlock_owned(game_id, "pack")
         if pack_owned:
                 var info := Arc.fit_label("OWNED - up to 10 snakes, each its own color. Pick the count from the ENEMY box in the optionals.",
@@ -2135,13 +2137,9 @@ func _gray_if_broke(b: Button, price: int) -> void:
 func _unlock_row(name_: String, sub: String, cat: String, price: int) -> Control:
         if Box.unlock_owned(game_id, cat):
                 var row2 := VBoxContainer.new()
-                var l := Arc.fit_label("%s  - OWNED (toggle it in the optionals)" % name_,
-                                20, Color("58c470"), 596)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                row2.add_child(l)
-                var s2 := Arc.fit_label(sub, 16, Color("8a6a40"), 596, false)
-                s2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                row2.add_child(s2)
+                row2.add_child(Arc.on_row(
+                                "%s  (OWNED - APPLY IT FROM THE OPTIONALS)"
+                                % name_, Vector2(560, 66), 17))
                 return row2
         var vb := VBoxContainer.new()
         var b := Arc.coin_button("%s  %d" % [name_, price], Vector2(560, 66), 22,

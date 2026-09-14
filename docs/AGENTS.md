@@ -700,3 +700,64 @@ seats, dishonest flights (from/to not adjacent/wrap/rest), and pixel
 teleports - exit 1 on any. Rule of thumb: a movement law is proven by
 POSITIONS over time, not by the direction enum after the fact; and when
 a helper returns "the next X", the call site adds NOTHING.
+
+**27. THE SHELF TRUTH LAWS (v0.3.9-11) - the shop says what it is, or it
+says nothing.**
+The owner audited the shops after v0.3.9-10 and found the whole shelf
+family lying in three ways: an equipped item collapsed into "small text
+in green saying a description for something no one cares about", rows
+wore "word + em-dash then shitty talk after the em dash", and every
+button wore its own color for no reason. THREE laws, one sweep (the
+sweep already landed in that version - keep them for every future
+shelf):
+   (a) **THE ON ROW LAW**: an equipped item keeps its FULL-SIZE row and
+       plainly reads `NAME  (ON)` - built with `Arc.on_row(...)` in
+       ui_kit.gd (a solid green card, same width/height as the action
+       buttons). It NEVER collapses into a small colored fit_label. If
+       the row is owned-not-equipped it reads just `NAME` (tapping
+       equips); unowned reads `NAME <coin icon> PRICE`.
+   (b) **THE NO-DASH LAW**: shop rows and section labels carry NO
+       description, no flavor, no "word - talk" after an em-dash.
+       Descriptions live in the game guide, never on the shelf. Section
+       labels are one short name: "SKINS", "THEMES", "POWER-UPS". The
+       ONE sanctioned exception is the functional pointer the owner
+       pinned in law 16: an owned row of a shop-only item may read
+       "(OWNED - APPLY IT FROM THE OPTIONALS)" - that is instructions,
+       not talk. Real examples of the banned shape (do not regrow
+       them): `"IVORY  (ON) - the carved classic - yours on any theme"`,
+       `"JADE - the lucky stone"`, `"%s - FIELD THEM"`, `"SKINS - the
+       pawns only you field, on any theme"`, `"PLACES - the garden you
+       play in"`.
+   (c) **THE ONE-COLOR LAW**: inside one shop, buy/equip buttons share
+       ONE color (`Arc.ACCENT`) unless the color IS the item's own
+       preview (snake's lava skin wearing lava orange - a direct
+       reason). The ON row is green because "live" is its meaning. No
+       third color, no per-row rainbow.
+Sweep test: `grep -rn '(ON) - ' game/games/` must return nothing (the
+powerup pointer's "OWNED - APPLY" inside the parens is the only legal
+dash left).
+
+**28. THE HOUSE CONTROLS LAW (v0.3.9-11) - optionals and mode asks wear
+the house layout, never a bespoke one.**
+The owner: a game's options menu "looks completely unrelated" when an
+agent invents a new layout per game. Every mode/optional ask follows
+the same bones: a dim + centered panel (Arc.sheet or the slasher
+overlay), the choices as EQUAL side-by-side cards/buttons in one
+HBoxContainer row (snake's mode row, fruit slasher's produce row, the
+ludo X1/X2/X4 row), ONE shared action color, NO title, NO hint line,
+NO explanation of what each mode is - "this is the guide work". Per-
+game differences are allowed only in the labels/icons themselves, not
+in the layout's bones. And the state stays visible: a selected choice
+reads ON (law 27a's spirit, in options too).
+
+**29. THE GUIDE CARRIES THE WORDS (v0.3.9-11) - "too helpful" text has
+exactly one home.**
+The owner has now killed the same disease three times: helpful
+sentence-stacks on the tap-anywhere gate (v0.3.9-6 round 2), helpful
+talk in optionals (law 28), and helpful dash-talk in shops (law 27).
+The rule that ends the family: ANY sentence that explains how
+something works belongs to the registry's guide text (desc/controls)
+and NOWHERE else. In-game surfaces (gates, trays, HUD, sheets) carry
+at most ONE short state line the moment needs ("THINKING", "(ON)",
+"TAP ANYWHERE TO START"). If you find yourself writing a second
+comma, you are writing guide text in the wrong place.

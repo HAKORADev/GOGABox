@@ -534,7 +534,7 @@ func _shop_open() -> void:
 func _theme_toggle(night_on: bool) -> Control:
         var v := VBoxContainer.new()
         v.add_theme_constant_override("separation", 2)
-        var head := Arc.label("THE NIGHT THEME (OWNED) - the sky you wear", 19,
+        var head := Arc.label("THE NIGHT THEME (OWNED)", 19,
                         Color("58c470"), false)
         head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         head.custom_minimum_size = Vector2(560, 0)
@@ -556,8 +556,7 @@ func _row(title: String, desc: String, price: int, cat: String,
         var v := VBoxContainer.new()
         v.add_theme_constant_override("separation", 2)
         var owned := Box.item_owned(game_id, cat, item)
-        var head := Arc.label("%s%s - %s" % [title, "  (OWNED)" if owned else "",
-                        desc], 19,
+        var head := Arc.label("%s%s" % [title, "  (OWNED)" if owned else ""], 19,
                         Color("58c470") if owned else Arc.INK, false)
         head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         head.custom_minimum_size = Vector2(560, 0)

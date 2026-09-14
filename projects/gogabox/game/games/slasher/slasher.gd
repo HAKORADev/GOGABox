@@ -56,6 +56,28 @@ const LOSS_WINDOW := 0.9
 
 const FRUITS := ["apple", "banana", "basaha", "peach", "sandia"]
 const VEGGIES := ["carrot", "tomato", "eggplant", "broccoli", "corn", "pepper"]
+## v0.3.9-11 THE DESSERT SHELF (the owner: the Cake Slice Ninja set,
+## assets + VFX "with some color and size modifications ofc so they
+## could get in") - the studied 3D meshes baked flat by
+## tools/v03911_dessert_bake.py, one consistent content box, a gentle
+## saturation lift; provenance in docs/ASSETS.md.
+const DESSERTS := ["cake", "cupcake", "donut", "macaron", "cakeroll",
+        "cookie"]
+const DESSERT_PRICE := 2400
+## v0.3.9-11 THE FRENZY (the owner: "make something called frenzy time
+## where it spams many things with some bombs for specific amount of
+## time like 10 seconds after a period of time like after every 30-60
+## seconds and before start it shows text at top like 'it's raining!'")
+const FRENZY_MIN := 30.0     # the quiet between the rains (seconds)
+const FRENZY_MAX := 60.0
+const FRENZY_LEN := 10.0
+const FRENZY_BEAT := 0.52    # the rain's spawn pace
+## v0.3.9-11 the desserts' own splash tints (cream, glaze, crumb)
+const DESSERT_JUICE := {
+        "cake": Color("f7c2cf"), "cupcake": Color("f9e6d8"),
+        "donut": Color("f2b563"), "macaron": Color("ff9db5"),
+        "cakeroll": Color("e8b58a"), "cookie": Color("d8a55e"),
+}
 ## v0.3.1 PATCH III - THE SHAPED COLLISION (the owner: "each object should
 ## have a collision that shaped like it"): the long produce wears a
 ## CAPSULE along its own body, everything round wears an honest CIRCLE.
@@ -69,7 +91,6 @@ const JUICE := {
         "eggplant": Color("eceff1"), "broccoli": Color("9ccc65"),
         "corn": Color("ffe082"), "pepper": Color("aedd83"),
 }
-
 # ---------------------------------------------------------------- state
 var _phase := "orient"
 var orient := "vertical"
@@ -89,6 +110,10 @@ var coin_clock := COIN_EVERY_S
 var mode_id := "fruits"
 var slashed_total := 0
 var missed_total := 0
+
+# THE FRENZY (v0.3.9-11)
+var frenzy_clock := 0.0      # the quiet left before the next rain
+var frenzy_t := -1.0         # the rain's life left (-1 = no rain)
 
 # the loss window (kept for the sfx throttle only - each fall shows its
 # own -2 floater now)
@@ -124,6 +149,7 @@ var _red_pulse: ColorRect
 func _goga_setup() -> void:
         _rng.randomize()
         tk.dragged.connect(_on_drag)
+        add_hud_button("SHOP", func(): _shop_open())
         _load_textures()
         var forced := start_orientation
         if forced != "":
@@ -141,8 +167,14 @@ func _load_textures() -> void:
                 _half_b[k] = load("res://assets/games/slasher/classic/c_%s_h2.png" % k)
         for k in VEGGIES:
                 _texs[k] = load("res://assets/games/slasher/v_%s.png" % k)
-                _half_a[k] = null                      # the painted stand-ins slice via the generic wedge
-                _half_b[k] = null
+                # v0.3.9-11: REAL cut halves (the veg art tool bakes the
+                # flesh faces) - the old wedge-squash slice is dead
+                _half_a[k] = load("res://assets/games/slasher/v_%s_h1.png" % k)
+                _half_b[k] = load("res://assets/games/slasher/v_%s_h2.png" % k)
+        for k in DESSERTS:
+                _texs[k] = load("res://assets/games/slasher/dessert_%s.png" % k)
+                _half_a[k] = load("res://assets/games/slasher/dessert_%s_h1.png" % k)
+                _half_b[k] = load("res://assets/games/slasher/dessert_%s_h2.png" % k)
         _bomb_tex = load("res://assets/games/slasher/classic/c_bomb.png")
         _coin_tex = load("res://assets/ui/coin.png")
         _heart_tex = load("res://assets/ui/heart.png")
@@ -262,59 +294,43 @@ func _show_options() -> void:
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 14)
         panel.add_child(box)
-        # v0.3.8-8 (owner: "the title appears in that menu is...i mean the
-        # fruit slasher word ... i actually want you to remove it so you
-        # keep the options only") - the FRUIT SLASHER wordmark is GONE from
-        # the sheet; the menu carries the produce options + START alone.
-        var owned := Box.item_owned(game_id, "produce", "veggies") \
-                        or int(Box.dev_cheat("all_owned")) > 0
+        # v0.3.8-8 (owner: the wordmark is gone from the sheet) - the
+        # menu carries the produce options + START alone.
+        ## THE HOUSE OPTIONALS LAW (v0.3.9-11): the produce choices sit
+        ## side by side like the snake one - equal cards, no hint line,
+        ## no explanations ("this is the guide work"). THE BUY LAW: the
+        ## shop SELLS, the options only APPLY - the old inline BUY
+        ## button and its note died here.
+        var kinds: Array = ["fruits"]
+        if Box.item_owned(game_id, "produce", "veggies") \
+                        or int(Box.dev_cheat("all_owned")) > 0:
+                kinds.append("veggies")
+        if Box.item_owned(game_id, "produce", "desserts") \
+                        or int(Box.dev_cheat("all_owned")) > 0:
+                kinds.append("desserts")
         mode_id = Box.item_on(game_id, "produce")
-        if mode_id != "veggies":
+        if not kinds.has(mode_id):
                 mode_id = "fruits"
-        if owned:
-                var row := HBoxContainer.new()
-                row.add_theme_constant_override("separation", 10)
-                row.alignment = BoxContainer.ALIGNMENT_CENTER
-                box.add_child(row)
-                row.add_child(Arc.button("FRUITS", Vector2(200, 70), 22,
-                                Arc.GOOD if mode_id == "fruits" else Arc.CARD,
+        var names := {"fruits": "FRUITS", "veggies": "VEGETABLES",
+                        "desserts": "DESSERTS"}
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 10)
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        box.add_child(row)
+        for k in kinds:
+                var kind_id: String = k
+                var sel: bool = mode_id == kind_id
+                row.add_child(Arc.button(String(names[kind_id]),
+                                Vector2(166, 74), 20,
+                                Arc.GOOD if sel else Arc.CARD,
                                 func():
-                                        mode_id = "fruits"
-                                        Box.equip_item(game_id, "produce", "fruits")
+                                        mode_id = kind_id
+                                        Box.equip_item(game_id,
+                                                        "produce", kind_id)
                                         Jukebox.sfx("confirm", -4.0)
                                         _show_options()))
-                row.add_child(Arc.button("VEGETABLES", Vector2(240, 70), 22,
-                                Arc.GOOD if mode_id == "veggies" else Arc.CARD,
-                                func():
-                                        mode_id = "veggies"
-                                        Box.equip_item(game_id, "produce", "veggies")
-                                        Jukebox.sfx("confirm", -4.0)
-                                        _show_options()))
-                for b in row.get_children():
-                        _ink_outline(b, 7)
-        else:
-                var desc := Arc.fit_label("the vegetable basket is a shop "
-                                + "item - one purchase, yours forever", 18,
-                                Arc.HOT, 520)
-                desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                _ink_outline(desc, 7)
-                box.add_child(desc)
-                var buy := Arc.coin_button("BUY THE VEGETABLES  %d" % VEG_PRICE,
-                                Vector2(520, 74), 22, Color("4a5ab8"), func():
-                                        if Box.buy_item(game_id, "produce",
-                                                        "veggies", VEG_PRICE):
-                                                Jukebox.sfx("buy")
-                                                mode_id = "veggies"
-                                                Box.equip_item(game_id,
-                                                        "produce", "veggies")
-                                        _show_options())
-                _ink_outline(buy, 7)
-                if Box.coins() < VEG_PRICE and not int(Box.dev_cheat("all_owned")) > 0:
-                        buy.disabled = true
-                var bc := HBoxContainer.new()
-                bc.alignment = BoxContainer.ALIGNMENT_CENTER
-                bc.add_child(buy)
-                box.add_child(bc)
+        for b in row.get_children():
+                _ink_outline(b, 7)
         var start := Arc.button("START", Vector2(520, 88), 30, Arc.GOOD,
                         func(): _start_run())
         _ink_outline(start, 8)
@@ -330,6 +346,8 @@ func _start_run() -> void:
         _build_hearts()
         spawn_clock = 0.7
         coin_clock = COIN_EVERY_S
+        frenzy_clock = _rng.randf_range(FRENZY_MIN, FRENZY_MAX)
+        frenzy_t = -1.0
         Jukebox.sfx("sl_launch", -8.0)
 
 # ============================================================ the world
@@ -465,6 +483,24 @@ func _paint_trail() -> void:
                 trail_painter.draw_string(font, Vector2(float(f["x"]) - 120.0,
                                 float(f["y"])), String(f["txt"]),
                                 HORIZONTAL_ALIGNMENT_CENTER, 240, fs, c)
+        # THE FRENZY BANNER (the owner: "before start it shows text at
+        # top like 'it's raining!'") - it pops big, then rides the rain
+        if frenzy_t >= 0.0:
+                var fvp := get_viewport_rect().size
+                var fbig: bool = frenzy_t > FRENZY_LEN - 1.5
+                var ffs := 74 if fbig else 46
+                var pulse := 0.5 + 0.5 * sin(_time * 9.0)
+                var fcol := Color(1.0, 0.86, 0.42).lerp(
+                                Color(1.0, 0.55, 0.25), pulse)
+                trail_painter.draw_string_outline(font,
+                                Vector2(fvp.x * 0.5 - 340.0, 170.0),
+                                "IT'S RAINING!",
+                                HORIZONTAL_ALIGNMENT_CENTER, 680, ffs, 12,
+                                Color(0.10, 0.07, 0.03, 0.92))
+                trail_painter.draw_string(font,
+                                Vector2(fvp.x * 0.5 - 340.0, 170.0),
+                                "IT'S RAINING!",
+                                HORIZONTAL_ALIGNMENT_CENTER, 680, ffs, fcol)
 
 func _paint_fx() -> void:
         # the bomb rings
@@ -487,20 +523,43 @@ func _paint_fx() -> void:
 # ============================================================ the spawn
 
 func _item_kind() -> String:
-        var pool: Array = FRUITS if mode_id == "fruits" else VEGGIES
+        var pool: Array = FRUITS if mode_id == "fruits" \
+                        else (DESSERTS if mode_id == "desserts" \
+                        else VEGGIES)
         return String(pool[_rng.randi() % pool.size()])
 
+## THE CONTENT SCALE LAW (v0.3.9-11, the owner: the vegs "has inaccurate
+## scale ... look too poor compared to the fruits one"): the drawn size
+## measures the CONTENT, never the canvas - the veg/fruit canvases wore
+## wildly different empty margins, so equal targets drew unequal produce.
+var _content_frac := {}
+
+func _frac_of(tex: Texture2D) -> Vector2:
+        var key := tex.resource_path
+        if not _content_frac.has(key):
+                var fx := 1.0
+                var fy := 1.0
+                var img: Image = tex.get_image()
+                if img != null:
+                        var r := img.get_used_rect()
+                        if r.size.x > 0 and r.size.y > 0:
+                                fx = clampf(float(r.size.x)
+                                                / float(img.get_width()),
+                                                0.4, 1.0)
+                                fy = clampf(float(r.size.y)
+                                                / float(img.get_height()),
+                                                0.4, 1.0)
+                _content_frac[key] = Vector2(fx, fy)
+        return _content_frac[key]
+
 func _item_scale(kind: String, tex: Texture2D) -> float:
-        # the drawn size wants ~118px for fruits, ~108 for the bomb
+        # the drawn size wants ~122px of real content for produce
         if kind == "coin":
                 return 84.0 / float(tex.get_width())
         if kind == "bomb":
                 return 106.0 / float(tex.get_width())
-        # v0.3.1: the vegs were "weirdly too small compared to the
-        # correct size of the fruit" - their painted art sits smaller in
-        # its canvas, so the target grows past the fruit's
-        var target := 122.0 if mode_id == "fruits" else 150.0
-        return target / float(tex.get_width())
+        var fr := _frac_of(tex)
+        return 122.0 / (float(tex.get_width()) * fr.x)
 
 func _launch(kind: String, at: Vector2 = Vector2.INF,
                 speed := 1.0) -> void:
@@ -545,11 +604,16 @@ func _spawn_pattern() -> void:
         if _rng.randf() < 0.08:
                 speed *= 1.28
         var roll := _rng.randf()
+        if frenzy_t >= 0.0:
+                ## THE RAIN: only the waves - many things at once, the
+                ## bombs ride along (the owner's frenzy ask)
+                roll = maxf(roll, 0.62)
         if roll < 0.38:
                 _launch(_roll_kind(0.12), Vector2.INF, speed)
         elif roll < 0.62:
                 _launch(_roll_kind(0.12), Vector2.INF, speed)
-                _launch(_roll_kind(0.12), Vector2.INF, speed * 0.94)
+                _launch(_roll_kind(0.12 if frenzy_t >= 0.0 else 0.0),
+                                Vector2.INF, speed * 0.94)
         elif roll < 0.78:
                 var vp := get_viewport_rect().size
                 var m: Dictionary = MODES[orient]
@@ -618,9 +682,25 @@ func _goga_tick(delta: float) -> void:
                 splat_painter.queue_redraw()
                 return
         clock += delta
+        # THE FRENZY CLOCK (v0.3.9-11): a quiet spell, then the rain
+        if frenzy_t < 0.0:
+                frenzy_clock -= delta
+                if frenzy_clock <= 0.0:
+                        frenzy_t = FRENZY_LEN
+                        Jukebox.sfx("sl_launch", -4.0, 0.8)
+                        Jukebox.sfx("sparkle", -5.0)
+        else:
+                frenzy_t -= delta
+                if frenzy_t <= 0.0:
+                        frenzy_t = -1.0
+                        frenzy_clock = _rng.randf_range(FRENZY_MIN,
+                                        FRENZY_MAX)
         spawn_clock -= delta
         if spawn_clock <= 0.0:
-                spawn_clock = maxf(0.78, 1.4 - clock * 0.009)
+                if frenzy_t >= 0.0:
+                        spawn_clock = FRENZY_BEAT      # the rain pours
+                else:
+                        spawn_clock = maxf(0.78, 1.4 - clock * 0.009)
                 _spawn_pattern()
         coin_clock -= delta
         if coin_clock <= 0.0:
@@ -788,8 +868,10 @@ func _shape_of(p: Dictionary) -> Dictionary:
                 return shp
         var n: Sprite2D = p["node"]
         var sc: float = float(p["scale"])
-        var dw := float(n.texture.get_width()) * sc
-        var dh := float(n.texture.get_height()) * sc
+        ## the CONTENT dims (the content scale law - margins lie)
+        var fr := _frac_of(n.texture)
+        var dw := float(n.texture.get_width()) * sc * fr.x
+        var dh := float(n.texture.get_height()) * sc * fr.y
         if String(p["kind"]) == "bomb":
                 shp = {"type": "circle", "r": dw * 0.44}
         elif ELONG.has(String(p["kind"])):
@@ -842,7 +924,8 @@ func _cut_item(p: Dictionary, from: Vector2, to: Vector2) -> void:
         var n: Sprite2D = p["node"]
         var kind := String(p["kind"])
         var sc: float = float(p["scale"])
-        var juice: Color = JUICE.get(kind, Color("ffc93c"))
+        var juice: Color = JUICE.get(kind, DESSERT_JUICE.get(kind,
+                        Color("ffc93c")))
         var cut_dir := (to - from).normalized()
         if cut_dir == Vector2.ZERO:
                 cut_dir = Vector2(1, 0)
@@ -861,7 +944,6 @@ func _cut_item(p: Dictionary, from: Vector2, to: Vector2) -> void:
         var cut_names := ["sl_cut_a", "sl_cut_b", "sl_cut_c"]
         Jukebox.sfx(cut_names[_rng.randi() % 3], -4.0,
                 _rng.randf_range(0.9, 1.18))
-        # THE +1 (the owner: "just make it +1 next to the cut")
         _push_float("+1", n.position + Vector2(0, -34.0),
                         Color(0.55, 1.0, 0.6), 34.0)
         # THE HALVES: the art's cut is vertical, so rotate the pair so that
@@ -1048,3 +1130,86 @@ func _point_segment_dist(pt: Vector2, a: Vector2, b: Vector2) -> float:
         var t := clampf((pt - a).dot(ab) / maxf(0.001, ab.length_squared()),
                         0.0, 1.0)
         return pt.distance_to(a + ab * t)
+
+# ============================================================ the shop
+## THE BUY LAW (agents law 16, landed here in v0.3.9-11): the shop
+## SELLS the produce, the options only APPLY it. One shelf: the produce
+## rows (THE SHELF TRUTH LAWS: ON rows keep their seat, no dash talk,
+## one action color).
+
+var shop_id := ""
+
+func _shop_open() -> void:
+        if shop_id != "":
+                return
+        shop_id = "shop"
+        paused = true
+        get_tree().paused = true
+        var sheet := sheet_push(0.0, "shop")
+        var t := Arc.label("FRUIT SLASHER SHOP", 34, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        sheet.add_child(t)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        sheet.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(560,
+                        clampf(vp.y * 0.52, 300.0, 640.0))
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        sheet.add_child(sc)
+        box.add_child(Arc.fit_label("PRODUCE", 24, Arc.HOT, 560))
+        box.add_child(_produce_row("fruits", "FRUITS", 0))
+        box.add_child(_produce_row("veggies", "VEGETABLES", VEG_PRICE))
+        box.add_child(_produce_row("desserts", "DESSERTS", DESSERT_PRICE))
+        box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
+                        func(): sheet_pop()))
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
+func _produce_row(id: String, txt: String, price: int) -> Control:
+        var owned := Box.item_owned(game_id, "produce", id) or price == 0
+        var on: bool = Box.item_on(game_id, "produce") == id \
+                        or (price == 0
+                        and Box.item_on(game_id, "produce") == "")
+        if on:
+                ## THE ON ROW LAW: the equipped row keeps its seat
+                return Arc.on_row("%s  (ON)" % txt)
+        if owned:
+                return Arc.button(txt, Vector2(560, 64), 22, Arc.ACCENT,
+                                func():
+                                        Box.equip_item(game_id, "produce", id)
+                                        Jukebox.sfx("confirm", -4.0)
+                                        _shop_reopen())
+        var b := Arc.coin_button("%s  %d" % [txt, price], Vector2(560, 64),
+                        22, Arc.ACCENT, func():
+                                if Box.buy_item(game_id, "produce", id,
+                                                price):
+                                        Jukebox.sfx("buy")
+                                        Box.equip_item(game_id, "produce", id)
+                                _shop_reopen())
+        if Box.coins() < price and not int(Box.dev_cheat("all_owned")) > 0:
+                b.disabled = true
+        return b
+
+func _shop_reopen() -> void:
+        if shop_id != "":
+                sheet_pop()
+                _shop_open.call_deferred()
+
+func _goga_sheet_popped(id: String) -> void:
+        if id == "shop":
+                shop_id = ""
+                get_tree().paused = false
+                paused = false
+                # the options may own a new produce now - rebuild it live
+                if _phase == "options":
+                        _show_options()

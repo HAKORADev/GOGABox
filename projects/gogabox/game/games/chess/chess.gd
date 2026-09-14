@@ -1611,7 +1611,7 @@ func _promo_picker() -> void:
     sheet.add_child(row)
     for choice in [[5, "QUEEN"], [2, "KNIGHT"], [4, "ROOK"], [3, "BISHOP"]]:
         var b := Arc.button(choice[1], Vector2(150, 84), 22,
-                Color("4a5ab8"), func():
+                Arc.ACCENT, func():
                         var mm: Dictionary = pending_promo
                         mm["promo"] = int(choice[0])
                         pending_promo = null
@@ -2081,10 +2081,10 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        box.add_child(_shop_label("PIECES - the army you hold"))
+        box.add_child(_shop_label("PIECES"))
         for id in SETS:
                 box.add_child(_set_row(id))
-        box.add_child(_shop_label("BOARDS - the ground you fight on"))
+        box.add_child(_shop_label("BOARDS"))
         for id in BOARDS:
                 box.add_child(_board_row(id))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
@@ -2138,17 +2138,14 @@ func _set_row(id: String) -> Control:
         var on: bool = Box.skin_on(game_id) == id \
                 or (int(c["price"]) == 0 and Box.skin_on(game_id) == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]],
-                        22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - WEAR" % c["name"], Vector2(560, 60),
-                        22, Color("4a5ab8"), func():
+                return Arc.button(c["name"], Vector2(560, 60),
+                        22, Arc.ACCENT, func():
                                 Box.equip_skin(game_id, id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("4a5ab8"), func():
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT, func():
                 if Box.buy_skin(game_id, id, int(c["price"])):
                         Jukebox.sfx("buy")
                         Box.equip_skin(game_id, id)
@@ -2160,17 +2157,14 @@ func _board_row(id: String) -> Control:
         var on: bool = Box.item_on(game_id, "theme") == id \
                 or (int(c["price"]) == 0 and Box.item_on(game_id, "theme") == "")
         if on:
-                var l := Arc.fit_label("%s  (ON) - %s" % [c["name"], c["desc"]],
-                        22, Color("58c470"), 560)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % c["name"])
         if owned:
-                return Arc.button("%s - FIGHT ON IT" % c["name"],
-                        Vector2(560, 60), 22, Color("2a7a68"), func():
+                return Arc.button(c["name"],
+                        Vector2(560, 60), 22, Arc.ACCENT, func():
                                 Box.equip_item(game_id, "theme", id)
                                 Jukebox.sfx("confirm", -4.0)
                                 _shop_reopen())
-        return _price_btn(c["name"], int(c["price"]), Color("2a7a68"), func():
+        return _price_btn(c["name"], int(c["price"]), Arc.ACCENT, func():
                 if Box.buy_item(game_id, "theme", id, int(c["price"])):
                         Jukebox.sfx("buy")
                         Box.equip_item(game_id, "theme", id)

@@ -89,3 +89,35 @@ it gets even better than the real fruit ninja bruh!". What changed:
   picks lo/med/hi/fast + a pitch nudge, and a voice never overlaps
   itself; "wheeeph or whoph based on slash movement speed"
 - the thumbnail recomposed to the current wood look
+
+## v0.3.9-11 — the frenzy, the dessert shelf, the veggie redraw
+
+- **THE FRENZY** (the owner: "make something called frenzy time where
+  it spams many things with some bombs for specific amount of time like
+  10 seconds after a period of time like after every 30-60 seconds and
+  before start it shows text at top like 'it's raining!'"): every 30–60s
+  of live play the sky opens for TEN seconds — the spawner only pours
+  WAVES (three and five-strong) at the 0.52s beat, bombs ride along,
+  and the "IT'S RAINING!" banner pops big at the top then rides the
+  rain smaller until it ends. The first frenzy arms at a fresh 30–60s
+  every run.
+- **THE DESSERT SHELF** (the owner: scrape the Cake Slice Ninja assets
+  "with some color and size modifications ofc so they could get in"):
+  the studied build is a PlayCanvas 3D game, so the desserts were BAKED
+  flat — tools/v03911_dessert_bake.py renders the real meshes (whole +
+  pre-cut halves) with a tiny software rasterizer, then the house
+  modifications land (one 236px content box, saturation lift, alpha
+  trim). Six cuttables: cake, cupcake, donut, macaron, cakeroll,
+  cookie — each with real halves and its own cream/glaze splash tint.
+  Sold in the NEW slasher shop (2400).
+- **THE VEGGIE REDRAW** (the owner: "enhance the vegetables skin, it
+  has inaccurate scale ... the internal cuts ... faked because it makes
+  it two small vegs"): all six vegetables redrawn in the fruit set's
+  language (corn and pepper rebuilt wholesale), every vegetable now
+  wears REAL cut halves with flesh faces, and THE CONTENT SCALE LAW
+  makes every produce draw ~122px of actual content (the old canvas
+  margins lied).
+- **THE SHOP + THE OPTIONS** (the buy law, agents law 16): the produce
+  sells in a proper shop shelf (one row per produce, ON rows keep their
+  seat, one action color); the options only APPLY what is owned — three
+  equal side-by-side cards, no note, no inline buy.

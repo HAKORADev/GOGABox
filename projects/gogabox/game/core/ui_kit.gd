@@ -117,6 +117,26 @@ static func button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
                         on_press.call())
         return b
 
+## THE ON ROW (the owner's v0.3.9-11 law): an equipped shop item keeps its
+## FULL-SIZE row seat and plainly says ON - it never collapses into a small
+## colored description label (the old "%s  (ON) - %s" fit_label pattern is
+## banned; see docs/AGENTS.md, THE SHELF TRUTH LAWS). A solid green card,
+## same width and height as the shop's action buttons, one line: NAME  (ON).
+static func on_row(txt: String, size := Vector2(560, 64), font_size := 22) \
+                -> PanelContainer:
+        var pc := PanelContainer.new()
+        var sb := panel_style(Color("2f7a46"), int(size.y / 2.6))
+        sb.shadow_color = Color(0, 0, 0, 0.25)
+        sb.shadow_size = 4
+        sb.shadow_offset = Vector2(0, 3)
+        pc.add_theme_stylebox_override("panel", sb)
+        pc.custom_minimum_size = size
+        var l := label(txt, font_size, Color.WHITE)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        pc.add_child(l)
+        pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        return pc
+
 ## Icon + text chip (used for coin balance, best score, prices).
 static func chip(txt: String, icon_path := "", bg := Color(0, 0, 0, 0.35),
                 font_size := 26, color := CARD) -> PanelContainer:

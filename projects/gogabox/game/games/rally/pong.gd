@@ -265,7 +265,7 @@ func _show_options() -> void:
         row.add_theme_constant_override("separation", 14)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
         vb.add_child(row)
-        row.add_child(Arc.button("SHOP", Vector2(220, 78), 26, Color("6a5ab8"),
+        row.add_child(Arc.button("SHOP", Vector2(220, 78), 26, Arc.ACCENT,
                         func(): _shop_open()))
         row.add_child(Arc.button("START", Vector2(300, 78), 30, Arc.GOOD,
                         func():
@@ -404,7 +404,7 @@ func _shop_open() -> void:
         sc.add_child(box)
         sheet.add_child(sc)
         # ---- PLATFORM SKINS ----
-        box.add_child(_shop_label("PLATFORM SKINS - your color"))
+        box.add_child(_shop_label("PLATFORM SKINS"))
         for id in SKINS:
                 var sk: Dictionary = SKINS[id]
                 # a price-0 skin is OWNED BY DEFAULT (the blue) - never a
@@ -436,7 +436,7 @@ func _shop_open() -> void:
         box.add_child(_shop_label("POWER-UPS - they ride the ball"))
         for key in ["pong_size", "pong_speed"]:
                 box.add_child(_unlock_row(key))
-        box.add_child(_shop_label("EXTRAS - the court wakes up"))
+        box.add_child(_shop_label("EXTRAS"))
         for key in ["pong_sparkles", "pong_more"]:
                 box.add_child(_unlock_row(key))
         box.add_child(Arc.button("CLOSE", Vector2(560, 74), 24, Arc.GOOD,
@@ -466,10 +466,8 @@ func _shop_label(txt: String) -> Label:
 func _unlock_row(key: String) -> Control:
         var u: Dictionary = UNLOCKS[key]
         if _owned(key):
-                var l := Arc.fit_label("%s  - OWNED (toggle it in the optionals)" \
-                                % u["name"], 20, Color("58c470"), 600)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (OWNED - APPLY IT FROM THE OPTIONALS)"
+                                % u["name"], Vector2(560, 66), 17)
         var vb := VBoxContainer.new()
         var b := Arc.coin_button("%s  %d" % [u["name"], u["price"]],
                         Vector2(560, 66), 22, Color("6a5ab8"),

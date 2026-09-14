@@ -179,15 +179,16 @@ const GAMES := [
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
                 "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
-                "desc": "Fruit fly, your finger is the blade - for real: the fruit splits along YOUR cut and the halves tumble. Choose your position first - portrait tosses from below, landscape lobs across. Every fruit +1, every fall -2, three hearts, and a slashed bomb takes one. A GOGACoin rides by every 20 seconds. The shop sells the vegetable basket.",
+                "desc": "Fruit fly, your finger is the blade - for real: the fruit splits along YOUR cut and the halves tumble. Choose your position first - portrait tosses from below, landscape lobs across. Every fruit +1, every fall -2, three hearts, and a slashed bomb takes one. A GOGACoin rides by every 20 seconds. Now and then the sky opens: FRENZY - for ten seconds it rains produce with bombs riding along. The shop sells the vegetable basket and the dessert shelf.",
                 "controls": [
                         "pick a position - portrait and landscape throw differently",
                         "swipe THROUGH a fruit to cut it where your finger crossed: +1",
                         "a fruit that falls unsliced costs -2 - the score never goes below 0",
                         "three hearts; slash a bomb and one bursts - lose all three and the run ends",
+                        "when IT'S RAINING! shows at the top, the frenzy pours for ten seconds - cut fast, dodge the bombs riding along",
                         "cut several fruits in one fast swipe and the top reads +1 +2 +3; falls flush as one -N",
                         "a GOGACoin flies by every 20 seconds - slash it like a fruit",
-                        "the shop's vegetable basket (1500) adds a fruits/vegetables toggle in the options",
+                        "the shop sells the vegetable basket (1500) and the dessert shelf (2400) - the options toggle whatever you own",
                 ],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
                 "ach": [
@@ -1138,12 +1139,15 @@ const GAMES := [
                         "TAP ANYWHERE TO START, then pick the way to play: "
                         + "x1 one army each, x2 you field armies 1 AND 3 "
                         + "against 2 AND 4, x4 every side is a rival",
-                        "on your turn tap ROLL at your tray - the die fades "
-                        + "in, shuffles, and settles",
+                        "on your turn your tray shows the die grayed out "
+                        + "and waiting - tap it and the die fades in, "
+                        + "shuffles, and settles",
                         "roll a 6 to drop a pawn onto your start cell, and "
                         + "a 6 always rolls again",
-                        "tap a pawn with an arrow to see its legal landings, "
-                        + "tap a landing to walk it - hop by hop",
+                        "tap a pawn with an arrow to choose it - it lifts "
+                        + "and its legal landings light up; tap a landing "
+                        + "to walk it, tap elsewhere to choose another "
+                        + "pawn",
                         "land on a rival pawn to eat it - it slides all the "
                         + "way back to its base; no bonus moves, ever",
                         "your start cell and the four stars are GUARDED - "
