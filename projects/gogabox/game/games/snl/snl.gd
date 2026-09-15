@@ -682,6 +682,10 @@ func _draw_board() -> void:
                                 Vector2(cell, cell))
                 var col: Color = th["sq_a"] if n % 2 == 1 else th["sq_b"]
                 board_l.draw_rect(r.grow(-1.0), col)
+        # THE CROWN STAR rides UNDER its numeral (the owner's v040-1
+        # round: "draw the star under it so the number stay visible" -
+        # the base pass writes the ONE 100 straight on the star)
+        _draw_crown_star()
         # the numerals (every square wears its number, the classic board)
         var f := ThemeDB.fallback_font
         var num_sz := int(maxf(11.0, cell * 0.24))
@@ -695,22 +699,16 @@ func _draw_board() -> void:
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, num_sz,
                                 th["num_ink"])
         _draw_cell_specials()
-        # the crown's numeral rides ABOVE its medallion (the medallion
-        # owns the cell's face - the number stays readable on the gold)
-        var f2 := ThemeDB.fallback_font
-        board_l.draw_string(f2, _cell_point(LAST) + Vector2(-cell * 0.5,
-                        cell * 0.44), str(LAST),
-                        HORIZONTAL_ALIGNMENT_CENTER, -1,
-                        int(maxf(11.0, cell * 0.24)), Color("3d2a08"))
         _draw_ladders()
         _draw_snakes()
 
-## THE TWO SPECIAL SQUARES (the owner: "the 100th grid should have cool
-## design and also the first one"): the START mat and the crown cell.
+## THE START MAT (cell 1) - and nothing else on it now: the owner's
+## v040-1 round kills both the chevron arrow AND the overlayed 1 -
+## ONE BIG numeral centered in the mat does both jobs at once.
 func _draw_cell_specials() -> void:
         var th := _theme()
         var f := ThemeDB.fallback_font
-        # THE START MAT (cell 1): a soft inset mat + a bold chevron up
+        # THE START MAT (cell 1): a soft inset mat + ONE big centered 1
         var g1 := cell_grid(1)
         var c1 := _cell_point(1)
         var r1 := Rect2(board_origin + Vector2(float(g1.x) * cell + 5.0,
@@ -718,20 +716,16 @@ func _draw_cell_specials() -> void:
                         Vector2(cell - 10.0, cell - 10.0))
         _draw_rr(board_l, r1, 10.0, th["snake"].darkened(0.15))
         _draw_rr(board_l, r1.grow(-3.0), 8.0, th["snake"])
-        # (the chevron: two strokes meeting at the top center)
-        var top := c1 + Vector2(0.0, -cell * 0.20)
-        var lft := c1 + Vector2(-cell * 0.17, cell * 0.06)
-        var rgt := c1 + Vector2(cell * 0.17, cell * 0.06)
-        board_l.draw_polyline(PackedVector2Array([lft, top, rgt]),
-                        Color(1, 1, 1, 0.9), cell * 0.07)
-        board_l.draw_string(f, c1 + Vector2(-cell * 0.5,
-                        cell * 0.36), str(1), HORIZONTAL_ALIGNMENT_CENTER,
-                        -1, int(maxf(11.0, cell * 0.24)),
-                        Color(1, 1, 1, 0.95))
-        # THE CROWN CELL (100): THE STAR, NOTHING ELSE (the owner's
-        # v0.3.9-13 round: "just make it the star only without circles
-        # or sun rays, will be much cooler btw") - one bold gold star
-        # with a deep outline, seated straight on the checker
+        board_l.draw_string(f, c1 + Vector2(-cell * 0.5, cell * 0.30),
+                        str(1), HORIZONTAL_ALIGNMENT_CENTER, -1,
+                        int(cell * 0.52), Color(1, 1, 1, 0.95))
+
+## THE CROWN STAR (cell 100): one bold gold star with a deep outline,
+## seated UNDER the checker's own numeral - it is drawn before the
+## numerals pass so the in-square 100 stays readable on the gold (the
+## owner's v040-1 catch: the number was written twice, once in the
+## square and once over the star).
+func _draw_crown_star() -> void:
         var c100 := _cell_point(LAST)
         var rad := cell * 0.36
         var star := PackedVector2Array()
@@ -753,10 +747,6 @@ func _draw_cell_specials() -> void:
                 glint.append(c100 + Vector2(cos(ang), sin(ang)) * rr \
                                 + Vector2(0, -cell * 0.02))
         board_l.draw_colored_polygon(glint, Color("ffe89a"))
-        board_l.draw_string(f, c100 + Vector2(-cell * 0.5,
-                        cell * 0.44), str(LAST),
-                        HORIZONTAL_ALIGNMENT_CENTER, -1,
-                        int(maxf(11.0, cell * 0.24)), th["num_ink"])
 
 ## THE LADDERS: two honest rails + the rungs between them, straight
 ## lanes from base to top (the owner: "ladders should be....ladders").
@@ -843,35 +833,25 @@ func _draw_snakes() -> void:
                 if pts.size() < 2:
                         continue
                 var n := pts.size()
-                # the OUTLINE pass (a hair wider than the body)
-                for i in n:
-                        var f0 := float(i) / float(n - 1)
-                        board_l.draw_circle(pts[i],
-                                        lerpf(cell * 0.27, cell * 0.05, f0)
-                                        + cell * 0.030, ink)
-                # the BODY pass: the stamped discs taper head -> tail
-                for i in n:
-                        var f1 := float(i) / float(n - 1)
-                        board_l.draw_circle(pts[i],
-                                        lerpf(cell * 0.27, cell * 0.05, f1),
-                                        th["snake"])
-                # the BELLY: a lighter stripe riding the same stamps
-                for i in n:
-                        var f2 := float(i) / float(n - 1)
-                        board_l.draw_circle(pts[i],
-                                        lerpf(cell * 0.115, cell * 0.02, f2),
-                                        th["snake_belly"])
-                # THE JUNGLE DOTS: dark spots every few stamps, shrinking
-                # with the body
+                # THE SMOOTH BODY (the owner's v040-1 round: "they are
+                # circle by circle, they should be smooth one body") -
+                # the path becomes ONE continuous ribbon: left and
+                # right shores follow the spine, the width tapers
+                # head -> tail, no stamped discs anywhere.
+                var body := _ribbon(pts, cell * 0.26, cell * 0.05)
+                var outline := _ribbon(pts, cell * 0.26 + cell * 0.030,
+                                cell * 0.05 + cell * 0.030)
+                var belly := _ribbon(pts, cell * 0.11, cell * 0.02)
+                board_l.draw_colored_polygon(outline, ink)
+                board_l.draw_colored_polygon(body, th["snake"])
+                board_l.draw_colored_polygon(belly, th["snake_belly"])
+                # THE JUNGLE DOTS: dark spots riding the smooth body
                 if spots:
                         for i in range(2, n - 1, 4):
                                 var f3 := float(i) / float(n - 1)
                                 board_l.draw_circle(pts[i],
-                                        lerpf(cell * 0.06, cell * 0.012, f3),
-                                        spot_c)
-                # the tail end: a small rounded cap (the body closes
-                # in a point, the outline holds it)
-                board_l.draw_circle(pts[n - 1], cell * 0.045, ink)
+                                                lerpf(cell * 0.06, cell * 0.012, f3),
+                                                spot_c)
                 # THE HEAD (the snake game's own face): a rimmed skull,
                 # the eyes look ALONG the crawl, the tongue forks ahead
                 var hp := pts[0]
@@ -900,6 +880,52 @@ func _draw_snakes() -> void:
                 board_l.draw_line(tt, tt + (hdir * 0.45 - perp * 0.55) \
                                 .normalized() * cell * 0.10,
                                 Color("e8574a"), cell * 0.024)
+
+## THE RIBBON: one polygon out of a point path - walk the spine twice,
+## offset each point along its normal by the lerped width (head->tail
+## taper; w0 at the head, w1 at the tail). center=true rides the spine
+## as the polygon's axis so the belly stripe stays centered. The
+## shores are smoothed with one Catmull-Rom subdivision pass first so
+## the body bends round, not cornered.
+func _ribbon(pts: PackedVector2Array, w0: float,
+                w1: float) -> PackedVector2Array:
+        # subdivide: every spine segment becomes 4 sub-points
+        var spine := PackedVector2Array()
+        for i in pts.size() - 1:
+                var p0 := pts[maxi(i - 1, 0)]
+                var p1 := pts[i]
+                var p2 := pts[i + 1]
+                var p3 := pts[mini(i + 2, pts.size() - 1)]
+                for s in 4:
+                        var t := float(s) / 4.0
+                        spine.append(p1.bezier_interpolate(
+                                p1 + (p2 - p0) * 0.25,
+                                p2 + (p1 - p3) * 0.25, p2, t))
+        spine.append(pts[pts.size() - 1])
+        var m := spine.size()
+        var left := PackedVector2Array()
+        var right := PackedVector2Array()
+        for i in m:
+                var prev := spine[maxi(i - 1, 0)]
+                var nxt := spine[mini(i + 1, m - 1)]
+                var dir := (nxt - prev).normalized()
+                if dir == Vector2.ZERO:
+                        dir = Vector2(1, 0)
+                var nrm := Vector2(-dir.y, dir.x)
+                var f := float(i) / float(maxi(m - 1, 1))
+                var w := lerpf(w0, w1, f)
+                var c := spine[i]
+                left.append(c + nrm * w)
+                right.append(c - nrm * w)
+        var poly := PackedVector2Array()
+        # the shores zip into one polygon: left shore head->tail, then
+        # the right shore back tail->head (same shape for the centered
+        # belly stripe - the spine rides its middle either way)
+        for i in m:
+                poly.append(left[i])
+        for i in range(m - 1, -1, -1):
+                poly.append(right[i])
+        return poly
 
 ## THE TOKENS: a pawn disc with its ring and a specular dot - the
 ## walkers and the riders drawn on top. THE BARE PAWN (the owner's

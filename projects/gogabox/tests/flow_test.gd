@@ -314,6 +314,18 @@ func _t_meta() -> int:
 func _t_registry() -> int:
         var ok := _check(GameReg.playable().size() == 25,
                 "25 playable games (heavy war joined, v0.4.0)")
+        # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
+        # the four teasers vanished when snl graduated and were never
+        # re-added) - and heavy war walks LAST in the catalog now (the
+        # feed sorts by this file's order; the newest game walks last)
+        ok += _check(GameReg.workshop().size() == 4,
+                "4 workshop teasers (craze caves / death worm / zuma / gold miner)")
+        var ids: Array = []
+        for g in GameReg.GAMES:
+                ids.append(String(g["id"]))
+        ok += _check(ids[ids.size() - 1] == "goldminer"
+                        and ids.find("heavywar") == ids.size() - 5,
+                "heavy war walks last of the playable, teasers after it")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -322,8 +334,11 @@ func _t_registry() -> int:
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
         # v0.4.0: HEAVY WAR graduated (the SOON shelf's first name)
-        ok += _check(GameReg.workshop().size() == 0,
-                "0 workshop teasers (snl graduated v0.3.9-12 - the workshop rests)")
+        ok += _check(String(GameReg.get_game("crazecaves")["title"]) == "CRAZE CAVES"
+                        and String(GameReg.get_game("deathworm")["title"]) == "DEATH WORM"
+                        and String(GameReg.get_game("zuma")["title"]) == "ZUMA"
+                        and String(GameReg.get_game("goldminer")["title"]) == "GOLD MINER",
+                "the four SOON teasers wear their shelf names (v0.4.0-1)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -2284,8 +2299,10 @@ func _t_feed_order() -> int:
                 "fourline surfaces LOCKED at 12 owned (%s)" % Roadmap.state("fourline"))
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
-        ok += _check(GameReg.workshop().size() == 0,
-                "the workshop rests (snl graduated, no teaser parked)")
+        # v0.4.0-1 THE SOON SHELF IS BACK: the four next names parked
+        # again (the owner's v040 report catch)
+        ok += _check(GameReg.workshop().size() == 4,
+                "the workshop wears the four soon teasers again")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2294,8 +2311,10 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                ok += _check(String(ids[soon_first_at]) == "snl",
-                        "the SOON block wears snl first (%s)" % [ids.slice(soon_first_at)])
+                # v0.4.0-1: craze caves leads the shelf (FUTURE_GAMES.md
+                # file order after heavy war's graduation)
+                ok += _check(String(ids[soon_first_at]) == "crazecaves",
+                        "the SOON block wears craze caves first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:
