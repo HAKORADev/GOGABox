@@ -799,3 +799,46 @@ types under the pause). NEVER build a raw Arc.sheet for a new story
 `finish_run`. (d) **THE EASTER-EGG LAW**: ambient dialogue (the table's
 secret, jumpcube's 60s idle) NEVER pauses - it draws over live play,
 auto-advances, and a tap skips ahead.
+
+**32. THE VISION LAW (v040-2) - the rig has EYES, so use them before the
+owner has to.**
+The owner's order after the v040-1 report: "you have full vision
+capabilities meaning that you can watch videos and see images, which
+means you can run simulated tests that use real finger touches and run
+real gameplay and record and make screenshots and see the videos and the
+images... you have the ability to keep telling yourself 'just one more
+test, just one more fix' the whole night." THIS IS A LAW NOW, not a
+suggestion, because the bugs that shipped (an opaque rectangle eating
+the sky, an OS hand cursor standing in for the aim reticle, a white
+mask drawn as the explosion, animals that never animated) were ALL
+visible in one screenshot and NONE of them were visible to headless
+asserts. The working loop, end to end:
+   (1) **STUDY THE SOURCE WITH YOUR EYES**: extracting the archive and
+       grepping the XMLs is HALF the study. OPEN the actual image files
+       (PIL montages on a dark backing sheet, viewed with the Read
+       tool), measure strips by their alpha seams, and count frames
+       BEFORE writing any sprite map. File names lie; pixels don't.
+       The masks are white-on-black LUMINANCE-alpha (never their own
+       alpha channel); strips are static horizontal cells; rotation
+       strips mean the engine NEVER rotated projectiles - it picked
+       frames.
+   (2) **FILM THE GAME**: xvfb-run + `--rendering-driver opengl3`
+       (the box is gl_compatibility, llvmpipe renders it), a film probe
+       that injects REAL InputEventScreenTouch/Drag through
+       `_goga_input`, and `get_viewport().get_texture().get_image()
+       .save_png()` at every beat (intro, combat, impacts, boss,
+       menus). Then READ THE FRAMES with the Read tool and fix what the
+       eye catches: voids, black squares (an additive material set on a
+       holder does nothing - it must ride the SPRITE), mis-scales,
+       floating pivots, dead widgets. One screenshot is worth a
+       hundred asserts.
+   (3) **HUNT REAL GAMEPLAY**: the browser exists; BiliBili hosts
+       gameplay (yt-dlp `bilisearch:`); web-search finds walkthroughs.
+       When the source game's FEEL is in question (pacing, entry
+       animation, menu flow), watch a human play it before trusting a
+       guess.
+   (4) **THE LOOP**: "just one more test, just one more fix" - after
+       every fix, re-film, re-look, re-fix. The owner will test when
+       they wake up; the rig should have watched MORE gameplay than
+       they will. Speedrunning the eye pass is how a patch becomes a
+       report.

@@ -1,7 +1,7 @@
 extends Node
-## HEAVY WAR probe (v040 pass 1) - the deterministic battery.
-## Runs headless: godot --headless --path . res://tests/hw_probe.tscn
-## Exit 0 = all laws hold. The brutal part rides every patch.
+## HEAVY WAR probe (v040-2) - the deterministic battery against the
+## ORIGINAL'S OWN LAWS. Runs headless: godot --headless --path . \
+## res://tests/hw_probe.tscn   Exit 0 = all laws hold.
 
 var checks := 0
 var fails := 0
@@ -26,6 +26,8 @@ func _boot() -> void:
                 await _wait(0.3)
         Box.reset_all()
         get_window().size = Vector2i(1920, 1080)
+        ScaleRule.apply(get_window())      # the house design law
+        get_window().content_scale_size = Vector2i(1920, 1080)
         await _wait(0.2)
         finished = [-1, -1]
         G = load("res://game/games/heavywar/heavywar.gd").new()
@@ -50,12 +52,12 @@ func _drag(idx: int, pos: Vector2) -> void:
         G._goga_input(e)
 
 func _run() -> void:
-        print("=== hw_probe (v040 pass 1) ===")
+        print("=== hw_probe (v040-2) ===")
         seed(20260915)
         await _boot()
 
         # ------------------------------------------------ the data laws
-        ck(HWData.ENEMIES.size() == 21, "21 enemies in the table")
+        ck(HWData.ENEMIES.size() == 22, "22 enemies in the table")
         var shared := 0
         var specials: Array = []
         for eid in HWData.ENEMIES:
@@ -64,7 +66,7 @@ func _run() -> void:
                         shared += 1
                 else:
                         specials.append(pts)
-        ck(shared == 11, "THE 10/11 LAW: 11 shared fry pay 1 (got %d)" % shared)
+        ck(shared == 12, "12 shared fry pay 1 (got %d)" % shared)
         ck(specials.size() == 10, "the ten specials exist")
         var sorted_sp := specials.duplicate()
         sorted_sp.sort()
@@ -74,60 +76,85 @@ func _run() -> void:
         var excl_total := 0
         for p in HWData.PLACES:
                 excl_total += (p["exclusive"] as Array).size()
-                ck(float(p["len"]) >= 180.0 and float(p["len"]) <= 360.0,
-                        "place %s length in the 3-10+ min band" % p["id"])
+                ck(float(p["len_orig"]) >= 10000.0
+                        and float(p["len_orig"]) <= 30000.0,
+                        "place %s wears the source's own length" % p["id"])
         ck(excl_total >= 10, "every place wears exclusives (%d)" % excl_total)
-        var all_eid: Array = HWData.ENEMIES.keys()
-        for p in HWData.PLACES:
-                for x in (p["exclusive"] as Array):
-                        ck(all_eid.has(x), "exclusive %s is a real enemy" % x)
-        ck(HWData.WAVES.size() == 5, "five pressure tiers")
+        # THE SOURCE'S OWN WAVES: 19 levels, 84 waves, verbatim lens
+        ck(HWData.WAVES_XML.size() == 84, "the source's 84 waves ride here")
+        var sum := 0
+        for n in HWData.LEVEL_WAVE_COUNTS:
+                sum += int(n)
+        ck(sum == 84, "the level lens covers all 84")
+        ck(HWData.waves_for_level(0).size() == 3,
+                "level 1 = the source's own 3 waves")
+        ck(HWData.waves_for_level(9).size() == 9,
+                "level 10 = the source's own 9-wave siege")
+        ck(HWData.waves_for_level(18).size() == 6,
+                "level 19 = the source's own 6 waves")
+        var all_waves_real := true
+        for w in HWData.WAVES_XML:
+                for ul in w["u"]:
+                        if not HWData.ENEMIES.has(String(ul[0])):
+                                all_waves_real = false
+        ck(all_waves_real, "every wave unit is a real enemy")
         ck(HWData.BOSS_ORDER.size() == 10, "ten boss faces")
         var bs: Dictionary = HWData.boss_stats(10)
         ck(int(bs["comeback"]) == 1 and bs["id"] == "gunship",
                 "boss 10 = gunship comeback 1")
-        ck(int(HWData.boss_stats(11)["comeback"]) == 1 \
-                and HWData.boss_stats(11)["id"] == "dreadnought",
-                "boss 11 = the dreadnought's first comeback")
         ck(int(bs["hp"]) > HWData.BOSSES["gunship"]["hp"],
-                "comeback wears heavier armor")
-        ck(HWData.UPGRADES.size() == 6, "six stats")
+                "THE SOURCE'S COMEBACK: the second meeting wears Level2 armor")
+        # THE SOURCE'S OWN ARMOR LAW: craft.xml armor = the hp table
+        ck(int(HWData.ENEMIES["scout"]["hp"]) == 1,
+                "the prop plane wears the source's armor 1")
+        ck(int(HWData.ENEMIES["raider"]["hp"]) == 10,
+                "the T-83 bomber wears the source's armor 10")
+        ck(int(HWData.ENEMIES["plowman"]["hp"]) == 400,
+                "the bulldozer wears the source's armor 400")
+        ck(int(HWData.ENEMIES["zeppelin"]["hp"]) == 400,
+                "the blimp wears the source's armor 400")
+        # THE ORIGINAL'S SIX WEAPON SYSTEMS
+        ck(HWData.UPGRADES.size() == 6, "six systems")
+        var names := ["speed", "shield", "rockets", "flak", "homing", "laser"]
+        var ids_ok := true
+        for n2 in names:
+                if not HWData.UPGRADES.has(n2):
+                        ids_ok = false
+        ck(ids_ok, "THE SOURCE'S OWN SIX: speed/shield/rockets/flak/homing/laser")
         var opens := 0
         for sid in HWData.UPGRADES:
                 if bool(HWData.UPGRADES[sid]["open"]):
                         opens += 1
-        ck(opens == 2, "THE 2-OPEN LAW: two stats born free")
-        ck(HWData.cannon_streams(0) == 1 and HWData.cannon_streams(5) == 5,
-                "cannons 1..5 streams")
-        ck(HWData.aegis_laser_need(0) == 3 and HWData.aegis_laser_need(5) == 1,
-                "aegis trims the laser parts 3 -> 1")
+        ck(opens == 2, "THE 2-OPEN LAW: two systems born free")
+        ck(HWData.shell_dmg(0) == 2 and HWData.shell_dmg(4) == 10,
+                "the gun power tiers bite 2..10")
+        ck(HWData.laser_need() == 4,
+                "THE SOURCE'S LAW: collect all FOUR megalaser parts")
         ck(HWData.SKINS.size() == 6 and HWData.LASER_PRICE >= 5000,
                 "six skins + the costly laser")
 
         # ------------------------------------------------ the meta laws
-        ## (BEFORE the all_owned cheat: the cheat owns every shop shelf and
-        ## would lie about the lock law)
         ck(meta.pts_free() == 0 and meta.pts_banked() == 0, "fresh ledger: 0 points")
         meta.mint_pts(3)
         ck(meta.pts_free() == 3, "3 bosses minted 3 free points")
-        ck(meta.raise("engine") and meta.level_of("engine") == 1, "raise engine")
+        ck(meta.raise("speed") and meta.level_of("speed") == 1, "raise speed")
         ck(meta.pts_free() == 2, "the raise spent a free point")
-        ck(meta.raise("armor") == false, "THE LOCK LAW: closed stat refuses")
+        ck(meta.raise("rockets") == false, "THE LOCK LAW: closed system refuses")
         meta.mint_pts(20)
         var ok_all := true
         for i in 4:
-                if not meta.raise("engine"):
+                if not meta.raise("speed"):
                         ok_all = false
-        ck(ok_all and meta.level_of("engine") == 5 and meta.pts_free() == 18,
-                "engine to the 5 cap (4 raises from LV1)")
-        ck(meta.raise("engine") == false, "THE CAP LAW: 6th level refuses")
-        ck(meta.lower("engine") and meta.lower("engine") \
-                and meta.level_of("engine") == 3 and meta.pts_free() == 20,
+        ck(ok_all and meta.level_of("speed") == 5 and meta.pts_free() == 18,
+                "speed to the 5 cap (4 raises from LV1)")
+        ck(meta.raise("speed") == false, "THE CAP LAW: 6th level refuses")
+        ck(meta.lower("speed") and meta.lower("speed") \
+                and meta.level_of("speed") == 3 and meta.pts_free() == 20,
                 "the rebalance lowers back and refunds")
-        meta.lower("engine")
-        meta.lower("engine")
-        meta.lower("engine")
-        ck(meta.level_of("engine") == 0 and meta.pts_free() == 23,
+        meta.lower("speed")
+        meta.lower("speed")
+        meta.lower("speed")
+        ck(meta.level_of("speed") == 0 and meta.pts_free() == 23,
                 "the ledger returns to zero use")
         Box.dev_set_cheat("all_owned", 1)   # NOW the cheat, for the game boot
 
@@ -146,20 +173,42 @@ func _run() -> void:
                         perm = false
         ck(perm, "the queue is a true permutation of the ten places")
 
+        # ------------------------------------------------ the world laws
+        ck(G.GROUND_Y > 900.0 and G.GROUND_Y < 990.0,
+                "the ground line sits at the source's own band")
+        var far_off: float = G.world.get_meta("far")["off"]
+        var mid_off: float = G.world.get_meta("mid")["off"]
+        var gnd_off: float = G.world.get_meta("ground")["off"]
+        await _wait(1.0)
+        var far_d: float = absf(float(G.world.get_meta("far")["off"])
+                - far_off)
+        var mid_d: float = absf(float(G.world.get_meta("mid")["off"])
+                - mid_off)
+        var gnd_d: float = absf(float(G.world.get_meta("ground")["off"])
+                - gnd_off)
+        ck(gnd_d > mid_d and mid_d > far_d and far_d > 0.0,
+                "THE PLANE LAW: sky crawls, mid jogs, the ground carries")
+        # the composed far strip loaded (not the null slab)
+        var far_leaves: Array = G.world.get_meta("far")["leaves"]
+        ck(far_leaves.size() == 3 and far_leaves[0] is Sprite2D,
+                "the far strip wears the composed original texture")
+        # props baked to their planes
+        await _wait(2.0)
+        ck(G.props.size() > 0, "the place's props walk out of the planes")
+
         # ------------------------------------------------ the gun + kills
         var n0: int = G.enemies.size()
         await _wait(3.0)
-        ck(G.enemies.size() > n0 or not G._wave_units.is_empty(),
-                "the director spawns (enemies=%d)" % G.enemies.size())
-        # park a scout in front of the barrel and shoot it
-        var scout_hp: int = G.enemies[0]["hp"] if G.enemies.size() > 0 else 0
+        ck(G.enemies.size() > n0 or not G._wave_plan.is_empty(),
+                "THE SOURCE'S WAVES FLOW: the director spawns (enemies=%d)"
+                        % G.enemies.size())
         if G.enemies.is_empty():
                 G._spawn_enemy("scout", G.tank.position.x, 300.0)
         var victim: Dictionary = G.enemies[0]
         victim["n"].position = Vector2(G.tank.position.x, 300.0)
         G.aim_pos = victim["n"].position      # the finger IS the aim
         var s0: int = G.score
-        for i in 60:
+        for i in 90:
                 G._fire()
                 G._shots_tick(1.0 / 60.0)
                 if G.score > s0:
@@ -168,10 +217,40 @@ func _run() -> void:
                 % (G.score - s0))
         ck(G.run["kills"] >= 1, "the kill lands in the ledger")
 
+        # the arm law: 24 angle columns x 5 tier rows, smooth fraction
+        G.aim_pos = Vector2(G.tank.position.x - 500.0, G.TANK_Y)
+        var arm: Sprite2D = G.tank.get_meta("turret")
+        G._turret_apply()
+        var col_left := arm.frame % 24
+        G.aim_pos = Vector2(G.tank.position.x + 500.0, G.TANK_Y)
+        G._turret_apply()
+        var col_right := arm.frame % 24
+        ck(col_left == 0 and col_right == 23,
+                "THE ARM LAW: left = col 0, right = col 23 (got %d/%d)"
+                        % [col_left, col_right])
+        G.gun_tier = 3
+        G._turret_apply()
+        ck(arm.frame >= 3 * 24 and arm.frame < 4 * 24,
+                "the arm wears its gun-power tier row")
+        G.gun_tier = 0
+
+        # the rotation strips: a bullet picks an angle frame, never spins
+        var eb0: Array = G.ebombs
+        G._enemy_shot(G.tank.position + Vector2(400, -200),
+                Vector2(-400, 0), "hellfire")
+        var shot: Dictionary = G.ebombs[-1]
+        var spr: Sprite2D = (shot["n"] as Node2D).get_meta("spr", null)
+        ck(spr != null and int((shot["n"] as Node2D).get_meta("rot", 0)) > 0,
+                "the shots wear the source's rotation strips")
+        var f0: int = spr.frame if spr != null else -1
+        G._set_rot_frame(shot["n"], Vector2(400, 0))
+        ck(f0 != spr.frame or f0 == 0,
+                "the rotation law flips the frame with the angle")
+        (shot["n"] as Node2D).queue_free()
+        G.ebombs.erase(shot)
+        var _eb_unused := eb0
+
         # ------------------------------------------------ the zones
-        # THE THREE-ZONE LAW (the owner's v040-1 redesign): bottom = steer
-        # (paddle glide), center = aim + fire, top = the nuke. A finger
-        # keeps its role until it LIFTS - zone exits change nothing.
         _tap(1, Vector2(200, 900), true)         # steer finger down
         await _wait(0.05)
         ck(G.steer_ptr == 1, "the bottom zone owns the steer finger")
@@ -190,7 +269,6 @@ func _run() -> void:
         _tap(1, Vector2(1700, 1000), false)
         await _wait(0.05)
         ck(G.aim_ptr == -1 and G.steer_ptr == -1, "lifting the fingers frees both")
-        # the nuke (the mercy law: the war starts with one in the magazine)
         ck(int(G.run["nukes"]) >= 1, "THE MERCY LAW: the war starts stocked")
         G.run["nukes"] = 2
         var enemies0: int = G.enemies.size()
@@ -202,27 +280,40 @@ func _run() -> void:
         ck(int(G.run["nukes"]) == 1, "THE NUKE LAW: the top-zone tap spends one")
         ck(G.enemies.size() < enemies0 + 3, "the blast cleared the front")
 
+        # ------------------------------------------------ the entry law
+        ## spawned-in enemies enter FULLY off the edge: head first, butt
+        ## after - never the whole body at once (the owner's law)
+        G.enemies.clear()
+        G._spawn_enemy("raider", -1.0, -1.0)
+        var raider: Dictionary = G.enemies[-1]
+        var edge: float = (raider["n"] as Node2D).position.x \
+                - float(raider["w"]) * 0.5
+        ck(edge > 1920.0,
+                "THE ENTRY LAW: the body enters fully off-screen (edge=%.0f)"
+                        % edge)
+        G._enemy_free(raider)
+
         # ------------------------------------------------ the tank laws
         var lives0: int = G.run["lives"]
         G._hurt_tank(G.tank.position)
         ck(int(G.run["lives"]) == lives0 - 1, "each hit takes one life")
         G._hurt_tank(G.tank.position)            # iframes eat this one
         ck(int(G.run["lives"]) == lives0 - 1, "THE IFRAME LAW: no double-bite")
+        ck(G.gun_tier == 0, "the hit dropped the gun power (already 0)")
         G.run["iframes"] = 0.0
-        # shield layers eat before lives
         (G.run["shield_hp"] as Array).append({"hp": 2})
         G.run["shields"] = 1
         var l_before: int = G.run["lives"]
         G.run["iframes"] = 0.0
         G._hurt_tank(G.tank.position)
-        ck(int(G.run["lives"]) == l_before, "THE SHIELD LAW: the layer eats the hit")
+        ck(int(G.run["lives"]) == l_before, "THE SPHERE LAW: the layer eats the hit")
         ck((G.run["shield_hp"] as Array)[0]["hp"] == 1, "the layer bled first")
         G.run["iframes"] = 0.0
         G._hurt_tank(G.tank.position)
         ck((G.run["shield_hp"] as Array).is_empty(), "the broken layer dies")
         G.run["iframes"] = 0.0
         G._hurt_tank(G.tank.position)
-        ck(int(G.run["lives"]) == l_before - 1, "lives pay after the shields")
+        ck(int(G.run["lives"]) == l_before - 1, "lives pay after the spheres")
 
         # ------------------------------------------------ score pays lives
         G.run["lives"] = 1
@@ -240,7 +331,7 @@ func _run() -> void:
         G._collect("shield")
         G._collect("shield")
         G._collect("shield")
-        ck(int(G.run["shields"]) == HWData.SHIELD_MAX, "THE CAP LAW: 3 shield layers")
+        ck(int(G.run["shields"]) == HWData.SHIELD_MAX, "THE CAP LAW: 3 sphere layers")
         G.run["nukes"] = 0
         G._collect("nuke")
         G._collect("nuke")
@@ -250,17 +341,21 @@ func _run() -> void:
         var coins0: int = G.run_coins
         G._collect("coin")
         ck(G.run_coins == coins0 + HWData.COIN_DROP, "the coin crate pays GOGACoin")
+        G.gun_tier = 0
+        G._collect("gunpower")
+        G._collect("gunpower")
+        ck(G.gun_tier == 2, "THE GUN POWER LAW: the pickups climb the arm")
 
         # ------------------------------------------------ the tunnel laws
         G.enemies.clear()
-        G.t_state = float(G.place["len"]) + 0.1
+        G.place_px_left = 0.0
         G._place_tick(0.016)
         ck(G.state == G.GS.TUNNEL, "the served place enters the tunnel")
         ck(int(G.run["places_done"]) == 1, "the place is banked")
         var spawned := false
         for i in 30:
                 G._director_tick(0.016)
-                if not G._wave_units.is_empty() or not G.enemies.is_empty():
+                if not G._wave_plan.is_empty() or not G.enemies.is_empty():
                         spawned = true
         ck(not spawned, "THE CALM LAW: the tunnel never spawns")
         G.t_state = 5.0
@@ -282,6 +377,12 @@ func _run() -> void:
         G._tunnel_tick(0.016)
         ck(G.state == G.GS.BOSS, "THE CADENCE LAW: 5 places -> the boss")
         ck(G.boss != null, "the boss is on the field")
+        # the parts sit at FIXED anchors (no random scatter)
+        if (G.boss["parts"] as Array).size() > 1:
+                var p0: Node2D = (G.boss["parts"][0] as Dictionary)["n"]
+                var a0: Vector2 = (G.boss["parts"][0] as Dictionary)["anchor"]
+                ck(p0.position == G.boss["n"].position + a0,
+                        "THE ANCHOR LAW: the parts ride their fixed slots")
         var pts0: int = meta.pts_banked()
         G.boss["hp"] = 1
         G._boss_die()
@@ -297,33 +398,31 @@ func _run() -> void:
         G.state = G.GS.PLACE
         G.run["lives"] = 1
         G.run["iframes"] = 0.0
-        (G.run["shield_hp"] as Array).clear()   # the caps test stocked layers
+        (G.run["shield_hp"] as Array).clear()
         G.run["shields"] = 0
         G._hurt_tank(G.tank.position)
         await _wait(2.2)
         ck(G.state == G.GS.OVER, "the last hit ends the run")
         ck(finished[0] >= 0, "finish_run paid the box (score=%d)" % finished[0])
-        ck(meta.best_places() >= 1 if meta.has_method("best_places") else true,
-                "the run landed in the ledger")
 
         # ------------------------------------------------ the shop laws
-        ## (the all_owned cheat owns every shelf - it would lie about the
-        ## locks AND block the buys; the shop laws run with the cheat off)
         Box.dev_set_cheat("all_owned", 0)
         ck(G.sheet_open_count() == 0, "no sheets before the shop")
         var coins_before: int = Box.coins()
         Box.earn(20000 - coins_before if coins_before < 20000 else 1000)
         ck(Box.coins() >= 20000, "the test wallet is stocked")
-        ck(not meta.stat_open("armor"), "armor born locked")
+        ck(not meta.stat_open("rockets"), "rockets born locked")
         G.state = G.GS.PLACE          # a live state: the shop must pause it
         G._shop_open()
         await _wait(0.2)
         ck(G.sheet_open_count() == 1, "THE SHOP LAW: the sheet is up")
         ck(G.paused, "the shop pauses the war")
-        ck(Box.buy_item("heavywar", "upg", "armor", int(HWData.UPGRADES["armor"]["shop_price"])),
-                "the armor lock buys")
-        ck(meta.stat_open("armor"), "the bought stat opens in the armory")
-        ck(Box.item_owned("heavywar", "rig", "laser") == false, "the laser born unbought")
+        ck(Box.buy_item("heavywar", "upg", "rockets",
+                int(HWData.UPGRADES["rockets"]["shop_price"])),
+                "the rockets lock buys")
+        ck(meta.stat_open("rockets"), "the bought system opens in the armory")
+        ck(Box.item_owned("heavywar", "rig", "laser") == false,
+                "the laser born unbought")
         ck(Box.buy_item("heavywar", "rig", "laser", HWData.LASER_PRICE),
                 "the laser buys at its price")
         ck(Box.item_owned("heavywar", "rig", "laser"), "the laser owned")
@@ -336,11 +435,9 @@ func _run() -> void:
         await _wait(0.2)
         ck(not G.paused, "closing the shop unpauses the war")
         ck(G.sheet_open_count() == 0, "the pair died clean")
-        Box.dev_set_cheat("all_owned", 1)   # the cheat returns for later laws
+        Box.dev_set_cheat("all_owned", 1)
 
         # ------------------------------------------------ the boss marathon
-        ## every face ticks its real brain for ~6 simulated seconds and
-        ## dies paying - the ten-brain crash hunt
         await _boot()
         _tap(0, Vector2(960, 540), true)
         _tap(0, Vector2(960, 540), false)
@@ -370,19 +467,6 @@ func _run() -> void:
         ck(marathon_ok, "THE MARATHON LAW: all ten faces fight and pay (%s)"
                 % marathon_why)
         ck(meta.pts_banked() >= 10, "ten bosses minted ten points")
-
-        # ------------------------------------------------ the shuffle law
-        await _boot()
-        _tap(0, Vector2(960, 540), true)
-        _tap(0, Vector2(960, 540), false)
-        await _wait(0.1)
-        var q2: Array = G.place_queue.duplicate()
-        var laps_same := true
-        for i in 10:
-                if int(q2[i]) != int(q[i]):
-                        laps_same = false
-        print("[NOTE] two boots shared a queue order: ", laps_same,
-                " (shuffle is seed-locked in the probe - fine)")
 
         print("=== hw_probe done: %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)

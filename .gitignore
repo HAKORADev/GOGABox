@@ -46,3 +46,4 @@ Thumbs.db
 # ---- never ship binaries from the working tree ----
 download/
 study_out/
+films/

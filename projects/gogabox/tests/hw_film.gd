@@ -1,81 +1,117 @@
 extends Node
-## HEAVY WAR film scene - a scripted demo run for the visual rig.
-## Boots the game, taps to start, then plays like a player: drags the tank,
-## holds fire, drops a nuke, skips ahead to the tunnel and a boss.
-## Film rig: tools/v038p6_film.sh res://tests/hw_film.tscn <secs> <out> 1920x1080x24 1920x1080
+## HEAVY WAR film probe (v040-2) - the simulated gameplay session: real
+## finger events, real state, SCREENSHOTS at every beat so the owner's
+## "watch the game with your own eyes" law runs on the rig.
+## Run: xvfb-run godot --path . --rendering-driver opengl3 \
+##        res://tests/hw_film.tscn
 
 var G: GogaGame = null
-var t := 0.0
-var act := 0
+var shot_dir := "/home/z/my-project/gogabox/films/v040-2"
 
-func _wait(sec: float) -> void:
-        await get_tree().create_timer(sec, true).timeout
+func _wait(t: float) -> void:
+        await get_tree().create_timer(t, true).timeout
 
-func tap(idx: int, pos: Vector2, down: bool) -> void:
+func _shot(name: String) -> void:
+        await RenderingServer.frame_post_draw
+        var img := get_viewport().get_texture().get_image()
+        img.save_png("%s/%s.png" % [shot_dir, name])
+        print("[FILM] shot ", name)
+
+func _tap(idx: int, pos: Vector2, down: bool) -> void:
         var e := InputEventScreenTouch.new()
         e.index = idx
         e.position = pos
         e.pressed = down
         G._goga_input(e)
 
-func drag(idx: int, pos: Vector2) -> void:
+func _drag(idx: int, pos: Vector2) -> void:
         var e := InputEventScreenDrag.new()
         e.index = idx
         e.position = pos
         G._goga_input(e)
 
-func _ready() -> void:
+func _run() -> void:
+        DirAccess.make_dir_recursive_absolute(shot_dir)
+        Box.reset_all()
         get_window().size = Vector2i(1920, 1080)
-        ScaleRule.apply(get_window())    # the landscape design law (host duty)
-        Box.dev_set_cheat("all_owned", 1)
+        ScaleRule.apply(get_window())      # the house design law
+        await _wait(0.3)
         G = load("res://game/games/heavywar/heavywar.gd").new()
         G.game_id = "heavywar"
         add_child(G)
         await _wait(1.2)
-        tap(0, Vector2(960, 540), true)     # THE TAP: anywhere starts the war
-        tap(0, Vector2(960, 540), false)
-        _play.call_deferred()
+        await _shot("01_intro")
 
-func _play() -> void:
-        # 6s of honest place-1 combat: the aim finger holds the center,
-        # the steer finger glides the tank along the bottom, the gun
-        # tracks the nearest enemy like a real thumb would
-        tap(2, Vector2(1500, 540), true)     # the AIM + FIRE finger (center)
-        tap(1, Vector2(500, 950), true)      # the STEER finger (bottom)
-        for i in 12:
-                drag(1, Vector2(240.0 + (i % 2) * 420.0, 950))
-                if not G.enemies.is_empty():
-                        drag(2, G.enemies[0]["n"].position)
-                await _wait(0.5)
-        # the nuke show (the top zone)
-        tap(3, Vector2(960, 200), true)
-        tap(3, Vector2(960, 200), false)
-        await _wait(2.0)
-        # skip to the tunnel (the veil + the calm)
-        G.t_state = float(G.place["len"]) + 0.1
-        await _wait(4.0)
-        # the next place fights on
-        for i in 6:
-                drag(1, Vector2(300.0 + (i % 2) * 380.0, 950))
-                if not G.enemies.is_empty():
-                        drag(2, G.enemies[0]["n"].position)
-                await _wait(0.5)
-        # force the 5-place cadence: straight to the boss face
-        G.run["places_done"] = 4
-        G.run["place_i"] = 4
-        G._ensure_queue()
-        G._enter_tunnel()
-        await _wait(5.0)
-        # the boss fight with the laser charged for the megabeam shot
-        G.run["laser_parts"] = 99
-        G._collect("laser")
+        # THE TAP ANYWHERE LAW: the war starts
+        _tap(0, Vector2(960, 540), true)
+        _tap(0, Vector2(960, 540), false)
+        await _wait(1.6)
+        await _shot("02_place_start")
+
+        # TWO FINGERS: steer bottom-left, aim center-right
+        _tap(1, Vector2(700, 1000), true)
+        _tap(2, Vector2(1350, 480), true)
+        _drag(1, Vector2(1250, 1000))
+        await _wait(0.5)
+        await _shot("03_two_fingers")
+
+        # the aim finger tracks a live enemy for 4s of combat
         for i in 8:
                 if not G.enemies.is_empty():
-                        drag(2, G.enemies[0]["n"].position)
-                elif boss_alive():
-                        drag(2, Vector2(1400, 320))
-                await _wait(0.8)
+                        var tgt: Node2D = G.enemies[0]["n"]
+                        _drag(2, tgt.position)
+                _drag(1, Vector2(700.0 + sin(i * 0.9) * 500.0, 1000.0))
+                await _wait(0.5)
+        await _shot("04_combat")
+
+        # a heavy kill near the road: explosion + crater + debris
+        G._spawn_enemy("carpet", G.tank.position.x + 420.0, G.ROAD_Y - 220.0)
+        G.aim_pos = G.tank.position + Vector2(420.0, -220.0)
+        var carpet: Dictionary = G.enemies[-1]
+        carpet["hp"] = 1
+        await _wait(1.2)
+        await _shot("05_impact_crater")
+
+        # the nuke: white-out + fire + smoke
+        G.run["nukes"] = 1
+        _tap(3, Vector2(960, 160), true)
+        _tap(3, Vector2(960, 160), false)
+        await _wait(0.25)
+        await _shot("06_nuke_blast")
+        await _wait(1.0)
+        await _shot("07_nuke_after")
+
+        # THE FRIEND: the white helicopter's crates
+        G._heli_pass("supply")
+        await _wait(1.4)
+        await _shot("08_heli_crates")
+        await _wait(2.6)
+        await _shot("09_drops_road")
+
+        # THE SPHERES: shield layers + the bubble
+        G._collect("shield")
+        G._collect("shield")
+        await _wait(0.6)
+        await _shot("10_deflector_spheres")
+
+        # THE MEGALASER: four parts and the cyan column
+        G.run["laser_parts"] = 3
+        G._collect("laser")
+        await _wait(0.7)
+        await _shot("11_megalaser")
+
+        # THE BOSS: the danger sign + the face + its bar
+        G._enter_boss()
+        await _wait(0.5)
+        await _shot("12_boss_danger")
+        await _wait(2.8)
+        await _shot("13_boss_fight")
+        G._boss_die()
+        await _wait(0.6)
+        await _shot("14_armory")
+
+        print("[FILM] done -> ", shot_dir)
         get_tree().quit(0)
 
-func boss_alive() -> bool:
-        return G.boss != null and is_instance_valid(G.boss["n"])
+func _ready() -> void:
+        _run.call_deferred()

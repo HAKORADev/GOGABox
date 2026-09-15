@@ -393,3 +393,73 @@ NEXT (post-test):
   toolchain yet; the LoveTheme carries the music in the meantime).
 - The armory sheet wearing armory.jpg + the real upgrade pods.
 - Rotor/prop sub-animations (copterblades strips) as polish.
+
+## v040-2 - THE OWNER'S REPORT WORKED TO THE BONE AGAIN (the night shift)
+
+The owner tested v040-1 and filed the report; every line of it landed as
+a law or a kill. The lesson he pinned: THE VISION LAW (AGENTS.md method
+32) - the rig has eyes (PIL montages, Xvfb films, the Read tool) and a
+browser (BiliBili via yt-dlp for real gameplay), so "I didn't look" is
+never an excuse again.
+
+WHAT THE REPORT CAUGHT, AND WHAT DIED:
+1. THE EMPTY SKY / MISPLACED SKY -> the whole world wore a hardcoded
+   1920x1080 canvas while the box's stretch law EXPANDS the design on
+   any phone (his 20:9 screen boots a wider canvas): the stack painted
+   only a corner and the host backdrop showed as the "empty sky area".
+   THE LIVE CANVAS LAW: W/H are seated from get_viewport_rect() at
+   setup (ScaleRule.apply first), 3-leaf tiling, the sky gives its band
+   to any height. The film before/after is the proof: corner-void ->
+   full-bleed world.
+2. WHITE ASSETS / MIS-CODED ANIMALS -> the raw _ masks and colorkey
+   guesses died. tools/v0402_compose.py recomposes EVERY original pair
+   (347 files) by the real law: color RGB + mask LUMINANCE = alpha (the
+   masks are opaque white-on-black; their alpha channel is dead weight).
+   The stale keyed twins and mask files are deleted from hwsrc.
+3. THE STATIC ANIMALS -> the props now BAKE to their planes (the
+   Anims.xml offsets repeat with each plane's own period, they ride the
+   plane's speed, pingpong/looping on the real fps, rare every third
+   set) - the old spawn-a-clump-at-the-edge is gone.
+4. THE SHIT AIM CURSOR -> cursor_pointer.png (an OS hand!) deleted from
+   duty; the aim cursor is the source's own target1-8 red reticle,
+   animated, additive.
+5. THE ARM -> gun.png is 24 angle columns x FIVE gun-power tier rows
+   (the source's own grid). The game sweeps col 0 (left) -> col 23
+   (right) with the FRACTION rotated between cells (butter, not 24
+   steps), the row follows the in-run gun tier (pickups raise it, a
+   hit drops it - the source's own loop).
+6. POOR ENEMY FIRE VFX -> the composed 20-frame explosion, craters
+   stamped on the road (12-dec ring, fading), smoke rising, sparks,
+   tumbling bigdebris, the tank flash, the shield dome + zap (all
+   additive where the source burned them), screen shake, casings.
+7. THE EMPTY ORIGINAL TOP BAR -> deleted entirely. Our own top bar
+   carries lives/shields/nukes chips with the source's powerup icons.
+8. THE 6 UPGRADES -> the source's own six weapon systems from the
+   binary's strings: SPEED, SHIELD (orbiting deflector spheres - the
+   orb sprites orbit the tank now), ROCKETS, FLAK, HOMING, LASER (four
+   parts, "Collect all four Megalaser parts!"). The armory wears the
+   source's upgrade bubbles.
+9. WRONG SPAWN RATES / COLLECTABLES -> the source's waves.xml rides
+   VERBATIM (19 levels, 84 waves, craft qtys untouched; craft.xml's
+   armor values ARE the hp table; levels.xml's lengths ARE the place
+   lengths, consumed by the scroll at the source's cruise). Collectables
+   come ONLY from the white helicopter's crates (4 crate skins), which
+   pop into the source's powerup orbs that bounce along the road.
+10. HEAD-THEN-BUTT ENTRY -> enemies spawn FULLY off the edge and glide
+    in clipped (probe: edge 1950 > 1920); projectiles pick pre-rendered
+    rotation frames (the source never rotated a sprite).
+11. THE THUMBNAIL -> rebuilt from the composed sprites after four eye
+    passes (the v040 placeholder polygons were the "trash").
+
+THE RIG: hw_probe 111 checks 0 fails (waves verbatim, armor law, the
+six systems, the arm law, the entry law, rotation law, sphere law,
+anchor law, the canvas law) + flow_test ALL TESTS PASSED + the 14-frame
+film reviewed BY EYE (intro, place, two-finger combat, cratered
+impacts, the nuke bloom, the crate pass, the spheres, the megabeam
+column, Twinblade + the DANGER plate, the armory).
+
+NEXT (post-test):
+- The owner plays v040-2 and files the report.
+- AtomicTank.mo3 still awaits a decoder.
+- The bosses' part anchors can wear per-face animation (copterblades
+  for Twinblade's rotors) as polish.
