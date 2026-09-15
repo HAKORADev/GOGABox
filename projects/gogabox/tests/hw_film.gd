@@ -37,24 +37,28 @@ func _ready() -> void:
         _play.call_deferred()
 
 func _play() -> void:
-        # 6s of honest place-1 combat: hold fire, wiggle the tank
-        tap(2, Vector2(1700, 900), true)
-        for i in 6:
-                drag(1, Vector2(240 + (i % 2) * 260, 900))
-                await _wait(0.4)
-                drag(1, Vector2(480 - (i % 2) * 200, 900))
-                await _wait(0.4)
-        # the nuke show
-        tap(3, Vector2(960, 540), true)
-        tap(3, Vector2(960, 540), false)
+        # 6s of honest place-1 combat: the aim finger holds the center,
+        # the steer finger glides the tank along the bottom, the gun
+        # tracks the nearest enemy like a real thumb would
+        tap(2, Vector2(1500, 540), true)     # the AIM + FIRE finger (center)
+        tap(1, Vector2(500, 950), true)      # the STEER finger (bottom)
+        for i in 12:
+                drag(1, Vector2(240.0 + (i % 2) * 420.0, 950))
+                if not G.enemies.is_empty():
+                        drag(2, G.enemies[0]["n"].position)
+                await _wait(0.5)
+        # the nuke show (the top zone)
+        tap(3, Vector2(960, 200), true)
+        tap(3, Vector2(960, 200), false)
         await _wait(2.0)
         # skip to the tunnel (the veil + the calm)
         G.t_state = float(G.place["len"]) + 0.1
         await _wait(4.0)
         # the next place fights on
-        tap(2, Vector2(1700, 900), true)
-        for i in 4:
-                drag(1, Vector2(300 + (i % 2) * 300, 900))
+        for i in 6:
+                drag(1, Vector2(300.0 + (i % 2) * 380.0, 950))
+                if not G.enemies.is_empty():
+                        drag(2, G.enemies[0]["n"].position)
                 await _wait(0.5)
         # force the 5-place cadence: straight to the boss face
         G.run["places_done"] = 4
@@ -65,5 +69,13 @@ func _play() -> void:
         # the boss fight with the laser charged for the megabeam shot
         G.run["laser_parts"] = 99
         G._collect("laser")
-        await _wait(6.5)
+        for i in 8:
+                if not G.enemies.is_empty():
+                        drag(2, G.enemies[0]["n"].position)
+                elif boss_alive():
+                        drag(2, Vector2(1400, 320))
+                await _wait(0.8)
         get_tree().quit(0)
+
+func boss_alive() -> bool:
+        return G.boss != null and is_instance_valid(G.boss["n"])

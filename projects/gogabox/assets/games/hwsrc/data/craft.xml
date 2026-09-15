@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+
+<!--
+This file defines all enemies and their attributes.
+Do NOT change the order in which these appear! Bad things WILL happen to you and your dog!
+
+Parameters:
+name		- Internal name of craft. Don't change!
+desc		- Full name of craft, displayed on mission info screen. 40 character max.
+arms		- Weapon type(s) that craft uses. Used only for display purposes on mission info screen. 40 characters max.
+points		- Number of points granted when craft is destroyed.
+armor		- Deducted from every time craft is hit. Tank gun power ranges from 1 to around 8 points in late stages.
+-->
+
+<!-- Small prop plane -->
+<Craft name="PROPFIGHTER" desc="R-44 Hominov prop plane" arms="None" points="50" armor="1" />
+
+<!-- Small prop plane -->
+<Craft name="SMALLJET" desc="RG-28 Bravski jet fighter" arms="Dumb bombs" points="100" armor="1" />
+
+<!-- Silver/Green bomber that drops dumb (white) bombs -->
+<Craft name="BOMBER" desc="T-83 Spetznak bomber" arms="Dumb bombs" points="250" armor="10" />
+
+<!-- Camouflaged jet that drops LGBs (red bombs) -->
+<Craft name="JETFIGHTER" desc="MG-24 Nikzov jet fighter" arms="Laser-guided bombs" points="500" armor="6" />
+
+<!-- RPG-firing pickup -->
+<Craft name="TRUCK" desc="Modified pickup truck" arms="Rocket-propelled grenades" points="750" armor="40" />
+
+<!-- Big blue bomber that drops several bombs at once -->
+<Craft name="BIGBOMBER" desc="TS-31 Kriznek carpet bomber" arms="Dumb bombs" points="750" armor="40" />
+
+<!-- Small black helicopter that fires bullets -->
+<Craft name="SMALLCOPTER" desc="KB-22 Czerk light helicopter" arms="Energy cannon" points="1000" armor="25" />
+
+<!-- Medium brown helicopter that fires missiles -->
+<Craft name="MEDCOPTER" desc="KB-31 Grakin assault helicopter" arms="Air-to-surface missiles" points="1500" armor="80" />
+
+<!-- Big green helicopter that fires missiles -->
+<Craft name="BIGCOPTER" desc="KB-72 Mokum assault helicopter" arms="Air-to-surface missiles" points="2000" armor="180" />
+
+<!-- Big green delta-winged jet that drops burst bombs (yellow) -->
+<Craft name="DELTABOMBER" desc="TD-52 Vorskat delta bomber" arms="Frag bombs" points="1500" armor="30" />
+
+<!-- Brownish colored delta fighter that drops armored bombs (dark grey) -->
+<Craft name="DELTAJET" desc="TD-21 Shiznik delta fighter" arms="Armored bombs" points="1500" armor="20" />
+
+<!-- ICBMs that launch in background, and come down on player -->
+<Craft name="BIGMISSILE" desc="IM-35 Tachrok ballistic missiles" arms="" points="500" armor="10" />
+
+<!-- Big silver bomber that drops armored bombs -->
+<Craft name="SUPERBOMBER" desc="TA-21 Frinska heavy bomber" arms="Armored bombs" points="2000" armor="90" />
+
+<!-- Huge beige bomber that drops fatboys -->
+<Craft name="FATBOMBER" desc="TF-77 Havanski atomic bomber" arms="Atomic bombs" points="3000" armor="300" />
+
+<!-- Huge blimp that drops dumb bombs and showers screen with bullets when destroyed -->
+<Craft name="BLIMP" desc="H-51 Barskov munitions blimp" arms="Dumb bombs" points="25000" armor="400" />
+
+<!-- Laser satellite -->
+<Craft name="SATELLITE" desc="CS-148 Romanov attack satellite" arms="Laser" points="5000" armor="200" />
+
+<!-- Small jet that swoops down and fires bullets -->
+<Craft name="STRAFER" desc="MG-17 Palinskat ground attack fighter" arms="Energy cannon" points="1500" armor="20" />
+
+<!-- Enemy tank... yeah -->
+<Craft name="ENEMYTANK" desc="T-63 Linstrad tank" arms="Energy cannon" points="7500" armor="150" />
+
+<!-- Bulldozer -->
+<Craft name="DOZER" desc="Shovak bulldozer" arms="War plow" points="8000" armor="400" />
+
+<!-- Deflector jet -->
+<Craft name="DEFLECTOR" desc="S-34 Reflex fighter" arms="Deflector shield / Missiles" points="2000" armor="80" />
+
+<!-- Cruise missile -->
+<Craft name="CRUISE" desc="C-31 Fovraski cruise missile" arms="" points="500" armor="75" />

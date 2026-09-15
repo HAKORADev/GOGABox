@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+
+<Level name="FRIGISTAN" length="10000">
+	<Intel text="Population: 32,440
+Primary Export: Snowcones
+
+This sub-zero wasteland houses the enemy's early warning systems. Don't let us down, Atomic Tank!" />
+
+	<Intel text="Population: 23,815
+Avg Temperature: -33 C
+
+In winter months, the midnight sun of Frigistan never sets. Also, you should wear good thermal underwear." />
+</Level>
+
+<Level name="BLASTNYA" length="15000">
+	<Intel text="Population: 643,030
+Primary Export: Mail-order brides
+
+The spectacular coast of Blastnya attracts both vacationers and enemy commanders. Take them out, Atomic Tank!" />
+
+	<Intel text="Population: 523,984
+Unit of Currency: the Blastnik
+
+Until the conflict, Blastnya was popular with backpackers due to the favorable exchange rate." />
+</Level>
+
+<Level name="PETROVAKIA" length="25000">
+	<Intel text="Population: 3,942,356
+Primary Export: Petroleum, Oil, Gas
+
+The rich oilfields of Petrovakia feed the thirsty war machine of the enemy. Don't let up now, Atomic Tank!" />
+
+	<Intel text="Population: 3,212,456
+National Bird: Scarlet Cockerel
+
+It is a little known fact that Petrovakia is home to over 3000 species of birds." />
+</Level>
+
+<Level name="DICTASTROIKA" length="20000">
+	<Intel text="Population: 2,322,125
+Primary Export: Plutonium Rods
+
+The nuclear reactors of this region supply energy and weapons to countless foes of freedom." />
+
+	<Intel text="Population: 2,122,165
+Government: Technocracy
+
+Nuke-Corp lackeys in parliament ensure that new reactors are constructed on a monthly basis." />
+</Level>
+
+
+<Level name="ZAMBLAMIA" length="30000">
+	<Intel text="Population: 1,212,496
+Primary Export: Hambobolubia death-masks
+
+The enemy's arsenal lies camouflaged within this steamy rainforest.  Defoliate at will!" />
+
+	<Intel text="Population: 721,572
+Average temperature: 39.5 C
+
+The most common cause of death in Zamblamia is mosquito bites. The Zamblamian skeeter grows to lengths of 6 inches." />
+</Level>
+
+<Level name="TANKYLVANIA" length="30000">
+	<Intel text="Population: 499,834
+Primary Export: Scary movies
+
+Not even darkest night can conceal the enemy from the brilliant, searing light of atomic justice!" />
+
+	<Intel text="Population: 417,549
+Average annual vampire attacks: 6
+
+The Spitting Bat, native to this region, disables its prey by spewing a paralyzing agent when within striking range, or when it's just plain angry." />
+</Level>
+
+<Level name="VODKAVANIA" length="30000">
+	<Intel text="Population: 32,105,843
+Primary Export: Rubble
+
+This war-torn nation has been invaded nearly 50 times in the last century. Don't get bogged down, Atomic Tank!" />
+
+	<Intel text="Population: 25,135,853
+Primary Industry: Body Bags
+
+Not surprisingly, the rate of alcoholism in this region is the highest in the world." />
+</Level>
+
+<Level name="ANTAGONISTAN" length="30000">
+	<Intel text="Population: 564,923
+Primary Export: Tasteful rugs
+
+This bleak desert country conceals subterranean command bunkers. Watch your temperature!" />
+
+	<Intel text="Population: 521,425
+Yearly Rainfall: 4 cm
+
+The black scorpion of this region is famous as the world's most poisonous arachnid. Be careful during bathroom breaks!" />
+</Level>
+
+<Level name="KILLINGRAD" length="30000">
+	<Intel text="Population: 45,203,201
+Primary Export: High-tech equipment
+
+This vast metropolis is the heart of the enemy empire. Don't fail us now, Atomic Tank!" />
+
+	<Intel text="Population: 34,123,251
+Founded 1350 AD
+
+Though this appears to be Red Star's last stand, we have noticed an increase in radio chatter originating from somewhere outside the region..." />
+</Level>
+
+<Level name="RED STAR HQ" length="30000">
+	<Intel text="Population: 3,821,387
+
+Through your heroism, the brave efforts of the allied forces, and not a few rubber hoses, we have discovered the location of Red Star's secret headquarters!  Let's finish this once and for all!" />
+</Level>

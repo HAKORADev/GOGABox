@@ -257,3 +257,139 @@ RESOLUTION (same session, ~30 min after the fix push):
 - Artifacts live: gogabox-arm64-v8a-release 76.3MB +
   gogabox-armeabi-v7a-release 77.6MB. Release job skipped is by design
   (manual dispatch only). The owner can download and test v040.
+
+## PASS 5 - THE OWNER'S VERDICT AND THE HONEST REBUILD (v040-1)
+
+THE OWNER PLAYED v040 AND THE REPORT IS BRUTAL: "this is not a game at
+all... even the horizontal scene of the moving world is corrupted and
+not real". The accusation that stings the most: the work was
+SPEEDRUN. He is right - the art was drawn by a script guessing at a
+game I never actually LOOKED at. The pack sat extracted for a whole
+session and I read its XML without ever opening its images.
+
+THE ASSETS, LOOKED AT WITH EYES THIS TIME (pass 5 study, all real):
+- tank.png: a 10-frame animation strip of the Atomic Tank (green camo
+  dome, three road wheels) - the tank IDLE/DRIVE animation.
+- gun.png: a 24-COLUMN x 5-ROW grid - the turret arm pre-rendered at
+  24 angles for each of the 5 gun power levels. THE ARM IS REAL.
+- Backgrounds/<place>_sky.jpg: 640x480 full-screen sky (clouds etc).
+- Backgrounds/<place>_bg.jpg: 960-wide tiling far strip (mountains,
+  towers, city walls) about 330 tall.
+- Backgrounds/<place>_bg2.png: a SOLID HAZE SLAB the far strip sits
+  on (yes, the real game's mid layer is a flat color - my "color
+  slab" guess was half right, but the real look is slab + painted
+  strip + speckled ground on top).
+- Backgrounds/<place>_ground.jpg: 640-wide tiling ground texture.
+- Anims/<place>/*.gif|jpg + Anims.xml: THE PLACE PROPS - per-prop
+  frame strips (yetti, penguin, igloo, lighthouse, oil rig, cows...)
+  with the REAL PLANE LAW: plane 4 = sky, 3 = far background, 2 =
+  background, 1 = ground; each anim wears offset/y/mx (scroll delta),
+  frames, speed, looping/pingpong, and a "nuke" destroyed frame.
+- explosion.jpg: 20-frame explosion strip; mushsmoke/smoke/spark/
+  bolt/flakflash/muzzleflash/tankflash/tankflame - the real VFX.
+- powerups.png: 16 round drop icons. upgrades.png: the 6 stat icons.
+  armory.jpg: THE REAL 6-POD +/-' REBALANCE MENU (3 left, 3 right).
+  statusbar.png: the metallic top bar with the recessed slots.
+- Images/*.png at root: every craft sprite (bomber, copters, jets,
+  missiles, satellite, enemytank, dozer, truck, blimp...), the bombs
+  family, the shields, the lasers, targets 1-8, the cursors.
+- Boss dirs: Eye/FinalBoss/Head/Rainer/Worm/ape/battleship/hugecopter/
+  robot/wrecker - multi-part sprites (body/turret/launcher/limbs).
+- Sounds: ~90 unique .ogg event sounds + 9 v_* voice lines (the
+  cached_*.wav are pre-decoded duplicates - skip).
+- Music: LoveTheme.ogg + AtomicTank.mo3 (tracker module).
+- data/: craft.xml (21 craft, points 50..25000, armor 1..400),
+  waves.xml (19 levels), levels.xml (10 places, scroll lengths
+  10000..30000 + Intel), bosses.xml (per-encounter armor/fire -
+  Level1/2/3 = the comeback model), survival0-9.xml (the endless
+  tiers), Anims.xml (the props).
+
+THE OWNER'S LAW CHANGE (he owns the project, he said it twice): "use
+the original assets AS-IS without changing anything for anything...
+working using original assets then modify them will be more faster
+and accurate than trying to make brand-new assets look good". So
+v040-1 SHIPS THE ORIGINAL ASSETS AS-IS. The remake pass happens
+LATER under his direction, once the logic and feel are stable. The
+GIFs convert to PNG (Godot does not import GIF); everything else
+goes in untouched.
+
+THE CONTROLS REDESIGN (his exact final spec after thinking out loud):
+- Screen = 3 vertical thirds.
+- TOP third: THE NUKE (tap).
+- CENTER third: AIM + FIRE - the finger position IS the aim point
+  (the turret arm tracks it, the shells go exactly there); HOLD to
+  fire; leaving the center does NOT stop aim/fire - only lifting
+  the finger does.
+- BOTTOM third: STEER - the tank follows the finger like a paddle
+  (ping-pong logic); leaving the bottom does NOT stop steering -
+  only lifting the finger does.
+- Each finger takes its role from where it TOUCHED DOWN and keeps
+  that role until it lifts. Multi-touch: steer + fire together.
+
+## PASS 6 - THE REBUILD SHIPS (v040-1): the as-is art, the three zones, the real world
+
+WHAT CHANGED (the owner's report, worked top to bottom):
+- THE WORLD: the color-slab guesswork is dead. Every place now wears
+  the original's own stack - the stretched sky, the haze slab, the far
+  strip (islands, mountains, cooling towers, gothic silhouettes, the
+  city, the red star wall), the ground band - scrolled by the plane
+  law (sky 0.055 / far 0.28 / slab 0.45 / ground 1.0 at 300 px/s).
+- THE PROPS: Anims.xml precomputed into heavywar_props.gd (43 rows,
+  all ten places): yetti/penguin/igloo, lighthouse/nessi, the oil
+  rig/cows, reactor coolers, dinosaurs, hangtrees, pyramids, statues,
+  peace balloon... each with the original's plane/y/mx/frames/speed/
+  pingpong/rare data. They spawn every 2400 ground px and ride their
+  planes.
+- THE TANK: the real 10-frame Atomic Tank strip + the 24x5 turret arm
+  grid, drive-animated, skins as modulate tints.
+- THE CONTROLS (his exact final wording): bottom = steer (paddle
+  glide toward the finger, engine-speed capped), center = aim + fire
+  (the finger IS the aim point, the arm tracks it, shells fly straight
+  through it, hold to keep firing), top = the nuke on press. A finger
+  takes its role at TOUCHDOWN and keeps it until LIFT - leaving the
+  zone changes nothing. The old dead zones are gone.
+- THE SPRITES: all 21 craft, the 10 boss bodies + parts, the bombs
+  family (dumb/guided/armored/frag/atom - tumbling strips), missiles,
+  rockets, orbs, boulders, the pupcopter, crates, powerup cells,
+  statusbar, nuke wipe, mushroom smoke - THE ORIGINAL'S PIXELS.
+- THE SOUND: 61 original oggs (hws_*) - tankfire1-4 rotate, the
+  real nukeblast, airraid danger, v_getready/v_danger/v_gameover
+  voices, bossblast, megalaser family... + THE LOVE THEME looping
+  under the war.
+- THE THUMBNAIL: composed from the real sprites - the tank on the
+  Blastnya beach, the raid incoming, the fireball, the title plate.
+
+THE THREE ART TRAPS THE PACK HID (and how they died):
+1. The `_.png` twins are WHITE ALPHA MASKS, not art - the real sprite
+   = the color JPG with the mask's luminance as alpha. 41 pairs
+   composed (craft, all ten boss dirs, backgrounds, grounds). The
+   import "prefer the _.png" rule was exactly backwards.
+2. The GIFs carry NO transparency - PopCap keyed the dark backdrop by
+   color. Corner-seeded flood-fill keying (background-connected only,
+   interior darks survive) - 56 files.
+3. The glow sheets (bullets/explosion family) sit on opaque black -
+   luminance alpha (brightness = coverage). The tank's shells are
+   finally glow bolts, not black squares.
+
+THE VERIFICATION:
+- hw_probe: 102 checks 0 fails (the zone laws rewritten to the new
+  contract: bottom owns the steer finger, center owns aim+fire,
+  leaving the zone keeps the role, lifting frees it, the top-zone
+  tap spends the nuke; THE PADDLE LAW glides the tank; the aimed gun
+  kills through the finger).
+- flow_test: ALL TESTS PASSED (25 playable + 4 teasers).
+- The film (55s, Xvfb): the coast, the gothic night boss fight with
+  the gunship's red-star body and its launcher pod, the megabeam
+  burning, the friend heli's crate pass, the tunnels, the war room
+  strip wearing the original statusbar - THE WORLD IS REAL NOW.
+- The sprite lineup rig (hw_lineup): every mapped id filmed in a
+  grid - this caught the mask trap and the tank-meta bug (the metas
+  lived on the skin child, the tick read them from the tank - the
+  turret never tracked; fixed at the build point).
+
+NEXT (post-test):
+- The owner plays v040-1. The numbers stay in heavywar_data.gd.
+- The AtomicTank.mo3 conversion (tracker module - no decoder in the
+  toolchain yet; the LoveTheme carries the music in the meantime).
+- The armory sheet wearing armory.jpg + the real upgrade pods.
+- Rotor/prop sub-animations (copterblades strips) as polish.

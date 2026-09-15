@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://hwlineup0401"]
+
+[ext_resource type="Script" path="res://tests/hw_lineup.gd" id="1"]
+
+[node name="hw_lineup" type="Node"]
+script = ExtResource("1")

@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+
+<!--
+name	- Filename of animation strip
+type	- Type of animation (looping, pingpong)
+frames	- Number of frames in strip. INCLUDING the "nuked" frame, if there is one!
+speed	- Speed at which the animation's frame advances per program cycle. 1 = 100fps, .1 = 10fps, etc.
+plane	- Which plane the animation appears in front of. 4 = Sky, 3 = Far background, 2 = background, 1 = ground.
+offset	- This controls where the animation appears by specifying an offset from the left side of
+		  the plane image that the animation appears on. This does not apply to the sky or ground planes.
+y		- The Y coordinate of the animation. The center of the image is used to position the animation.
+mx		- Number of pixels that are added/subtracted to the X coordinate of the animation per frame
+		  (may be decimal). This is in addition to however fast the plane image it appears on is moving.
+nuke	- Specifies whether or not the animation has a "nuked" frame. Always at the very end of the strip.
+
+<Delay> - Allows animation speed tweaking of individual frames.
+-->
+
+<!-- Frigistan -->
+<Level>
+	<Anim name="frigistan\yetti" type="looping" frames="6" speed=".1" plane="1" offset="640" y="356" mx="0" nuke="no" rare="yes"/>
+	<Anim name="frigistan\penguin" type="looping" frames="6" speed=".2" plane="1" offset="640" y="405" mx="-1" nuke="no" rare="yes"/>
+	<Anim name="frigistan\igloo" type="looping" frames="1" speed="0" plane="2" offset="341" y="348" mx="0" nuke="no"/>
+	<Anim name="frigistan\eskimo" type="looping" frames="9" speed=".02" plane="2" offset="634" y="354" mx="0" nuke="no">
+		<Delay frame="0" speed=".002"/>
+		<Delay frame="1" speed=".2"/>
+		<Delay frame="7" speed=".04"/>
+		<Delay frame="8" speed=".2"/>
+	</Anim>
+	<Anim name="frigistan\snocommie" type="looping" frames="2" speed="0" plane="1" offset="700" y="377" mx="0" nuke="yes" rare="yes"/>
+</Level>
+
+<!-- Blastnya -->
+<Level>
+	<Anim name="blastnya\scope" type="looping" frames="1" speed="0" plane="2" offset="640" y="376" mx="-.5" nuke="no"/>
+	<Anim name="blastnya\nessi" type="looping" frames="1" speed="0" plane="3" offset="640" y="328" mx=".1" nuke="no"/>
+	<Anim name="blastnya\murryandmaud" type="looping" frames="2" speed="0" plane="1" offset="640" y="402" mx="0" nuke="yes" rare="yes"/>
+	<Anim name="blastnya\lighthouse" type="looping" frames="2" speed="0" plane="2" offset="350" y="170" mx="0" nuke="yes"/ rare="yes">
+	<Anim name="blastnya\radiotowers" type="looping" frames="2" speed="0" plane="3" offset="170" y="235" mx="0" nuke="yes"/>
+	<Anim name="blastnya\radiotowers" type="looping" frames="2" speed="0" plane="3" offset="340" y="220" mx="0" nuke="yes"/>
+</Level>
+
+<!-- Petrovakia -->
+<Level>
+	<Anim name="petrovakia\petro-rig" type="looping" frames="1" speed="0" plane="2" offset="524" y="288" mx="0" nuke="no"/>
+	<Anim name="petrovakia\cow" type="pingpong" frames="5" speed=".08" plane="2" offset="733" y="401" mx="0" nuke="no">
+		<Delay frame="0" speed=".003"/>
+		<Delay frame="4" speed=".003"/>
+	</Anim>
+	<Anim name="petrovakia\cow" type="pingpong" frames="5" speed=".08" plane="2" offset="103" y="401" mx="0" nuke="no">
+		<Delay frame="0" speed=".003"/>
+		<Delay frame="4" speed=".003"/>
+	</Anim>
+	<Anim name="petrovakia\gaspill" type="looping" frames="2" speed="0" plane="1" offset="640" y="382" mx="0" nuke="yes"/>
+	<Anim name="petrovakia\oilcans" type="looping" frames="2" speed="0" plane="1" offset="640" y="385" mx="0" nuke="yes"/>
+</Level>
+
+<!-- Dictastroika -->
+<Level>
+	<Anim name="dictastroika\cooler-crack" type="looping" frames="1" speed="0" plane="3" offset="385" y="178" mx="0" nuke="no"/>
+	<Anim name="dictastroika\wastespill" type="looping" frames="1" speed="0" plane="3" offset="485" y="313" mx="0" nuke="no"/>
+	<Anim name="dictastroika\surrender" type="looping" frames="1" speed="0" plane="3" offset="70" y="150" mx="0" nuke="no"/>
+	<Anim name="dictastroika\surrender" type="looping" frames="1" speed="0" plane="3" offset="370" y="150" mx="0" nuke="no"/>
+	<Anim name="dictastroika\barrelofnuke" type="looping" frames="1" speed="0" plane="1" offset="640" y="390" mx="0" nuke="no"/>
+	<Anim name="dictastroika\spiltnuke" type="looping" frames="1" speed="0" plane="1" offset="640" y="397" mx="0" nuke="no"/>
+</Level>
+
+<!-- Zamblamia -->
+<Level>
+	<Anim name="zamblamia\brontasaur" type="looping" frames="2" speed="0" plane="3" offset="480" y="217" mx="-.2" nuke="yes" rare="yes"/>
+	<Anim name="zamblamia\zambian" type="looping" frames="2" speed="0" plane="1" offset="640" y="395" mx="0" nuke="yes" rare="yes"/>
+	<Anim name="zamblamia\pterodactyl" type="looping" frames="2" speed="0" plane="1" offset="640" y="70" mx="0" nuke="yes" rare="yes"/>
+</Level>
+
+<!-- Tankylvania -->
+<Level>
+	<Anim name="tankylvania\vania_light" type="looping" frames="1" speed="0" plane="2" offset="269" y="292" mx="0" nuke="no"/>
+	<Anim name="tankylvania\hangtree" type="looping" frames="1" speed="0" plane="3" offset="510" y="175" mx="0" nuke="no"/>
+	<Anim name="tankylvania\vania_ghost" type="looping" frames="1" speed="0" plane="1" offset="400" y="240" mx="0" nuke="no" rare="yes"/>
+	<Anim name="tankylvania\vania_ghost" type="looping" frames="1" speed="0" plane="1" offset="750" y="200" mx="0" nuke="no" rare="yes"/>
+	<Anim name="tankylvania\vania_pumpkin1" type="looping" frames="2" speed="0" plane="2" offset="410" y="365" mx="0" nuke="yes"/>
+	<Anim name="tankylvania\vania_pumpkin2" type="looping" frames="2" speed="0" plane="2" offset="635" y="365" mx="0" nuke="yes"/>
+</Level>
+
+<!-- Vodkavania -->
+<Level>
+	<Anim name="vodkavania\fence" type="looping" frames="1" speed="0" plane="2" offset="100" y="360" mx="-.5" nuke="no"/>
+	<Anim name="vodkavania\fence" type="looping" frames="1" speed="0" plane="2" offset="400" y="360" mx="-.5" nuke="no"/>
+	<Anim name="vodkavania\silo" type="looping" frames="1" speed="0" plane="2" offset="50" y="240" mx="0" nuke="no"/>
+	<Anim name="vodkavania\brokenwindmill" type="looping" frames="1" speed="0" plane="2" offset="460" y="190" mx="0" nuke="no"/>
+	<Anim name="vodkavania\grainelevator" type="looping" frames="1" speed="0" plane="3" offset="420" y="200" mx="0" nuke="no"/>
+</Level>
+
+<!-- Antagonistan -->
+<Level>
+	<Anim name="antagonistan\oasis" type="looping" frames="2" speed="0" plane="2" offset="220" y="300" mx="0" nuke="yes"/>
+	<Anim name="antagonistan\bedouin-tents" type="looping" frames="1" speed="0" plane="2" offset="715" y="345" mx="0" nuke="no"/>
+	<Anim name="antagonistan\pyramid" type="looping" frames="1" speed="0" plane="3" offset="413" y="187" mx="0" nuke="no"/>
+	<Anim name="antagonistan\pyramid" type="looping" frames="1" speed="0" plane="3" offset="862" y="184" mx="0" nuke="no"/>
+</Level>
+
+<!-- Killingrad -->
+<Level>
+	<Anim name="killingrad\statue2" type="looping" frames="2" speed="0" plane="2" offset="0" y="190" mx="-.3" nuke="yes"/>
+	<Anim name="killingrad\statue1" type="looping" frames="2" speed="0" plane="2" offset="400" y="195" mx="-.3" nuke="yes"/>
+	<Anim name="killingrad\peaceballoon" type="looping" frames="1" speed="0" plane="1" offset="640" y="40" mx=".5" nuke="no" rare="yes"/>
+</Level>
+
+<!-- Red Star HQ -->
+<Level>
+</Level>
+
+<!-- Survival Mode -->
+<Level>
+	<Anim name="survival\propaganda1" type="looping" frames="2" speed="0" plane="2" offset="70" y="150" mx="0" nuke="yes"/>
+	<Anim name="survival\propaganda2" type="looping" frames="2" speed="0" plane="2" offset="200" y="150" mx="0" nuke="yes"/>
+	<Anim name="survival\propaganda3" type="looping" frames="2" speed="0" plane="2" offset="300" y="150" mx="0" nuke="yes"/>
+	<Anim name="survival\propaganda4" type="looping" frames="2" speed="0" plane="2" offset="400" y="150" mx="0" nuke="yes"/>
+	<Anim name="survival\propaganda5" type="looping" frames="2" speed="0" plane="2" offset="500" y="150" mx="0" nuke="yes"/>
+
+	<Anim name="survival\marker1" type="looping" frames="2" speed="0" plane="2" offset="100" y="180" mx="-.3" nuke="yes"/>
+	<Anim name="survival\marker2" type="looping" frames="2" speed="0" plane="2" offset="300" y="150" mx="-.3" nuke="yes"/>
+	<Anim name="survival\marker3" type="looping" frames="2" speed="0" plane="2" offset="500" y="150" mx="-.3" nuke="yes"/>
+	<Anim name="survival\marker4" type="looping" frames="2" speed="0" plane="2" offset="650" y="150" mx="-.3" nuke="yes"/>
+	<Anim name="survival\marker5" type="looping" frames="2" speed="0" plane="2" offset="750" y="150" mx="-.3" nuke="yes"/>
+
+	<Anim name="survival\shelled1" type="looping" frames="1" speed="0" plane="4" offset="640" y="250" mx="-.05" nuke="no"/>
+	<Anim name="survival\shelled2" type="looping" frames="1" speed="0" plane="4" offset="640" y="250" mx="-.05" nuke="no"/>
+	<Anim name="survival\shelled3" type="looping" frames="1" speed="0" plane="4" offset="640" y="250" mx="-.05" nuke="no"/>
+	<Anim name="survival\shelled4" type="looping" frames="1" speed="0" plane="4" offset="640" y="250" mx="-.05" nuke="no"/>
+
+	<Anim name="survival\controltower1" type="looping" frames="1" speed="0" plane="3" offset="200" y="120" mx="-.05" nuke="no"/>
+	<Anim name="survival\satdish1" type="looping" frames="1" speed="0" plane="3" offset="400" y="120" mx="-.05" nuke="no"/>
+
+	<Anim name="survival\survival-marker" type="looping" frames="1" speed="0" plane="2" offset="600" y="320" mx="-.6" nuke="no"/>
+</Level>

@@ -157,6 +157,7 @@ func _run() -> void:
                 G._spawn_enemy("scout", G.tank.position.x, 300.0)
         var victim: Dictionary = G.enemies[0]
         victim["n"].position = Vector2(G.tank.position.x, 300.0)
+        G.aim_pos = victim["n"].position      # the finger IS the aim
         var s0: int = G.score
         for i in 60:
                 G._fire()
@@ -168,31 +169,37 @@ func _run() -> void:
         ck(G.run["kills"] >= 1, "the kill lands in the ledger")
 
         # ------------------------------------------------ the zones
-        _tap(1, Vector2(200, 900), true)         # move pointer down
-        _drag(1, Vector2(400, 900))              # swipe right 200px
+        # THE THREE-ZONE LAW (the owner's v040-1 redesign): bottom = steer
+        # (paddle glide), center = aim + fire, top = the nuke. A finger
+        # keeps its role until it LIFTS - zone exits change nothing.
+        _tap(1, Vector2(200, 900), true)         # steer finger down
         await _wait(0.05)
-        ck(G.move_ptr == 1, "the left zone owns the move pointer")
-        _tap(2, Vector2(1600, 900), true)        # shoot pointer down
+        ck(G.steer_ptr == 1, "the bottom zone owns the steer finger")
+        _tap(2, Vector2(1600, 540), true)        # aim + fire finger down
         await _wait(0.05)
-        ck(G.shoot_ptr == 2, "the right zone owns the shoot pointer")
+        ck(G.aim_ptr == 2, "the center zone owns the aim finger")
         var tx0: float = G.tank.position.x
-        _drag(1, Vector2(700, 900))              # +300px more
+        _drag(1, Vector2(1600, 1000))            # steer target far right
+        await _wait(0.3)
+        ck(G.tank.position.x > tx0 + 40.0,
+                "THE PADDLE LAW: the tank glides toward the steer finger")
+        _drag(1, Vector2(1700, 1000))            # steer leaves its zone
         await _wait(0.05)
-        ck(G.tank.position.x > tx0, "the swipe moves the tank")
-        _tap(2, Vector2(1600, 900), false)
-        _tap(1, Vector2(200, 900), false)
+        ck(G.steer_ptr == 1, "leaving the zone keeps the steer role")
+        _tap(2, Vector2(1700, 540), false)
+        _tap(1, Vector2(1700, 1000), false)
         await _wait(0.05)
-        ck(G.shoot_ptr == -1 and G.move_ptr == -1, "releases free the pointers")
+        ck(G.aim_ptr == -1 and G.steer_ptr == -1, "lifting the fingers frees both")
         # the nuke (the mercy law: the war starts with one in the magazine)
         ck(int(G.run["nukes"]) >= 1, "THE MERCY LAW: the war starts stocked")
         G.run["nukes"] = 2
         var enemies0: int = G.enemies.size()
         for i in 3:
                 G._spawn_enemy("scout", G.tank.position.x + 200.0, 500.0)
-        G._touch(5, Vector2(960, 540), true)
-        G._touch(5, Vector2(960, 540), false)
+        G._touch(5, Vector2(960, 200), true)
+        G._touch(5, Vector2(960, 200), false)
         await _wait(0.1)
-        ck(int(G.run["nukes"]) == 1, "THE NUKE LAW: the middle tap spends one")
+        ck(int(G.run["nukes"]) == 1, "THE NUKE LAW: the top-zone tap spends one")
         ck(G.enemies.size() < enemies0 + 3, "the blast cleared the front")
 
         # ------------------------------------------------ the tank laws

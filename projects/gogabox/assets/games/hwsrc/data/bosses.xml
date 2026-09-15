@@ -1,0 +1,178 @@
+<?xml version="1.0"?>
+
+<!--
+Each boss begins with a block containing its name.
+
+Level1, Level2, Level3 blocks indicate whether it's the 1st, 2nd, or 3rd time the player has encountered this boss.
+Within each Level block, the parameters vary from boss to boss. Some parameters you'll see frequently:
+
+armor		- Not surprisingly, this controls how many points of armor the boss, or any component of the boss has.
+fire		- Specifies how many frames must elapse between each time the boss or component fires.
+-->
+
+<Helicopter info="ENCOUNTERED: TWINBLADE
+
+- ENERGY CANNON
+- HOMING MISSILES">
+	<Level1 armor="300" score="10000">
+		<Turret armor="80" fire="175" stationary="yes"/>
+		<Launcher armor="100" fire="250" speed=".75"/>
+	</Level1>
+
+	<Level2 armor="4000" score="80000">
+		<Turret armor="800" fire="80" stationary="no"/>
+		<Launcher armor="1000" fire="150" speed="1"/>
+	</Level2>
+</Helicopter>
+
+<Battleship info="ENCOUNTERED: BATTLESHIP
+
+- ENERGY CANNONS
+- HOMING MISSILES">
+	<Level1 armor="800" score="20000" turretarmor="200">
+		<!-- "speed" indicates the number of frames the gun advances per frame -->
+		<Turret1 fire="150" speed=".1"/>
+		<Turret2 fire="200" speed=".075"/>
+		<Turret3 fire="200" speed=".075"/>
+		<Turret4 fire="150" speed=".1"/>
+		<Launcher fire="250"/>
+	</Level1>
+
+	<Level2 armor="3500" score="90000" turretarmor="1500">
+		<Turret1 fire="70" speed=".15"/>
+		<Turret2 fire="90" speed=".1"/>
+		<Turret3 fire="90" speed=".1"/>
+		<Turret4 fire="70" speed=".15"/>
+		<Launcher fire="150"/>
+	</Level2>
+</Battleship>
+
+<Rainer info="ENCOUNTERED: WAR BLIMP
+
+- ROTO-MINES
+- METEOR TRACTOR BEAM">
+	<Level1 armor="2700" score="30000" fire="80">
+		<Dish down="800" up="400" meteors="15"/>
+	</Level1>
+
+	<Level2 armor="9000" score="100000" fire="60">
+		<Dish down="800" up="400" meteors="20"/>
+	</Level2>
+</Rainer>
+
+<Wrecker info="ENCOUNTERED: WAR WRECKER
+
+- WRECKING BALL">
+	<Level1 armor="2500" score="40000" longchain="no">
+	</Level1>
+
+	<Level2 armor="5500" score="110000" longchain="yes">
+	</Level2>
+</Wrecker>
+
+<Head info="ENCOUNTERED: BUSTCZAR
+
+- HOMING MISSILES
+- BOMB SWEEP">
+	<Level1 armor="2800" score="60000" speed="3">
+		<!-- delay: Number of frames that elapse before boss charges across screen -->
+		<Charge delay="500"/>
+		<Launcher1 fire="100"/>
+		<Launcher2 fire="150"/>
+		<!--
+		Head drops bombs when it charges.
+		on: number of frames that bombs are dropped
+		off: number of frames that bombs are NOT dropped.
+		freq: number of frames that elapse between the dropping of each bomb.
+		-->
+		<Bomb on="30" off="30" freq="6"/>
+	</Level1>
+
+	<Level2 armor="5000" score="130000" speed="3.5">
+		<Charge delay="500"/>
+		<Launcher1 fire="70"/>
+		<Launcher2 fire="90"/>
+		<Bomb on="25" off="20" freq="4"/>
+	</Level2>
+</Head>
+
+<Ape info="ENCOUNTERED: KOMMIE KONG
+
+- BURSTING ROCKETS
+- STOMPING ATTACK">
+	<Level1 armor="2500" score="50000" throw=".04">
+		<Jump xspeed="1.35" yspeed="4" gravity=".06"/>
+	</Level1>
+
+	<Level2 armor="6000" score="120000" throw=".04">
+		<Jump xspeed="1.35" yspeed="4" gravity=".06"/>
+	</Level2>
+</Ape>
+
+<Eye info="ENCOUNTERED: EYEBOT
+
+- ENERGY CANNON
+- LIGHTNING ARMS">
+	<Level1 armor="1500" score="50000" fire="60">
+		<Hand armor="300" fire="20"/>
+	</Level1>
+
+	<Level2 armor="2500" score="120000" fire="40">
+		<Hand armor="900" fire="10"/>
+	</Level2>
+</Eye>
+
+<Worm info="ENCOUNTERED: MECHWORM
+
+- LOOK OUT BELOW!
+- BOULDER BASH
+- ARMORED BOMBS
+- HOMING MISSILES">
+	<Level1 armor="2000" score="50000" fire="40" boulders="8">
+		<Turret armor="500" fire="60"/>
+		<Jump depth="1100" jump="4" gravity=".02" lateral="1"/>
+		<JumpFast depth="900" jump="4" gravity=".02" lateral="1"/>
+	</Level1>
+
+	<Level2 armor="4000" score="120000" fire="30" boulders="16">
+		<Turret armor="1000" fire="40"/>
+		<Jump depth="900" jump="5" gravity=".03" lateral="1"/>
+		<JumpFast depth="800" jump="5" gravity=".03" lateral="1"/>
+	</Level2>
+</Worm>
+
+<Robot info="ENCOUNTERED: X-BOT
+
+- CRUSHING ATTACK
+- HOMING MISSILES
+- EYE BEAMS">
+	<!-- fire: Eye laser fire delay -->
+	<Level1 armor="2200" score="70000" fire="300">
+		<Launcher armor="700" fire="200"/>
+		<Arm armor="750"/>
+		<!--
+		downaccel: Value added to Y speed vector as robot falls to the ground
+		downmax: Maximum speed (in pixels) that boss can fall
+		upaccel: Value subtracted from Y speed vector as robot begins it's jump
+		upmax: Maximum speed (in pixels) that boss can climb in it's jump
+		-->
+		<Jump downaccel=".04" downmax="3" upaccel=".2" upmax="3"/>
+	</Level1>
+
+	<Level2 armor="4000" score="140000" fire="250">
+		<Launcher armor="1000" fire="150"/>
+		<Arm armor="1700"/>
+		<Jump downaccel=".05" downmax="3.5" upaccel=".2" upmax="3.5"/>
+	</Level2>
+</Robot>
+
+<Final info="ENCOUNTERED:
+SECRET WEAPON">
+	<Level armor="15000" score="140000">
+		<Bomb fire="200"/>
+		<Laser fire="50"/>
+		<Turret fire="60" spin=".1"/>
+		<SmallLauncher fire="120"/>
+		<BigLauncher fire="160"/>
+	</Level>
+</Final>

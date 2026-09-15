@@ -21,6 +21,25 @@ const Z_MOVE := 640.0
 const Z_SHOOT := 1280.0
 
 const ART := "res://assets/games/heavywar/"
+const SRC_ART := "res://assets/games/hwsrc/"
+
+# THE PLACE -> ORIGINAL LAYERS MAP (the owner's as-is law, v040-1):
+# our ten places wear the original's real sky / slab / far / ground art.
+const ORIG_BG := {
+        "frostkrai": "frigistan", "gulfgate": "blastnya",
+        "oilreach": "petrovakia", "nukeflats": "dictastroika",
+        "vinebelt": "zamblamia", "gloomkeep": "tankylvania",
+        "ashfall": "vodkavania", "dunefort": "antagonistan",
+        "steelcrown": "killingrad", "ironhold": "redstarhq",
+}
+# THE PLANE LAW (the original Anims.xml header): sky crawls slowest,
+# the ground carries the war. The props ride the same factors.
+const PLANE_SKY := 0.055
+const PLANE_FAR := 0.28
+const PLANE_BG := 0.45
+const PLANE_GROUND := 1.0
+const WORLD_SPEED := 300.0        # ground px per second
+const GROUND_H := 180.0
 
 enum GS { INTRO, PLACE, CALM, TUNNEL, BOSS, ARMORY, OVER }
 
@@ -49,10 +68,22 @@ var drops: Array = []            # crates {n, kind}
 var fx: Array = []               # {n, t, life, kind}
 
 # input (true multi-touch: the kit is single-pointer, the war is not)
-var move_ptr := -1
-var move_last_x := 0.0
-var shoot_ptr := -1
-var nuke_ptrs := {}              # index -> start pos (tap detector)
+# THE THREE-ZONE TOUCH LAW (the owner's v040-1 redesign): a finger takes
+# its role from where it TOUCHED DOWN and keeps it until it LIFTS -
+# leaving the zone never stops the role, only lifting the finger does.
+# top third = THE NUKE, center = AIM + FIRE, bottom = STEER.
+var steer_ptr := -1
+var steer_target_x := 0.0
+var aim_ptr := -1
+var aim_pos := Vector2(960.0, 380.0)
+var nuke_ptrs := {}              # legacy tap detector (kept for probes)
+
+# the world scroll + the place props (the Anims law, as-is art)
+var scroll_x := 0.0
+var props: Array = []            # {n, frames, fps, type, mx, t, frame}
+var prop_set_i := 0
+var prop_gap_px := 0.0
+const PROPS_GAP := 2400.0        # ground px between prop sets
 
 # war room widget refs
 var wg := {}                     # lives/shields/nukes/laser/place labels + bars
@@ -109,124 +140,217 @@ func _build_world() -> void:
         fx_layer = Node2D.new()
         add_child(fx_layer)
 
-        # parallax layers - ColorRect gradients + silhouette bands now;
-        # the art pass swaps in real textures through the same slots
-        world.set_meta("sky", _mk_layer(H - 140.0, 0.0))
-        world.set_meta("far", _mk_layer(150.0, 0.12))
-        world.set_meta("near", _mk_layer(120.0, 0.3))
-        world.set_meta("ground", _mk_layer(H - 140.0 - 95.0, 1.0))
-        world.set_meta("road", _mk_layer(52.0, 1.0))
+        # THE FOUR REAL PLANES (the original's own stack): sky fills the
+        # screen, the haze slab sits behind the far strip, the ground band
+        # carries the tank. Props ride the planes too.
+        world.set_meta("sky", _mk_layer(PLANE_SKY))
+        world.set_meta("slab", _mk_layer(PLANE_BG))
+        world.set_meta("far", _mk_layer(PLANE_FAR))
+        world.set_meta("ground", _mk_layer(PLANE_GROUND))
+        var props_l := Node2D.new()
+        world.add_child(props_l)
+        world.set_meta("props", props_l)
         _dress_place(0)
 
         tank = Node2D.new()
         tank.position = Vector2(W * 0.35, TANK_Y)
         add_child(tank)
-        tank.add_child(_skin_node())
+        var skin := _skin_node()
+        tank.add_child(skin)
+        # the body + the arm live where the tick and the skin swap read them
+        tank.set_meta("body", skin.get_meta("body"))
+        tank.set_meta("turret", skin.get_meta("turret"))
         tank.set_meta("skin", "olive")
 
         heli = Node2D.new()
         heli.visible = false
         add_child(heli)
 
-func _mk_layer(h: float, scroll: float) -> Dictionary:
-        # each layer: two wide rects leapfrogging for an endless scroll
+        var aim_cur := Sprite2D.new()
+        aim_cur.texture = _src_tex("sprites/cursor_pointer.png")
+        aim_cur.scale = Vector2(1.7, 1.7)
+        aim_cur.visible = false
+        aim_cur.z_index = 90
+        add_child(aim_cur)
+        world.set_meta("aim_cursor", aim_cur)
+
+## a leaf pair that leapfrogs by the texture's own period; the region
+## repeat makes ONE sprite tile the whole visible band
+func _mk_layer(scroll: float) -> Dictionary:
         var holder := Node2D.new()
         world.add_child(holder)
-        var a := ColorRect.new()
-        a.size = Vector2(W + 4.0, h)
-        a.position = Vector2(0, 0)
-        var b := ColorRect.new()
-        b.size = Vector2(W + 4.0, h)
-        b.position = Vector2(W + 4.0, 0)
-        holder.add_child(a)
-        holder.add_child(b)
-        return {"node": holder, "a": a, "b": b, "h": h, "scroll": scroll, "off": 0.0}
+        return {"node": holder, "a": null, "b": null, "scroll": scroll,
+                "off": 0.0, "period": W + 4.0, "h": 0.0}
 
-func _layer_roll(l: Dictionary, speed: float, dx: float) -> void:
-        l["off"] = fmod(l["off"] + dx * float(l["scroll"]), W + 4.0)
-        var x: float = -float(l["off"])
-        for k in ["a", "b"]:
-                var leaf: CanvasItem = l[k]
-                if is_instance_valid(leaf):
-                        leaf.position.x = x if k == "a" else x + W + 4.0
+func _src_tex(rel: String) -> Texture2D:
+        var p := SRC_ART + rel
+        if ResourceLoader.exists(p):
+                return load(p)
+        return null
 
-## paint the parallax slots with the place's palette; when the art pass
-## has painted the place's layers they load through the same slots - the
-## sim never changes either way
-func _dress_place(pi: int) -> void:
-        place = HWData.PLACES[pi if pi < HWData.PLACES.size() else 0]
-        var sky: Dictionary = world.get_meta("sky")
-        # cheap vertical gradient without a shader file: a top band + the body
-        (sky["a"] as ColorRect).color = place["sky"][0]
-        (sky["a"] as ColorRect).size = Vector2(W + 4.0, 200)
-        (sky["a"] as ColorRect).position = Vector2(0, 0)
-        (sky["b"] as ColorRect).color = place["sky"][1]
-        (sky["b"] as ColorRect).size = Vector2(W + 4.0, sky["h"] - 200.0)
-        (sky["b"] as ColorRect).position = Vector2(0, 200)
-        _skin_layer("far", "bg_" + String(place["id"]), place["far"], 600.0,
-                H - 140.0 - 600.0 + 66.0)
-        var near: Dictionary = world.get_meta("near")
-        (near["a"] as ColorRect).color = place["near"]
-        (near["b"] as ColorRect).color = place["near"]
-        var gnd_ok := _skin_layer("ground", "ground_" + String(place["id"]),
-                place["ground"], 180.0, H - 200.0)
-        var road: Dictionary = world.get_meta("road")
-        (road["node"] as Node2D).visible = not gnd_ok
-        if not gnd_ok:
-                (road["a"] as ColorRect).color = place["road"]
-                (road["b"] as ColorRect).color = place["road"]
-        _layout_layers()
-
-## swap a layer's two leaves to a texture when it exists (fallback: the
-## honest colored slabs). Returns true when the texture took over.
-func _skin_layer(key: String, tex_name: String, tint: Color, h: float,
-        y: float) -> bool:
-        var l: Dictionary = world.get_meta(key)
+## fill a layer with a tiling texture: band_h is the visible height,
+## anchored to the band's bottom; scale x = tile_w / tex width; the
+## vertical scale keeps the texture's own aspect (the sky stretches,
+## see _dress_place).
+func _layer_fill(l: Dictionary, tex: Texture2D, tile_w: float,
+        band_h: float, y: float, stretch := false) -> void:
         var holder: Node2D = l["node"]
-        holder.position.y = y
         for c in holder.get_children():
                 c.queue_free()
-        var path := ART + "spr_" + tex_name + ".png"
-        var tex := true
-        if ResourceLoader.exists(path):
-                l["a"] = _layer_leaf(holder, load(path), h, Vector2.ZERO)
-                l["b"] = _layer_leaf(holder, load(path), h, Vector2(W + 4.0, 0))
-        else:
-                tex = false
-                l["a"] = _layer_leaf(holder, null, h, Vector2.ZERO, tint)
-                l["b"] = _layer_leaf(holder, null, h, Vector2(W + 4.0, 0), tint)
-        return tex
-
-func _layer_leaf(holder: Node2D, tex: Texture2D, h: float, at: Vector2,
-        tint := Color.WHITE) -> CanvasItem:
-        if tex != null:
+        l["a"] = null
+        l["b"] = null
+        l["leaves"] = []
+        l["h"] = band_h
+        holder.position.y = y
+        if tex == null:
+                var r := ColorRect.new()
+                r.color = Color(0.08, 0.08, 0.08)
+                r.size = Vector2(W + 4.0, band_h)
+                holder.add_child(r)
+                l["leaves"].append(r)
+                l["period"] = W + 4.0
+                return
+        var ts: Vector2 = tex.get_size()
+        var sc: float = tile_w / ts.x
+        var draw_h: float = ts.y * sc
+        if stretch:
+                draw_h = band_h
+        l["period"] = tile_w
+        for k in 2:
                 var sp := Sprite2D.new()
                 sp.texture = tex
-                var ts: Vector2 = tex.get_size()
-                var sc := (W + 4.0) / ts.x
-                sp.scale = Vector2(sc, sc)
                 sp.centered = false
-                sp.position = at + Vector2(0, h - ts.y * sc)
+                sp.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+                sp.region_enabled = true
+                sp.region_rect = Rect2(0, 0, ts.x, minf(band_h / sc, ts.y))
+                if stretch:
+                        sp.region_rect = Rect2(0, 0, ts.x, ts.y)
+                sp.scale = Vector2(sc, band_h / (sp.region_rect.size.y * sc) \
+                        if stretch else sc)
+                sp.position = Vector2(float(k) * tile_w,
+                        band_h - sp.region_rect.size.y * sp.scale.y)
                 holder.add_child(sp)
-                return sp
-        var r := ColorRect.new()
-        r.color = tint
-        r.size = Vector2(W + 4.0, h)
-        r.position = at
-        holder.add_child(r)
-        return r
+                l["leaves"].append(sp)
 
-func _layout_layers() -> void:
+func _layer_roll(l: Dictionary, _speed: float, dx: float) -> void:
+        var period: float = float(l.get("period", W + 4.0))
+        l["off"] = fmod(float(l["off"]) + dx * float(l["scroll"]), period)
+        var x: float = -float(l["off"])
+        var leaves: Array = l.get("leaves", [])
+        for k in leaves.size():
+                var leaf: CanvasItem = leaves[k]
+                if is_instance_valid(leaf):
+                        leaf.position.x = x if k == 0 else x + period
+
+## THE PLACE DRESSING - the original's real layers, as-is
+func _dress_place(pi: int) -> void:
+        place = HWData.PLACES[pi if pi < HWData.PLACES.size() else 0]
+        var oid := String(ORIG_BG.get(String(place["id"]), "frigistan"))
+        var dir := "backgrounds/"
+        # SKY: full screen, the whole 640x480 sky stretched once
         var sky: Dictionary = world.get_meta("sky")
-        (sky["node"] as Node2D).position.y = 0
+        _layer_fill(sky, _src_tex(dir + oid + "_sky.jpg"), W, H, 0.0, true)
+        # SLAB: the haze wall the far strip sits on
+        var slab: Dictionary = world.get_meta("slab")
+        var slab_tex: Texture2D = _src_tex(dir + oid + "_bg2.png")
+        if slab_tex == null:
+                slab_tex = _src_tex(dir + oid + "_bg2_.png")
+        _layer_fill(slab, slab_tex, W, 560.0, H - GROUND_H - 560.0)
+        # FAR: the painted strip (mountains / towers / walls) - the
+        # COMPOSED plain names first (real color + real alpha), the
+        # masks never (the _.png twins are white silhouettes)
         var far: Dictionary = world.get_meta("far")
-        (far["node"] as Node2D).position.y = H - 140.0 - 600.0 + 66.0
-        var near: Dictionary = world.get_meta("near")
-        (near["node"] as Node2D).position.y = H - 140.0 - near["h"] - 20.0
+        var far_tex: Texture2D = _src_tex(dir + oid + "_bg.png")
+        if far_tex == null:
+                far_tex = _src_tex(dir + oid + "_bg.jpg")
+        if far_tex == null:
+                far_tex = _src_tex(dir + oid + "_bg_.png")
+        _layer_fill(far, far_tex, W, 640.0, H - GROUND_H - 640.0)
+        # GROUND: the speckled band the tank rides
         var gnd: Dictionary = world.get_meta("ground")
-        (gnd["node"] as Node2D).position.y = H - 200.0
-        var road: Dictionary = world.get_meta("road")
-        (road["node"] as Node2D).position.y = ROAD_Y - 14.0
+        var g_tex: Texture2D = _src_tex(dir + oid + "_ground.png")
+        if g_tex == null:
+                g_tex = _src_tex(dir + oid + "_ground.jpg")
+        if g_tex == null:
+                g_tex = _src_tex(dir + oid + "_ground_.png")
+        _layer_fill(gnd, g_tex, W, GROUND_H, H - GROUND_H)
+        _props_reset()
+
+# ------------------------------------------------------------- THE PROPS
+func _props_reset() -> void:
+        var pl: Node2D = world.get_meta("props")
+        for c in pl.get_children():
+                c.queue_free()
+        props.clear()
+        prop_set_i = 0
+        prop_gap_px = 600.0            # the first set arrives soon
+
+## one set = every non-rare prop of the place, at the original's scaled
+## offsets; rare props join every third set (the Anims rare law)
+func _props_spawn_set() -> void:
+        var pl: Node2D = world.get_meta("props")
+        prop_set_i += 1
+        var y_sc := H / 480.0
+        for r in HWProps.PROPS:
+                if String(r["p"]) != String(place["id"]):
+                        continue
+                if bool(r["rare"]) and prop_set_i % 3 != 1:
+                        continue
+                var tex := load(String(r["tex"])) as Texture2D
+                if tex == null:
+                        continue
+                var n := Sprite2D.new()
+                n.texture = tex
+                var frames := int(r["frames"])
+                var ts: Vector2 = tex.get_size()
+                if frames > 1:
+                        n.hframes = frames
+                        n.frame = 0
+                        n.region_enabled = false
+                        ts.x = ts.x / float(frames)
+                n.scale = Vector2(2.4, 2.4)
+                var px: float = W + 200.0 \
+                        + float(r["offset"]) * (W / 640.0) * 0.55
+                var py: float = float(r["y"]) * y_sc
+                n.position = Vector2(px, py)
+                var plane := int(r["plane"])
+                n.z_index = {4: -6, 3: -5, 2: -4, 1: 2}.get(plane, 0)
+                pl.add_child(n)
+                props.append({"n": n, "frames": frames,
+                        "fps": float(r["speed"]) * 100.0,
+                        "type": String(r["type"]),
+                        "mx": float(r["mx"]) * 100.0,
+                        "plane": float(r["plane"]) / 4.0 * 0.8 + 0.2,
+                        "t": 0.0, "frame": 0})
+
+func _props_tick(dt: float, ground_dx: float) -> void:
+        # the gap counts GROUND pixels; when it empties a set spawns
+        prop_gap_px -= absf(ground_dx)
+        if prop_gap_px <= 0.0:
+                prop_gap_px = PROPS_GAP
+                _props_spawn_set()
+        var dead: Array = []
+        for p in props:
+                var n: Sprite2D = p["n"]
+                n.position.x -= (WORLD_SPEED * float(p["plane"])
+                        + float(p["mx"])) * dt
+                if int(p["frames"]) > 1 and float(p["fps"]) > 0.0:
+                        p["t"] = float(p["t"]) + dt
+                        var adv := int(p["t"] * float(p["fps"]))
+                        p["t"] = float(p["t"]) - float(adv) / float(p["fps"])
+                        var f := int(p["frame"]) + adv
+                        var fr := int(p["frames"])
+                        if String(p["type"]) == "pingpong":
+                                var cyc := f % (fr * 2 - 2)
+                                p["frame"] = cyc if cyc < fr else (fr * 2 - 2 - cyc)
+                        else:
+                                p["frame"] = f % fr
+                        n.frame = int(p["frame"])
+                if n.position.x < -500.0:
+                        dead.append(p)
+        for p in dead:
+                props.erase(p)
+                (p["n"] as Sprite2D).queue_free()
 
 ## THE SKIN SLOT: olive is the base sprite; the shop's skins are the
 ## recolored tanks the art tool painted. One rebuild point, live-swappable.
@@ -235,43 +359,157 @@ func _skin_id() -> String:
         return "olive" if s.is_empty() else s
 
 func _skin_node() -> Node2D:
-        var sid := _skin_id()
-        return _art_sprite("tank" if sid == "olive" else "tank_" + sid,
-                Vector2(96, 60), Color("5a6e3a"))
+        # THE REAL ATOMIC TANK (as-is): the 10-frame strip + the 24x5
+        # turret arm. Shop skins = modulate tints (reversible, the art
+        # stays the original's pixels).
+        var root := Node2D.new()
+        var body := Sprite2D.new()
+        body.texture = _src_tex("sprites/tank.png")
+        body.hframes = 10
+        body.frame = 0
+        body.scale = Vector2(2.3, 2.3)
+        body.position = Vector2(0, 14)
+        root.add_child(body)
+        root.set_meta("body", body)
+        var turret := Sprite2D.new()
+        turret.texture = _src_tex("sprites/gun.png")
+        turret.hframes = 24
+        turret.vframes = 5
+        turret.frame = 12
+        turret.scale = Vector2(2.3, 2.3)
+        turret.position = Vector2(0, -6)
+        root.add_child(turret)
+        root.set_meta("turret", turret)
+        return root
 
+## THE SKIN LAW (v040-1): the original tank is the body; the shop's
+## skins are modulate tints on it (reversible, the pixels stay as-is).
 func _apply_skin() -> void:
         if tank == null or not is_instance_valid(tank):
                 return
-        var old := tank.get_child(0)
-        if old != null:
-                old.queue_free()
-        tank.add_child(_skin_node())
-        tank.set_meta("skin", _skin_id())
+        var sid := _skin_id()
+        tank.set_meta("skin", sid)
+        var body: Sprite2D = tank.get_meta("body")
+        var tints := {
+                "olive": Color(1, 1, 1), "desert": Color(0.95, 0.82, 0.55),
+                "arctic": Color(0.82, 0.92, 1.0), "navy": Color(0.55, 0.68, 0.95),
+                "crimson": Color(1.0, 0.5, 0.45), "gold": Color(1.0, 0.85, 0.3),
+        }
+        body.modulate = tints.get(sid, Color(1, 1, 1))
 
 ## THE ART INDIRECTION: real texture when the art pass has painted it,
 ## an honest colored slab when it has not. One point of swap, forever.
+## THE AS-IS SPRITE MAP (the owner's v040-1 law): our art ids point at
+## the ORIGINAL textures - strips carry their real frame counts, the
+## odd ones wear a region. The fallback below stays honest for anything
+## unmapped.
+const SRC_SPRITES := {
+        "enemy_scout": {"p": "sprites/propfighter.png", "hf": 4},
+        "enemy_dart": {"p": "sprites/smalljet.png"},
+        "enemy_raider": {"p": "sprites/bomber.png"},
+        "enemy_lynx": {"p": "sprites/jetfighter.png"},
+        "enemy_komet": {"p": "sprites/bigmissile.png",
+                "region": [0, 0, 88, 200]},
+        "enemy_skimmer": {"p": "sprites/cruise.png", "hf": 8},
+        "enemy_fang": {"p": "sprites/deltajet.png"},
+        "enemy_talon": {"p": "sprites/deltabomber.png"},
+        "enemy_wasp": {"p": "sprites/smallcopter.png", "hf": 5},
+        "enemy_hornet": {"p": "sprites/medcopter.png", "hf": 7},
+        "enemy_mirror": {"p": "sprites/deflector.png"},
+        "enemy_technical": {"p": "sprites/truck.png", "hf": 10},
+        "enemy_carpet": {"p": "sprites/bigbomber.png"},
+        "enemy_viper": {"p": "sprites/bigcopter.png", "hf": 9},
+        "enemy_mammoth": {"p": "sprites/hugecopter.png"},
+        "enemy_fortress": {"p": "sprites/superbomber.png"},
+        "enemy_orbital": {"p": "sprites/satellite.png", "hf": 10},
+        "enemy_grinder": {"p": "sprites/enemytank.png", "hf": 10},
+        "enemy_plowman": {"p": "sprites/dozer.png", "hf": 10},
+        "enemy_atomault": {"p": "sprites/fatbomber.png"},
+        "enemy_zeppelin": {"p": "sprites/blimp.png"},
+        "boss_gunship": {"p": "bosses/hugecopter/hugecopter.png"},
+        "boss_gunship_turret": {"p": "bosses/hugecopter/turret.png"},
+        "boss_gunship_launcher": {"p": "bosses/hugecopter/launcher.png"},
+        "boss_dreadnought": {"p": "bosses/battleship/main.png"},
+        "boss_dreadnought_t1": {"p": "bosses/battleship/gun.png"},
+        "boss_dreadnought_t2": {"p": "bosses/battleship/gun.png"},
+        "boss_dreadnought_t3": {"p": "bosses/battleship/gun.png"},
+        "boss_dreadnought_t4": {"p": "bosses/battleship/gun.png"},
+        "boss_dreadnought_launcher": {"p": "bosses/battleship/hull.png"},
+        "boss_skystealer": {"p": "bosses/rainer/Rainer.png"},
+        "boss_wreckball": {"p": "bosses/wrecker/body.png"},
+        "boss_warhead": {"p": "bosses/head/head.png"},
+        "boss_kongo": {"p": "bosses/ape/ape.png"},
+        "boss_eyebot": {"p": "bosses/eye/eye.png"},
+        "boss_eyebot_hand": {"p": "bosses/eye/hand.png"},
+        "boss_mechworm": {"p": "bosses/worm/head.png"},
+        "boss_mechworm_turret": {"p": "bosses/worm/turret.png"},
+        "boss_warbot": {"p": "bosses/robot/body.png"},
+        "boss_warbot_arm": {"p": "bosses/robot/arms.png"},
+        "boss_warbot_launcher": {"p": "bosses/robot/launchers.png"},
+        "boss_secretfist": {"p": "bosses/finalboss/body1.png"},
+        "shell": {"p": "sprites/bullets.png", "region": [434, 40, 60, 40]},
+        "eshot_bullet": {"p": "sprites/bullets.png", "region": [434, 0, 60, 40]},
+        "eshot_missile": {"p": "sprites/missile.png", "hf": 10},
+        "eshot_rpg": {"p": "sprites/rocket.png", "hf": 21},
+        "eshot_fraglet": {"p": "sprites/fragbomb.png",
+                "region": [0, 0, 30, 30]},
+        "eshot_meteor": {"p": "sprites/rock.png"},
+        "eshot_boulder": {"p": "sprites/rock.png"},
+        "eshot_barrel": {"p": "sprites/crates.png", "region": [72, 0, 36, 36]},
+        "eshot_ball": {"p": "bosses/wrecker/ball.png"},
+        "bomb_dumb": {"p": "sprites/dumbbomb.png", "hf": 10},
+        "bomb_guided": {"p": "sprites/lgb.png", "hf": 21},
+        "bomb_armored": {"p": "sprites/ironbomb.png", "hf": 10},
+        "bomb_frag": {"p": "sprites/fragbomb.png", "hf": 10},
+        "bomb_atom": {"p": "sprites/fatboy.png", "hf": 10},
+        "boom": {"p": "sprites/explosion_.png", "hf": 20},
+        "mush": {"p": "sprites/mushsmoke.png", "hf": 3},
+        "crate": {"p": "sprites/crates.png", "region": [0, 0, 36, 36]},
+        "heli": {"p": "sprites/pupcopter.png"},
+        "nukeflash": {"p": "sprites/nukebg.jpg"},
+}
+
 func _art_sprite(art_id: String, size: Vector2, tint: Color) -> Node2D:
         var holder := Node2D.new()
-        var path := ART + "spr_" + art_id + ".png"
-        if ResourceLoader.exists(path):
-                var sp := Sprite2D.new()
-                sp.texture = load(path)
-                var tex_size: Vector2 = sp.texture.get_size()
-                sp.scale = size / tex_size
-                holder.add_child(sp)
-        else:
-                var r := ColorRect.new()
-                r.color = tint
-                r.size = size
-                r.position = -size / 2.0
-                holder.add_child(r)
-                var rim := ReferenceRect.new()
-                rim.border_color = tint.darkened(0.4)
-                rim.border_width = 3.0
-                rim.editor_only = false
-                rim.size = size
-                rim.position = -size / 2.0
-                holder.add_child(rim)
+        var m: Dictionary = SRC_SPRITES.get(art_id, {})
+        var tex: Texture2D = null
+        if not m.is_empty():
+                tex = _src_tex(String(m["p"]))
+        if tex != null:
+                if m.has("region"):
+                        var r: Array = m["region"]
+                        var sp := Sprite2D.new()
+                        sp.texture = tex
+                        sp.region_enabled = true
+                        sp.region_rect = Rect2(r[0], r[1], r[2], r[3])
+                        sp.scale = size / Vector2(r[2], r[3])
+                        holder.add_child(sp)
+                        return holder
+                var hf: int = int(m.get("hf", 1))
+                var cell: Vector2 = tex.get_size()
+                if hf > 1:
+                        cell.x = cell.x / float(hf)
+                var sp2 := Sprite2D.new()
+                sp2.texture = tex
+                sp2.hframes = hf
+                sp2.frame = 0
+                sp2.scale = size / cell
+                holder.add_child(sp2)
+                holder.set_meta("spr", sp2)
+                return holder
+        # the honest fallback (unmapped ids only)
+        var r2 := ColorRect.new()
+        r2.color = tint
+        r2.size = size
+        r2.position = -size / 2.0
+        holder.add_child(r2)
+        var rim := ReferenceRect.new()
+        rim.border_color = tint.darkened(0.4)
+        rim.border_width = 3.0
+        rim.editor_only = false
+        rim.size = size
+        rim.position = -size / 2.0
+        holder.add_child(rim)
         return holder
 
 # =================================================================
@@ -281,6 +519,14 @@ func _build_war_room() -> void:
         war_layer = CanvasLayer.new()
         war_layer.layer = 5
         add_child(war_layer)
+        # THE ORIGINAL'S STATUS BAR (as-is): the metal strip under the
+        # host top bar - the widgets read out of its recessed slots
+        var sb := TextureRect.new()
+        sb.texture = _src_tex("sprites/statusbar.png")
+        sb.stretch_mode = TextureRect.STRETCH_SCALE
+        sb.size = Vector2(W, 84.0)
+        sb.position = Vector2(0, WAR_Y - 84.0)
+        war_layer.add_child(sb)
         var bar := PanelContainer.new()
         var st := StyleBoxFlat.new()
         st.bg_color = Color(0.08, 0.06, 0.04, 0.72)
@@ -369,38 +615,38 @@ func _goga_input(event: InputEvent) -> void:
                 _touch(t.index, t.position, t.pressed)
         elif event is InputEventScreenDrag:
                 var d := event as InputEventScreenDrag
-                if d.index == move_ptr:
-                        _move_tank(d.position.x - move_last_x)
-                        move_last_x = d.position.x
+                if d.index == aim_ptr:
+                        aim_pos = d.position
+                elif d.index == steer_ptr:
+                        steer_target_x = d.position.x
         elif event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
                 var mb := event as InputEventMouseButton
                 _touch(-1, mb.position, mb.pressed)
 
+## THE THREE ZONES (the owner's v040-1 law, final wording):
+## "steering is the bottom... the aim part will be for the center, and
+## also leaving center will not stop shooting or aiming, only removing
+## finger, the top area be for the nuclear weapon".
 func _touch(idx: int, pos: Vector2, down: bool) -> void:
         if down:
-                if pos.x < Z_MOVE:
-                        if move_ptr == -1:
-                                move_ptr = idx
-                                move_last_x = pos.x
-                elif pos.x > Z_SHOOT:
-                        if shoot_ptr == -1:
-                                shoot_ptr = idx
-                                _fire()
-                else:
-                        # the mouse emulation double-path guard: a real finger
-                        # AND its synthetic mouse twin land in the same frame
+                if pos.y < H / 3.0:
+                        # THE NUKE - on press, debounced (the mouse twin guard)
                         if not _nuke_debounce():
-                                nuke_ptrs[idx] = pos
-        else:
-                if idx == move_ptr:
-                        move_ptr = -1
-                elif idx == shoot_ptr:
-                        shoot_ptr = -1
-                elif nuke_ptrs.has(idx):
-                        var p0: Vector2 = nuke_ptrs[idx]
-                        nuke_ptrs.erase(idx)
-                        if pos.distance_to(p0) <= 18.0 and not _nuke_debounce():
+                                _nuke_ms = Time.get_ticks_msec()
                                 _nuke()
+                elif pos.y < H * 2.0 / 3.0:
+                        if aim_ptr == -1:
+                                aim_ptr = idx
+                                aim_pos = pos
+                else:
+                        if steer_ptr == -1:
+                                steer_ptr = idx
+                                steer_target_x = pos.x
+        else:
+                if idx == aim_ptr:
+                        aim_ptr = -1
+                elif idx == steer_ptr:
+                        steer_ptr = -1
 
 var _nuke_ms := 0
 ## true when a nuke already fired within 120ms (the emulation twin)
@@ -410,27 +656,83 @@ func _nuke_debounce() -> bool:
                 return true
         return false
 
-func _move_tank(dx: float) -> void:
-        tank.position.x = clampf(tank.position.x + dx * 1.7, 60.0, W - 60.0)
+## THE PADDLE LAW (the owner: "the tank will move toward the finger,
+## using similar logic of moving like ping pong game"): the tank glides
+## toward the steering finger, distance-proportional, never a teleport.
+func _steer_glide(dt: float) -> void:
+        if steer_ptr == -1 or not (state in [GS.PLACE, GS.CALM, GS.BOSS]):
+                return
+        var max_step: float = HWData.engine_speed(meta.level_of("engine")) * dt
+        var d: float = clampf(steer_target_x - tank.position.x,
+                -max_step, max_step)
+        tank.position.x = clampf(tank.position.x + d, 70.0, W - 70.0)
+        # the drive anim rolls while the tank actually moves
+        var body: Sprite2D = tank.get_meta("body")
+        var moving := absf(steer_target_x - tank.position.x) > 4.0
+        tank.set_meta("anim_t", float(tank.get_meta("anim_t", 0.0)) + dt)
+        var fps := 9.0 if moving else 3.0
+        if float(tank.get_meta("anim_t")) > 1.0 / fps:
+                tank.set_meta("anim_t", 0.0)
+                body.frame = (body.frame + 1) % 10
 
 # =================================================================
 # THE GUN - streams fan with CANNONS; damage = SHELLS; cd = RELOAD
 # =================================================================
+## the aim point rules the gun: the turret arm tracks the finger and the
+## shells fly straight THROUGH it (the owner: "it aims where the shots
+## will exactly go")
+func _muzzle_pos() -> Vector2:
+        var turret: Sprite2D = tank.get_meta("turret")
+        var ang := _turret_angle()
+        return tank.position + Vector2(0, -6) \
+                + Vector2.from_angle(ang) * 66.0
+
+## the 24-frame arm strip sweeps LEFT -> UP -> RIGHT (cols 0..23);
+## aiming below the horizon clamps to the ends
+func _turret_angle() -> float:
+        var to := aim_pos - (tank.position + Vector2(0, -6))
+        var a := to.angle()
+        # Godot: right = 0, up = -PI/2, left = PI. The strip covers
+        # PI (left) .. -PI/2 (up) .. 0 (right) = the upper half circle.
+        if a > 0.0:
+                # below the horizon: clamp to the nearer end
+                return PI if a < PI * 0.5 else 0.0
+        return a
+
+func _turret_frame() -> int:
+        var a := _turret_angle()
+        # sweep PI -> 2PI mapped onto cols 0..23 (left .. up .. right)
+        var t: float = (a - PI) / PI
+        if t < 0.0:
+                t += 2.0
+        return clampi(int(round(t * 23.0)), 0, 23)
+
 func _fire() -> void:
         if run["fire_cd"] > 0.0:
                 return
         run["fire_cd"] = HWData.reload_cd(meta.level_of("reload"))
         var streams := HWData.cannon_streams(meta.level_of("cannons"))
         var dmg := HWData.shell_dmg(meta.level_of("shells"))
+        var muzzle := _muzzle_pos()
+        var base_ang := (aim_pos - muzzle).angle()
         for i in streams:
-                var spread: float = (float(i) - float(streams - 1) * 0.5) * 0.10
-                var n := _art_sprite("shell", Vector2(10, 26), Color("ffe08a"))
-                n.position = tank.position + Vector2(0, -34)
-                n.rotation = spread
+                var spread: float = (float(i) - float(streams - 1) * 0.5) * 0.055
+                var v := Vector2.from_angle(base_ang + spread) * 1500.0
+                var n := _art_sprite("shell", Vector2(12, 28), Color("ffe08a"))
+                n.position = muzzle
+                n.rotation = v.angle()
                 shot_layer.add_child(n)
-                shots.append({"n": n, "vel": Vector2(sin(spread), -cos(spread)) * 1500.0,
-                        "dmg": dmg})
-        Jukebox.sfx("hw_fire", -8.0, randf_range(0.94, 1.06))
+                shots.append({"n": n, "vel": v, "dmg": dmg})
+        # the muzzle flash: the original's own flash frame
+        var fl := Sprite2D.new()
+        fl.texture = _src_tex("sprites/tankflash.png")
+        fl.position = muzzle
+        fl.rotation = base_ang + PI * 0.5
+        fl.scale = Vector2(0.8, 0.8)
+        shot_layer.add_child(fl)
+        fx.append({"n": fl, "t": 0.0, "life": 0.09, "kind": "flash"})
+        Jukebox.sfx("hws_tankfire%d" % (1 + randi() % 4), -8.0,
+                randf_range(0.94, 1.06))
 
 # =================================================================
 # THE SKY - the spawn director (waves per tier, place exclusives)
@@ -628,7 +930,7 @@ func _drop_bomb(at: Vector2, kind: String) -> void:
                 ebombs[-1]["frag"] = true
         if kind == "atom":
                 ebombs[-1]["atom"] = true
-        Jukebox.sfx("hw_bombfall", -14.0, randf_range(0.9, 1.1))
+        Jukebox.sfx("hws_bombfall", -14.0, randf_range(0.9, 1.1))
 
 func _enemy_shot(at: Vector2, vel: Vector2, kind: String) -> void:
         var n := _art_sprite("eshot_" + kind,
@@ -717,14 +1019,14 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
         if String(e["kind"]) == "guard" and bool(e["guard"]) \
                         and (e["n"] as Node2D).position.x > tank.position.x:
                 _fx_ring((e["n"] as Node2D).position, Color("58a8e8"), 20.0, 0.2)
-                Jukebox.sfx("hw_rico", -12.0, 1.3)
+                Jukebox.sfx("hws_orbhit", -12.0, 1.3)
                 return
         # PLOWMAN law: the plow is armor - shots from the left bounce
         if String(e["kind"]) == "plow" \
                         and (e["n"] as Node2D).position.x > tank.position.x:
                 _fx_ring((e["n"] as Node2D).position + Vector2(-e["w"] * 0.4, 0),
                         Color("ffb020"), 18.0, 0.2)
-                Jukebox.sfx("hw_rico", -12.0, 0.9)
+                Jukebox.sfx("hws_orbhit", -12.0, 0.9)
                 return
         e["hp"] = int(e["hp"]) - dmg
         if int(e["hp"]) <= 0:
@@ -736,7 +1038,7 @@ func _kill_enemy(e: Dictionary) -> void:
         _pay_score(int(e["pts"]), n.position)
         run["kills"] += 1
         achievement_count("hw_kill_bank", 1)
-        Jukebox.sfx("hw_boom", -6.0, randf_range(0.85, 1.15))
+        Jukebox.sfx("hws_smallexplode", -6.0, randf_range(0.85, 1.15))
         _enemy_free(e)
 
 ## THE SCORE LAW: kills pay; every 1000 pays a life back (max 3)
@@ -786,12 +1088,12 @@ func _ebombs_tick(dt: float) -> void:
                                 "ball":
                                         _fx_ring(Vector2(n.position.x, ROAD_Y),
                                                 Color("ffb020"), 120.0, 0.45)
-                                        Jukebox.sfx("hw_bigboom", -4.0, 0.85)
+                                        Jukebox.sfx("hws_bigexplode", -4.0, 0.85)
                                         if absf(tank.position.x - n.position.x) < 150.0:
                                                 _hurt_tank(tank.position)
                                 "meteor", "boulder", "barrel":
                                         _fx_boom(Vector2(n.position.x, ROAD_Y), 0.8)
-                                        Jukebox.sfx("hw_boom", -8.0, 1.1)
+                                        Jukebox.sfx("hws_smallexplode", -8.0, 1.1)
                         dead.append(b)
                         continue
                 if _hits_tank(n.position):
@@ -825,14 +1127,14 @@ func _hurt_tank(at: Vector2) -> void:
                         run["shields"] = arr.size()
                 run["iframes"] = 0.7
                 _fx_ring(tank.position, Color("58a8e8"), 60.0, 0.35)
-                Jukebox.sfx("hw_shieldhit", -8.0)
+                Jukebox.sfx("hws_deflect", -8.0)
                 _war_refresh()
                 return
         run["lives"] = int(run["lives"]) - 1
         run["iframes"] = 1.4
         _fx_boom(tank.position, 1.4)
         _fx_text(tank.position + Vector2(0, -70), "-1 LIFE", Color("e8574a"))
-        Jukebox.sfx("hw_tankhit", -2.0)
+        Jukebox.sfx("hws_bullethit", -2.0)
         _war_refresh()
         if int(run["lives"]) <= 0:
                 _run_over()
@@ -847,7 +1149,7 @@ func _nuke() -> void:
         run["nukes"] -= 1
         _war_refresh()
         _nuke_blast_at(tank.position.x + 240.0, HWData.aegis_blast_w(meta.level_of("aegis")))
-        Jukebox.sfx("hw_nuke", 0.0)
+        Jukebox.sfx("hws_nukeblast", 0.0)
 
 ## everything inside the blast width dies (the boss parts too, but the
 ## boss body only bleeds - the nuke is not a boss-killer)
@@ -911,7 +1213,7 @@ func _heli_pass(mode: String) -> void:
                 shot_layer.add_child(n)
                 drops.append({"n": n, "kind": kind, "fall": 120.0 + 30.0 * i,
                         "landed": false, "life": 14.0})
-        Jukebox.sfx("hw_heli", -10.0)
+        Jukebox.sfx("hws_pupcopter", -10.0)
 
 func _roll_drop() -> String:
         var caps := {
@@ -983,7 +1285,7 @@ func _collect(kind: String) -> void:
                                 run["laser_on"] = HWData.LASER_BURN
                                 _fx_text(tank.position + Vector2(0, -80), "LASER!",
                                         Color("ffb020"))
-                                Jukebox.sfx("hw_lasergo", 0.0)
+                                Jukebox.sfx("hws_megalaser_start", 0.0)
                         else:
                                 _fx_text(tank.position + Vector2(0, -80), "+PART",
                                         Color("ffb020"))
@@ -997,7 +1299,7 @@ func _collect(kind: String) -> void:
                         _fx_text(tank.position + Vector2(0, -80),
                                 "+%d COINS" % HWData.COIN_DROP, Arc.COIN)
         _war_refresh()
-        Jukebox.sfx("hw_pickup", -6.0, randf_range(0.95, 1.05))
+        Jukebox.sfx("hws_powerup", -6.0, randf_range(0.95, 1.05))
 
 ## THE MEGABEAM: burning while laser_on > 0 - a wall of light ahead of
 ## the tank that erases everything it touches
@@ -1038,6 +1340,8 @@ func _laser_beam_node() -> ColorRect:
 # THE PLACES + THE TUNNELS - shuffle law, calm zones, no spawns
 # =================================================================
 func _enter_intro() -> void:
+        # THE LOVE THEME (as-is): the original's own menu-and-war song
+        Jukebox.music("res://assets/audio/music/hws_lovetheme.ogg")
         state = GS.INTRO
         var pi: int = place_queue_placeholder()
         _dress_place(pi)
@@ -1065,7 +1369,7 @@ func _start_place() -> void:
         t_state = 0.0
         _roll_wave()
         _war_refresh()
-        Jukebox.sfx("hw_start", -4.0)
+        Jukebox.sfx("hws_v_getready", -4.0)
 
 ## the place's clock: when its pressure is served -> the tunnel
 func _place_tick(dt: float) -> void:
@@ -1101,7 +1405,7 @@ func _enter_tunnel() -> void:
         fx_layer.add_child(tunnel)
         fx.append({"n": tunnel, "t": 0.0, "life": 4.6, "kind": "tunnel"})
         _war_refresh()
-        Jukebox.sfx("hw_tunnel", -6.0)
+        Jukebox.sfx("hws_swoosh", -6.0)
 
 func _tunnel_tick(dt: float) -> void:
         t_state += dt
@@ -1169,7 +1473,7 @@ func _enter_boss() -> void:
                 "fire_t": 1.6 * fm, "spd_mul": st["spd_mul"],
                 "cb": int(st["comeback"]), "entered": false}
         _boss_bar_show(String(HWData.BOSSES[String(st["id"])]["name"]))
-        Jukebox.sfx("hw_bossgo", 0.0)
+        Jukebox.sfx("hws_v_danger", 0.0)
         _war_refresh()
 
 func _boss_tick(dt: float) -> void:
@@ -1339,7 +1643,7 @@ func _brain_kongo(n: Node2D, dt: float) -> void:
                         boss.erase("leap_x")
                         _fx_ring(Vector2(n.position.x, ROAD_Y - 20.0),
                                 Color("ffb020"), 140.0, 0.5)
-                        Jukebox.sfx("hw_bigboom", -2.0, 0.8)
+                        Jukebox.sfx("hws_bigexplode", -2.0, 0.8)
                         if absf(tank.position.x - n.position.x) < 200.0:
                                 _hurt_tank(tank.position)
 
@@ -1385,7 +1689,7 @@ func _brain_warbot(n: Node2D, dt: float) -> void:
                 fx_layer.add_child(col)
                 fx.append({"n": col, "t": 0.0, "life": 0.8, "kind": "oburn",
                         "hit_at": 0.45})
-                Jukebox.sfx("hw_lasergo", -6.0, 0.8)
+                Jukebox.sfx("hws_megalaser_start", -6.0, 0.8)
 
 func _brain_secretfist(n: Node2D, dt: float) -> void:
         # the final fist: everything at once, slower rhythm
@@ -1419,7 +1723,7 @@ func _boss_damage_part(p: Dictionary, dmg: float) -> void:
                         _fx_boom((p["n"] as Node2D).position, 1.6)
                         (p["n"] as Node2D).queue_free()
                         (boss["parts"] as Array).erase(p)
-                        Jukebox.sfx("hw_boom", -2.0, 0.8)
+                        Jukebox.sfx("hws_smallexplode", -2.0, 0.8)
         if boss != null and (boss["parts"] as Array).is_empty():
                 # body exposed: shells now hit the body
                 pass
@@ -1453,7 +1757,7 @@ func _boss_bar_set() -> void:
 func _boss_die() -> void:
         _pay_score(100, (boss["n"] as Node2D).position)
         _fx_boom((boss["n"] as Node2D).position, 3.0)
-        Jukebox.sfx("hw_bossdie", 2.0)
+        Jukebox.sfx("hws_bossblast", 2.0)
         for p in boss["parts"]:
                 (p["n"] as Node2D).queue_free()
         boss["n"].queue_free()
@@ -1524,7 +1828,7 @@ func _armory_change(sid: String, dir: int, free_lbl: Label, rows: VBoxContainer)
                 var row: HBoxContainer = rows.get_child(i)
                 (row.get_child(1) as Label).text = "LV %d" % meta.level_of(sid2)
                 i += 1
-        Jukebox.sfx("hw_click", -8.0)
+        Jukebox.sfx("hws_buttondown", -8.0)
 
 func _armory_closed() -> void:
         state = GS.CALM
@@ -1540,7 +1844,7 @@ func _run_over() -> void:
         meta.record_run(run["places_done"], run["bosses_met"], score, run["kills"])
         check_achievements()
         _fx_boom(tank.position, 3.0)
-        Jukebox.sfx("hw_gameover", 0.0)
+        Jukebox.sfx("hws_v_gameover", 0.0)
         await get_tree().create_timer(1.4).timeout
         finish_run(score)
 
@@ -1560,7 +1864,15 @@ func _fx_ring(at: Vector2, tint: Color, r: float, life: float) -> void:
         fx.append({"n": n, "t": 0.0, "life": life, "kind": "ring"})
 
 func _fx_nukeflash(at: Vector2, half: float) -> void:
-        var n := _art_sprite("mush", Vector2(half * 2.2, half * 1.6), Color("fff0b0"))
+        # the original's white-out wipe + the smoke column riding it
+        var wipe := TextureRect.new()
+        wipe.texture = _src_tex("sprites/nukebg.jpg")
+        wipe.stretch_mode = TextureRect.STRETCH_SCALE
+        wipe.size = Vector2(W, H)
+        fx_layer.add_child(wipe)
+        fx.append({"n": wipe, "t": 0.0, "life": 0.5, "kind": "flash"})
+        var n := _art_sprite("mush", Vector2(half * 2.2, half * 1.6),
+                Color("fff0b0"))
         n.position = at
         fx_layer.add_child(n)
         fx.append({"n": n, "t": 0.0, "life": 1.6, "kind": "mush"})
@@ -1579,16 +1891,32 @@ func _fx_tick(dt: float) -> void:
                 var life: float = float(f["life"])
                 var n: Node = f["n"]
                 match String(f["kind"]):
+                        "flash":
+                                if n is CanvasItem:
+                                        (n as CanvasItem).modulate.a \
+                                                = 1.0 - t / life
                         "boom", "ring":
                                 if n is Node2D:
                                         (n as Node2D).scale = Vector2.ONE \
                                                 .lerp(Vector2(1.4, 1.4), t / life)
+                                        var spr: Sprite2D = (n as Node2D) \
+                                                .get_meta("spr", null)
+                                        if spr != null and spr.hframes > 1:
+                                                spr.frame = mini(int(t / life \
+                                                        * float(spr.hframes)),
+                                                        spr.hframes - 1)
                                 if n is CanvasItem:
                                         (n as CanvasItem).modulate.a = 1.0 - t / life
                         "mush":
                                 if n is Node2D:
                                         (n as Node2D).scale = Vector2(0.4, 0.4) \
                                                 .lerp(Vector2.ONE, minf(t / 0.5, 1.0))
+                                        var spr2: Sprite2D = (n as Node2D) \
+                                                .get_meta("spr", null)
+                                        if spr2 != null and spr2.hframes > 1:
+                                                spr2.frame = mini(int(t / life \
+                                                        * float(spr2.hframes)),
+                                                        spr2.hframes - 1)
                                 if n is CanvasItem:
                                         (n as CanvasItem).modulate.a = clampf(
                                                 1.4 - t / life, 0.0, 1.0)
@@ -1649,14 +1977,24 @@ func _goga_tick(dt: float) -> void:
                 _ebombs_tick(dt)
         run["fire_cd"] = maxf(0.0, float(run["fire_cd"]) - dt)
         run["iframes"] = maxf(0.0, float(run["iframes"]) - dt)
-        if shoot_ptr != -1 and float(run["fire_cd"]) <= 0.0 \
+        if aim_ptr != -1 and float(run["fire_cd"]) <= 0.0 \
                         and state in [GS.PLACE, GS.CALM, GS.BOSS]:
                 _fire()
-        # the road never sleeps - the world scrolls even in the calm
-        _layer_roll(world.get_meta("far"), 0.0, 46.0 * dt)
-        _layer_roll(world.get_meta("near"), 0.0, 110.0 * dt)
-        _layer_roll(world.get_meta("ground"), 0.0, 300.0 * dt)
-        _layer_roll(world.get_meta("road"), 0.0, 420.0 * dt)
+        _steer_glide(dt)
+        # the turret arm tracks the aim finger; the aim cursor rides it
+        var turret: Sprite2D = tank.get_meta("turret")
+        turret.frame = _turret_frame()
+        var aim_cur: Sprite2D = world.get_meta("aim_cursor")
+        aim_cur.visible = aim_ptr != -1
+        aim_cur.position = aim_pos
+        # the turret frame also tracks when only steering moves the tank
+        # the planes crawl at the world speed - the ground carries the war
+        scroll_x += WORLD_SPEED * PLANE_GROUND * dt
+        _layer_roll(world.get_meta("sky"), 0.0, WORLD_SPEED * dt)
+        _layer_roll(world.get_meta("slab"), 0.0, WORLD_SPEED * dt)
+        _layer_roll(world.get_meta("far"), 0.0, WORLD_SPEED * dt)
+        _layer_roll(world.get_meta("ground"), 0.0, WORLD_SPEED * dt)
+        _props_tick(dt, WORLD_SPEED * PLANE_GROUND * dt)
         # the tank's iframes blink
         tank.modulate.a = 0.45 if (fmod(run["iframes"], 0.16) > 0.08
                 and float(run["iframes"]) > 0.0) else 1.0
@@ -1749,12 +2087,12 @@ func _shop_skin_row(id: String) -> Control:
                 return Arc.button(String(sk["name"]), Vector2(560, 60), 22,
                         Arc.ACCENT, func():
                                 Box.equip_skin(game_id, id)
-                                Jukebox.sfx("hw_pickup", -4.0)
+                                Jukebox.sfx("hws_powerup", -4.0)
                                 _apply_skin()
                                 _shop_reopen())
         return _shop_price_btn(String(sk["name"]), int(sk["price"]), func():
                 if Box.buy_skin(game_id, id, int(sk["price"])):
-                        Jukebox.sfx("hw_coin", -4.0)
+                        Jukebox.sfx("hws_star", -4.0)
                         _apply_skin()
                 _shop_reopen())
 
@@ -1767,7 +2105,7 @@ func _shop_stat_row(sid: String) -> Control:
                 return l
         return _shop_price_btn(String(u["name"]), int(u["shop_price"]), func():
                 if Box.buy_item(game_id, "upg", sid, int(u["shop_price"])):
-                        Jukebox.sfx("hw_pickup", -4.0)
+                        Jukebox.sfx("hws_powerup", -4.0)
                 _shop_reopen())
 
 func _shop_laser_row() -> Control:
@@ -1778,7 +2116,7 @@ func _shop_laser_row() -> Control:
                 return l
         return _shop_price_btn("THE LASER", HWData.LASER_PRICE, func():
                 if Box.buy_item(game_id, "rig", "laser", HWData.LASER_PRICE):
-                        Jukebox.sfx("hw_lasergo", -2.0)
+                        Jukebox.sfx("hws_megalaser_start", -2.0)
                 _shop_reopen())
 
 ## the shop's state sync through the back law (and the CLOSE button)
@@ -1791,4 +2129,4 @@ func _goga_sheet_popped(id: String) -> void:
                         get_tree().paused = false
                 _apply_skin()
                 _war_refresh()
-                Jukebox.sfx("hw_click", -6.0)
+                Jukebox.sfx("hws_buttondown", -6.0)
