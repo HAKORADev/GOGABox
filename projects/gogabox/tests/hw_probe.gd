@@ -217,7 +217,11 @@ func _run() -> void:
                 % (G.score - s0))
         ck(G.run["kills"] >= 1, "the kill lands in the ledger")
 
-        # the arm law: 24 angle columns x 5 tier rows, smooth fraction
+        # the arm law: 24 angle columns x 5 tier rows, smooth fraction.
+        # v040-3 THE AIM-ONLY LAW: the arm reads the AIM FINGER only - the
+        # probe presses one (the owner: 'the arm follows the aim, not the
+        # steering'), and without a finger the barrel rests UP (col 12).
+        G.aim_ptr = 1
         G.aim_pos = Vector2(G.tank.position.x - 500.0, G.TANK_Y)
         var arm: Sprite2D = G.tank.get_meta("turret")
         G._turret_apply()
@@ -228,6 +232,11 @@ func _run() -> void:
         ck(col_left == 0 and col_right == 23,
                 "THE ARM LAW: left = col 0, right = col 23 (got %d/%d)"
                         % [col_left, col_right])
+        G.aim_ptr = -1
+        G._turret_apply()
+        ck(arm.frame % 24 == 12,
+                "THE ARM RESTS UP: no aim finger = col 12 (got %d)"
+                        % (arm.frame % 24))
         G.gun_tier = 3
         G._turret_apply()
         ck(arm.frame >= 3 * 24 and arm.frame < 4 * 24,
@@ -467,6 +476,138 @@ func _run() -> void:
         ck(marathon_ok, "THE MARATHON LAW: all ten faces fight and pay (%s)"
                 % marathon_why)
         ck(meta.pts_banked() >= 10, "ten bosses minted ten points")
+
+        # =============================================================
+        # v040-3 - the owner's report laws
+        # =============================================================
+        # THE LEAF LAW: at ANY roll offset the 3-leaf tiling covers the
+        # whole live canvas (the old stacking left the raw void = the
+        # owner's blue/white rectangles and the 'unreachable wall')
+        var leaf_ok := true
+        for plane in ["sky", "far", "mid", "ground"]:
+                var l: Dictionary = G.world.get_meta(plane)
+                for trial in 6:
+                        l["off"] = float(trial) / 6.0 * float(l["period"])
+                        G._layer_roll(l, 0.0)
+                        var covered := 0.0
+                        for leaf in l["leaves"]:
+                                if is_instance_valid(leaf):
+                                        covered = maxf(covered,
+                                                leaf.position.x
+                                                + float(l["period"]))
+                        if covered < G.W + 1.0:
+                                leaf_ok = false
+        ck(leaf_ok, "THE LEAF LAW: the tiling covers the canvas at any roll")
+
+        # THE BOTH-SIDES LAW: the craft table carries left chances, the
+        # spawner honors them, and left entries FACE right (flip)
+        var any_left := false
+        for i in 24:
+                G._spawn_enemy("scout", -1.0, -1.0, true)
+                var e: Dictionary = G.enemies[-1]
+                if float(e.get("dir", -1.0)) > 0.0:
+                        any_left = true
+                        var sprL: Sprite2D = (e["n"] as Node2D) \
+                                .get_meta("spr", null)
+                        if sprL != null and not sprL.flip_h:
+                                any_left = false
+                G._enemy_free(G.enemies[-1])
+        ck(any_left, "THE BOTH-SIDES LAW: a left entry flips to face right")
+        var left_p := 0
+        for d in HWData.ENEMIES.values():
+                left_p += 1 if float(d.get("left", 0.0)) > 0.0 else 0
+        ck(left_p >= 10, "the craft table carries left chances (%d types)"
+                % left_p)
+
+        # THE TRUE FRAMES LAW: the strip cells slice whole sprites (the
+        # old hf=4 on a 10-frame strip squeezed the owner's anims)
+        var frames_ok := true
+        var expect := {"enemy_scout": 10, "enemy_wasp": 9, "enemy_viper": 9,
+                "enemy_strafer": 10, "enemy_grinder": 10,
+                "enemy_hornet": 7, "enemy_plowman": 10}
+        for k in expect:
+                var spr2: Sprite2D = G._art_sprite(k, Vector2(100, 40),
+                        Color.WHITE).get_meta("spr", null)
+                if spr2 == null or spr2.hframes != int(expect[k]):
+                        frames_ok = false
+        ck(frames_ok, "THE TRUE FRAMES LAW: strips slice whole sprites")
+
+        # THE INTERCEPT LAW: shells kill bombs, never the pink hellfire
+        G.ebombs.clear()
+        G._drop_bomb(G.tank.position + Vector2(300, -260), "dumb")
+        var bomb_n: Node2D = G.ebombs[-1]["n"]
+        G._shell_intercept(bomb_n.position)
+        ck(G.ebombs.is_empty(),
+                "THE INTERCEPT LAW: a shell shoots a dumb bomb down")
+        G.ebombs.clear()
+        G._enemy_shot(G.tank.position + Vector2(300, -260),
+                Vector2(-300, 200), "hellfire")
+        G._shell_intercept((G.ebombs[-1]["n"] as Node2D).position)
+        ck(G.ebombs.size() == 1,
+                "THE INTERCEPT LAW: the pink poison is untouchable")
+        G.ebombs.clear()
+
+        # THE FRIEND LAW: one crate, mid-band release, ten hits to kill
+        G._heli_pass("supply")
+        G.heli.position = Vector2(G.W * 0.5, 235.0)
+        var drops0: int = G.drops.size()
+        G._heli_tick(1.0 / 60.0)
+        ck(G.drops.size() == drops0 + 1,
+                "THE FRIEND LAW: exactly ONE crate released")
+        ck(G.heli.position.x >= G.W * 0.35
+                and G.heli.position.x <= G.W * 0.75,
+                "THE FRIEND LAW: the drop lands in the 35-75% band")
+        var kills := 0
+        for i in 10:
+                G._heli_hit(1)
+                kills += 1
+        ck(G.heli_hp <= 0 and not G.heli.visible,
+                "THE FRIEND LAW: ten points end the pass")
+        ck(G.heli_dropped, "THE FRIEND LAW: the cargo falls even on death")
+        for c in G.drops.duplicate():
+                G.drops.erase(c)
+                (c["n"] as Node2D).queue_free()
+
+        # THE ONE-COIN LAW: the pickup pays exactly one, the death bonus 0
+        var coins1 := G.run_coins
+        G._collect("coin")
+        ck(G.run_coins == coins1 + 1,
+                "THE ONE-COIN LAW: a coin pays ONE (got %d)"
+                % (G.run_coins - coins1))
+        ck(not G.score_bonus_enabled,
+                "THE ONE-COIN LAW: the score death-bonus is ZERO")
+
+        # THE DEATH RESET LAW: a lost life zeroes laser parts AND nukes
+        G.run["laser_parts"] = 3
+        G.run["nukes"] = 2
+        G.run["shield_hp"] = []
+        G.run["shields"] = 0
+        G.run["iframes"] = 0.0
+        G.run["lives"] = 2
+        G._hurt_tank(G.tank.position)
+        ck(int(G.run["laser_parts"]) == 0 and int(G.run["nukes"]) == 0,
+                "THE DEATH RESET LAW: dying zeroes laser parts + nukes")
+
+        # THE LASER WIDGET LAW: the chip exists and shows live percent
+        ck(G.chips.has("laser") and is_instance_valid(G.chips["laser"]),
+                "THE LASER WIDGET LAW: the orange wavy chip lives")
+        G.run["laser_parts"] = 2
+        G._chips_refresh()
+        ck((G.chips["laser"] as Label).text == "50%",
+                "THE LASER WIDGET LAW: two parts read 50%% (got %s)"
+                        % (G.chips["laser"] as Label).text)
+
+        # THE GEOMETRY LAW: the tank rides ON the band, craters on its face
+        ck(absf(G.TANK_Y - (G.GROUND_Y + 58.0)) < 0.5
+                and absf(G.ROAD_Y - (G.GROUND_Y + 104.0)) < 0.5,
+                "THE GEOMETRY LAW: tank +58 / road +104 from the band top")
+
+        # THE PLACE ORDER LAW: the source's own walk, no shuffle
+        var seq_ok := true
+        for i in HWData.PLACES.size():
+                if int(G.place_queue[i]) != i:
+                        seq_ok = false
+        ck(seq_ok, "THE PLACE ORDER LAW: places walk the source's order")
 
         print("=== hw_probe done: %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)

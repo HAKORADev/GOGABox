@@ -97,7 +97,6 @@ var debris: Array = []           # tumbling chunks {n, vel, spin}
 
 # input (true multi-touch: the kit is single-pointer, the war is not)
 var steer_ptr := -1
-var steer_target_x := 0.0
 var aim_ptr := -1
 var aim_pos := Vector2(960.0, 380.0)
 var nuke_ptrs := {}              # legacy tap detector (kept for probes)
@@ -119,13 +118,25 @@ func _goga_setup() -> void:
         W = maxf(960.0, vp.x)
         H = maxf(540.0, vp.y)
         GROUND_Y = H - GROUND_H
-        ROAD_Y = GROUND_Y + 62.0
-        TANK_Y = GROUND_Y + 78.0
+        # v040-3 THE SOURCE GEOMETRY LAW (the owner: 'the tank and enemy
+        # weapons land on far land, the ground is up a little'): the source's
+        # band runs y 420..480 and the tank rides at y~445 with its wheels
+        # ON the road, craters stamp at y~465. Scaled from the band top:
+        # tank center = +25 orig px, road surface = +45 orig px. The old
+        # +78/+62 sat the tank BELOW the band (half off-screen) and the
+        # impacts in the sky-side grass.
+        ROAD_Y = GROUND_Y + 104.0
+        TANK_Y = GROUND_Y + 58.0
         Z_NUKE_Y = H / 3.0
         Z_STEER_Y = H * 2.0 / 3.0
         meta = HWMeta.load_meta()
         game_id = "heavywar"
         pause_end_run = false
+        # v040-3 THE ONE-COIN LAW (the owner: 'i got 30 gogacoins from a
+        # collected gogacoin i have not even seen... one coin is one coin'):
+        # the score->coins death bonus is ZERO for this game - the wallet
+        # grows ONLY from the helicopter's own gogacoin drops.
+        score_bonus_enabled = false
         _run_reset()
         _build_world()
         _build_chips()
@@ -137,10 +148,6 @@ func _goga_setup() -> void:
 # THE RUN LEDGER
 # =================================================================
 func _run_reset() -> void:
-        var shuf := []
-        for i in HWData.PLACES.size():
-                shuf.append(i)
-        shuf.shuffle()
         run = {
                 "place_i": 0,            # index into place_queue
                 "places_done": 0,        # places fully survived
@@ -151,6 +158,7 @@ func _run_reset() -> void:
                 "nukes": HWData.start_nukes(),
                 "laser_parts": 0,        # components collected this run
                 "laser_on": 0.0,         # >0 = the megabeam is burning
+                "laser_burn_max": 0.0,   # the burn the live % drains from
                 "iframes": 0.0,
                 "fire_cd": 0.0,
                 "score_life_mark": 0,    # the last score mark that paid a life
@@ -275,10 +283,15 @@ func _layer_roll(l: Dictionary, dx: float) -> void:
         l["off"] = fmod(float(l["off"]) + dx, period)
         var x: float = -float(l["off"])
         var leaves: Array = l.get("leaves", [])
+        # v040-3 THE LEAF LAW: leaf k tiles at x + k*period - the old code
+        # stacked EVERY leaf past the first at the SAME x + period, so any
+        # canvas wider than 2 periods showed the raw void: the owner's
+        # blue/white rectangles, the 'unreachable wall', the 4:10 brown
+        # pixels - the world periodically RAN OUT on his 20:9 screen.
         for k in leaves.size():
                 var leaf: CanvasItem = leaves[k]
                 if is_instance_valid(leaf):
-                        leaf.position.x = x if k == 0 else x + period
+                        leaf.position.x = x + float(k) * period
 
 ## THE PLACE DRESSING - the original's real layers, composed + true-scaled
 func _dress_place(pi: int) -> void:
@@ -398,8 +411,15 @@ func _props_spawn_set(plane: int, set_i: int, period: float,
                 props.append({"n": n, "frames": frames,
                         "fps": float(r["speed"]) * 100.0,
                         "type": String(r["type"]),
+                        # v040-3 THE DRIFT LAW: mx is the source's signed
+                        # per-frame drift ADDED to the plane's leftward walk
+                        # (negative mx = walks left FASTER - the penguin
+                        # waddles forward, the balloon lags). The old + sign
+                        # reversed it: props visibly SWAM BACKWARDS while
+                        # the world scrolled left (the owner's 'moved the
+                        # opposite directions').
                         "dx": WORLD_SPEED * speed_f
-                                + float(r["mx"]) * 100.0 * SC,
+                                - float(r["mx"]) * 100.0 * SC,
                         "t": 0.0, "frame": 0})
 
 ## THE SKIN SLOT: olive is the base sprite; the shop's skins are the
@@ -457,15 +477,22 @@ func _apply_skin() -> void:
 # texture with its TRUE frame count (the strips were counted by eye and
 # by seam - no more squeezed cells, no more raw masks, no white boxes).
 const SRC_SPRITES := {
-        "enemy_scout": {"p": "sprites/propfighter.png", "hf": 4},
+        # v040-3: the hframes are the STRIPS' TRUE frame counts (counted off
+        # the source's own pixels): propfighter 280x30 = 10 frames of 28,
+        # smallcopter 450x40 = 9 of 50, bigcopter 900x60 = 9 of 100 (alpha
+        # gaps), strafer 850x72 = 10 of 85, satellite 760x100 = 10 of 76,
+        # truck 900x60 = 10 of 90, dozer 1400x90 = 10 of 140. The old wrong
+        # counts sliced MID-SPRITE - the owner's '2 images moving fast or
+        # one static image'.
+        "enemy_scout": {"p": "sprites/propfighter.png", "hf": 10},
         "enemy_dart": {"p": "sprites/smalljet.png"},
         "enemy_raider": {"p": "sprites/bomber.png"},
         "enemy_lynx": {"p": "sprites/jetfighter.png"},
-        "enemy_komet": {"p": "sprites/bigmissile.png", "hf": 3},
+        "enemy_komet": {"p": "sprites/bigmissile.png", "hf": 3, "vf": 5},
         "enemy_skimmer": {"p": "sprites/cruise.png", "hf": 8},
         "enemy_fang": {"p": "sprites/deltajet.png"},
         "enemy_talon": {"p": "sprites/deltabomber.png"},
-        "enemy_wasp": {"p": "sprites/smallcopter.png", "hf": 5},
+        "enemy_wasp": {"p": "sprites/smallcopter.png", "hf": 9},
         "enemy_hornet": {"p": "sprites/medcopter.png", "hf": 7},
         "enemy_mirror": {"p": "sprites/deflector.png"},
         "enemy_strafer": {"p": "sprites/strafer.png", "hf": 10},
@@ -503,22 +530,30 @@ const SRC_SPRITES := {
         "shell": {"p": "sprites/bullets.png", "cell": [24, 12],
                 "cols": 21, "rows": 5, "angle_cols": true},
         # the rotation strips: the source picked angle frames, never spun
-        "eshot_bullet": {"p": "sprites/enemygun.png", "hf": 10, "vf": 2,
-                "rot": 20},
-        "eshot_missile": {"p": "sprites/missile.png", "hf": 20, "rot": 20},
-        "eshot_rpg": {"p": "sprites/rpg.png", "hf": 10, "rot": 10},
-        "eshot_hellfire": {"p": "sprites/hellfire.png", "hf": 21, "rot": 21},
+        "eshot_bullet": {"p": "sprites/enemygun.png", "hf": 20, "vf": 2,
+                "rot": 20, "rot0": 0.0},
+        "eshot_missile": {"p": "sprites/missile.png", "hf": 20, "rot": 20,
+                "rot0": 0.0},
+        "eshot_rpg": {"p": "sprites/rpg.png", "hf": 10, "rot": 10,
+                "rot0": 90.0},
+        "eshot_hellfire": {"p": "sprites/hellfire.png", "hf": 21, "rot": 21,
+                "rot0": 90.0},
         "eshot_headmissile": {"p": "sprites/headmissile.png", "hf": 20,
-                "rot": 20},
+                "rot": 20, "rot0": 0.0},
         "eshot_meteor": {"p": "sprites/meteorite.png", "hf": 10},
         "eshot_boulder": {"p": "sprites/boulder.png", "hf": 5},
         "eshot_barrel": {"p": "sprites/crates.png", "region": [72, 0, 36, 36]},
         "eshot_ball": {"p": "bosses/wrecker/ball.png"},
-        "bomb_dumb": {"p": "sprites/dumbbomb.png", "hf": 10, "rot": 10},
-        "bomb_guided": {"p": "sprites/lgb.png", "hf": 21, "rot": 21},
-        "bomb_armored": {"p": "sprites/ironbomb.png", "hf": 10, "rot": 10},
-        "bomb_frag": {"p": "sprites/fragbomb.png", "hf": 10, "rot": 10},
-        "bomb_atom": {"p": "sprites/fatboy.png", "hf": 10, "rot": 10},
+        "bomb_dumb": {"p": "sprites/dumbbomb.png", "hf": 10, "rot": 10,
+                "rot0": 90.0},
+        "bomb_guided": {"p": "sprites/lgb.png", "hf": 21, "rot": 21,
+                "rot0": 90.0},
+        "bomb_armored": {"p": "sprites/ironbomb.png", "hf": 10, "rot": 10,
+                "rot0": 90.0},
+        "bomb_frag": {"p": "sprites/fragbomb.png", "hf": 10, "rot": 10,
+                "rot0": 90.0},
+        "bomb_atom": {"p": "sprites/fatboy.png", "hf": 10, "rot": 10,
+                "rot0": 90.0},
         # THE IMPACT FAMILY (the source's own VFX, composed)
         "boom": {"p": "sprites/explosion.png", "hf": 20},
         "crater": {"p": "sprites/crater.png", "hf": 5},
@@ -553,6 +588,8 @@ func _art_sprite(art_id: String, size: Vector2, tint: Color) -> Node2D:
         if not m.is_empty():
                 tex = _src_tex(String(m["p"]))
         if tex != null:
+                var holder_meta := holder
+                holder_meta.set_meta("art", art_id)
                 # THE BLEND LAW: the source's black-plate sprites (the
                 # shield dome, the zap, the mushroom fire) burn additively
                 # - the material rides the SPRITE, holders never inherit.
@@ -623,9 +660,13 @@ func _set_rot_frame(n: Node2D, vel: Vector2) -> void:
         var total := int(n.get_meta("rot", 0))
         if total <= 0:
                 return
+        var m: Dictionary = SRC_SPRITES.get(String(n.get_meta("art", "")), {})
+        var rot0: float = float(m.get("rot0", 0.0))
         var deg := rad_to_deg(vel.angle())
-        # the strips draw frame 0 pointing RIGHT, sweeping a full circle
-        var f := int(round((deg + 360.0) / 360.0 * float(total))) % total
+        # rot0 = the source strip's frame-0 nose direction (the bombs draw
+        # nose-UP at frame 0, the bullets nose-RIGHT)
+        var f := int(round(fposmod(deg - rot0, 360.0) / 360.0
+                * float(total))) % total
         var spr: Sprite2D = n.get_meta("spr", null)
         if spr != null:
                 spr.frame = f
@@ -649,12 +690,21 @@ func _build_chips() -> void:
         war_layer = CanvasLayer.new()
         war_layer.layer = 5
         add_child(war_layer)
+        # v040-3 THE TRUE ICONS (the owner: 'the life points icon is wrong,
+        # this is an icon of an upgrade'): LIVES = the source's own TANK
+        # icon, NUKES = the source's nuke icon. The powerup orbs only
+        # badge the things they ARE.
         chips["lives"] = add_hud_chip("x%d" % int(run["lives"]),
-                SRC_ART + "sprites/pup_12.png")
+                SRC_ART + "sprites/tankicon.png")
         chips["shields"] = add_hud_chip("x0",
                 SRC_ART + "sprites/pup_02.png")
         chips["nukes"] = add_hud_chip("x%d" % int(run["nukes"]),
-                SRC_ART + "sprites/pup_01.png")
+                SRC_ART + "sprites/nukeicon.png")
+        # THE LASER WIDGET (the owner's own design - 'make it orange wavy
+        # I, and next to it nn%'; each part +25%, at 100% it fires itself
+        # and the burn drains the % back to 0, dying takes it to 0):
+        chips["laser"] = add_hud_chip("0%",
+                SRC_ART + "sprites/laser_wavy.png")
         _chips_refresh()
 
 func _chips_refresh() -> void:
@@ -666,6 +716,16 @@ func _chips_refresh() -> void:
                 (chips["shields"] as Label).text = "x%d" % int(run["shields"])
         if is_instance_valid(chips["nukes"]) and chips["nukes"] is Label:
                 (chips["nukes"] as Label).text = "x%d" % int(run["nukes"])
+        if is_instance_valid(chips.get("laser")) and chips["laser"] is Label:
+                # the live laser %: burning = the drain watch; idle = parts
+                var pct := 0
+                if float(run["laser_on"]) > 0.0:
+                        pct = int(round(float(run["laser_on"])
+                                / maxf(0.01, float(run["laser_burn_max"]))
+                                * 100.0))
+                else:
+                        pct = int(run["laser_parts"]) * 25
+                (chips["laser"] as Label).text = "%d%%" % clampi(pct, 0, 100)
 
 ## the boss bar + THE DANGER sign (the source's own warning plate)
 var boss_bar: ProgressBar = null
@@ -728,28 +788,39 @@ func _goga_input(event: InputEvent) -> void:
                 if d.index == aim_ptr:
                         aim_pos = d.position
                 elif d.index == steer_ptr:
-                        steer_target_x = d.position.x
+                        # the slider: stroke speed drives the tank speed
+                        var inst := (d.position.x - steer_last_x) \
+                                / maxf(0.008, 1.0 / 60.0)
+                        steer_vel = clampf(inst * STEER_GAIN,
+                                -HWData.engine_speed(
+                                meta.level_of("speed")) * 1.15,
+                                HWData.engine_speed(
+                                meta.level_of("speed")) * 1.15)
+                        steer_last_x = d.position.x
         elif event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
                 var mb := event as InputEventMouseButton
                 _touch(-1, mb.position, mb.pressed)
 
-## THE THREE ZONES (the owner's final wording): bottom = STEER (the tank
-## glides to the finger), center = AIM + FIRE (the finger IS the aim
-## point), top = THE NUKE. A finger keeps its role until it lifts.
+## THE ZONES v040-3 (the owner's item 9): TOP THIRD = THE NUKE, the BOTTOM
+## LEFT QUARTER = THE HIDDEN STEERING SLIDER, everything else = AIM + FIRE.
+## The slider is RELATIVE: the finger parks anywhere in its zone and small
+## left/right strokes steer; a bigger stroke steers faster - no more
+## chasing the tank across the whole screen with two fingers.
 func _touch(idx: int, pos: Vector2, down: bool) -> void:
         if down:
                 if pos.y < Z_NUKE_Y:
                         if not _nuke_debounce():
                                 _nuke_ms = Time.get_ticks_msec()
                                 _nuke()
-                elif pos.y < Z_STEER_Y:
+                elif pos.y > Z_STEER_Y and pos.x < W * 0.5:
+                        if steer_ptr == -1:
+                                steer_ptr = idx
+                                steer_last_x = pos.x
+                                steer_vel = 0.0
+                else:
                         if aim_ptr == -1:
                                 aim_ptr = idx
                                 aim_pos = pos
-                else:
-                        if steer_ptr == -1:
-                                steer_ptr = idx
-                                steer_target_x = pos.x
         else:
                 if idx == aim_ptr:
                         aim_ptr = -1
@@ -760,19 +831,27 @@ var _nuke_ms := 0
 func _nuke_debounce() -> bool:
         return Time.get_ticks_msec() - _nuke_ms < 120
 
-## THE PADDLE LAW (the owner: "the tank will move toward the finger,
-## using similar logic of moving like ping pong game")
+## THE SLIDER LAW (the owner's exact wording): 'keep his finger in one area
+## and move the finger a little to left to move tank to left and right to
+## right and increase finger movement so it move faster'. The finger's
+## MOTION steers, not its position: stroke velocity x gain = tank velocity,
+## decaying to a stop the moment the finger rests.
+var steer_last_x := 0.0
+var steer_vel := 0.0
+const STEER_GAIN := 9.0
 func _steer_glide(dt: float) -> void:
-        if steer_ptr == -1 or not (state in [GS.PLACE, GS.CALM, GS.BOSS]):
+        if not (state in [GS.PLACE, GS.CALM, GS.BOSS]):
                 return
-        var max_step: float = HWData.engine_speed(meta.level_of("speed")) * dt
-        var d: float = clampf(steer_target_x - tank.position.x,
-                -max_step, max_step)
-        tank.position.x = clampf(tank.position.x + d, 90.0, W - 90.0)
+        var max_v: float = HWData.engine_speed(meta.level_of("speed"))
+        if steer_ptr != -1:
+                tank.position.x = clampf(
+                        tank.position.x + steer_vel * dt, 90.0, W - 90.0)
+        # the stroke's push decays fast - a resting finger = a resting tank
+        steer_vel = move_toward(steer_vel, 0.0, max_v * 6.0 * dt)
         var body: Sprite2D = tank.get_meta("body")
-        var moving := absf(steer_target_x - tank.position.x) > 4.0
+        var moving := absf(steer_vel) > 40.0
         tank.set_meta("anim_t", float(tank.get_meta("anim_t", 0.0)) + dt)
-        var fps := 12.0 if moving else 4.0
+        var fps := 14.0 if moving else 4.0
         if float(tank.get_meta("anim_t")) > 1.0 / fps:
                 tank.set_meta("anim_t", 0.0)
                 body.frame = (body.frame + 1) % 10
@@ -785,7 +864,14 @@ func _arm_pivot() -> Vector2:
 
 ## the 24 columns sweep RIGHT (col 0) -> UP (col 12) -> LEFT (col 23);
 ## aiming below the horizon clamps to the ends. Returns the float column.
+## v040-3 THE AIM-ONLY LAW (the owner: 'the tank arm moves with the steer
+## while it should move following the aim... a proper one should look up
+## first then when there is an aim, the arm follows the aim... just spin
+## with it in 180 degrees'): the arm reads NOTHING but the aim finger -
+## no finger means the barrel rests pointing straight up.
 func _turret_col_f() -> float:
+        if aim_ptr == -1:
+                return 12.0
         var to := aim_pos - _arm_pivot()
         if to.length() < 8.0:
                 return 12.0
@@ -880,7 +966,8 @@ func _director_tick(dt: float) -> void:
         while not _wave_plan.is_empty() \
                         and float(_wave_plan[0]["at_px"]) >= _wave_px:
                 var u: Dictionary = _wave_plan.pop_front()
-                _spawn_enemy(String(u["id"]))
+                _spawn_enemy(String(u["id"]), -1.0, float(u.get("y", -1.0)),
+                        bool(u.get("left", false)))
 
 var _breath_t := 0.0
 func _wave_breather(dt: float) -> void:
@@ -903,16 +990,31 @@ func _roll_wave() -> void:
         _wave_px = float(w["len"])
         _wave_plan.clear()
         # each craft's qty spreads across the wave's walk, interleaved by
-        # phase (the source's own spread - craft stream, not clump)
+        # phase (the source's own spread - craft stream, not clump).
+        # v040-3: each spawn also rolls its SIDE (the craft table's left
+        # chance) and its FORMATION LANE (the source flew waves in lanes,
+        # not scattered confetti).
         var k := 0
         for ul in w["u"]:
                 var eid: String = ul[0]
                 var qty := int(ul[1])
+                var d: Dictionary = HWData.ENEMIES.get(eid, {})
+                var left_p: float = float(d.get("left", 0.0))
+                var lanes: Array = [190.0, 295.0, 400.0, 505.0]
                 for i in qty:
                         var frac: float = (float(i) + 0.5) / float(qty)
                         var at: float = _wave_px * (1.0 - frac) \
                                 + float(k % 3) * 6.0
-                        _wave_plan.append({"id": eid, "at_px": at})
+                        var lane_y: float = -1.0
+                        var kd := String(d.get("kind", "line"))
+                        if kd != "ballistic" and kd != "ground" \
+                                        and kd != "plow" and kd != "sea" \
+                                        and kd != "orbit":
+                                lane_y = lanes[k % lanes.size()] \
+                                        + randf_range(-24.0, 24.0)
+                        _wave_plan.append({"id": eid, "at_px": at,
+                                "left": randf() < left_p,
+                                "y": lane_y})
                         k += 1
         _wave_plan.sort_custom(func(a, b): return float(a["at_px"]) \
                 > float(b["at_px"]))
@@ -933,38 +1035,54 @@ func _level_waves() -> Array:
 # =================================================================
 # THE ENEMIES - spawn + brains
 # =================================================================
-func _spawn_enemy(eid: String, at_x := -1.0, at_y := -1.0) -> void:
+func _spawn_enemy(eid: String, at_x := -1.0, at_y := -1.0,
+                from_left := false) -> void:
         var d: Dictionary = HWData.ENEMIES[eid]
         var sc_mul := 1.0
         if eid == "mammoth":
                 sc_mul = 1.45          # the elite big copter (same pixels)
         var n := _art_sprite("enemy_" + eid,
-                Vector2(d["w"], d["h"]) * sc_mul, Color("a8402e"))
+                Vector2(d["w"], d["h"]) * sc_mul, Color("ffffff"))
         var w: float = d["w"] * sc_mul
         var h: float = d["h"] * sc_mul
-        # THE ENTRY LAW (the owner: "it shows its head then its butt"):
-        # spawn FULLY off the edge and let the body glide in, clipped -
-        # never the whole body at once.
-        var x: float = at_x if at_x >= 0.0 else W + w * 0.5 + 30.0
+        # THE BOTH-SIDES LAW (the owner: 'in original they can appear from
+        # both sides... a thing from the left goes to right and thing from
+        # right goes to left'): the craft table carries each type's left
+        # chance; the body ALWAYS faces its travel (the source art faces
+        # left = the right-side entry; a left entry flips).
+        var dir := -1.0
+        var x: float
+        if at_x >= 0.0:
+                x = at_x
+        elif from_left:
+                x = -w * 0.5 - 30.0
+                dir = 1.0
+        else:
+                x = W + w * 0.5 + 30.0
+        if dir > 0.0:
+                var spr: Sprite2D = n.get_meta("spr", null)
+                if spr != null:
+                        spr.flip_h = true
         var y := at_y
         if y < 0:
                 match String(d["kind"]):
-                        "ground":
-                                y = ROAD_Y - 6.0
+                        "ground", "plow":
+                                y = ROAD_Y - h * 0.42
                         "sea":
                                 y = H - 210.0
                         "ballistic":
                                 y = -h * 0.5 - 40.0
                         _:
-                                y = randf_range(190.0, GROUND_Y - 220.0)
+                                y = randf_range(170.0, GROUND_Y - 240.0)
         n.position = Vector2(x, y)
         ent_layer.add_child(n)
         var hp := maxi(1, int(round(float(d["hp"]) * _wave_hp_mul())))
         enemies.append({
                 "id": eid, "n": n, "hp": hp, "maxhp": hp,
-                "w": w, "h": h,
+                "w": w, "h": h, "dir": dir,
                 "kind": String(d["kind"]), "wpn": d["weapon"],
                 "spd": float(d["spd"]) * (1.0 + 0.03 * _lvl_i),
+                "fps": float(d.get("fps", 0.0)),
                 "t": randf() * TAU, "y0": y,
                 "fire_t": float(d["weapon"].get("cd",
                         d["weapon"].get("gun",
@@ -977,45 +1095,65 @@ func _enemies_tick(dt: float) -> void:
         for e in enemies:
                 var n: Node2D = e["n"]
                 var sp: float = e["spd"]
+                var dir: float = float(e.get("dir", -1.0))
+                var ew: float = float(e.get("w", 100.0))
                 e["t"] += dt
+                # THE REAL ANIM LAW: every strip animates at its source fps
+                # (rotors, props, treads) - never a frozen or squeezed cell
+                if float(e.get("fps", 0.0)) > 0.0:
+                        var spr: Sprite2D = n.get_meta("spr", null)
+                        if spr != null and spr.hframes > 1:
+                                spr.frame = int(e["t"] * float(e["fps"])) \
+                                        % spr.hframes
                 match String(e["kind"]):
                         "sine":
-                                n.position.x -= sp * dt
+                                n.position.x += dir * sp * dt
                                 n.position.y = float(e["y0"]) \
-                                        + sin(e["t"] * 2.2) * 60.0
+                                        + sin(e["t"] * 2.2) * 42.0
                         "line":
-                                n.position.x -= sp * dt
+                                n.position.x += dir * sp * dt
                         "sea":
-                                n.position.x -= sp * dt
+                                # the cruise missile rides LOW and level; its
+                                # 8 frames are pitch poses - pick by climb
+                                n.position.x += dir * sp * dt
                                 n.position.y = float(e["y0"]) \
-                                        + sin(e["t"] * 6.0) * 8.0
+                                        + sin(e["t"] * 1.3) * 14.0
+                                var vy := cos(e["t"] * 1.3) * 18.2
+                                var spr2: Sprite2D = n.get_meta("spr", null)
+                                if spr2 != null and spr2.hframes > 1:
+                                        spr2.frame = clampi(int(
+                                                (vy + 18.0) / 36.0 * 7.0),
+                                                0, 7)
                         "ballistic":
                                 n.position.y += sp * dt
-                                n.position.x -= 40.0 * dt
+                                n.position.x += dir * 40.0 * dt
                         "hover":
-                                n.position.x -= sp * dt * 0.35
+                                # the copter hangs against its own walk, bobbing
+                                n.position.x += dir * sp * dt * 0.55
                                 n.position.y = float(e["y0"]) \
-                                        + sin(e["t"] * 1.6) * 50.0
-                                if n.position.x < W * 0.72:
-                                        n.position.x += sp * dt * 0.30
+                                        + sin(e["t"] * 1.6) * 26.0
                         "swoop":
                                 # dive at the tank, climb back, dive again
-                                var want_y: float = TANK_Y - 90.0 \
-                                        if sin(e["t"] * 0.9) > 0.0 else 260.0
-                                n.position.x -= sp * dt * 0.7
+                                var want_y: float = TANK_Y - 110.0 \
+                                        if sin(e["t"] * 0.9) > 0.0 else 250.0
+                                n.position.x += dir * sp * dt * 0.7
                                 n.position.y = move_toward(n.position.y,
                                         want_y, sp * dt * 0.9)
                         "ground", "plow":
-                                n.position.x -= sp * dt
+                                n.position.x += dir * sp * dt
                         "guard":
-                                n.position.x -= sp * dt
+                                n.position.x += dir * sp * dt
                                 e["guard"] = fmod(e["t"], 4.0) < 2.6
                         "orbit":
                                 n.position.x = W * 0.86 \
                                         + sin(e["t"] * 0.5) * 120.0
                                 n.position.y = 160.0 + cos(e["t"] * 0.4) * 40.0
                 _enemy_weapons(e, dt)
-                if n.position.x < -320.0 or n.position.y > H + 160.0:
+                # the exit law: fully past the edge it entered from
+                if (dir < 0.0 and n.position.x < -ew * 0.5 - 80.0) \
+                                or (dir > 0.0
+                                and n.position.x > W + ew * 0.5 + 80.0) \
+                                or n.position.y > H + 160.0:
                         dead.append(e)
         for e in dead:
                 _enemy_free(e)
@@ -1033,14 +1171,21 @@ func _enemy_weapons(e: Dictionary, dt: float) -> void:
         if float(e["fire_t"]) > 0.0:
                 return
         var n: Node2D = e["n"]
-        if n.position.x > W - 60.0:
+        var dir: float = float(e.get("dir", -1.0))
+        # the hold-fire law: nobody fires from OFF-screen (the old law only
+        # knew the right edge; a left-entering plane opened fire at once)
+        if n.position.x > W - 60.0 or n.position.x < 60.0:
                 e["fire_t"] = 0.4
                 return
+        # the fire point rides the NOSE (the facing side)
+        var nose := n.position + Vector2(dir * e["w"] * 0.3, e["h"] * 0.15)
         if wpn.has("gun"):
                 e["fire_t"] = float(wpn["gun"])
-                _enemy_shot(n.position + Vector2(-e["w"] * 0.3, e["h"] * 0.2),
+                _enemy_shot(nose,
                         (tank.position - n.position).normalized() * 620.0,
                         "bullet")
+                # THE MUZZLE LAW: every shot wears its firing flash
+                _fire_flash(nose, 0.7)
                 Jukebox.sfx("hws_enemyfire", -14.0, randf_range(0.9, 1.1))
         elif wpn.has("bomb"):
                 var kind: String = wpn["bomb"]
@@ -1050,21 +1195,37 @@ func _enemy_weapons(e: Dictionary, dt: float) -> void:
                 e["fire_t"] = float(wpn["cd"])
                 for i in 5:
                         _drop_bomb(n.position
-                                + Vector2(20.0 * i - 40.0, e["h"] * 0.4),
+                                + Vector2(dir * 20.0 * i, e["h"] * 0.4),
                                 String(wpn["carpet"]))
         elif wpn.has("missile"):
                 e["fire_t"] = float(wpn["missile"])
-                _enemy_shot(n.position + Vector2(-e["w"] * 0.3, 0),
-                        Vector2(-420.0, 0), "hellfire")
+                _enemy_shot(nose, Vector2(dir * 460.0, -60.0), "hellfire")
+                _puff_at(nose)
                 Jukebox.sfx("hws_missile", -12.0)
         elif wpn.has("rpg"):
                 e["fire_t"] = float(wpn["rpg"])
-                _enemy_shot(n.position + Vector2(-e["w"] * 0.4, -e["h"] * 0.3),
-                        Vector2(-560.0, -380.0), "rpg")
+                _enemy_shot(nose, Vector2(dir * 560.0, -380.0), "rpg")
+                _fire_flash(nose, 0.8)
                 Jukebox.sfx("hws_enemyfire", -12.0, 0.8)
         elif wpn.has("laser"):
                 e["fire_t"] = float(wpn["laser"])
                 _orbital_laser(n.position)
+
+## THE ENEMY FIRE VFX FAMILY (the owner: 'the projectile missing maybe both
+## the firing VFX and the projectile animation'): a smaller muzzle star for
+## guns/rpgs, a smoke puff for missile launches.
+func _fire_flash(at: Vector2, scale_f: float) -> void:
+        var fl := _art_sprite("muzzle", Vector2(64, 64) * scale_f,
+                Color("ffffff"))
+        fl.position = at
+        shot_layer.add_child(fl)
+        fx.append({"n": fl, "t": 0.0, "life": 0.08, "kind": "flash"})
+
+func _puff_at(at: Vector2) -> void:
+        var p := _art_sprite("smoke", Vector2(40, 40), Color("cfcfcf"))
+        p.position = at
+        shot_layer.add_child(p)
+        fx.append({"n": p, "t": 0.0, "life": 0.5, "kind": "puff"})
 
 func _drop_bomb(at: Vector2, kind: String) -> void:
         var size := Vector2(26, 26)
@@ -1168,9 +1329,34 @@ func _shots_tick(dt: float) -> void:
                 if not hit.is_empty():
                         _flak_burst(n.position)
                         dead.append(s)
+                        continue
+                # THE INTERCEPT LAW (the owner: 'the tank weapon when hit a
+                # projectile, it can destroy it, except the pink poison-like
+                # things'): a shell that reaches an enemy bomb/bullet/grenade
+                # SHOOTS IT OUT OF THE AIR - the hellfire acid family is
+                # untouchable (the source's own rule).
+                if _shell_intercept(n.position):
+                        dead.append(s)
         for s in dead:
                 shots.erase(s)
                 (s["n"] as Node2D).queue_free()
+
+## shells sweep the enemy fire: any interceptable ebomb near the shell dies
+## with a small air burst. Returns true when the shell consumed itself.
+func _shell_intercept(at: Vector2) -> bool:
+        for b in ebombs:
+                if String(b.get("kind", "")) == "hellfire":
+                        continue          # the pink poison cannot be shot
+                var bn: Node2D = b["n"]
+                if bn.position.distance_to(at) < 44.0:
+                        _fx_boom(bn.position, 0.55)
+                        _spark_at(bn.position)
+                        Jukebox.sfx("hws_flak", -16.0,
+                                randf_range(1.1, 1.3))
+                        ebombs.erase(b)
+                        bn.queue_free()
+                        return true
+        return false
 
 func _nearest_dir(at: Vector2) -> Vector2:
         var best := Vector2.ZERO
@@ -1212,6 +1398,12 @@ func _shell_hit(at: Vector2, dmg: int) -> Dictionary:
                         _spark_at(at)
                         _damage_enemy(e, dmg)
                         return e
+        # THE FRIEND UNDER FIRE: the white heli eats ten points then falls
+        if heli.visible and heli_hp > 0 \
+                        and absf(heli.position.x - at.x) < 140.0 \
+                        and absf(heli.position.y - at.y) < 70.0:
+                _heli_hit(dmg)
+                return {"heli": true}
         if boss != null and is_instance_valid(boss["n"]):
                 var parts: Array = boss["parts"]
                 if parts.is_empty():
@@ -1257,14 +1449,84 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
                 Jukebox.sfx("hws_deflect", -12.0, 0.9)
                 return
         e["hp"] = int(e["hp"]) - dmg
+        # THE HIT FLASH LAW (the owner: 'same weapon hit effect? without
+        # differences?'): every struck craft FLASHES white at its own hit
+        # point - the source's damage read.
+        var hn: Node2D = e["n"]
+        var spr: Sprite2D = hn.get_meta("spr", null)
+        if spr != null:
+                spr.modulate = Color(1.9, 1.9, 1.6)
+                fx.append({"n": hn, "t": 0.0, "life": 0.0,
+                        "kind": "unflash", "spr": spr})
         if int(e["hp"]) <= 0:
                 _kill_enemy(e)
 
+## THE PER-FAMILY KILL LAW (the owner: 'different enemies share same
+## destroy effect? the exact same?'): the source's families die DIFFERENTLY
+## - jets burst + scatter, copters spin their wreck down smoking, bombers
+## break into fireballs, the blimp DETONATES INTO A BULLET SHOWER
+## (craft.xml: 'showers screen with bullets when destroyed'), the ground
+## steel stamps craters.
 func _kill_enemy(e: Dictionary) -> void:
         var n: Node2D = e["n"]
+        var eid := String(e["id"])
         var big: float = clampf(float(e["w"]) / 160.0, 0.7, 2.2)
-        _fx_boom(n.position, big)
-        _debris_shower(n.position, 2 + int(big * 2.0))
+        var fam := "jet"
+        if eid in ["wasp", "hornet", "viper", "mammoth"]:
+                fam = "copter"
+        elif eid in ["raider", "carpet", "fortress"]:
+                fam = "bomber"
+        elif eid == "atomault":
+                fam = "atomic"
+        elif eid == "zeppelin":
+                fam = "zeppelin"
+        elif eid in ["technical", "grinder", "plowman"]:
+                fam = "steel"
+        elif eid in ["komet", "skimmer", "orbital"]:
+                fam = "airburst"
+        match fam:
+                "jet":
+                        _fx_boom(n.position, big * 0.9)
+                        _debris_shower(n.position, 3 + int(big * 2.0))
+                        _spark_at(n.position)
+                "copter":
+                        _fx_boom(n.position, big)
+                        _debris_shower(n.position, 2 + int(big * 2.0))
+                        for i in 3:
+                                _puff_at(n.position + Vector2(
+                                        randf_range(-30, 30),
+                                        randf_range(-20, 20)))
+                "bomber":
+                        _fx_boom(n.position, big * 1.15)
+                        _fx_boom(n.position + Vector2(30, -14), big * 0.7)
+                        _debris_shower(n.position, 4 + int(big * 2.0))
+                        _puff_at(n.position)
+                "atomic":
+                        _fx_boom(n.position, 2.4)
+                        _fx_ring(n.position, Color("ffd23c"), 130.0, 0.4)
+                        _debris_shower(n.position, 8)
+                "zeppelin":
+                        # THE SOURCE'S OWN DEATH: the munitions blimp goes up
+                        # in chained blasts AND showers the road with its
+                        # cargo bullets (craft.xml arms note)
+                        for i in 4:
+                                _fx_boom(n.position + Vector2(
+                                        randf_range(-110, 110),
+                                        randf_range(-40, 40)),
+                                        1.1 + 0.35 * i)
+                        for i in 12:
+                                _enemy_shot(n.position, Vector2(
+                                        randf_range(-420, 60),
+                                        randf_range(120, 420)), "bullet")
+                        _debris_shower(n.position, 10)
+                "steel":
+                        _fx_boom(n.position, big * 1.1)
+                        _debris_shower(n.position, 5)
+                        _crater_stamp(n.position, 0.9)
+                "airburst":
+                        _fx_boom(n.position, big * 0.8)
+                        _spark_at(n.position)
+                        _debris_shower(n.position, 2)
         _pay_score(int(e["pts"]), n.position)
         run["kills"] += 1
         achievement_count("hw_kill_bank", 1)
@@ -1457,6 +1719,14 @@ func _hurt_tank(at: Vector2) -> void:
                 return
         run["lives"] = int(run["lives"]) - 1
         gun_tier = maxi(0, gun_tier - 1)
+        # THE DEATH RESET LAW (the owner: 'dying takes the pieces to 0 again
+        # like the original... i guess the original resets nukes to 0 when
+        # die too next to the laser'): a lost life takes the laser parts AND
+        # the nukes back to zero - the source's own brutality.
+        run["laser_parts"] = 0
+        run["laser_on"] = 0.0
+        run["laser_burn_max"] = 0.0
+        run["nukes"] = 0
         run["iframes"] = 1.4
         _tank_hit_flash()
         _fx_text(tank.position + Vector2(0, -90), "-1 LIFE",
@@ -1483,23 +1753,26 @@ var shield_bubble: Node2D = null
 func _shield_bubble() -> void:
         var on: bool = not (run["shield_hp"] as Array).is_empty()
         if on and shield_bubble == null:
+                # v040-3 THE DOME EMBRACES THE TANK (the owner: 'the shield
+                # is smaller than the tank body'): the dome wraps the whole
+                # hull with room to breathe.
                 shield_bubble = _art_sprite("shieldbubble",
-                        Vector2(150, 132), Color("bcd8ff"))
-                shield_bubble.position = tank.position + Vector2(0, -18)
+                        Vector2(260, 226), Color("bcd8ff"))
+                shield_bubble.position = tank.position + Vector2(0, -26)
                 tank.add_child(shield_bubble)
         elif not on and shield_bubble != null:
                 shield_bubble.queue_free()
                 shield_bubble = null
         elif on:
-                shield_bubble.position = Vector2(0, -18)
+                shield_bubble.position = Vector2(0, -26)
                 var spr: Sprite2D = shield_bubble.get_meta("spr", null)
                 if spr != null:
                         spr.frame = int(Time.get_ticks_msec() * 0.012) % 10
 
 func _zap_shield() -> void:
-        var z := _art_sprite("shieldzap", Vector2(180, 158),
+        var z := _art_sprite("shieldzap", Vector2(260, 226),
                 Color("dff0ff"))
-        z.position = Vector2(0, -18)
+        z.position = Vector2(0, -26)
         tank.add_child(z)
         fx.append({"n": z, "t": 0.0, "life": 0.45, "kind": "zap"})
 
@@ -1507,7 +1780,13 @@ func _zap_shield() -> void:
 var spheres: Array = []
 
 func _spheres_tick(dt: float) -> void:
-        var want: int = int(run["shields"])
+        # THE ORBIT LAW (the owner: 'the orbital orbit is wrong, this is for
+        # the shield orbits upgrade, not here'): the spinning deflector
+        # spheres belong to the SHIELD upgrade's higher levels only - the
+        # base shield pickup wears the dome, never the orbits.
+        var want: int = 0
+        if meta.level_of("shield") >= 2:
+                want = int(run["shields"])
         while spheres.size() < want:
                 var o := _art_sprite("orb", Vector2(56, 56),
                         Color("b0f0e0"))
@@ -1577,15 +1856,47 @@ func _nuke_blast_at(cx: float, width_frac: float) -> void:
 # THE FRIEND - the white helicopter's crates (the source's own law:
 # "Don't shoot the white helicopters! They are your allies")
 # =================================================================
+## THE FRIEND HELICOPTER LAW v040-3 (the owner's items 3, 4, 19, 25):
+##  * the pupcopter FLIES: the rotor strip SPINS on the mast at real fps,
+##    the body bobs and tilts gently (the dead-stick slide is gone);
+##  * it enters from the LEFT and crosses right (the source's own pass);
+##  * it drops exactly ONE crate, released while crossing the MIDDLE band
+##    (x in 35..75% of the run - 'if total range is 100, drop at 35-75'),
+##    and the crate really FALLS from the cargo hook;
+##  * the pass clock follows the source's own supply rhythm;
+##  * it is MORTAL: ten points of tank fire (the base gun is 1 - x10 the
+##    power), each hit flashes + smokes + sounds; killed in the air it
+##    explodes and its crate falls where it died. The gogacoin rides ITS
+##    drops (the owner: 'gogacoin should drop from the help helicopter').
+var heli_hp := 0
+var heli_dropped := false
+var heli_t := 0.0
+
 func _heli_tick(dt: float) -> void:
+        # the teardown race guard: a game closing while its last ticks run
+        if not is_instance_valid(heli):
+                return
         if heli.visible:
                 var h := heli
-                h.position.x -= 210.0 * dt
-                h.position.y = 260.0 + sin(h.position.x * 0.01) * 26.0
-                var rot: Sprite2D = h.get_meta("rotor", null)
-                if rot != null:
-                        rot.frame = int(Time.get_ticks_msec() * 0.05) % 7
-                if h.position.x < -200.0:
+                heli_t += dt
+                h.position.x += 165.0 * dt
+                h.position.y = 235.0 + sin(heli_t * 1.7) * 22.0
+                h.rotation = sin(heli_t * 1.7 + 0.9) * 0.05
+                # THE CAST TRAP (this exact line killed the tick in v040-2:
+                # the rotor meta holds the HOLDER - a Node2D - and the typed
+                # Sprite2D assignment aborted the whole function every
+                # frame: the frozen rotor the owner filmed)
+                var rot = h.get_meta("rotor", null)
+                if rot != null and is_instance_valid(rot):
+                        var rspr: Sprite2D = rot.get_meta("spr", null)
+                        if rspr != null:
+                                rspr.frame = int(heli_t * 30.0) % 7
+                # THE ONE-DROP LAW: a single crate, released mid-range
+                if not heli_dropped and h.position.x >= W * 0.35 \
+                                and h.position.x <= W * 0.75:
+                        heli_dropped = true
+                        _heli_release()
+                if h.position.x > W + 220.0:
                         h.visible = false
                 return
         run["supply_t"] -= dt
@@ -1601,39 +1912,76 @@ func _heli_check_coin() -> void:
 
 func _heli_pass(mode: String) -> void:
         heli.visible = true
-        heli.position = Vector2(W + 160.0, 260.0)
+        heli.position = Vector2(-180.0, 235.0)
+        heli.rotation = 0.0
+        heli_t = 0.0
+        heli_hp = 10          # x10 the base gun's power - the owner's law
+        heli_dropped = false
         for c in heli.get_children():
                 c.queue_free()
         var body := _art_sprite("heli", Vector2(270, 99), Color("ffffff"))
         heli.add_child(body)
-        var rot := _art_sprite("helirotor", Vector2(248, 56),
-                Color("d0d0d0"))
-        rot.position = Vector2(0, -58)
+        # THE ROTOR RIDES THE MAST: the source's own 7-frame spin strip,
+        # seated on the body's top plate (measured off pupcopter.png)
+        var rot := _art_sprite("helirotor", Vector2(276, 62),
+                Color("ffffff"))
+        rot.position = Vector2(2, -52)
         heli.add_child(rot)
         heli.set_meta("rotor", rot)
         heli.set_meta("mode", mode)
-        # crate chain: supply = 2 crates; coin = 1 fat crate
-        var crates := 2 if mode == "supply" else 1
-        for i in crates:
-                var kind := mode if mode == "coin" else _roll_drop()
-                var rec: Dictionary = {}
-                for d in HWData.DROPS:
-                        if String(d["kind"]) == kind:
-                                rec = d
-                                break
-                var crate_i: int = int(rec.get("crate", 0))
-                var n := _art_sprite("crate", Vector2(72, 72),
-                        Color("c8933c"))
-                var spr: Sprite2D = n.get_meta("spr", null)
-                if spr != null:
-                        spr.frame = crate_i
-                n.position = heli.position + Vector2(60.0 * (i + 1), 80.0)
-                shot_layer.add_child(n)
-                drops.append({"n": n, "kind": kind, "icon": String(
-                        rec.get("icon", "pup_05")),
-                        "phase": "fall", "vy": 60.0,
-                        "life": 14.0, "t": 0.0})
         Jukebox.sfx("hws_pupcopter", -10.0)
+
+## the crate DETACHES from the cargo hook and falls with the heli's drift
+func _heli_release() -> void:
+        var mode := String(heli.get_meta("mode", "supply"))
+        var kind := "coin" if mode == "coin" else _roll_drop()
+        var rec: Dictionary = {}
+        for d in HWData.DROPS:
+                if String(d["kind"]) == kind:
+                        rec = d
+                        break
+        var crate_i: int = int(rec.get("crate", 0))
+        var n := _art_sprite("crate", Vector2(78, 78), Color("ffffff"))
+        var spr: Sprite2D = n.get_meta("spr", null)
+        if spr != null:
+                spr.frame = crate_i
+        n.position = heli.position + Vector2(0, 58)
+        shot_layer.add_child(n)
+        drops.append({"n": n, "kind": kind, "icon": String(
+                rec.get("icon", "pup_05")),
+                "phase": "fall", "vy": 40.0,
+                "life": 14.0, "t": 0.0})
+        _puff_at(n.position)
+        Jukebox.sfx("hws_powerup", -12.0, 0.8)
+
+## THE FRIEND UNDER FIRE: shells check the heli (in _shots_tick's
+## _shell_hit chain); ten points end the pass mid-air.
+func _heli_hit(dmg: int) -> bool:
+        if not heli.visible or heli_hp <= 0:
+                return false
+        heli_hp -= dmg
+        for c in heli.get_children():
+                if is_instance_valid(c):
+                        (c as CanvasItem).modulate = Color(1.9, 1.7, 1.4)
+        fx.append({"n": heli, "t": 0.0, "life": 0.0, "kind": "heli_unflash"})
+        _spark_at(heli.position)
+        Jukebox.sfx("hws_orbhit", -10.0, 0.8)
+        if heli_hp <= 0:
+                # the friend goes down: blast + the cargo drops where it died
+                _fx_boom(heli.position, 1.8)
+                _fx_boom(heli.position + Vector2(40, 20), 1.2)
+                _debris_shower(heli.position, 6)
+                Jukebox.sfx("hws_bigexplode", -4.0)
+                heli.visible = false
+                if not heli_dropped:
+                        heli_dropped = true
+                        heli.position.x = clampf(heli.position.x,
+                                W * 0.35, W * 0.75)
+                        _heli_release()
+                _pay_score(500, heli.position)
+        else:
+                _puff_at(heli.position + Vector2(0, 20))
+        return true
 
 func _roll_drop() -> String:
         var caps := {
@@ -1673,7 +2021,7 @@ func _drops_tick(dt: float) -> void:
                         "fall":
                                 c["vy"] = float(c["vy"]) + 700.0 * dt
                                 n.position.y += float(c["vy"]) * dt
-                                n.position.x -= 210.0 * dt * 0.4
+                                n.position.x += 60.0 * dt   # the heli's drift
                                 if n.position.y >= ROAD_Y:
                                         n.position.y = ROAD_Y
                                         c["phase"] = "pop"
@@ -1696,11 +2044,23 @@ func _drops_tick(dt: float) -> void:
                                 if float(c["life"]) <= 0.0:
                                         dead.append(c)
                                         continue
+                                # THE FLICKER-FADE LAW (the owner: 'when
+                                # something will disappear, make the flickering
+                                # effect then make it fade-out'): the last
+                                # 2.5s flicker, the final 0.5s fades.
+                                if float(c["life"]) < 2.5:
+                                        (n as CanvasItem).visible = \
+                                                fmod(float(c["life"]), 0.24) \
+                                                > 0.10
+                                        if float(c["life"]) < 0.5:
+                                                (n as CanvasItem).modulate.a = \
+                                                        float(c["life"]) / 0.5
                                 if absf(n.position.x - tank.position.x) \
                                                 < 80.0 and absf(
                                         n.position.y - TANK_Y) < 90.0:
                                         _collect(String(c["kind"]))
                                         dead.append(c)
+                # the fall phase flickers too once it sits (pop wait)
         for c in dead:
                 drops.erase(c)
                 (c["n"] as Node2D).queue_free()
@@ -1750,13 +2110,16 @@ func _collect(kind: String) -> void:
                                 run["laser_parts"] = 0
                                 run["laser_on"] = HWData.laser_burn(
                                         meta.level_of("laser"))
+                                run["laser_burn_max"] = float(
+                                        run["laser_on"])
                                 _fx_text(tank.position + Vector2(0, -100),
                                         "MEGALASER!", Color("40e8ff"))
                                 Jukebox.sfx("hws_megalaser_start", 0.0)
                         else:
                                 _fx_text(tank.position + Vector2(0, -100),
-                                        "MEGALASER %d/%d" % [
-                                        int(run["laser_parts"]), need],
+                                        "MEGALASER %d/4 - %d%%" % [
+                                        int(run["laser_parts"]),
+                                        int(run["laser_parts"]) * 25],
                                         Color("40b0ff"))
                                 Jukebox.sfx("hws_megaup%d" % clampi(
                                         int(run["laser_parts"]), 1, 4), -6.0)
@@ -1768,7 +2131,7 @@ func _collect(kind: String) -> void:
                 "coin":
                         add_run_coins(HWData.COIN_DROP)
                         _fx_text(tank.position + Vector2(0, -100),
-                                "+%d COINS" % HWData.COIN_DROP, Arc.COIN)
+                                "+%d GOGACOIN" % HWData.COIN_DROP, Arc.COIN)
         _chips_refresh()
         if kind != "shield" and kind != "laser":
                 Jukebox.sfx("hws_powerup", -6.0, randf_range(0.95, 1.05))
@@ -1781,6 +2144,7 @@ func _laser_tick(dt: float) -> void:
                         _laser_col.visible = false
                 return
         run["laser_on"] = float(run["laser_on"]) - dt
+        _chips_refresh()
         var beam_x := tank.position.x + 120.0
         var dead: Array = []
         for e in enemies:
@@ -1853,15 +2217,31 @@ func _enter_intro() -> void:
         var pi: int = place_queue_placeholder()
         _dress_place(pi)
         _chips_refresh()
+        # THE TAP SIGN (the owner: 'it does not show the tap anywhere to
+        # start when replay it'): EVERY intro entry - fresh boot AND replay
+        # - wears the flashing start plate. No more alive-looking dead wait.
+        if _intro_sign != null and is_instance_valid(_intro_sign):
+                _intro_sign.queue_free()
+        _intro_sign = Arc.label("TAP ANYWHERE TO START", 52, Arc.CARD)
+        _intro_sign.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _intro_sign.add_theme_color_override("font_outline_color",
+                Color(0.12, 0.09, 0.05, 0.95))
+        _intro_sign.add_theme_constant_override("outline_size", 14)
+        _intro_sign.custom_minimum_size = Vector2(900, 90)
+        _intro_sign.position = Vector2(W * 0.5 - 450.0, GROUND_Y - 320.0)
+        fx_layer.add_child(_intro_sign)
 
-## THE SHUFFLE LAW: every lap through the ten places reshuffles.
+## the intro plate node (rebuilt per entry so the size never goes stale)
+var _intro_sign: Label = null
+
+## THE PLACE ORDER LAW (v040-3): the source walks its OWN ten places in
+## levels.xml order - Frigistan first, Red Star HQ last. The old shuffle
+## threw the owner into random places (the 'inconsistent patterns').
 func _ensure_queue() -> void:
         if place_queue.is_empty() or run["place_i"] >= place_queue.size():
-                var shuf := []
+                place_queue.clear()
                 for i in HWData.PLACES.size():
-                        shuf.append(i)
-                shuf.shuffle()
-                place_queue = shuf
+                        place_queue.append(i)
                 run["place_i"] = 0
 
 func place_queue_placeholder() -> int:
@@ -1881,6 +2261,12 @@ func _start_place() -> void:
         _wave_plan.clear()
         _wave_px = 0.0
         _chips_refresh()
+        # the tap sign's job is done; the war wears its own action song
+        # (the source's AtomicTank module, rendered for the rig)
+        if _intro_sign != null and is_instance_valid(_intro_sign):
+                _intro_sign.queue_free()
+                _intro_sign = null
+        Jukebox.music("res://assets/audio/music/hws_atomictank.ogg")
         Jukebox.sfx("hws_v_getready", -4.0)
 
 func _place_tick(dt: float) -> void:
@@ -2401,13 +2787,39 @@ func _fx_tick(dt: float) -> void:
                 f["t"] = float(f["t"]) + dt
                 var t: float = float(f["t"])
                 var life: float = float(f["life"])
-                var n: Node = f["n"]
-                if not is_instance_valid(n):
+                # untyped on purpose: a freed node must not explode on the
+                # typed assignment - the validity guard below eats it
+                var n = f["n"]
+                if n == null or not is_instance_valid(n):
                         dead.append(f)
                         continue
                 match String(f["kind"]):
                         "flash":
                                 (n as CanvasItem).modulate.a = 1.0 - t / life
+                        "puff":
+                                (n as Node2D).position.y -= 26.0 * dt
+                                (n as Node2D).scale = (n as Node2D).scale \
+                                        .lerp(Vector2(1.5, 1.5), dt * 2.0)
+                                (n as CanvasItem).modulate.a = 1.0 - t / life
+                        "unflash":
+                                # THE HIT FLASH decay: white -> natural fast
+                                var spr5: Sprite2D = f.get("spr", null)
+                                if spr5 != null and is_instance_valid(spr5):
+                                        if t >= 0.07:
+                                                spr5.modulate = Color(1, 1, 1)
+                                                dead.append(f)
+                                        continue
+                                dead.append(f)
+                                continue
+                        "heli_unflash":
+                                # the friend's hit flash decays over the body
+                                if t >= 0.09 and is_instance_valid(n):
+                                        for c in (n as Node2D).get_children():
+                                                if is_instance_valid(c):
+                                                        (c as Sprite2D).modulate = Color(1, 1, 1)
+                                        dead.append(f)
+                                if t > 1.0:
+                                        dead.append(f)
                         "boom":
                                 (n as Node2D).scale = Vector2.ONE \
                                         .lerp(Vector2(1.25, 1.25), t / life)
@@ -2446,7 +2858,9 @@ func _fx_tick(dt: float) -> void:
                                 (n as CanvasItem).modulate.a = clampf(
                                         1.4 - t / life, 0.0, 1.0)
                         "text":
-                                (n as Node2D).position.y -= 46.0 * dt
+                                # the plate is a Label (Control) - the old
+                                # Node2D cast nulled and spammed the console
+                                (n as Control).position.y -= 46.0 * dt
                                 (n as CanvasItem).modulate.a = 1.0 - t / life
                         "zap":
                                 var spr4: Sprite2D = (n as Node2D) \
@@ -2489,7 +2903,12 @@ func _fx_tick(dt: float) -> void:
 func _goga_tick(dt: float) -> void:
         match state:
                 GS.INTRO:
-                        pass
+                        # the tap plate breathes while the war waits
+                        if _intro_sign != null and is_instance_valid(
+                                        _intro_sign):
+                                _intro_sign.modulate.a = 0.72 + 0.28 \
+                                        * sin(t_state * 5.0)
+                        t_state += dt
                 GS.PLACE:
                         _place_tick(dt)
                 GS.CALM:
@@ -2583,6 +3002,11 @@ func _shop_open() -> void:
         sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         var vp := get_viewport_rect().size
         sc.custom_minimum_size = Vector2(560, clampf(vp.y * 0.52, 300.0, 640.0))
+        # v040-3 THE MISSING SHELF (the owner: 'shop is currently empty...
+        # i guess this is a bug'): the scroll was BUILT and FILLED but never
+        # actually ADDED to the sheet - the shop wore an empty plate since
+        # v040-1. One line, the whole store.
+        vb.add_child(sc)
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 8)
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
