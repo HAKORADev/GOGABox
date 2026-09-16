@@ -229,6 +229,13 @@ stay.
 - **craze-caves-like** — Gamesnacks' Craze Caves, same concept (the owner's
   v0.3.3-p5 dump): dig/drill your way through the caves, grab everything
   shiny, don't get crushed - the one-thumb dig-and-collect loop.
+  **GRADUATED v040-7 as ROCK BREAKER** (the owner's rename law: "the name
+  feels like brick breaker but actually the game mechanic is different") —
+  the mechanic is NOT the dig-and-collect loop after all: the teachers are
+  Gamesnacks' Crazy Caves AND Voodoo's Ball Blast ("another game called
+  ball blast by voodoo that shares the same core mechanics") - the vertical
+  bouncing-rock cannon shooter. The owner's full spec, GDD:
+  gogames_ideas/rockbreaker.md.
 - **death-worm-like** (owner, v0.3.9-2 round) — the Death Worm energy: YOU
   ARE THE WORM - dive, tunnel and burst out of the ground to devour the
   walkers, snap at the birds, dodge the bullets; the surface is the
@@ -662,7 +669,13 @@ balloon connect + circle connect were mined from My Talking Angela 2).
   and the owner prefers the local net direction, because the per-round
   economy (fees, GOGACoins, GOGABatteries per device) works way better with
   a device per player than one-device-many-players. Keep this in mind when
-  mining this box.
+  mining this box. **THE SYSTEM HAS ITS DOC NOW (v040-7)**: the owner
+  specced the whole LAN multiplayer system — the plus+human menu button,
+  host/join, the PLAYERS badge (1..4), the hold screen with its seconds
+  counter and seat order, the ten-seconds countdown, the display name +
+  the one-guy PFP, CPU eliminated - one winner, the rest losers. The
+  binding contract lives in ideas/LAN_MULTIPLAYER.md (next to it sits the
+  owner's TOP-UP system, ideas/TOPUP_SYSTEM.md).
 - **tap the frog** — the owner's add (the v0.2.5 round, while Snowy Tower
   was being rebuilt): a whole box of quick tap-timing mini-games around one
   frog. Mine it for reflex/timing mini-game shapes.
@@ -760,3 +773,38 @@ then the house law stands: the user opens the first round, the loser
 opens the rest. It pairs with the LOCAL-NETWORK multiplayer direction
 (see the "1 2 3 4 player games" mine above): on a real opponent the
 first-move right is the coin sink that makes sense.
+
+Twentieth dump — the v040-7 round (2026-09-17, Rock Breaker's graduation
+night, +4: burrito bison, pocket tanks, atomic bomberman, the orbital
+sword arena rogue-like). The owner dumped these alongside the Rock
+Breaker spec ("update it with these details"). Dedup-checked against the
+shelf: none of the four walks an existing game (the launcher family has
+no entry, the artillery duels none, the bomb-grid none, the orbit-sword
+is an original).
+
+- **burrito-bison-like** — the launch-and-bounce runway: one big launch
+  down the ramp, then the body does the flying - bounce as far as the
+  momentum carries, smash through whatever the field puts up, keep the
+  combo alive, bank the haul into launch upgrades and go again. The
+  distance loop: launch, bounce, upgrade, launch farther.
+- **pocket-tanks-like** — the angle-and-power artillery duel: two tanks,
+  a broken terrain between them, turns traded in shots - pick the angle,
+  charge the power, let the projectile fly (the wind and the dig matter),
+  walk the blast closer and closer until the shell lands home. Weapon
+  packs make each duel a fresh puzzle.
+- **atomic-bomberman-like** — the fast frantic bomb grid: drop, run, cut
+  corners with the blast timing, chain the explosions, grab the powerups
+  before someone else does - the classic bomb-dodge arena at arcade
+  speed, where the bombs you place are the ones that kill you.
+- **orbital-sword arena rogue-like** (the owner's own concept, specced in
+  full) — a top-down arena rogue-like where the character carries a
+  SWORD ORBITING them: it starts as a simple spinning swing against
+  enemies, and the spin is the whole game. Some enemies carry swords
+  that slow the spin when the blades clash; some carry nothing (easy
+  meat, but they slow the spinning). The law of the clash: when the
+  sword hits something HEAVY (more than one hit to break) or hits
+  another sword, the spin REVERSES its side. Some enemies shoot fire -
+  their bullets can hit the player if they pass the orbit, or get
+  PARRIED by the sword on the way through (the parry is the
+  counter-attack). Kill, take the arena's rewards, grow the orbit, go
+  deeper - the rogue-like loop wrapped around one spinning blade.

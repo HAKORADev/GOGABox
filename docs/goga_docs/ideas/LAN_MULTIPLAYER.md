@@ -1,0 +1,134 @@
+# LAN MULTIPLAYER — the box-level system (owner spec, v040-7 round)
+
+> The owner's own spec, verbatim-shaped into laws. This is the dedicated
+> home of the LOCAL NETWORK multiplayer system — it grew out of the
+> parking-lot notes (FUTURE_GAMES.md's "1 2 3 4 player games" mine and the
+> WHO-PLAYS-FIRST pairing note, plus BRAINSTORM.md's v0.2.8 "shared
+> system, not a game feature" call). DOCUMENT ONLY — nothing here is
+> scheduled or built yet. When the owner green-lights it, it becomes a
+> `plans/PLAN_vX.Y.Z.md` task list and this file is the contract every
+> game and the box both read.
+
+## THE SYSTEM IN ONE BREATH
+
+Players on their own phones, one wifi, no servers: the main menu grows a
+multiplayer seat (HOST or JOIN), games that offer multiplayer wear a
+PLAYERS badge (1 up to 4), and a multiplayer-capable game opened by two or
+more holding players becomes a real-everyone match — CPU eliminated, one
+winner, the rest losers.
+
+## THE OWNER'S LAWS (binding, from the v040-7 message)
+
+- **THE LAN LAW**: "it will be a LAN". Local network only — each player
+  on their own device, one wifi. No accounts, no internet, no servers.
+  This is the device-per-player direction the owner chose back in the
+  v0.2.4 note: the per-round economy (fees, GOGACoins, batteries per
+  device) works because every player pays from their own wallet.
+- **THE MENU BUTTON LAW**: "in main menu there will be button visualized
+  as the (symbol + and a human emoji but not emoji)". The multiplayer
+  button in the main menu is DRAWN — a plus symbol and a human figure,
+  code-drawn icons in the box's own style (never an emoji glyph).
+- **THE HOST/JOIN LAW**: "will have two buttons which is host or join".
+  - **HOST** "will make IP or something": starts a session and shows the
+    address the others join (the device's LAN IP + port). The host "will
+    see the active session and can delete it" — a live session row with
+    an end/delete action — and the session "will auto-delete when the
+    app is closed" (no zombie sessions; closing the app kills it).
+  - **JOIN** "will let player to enter IP to join": a text field for the
+    host's address, then the handshake.
+- **THE PLAYERS BADGE LAW**: "games that offer multiplayer will have
+  special badge area and not a normal badge in genres, it will be called
+  'players' then show 1 up to 4". A dedicated badge AREA (its own slot,
+  visually apart from the genre/sub badges) carrying the supported player
+  count 1..4.
+- **THE OUT-OF-RADAR LAW**: "a game that is one, it is single player even
+  in LAN, completely out of radar". A game whose player count is 1 never
+  joins the LAN dance at all — no hold screen, no badge, no multiplayer
+  path. The registry carries the count per game; 1 means the system
+  pretends the game does not exist.
+- **THE HOLD SCREEN LAW**: "a game that is 2 or 2+ when opened it will
+  wait in holding screen and seconds counting waiting for others". Every
+  multiplayer-capable game opens into a HOLDING SCREEN with a running
+  seconds counter. The law of seats: "the one who opened first will be
+  first and second will be second" — arrival order fixes the seat order.
+- **THE LONE LAW**: "if no one opened the game except one, he will play
+  the single player, that's it". One holder alone eventually plays the
+  normal single-player game (the hold is not a trap — it waits a grace,
+  then falls through to the ordinary game).
+- **THE HOLD MIRROR LAW**: "the hold screen will show if others are in
+  hold or not" — the screen mirrors the session live: who is holding,
+  their name beside their figure. "If there is another one waiting, they
+  will appear in the hold screen" as they arrive; "if they left the
+  game, they will not show up" — leaves are reflected instantly.
+- **THE CROSS-GAME LAW**: "if the others entered, then that's a game gone
+  for the one in hold" — holding matches THE SAME GAME only. Players
+  holding a different game are a different hold; they never appear in
+  this game's screen, and a hold never drags anyone across games.
+- **THE TEN SECONDS LAW**: "once they are ready, if someone get into the
+  game, others will get 10 seconds count down, all of them should whether
+  get in or quit then the game will start". When any holder commits and
+  gets into the game, EVERY other holder gets a 10-second countdown —
+  each of them either gets in or quits — and then the match starts with
+  whoever is in. No infinite waiting once someone has committed.
+- **THE NAME LAW**: "in the multiplayer menu in main menu, it will let
+  player write display name so it will be displayed next to him (only
+  english unicode letters acceptable)". The multiplayer menu owns a
+  display-name field — English letters only — shown beside the player
+  everywhere the system shows people (the hold screen, the match). The
+  name exists "just so players know each other".
+- **THE PFP LAW**: "the PFP will just be simple one guy". No avatars, no
+  picker — every player is the same simple drawn one-guy figure (the
+  menu button's human, reused at person scale). The name is the
+  identity; the figure is the face.
+- **THE REAL-ONLY LAW**: "in it, CPU will be eliminated, all will be
+  real, all sides are real and when one win, others are losers, simple
+  logic i mean". A multiplayer match has NO CPU players — every seat is
+  a human on a device. The verdict is simple: one winner, everyone else
+  a loser. Games keep their own win logic; the system only guarantees
+  the seats are real.
+
+## THE GAMES (the owner's list)
+
+"games, like S&L or domino or chess or squares or dice conquer or even
+space invaders or more" — the first multiplayer-capable shelf the owner
+names: Snakes & Ladders, Domino, Chess, Squares, Conquer Dice, Space
+Invaders, and whatever graduates later. Each game's GDD carries its own
+multiplayer notes (seat count, what the opponents replace); this system
+carries everything shared.
+
+## THE FLOW (the whole loop, end to end)
+
+1. The player opens the multiplayer menu (the plus+human button), writes
+   a display name once.
+2. HOST starts a session: the box shows the join address and the live
+   session row (with delete). The session dies with the app.
+3. Another player taps JOIN, enters the address, the handshake lands
+   them in the same session.
+4. Everyone picks a multiplayer-capable game (the PLAYERS badge shows
+   2+). Opening it lands them in that game's HOLDING SCREEN — seconds
+   counting, arrivals appearing with their names, leaves vanishing.
+5. A holder alone long enough falls through to single player. A holder
+   joined by others waits.
+6. Someone commits (gets into the game): the rest get the 10-second
+   countdown — get in or quit.
+7. The match starts with the committed seats, CPU eliminated, all real.
+8. One wins; the others lose. The box economy charges/pays per device as
+   it always does.
+
+## THE OPEN TECH NOTES (for the plan that builds this)
+
+- Transport: plain TCP over the LAN (Godot's StreamPeerTCP/WebSocket
+  family) — host = server on a port, join = client to the address. The
+  "IP or something" is the host's LAN IP + port, shown as text.
+- Session lifecycle: host-owned. A heartbeat (a few seconds) prunes
+  silently-gone devices — "if they left the game, they will not show up"
+  has to survive crashed apps, not just clean quits.
+- The hold screen's seconds counter, seat order and the 10-second
+  countdown are SYSTEM-owned (every game gets them free); games only
+  implement "start the match with these seats".
+- The PLAYERS badge rides the registry entry (a "players" field, 1..4) —
+  the feed, the store page and the system all read the same number.
+- The display name lives in the box save (one field, English letters
+  sanitized at input).
+- Fairness note: the per-round economy already charges every device its
+  own fee — multiplayer changes WHO you play against, never who pays.

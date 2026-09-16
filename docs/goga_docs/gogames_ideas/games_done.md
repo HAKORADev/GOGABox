@@ -38,7 +38,8 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 ## back to their shelves, nothing was lost.)
 
 25. HEAVY WEAPON-LIKE — shipped as HEAVY WAR (v0.4.0)
-26. CRAZE CAVES-LIKE — soon
+26. CRAZE CAVES-LIKE — shipped as ROCK BREAKER (v040-7, the owner's
+    rename law; the mechanic follows Ball Blast, not the dig loop)
 27. DEATH WORM-LIKE — soon
 28. ZUMA-LIKE — soon
 29. GOLD MINER-LIKE — soon

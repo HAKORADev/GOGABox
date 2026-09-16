@@ -165,7 +165,9 @@ built yet):
   study app): parked as a BOX-LEVEL future direction - a device per player
   pays the per-round economy better than pass-the-phone. When it comes,
   it comes as a shared system (lobby + per-device wallets), not a game
-  feature bolted onto one GDD. Recorded in FUTURE_GAMES.md.
+  feature bolted onto one GDD. Recorded in FUTURE_GAMES.md; the owner's
+  full spec lives in ideas/LAN_MULTIPLAYER.md (v040-7 round, document
+  only).
 
 ## v0.2.8 owner brainstorm — THE APP STORE QUESTION (age gate, content
 ## rules, per-dev ad splits, the gambling shelf) moved to its own file:
