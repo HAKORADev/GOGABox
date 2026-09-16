@@ -312,20 +312,21 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 25,
-                "25 playable games (heavy war joined, v0.4.0)")
+        var ok := _check(GameReg.playable().size() == 26,
+                "26 playable games (rock breaker joined, v040-7)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
         # feed sorts by this file's order; the newest game walks last)
-        ok += _check(GameReg.workshop().size() == 4,
-                "4 workshop teasers (craze caves / death worm / zuma / gold miner)")
+        ok += _check(GameReg.workshop().size() == 3,
+                "3 workshop teasers (death worm / zuma / gold miner - "
+                + "craze caves graduated as rock breaker, v040-7)")
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
         ok += _check(ids[ids.size() - 1] == "goldminer"
-                        and ids.find("heavywar") == ids.size() - 5,
-                "heavy war walks last of the playable, teasers after it")
+                        and ids.find("rockbreaker") == ids.size() - 4,
+                "rock breaker walks last of the playable, teasers after it")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -334,11 +335,13 @@ func _t_registry() -> int:
         # v0.3.9-3: SQUARES graduated (the teaser DOTS renamed) + the
         # NEXT FIVE teasers parked (the owner's soon-shelf order)
         # v0.4.0: HEAVY WAR graduated (the SOON shelf's first name)
-        ok += _check(String(GameReg.get_game("crazecaves")["title"]) == "CRAZE CAVES"
+        # v040-7: CRAZE CAVES graduated as ROCK BREAKER - three teasers left
+        ok += _check(GameReg.get_game("crazecaves").is_empty()
+                        and String(GameReg.get_game("rockbreaker")["title"]) == "Rock Breaker"
                         and String(GameReg.get_game("deathworm")["title"]) == "DEATH WORM"
                         and String(GameReg.get_game("zuma")["title"]) == "ZUMA"
                         and String(GameReg.get_game("goldminer")["title"]) == "GOLD MINER",
-                "the four SOON teasers wear their shelf names (v0.4.0-1)")
+                "the SOON teasers wear their shelf names; craze caves is ROCK BREAKER (v040-7)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -369,6 +372,51 @@ func _t_registry() -> int:
                 "heavy war wears the owner's economy (bonus /500, fee 20)")
         ok += _check(String(GameReg.get_game("heavywar")["orientation"]) == "landscape",
                 "heavy war is landscape (the horizontal law)")
+        # v040-7: ROCK BREAKER graduates (the craze-caves teaser renamed;
+        # the mechanic follows Ball Blast, not the dig loop)
+        var rb_reg: Dictionary = GameReg.get_game("rockbreaker")
+        ok += _check(not bool(rb_reg.get("coming_soon", false)) \
+                        and String(rb_reg["orientation"]) == "portrait",
+                "rock breaker is PLAYABLE now: portrait only (the vertical law)")
+        ok += _check(String(rb_reg["title"]) == "Rock Breaker",
+                "the craze-caves-like ships as ROCK BREAKER (rename law)")
+        ok += _check(int(rb_reg["coin_div"]) == 250 and int(rb_reg["fee"]) == 8,
+                "rock breaker wears the owner's economy (bonus /250, fee 8)")
+        ok += _check(bool(rb_reg["shop"]) and bool(rb_reg["banner"]),
+                "rock breaker wears the shop + the banner")
+        ok += _check(rb_reg["ach"].size() == 14,
+                "rock breaker wears the tiered ladder (14)")
+        var RB: GDScript = load("res://game/games/rockbreaker/rockbreaker.gd")
+        ok += _check(int(RB.PROJ_CAP) == 50,
+                "rock breaker wears the projectile cap 50 (the owner's law)")
+        ok += _check(int(RB.GOLDEN_EVERY) == 300 and int(RB.GOLDEN_HP_MIN) == 300
+                        and int(RB.GOLDEN_HP_MAX) == 1000,
+                "the golden law: every 300 rockPoints, hidden 300-1000 pool")
+        ok += _check(int(RB.MYSTERY_HP_MIN) == 250 and int(RB.MYSTERY_HP_MAX) == 500,
+                "the mystery law: hidden 250-500 pool")
+        ok += _check(int(RB.SIDE_BUDGET) == 15 and int(RB.SCREEN_CAP) == 50
+                        and int(RB.HOLD_AT) == 45,
+                "the sides law: 15 a side, 50 on screen, the 45 hold")
+        ok += _check(int(RB.SIZES) == 5 and (RB.RADII as Array).size() == 5,
+                "the size law: five sizes")
+        ok += _check(absf(float(RB.HP_SLOPE) - 0.4) < 0.0001,
+                "the heat curve: the pool climbs 0.4 a rockPoint (unbounded)")
+        ok += _check(RB.THEMES.size() == 5 and RB.THEMES.has("cave") \
+                        and int(RB.THEMES["cave"]["price"]) == 0,
+                "5 themes with CAVE the free default")
+        ok += _check(RB.THEMES.has("neon") and RB.THEMES.has("candy") \
+                        and RB.THEMES.has("pixel") and RB.THEMES.has("forest"),
+                "the owner's five: cave, forest, pixel, neon, candy")
+        var rb_places_ok := true
+        for tid in RB.THEMES:
+                rb_places_ok = rb_places_ok \
+                        and (RB.THEMES[tid]["places"] as Array).size() == 5
+        ok += _check(rb_places_ok,
+                "FIVE PLACES each: every theme owns five views")
+        ok += _check(RB.SKINS.size() == 5 and int(RB.SKINS["classic"]["price"]) == 0,
+                "5 cannon skins, the first free")
+        ok += _check(RB.fmt(1000) == "1.00K" and RB.fmt(1254000) == "1.25M",
+                "the number law: 1.00K, 1.25M after 999")
         # v0.3.9-5: THE SPLIT SIGHT + THE HEAVY KICK (the owner's patch-5)
         var CSData: GDScript = load("res://game/games/cosmic_spud/cs_data.gd")
         ok += _check(CSData.SKILLS.has("split_sight") \
@@ -2301,8 +2349,9 @@ func _t_feed_order() -> int:
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
         # v0.4.0-1 THE SOON SHELF IS BACK: the four next names parked
         # again (the owner's v040 report catch)
-        ok += _check(GameReg.workshop().size() == 4,
-                "the workshop wears the four soon teasers again")
+        ok += _check(GameReg.workshop().size() == 3,
+                "the workshop wears the three soon teasers again "
+                + "(craze caves graduated v040-7)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2311,10 +2360,10 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                # v0.4.0-1: craze caves leads the shelf (FUTURE_GAMES.md
-                # file order after heavy war's graduation)
-                ok += _check(String(ids[soon_first_at]) == "crazecaves",
-                        "the SOON block wears craze caves first (%s)" % [ids.slice(soon_first_at)])
+                # v040-7: death worm leads the shelf (FUTURE_GAMES.md file
+                # order after craze caves' graduation)
+                ok += _check(String(ids[soon_first_at]) == "deathworm",
+                        "the SOON block wears death worm first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

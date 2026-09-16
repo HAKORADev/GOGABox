@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://rbprobe7"]
+
+[ext_resource type="Script" path="res://tests/qa_v0407_rock.gd" id="1"]
+
+[node name="RBProbe" type="Node"]
+script = ExtResource("1")

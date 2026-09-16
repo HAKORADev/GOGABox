@@ -144,6 +144,13 @@
       "url": "no external source - every pixel and sound is code-generated in-repo",
       "license": "the owner's own",
       "used_for": "assets/games/heavywar/** (tank + skins, 22 enemies x 2 frames, 10 bosses x 2 frames, 10 places x 4 env layers, shots, pickups, fx, card icons, the feed thumbnail), assets/audio/sfx/rw_* (20 sfx + 4 seamless music loops). Re-derive: python3 tools/v0404_rogue_art.py all && python3 tools/v0404_rogue_sfx.py. The old composed PopCap sprites (assets/games/heavywar/spr_*, assets/games/hwsrc/**) and the hws_* sfx died in this commit - zero original-game bytes remain."
+    },
+    {
+      "id": "rockbreaker-synth-v0407",
+      "name": "ROCK BREAKER audio + thumb (this repo, tools/v0407_sfx.py + tools/v0407_thumb.py)",
+      "url": "",
+      "license": "Original work (GOGABox) - 100% synthesized / composed from the game's own film render",
+      "used_for": "assets/audio/sfx/rb_start|shoot|hit|break|bounce|ground|golden|mystery|shieldsave|death|click|buy|confirm.wav (13 voices), assets/audio/music/rb_theme.wav (the 118bpm cave-drill loop), assets/thumbs/rockbreaker.png (the film rig's staged deep-heat frame, cropped - the photograph-of-the-game law). Re-derive: python3 tools/v0407_sfx.py && xvfb-run godot --path . --rendering-driver opengl3 res://tests/rock_film.tscn && python3 tools/v0407_thumb.py"
     }
   ],
   "audit": {

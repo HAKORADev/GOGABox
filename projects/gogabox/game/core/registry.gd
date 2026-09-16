@@ -1323,6 +1323,53 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
 ],
         },
+        # v040-7: the CRAZE CAVES-LIKE note graduated as ROCK BREAKER (the
+        # owner's rename law: "the name feels like brick breaker but
+        # actually the game mechanic is different") - the full game lives
+        # in game/games/rockbreaker/rockbreaker.gd now.
+        {"id": "rockbreaker", "title": "Rock Breaker", "tag": "the endless rock flood",
+                "script": "res://game/games/rockbreaker/rockbreaker.gd",
+                "thumb": "res://assets/thumbs/rockbreaker.png",
+                # THE VERTICAL LAW (the owner: "the game will be vertical
+                # only") - the Snowy Tower / Space Invaders shape.
+                "orientation": "portrait", "dim": "2d",
+                # THE SCORE LAW (the owner: "rockPoints is the number of
+                # break-ed rocks in the round regardless of it's level,
+                # score bonus will be /250").
+                "coin_div": 250, "price": 500, "fee": 8, "shop": true,
+                "banner": true,
+                "reveal": {"kind": "direct", "appear_after": 14,
+        "needs_games": 15},
+                "desc": "THE ENDLESS ROCK FLOOD: a closed arena where boulders of every size, heat and speed ride in from the walls and bounce forever - and your two-wheeled cannon rolls the ground below. Rocks carry their damage on their face (a rock's level IS its color: the intense-er the longer, and the damage pool never stops growing); break one and its family pops out - a size-5 rock carries five children of smaller sizes, over and over, until only the pebbles remain. The left half of the screen rolls the cannon, the right half FIRES while held (tapping never spams). One touch of a rock and the run is over - unless a mystery rock's SHIELD forgives one. Every break pays rockCoins by the rock's damage (a 120-damage rock pays 12) - spend them on exactly two upgrades: PROJECTILE (more shots per second, capped at 50) and DAMAGE (+1 per level, no cap) - the prices climb steep, this is a long-term war. Mystery rocks carry SLOW, SHIELD or RUSH x2 (never the double throw, never the cash); a GOLDEN rock with a hidden 300-1000 damage pool arrives after every 300 rock points and pays a real GOGACoin. 5 cannon skins, 5 themes (CAVE, FOREST, PIXEL, NEON, CANDY) each owning five places and its own rock pack.",
+                "controls": [
+                        "tap anywhere to start - then the flood begins",
+                        "LEFT half of the screen: touch and slide - the cannon rolls the ground with your thumb (the Snowy Tower analog)",
+                        "RIGHT half: HOLD to fire - the shots pour while you hold; a tap never shoots (tapping will not spam shots here)",
+                        "a rock's number is its damage pool - grind it to zero and it breaks into rockCoins (the damage / 10) and, if it is big enough, its children pop out",
+                        "one rock touching the cannon ends the run - the SHIELD gift forgives exactly one touch",
+                        "mystery rocks (the ?) hide 250-500 damage and carry one gift: SLOW the rocks, SHIELD the cannon, or RUSH the throw speed x2 - never a double throw, never cash",
+                        "after every 300 rock points a GOLDEN rock rides in with a hidden 300-1000 pool - break it and a GOGACoin is yours; the next one counts from its collection",
+                        "the screen holds 50 rocks and the walls spawn at most 15 a side - at 45 the spawner holds its breath until you thin the herd",
+                        "UPGRADES spends rockCoins: PROJECTILE adds shots per second (cap 50), DAMAGE adds +1 per shot (no cap); the SHOP sells skins and themes for GOGACoins",
+                ],
+                "genres": {"main": ["shooter", "arcade"], "sub": ["endless", "physics"]},
+                "ach": [
+    {"id": "rp_t1", "title": "First Crush", "desc": "Break 100 rocks in one run", "tier": 1, "rule": {"k": "max", "key": "best_rp", "v": 100}},
+    {"id": "rp_t2", "title": "The Demolisher", "desc": "Break 500 rocks in one run", "tier": 2, "rule": {"k": "max", "key": "best_rp", "v": 500}},
+    {"id": "rp_t3", "title": "The Quarry", "desc": "Break 2000 rocks in one run", "tier": 3, "rule": {"k": "max", "key": "best_rp", "v": 2000}},
+    {"id": "rp_t4", "title": "THE FLOOD'S MASTER", "desc": "Break 5000 rocks in one run", "tier": 4, "rule": {"k": "max", "key": "best_rp", "v": 5000}},
+    {"id": "rocks_t1", "title": "Gravel Worker", "desc": "Break 250 rocks total", "tier": 1, "rule": {"k": "cnt", "key": "rocks", "v": 250}},
+    {"id": "rocks_t2", "title": "The Stone Mill", "desc": "Break 2500 rocks total", "tier": 2, "rule": {"k": "cnt", "key": "rocks", "v": 2500}},
+    {"id": "rocks_t3", "title": "The Mountain Eater", "desc": "Break 10000 rocks total", "tier": 3, "rule": {"k": "cnt", "key": "rocks", "v": 10000}},
+    {"id": "rocks_t4", "title": "THE ROCKPOCALYPSE", "desc": "Break 50000 rocks total", "tier": 4, "rule": {"k": "cnt", "key": "rocks", "v": 50000}},
+    {"id": "gold_t1", "title": "The First Shine", "desc": "Break 1 golden rock", "tier": 1, "rule": {"k": "cnt", "key": "golden", "v": 1}},
+    {"id": "gold_t2", "title": "The Gold Rush", "desc": "Break 10 golden rocks", "tier": 2, "rule": {"k": "cnt", "key": "golden", "v": 10}},
+    {"id": "gold_t3", "title": "The Midas Cannon", "desc": "Break 40 golden rocks", "tier": 3, "rule": {"k": "cnt", "key": "golden", "v": 40}},
+    {"id": "save_t1", "title": "One Life Borrowed", "desc": "Let the shield save you once", "tier": 2, "rule": {"k": "cnt", "key": "saves", "v": 1}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Flood Watcher", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
+],
+        },
 
         # v0.4.0-1 THE FEED TRUTH FIX (the owner's v040 test report):
         # heavy war graduated mid-catalog and walked the feed in the
@@ -1334,15 +1381,9 @@ const GAMES := [
         # caught them missing ("where is the other 4 soon titles").
         # The four walk FUTURE_GAMES.md file order, straight after
         # heavy war: craze caves, death worm, zuma, gold miner.
-        {"id": "crazecaves", "title": "CRAZE CAVES",
-                "tag": "dig and grab",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
-                "reveal": {"kind": "direct", "appear_after": 8,
-                        "needs_games": 11},
-                "desc": "dig your way through the caves, grab everything "
-                        + "shiny, don't get crushed - the one-thumb "
-                        + "dig-and-collect loop, the workshop version is baking"},
+        # v040-7: CRAZE CAVES graduated - as ROCK BREAKER (the owner's
+        # rename law; the mechanic follows Ball Blast, not the dig loop)
+        # - its teaser seat is the real game above now.
         {"id": "deathworm", "title": "DEATH WORM",
                 "tag": "you are the worm",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",

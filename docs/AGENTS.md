@@ -881,3 +881,24 @@ render over pure magenta (`RenderingServer.set_default_clear_color`) and
 key it in PIL - never paste rectangular crops over a scene (the sky
 seam ships). And when a still must be cleaned, patch with a strip sampled
 from the SAME rows (the vertical gradient survives), never a flat fill.
+
+**36. THE SIM TELLS THE DESIGN (v040-7) - let the headless bot play
+BEFORE the owner does; it finds the spec's silent contradictions.**
+Rock Breaker's owner spec said "both golden and mystery rocks will not
+leave screen" - which quietly means REGULAR rocks CAN. The first build
+sealed the arena (everything bounced forever); the pacing sim then
+showed rocks raining onto the cannon faster than early DPS could kill
+them - the shield vaporized everything, rp crawled at 1-2, the economy
+was dead. The open floor (regular rocks shatter on the ground, only
+the specials persist) fell straight out of re-reading the spec with the
+sim's evidence in hand. THE METHOD: give every new game a fast-forward
+bot that plays 8 minutes in seconds (drive `_goga_tick(dt)` manually,
+`set_process(false)` first), instrument rp/income/rocks-alive every few
+sim-seconds, and let the CURVE - not your taste - pick the physics laws.
+Subsidiary laws it taught: bullets need SUBSTEPPED sweeps (a 1350px/s
+bullet steps 45px at 30Hz - a 43px hit circle tunnels straight through);
+straight-vertical shots need THE LEAD LAW (fire only when the target is
+low - a short flight beats the drift); a live bank (coins spendable
+mid-run) must flush to the save on a debounce, not per event; and a
+number-format law ("1.00K") belongs in ONE static function the probe
+reads without booting the scene.
