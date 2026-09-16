@@ -1,20 +1,28 @@
 extends GogaGame
-## HEAVY WAR: ROGUE ARSENAL (v040-5) - the survival rogue-like, THE OWNER'S
-## TEST REPORT WORKED TO THE BONE. Every visual is CODE-DRAWN (smooth steel,
-## no pixel art): the tank follows the owner's own drawing - visible wheels,
-## rocket pods on the outer hull edges, machine guns on the shoulders that
-## point UP ONLY, and the main cannon alone follows the aim from a turret
-## TALLER than the MGs so a 180-degree swing never overlaps them.
-##   * THE SCRAP LAW: 1 XP orb = 1 point, 1 scrap piece = 1 scrap. The scrap
-##     bank survives the run; the SCRAP SHOP (the HTML prototype's exact 11
-##     items) spends it. MAX can not be re-bought; no funds refuses the buy.
-##   * THE WEAPON LOCK LAW: MGs and rockets DO NOT EXIST until bought.
-##   * THE MENU LAW: "TAP ANYWHERE TO START" - the tap opens DEPLOY +
-##     SCRAP SHOP + the scrap total. Controls live in the guide, not here.
-##   * NO MINI TANKS. No kills widget (score wears a plane icon). No dots.
-##   * NEW WAR MACHINES: the carpet bomber (big-radius bomb), the shred
-##     bomber (cluster bomb), the shadow lancer (a laser straight down),
-##     and heavy enemies burst into falling shreds that can hit the tank.
+## HEAVY WAR (v040-6) - the survival rogue-like, THE OWNER'S TEST REPORT
+## WORKED TO THE BONE. Every visual is CODE-DRAWN (smooth steel, no pixel
+## art). The name is HEAVY WAR - no subtitle, no "rogue arsenal".
+##   * THE SHOP SPLIT: the SCRAP SHOP is the war's proper shop (8 honest
+##     items, paid in scrap, the real prices) and the normal GOGABox SHOP
+##     is back in its own place (skins, GOGACoins, LOCKED until bought).
+##   * THE TANK LAYOUT LAW: the GROUND layer is wide enough for every
+##     wheel, the BOTTOM layer is the SAME width and the rockets live IN
+##     it, only the UPPER layer is smaller - the MGs ride its shoulders.
+##   * THE COIN LAW: a real GOGACoin drops after every 500 kills; bosses
+##     pay 5 direct. No timer, no cheap 25-kill coins.
+##   * THE HUD LAW: score (with a DESIGNED plane icon) right, the top-left
+##     carries hull / weapons / LVL+XP / the REMAINING widget (time +
+##     enemies) in bigger outlined text; the scrap counter is a proper
+##     widget with its icon; NO bottom coin text, NO bank text in the HUD.
+##   * THE BOSS LAW: the WARNING siren, a dramatic ENTRANCE (the opposite
+##     side, fast, with escorts), SHIELD phases at 66%/33%, harder bites.
+##     The Dust Reaver fix: the sidewinder now ARRIVES (it used to slide
+##     off the world edge forever).
+##   * THE TUNNEL LAW: the tunnel is part of the world - a portal rides
+##     in, the tank DRIVES THROUGH it (rock ceiling, ribs, lights, a calm
+##     coin trail), and the drive ends in the next place's daylight.
+##   * THE CONTROLS LAW: on a touch screen the emulated mouse is IGNORED -
+##     moving can never aim again. The aim is the right-half finger only.
 
 enum GS { INTRO, MENU, PLACE, BOSS, TUNNEL, OVER }
 
@@ -118,10 +126,8 @@ var shake := 0.0
 var flash := 0.0
 var damage_flash := 0.0
 
-# the coin law
+# the coin law (v040-6: the kill count is the whole law - no timer)
 var coin_kills := 0
-var coin_timer := 0.0
-var coin_armed := false
 
 # input (the hopper law: roles at touchdown, kept until lift)
 var move_ptr := -1
@@ -130,6 +136,7 @@ var move_force := 0.0
 var aim_ptr := -1
 var aim_pos := Vector2(960.0, 400.0)
 var mouse_aim := false
+var touch_ui := false          # a real touch screen: the emulated mouse is dead
 
 # parallax scroll
 var scroll_x := 0.0
@@ -143,6 +150,12 @@ func _goga_setup() -> void:
         meta = HWMeta.load_meta()
         game_id = "heavywar"
         pause_end_run = false
+        # THE CONTROLS LAW: on a touch device Godot ALSO delivers emulated
+        # mouse events for the first finger - the v040-5 bug where MOVING
+        # (a left-half finger) also steered the aim came from exactly that.
+        # A touch screen never reads the mouse again; desktop rigs keep it.
+        touch_ui = DisplayServer.is_touchscreen_available() \
+                or OS.has_feature("mobile") or OS.has_feature("android")
         set_score(0)
         _run_reset()
         _build_world()
@@ -175,8 +188,6 @@ func _run_reset() -> void:
                 "cd": 1.0, "crit": 0.0, "bounce": 0, "slow": 0.0}
         level_up_queue = 0
         coin_kills = 0
-        coin_timer = 0.0
-        coin_armed = false
         wave_state = "idle"
         spawn_list = []
         enemies = []
@@ -257,18 +268,105 @@ func _sky_node() -> void:
         world.add_child(sky_node)
         world.move_child(sky_node, 0)
         sun_node = Node2D.new()
-        sun_node.draw.connect(_draw_sun)
+        sun_node.draw.connect(_draw_sun_moon)
+        sun_node.draw.connect(_draw_stars)
+        sun_node.draw.connect(_draw_clouds)
         world.add_child(sun_node)
         world.move_child(sun_node, 1)
 
-func _draw_sun() -> void:
+## THE SKY LAW (v040-6): a real celestial body - the bright places get a
+## layered sun with soft rays, the dark places a crescent moon. No more
+## flat circles.
+func _draw_sun_moon() -> void:
         var pl: Dictionary = HWData.PLACES[place_i % 10]
-        var c: Vector2 = Vector2(W * 0.76, GROUND_Y * 0.28)
+        var c: Vector2 = Vector2(W * 0.76, GROUND_Y * 0.26)
         var sun: Color = pl["sun"]
-        sun_node.draw_circle(c, 260.0, Color(sun, 0.10))
-        sun_node.draw_circle(c, 150.0, Color(sun, 0.18))
-        sun_node.draw_circle(c, 66.0, Color(sun, 0.42))
-        sun_node.draw_circle(c, 34.0, Color(sun, 0.95))
+        if bool(pl.get("moon", false)):
+                # THE MOON: a pale disc with a crescent bite + a cold halo
+                var moon := Color(0.86, 0.9, 0.98)
+                sun_node.draw_circle(c, 150.0, Color(moon, 0.05))
+                sun_node.draw_circle(c, 96.0, Color(moon, 0.10))
+                sun_node.draw_circle(c, 52.0, Color(moon, 0.34))
+                sun_node.draw_circle(c, 34.0, Color(moon, 0.92))
+                var bite := c + Vector2(14, -9)
+                sun_node.draw_circle(bite, 29.0, Color(pl["sky_top"], 0.94))
+                sun_node.draw_circle(c + Vector2(-10, 8), 5.0,
+                        Color(moon, 0.30))
+                sun_node.draw_circle(c + Vector2(6, 16), 3.4,
+                        Color(moon, 0.24))
+        else:
+                # THE SUN: halo, corona, soft rotating rays, the core
+                var t := t_state * 0.05
+                for r in 3:
+                        sun_node.draw_circle(c, 240.0 - float(r) * 58.0,
+                                Color(sun, 0.08))
+                for i in 12:
+                        var a := t + TAU * float(i) / 12.0
+                        var l0 := c + Vector2.from_angle(a) * 84.0
+                        var l1 := c + Vector2.from_angle(a) * (128.0
+                                + 14.0 * sin(t_state * 1.4 + float(i)))
+                        sun_node.draw_line(l0, l1, Color(sun, 0.16), 7.0,
+                                true)
+                sun_node.draw_circle(c, 74.0, Color(sun, 0.30))
+                sun_node.draw_circle(c, 48.0, Color(sun, 0.62))
+                sun_node.draw_circle(c, 34.0, Color(sun, 0.96))
+                sun_node.draw_circle(c + Vector2(-7, -7), 22.0,
+                        Color(1, 1, 1, 0.20))
+
+## THE STAR FIELD: the dark places carry a twinkling field (deterministic,
+## two depths, never scrolled away - the sky is a dome).
+func _draw_stars() -> void:
+        var pl: Dictionary = HWData.PLACES[place_i % 10]
+        if not bool(pl.get("stars", false)):
+                return
+        for i in 64:
+                var sx := fposmod(float(i) * 173.13, W + 40.0) - 20.0
+                var sy := fposmod(float(i) * 311.7, GROUND_Y * 0.82)
+                var tw := 0.35 + 0.30 * sin(t_state * (1.2 + fposmod(
+                        float(i) * 7.3, 2.2)) + float(i))
+                var sr := 1.4 + fposmod(float(i) * 5.1, 1.6)
+                sun_node.draw_circle(Vector2(sx, sy), sr,
+                        Color(1, 1, 1, tw * 0.8))
+        # one slow shooting star every ~9s (a moment, not a fountain)
+        var cyc := fposmod(t_state, 9.0)
+        if cyc < 0.9:
+                var k := cyc / 0.9
+                var p0 := Vector2(W * 0.18 + float(int(t_state / 9.0) % 5)
+                        * 60.0, GROUND_Y * 0.14)
+                var tail := Vector2(90, 34)
+                sun_node.draw_line(p0 + tail * k, p0 + tail * k - tail * 0.3,
+                        Color(1, 1, 1, 0.5 * (1.0 - k)), 2.0, true)
+
+## THE CLOUD LAW: soft drifting banks - two depths, puffy circle clusters,
+## tinted by the place. They ride the far parallax and TILE forever.
+func _draw_clouds() -> void:
+        var pl: Dictionary = HWData.PLACES[place_i % 10]
+        var cc: Color = pl.get("clouds", Color(1, 1, 1))
+        var periods := [860.0, 1180.0]
+        var speeds := [0.07, 0.12]
+        for li in 2:
+                var period: float = periods[li]
+                var off := fposmod(scroll_x * speeds[li], period)
+                var k := 0
+                var x := -off
+                while x < W + period:
+                        var hy := 60.0 + hpos(k * 3 + li * 17) * 180.0
+                        var cw := 90.0 + hpos(k + li * 7) * 120.0
+                        var a := 0.16 + 0.08 * hpos(k * 5 + li)
+                        _cloud_puff(Vector2(x, hy), cw, Color(cc, a))
+                        x += period
+                        k += 1
+
+func _cloud_puff(c: Vector2, wdt: float, col: Color) -> void:
+        var puffs := [
+                [Vector2(0, 0), 0.52], [Vector2(-wdt * 0.42, wdt * 0.10), 0.36],
+                [Vector2(wdt * 0.40, wdt * 0.08), 0.38],
+                [Vector2(wdt * 0.16, -wdt * 0.16), 0.34],
+                [Vector2(-wdt * 0.14, -wdt * 0.12), 0.30],
+        ]
+        for pf in puffs:
+                sun_node.draw_circle(c + (pf[0] as Vector2), wdt * float(pf[1]),
+                        col)
 
 ## the parallax silhouettes. layer 0 = far, 1 = mid, 2 = near.
 ## every shape is seeded so the plane TILES: k-th shape rides at
@@ -564,29 +662,32 @@ func _apply_skin() -> void:
 
 func _wheel_xs() -> Array:
         var total := 3 + _shop_lvl("wheels")     # 3..8
-        var span := 320.0
+        var span := 340.0
         var out := []
         for i in total:
                 var t := 0.5 if total == 1 else float(i) / float(total - 1)
                 out.append(-span * 0.5 + t * span)
         return out
 
+## THE POD LAW (v040-6, the owner's drawing): the rockets live IN the
+## BOTTOM layer - the launch cells sit on the bottom slab's face, one
+## cluster per side, 1..4 per side.
 func _pod_xs() -> Array:
-        # the ROCKET PODS: the outer hull edges, 1..4 per side
         var n := _rk_lvl()
         var out := []
         for i in n:
-                var offx := 120.0 + float(i) * 17.0
+                var offx := 112.0 + float(i) * 21.0
                 out.append(-offx)
                 out.append(offx)
         return out
 
+## THE MG LAW: the machine guns ride the UPPER layer's shoulders (the
+## upper layer is the SMALL one), inboard of the bottom layer's pods.
 func _mg_xs() -> Array:
-        # the MG barrels: shoulder mounts inboard of the pods, 1..4 per side
         var n := _mg_lvl()
         var out := []
         for i in n:
-                var offx := 66.0 + float(i) * 13.0
+                var offx := 56.0 + float(i) * 15.0
                 out.append(-offx)
                 out.append(offx)
         return out
@@ -611,60 +712,64 @@ func _draw_tank() -> void:
         var alpha := 0.45 if blink else 1.0
         # ground shadow: a soft squashed ellipse, not a blob
         tank_draw.draw_set_transform(o + Vector2(0, -4), 0.0, Vector2(1.0, 0.20))
-        tank_draw.draw_circle(Vector2(0, 0), 168.0, Color(0, 0, 0, 0.34 * alpha))
+        tank_draw.draw_circle(Vector2(0, 0), 200.0, Color(0, 0, 0, 0.34 * alpha))
         tank_draw.draw_set_transform(Vector2(0, 0), 0.0, Vector2(1.0, 1.0))
         tank_draw.modulate = Color(1, 1, 1, alpha)
 
         # ---------- WHEELS (big, visible, spinning) ----------
         for wx in _wheel_xs():
-                var wc := o + Vector2(float(wx), -23.0)
-                tank_draw.draw_circle(wc, 24.0, edge)
-                tank_draw.draw_circle(wc, 21.0, lo)
-                tank_draw.draw_circle(wc + Vector2(-3, -3), 13.0, mid)
-                tank_draw.draw_circle(wc, 7.0, hi)
+                var wc := o + Vector2(float(wx), -22.0)
+                tank_draw.draw_circle(wc, 28.0, edge)
+                tank_draw.draw_circle(wc, 24.0, mid)
+                tank_draw.draw_circle(wc, 14.0, lo)
+                tank_draw.draw_circle(wc, 8.0, hi)
                 for spk in 4:
                         var a := p_wheel_spin + float(spk) * TAU / 4.0
                         tank_draw.draw_line(wc,
-                                wc + Vector2(cos(a), sin(a)) * 17.0, edge, 2.4)
-                tank_draw.draw_circle(wc - Vector2(1.5, 1.5), 2.4, hi)
+                                wc + Vector2(cos(a), sin(a)) * 20.0, hi, 2.8)
+                tank_draw.draw_circle(wc - Vector2(1.5, 1.5), 2.6, hi)
 
-        # ---------- BOTTOM HULL (rides ON the wheels, no gap) ----------
-        _steel_slab(o, Rect2(-150, -76, 300, 40), lo, lo.darkened(0.3), edge, band, 5)
-        # ---------- MID HULL (the widest deck) ----------
-        _steel_slab(o, Rect2(-160, -122, 320, 46), mid, lo, edge, band, 6)
-        tank_draw.draw_rect(Rect2(o.x - 156, o.y - 102, 312, 4), Color(band, 0.5))
-        # ---------- TOP DECK (the weapons' floor) ----------
-        _steel_slab(o, Rect2(-140, -156, 280, 38), mid, lo.darkened(0.15), edge, band, 5)
-        # ---------- ROCKET PODS (outer edges) + MG BARRELS (shoulders) ----------
+        # ---------- GROUND LAYER (the WIDE one - it fits every wheel) ----------
+        _steel_slab(o, Rect2(-192, -78, 384, 36), lo, lo.darkened(0.3), edge, band, 9)
+        # ---------- BOTTOM LAYER (SAME width - the rockets live IN it) ----------
+        _steel_slab(o, Rect2(-192, -134, 384, 56), mid, lo, edge, band, 9)
+        tank_draw.draw_rect(Rect2(o.x - 186, o.y - 114, 372, 4), Color(band, 0.45))
+        # the rocket cells: armoured launcher boxes sunk into the slab face
         for i in _pod_xs().size():
                 var px: float = float(_pod_xs()[i])
-                _rocket_pod(o + Vector2(px, -156), -0.10 if px < 0.0 else 0.10, rk_flash)
+                _rocket_pod(o + Vector2(px, -106), -0.06 if px < 0.0 else 0.06,
+                        rk_flash)
+        # ---------- UPPER LAYER (the SMALL deck - the MGs' floor) ----------
+        _steel_slab(o, Rect2(-122, -172, 244, 38), mid, lo.darkened(0.15), edge, band, 6)
+        # ---------- MG BARRELS (shoulders, UP ONLY) ----------
         for i in _mg_xs().size():
                 var mx: float = float(_mg_xs()[i])
-                _mg_barrel(o + Vector2(mx, -156), -0.08 if mx < 0.0 else 0.08, mg_flash)
+                _mg_barrel(o + Vector2(mx, -172), -0.07 if mx < 0.0 else 0.07,
+                        mg_flash)
         # ---------- TURRET BASE (seated ON the deck, no gap) ----------
-        _trap(o + Vector2(0, -154), o + Vector2(0, -184), 128.0, 104.0, lo, edge)
+        _trap(o + Vector2(0, -170), o + Vector2(0, -200), 116.0, 96.0, lo, edge)
         # ---------- TURRET TOWER (tall, tapered, banded) ----------
-        var tw0 := o + Vector2(0, -184)
-        var tw1 := o + Vector2(0, -298)
-        _trap(tw0, tw1, 100.0, 70.0, mid, edge)
-        for by in [210.0, 242.0, 272.0]:
-                var wdt: float = 100.0 - (float(by) - 184.0) * 0.27
+        var tw0 := o + Vector2(0, -200)
+        var tw1 := o + Vector2(0, -310)
+        _trap(tw0, tw1, 94.0, 66.0, mid, edge)
+        for by in [226.0, 256.0, 284.0]:
+                var wdt: float = 94.0 - (float(by) - 200.0) * 0.26
                 tank_draw.draw_rect(Rect2(o.x - wdt * 0.5, o.y - by - 3.0, wdt, 5.0), edge)
-        tank_draw.draw_rect(Rect2(o.x - 33.0, o.y - 296.0, 66.0, 3.0),
+        tank_draw.draw_rect(Rect2(o.x - 31.0, o.y - 308.0, 62.0, 3.0),
                 Color(band, 0.55))
-        # view slits on the tower
-        tank_draw.draw_rect(Rect2(o.x - 20.0, o.y - 232.0, 40.0, 6.0), Color(0.04, 0.05, 0.07))
+        # view slits on the tower + a commander's hatch light
+        tank_draw.draw_rect(Rect2(o.x - 19.0, o.y - 246.0, 38.0, 6.0), Color(0.04, 0.05, 0.07))
+        tank_draw.draw_circle(o + Vector2(0, -304), 9.0, Color(band, 0.7))
         # ---------- MAIN CANNON (the aim follower, from the tower top) ----------
-        var pivot := o + Vector2(0, -272)
+        var pivot := o + Vector2(0, -284)
         _main_cannon(pivot, p_aim, sk)
         # ---------- SHIELD BUBBLE ----------
         if p_shield > 0.0:
                 var pulse := 0.55 + sin(t_state * 9.0) * 0.14
-                var sc := o + Vector2(0, -160)
-                tank_draw.draw_circle(sc, 220.0,
+                var sc := o + Vector2(0, -178)
+                tank_draw.draw_circle(sc, 235.0,
                         Color(THEME["shield"], 0.10 * pulse))
-                tank_draw.draw_arc(sc, 220.0, 0, TAU, 48,
+                tank_draw.draw_arc(sc, 235.0, 0, TAU, 48,
                         Color(THEME["shield"], 0.55 * pulse), 3.0)
 
 func _steel_slab(o: Vector2, r: Rect2, top_c: Color, bot_c: Color,
@@ -702,18 +807,23 @@ func _trap(p0: Vector2, p1: Vector2, w0: float, w1: float, col: Color,
         tank_draw.draw_polyline(pts + PackedVector2Array([pts[0]]), edge, 2.4)
 
 func _rocket_pod(at: Vector2, splay: float, flash_v: float) -> void:
-        # a launch tube with a red-nosed rocket peeking out, tilted outward
-        tank_draw.draw_rect(Rect2(at.x - 9.0, at.y - 4.0, 18.0, 5.0),
-                _skin()["edge"])   # the mount plate
+        # a launch CELL sunk into the bottom slab: an armoured box with two
+        # tube mouths and a rocket nose peeking out, aimed up-and-out
+        var sk: Dictionary = _skin()
+        tank_draw.draw_rect(Rect2(at.x - 15.0, at.y - 26.0, 30.0, 40.0),
+                sk["edge"])   # the cell housing
+        tank_draw.draw_rect(Rect2(at.x - 12.0, at.y - 23.0, 24.0, 34.0),
+                sk["lo"])
         var up := Vector2(sin(splay), -1.0).normalized()
-        tank_draw.draw_line(at, at + up * 46.0, _skin()["edge"], 17.0)
-        tank_draw.draw_line(at, at + up * 46.0, _skin()["lo"], 13.0)
-        tank_draw.draw_line(at, at + up * 40.0, _skin()["mid"], 7.0)
-        var tip := at + up * 52.0
-        tank_draw.draw_circle(tip, 6.5, Color("8a2020"))
-        tank_draw.draw_circle(tip + Vector2(-1.5, -1.5), 2.2, Color("c86060"))
+        for tcol in 2:
+                var mouth := at + Vector2(-5.5 + float(tcol) * 11.0, -20.0)
+                tank_draw.draw_circle(mouth, 4.6, Color(0.03, 0.03, 0.05))
+                tank_draw.draw_circle(mouth + up * 1.4, 3.4, sk["mid"])
+                # the rocket's red nose resting in the tube
+                tank_draw.draw_circle(mouth + up * 3.4, 2.2, Color("a03030"))
+        var tip := at + up * 26.0
         if flash_v > 0.15:
-                tank_draw.draw_circle(tip, 10.0 + flash_v * 9.0,
+                tank_draw.draw_circle(tip, 12.0 + flash_v * 10.0,
                         Color(1.0, 0.72, 0.32, flash_v * 0.75))
 
 func _mg_barrel(at: Vector2, splay: float, flash_v: float) -> void:
@@ -795,6 +905,11 @@ func _goga_input(event: InputEvent) -> void:
                 elif d.index == aim_ptr:
                         aim_pos = d.position
         elif event is InputEventMouseButton:
+                # THE CONTROLS LAW: a touch screen's emulated mouse is DEAD
+                # (it was the moving-also-aims bug: the first finger IS a
+                # synthetic mouse press). Desktop rigs keep the mouse.
+                if touch_ui:
+                        return
                 var m := event as InputEventMouseButton
                 mouse_aim = m.pressed
                 if m.pressed:
@@ -807,6 +922,8 @@ func _goga_input(event: InputEvent) -> void:
                 elif state == GS.PLACE or state == GS.BOSS:
                         pass
         elif event is InputEventMouseMotion:
+                if touch_ui:
+                        return
                 if mouse_aim:
                         aim_pos = (event as InputEventMouseMotion).position
 
@@ -886,12 +1003,6 @@ func _goga_tick(delta: float) -> void:
         damage_flash = maxf(0.0, damage_flash - delta * 1.8)
         if p_invuln > 0.0:
                 p_invuln -= delta
-        # THE COIN LAW - the timer half finally TICKS (it never did)
-        if state == GS.PLACE or state == GS.BOSS:
-                coin_timer += delta
-                if not coin_armed and (coin_kills >= HWData.COIN_KILLS
-                                or coin_timer >= HWData.COIN_TIME):
-                        coin_armed = true
         match state:
                 GS.INTRO, GS.MENU:
                         _tick_world_scroll(delta, 0.6)
@@ -991,7 +1102,7 @@ func _spawn_enemy(kind := "") -> void:
                 kind = String(pool[randi() % pool.size()])
         var def: Dictionary = HWData.ENEMIES[kind]
         var df := _diff()
-        var hp := int(round(float(def["hp"]) * (1.0 + df * 0.52)))
+        var hp := int(round(float(def["hp"]) * (1.0 + df * 0.62)))
         var spd := float(def["speed"]) * (1.0 + df * 0.045)
         var from_left := randf() < 0.5
         var e := {
@@ -1019,6 +1130,13 @@ func _spawn_enemy(kind := "") -> void:
         if e["move"] == "shadow":
                 e["y"] = randf_range(120.0, 220.0)
                 e["base_y"] = e["y"]
+        # THE SHIELD LAW (the owner: "enemies get shields and like that"):
+        # from place 3 on, ordinary machines start arriving shielded - the
+        # war grows armor as the tank grows power.
+        if place_i >= 2 and float(e["shield"]) <= 0.0 \
+                        and randf() < minf(0.32, 0.06 + float(place_i) * 0.035):
+                e["shield"] = 10.0 + df * 5.0
+                e["max_shield"] = float(e["shield"])
         enemies.append(e)
 
 func _enemy_dead_cleanup(e: Dictionary) -> void:
@@ -1043,6 +1161,13 @@ func _update_enemies(delta: float) -> void:
                         "straight":
                                 d["x"] += d["dir"] * spd * delta
                                 d["y"] = d["base_y"] + sin(d["t"] * 2.4 + d["phase"]) * 14.0
+                        "rush":
+                                # THE RAIDER: it crosses the field fast and
+                                # low, jinking - you will not catch it, you
+                                # must kill it before it is gone
+                                d["x"] += d["dir"] * spd * delta
+                                d["y"] = d["base_y"] + sin(d["t"] * 5.2
+                                        + d["phase"]) * 26.0
                         "sine":
                                 d["x"] += d["dir"] * spd * delta
                                 d["y"] = d["base_y"] + sin(d["t"] * 1.8 + d["phase"]) * 30.0
@@ -1104,6 +1229,15 @@ func _update_enemies(delta: float) -> void:
                                         d["shoot_t"] = randf_range(1.1, 2.4) \
                                                 * maxf(0.55, 1.0 - _diff() * 0.03)
                                         _enemy_fire(d)
+                # THE RAIDER's rocket rain rides its own fast clock
+                if String(d["weapon"]) == "rocketdrop":
+                        d["drop_t"] = float(d.get("drop_t", 0.0)) - delta
+                        if float(d["drop_t"]) <= 0.0:
+                                d["drop_t"] = 0.85
+                                _eshot(Vector2(d["x"], d["y"] + 18.0),
+                                        Vector2(d["dir"] * 120.0, 90.0), 12.0,
+                                        "missile")
+                                Jukebox.sfx("rw_rocket", -14.0)
                 # the shadow lancer's beam also burns on its own clock
                 if String(d["weapon"]) == "laser":
                         d["laser_t"] -= delta
@@ -1137,12 +1271,12 @@ func _enemy_fire(e: Dictionary) -> void:
         var col: Color = HWData.PLACES[place_i % 10]["accent"]
         match String(e["weapon"]):
                 "aimed":
-                        _eshot(src, Vector2.from_angle(ang) * 380.0, 9.0, "plasma")
+                        _eshot(src, Vector2.from_angle(ang) * 380.0, 11.0, "plasma")
                         Jukebox.sfx("rw_eshot", -10.0)
                 "spread":
                         for i in 3:
                                 _eshot(src, Vector2.from_angle(ang + (i - 1) * 0.17) * 350.0,
-                                        9.0, "plasma")
+                                        11.0, "plasma")
                         Jukebox.sfx("rw_eshot", -9.0)
                 "homing":
                         _eshot(src, Vector2(e["dir"] * 160.0, 70.0), 13.0, "missile")
@@ -1174,28 +1308,59 @@ func _enemy_fire(e: Dictionary) -> void:
                         Jukebox.sfx("rw_laser", -8.0)
 
 # ------------------------------------------------------------------ bosses
+## THE BOSS LAW (v040-6): the WARNING siren, a DRAMATIC entrance (some
+## come from the OPPOSITE side, fast; some dive from the sky) with escort
+## planes, SHIELD phases at 66% / 33% that summon more escorts, and
+## harder bites. THE DUST REAVER FIX: the sidewinder entrance used to
+## slide it to the RIGHT from beyond the right edge - it never arrived
+## and the fight never started. Every entrance now walks TOWARD the
+## field.
 func _spawn_boss() -> void:
         wave_state = "boss"
         run["bosses_met"] = int(run["bosses_met"]) + 1
         var def: Dictionary = HWData.BOSSES[place_i % 10]
         var hp := HWData.boss_hp(place_i, loop)
+        var brain := String(def["brain"])
+        # the entrance seat: the opposite side, fast, or the sky
+        var ex := W + 300.0
+        var ey := 210.0
+        var evx := -140.0
+        var evy := 0.0
+        match brain:
+                "flyer":
+                        ex = -300.0; ey = 210.0; evx = 560.0   # opposite side dash
+                "dropship":
+                        ex = W * 0.62; ey = -300.0; evy = 300.0   # the sky dive
+                "sidewinder":
+                        ex = -280.0; ey = 230.0; evx = 500.0   # THE FIX: arrives
+                "fortress":
+                        ex = W + 340.0; ey = 200.0; evx = -120.0
+                "weaver":
+                        ex = -260.0; ey = 200.0; evx = 420.0
+                "prime":
+                        ex = W * 0.6; ey = -320.0; evy = 260.0
         var b := {
                 "kind": "boss", "boss_id": String(def["id"]),
-                "name": String(def["name"]), "brain": String(def["brain"]),
+                "name": String(def["name"]), "brain": brain,
                 "hp": float(hp), "maxhp": float(hp), "size": float(def["size"]),
-                "x": W + 260.0, "y": 210.0, "base_y": 210.0, "t": 0.0,
+                "x": ex, "y": ey, "base_y": ey, "t": 0.0,
                 "dir": -1, "hit": 0.0,
-                "arrived": false, "vx": -110.0, "weapon_t": 1.6,
-                "weapon_cycle": 0, "spawn_t": 6.0, "enraged": false,
-                "chill": 0.0, "dash_dir": -1,
-                "scrap": 30 + place_i * 2, "xp": 40,
+                "arrived": false, "vx": evx, "vy": evy,
+                "weapon_t": 1.6, "weapon_cycle": 0, "spawn_t": 5.0,
+                "enraged": false, "chill": 0.0, "dash_dir": -1,
+                "shield": 0.0, "shield_breaks": 0,
+                "scrap": 60 + place_i * 10, "xp": 60,
         }
         enemies.append(b)
         boss_ent = b
         state = GS.BOSS
         Jukebox.music(MUSIC_BOSS)
-        _banner("BOSS  -  " + String(b["name"]), 2.6)
+        _banner("WARNING  -  " + String(b["name"]), 2.6)
         Jukebox.sfx("rw_boss_warn", -4.0)
+        # the escort wing: the boss never comes alone
+        var n_esc := 2 + (place_i % 3)
+        for i in n_esc:
+                _spawn_enemy("fighter" if i % 2 == 0 else "scout")
 
 func _tick_boss(delta: float) -> void:
         _tick_world_scroll(delta, 0.4)
@@ -1219,18 +1384,32 @@ func _update_boss(b: Dictionary, delta: float) -> void:
         var enraged: bool = float(b["hp"]) < float(b["maxhp"]) * 0.4
         b["enraged"] = enraged
         var rage := 0.72 if enraged else 1.0
+        # THE SHIELD PHASES: at 66% and 33% the boss slams a shield up and
+        # calls its wing - the fight has acts, not a flat health bar
+        var breaks := int(b.get("shield_breaks", 0))
+        if bool(b.get("arrived", false)) and breaks < 2:
+                var frac := float(b["hp"]) / float(b["maxhp"])
+                var next_gate := 0.66 if breaks == 0 else 0.33
+                if frac <= next_gate and float(b.get("shield", 0.0)) <= 0.0:
+                        b["shield"] = float(b["maxhp"]) * 0.13
+                        b["shield_breaks"] = breaks + 1
+                        _banner(String(b["name"]) + "  -  SHIELDS UP", 1.6)
+                        Jukebox.sfx("rw_shieldhit", -2.0)
+                        for i in 2 + int(b["shield_breaks"]):
+                                _spawn_enemy("kamikaze" if i % 2 == 0 else "fighter")
         match String(b["brain"]):
                 "flyer":
                         if not bool(b["arrived"]):
                                 b["x"] += b["vx"] * delta
-                                if b["x"] <= W - 340.0:
+                                b["y"] = 210.0 + sin(b["t"] * 2.2) * 46.0
+                                if b["x"] >= W - 340.0:
                                         b["arrived"] = true
                         else:
                                 b["y"] = 200.0 + sin(b["t"] * 1.1) * 40.0
                                 b["x"] += sin(b["t"] * 0.5) * 70.0 * delta
                 "dropship":
                         if not bool(b["arrived"]):
-                                b["y"] += 130.0 * delta
+                                b["y"] += b["vy"] * delta
                                 if b["y"] >= 200.0:
                                         b["arrived"] = true
                         else:
@@ -1238,11 +1417,12 @@ func _update_boss(b: Dictionary, delta: float) -> void:
                                 b["x"] += sin(b["t"] * 0.7) * 90.0 * delta
                 "sidewinder":
                         if not bool(b["arrived"]):
-                                b["x"] += 160.0 * delta
-                                if b["x"] <= W - 240.0:
+                                # THE FIX: it slides IN from the opposite side
+                                b["x"] += b["vx"] * delta
+                                if b["x"] >= W - 240.0:
                                         b["arrived"] = true
                         else:
-                                b["x"] += b["dash_dir"] * (380.0 if enraged else 300.0) * delta
+                                b["x"] += b["dash_dir"] * (420.0 if enraged else 330.0) * delta
                                 if b["x"] < 190.0:
                                         b["x"] = 190.0
                                         b["dash_dir"] = 1
@@ -1252,23 +1432,23 @@ func _update_boss(b: Dictionary, delta: float) -> void:
                                 b["y"] = 230.0 + sin(b["t"] * 1.5) * 20.0
                 "fortress":
                         if not bool(b["arrived"]):
-                                b["x"] += -90.0 * delta
+                                b["x"] += b["vx"] * delta
                                 if b["x"] <= W - 300.0:
                                         b["arrived"] = true
                         else:
                                 b["y"] = 190.0 + sin(b["t"] * 0.6) * 22.0
                 "weaver":
                         if not bool(b["arrived"]):
-                                b["x"] += -140.0 * delta
-                                if b["x"] <= W * 0.62:
+                                b["x"] += b["vx"] * delta
+                                if b["x"] >= W * 0.62:
                                         b["arrived"] = true
                         else:
                                 b["x"] += sin(b["t"] * 0.9) * 240.0 * delta
                                 b["y"] = 180.0 + sin(b["t"] * 1.3) * 60.0
                 "prime":
                         if not bool(b["arrived"]):
-                                b["x"] += -120.0 * delta
-                                if b["x"] <= W - 380.0:
+                                b["y"] += b["vy"] * delta
+                                if b["y"] >= 190.0:
                                         b["arrived"] = true
                         else:
                                 b["y"] = 190.0 + sin(b["t"] * 1.2) * 44.0
@@ -1278,12 +1458,12 @@ func _update_boss(b: Dictionary, delta: float) -> void:
         # weapons
         b["weapon_t"] -= delta / maxf(0.55, rage)
         if b["weapon_t"] <= 0.0:
-                b["weapon_t"] = 1.25 if not enraged else 0.9
+                b["weapon_t"] = 1.15 if not enraged else 0.82
                 _boss_attack(b, enraged)
         # minion pressure
         b["spawn_t"] -= delta
         if b["spawn_t"] <= 0.0:
-                b["spawn_t"] = 5.0 if not enraged else 3.2
+                b["spawn_t"] = 4.6 if not enraged else 3.0
                 _spawn_enemy()
 
 func _boss_attack(b: Dictionary, enraged: bool) -> void:
@@ -1293,7 +1473,7 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
         var n := 9 if enraged else 7
         match String(b["brain"]):
                 "flyer":
-                        match cycle % 3:
+                        match cycle % 4:
                                 0:
                                         for i in n:
                                                 _boss_fire(b, aim + (i - n / 2.0) * 0.13, 380.0, 11.0)
@@ -1301,10 +1481,14 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
                                         for i in 5:
                                                 _boss_fire(b, aim + randf_range(-0.06, 0.06), 460.0, 9.0)
                                 2:
-                                        _eshot(Vector2(b["x"], b["y"] + 30.0),
-                                                Vector2(randf_range(-120, 120), 160.0), 14.0, "missile")
+                                        for i in 3:
+                                                _eshot(Vector2(b["x"] + (i - 1) * 50.0, b["y"] + 30.0),
+                                                        Vector2(randf_range(-120, 120), 160.0), 14.0, "missile")
+                                3:
+                                        _eshot(Vector2(b["x"], b["y"] + 40.0),
+                                                Vector2((p_x - b["x"]) * 0.5, 120.0), 20.0, "bigbomb")
                 "dropship":
-                        match cycle % 3:
+                        match cycle % 4:
                                 0:
                                         for i in 9:
                                                 _boss_fire(b, PI / 2 - 0.7 + i * 0.16, 320.0, 11.0)
@@ -1315,16 +1499,25 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
                                 2:
                                         for i in 3:
                                                 _boss_fire(b, aim + (i - 1) * 0.2, 420.0, 11.0)
+                                3:
+                                        for i in 2:
+                                                _eshot(Vector2(b["x"] + (i - 1) * 90.0, b["y"] + 40.0),
+                                                        Vector2(randf_range(-40, 40), 70.0), 24.0, "bigbomb")
                 "sidewinder":
-                        match cycle % 2:
+                        match cycle % 3:
                                 0:
                                         for i in 3:
                                                 _boss_fire(b, aim + (i - 1) * 0.08, 560.0, 8.0)
                                 1:
                                         for i in 5:
                                                 _boss_fire(b, aim + (i - 2) * 0.15, 430.0, 9.0)
+                                2:
+                                        for r in 2:
+                                                for i in 4:
+                                                        _boss_fire(b, aim + (i - 1.5) * 0.24 + float(r) * 0.12,
+                                                                380.0 + float(r) * 120.0, 8.0)
                 "fortress":
-                        match cycle % 2:
+                        match cycle % 3:
                                 0:
                                         var m := 20 if enraged else 14
                                         for i in m:
@@ -1332,8 +1525,12 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
                                 1:
                                         for i in 11:
                                                 _boss_fire(b, aim + (i - 5) * 0.075, 440.0, 10.0)
+                                2:
+                                        for i in 4:
+                                                _eshot(Vector2(b["x"] + (i - 1.5) * 70.0, b["y"] + 50.0),
+                                                        Vector2(0, 60.0), 15.0, "bomb")
                 "weaver":
-                        match cycle % 3:
+                        match cycle % 4:
                                 0:
                                         for i in 5:
                                                 _boss_fire(b, aim + (i - 2) * 0.16, 400.0, 10.0)
@@ -1341,10 +1538,16 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
                                         for i in 2:
                                                 _spawn_enemy()
                                 2:
-                                        _eshot(Vector2(b["x"], b["y"]),
-                                                Vector2((p_x - b["x"]) * 0.4, -260.0), 14.0, "plasma")
+                                        for i in 3:
+                                                _eshot(Vector2(b["x"], b["y"]),
+                                                        Vector2((p_x - b["x"]) * 0.4 + float(i - 1) * 60.0,
+                                                                -260.0), 13.0, "missile")
+                                3:
+                                        var m2 := 10
+                                        for i in m2:
+                                                _boss_fire(b, TAU * i / m2 - b["t"] * 0.7, 300.0, 9.0)
                 "prime":
-                        match cycle % 4:
+                        match cycle % 5:
                                 0:
                                         for i in 11:
                                                 _boss_fire(b, aim + (i - 5) * 0.12, 420.0, 11.0)
@@ -1359,6 +1562,10 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
                                 3:
                                         for i in 3:
                                                 _spawn_enemy()
+                                4:
+                                        for i in 3:
+                                                _eshot(Vector2(b["x"] + (i - 1) * 70.0, b["y"] + 40.0),
+                                                        Vector2(0, 80.0), 26.0, "bigbomb")
         Jukebox.sfx("rw_eshot", -7.0)
 
 # =================================================================
@@ -1366,9 +1573,12 @@ func _boss_attack(b: Dictionary, enraged: bool) -> void:
 # =================================================================
 func _update_player(delta: float) -> void:
         if state in [GS.INTRO, GS.MENU, GS.TUNNEL, GS.OVER]:
-                # the tank still rolls during the tunnel (auto-drive)
+                # the tank still rolls through the tunnel (the drive law)
                 if state == GS.TUNNEL:
-                        p_x = move_toward(p_x, W * 0.5, 240.0 * delta)
+                        var tspd := 240.0 * (1.0 + _shop_lvl("wheels") * 0.12)
+                        p_x = clampf(p_x + move_force * tspd * delta + 30.0 * delta,
+                                220.0, W - 220.0)
+                        p_wheel_spin += delta * 15.0
                 _tank_pose(delta)
                 return
         # move: the analog force from the LEFT zone
@@ -1378,7 +1588,7 @@ func _update_player(delta: float) -> void:
         if absf(move_force) > 0.02:
                 p_wheel_spin += move_force * delta * 11.0
         # aim: the RIGHT zone finger, else dead ahead
-        var pivot := Vector2(p_x, GROUND_Y - 270.0)
+        var pivot := Vector2(p_x, GROUND_Y - 284.0)
         if aim_ptr != -1 or mouse_aim:
                 var a := (aim_pos - pivot).angle()
                 if a > -0.06 and a < PI / 2:
@@ -1396,7 +1606,7 @@ func _update_player(delta: float) -> void:
         var fire := aim_ptr != -1 or mouse_aim
         if fire and cd_main <= 0.0:
                 _fire_main()
-                cd_main = maxf(0.08, 0.55 - (_shop_lvl("cannon") + 1) * 0.025) \
+                cd_main = maxf(0.09, 0.62 - (_shop_lvl("cannon") + 1) * 0.025) \
                         * cd_mul / (1.0 + float(buffs["rate"]))
         if _mg_lvl() > 0 and cd_mg <= 0.0:
                 _fire_mg()
@@ -1404,7 +1614,7 @@ func _update_player(delta: float) -> void:
                         * cd_mul / (1.0 + float(buffs["rate"]))
         if _rk_lvl() > 0 and cd_rk <= 0.0:
                 _fire_rockets()
-                cd_rk = maxf(0.35, 1.6 - float(_rk_lvl()) * 0.15) * cd_mul
+                cd_rk = maxf(0.4, 1.8 - float(_rk_lvl()) * 0.15) * cd_mul
         _tank_pose(delta)
 
 func _tank_pose(delta: float) -> void:
@@ -1418,7 +1628,7 @@ func _main_dmg() -> float:
                 * (1.0 + float(buffs["dmg"]) + float(c) * 0.22)
 
 func _fire_main() -> void:
-        var pivot := Vector2(p_x, GROUND_Y - 270.0)
+        var pivot := Vector2(p_x, GROUND_Y - 284.0)
         var n := 1 + int(buffs["multi"])
         for i in n:
                 var a := p_aim + (i - (n - 1) / 2.0) * 0.09 + randf_range(-0.008, 0.008)
@@ -1442,11 +1652,11 @@ func _fire_main() -> void:
 ## never the aim. The rack levels add one more barrel per side.
 func _fire_mg() -> void:
         var xs := _mg_xs()
-        var dmg := 4.0 * (1.0 + float(_shop_lvl("mg_rack")) * 0.15) \
+        var dmg := 3.2 * (1.0 + float(_shop_lvl("mg_rack")) * 0.15) \
                 * (1.0 + float(buffs["dmg"]))
         for mx in xs:
                 var bx := p_x + float(mx)
-                var by := GROUND_Y - 196.0
+                var by := GROUND_Y - 208.0
                 var a := -PI / 2 + (0.10 if float(mx) < 0.0 else -0.10) \
                         + randf_range(-0.035, 0.035)
                 shots.append({
@@ -1458,32 +1668,34 @@ func _fire_mg() -> void:
         mg_flash = 1.0
         Jukebox.sfx("rw_mg", -8.0, randf_range(0.94, 1.08))
 
-## THE ROCKET LAW: one rocket per pod, launch straight up, then home -
-## and EVERY rocket picks a DIFFERENT target (round-robin over the living
-## enemies, the owner's "each single rocket follows different target").
+## THE ROCKET LAW: one rocket per CELL, launch up out of the bottom layer,
+## then home - and EVERY rocket picks a DIFFERENT target (round-robin over
+## the living enemies, the owner's "each single rocket follows different").
 func _fire_rockets() -> void:
         var xs := _pod_xs()
-        var dmg := 26.0 * (1.0 + float(_shop_lvl("rocket_rack")) * 0.15) \
+        var dmg := 23.0 * (1.0 + float(_shop_lvl("rocket_rack")) * 0.15) \
                 * (1.0 + float(buffs["dmg"]))
         var rk_spd_mul := 1.0 + float(_shop_lvl("rocket_rack")) * 0.06
         var alive := enemies.duplicate()
         alive.shuffle()
         for i in xs.size():
                 var rx := p_x + float(xs[i])
-                var by := GROUND_Y - 206.0
+                var by := GROUND_Y - 124.0
                 var tgt: Dictionary = {}
                 if not alive.is_empty():
                         tgt = alive[i % alive.size()]
-                _launch_rocket(Vector2(rx, by), dmg, 2.4, tgt, rk_spd_mul)
+                _launch_rocket(Vector2(rx, by), dmg, 2.4, tgt, rk_spd_mul,
+                        130.0 * signf(float(xs[i])))
         rk_flash = 1.0
         Jukebox.sfx("rw_rocket", -8.0)
 
 func _launch_rocket(src: Vector2, dmg: float, homing: float,
-                target: Dictionary = {}, spd_mul := 1.0) -> void:
+                target: Dictionary = {}, spd_mul := 1.0, vx0 := 0.0) -> void:
         if rockets.size() >= 40:
                 return
         rockets.append({
-                "x": src.x, "y": src.y, "vx": randf_range(-40, 40), "vy": -320.0,
+                "x": src.x, "y": src.y, "vx": vx0 + randf_range(-40, 40),
+                "vy": -320.0,
                 "dmg": dmg, "homing": homing, "target": target, "t": 0.0,
                 "launch": 0.35, "spd_mul": spd_mul,
         })
@@ -1621,10 +1833,10 @@ func _update_eshots(delta: float) -> void:
                                 _explode(d["x"], GROUND_Y - 8.0, 0.5)
                         dead.append(d)
                         continue
-                # tank hitbox: the hull slab + the tall turret column
-                if (absf(d["x"] - p_x) < 150.0 and d["y"] > GROUND_Y - 160.0) \
-                                or (absf(d["x"] - p_x) < 58.0 \
-                                and d["y"] > GROUND_Y - 300.0):
+                # tank hitbox: the wide hull slabs + the tall turret column
+                if (absf(d["x"] - p_x) < 188.0 and d["y"] > GROUND_Y - 140.0) \
+                                or (absf(d["x"] - p_x) < 62.0 \
+                                and d["y"] > GROUND_Y - 316.0):
                         _damage_player(float(d["dmg"]))
                         _explode(d["x"], d["y"], 0.5)
                         dead.append(d)
@@ -1744,21 +1956,18 @@ func kill_enemy(e: Dictionary, pay: bool) -> void:
                 return
         # SCORE = KILLS (the owner's law): one kill, one point
         set_score(score + 1)
-        # XP ORBS: one orb = ONE point (the owner's law). The count scales
-        # with NEURAL LINK and the +XP cards.
+        coin_kills += 1
+        # XP ORBS: one orb = ONE point (the owner's law). No +XP cheats.
         var def: Dictionary = HWData.ENEMIES.get(String(e["kind"]), {})
         var xp_base: int = int(def.get("xp", 8)) if not is_boss \
-                else int(e.get("xp", 40))
-        var xp_mul := 1.0 + _shop_lvl("xpGain") * 0.20 + float(buffs["dmg"]) * 0.0
-        var orbs := maxi(1, int(round(float(xp_base) * xp_mul)))
+                else int(e.get("xp", 60))
+        var orbs := maxi(1, xp_base)
         for i in orbs:
                 _drop(Vector2(e["x"], e["y"]), "xp", 1)
-        # SCRAP: one piece = ONE scrap (the owner's law). SALVAGE CLAW and
-        # the +scrap cards add pieces.
+        # SCRAP: one piece = ONE scrap (the owner's law). No +scrap cheats.
         var scrap_base: int = int(def.get("scrap", 4)) if not is_boss \
-                else int(e.get("scrap", 30))
-        var scrap_mul := 1.0 + _shop_lvl("scrapGain") * 0.20
-        var pieces := maxi(1, int(round(float(scrap_base) * scrap_mul)))
+                else int(e.get("scrap", 60))
+        var pieces := maxi(1, scrap_base)
         if is_boss:
                 # the boss's salvage rains down across the death chain
                 for i in 7:
@@ -1774,19 +1983,15 @@ func kill_enemy(e: Dictionary, pay: bool) -> void:
                 for i in pieces:
                         _drop(Vector2(e["x"] + randf_range(-16, 16),
                                 e["y"] + randf_range(-10, 10)), "scrap", 1)
-        # THE GOGACOIN LAW: the armed kill carries a coin; bosses pay direct
+        # THE GOGACOIN LAW (v040-6): every 500th kill carries a REAL coin;
+        # bosses pay 5 direct. No timer, no cheap arms.
         if is_boss:
-                add_run_coins(5)
-                coin_kills = 0
-                coin_timer = 0.0
-                coin_armed = false
+                add_run_coins(HWData.BOSS_COINS)
                 _fx_boom_chain(e["x"], e["y"])
                 Jukebox.sfx("rw_boss_die", -2.0)
-                _banner("BOSS DOWN  +5 GOGACOINS", 2.0)
-        elif coin_armed:
-                coin_armed = false
+                _banner("BOSS DOWN  +" + str(HWData.BOSS_COINS) + " GOGACOINS", 2.0)
+        elif coin_kills >= HWData.COIN_KILLS:
                 coin_kills = 0
-                coin_timer = 0.0
                 _drop(Vector2(e["x"], e["y"]), "coin", 1)
         # SHREDS: heavy machines burst into falling shrapnel that may hit
         if not is_boss and int(def.get("shreds", 0)) > 0:
@@ -1826,8 +2031,9 @@ func _damage_player(dmg: float) -> void:
 
 # ------------------------------------------------------------- pickups
 func _magnet_radius() -> float:
-        return minf(420.0, 160.0 + float(p_level) * 8.0
-                + float(_shop_lvl("magnet")) * 35.0)
+        # the pickup pull grows with the level only - the magnet coil is
+        # dead (the owner's no-cheat law)
+        return minf(420.0, 160.0 + float(p_level) * 10.0)
 
 func _drop(pos: Vector2, kind: String, value: int) -> void:
         if drops.size() >= 220:
@@ -2103,105 +2309,179 @@ func _goga_sheet_popped(id: String) -> void:
                 _apply_skin()
 
 # --------------------------------------------------------------- tunnel
+# THE TUNNEL LAW (v040-6): NO teleport. The tunnel is part of the world -
+# a concrete PORTAL rides in from the right (the world's own scroll), the
+# tank DRIVES THROUGH it under a rock ceiling with ribs and lights and a
+# calm coin trail, the place swaps BEHIND the walls, and the drive ends
+# in the next place's daylight. (The Zombie Tsunami law: the world is
+# connected - you see the mouth, you drive it, you come out the other
+# side.)
 var tunnel := {}
 var tunnel_node: Node2D
 
 func _enter_tunnel() -> void:
         state = GS.TUNNEL
-        tunnel = {"t": 0.0, "dur": 5.2, "swapped": false, "scroll": 0.0}
+        tunnel = {"t": 0.0, "phase": "approach", "portal_x": W + 520.0,
+                "inside_t": 0.0, "out_t": 0.0, "swapped": false,
+                "coin_t": 0.0}
+        enemies.clear()
+        eshots.clear()
+        boss_ent = {}
         Jukebox.sfx("rw_tunnel", -6.0)
-        _banner("ENTERING THE TUNNEL", 1.6)
-        # a calm coin trail pays the drive
-        for i in 8:
-                _drop(Vector2(W * 0.2 + i * 44.0, GROUND_Y - 84.0), "coin", 1)
-        tunnel_node = Node2D.new()
-        tunnel_node.z_index = 40
-        tunnel_node.draw.connect(_draw_tunnel)
-        add_child(tunnel_node)
+        _banner("THE TUNNEL AHEAD", 1.8)
+        if tunnel_node == null or not is_instance_valid(tunnel_node):
+                tunnel_node = Node2D.new()
+                tunnel_node.z_index = 40
+                tunnel_node.draw.connect(_draw_tunnel)
+                add_child(tunnel_node)
+
+func _end_tunnel() -> void:
+        tunnel = {}
+        if tunnel_node != null and is_instance_valid(tunnel_node):
+                tunnel_node.queue_free()
+        tunnel_node = null
+        _start_place()
 
 func _draw_tunnel() -> void:
         if tunnel.is_empty() or tunnel_node == null:
                 return
         var t: Dictionary = tunnel
-        var wall := 176.0
-        var top_h := wall + sin(float(t["scroll"]) * 0.021) * 26.0
-        var bot_h := wall + sin(float(t["scroll"]) * 0.017 + 2.0) * 26.0
-        # the dark
-        tunnel_node.draw_rect(Rect2(0, 0, W, H), Color(0.02, 0.024, 0.04, 0.94))
-        # rock walls (jagged strips riding the scroll)
-        var step := 110.0
-        var off := fposmod(float(t["scroll"]) * 0.9, step)
-        var pts_top := PackedVector2Array()
-        pts_top.append(Vector2(-40, -40))
-        pts_top.append(Vector2(W + 40, -40))
-        var pts_bot := PackedVector2Array()
-        pts_bot.append(Vector2(-40, H + 40))
-        pts_bot.append(Vector2(W + 40, H + 40))
-        var x := -off
-        while x < W + step:
-                pts_top.append(Vector2(x, top_h + sin(x * 0.05 + float(t["scroll"]) * 0.02) * 22.0))
-                pts_bot.append(Vector2(x, H - bot_h + sin(x * 0.04 + float(t["scroll"]) * 0.015) * 22.0))
-                x += step
-        tunnel_node.draw_colored_polygon(pts_top, Color(0.16, 0.175, 0.215))
-        tunnel_node.draw_colored_polygon(pts_bot, Color(0.16, 0.175, 0.215))
-        for i in range(pts_top.size() - 2):
-                tunnel_node.draw_line(pts_top[i + 2], pts_top[i + 1],
-                        Color(0.38, 0.41, 0.48), 5.0)
-                tunnel_node.draw_line(pts_bot[i + 2], pts_bot[i + 1],
-                        Color(0.38, 0.41, 0.48), 5.0)
-        # the lights every 220px
-        var lo := fposmod(float(t["scroll"]) * 0.9, 220.0)
-        var lx := -lo
-        while lx < W + 220.0:
-                var ly_t := top_h - 26.0
-                var ly_b := H - bot_h + 26.0
-                tunnel_node.draw_circle(Vector2(lx, ly_t), 10.0, Color(1.0, 0.85, 0.5, 0.9))
-                tunnel_node.draw_circle(Vector2(lx, ly_b), 10.0, Color(1.0, 0.85, 0.5, 0.9))
-                tunnel_node.draw_circle(Vector2(lx, ly_t), 34.0, Color(1.0, 0.8, 0.4, 0.10))
-                tunnel_node.draw_circle(Vector2(lx, ly_b), 34.0, Color(1.0, 0.8, 0.4, 0.10))
-                lx += 220.0
-        # steel ribs every 300px
-        var ro := fposmod(float(t["scroll"]), 300.0)
-        var rx := -ro
-        var rib := Color(0.30, 0.33, 0.40, 0.55)
-        while rx < W + 300.0:
-                tunnel_node.draw_line(Vector2(rx, top_h), Vector2(rx, H - bot_h), rib, 7.0)
-                tunnel_node.draw_line(Vector2(rx + 7, top_h), Vector2(rx + 7, H - bot_h),
-                        Color(0.12, 0.13, 0.16, 0.8), 3.0)
-                rx += 300.0
-        # the exit glow grows as the tunnel ends
-        var out_a: float = clampf((float(t["t"]) - float(t["dur"]) * 0.72)
-                / (float(t["dur"]) * 0.28), 0.0, 1.0)
-        if out_a > 0.0:
-                tunnel_node.draw_rect(Rect2(0, 0, W, H),
-                        Color(HWData.PLACES[place_i % 10]["sky_bot"], 0.55 * out_a))
+        var phase := String(t["phase"])
+        var rock := Color(0.13, 0.145, 0.175)
+        var rock_hi := Color(0.30, 0.33, 0.40)
+        var rock_lo := Color(0.07, 0.08, 0.10)
+        if phase == "approach":
+                # ---- the MOUTH rides the world: pillars + a dark maw ----
+                var px: float = float(t["portal_x"])
+                if px < W + 120.0:
+                        var mouth_top := GROUND_Y - 540.0
+                        # the dark interior beyond the mouth
+                        tunnel_node.draw_rect(Rect2(px, -40, W + 80 - px,
+                                GROUND_Y + 40), Color(0.045, 0.05, 0.065, 0.98))
+                        # the concrete frame: near pillar + arch + far lip
+                        tunnel_node.draw_rect(Rect2(px - 54.0, mouth_top,
+                                54.0, GROUND_Y - mouth_top), rock)
+                        tunnel_node.draw_rect(Rect2(px - 54.0, mouth_top,
+                                54.0, 26.0), rock_hi)
+                        tunnel_node.draw_rect(Rect2(px - 120.0, mouth_top - 34.0,
+                                174.0, 34.0), rock)
+                        tunnel_node.draw_rect(Rect2(px - 120.0, mouth_top - 34.0,
+                                174.0, 8.0), rock_hi)
+                        tunnel_node.draw_rect(Rect2(px - 62.0, mouth_top,
+                                8.0, GROUND_Y - mouth_top), rock_lo)
+                        # hazard chevrons on the pillar
+                        for ci in 5:
+                                var cy := mouth_top + 70.0 + float(ci) * 92.0
+                                tunnel_node.draw_colored_polygon(
+                                        PackedVector2Array([
+                                                Vector2(px - 40.0, cy),
+                                                Vector2(px - 14.0, cy + 26.0),
+                                                Vector2(px - 14.0, cy + 44.0),
+                                                Vector2(px - 40.0, cy + 18.0)]),
+                                        Color(0.85, 0.62, 0.14, 0.85))
+                        # the mouth lamp
+                        tunnel_node.draw_circle(Vector2(px - 27.0, mouth_top + 18.0),
+                                9.0, Color(1.0, 0.85, 0.5, 0.9))
+                        tunnel_node.draw_circle(Vector2(px - 27.0, mouth_top + 18.0),
+                                26.0, Color(1.0, 0.8, 0.4, 0.12))
+        else:
+                # ---- INSIDE / OUT: the rock ceiling closes over the world ----
+                var opening := 0.0
+                if phase == "out":
+                        opening = clampf(float(t["out_t"]) / 0.85, 0.0, 1.0)
+                var ceil_bot: float = lerpf(GROUND_Y - 74.0, -60.0, opening)
+                # the rock body (covers the sky; the road stays open)
+                tunnel_node.draw_rect(Rect2(-40, -40, W + 80, ceil_bot + 40.0),
+                        Color(0.05, 0.055, 0.07, 0.99))
+                # the jagged rock edge riding the world scroll
+                var step := 96.0
+                var off := fposmod(scroll_x, step)
+                var pts := PackedVector2Array()
+                pts.append(Vector2(-40, ceil_bot - 42.0))
+                var x := -off
+                while x < W + step:
+                        var jag := 26.0 + sin(x * 0.045 + scroll_x * 0.01) * 14.0
+                        pts.append(Vector2(x, ceil_bot - jag))
+                        x += step
+                pts.append(Vector2(W + 40, ceil_bot - 42.0))
+                tunnel_node.draw_colored_polygon(pts, rock)
+                for i in range(1, pts.size() - 1):
+                        tunnel_node.draw_line(pts[i], pts[i + 1], rock_hi, 4.0)
+                # warm lights every 250px
+                var lo := fposmod(scroll_x, 250.0)
+                var lx := -lo
+                while lx < W + 250.0:
+                        tunnel_node.draw_circle(Vector2(lx, ceil_bot - 44.0),
+                                8.0, Color(1.0, 0.85, 0.5, 0.92))
+                        tunnel_node.draw_circle(Vector2(lx, ceil_bot - 44.0),
+                                30.0, Color(1.0, 0.8, 0.4, 0.10))
+                        lx += 250.0
+                # steel ribs every 300px
+                var ro := fposmod(scroll_x, 300.0)
+                var rx := -ro
+                while rx < W + 300.0:
+                        tunnel_node.draw_line(Vector2(rx, -40),
+                                Vector2(rx, ceil_bot - 30.0),
+                                Color(0.24, 0.26, 0.32, 0.85), 7.0)
+                        tunnel_node.draw_line(Vector2(rx + 7, -40),
+                                Vector2(rx + 7, ceil_bot - 30.0),
+                                Color(0.10, 0.11, 0.14, 0.9), 3.0)
+                        rx += 300.0
+                # the EXIT: a growing daylight at the right edge
+                var exit_a: float = clampf((float(t["inside_t"]) - 2.1) / 1.3,
+                        0.0, 1.0) if phase == "inside" else 1.0
+                if exit_a > 0.0:
+                        var glow_w := 240.0 * exit_a
+                        tunnel_node.draw_rect(Rect2(W - glow_w, -40,
+                                glow_w + 40.0, GROUND_Y + 40.0),
+                                Color(HWData.PLACES[place_i % 10]["sky_bot"],
+                                        0.85 * exit_a))
+                        tunnel_node.draw_rect(Rect2(W - glow_w * 0.5, -40,
+                                glow_w * 0.5 + 40.0, GROUND_Y + 40.0),
+                                Color(1, 1, 1, 0.16 * exit_a))
 
 func _tick_tunnel(delta: float) -> void:
         var t: Dictionary = tunnel
         t["t"] += delta
-        t["scroll"] = float(t["scroll"]) + HWData.WORLD_SPEED * 2.6 * delta
+        match String(t["phase"]):
+                "approach":
+                        # the world scroll carries the mouth toward the tank
+                        _tick_world_scroll(delta, 2.2)
+                        t["portal_x"] = float(t["portal_x"]) \
+                                - HWData.WORLD_SPEED * 2.2 * delta
+                        if float(t["portal_x"]) <= p_x - 60.0:
+                                t["phase"] = "inside"
+                                t["inside_t"] = 0.0
+                                Jukebox.sfx("rw_tunnel", -8.0)
+                "inside":
+                        _tick_world_scroll(delta, 2.6)
+                        t["inside_t"] = float(t["inside_t"]) + delta
+                        # the calm coin trail pays the drive
+                        t["coin_t"] = float(t["coin_t"]) - delta
+                        if float(t["coin_t"]) <= 0.0:
+                                t["coin_t"] = 0.55
+                                for i in 3:
+                                        _drop(Vector2(W + 60.0 + float(i) * 46.0,
+                                                GROUND_Y - 88.0), "coin", 1)
+                        # the place swaps BEHIND the walls
+                        if not bool(t["swapped"]) and float(t["inside_t"]) >= 1.9:
+                                t["swapped"] = true
+                                place_i += 1
+                                if place_i % 10 == 0 and place_i > 0:
+                                        loop += 1
+                                wave = 1
+                                drops.clear()
+                                _sky_node()
+                        if float(t["inside_t"]) >= 3.4:
+                                t["phase"] = "out"
+                                t["out_t"] = 0.0
+                "out":
+                        _tick_world_scroll(delta, 2.2)
+                        t["out_t"] = float(t["out_t"]) + delta
+                        if float(t["out_t"]) >= 0.9:
+                                _end_tunnel()
         if tunnel_node != null and is_instance_valid(tunnel_node):
                 tunnel_node.queue_redraw()
-        var speed_mul: float = 2.0 + float(t["t"]) * 0.5
-        _tick_world_scroll(delta, speed_mul)
-        if not bool(t["swapped"]) and float(t["t"]) >= float(t["dur"]) * 0.5:
-                t["swapped"] = true
-                place_i += 1
-                if place_i % 10 == 0 and place_i > 0:
-                        loop += 1
-                wave = 1
-                enemies.clear()
-                eshots.clear()
-                drops.clear()
-                boss_ent = {}
-                _sky_node()
-        # the drive out
-        if float(t["t"]) >= float(t["dur"]):
-                tunnel = {}
-                if tunnel_node != null and is_instance_valid(tunnel_node):
-                        tunnel_node.queue_free()
-                tunnel_node = null
-                _start_place()
 
 # -------------------------------------------------------------------- fx
 # THE SMOOTH LAW: everything is a soft additive circle, never a sprite.
@@ -2321,7 +2601,7 @@ func _ecirc(e: Dictionary, dx: float, dy: float, r: float, col: Color) -> void:
 
 func _draw_enemies() -> void:
         if state == GS.TUNNEL:
-                return   # the tunnel overlay owns the screen
+                return   # the tunnel drive is a calm road - no enemies
         for e in enemies:
                 var d: Dictionary = e
                 if String(d.get("kind", "")) == "boss":
@@ -2360,24 +2640,42 @@ func _draw_health_bar(e: Dictionary) -> void:
 func _draw_enemy_kind(e: Dictionary) -> void:
         match String(e["kind"]):
                 "scout":
-                        _epoly(e, [[6, -4], [-8, -18], [-24, -18], [-16, -4]], Color("6a1a12"))
-                        _epoly(e, [[6, 4], [-8, 18], [-24, 18], [-16, 4]], Color("6a1a12"))
-                        _epoly(e, [[26, 0], [8, -9], [-16, -8], [-26, 0], [-16, 8], [8, 8]], Color("c04a38"))
-                        _eoutline(e, [[26, 0], [8, -9], [-16, -8], [-26, 0], [-16, 8], [8, 8]], Color("2a0808"), 2.0)
-                        _ecirc(e, 7, -1, 5.0, Color("8fd8ff"))
+                        # a hornet-dart: two-tone wings, a hot canopy, a
+                        # twin exhaust that flickers
+                        var eng := 0.5 + 0.5 * sin(e["t"] * 26.0)
+                        _epoly(e, [[2, -5], [-10, -20], [-26, -20], [-19, -4]], Color("551410"))
+                        _epoly(e, [[2, 5], [-10, 20], [-26, 20], [-19, 4]], Color("551410"))
+                        _epoly(e, [[26, 0], [10, -10], [-14, -9], [-26, 0], [-14, 9], [10, 10]], Color("c04a38"))
+                        _epoly(e, [[22, 0], [8, -4], [-8, -3], [-8, 3], [8, 4]], Color("e0785a"))
+                        _eoutline(e, [[26, 0], [10, -10], [-14, -9], [-26, 0], [-14, 9], [10, 10]], Color("2a0808"), 2.0)
+                        _ecirc(e, 8, -1, 5.0, Color("8fd8ff"))
+                        _ecirc(e, -26, 0, 3.0 + eng * 2.0, Color(1.0, 0.62, 0.25, 0.85))
                 "fighter":
-                        _epoly(e, [[4, -5], [-14, -28], [-32, -28], [-24, -5]], Color("153048"))
-                        _epoly(e, [[4, 5], [-14, 28], [-32, 28], [-24, 5]], Color("153048"))
-                        _epoly(e, [[36, 0], [16, -10], [-8, -9], [-32, -6], [-32, 6], [-8, 9], [16, 10]], Color("2c5a8a"))
-                        _eoutline(e, [[36, 0], [16, -10], [-8, -9], [-32, -6], [-32, 6], [-8, 9], [16, 10]], Color("03101d"), 2.0)
+                        # a swept warbird: layered steel, wing stripes, a
+                        # glowing intake
+                        var eng2 := 0.5 + 0.5 * sin(e["t"] * 20.0)
+                        _epoly(e, [[4, -6], [-14, -30], [-34, -30], [-25, -6]], Color("12283c"))
+                        _epoly(e, [[4, 6], [-14, 30], [-34, 30], [-25, 6]], Color("12283c"))
+                        _epoly(e, [[36, 0], [16, -11], [-8, -10], [-32, -7], [-32, 7], [-8, 10], [16, 11]], Color("2c5a8a"))
+                        _epoly(e, [[30, 0], [12, -5], [-10, -4], [-10, 4], [12, 5]], Color("4a7aa8"))
+                        _eoutline(e, [[36, 0], [16, -11], [-8, -10], [-32, -7], [-32, 7], [-8, 10], [16, 11]], Color("03101d"), 2.0)
                         _ecirc(e, 15, -2, 7.0, Color("a0e8ff"))
+                        _epoly(e, [[-6, -8], [2, -8], [2, -5], [-6, -5]], Color("6ab0d8"))
+                        _epoly(e, [[-6, 8], [2, 8], [2, 5], [-6, 5]], Color("6ab0d8"))
+                        _ecirc(e, -32, 0, 3.6 + eng2 * 2.4, Color(1.0, 0.66, 0.3, 0.85))
                 "bomber":
-                        _epoly(e, [[2, -7], [-16, -36], [-40, -36], [-28, -7]], Color("4a1c0a"))
-                        _epoly(e, [[2, 7], [-16, 36], [-40, 36], [-28, 7]], Color("4a1c0a"))
+                        # a twin-engine heavy: engine nacelles, a bomb-bay
+                        # seam, a lit cockpit
+                        _epoly(e, [[2, -8], [-16, -38], [-42, -38], [-30, -8]], Color("3a1408"))
+                        _epoly(e, [[2, 8], [-16, 38], [-42, 38], [-30, 8]], Color("3a1408"))
                         _epoly(e, [[50, 0], [28, -16], [-2, -15], [-48, -12], [-52, 0], [-48, 12], [-2, 15], [28, 16]], Color("8a3a1a"))
+                        _epoly(e, [[42, 0], [24, -8], [-4, -7], [-4, 7], [24, 8]], Color("a85a30"))
                         _eoutline(e, [[50, 0], [28, -16], [-2, -15], [-48, -12], [-52, 0], [-48, 12], [-2, 15], [28, 16]], Color("1a0603"), 2.4)
                         _ecirc(e, 25, -3, 9.0, Color("ffddaa"))
-                        _ecirc(e, -30, 0, 6.0, Color("2a2a2a"))
+                        _ecirc(e, 27, 0, 4.0, Color("5a5a5a"))
+                        _epoly(e, [[-8, 8], [18, 8], [18, 12], [-8, 12]], Color("140a06"))
+                        _ecirc(e, -30, -14, 5.0, Color("2a2a2a"))
+                        _ecirc(e, -30, 14, 5.0, Color("2a2a2a"))
                 "heli":
                         _epoly(e, [[-48, -4], [-6, -8], [-6, 8], [-48, 4]], Color("5a3010"))
                         _ecirc(e, 0, 0, 27.0, Color("b05a1c"))
@@ -2391,12 +2689,38 @@ func _draw_enemy_kind(e: Dictionary) -> void:
                                 Vector2(float(e["x"]) + rlen, float(e["y"]) - 30.0),
                                 Color(0.12, 0.12, 0.12, 0.9), 5.0)
                 "kamikaze":
+                        # THE SUICIDE DART: a bomb with fins, a blinking
+                        # armed light, and a dive trail it wears with pride
                         if bool(e.get("diving", false)):
                                 ent_draw.draw_circle(Vector2(e["x"], e["y"]), 26.0,
                                         Color(1.0, 0.4, 0.2, 0.2))
-                        _epoly(e, [[28, 0], [-2, -13], [-22, -8], [-22, 8], [-2, 13]], Color("8a1a5a"))
-                        _eoutline(e, [[28, 0], [-2, -13], [-22, -8], [-22, 8], [-2, 13]], Color("1a0410"), 2.0)
+                        var armed := fmod(e["t"], 0.4) < 0.2
+                        _epoly(e, [[28, 0], [6, -12], [-20, -9], [-24, 0], [-20, 9], [6, 12]], Color("8a1a5a"))
+                        _epoly(e, [[20, 0], [6, -5], [-10, -4], [-10, 4], [6, 5]], Color("b83a80"))
+                        _eoutline(e, [[28, 0], [6, -12], [-20, -9], [-24, 0], [-20, 9], [6, 12]], Color("1a0410"), 2.0)
                         _epoly(e, [[-16, -3], [-9, -3], [-9, 3], [-16, 3]], Color("ffdd00"))
+                        _ecirc(e, 10, 0, 3.4,
+                                Color(1.0, 0.3, 0.2, 0.95) if armed else Color(0.4, 0.1, 0.1))
+                "raider":
+                        # THE ROCKET RUNNER: a needle-thin interceptor with
+                        # a hot afterburner, rain tanks under its wings -
+                        # faster than anything else in the sky
+                        var burn := 0.6 + 0.4 * sin(e["t"] * 34.0)
+                        _epoly(e, [[0, -4], [-14, -24], [-30, -22], [-20, -4]], Color("5a2410"))
+                        _epoly(e, [[0, 4], [-14, 24], [-30, 22], [-20, 4]], Color("5a2410"))
+                        _epoly(e, [[34, 0], [16, -8], [-16, -7], [-30, 0], [-16, 7], [16, 8]], Color("b86228"))
+                        _epoly(e, [[28, 0], [12, -3.4], [-12, -2.6], [-12, 2.6], [12, 3.4]], Color("e09048"))
+                        _eoutline(e, [[34, 0], [16, -8], [-16, -7], [-30, 0], [-16, 7], [16, 8]], Color("2a1004"), 2.0)
+                        _ecirc(e, 12, -1, 4.6, Color("ffd9a0"))
+                        # the rain tanks: little rockets under each wing
+                        for rt in 2:
+                                var ry := -16.0 + float(rt) * 32.0
+                                _epoly(e, [[-2, ry], [-8, ry - 3], [-16, ry - 3],
+                                        [-16, ry + 3], [-8, ry + 3]], Color("8a3020"))
+                        # the afterburner
+                        _epoly(e, [[-30, -3], [-30 - 14.0 * burn, 0], [-30, 3]],
+                                Color(1.0, 0.62, 0.2, 0.8))
+                        _ecirc(e, -31, 0, 4.0 + burn * 3.0, Color(1.0, 0.8, 0.35, 0.9))
                 "gunship":
                         _epoly(e, [[6, -9], [-8, -46], [-42, -46], [-32, -9]], Color("2a2a1e"))
                         _epoly(e, [[6, 9], [-8, 46], [-42, 46], [-32, 9]], Color("2a2a1e"))
@@ -2634,6 +2958,8 @@ func _boutline(b: Dictionary, pts: Array, col: Color, w := 2.6) -> void:
 # ------------------------------------------------------- shots & drops
 func _draw_shots() -> void:
         if state == GS.TUNNEL:
+                # the tunnel drive: the coin trail still shines
+                _draw_drops()
                 return
         # MY shots: shells = glowing orb + tail, MG = tracer line
         for s in shots:
@@ -2724,7 +3050,12 @@ func _draw_shots() -> void:
                                 shot_draw.draw_colored_polygon(spts, Color("9aa2ae"))
                                 shot_draw.draw_polyline(spts + PackedVector2Array([spts[0]]),
                                         Color("3a3e46"), 1.4)
-        # drops: xp orbs / scrap / coins
+        _draw_drops()
+
+## THE DROPS: xp orbs / scrap cogs / the REAL GOGACoin (gold disc, dark
+## rim, the box's own G - the owner: "it should really drop and look
+## like a gogacoin normally").
+func _draw_drops() -> void:
         for p in drops:
                 var d3: Dictionary = p
                 var flick: bool = float(d3["life"]) < 3.0 \
@@ -2757,11 +3088,32 @@ func _draw_shots() -> void:
                                 shot_draw.draw_circle(p3 + Vector2(-4, -4) * spin,
                                         3.4, Color("f0dc9c"))
                         "coin":
-                                shot_draw.draw_circle(p3, 13.0, Color(1.0, 0.84, 0.3, 0.3))
-                                shot_draw.draw_circle(p3, 9.0, Color("f0c040"))
-                                shot_draw.draw_circle(p3, 6.0, Color("c89828"))
-                                shot_draw.draw_circle(p3 + Vector2(-2.5, -2.5), 2.6,
-                                        Color("fff0b0"))
+                                # THE GOGACOIN: rim, face, the blocky G, a shine
+                                var ca := fmod(d3["t"] * 2.6, TAU)
+                                var squash: float = 0.35 + 0.65 * absf(cos(ca))
+                                var bob := sin(d3["t"] * 5.0) * 2.0
+                                var cc := p3 + Vector2(0, bob)
+                                shot_draw.draw_set_transform(cc, 0.0,
+                                        Vector2(squash, 1.0))
+                                shot_draw.draw_circle(Vector2.ZERO, 15.0,
+                                        Color(1.0, 0.84, 0.3, 0.28))
+                                shot_draw.draw_circle(Vector2.ZERO, 12.5,
+                                        Color("b8860b"))
+                                shot_draw.draw_circle(Vector2.ZERO, 10.0,
+                                        Color("f0c040"))
+                                shot_draw.draw_circle(Vector2(0, 0), 7.4,
+                                        Color("d8a018"))
+                                # the G glyph: block strokes, the box's mark
+                                var gcol := Color("8a6508")
+                                shot_draw.draw_rect(Rect2(-4.6, -5.2, 9.2, 2.6), gcol)
+                                shot_draw.draw_rect(Rect2(-4.6, -5.2, 2.6, 10.4), gcol)
+                                shot_draw.draw_rect(Rect2(-4.6, 2.6, 9.2, 2.6), gcol)
+                                shot_draw.draw_rect(Rect2(2.0, 0.2, 2.6, 5.0), gcol)
+                                shot_draw.draw_rect(Rect2(-0.6, 0.2, 2.6, 2.6), gcol)
+                                shot_draw.draw_circle(Vector2(-3.5, -4.0), 1.8,
+                                        Color(1, 1, 1, 0.55))
+                                shot_draw.draw_set_transform(Vector2.ZERO, 0.0,
+                                        Vector2(1, 1))
 
 func _draw_fx() -> void:
         for f in fx:
@@ -2792,9 +3144,12 @@ func _draw_fx() -> void:
                                         Color(0.85, 0.7, 0.45, 0.4 * a))
 
 # =================================================================
-# THE SCRAP SHOP - the HTML prototype's exact 11 items with scrap, the
-# exact edge cases: MAX can not be re-bought, LOCKED needs its unlock,
-# not enough scrap refuses the buy. Skins stay box cosmetics (coins).
+# THE SHOPS (v040-6, THE SPLIT): the SCRAP SHOP is the war's proper shop -
+# 8 honest items, scrap prices, the edge cases (MAX can not be re-bought,
+# LOCKED needs its unlock, no funds refuses the buy). The normal GOGABox
+# SHOP is back in its own place: the coin wallet chip, the tank skins with
+# the GOGACoin icon prices, LOCKED until bought (the owner: "GOGABox-shop
+# things before get bought, they are locked").
 # =================================================================
 func _shop_open() -> void:
         if state in [GS.PLACE, GS.BOSS, GS.TUNNEL] and not paused:
@@ -2804,15 +3159,16 @@ func _shop_open() -> void:
         var t := Arc.label("SCRAP SHOP", 36, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
-        var wallet := Arc.label("SCRAPS  %d   -   permanent upgrades" % meta.scrap(),
-                20, THEME["cost"])
-        wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        # the scrap wallet rides the sheet like every real shop's wallet
+        var wallet := Arc.chip("SCRAPS  %d" % meta.scrap(), "", THEME["panel"], 24,
+                THEME["cost"])
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         vb.add_child(wallet)
         var sc := BoxScroll.new()
         sc.game_safe = true
         sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         var vp := get_viewport_rect().size
-        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.52, 320.0, 640.0))
+        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.56, 320.0, 660.0))
         vb.add_child(sc)
         var box := VBoxContainer.new()
         box.add_theme_constant_override("separation", 8)
@@ -2820,9 +3176,6 @@ func _shop_open() -> void:
         sc.add_child(box)
         for it in HWData.SHOP_ITEMS:
                 box.add_child(_shop_scrap_row(it))
-        box.add_child(_shop_lbl("TANK SKINS  -  GOGACoins"))
-        for id in HWData.SKINS:
-                box.add_child(_shop_skin_row(id))
         var close_b := Arc.button("BACK", Vector2(560, 70), 24, Arc.ACCENT,
                 func(): sheet_pop())
         var cc := HBoxContainer.new()
@@ -2919,42 +3272,108 @@ func _shop_reopen() -> void:
                 sheet_pop()
                 _shop_open()
 
+func _box_shop_reopen() -> void:
+        if not _sheet_stack.is_empty() \
+                        and String(_sheet_stack[-1].get("id", "")) == "boxshop":
+                sheet_pop()
+                _box_shop_open()
+
+## THE NORMAL GOGABOX SHOP (the owner: "re-put the normal gogabox shop in
+## it's place"): the box's own shelf - the coin wallet chip on top, the
+## tank skins priced in GOGACoins (the coin icon ON the price, the law),
+## every unowned item plainly LOCKED until bought, ONE action color.
+func _box_shop_open() -> void:
+        if state in [GS.PLACE, GS.BOSS, GS.TUNNEL] and not paused:
+                paused = true
+                get_tree().paused = true
+        var vb := sheet_push(0.0, "boxshop")
+        var t := Arc.label("SHOP", 36, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var wallet := Arc.coin_chip()
+        wallet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        vb.add_child(wallet)
+        var sc := BoxScroll.new()
+        sc.game_safe = true
+        sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var vp := get_viewport_rect().size
+        sc.custom_minimum_size = Vector2(620, clampf(vp.y * 0.56, 300.0, 620.0))
+        vb.add_child(sc)
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        sc.add_child(box)
+        box.add_child(_shop_lbl("TANK SKINS"))
+        for id in HWData.SKINS:
+                box.add_child(_shop_skin_row(id))
+        var close_b := Arc.button("CLOSE", Vector2(560, 70), 24, Arc.ACCENT,
+                func(): sheet_pop())
+        var cc := HBoxContainer.new()
+        cc.alignment = BoxContainer.ALIGNMENT_CENTER
+        cc.add_child(close_b)
+        box.add_child(cc)
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
+
 func _shop_skin_row(id: String) -> Control:
         var sk: Dictionary = HWData.SKINS[id]
         var owned := Box.skin_owned(game_id, id) or int(sk["price"]) == 0
         var on := Box.skin_on(game_id) == id \
                 or (int(sk["price"]) == 0 and Box.skin_on(game_id) == "")
+        # THE ON ROW LAW: the equipped skin keeps its full-size row
         if on:
-                var l := Arc.fit_label("%s  (ON)" % sk["name"], 22, THEME["good"], 600)
-                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                return l
+                return Arc.on_row("%s  (ON)" % sk["name"], Vector2(600, 64), 22)
+        # owned but not equipped: one tap equips
         if owned:
-                return Arc.button(String(sk["name"]), Vector2(600, 56), 22,
+                return Arc.button(String(sk["name"]), Vector2(600, 62), 22,
                         Arc.ACCENT, func():
                                 Box.equip_skin(game_id, id)
                                 Jukebox.sfx("rw_click", -4.0)
                                 _apply_skin()
-                                _shop_reopen())
-        var b := Arc.coin_button("%s  %d" % [sk["name"], int(sk["price"])],
-                Vector2(600, 56), 20, Arc.ACCENT, func():
+                                _box_shop_reopen())
+        # LOCKED until bought: a padlock row + the coin-icon price
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 2)
+        var lock_row := HBoxContainer.new()
+        lock_row.alignment = BoxContainer.ALIGNMENT_CENTER
+        lock_row.add_theme_constant_override("separation", 8)
+        var lock_c := Control.new()
+        lock_c.custom_minimum_size = Vector2(20, 20)
+        lock_c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        lock_c.draw.connect(func():
+                var s: float = minf(lock_c.size.x, lock_c.size.y)
+                var k: float = s / 20.0
+                var body := Rect2(Vector2(4 * k, 9 * k), Vector2(12 * k, 9 * k))
+                lock_c.draw_rect(body, Color("6a7488"))
+                lock_c.draw_arc(Vector2(10 * k, 9 * k), 4 * k, PI, TAU, 12,
+                        Color("6a7488"), 2.2 * k)
+                lock_c.draw_circle(Vector2(10 * k, 13 * k), 1.8 * k,
+                        Color(0.02, 0.02, 0.03)))
+        lock_row.add_child(lock_c)
+        var lk := Arc.label("LOCKED", 18, THEME["mute"])
+        lock_row.add_child(lk)
+        v.add_child(lock_row)
+        var b := Arc.coin_button("BUY  %s  %d" % [sk["name"], int(sk["price"])],
+                Vector2(600, 60), 20, Arc.ACCENT, func():
                         if Box.buy_skin(game_id, id, int(sk["price"])):
                                 Jukebox.sfx("rw_buy", -4.0)
                                 _apply_skin()
-                        _shop_reopen())
+                        _box_shop_reopen())
         if Box.coins() < int(sk["price"]):
-                b.disabled = true
-        return b
+                b.disabled = true   # a dry wallet never buys (the box law)
+        v.add_child(b)
+        return v
 
 # =================================================================
-# THE HUD - the HTML's clean law: the hull panel + the weapon slots, the
-# score with a PLANE icon (kills are the score - one widget, one truth),
-# LVL/XP, the scrap counter with its cog, the boss bar, the crosshair.
-# No kills widget. No 4 dots. No mini tank lights.
+# THE HUD (v040-6) - everything canvas-drawn with outlined text:
+# the top-left GAME WIDGET (hull + weapons + LVL/XP + the REMAINING pair),
+# the top-right score with the DESIGNED plane icon, the scrap widget with
+# its icon (the brick breaker / pop siege law). NO kills widget, NO bottom
+# coin text, NO bank text in the HUD (the bank lives in the shops).
 # =================================================================
-var lbl_place: Label
-var lbl_wave: Label
-var lbl_lvl: Label
-var lbl_scrap: Label
 
 func _build_hw_hud() -> void:
         hud_draw = Control.new()
@@ -2962,26 +3381,24 @@ func _build_hw_hud() -> void:
         hud_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
         hud_draw.draw.connect(_draw_hud)
         _overlay_root_ref().add_child(hud_draw)
-        var box := VBoxContainer.new()
-        box.position = Vector2(14, 84)
-        box.add_theme_constant_override("separation", 2)
-        hud_draw.add_child(box)
-        lbl_place = Arc.label("", 20, Color(1, 1, 1, 0.92), false)
-        lbl_wave = Arc.label("", 16, Color(1, 1, 1, 0.7), false)
-        box.add_child(lbl_place)
-        box.add_child(lbl_wave)
-        var box2 := VBoxContainer.new()
-        box2.set_anchors_preset(Control.PRESET_TOP_WIDE)
-        box2.offset_top = 84
-        box2.offset_right = -14
-        box2.alignment = BoxContainer.ALIGNMENT_END
-        hud_draw.add_child(box2)
-        lbl_lvl = Arc.label("", 16, Color(1, 1, 1, 0.7), false)
-        lbl_lvl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-        box2.add_child(lbl_lvl)
-        lbl_scrap = Arc.label("", 20, THEME["cost"], false)
-        lbl_scrap.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-        box2.add_child(lbl_scrap)
+
+## THE OUTLINED TEXT LAW (the owner: "bigger text and better contrast,
+## like giving the text a black outlines"): every HUD string wears a hard
+## black outline under its fill - readable over any sky, never huge.
+func _htxt(pos: Vector2, txt: String, fsize: int, col: Color,
+                align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
+        hud_draw.draw_string_outline(Arc.font_ui(), pos, txt, align, width,
+                fsize, 6, Color(0, 0, 0, 0.9))
+        hud_draw.draw_string(Arc.font_ui(), pos, txt, align, width, fsize, col)
+
+## THE REMAINING WIDGET (the owner: "design 'remaining' widget which shows
+## two, time and enemies, make it accurately"): the wave's remaining clock
+## (the 3:00 law counting down) and the enemies still alive + incoming.
+func _remaining_secs() -> float:
+        return maxf(0.0, HWData.WAVE_MAX_TIME - wave_clock)
+
+func _remaining_enemies() -> int:
+        return enemies.size() + spawn_list.size()
 
 func _draw_hud() -> void:
         if state == GS.INTRO:
@@ -2991,88 +3408,106 @@ func _draw_hud() -> void:
                 _draw_menu()
                 return
         var x := 14.0
-        var y := 152.0
-        # ---------- the hull panel ----------
-        var w := 360.0
-        var pw := w + 28
-        var ph := 118.0
-        hud_draw.draw_rect(Rect2(x - 4, y - 12, pw, ph), THEME["panel"])
-        hud_draw.draw_rect(Rect2(x - 4, y - 12, pw, ph), THEME["border"], false, 1.5)
+        var y := 76.0
+        # ================= THE TOP-LEFT GAME WIDGET =================
+        # one panel: hull, the weapon slots, LVL + XP, the REMAINING pair
+        var w := 372.0
+        var pw := w + 24
+        var ph := 236.0
+        hud_draw.draw_rect(Rect2(x - 6, y - 8, pw, ph), Color(0.02, 0.024, 0.03, 0.62))
+        hud_draw.draw_rect(Rect2(x - 6, y - 8, pw, ph), THEME["border"], false, 1.5)
+        # ---------- HULL ----------
         var pct := clampf(p_hp / p_hp_max, 0.0, 1.0)
         var col: Color = THEME["hp"] if pct > 0.5 \
                 else (THEME["hp_low"] if pct > 0.25 else THEME["hp_crit"])
-        hud_draw.draw_rect(Rect2(x, y, w, 20), Color(0, 0, 0, 0.5))
-        hud_draw.draw_rect(Rect2(x, y, maxf(2.0, w * pct), 20), col)
-        hud_draw.draw_rect(Rect2(x, y, w, 20), THEME["border"], false, 1.0)
-        hud_draw.draw_string(Arc.font_ui(), Vector2(x, y + 15),
-                "HULL", HORIZONTAL_ALIGNMENT_LEFT, 60, 13, THEME["text"])
-        hud_draw.draw_string(Arc.font_ui(), Vector2(x, y + 15),
-                "%d / %d" % [ceili(p_hp), int(p_hp_max)],
-                HORIZONTAL_ALIGNMENT_RIGHT, w - 8, 13, THEME["text"])
+        hud_draw.draw_rect(Rect2(x, y, w, 22), Color(0, 0, 0, 0.55))
+        hud_draw.draw_rect(Rect2(x, y, maxf(2.0, w * pct), 22), col)
+        hud_draw.draw_rect(Rect2(x, y, w, 22), THEME["border"], false, 1.0)
+        _htxt(Vector2(x + 6, y + 17), "HULL", 14, THEME["text"])
+        _htxt(Vector2(x + 4, y + 17), "%d / %d" % [ceili(p_hp), int(p_hp_max)],
+                14, THEME["text"], HORIZONTAL_ALIGNMENT_RIGHT, w - 10)
+        var ry := y + 30.0
         if p_shield > 0.0:
-                hud_draw.draw_rect(Rect2(x, y + 24, w * clampf(p_shield / 120.0, 0, 1), 8),
+                hud_draw.draw_rect(Rect2(x, ry, w * clampf(p_shield / 120.0, 0, 1), 7),
                         THEME["shield"])
-        # the weapon slots: MAIN pips, MG pips (locked till bought), RKT pips
-        _weapon_pips("MAIN", Vector2(x, y + 40), 1 + _shop_lvl("cannon"), 8, true)
-        _weapon_pips("MG", Vector2(x, y + 62), _mg_lvl(), 4, _mg_lvl() > 0)
-        _weapon_pips("RKT", Vector2(x, y + 84), _rk_lvl(), 4, _rk_lvl() > 0)
-        # ---------- the right panel ----------
-        var rpw := 320.0
+                ry += 12.0
+        # ---------- the weapon slots ----------
+        _weapon_pips("MAIN", Vector2(x, ry + 4), 1 + _shop_lvl("cannon"), 8, true)
+        _weapon_pips("MG", Vector2(x, ry + 26), _mg_lvl(), 4, _mg_lvl() > 0)
+        _weapon_pips("RKT", Vector2(x, ry + 48), _rk_lvl(), 4, _rk_lvl() > 0)
+        # ---------- LVL + XP ----------
+        var ly := ry + 74.0
+        _htxt(Vector2(x, ly + 20), "LVL %d" % p_level, 26, THEME["accent_hi"])
+        _htxt(Vector2(x + 118, ly + 18), "XP  %d / %d" % [p_xp, p_xp_next],
+                18, THEME["text"])
+        hud_draw.draw_rect(Rect2(x + 118, ly + 26, w - 122, 7), Color(0, 0, 0, 0.55))
+        hud_draw.draw_rect(Rect2(x + 118, ly + 26, maxf(0.0,
+                (w - 122) * clampf(float(p_xp) / float(p_xp_next), 0, 1)), 7),
+                THEME["xp"])
+        # ---------- THE REMAINING WIDGET: time + enemies ----------
+        var my := ly + 46.0
+        _draw_clock_icon(Vector2(x + 16, my + 16))
+        var rem := _remaining_secs()
+        var time_txt := "%d:%02d" % [int(rem) / 60, int(rem) % 60]
+        var tcol: Color = Color(1.0, 0.62, 0.4) if rem <= 30.0 else THEME["text"]
+        if state == GS.PLACE:
+                _htxt(Vector2(x + 40, my + 25), time_txt, 22, tcol)
+        _draw_jet_icon(Vector2(x + 168, my + 14), 0.62, Color("d88878"))
+        _htxt(Vector2(x + 192, my + 25), "x %d" % _remaining_enemies(),
+                22, THEME["text"])
+        # ================= THE TOP-RIGHT PANEL =================
+        var rpw := 330.0
         var rpx := W - rpw - 14.0
-        hud_draw.draw_rect(Rect2(rpx, y - 12, rpw + 4, 116), THEME["panel"])
-        hud_draw.draw_rect(Rect2(rpx, y - 12, rpw + 4, 116), THEME["border"], false, 1.5)
-        # the PLANE icon + the score (kills = score, one widget)
-        _draw_plane_icon(Vector2(rpx + 30, y + 16))
-        hud_draw.draw_string(Arc.font_ui(), Vector2(rpx + 58, y + 28),
-                str(score), HORIZONTAL_ALIGNMENT_LEFT, -1, 30, THEME["accent_hi"])
-        hud_draw.draw_string(Arc.font_ui(), Vector2(rpx, y + 6),
+        hud_draw.draw_rect(Rect2(rpx - 6, y - 8, rpw + 6, 108),
+                Color(0.02, 0.024, 0.03, 0.62))
+        hud_draw.draw_rect(Rect2(rpx - 6, y - 8, rpw + 6, 108),
+                THEME["border"], false, 1.5)
+        _htxt(Vector2(rpx, y + 14),
                 String(HWData.PLACES[place_i % 10]["name"])
                 + ("  II" if place_i >= 10 else ""),
-                HORIZONTAL_ALIGNMENT_RIGHT, rpw, 15, THEME["text"])
-        hud_draw.draw_string(Arc.font_ui(), Vector2(rpx, y + 52),
-                "WAVE %d / %d" % [wave, HWData.WAVES_PER_PLACE],
-                HORIZONTAL_ALIGNMENT_RIGHT, rpw, 14, THEME["dim"])
-        hud_draw.draw_string(Arc.font_ui(), Vector2(rpx, y + 92),
-                "LVL %d   XP %d/%d" % [p_level, p_xp, p_xp_next],
-                HORIZONTAL_ALIGNMENT_RIGHT, rpw, 14, THEME["dim"])
-        # the XP progress line under the level text
-        hud_draw.draw_rect(Rect2(rpx, y + 100, rpw, 4), Color(0, 0, 0, 0.5))
-        hud_draw.draw_rect(Rect2(rpx, y + 100, rpw * clampf(
-                float(p_xp) / float(p_xp_next), 0, 1), 4), THEME["xp"])
-        # ---------- the scrap counter (bottom left, with its cog) ----------
-        _draw_scrap_icon(Vector2(x + 18, H - 30))
-        hud_draw.draw_string(Arc.font_ui(), Vector2(x + 40, H - 22),
-                str(p_scrap) + "   (BANK " + str(meta.scrap()) + ")",
-                HORIZONTAL_ALIGNMENT_LEFT, -1, 18, THEME["cost"])
-        # ---------- the GOGACoin counter (bottom right) ----------
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H - 22),
-                "GOGACoins " + str(run_coins),
-                HORIZONTAL_ALIGNMENT_RIGHT, W - 14, 16, Color("f0c040"))
-        # ---------- the wave clock at the cap ----------
-        if state == GS.PLACE and wave_clock >= HWData.WAVE_MAX_TIME * 0.8:
-                hud_draw.draw_string(Arc.font_ui(), Vector2(W / 2 - 60, 60),
-                        "%d:%02d" % [int(wave_clock) / 60, int(wave_clock) % 60],
-                        HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1.0, 0.6, 0.4))
-        # ---------- the boss bar ----------
+                16, THEME["text"], HORIZONTAL_ALIGNMENT_RIGHT, rpw)
+        # THE SCORE: kills are the score, one widget, a DESIGNED plane icon
+        _draw_plane_icon(Vector2(rpx + 34, y + 52))
+        _htxt(Vector2(rpx + 64, y + 68), str(score), 40, THEME["accent_hi"])
+        _htxt(Vector2(rpx, y + 66), "WAVE %d / %d"
+                % [wave, HWData.WAVES_PER_PLACE], 16, THEME["dim"],
+                HORIZONTAL_ALIGNMENT_RIGHT, rpw - 4)
+        # ---------- THE SCRAP WIDGET (a real widget with its icon -
+        # the brick breaker / pop siege law; the BANK lives in the shop) ----------
+        var sw := 176.0
+        var shy := H - 66.0
+        hud_draw.draw_rect(Rect2(x - 2, shy, sw, 52), Color(0.02, 0.024, 0.03, 0.66))
+        hud_draw.draw_rect(Rect2(x - 2, shy, sw, 52), THEME["border"], false, 1.5)
+        _draw_scrap_icon(Vector2(x + 26, shy + 26))
+        _htxt(Vector2(x + 52, shy + 35), str(p_scrap), 26, THEME["cost"])
+        # ---------- the boss bar (with its shield overlay) ----------
         for e in enemies:
                 var d: Dictionary = e
                 if String(d.get("kind", "")) == "boss":
-                        var bw := minf(W - 260.0, 620.0)
+                        var bw := minf(W - 420.0, 640.0)
                         var bx := W / 2.0 - bw / 2.0
-                        hud_draw.draw_rect(Rect2(bx - 4, 84, bw + 8, 20),
+                        hud_draw.draw_rect(Rect2(bx - 4, 78, bw + 8, 24),
                                 Color(0, 0, 0, 0.75))
-                        hud_draw.draw_rect(Rect2(bx, 88, bw * clampf(
-                                float(d["hp"]) / float(d["maxhp"]), 0, 1), 12),
+                        hud_draw.draw_rect(Rect2(bx, 82, bw * clampf(
+                                float(d["hp"]) / float(d["maxhp"]), 0, 1), 14),
                                 Color("b85060"))
-                        hud_draw.draw_string(Arc.font_ui(), Vector2(0, 80),
-                                String(d["name"]) + ("  -  ENRAGED" if bool(d.get("enraged", false)) else ""),
-                                HORIZONTAL_ALIGNMENT_CENTER, W, 13, THEME["text"])
+                        if float(d.get("shield", 0.0)) > 0.0:
+                                hud_draw.draw_rect(Rect2(bx, 82, bw * clampf(
+                                        float(d["shield"]) / float(d["maxhp"]), 0, 1), 14),
+                                Color(THEME["shield"], 0.8))
+                        hud_draw.draw_rect(Rect2(bx - 4, 78, bw + 8, 24),
+                                THEME["border"], false, 1.0)
+                        _htxt(Vector2(0, 72),
+                                String(d["name"])
+                                + ("  -  ENRAGED" if bool(d.get("enraged", false)) else "")
+                                + ("  -  SHIELDS UP" if float(d.get("shield", 0.0)) > 0.0 else ""),
+                                15, THEME["text"], HORIZONTAL_ALIGNMENT_CENTER, W)
         # ---------- the banner ----------
         if banner_t > 0.0 and banner != "":
                 var a := minf(1.0, banner_t / 0.4)
-                hud_draw.draw_string(Arc.font_ui(), Vector2(4, H * 0.2 + 4),
-                        banner, HORIZONTAL_ALIGNMENT_CENTER, W, 46,
-                        Color(0, 0, 0, 0.85 * a))
+                hud_draw.draw_string_outline(Arc.font_ui(), Vector2(4, H * 0.2 + 4),
+                        banner, HORIZONTAL_ALIGNMENT_CENTER, W, 46, 10,
+                        Color(0, 0, 0, 0.9 * a))
                 hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.2), banner,
                         HORIZONTAL_ALIGNMENT_CENTER, W, 46,
                         Color(THEME["accent_hi"], a))
@@ -3082,55 +3517,91 @@ func _draw_hud() -> void:
                         Color(0.78, 0.24, 0.24, damage_flash * 0.35))
         if flash > 0.0:
                 hud_draw.draw_rect(Rect2(0, 0, W, H), Color(1, 1, 1, flash))
-        # ---------- THE AIM CURSOR (the owner's report, item 3) ----------
+        # ---------- THE AIM CURSOR ----------
         if aim_ptr != -1 or mouse_aim:
                 _draw_crosshair(aim_pos)
-        # labels
-        if lbl_place != null:
-                lbl_place.visible = false   # the right panel carries the text now
-                lbl_wave.visible = false
-                lbl_lvl.visible = false
-                lbl_scrap.visible = false
 
 func _weapon_pips(name_txt: String, at: Vector2, n: int, maxn: int,
                 unlocked: bool) -> void:
-        hud_draw.draw_string(Arc.font_ui(), at + Vector2(0, 10), name_txt,
-                HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+        _htxt(at + Vector2(0, 12), name_txt, 13,
                 THEME["dim"] if unlocked else THEME["mute"])
         var px := at.x + 56.0
         if not unlocked:
-                hud_draw.draw_string(Arc.font_ui(), Vector2(px, at.y + 10),
-                        "- locked - buy in the SCRAP SHOP",
-                        HORIZONTAL_ALIGNMENT_LEFT, -1, 11, THEME["mute"])
+                _htxt(Vector2(px, at.y + 12), "locked - the SCRAP SHOP sells it",
+                        13, THEME["mute"])
                 return
         for i in maxn:
-                var r := Rect2(px + float(i) * 18.0, at.y, 12, 12)
+                var r := Rect2(px + float(i) * 18.0, at.y, 12, 13)
                 hud_draw.draw_rect(r, THEME["accent"] if i < n
                         else Color(0.47, 0.5, 0.55, 0.18))
                 hud_draw.draw_rect(r, THEME["border"], false, 1.0)
 
-## the score icon: a small jet silhouette - kills are things destroyed
+## THE SCORE ICON (the owner: "design an icon for it, not the shitty way"):
+## a real warbird - swept wings, a tailfin, a canopy, a hard outline.
 func _draw_plane_icon(c: Vector2) -> void:
-        var pts := PackedVector2Array([
-                c + Vector2(20, 0), c + Vector2(6, -5), c + Vector2(-2, -16),
-                c + Vector2(-7, -16), c + Vector2(-5, -5), c + Vector2(-18, -2),
-                c + Vector2(-22, -8), c + Vector2(-25, -8), c + Vector2(-23, 0),
-                c + Vector2(-25, 8), c + Vector2(-22, 8), c + Vector2(-18, 2),
-                c + Vector2(-5, 5), c + Vector2(-7, 16), c + Vector2(-2, 16),
-                c + Vector2(6, 5),
-        ])
-        hud_draw.draw_colored_polygon(pts, THEME["accent"])
+        var body := THEME["accent"]
+        var dark := Color(0.06, 0.07, 0.09)
+        var glass := Color("bfe8ff")
+        var s := 1.25
+        var P := func(v: Vector2) -> Vector2:
+                return c + v * s
+        # the swept main wings
+        hud_draw.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(2, 0)), P.call(Vector2(-6, -22)),
+                P.call(Vector2(-13, -22)), P.call(Vector2(-12, 0)),
+                P.call(Vector2(-13, 22)), P.call(Vector2(-6, 22)),
+                P.call(Vector2(2, 0))]), dark)
+        # the tailfins
+        hud_draw.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(-14, 0)), P.call(Vector2(-22, -12)),
+                P.call(Vector2(-25, -12)), P.call(Vector2(-20, 0)),
+                P.call(Vector2(-25, 12)), P.call(Vector2(-22, 12)),
+                P.call(Vector2(-14, 0))]), dark)
+        # the fuselage (a swept dart)
+        hud_draw.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(26, 0)), P.call(Vector2(10, -6)),
+                P.call(Vector2(-12, -5)), P.call(Vector2(-20, -2)),
+                P.call(Vector2(-20, 2)), P.call(Vector2(-12, 5)),
+                P.call(Vector2(10, 6)),
+        ]), body)
+        # the canopy
+        hud_draw.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(14, -1)), P.call(Vector2(8, -4)),
+                P.call(Vector2(2, -4)), P.call(Vector2(2, 2)),
+                P.call(Vector2(12, 2)),
+        ]), glass)
+        # the nose flash
+        hud_draw.draw_circle(P.call(Vector2(24, 0)), 2.2 * s, Color(1, 1, 1, 0.9))
 
-## the scrap icon: a brass cog
+## a small jet glyph for the REMAINING widget (enemies left)
+func _draw_jet_icon(c: Vector2, s: float, col: Color) -> void:
+        hud_draw.draw_colored_polygon(PackedVector2Array([
+                c + Vector2(16 * s, 0), c + Vector2(-2 * s, -11 * s),
+                c + Vector2(-7 * s, -11 * s), c + Vector2(-4 * s, 0),
+                c + Vector2(-7 * s, 11 * s), c + Vector2(-2 * s, 11 * s),
+        ]), col)
+
+## the clock glyph for the REMAINING widget (time left)
+func _draw_clock_icon(c: Vector2) -> void:
+        hud_draw.draw_circle(c, 12.0, Color(0.02, 0.024, 0.03, 0.8))
+        hud_draw.draw_arc(c, 12.0, 0, TAU, 24, THEME["accent"], 2.4)
+        var ma := t_state * 1.6 - PI / 2.0
+        hud_draw.draw_line(c, c + Vector2(cos(ma), sin(ma)) * 7.6,
+                THEME["text"], 2.2)
+        var ha := -PI * 0.35
+        hud_draw.draw_line(c, c + Vector2(cos(ha), sin(ha)) * 4.8,
+                THEME["text"], 2.2)
+
+## the scrap icon: a brass cog with a hard edge
 func _draw_scrap_icon(c: Vector2) -> void:
         var gear := PackedVector2Array()
         for gi in 8:
                 var ga := float(gi) / 8.0 * TAU
-                gear.append(c + Vector2(cos(ga) * 11.0, sin(ga) * 11.0))
-                gear.append(c + Vector2(cos(ga + 0.22) * 7.5, sin(ga + 0.22) * 7.5))
-        hud_draw.draw_colored_polygon(gear, Color("a08848"))
-        hud_draw.draw_circle(c, 4.4, Color("504028"))
-        hud_draw.draw_circle(c + Vector2(-3, -3), 2.4, Color("f0dc9c"))
+                gear.append(c + Vector2(cos(ga) * 13.0, sin(ga) * 13.0))
+                gear.append(c + Vector2(cos(ga + 0.22) * 8.8, sin(ga + 0.22) * 8.8))
+        hud_draw.draw_colored_polygon(gear, Color("c8a86a"))
+        hud_draw.draw_circle(c, 5.4, Color("504028"))
+        hud_draw.draw_circle(c + Vector2(-3.4, -3.4), 2.6, Color("f0dc9c"))
 
 ## THE AIM CURSOR: ring + ticks + dot, the HTML crosshair, theme white
 func _draw_crosshair(at: Vector2) -> void:
@@ -3143,66 +3614,81 @@ func _draw_crosshair(at: Vector2) -> void:
                         Vector2(at.x, at.y + float(t[1])), c, 1.8)
         hud_draw.draw_circle(at, 1.8, c)
 
-## THE INTRO: the world + "TAP ANYWHERE TO START". Nothing else - the
-## controls live in the guide (the owner's law).
+## THE INTRO: the world + "TAP ANYWHERE TO START". The name is HEAVY WAR -
+## nothing else (the owner: "it shows rogue arsenal which i do not want").
 func _draw_intro() -> void:
         var a := 0.7 + sin(t_state * 3.0) * 0.3
-        hud_draw.draw_string(Arc.font_ui(), Vector2(3, H * 0.56 + 3),
-                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 64,
-                Color(0, 0, 0, 0.8 * a))
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.56),
-                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 64,
+        hud_draw.draw_string_outline(Arc.font_ui(), Vector2(3, H * 0.48 + 3),
+                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 68, 12,
+                Color(0, 0, 0, 0.85 * a))
+        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.48),
+                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 68,
                 Color(THEME["accent_hi"], a))
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.56 + 44),
-                "R O G U E   A R S E N A L", HORIZONTAL_ALIGNMENT_CENTER, W, 22,
-                Color(THEME["dim"], a))
+        hud_draw.draw_string_outline(Arc.font_ui(), Vector2(0, H * 0.72 + 2),
+                "TAP ANYWHERE TO START", HORIZONTAL_ALIGNMENT_CENTER, W, 38, 8,
+                Color(0, 0, 0, 0.8 * a))
         hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.72),
                 "TAP ANYWHERE TO START", HORIZONTAL_ALIGNMENT_CENTER, W, 38,
                 Color(1, 1, 1, a))
 
-## THE MENU: DEPLOY + SCRAP SHOP + the scrap total + the best line
+## THE MENU: DEPLOY + SCRAP SHOP + the normal GOGABox SHOP + the best line.
+## The scrap total lives ON the scrap shop button; the coin shop opens the
+## box's own shelf (skins, GOGACoins, LOCKED until bought).
 func _draw_menu() -> void:
         hud_draw.draw_rect(Rect2(0, 0, W, H), Color(0.016, 0.02, 0.027, 0.72))
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.26),
-                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 72, THEME["accent_hi"])
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.26 + 48),
-                "R O G U E   A R S E N A L", HORIZONTAL_ALIGNMENT_CENTER, W, 24,
-                THEME["dim"])
-        # the scrap total lives ON the shop button (the HTML law)
-        var by := H * 0.52
+        hud_draw.draw_string_outline(Arc.font_ui(), Vector2(0, H * 0.24 + 3),
+                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 76, 12,
+                Color(0, 0, 0, 0.9))
+        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H * 0.24),
+                "HEAVY WAR", HORIZONTAL_ALIGNMENT_CENTER, W, 76, THEME["accent_hi"])
+        var by := H * 0.42
         var bw := 460.0
-        var bh := 96.0
+        var bh := 88.0
         _menu_button(Rect2(W / 2 - bw / 2.0, by, bw, bh), "DEPLOY", true)
-        _menu_button(Rect2(W / 2 - bw / 2.0, by + bh + 24.0, bw, bh),
+        _menu_button(Rect2(W / 2 - bw / 2.0, by + bh + 20.0, bw, bh),
                 "SCRAP SHOP   %d" % meta.scrap(), false)
-        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H - 30),
+        _menu_button(Rect2(W / 2 - bw / 2.0, by + (bh + 20.0) * 2.0, bw, bh),
+                "SHOP", false)
+        hud_draw.draw_string_outline(Arc.font_ui(), Vector2(0, H - 28),
                 "BEST: PLACE %d   -   SCORE %d   -   TOTAL SCRAP %d"
                         % [int(meta.d["best_place"]), int(meta.d["best_kills"]),
                         meta.total_scrap()],
-                HORIZONTAL_ALIGNMENT_CENTER, W, 17, THEME["mute"])
+                HORIZONTAL_ALIGNMENT_CENTER, W, 17, 6, Color(0, 0, 0, 0.8))
+        hud_draw.draw_string(Arc.font_ui(), Vector2(0, H - 28),
+                "BEST: PLACE %d   -   SCORE %d   -   TOTAL SCRAP %d"
+                        % [int(meta.d["best_place"]), int(meta.d["best_kills"]),
+                        meta.total_scrap()],
+                HORIZONTAL_ALIGNMENT_CENTER, W, 17, THEME["text"])
 
 func _menu_button(r: Rect2, label: String, primary: bool) -> void:
         hud_draw.draw_rect(r, THEME["panel"])
         hud_draw.draw_rect(r, THEME["border_hi"] if primary else THEME["border"],
                 false, 2.5 if primary else 1.5)
+        hud_draw.draw_string_outline(Arc.font_ui(), r.position + Vector2(0,
+                r.size.y * 0.64), label, HORIZONTAL_ALIGNMENT_CENTER,
+                r.size.x, 30, 6, Color(0, 0, 0, 0.7))
         hud_draw.draw_string(Arc.font_ui(), r.position + Vector2(0,
-                r.size.y * 0.62), label, HORIZONTAL_ALIGNMENT_CENTER,
+                r.size.y * 0.64), label, HORIZONTAL_ALIGNMENT_CENTER,
                 r.size.x, 30, THEME["cost"] if primary else THEME["text"])
 
-## the menu buttons own their half of the screen - the input law routes
-## taps here when the state is MENU
+## the menu buttons own their taps - the input law routes taps here when
+## the state is MENU
 func _menu_tap(pos: Vector2) -> void:
-        var by := H * 0.52
+        var by := H * 0.42
         var bw := 460.0
-        var bh := 96.0
+        var bh := 88.0
         var b1 := Rect2(W / 2 - bw / 2.0, by, bw, bh)
-        var b2 := Rect2(W / 2 - bw / 2.0, by + bh + 24.0, bw, bh)
+        var b2 := Rect2(W / 2 - bw / 2.0, by + bh + 20.0, bw, bh)
+        var b3 := Rect2(W / 2 - bw / 2.0, by + (bh + 20.0) * 2.0, bw, bh)
         if b1.has_point(pos):
                 Jukebox.sfx("rw_click", -4.0)
                 _run_start()
         elif b2.has_point(pos):
                 Jukebox.sfx("rw_click", -4.0)
                 _shop_open()
+        elif b3.has_point(pos):
+                Jukebox.sfx("rw_click", -4.0)
+                _box_shop_open()
 
 func _run_start() -> void:
         _run_reset()

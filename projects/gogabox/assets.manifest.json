@@ -140,7 +140,7 @@
     },
     {
       "id": "heavywar-rogue-arsenal-v0404",
-      "name": "HEAVY WAR: ROGUE ARSENAL - 100% generated (v040-4)",
+      "name": "HEAVY WAR - 100% generated (v040-4)",
       "url": "no external source - every pixel and sound is code-generated in-repo",
       "license": "the owner's own",
       "used_for": "assets/games/heavywar/** (tank + skins, 22 enemies x 2 frames, 10 bosses x 2 frames, 10 places x 4 env layers, shots, pickups, fx, card icons, the feed thumbnail), assets/audio/sfx/rw_* (20 sfx + 4 seamless music loops). Re-derive: python3 tools/v0404_rogue_art.py all && python3 tools/v0404_rogue_sfx.py. The old composed PopCap sprites (assets/games/heavywar/spr_*, assets/games/hwsrc/**) and the hws_* sfx died in this commit - zero original-game bytes remain."
