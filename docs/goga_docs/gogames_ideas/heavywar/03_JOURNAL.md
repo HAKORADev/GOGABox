@@ -463,3 +463,70 @@ NEXT (post-test):
 - AtomicTank.mo3 still awaits a decoder.
 - The bosses' part anchors can wear per-face animation (copterblades
   for Twinblade's rotors) as polish.
+
+---
+
+## v040-4 - ROGUE ARSENAL: THE REWORK (the owner's HTML prototype became law)
+
+The owner speed-ran a CODE-ONLY prototype ("HEAVY WEAPON - Rogue Arsenal",
+one HTML file, everything drawn by hand in canvas) and ordered the real
+game rebuilt around it: "we use original heavy weapon assets as
+placeholders and now we will use our own originals". THE ORIGINAL BYTES
+ARE GONE THIS COMMIT: assets/games/hwsrc/** (1092 files), the 75 composed
+spr_* sprites, the 132 hws_* sfx, the lovetheme - all deleted.
+
+THE OWNER'S NUMBERS, now the game's laws:
+- 10 PLACES (his: "10 different places is more cooler than 5 themes"),
+  each with ONE exclusive enemy + the shared pool; the prototype's 10
+  biomes kept as the place table (Iron Wasteland ... The Void).
+- 10 WAVES per place (the prototype had 5), a BOSS after every 10th wave,
+  10 BOSSES (the prototype had 5) - one per place, distinct silhouettes:
+  SCRAP COLOSSUS, DUST REAVER, GLACIER TITAN, MAGMA HEART, SPORE MOTHER,
+  PRISM WARDEN, STORM CARRIER, ABYSS LEVIATHAN, GRID SOVEREIGN and
+  THE NULL AVATAR (the prime). Bosses enrage at 40% (the "too easy" fix).
+- WAVES ride TIME + BUDGET, max 3:00; at the cap "it will keep increasing
+  enemies over and over" - the pour never stops until the field clears.
+- HEALTH SYSTEM instead of lives (hull 100 + shop armor x20).
+- CONTROLS = SNOWY TOWER's law (hopper v0.2.6): LEFT HALF = the analog
+  move zone (anchor + X offset = force), RIGHT HALF = aim + fire. NO
+  NUKES ("i do not want nukes, just aiming and moving").
+- SCORE = KILLS. One kill, one point. The registry coin_div still pays
+  kills/500 at run end.
+- THE NO-CHEAT LAW: the XP card pool is combat-only (15 cards) - "the
+  magnet as upgrade or extra coins, they should not exist". The MAGNET
+  is a MINI TANK in the shop, with the rocket, the aim-able gunner and
+  the frost (slow) mini tanks - "expensive gogacoins" (800-1300).
+- THE GOGACOIN LAW: a coin rides the next kill every 22 kills or 40s;
+  bosses pay +5 direct (ground drops would die in the tunnel swap).
+- THE TANK REDESIGN (his: "a big one tank part and putting the weapons
+  at the out part of the side facing the player"): ONE armored hull slab
+  (tracks, sloped glacis, engine deck, rivets, hardpoint bosses), the
+  turret + barrel on top, the 4 mini tanks BOLTED ON the visible flank.
+  The cannon fires REAL cannonballs (dark iron spheres, hot muzzle glow,
+  craters on the road).
+- THE TUNNEL is a real enclosed scene now (his prototype's tunnel was
+  "not too accurate"): jagged rock walls ride the scroll, steel ribs +
+  wall lights, the dark eats the world, the next place's sky glows at
+  the exit, a calm coin trail pays the drive.
+- THE ART: tools/v0404_rogue_art.py (~1600 lines) draws EVERYTHING -
+  the house pixel look (dark outline + 3-tone ramp + rim light) - and
+  tools/v0404_rogue_sfx.py synthesizes 20 sfx + 4 seamless music loops
+  (menu march / war / pressure / boss stomp - "more action-focused").
+  THE OUTLINE FLOOD BUG: outline() read its own live buffer while
+  writing, cascading opaque ink across every sprite (2% transparent!);
+  the fix reads a FROZEN snapshot. THE VISION LAW caught it.
+- THE APP (his three, more important than the game): the feed's return
+  position anchors at the tap (stop_motion in _hit_tappable) + saves at
+  set_active(false) and restores deferred after the return rebuild;
+  the trophies sheet finally CLOSES (its dim+panel were never recorded
+  in a pair - the X button freed nothing, the next back opened the quit
+  dialog); the quit dialog wears "title and the buttons" only; and the
+  carousel strip's ghost rect no longer eats top-bar taps (BoxScroll's
+  _visible_point law: a scroll never owns a tap a clipping ancestor hides).
+- THE TESTS: rogue_probe 120 checks 0 fails (zones, kills, coin law,
+  levels+cards, boss chain, tunnel, shop, game over, art/audio existence);
+  flow_test ALL PASSED; the 14-frame film reviewed BY EYE across 3 rounds
+  - caught: the shop scroll never mounted (vb.add_child(sc) was MISSING),
+  the tank buried under the rebuilt mesa planes after _swap_place_art
+  (the _bolt_mini rebuild parked it before the new layers), the barrel
+  comically long. All three dead.

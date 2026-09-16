@@ -58,6 +58,15 @@ var _trophies_open := false
 # called _close_sheet unconditionally, nuked the menu content + toast, and
 # the next tick/toggle/free walked into freed instances).
 var _sheet_pair: Array = []
+# v040-4: the trophies sheet hangs its dim+panel OUTSIDE _sheet_pair (it is
+# not built by _sheet_base) - the pair is tracked here so the X button and
+# the Android BACK can actually free them (the owner: tapping close did
+# nothing, the next back opened the LEAVE dialog instead).
+var _trophies_pair: Array = []
+# v040-4 THE EXACT-RESTORE LAW (the owner: "feed returns a little up"): the
+# feed's scroll position at the moment a game takes the screen is saved
+# here and re-applied after the return rebuild - one number, no drift.
+var _saved_feed_scroll := -1
 var _last_wide := false
 ## The launch router (main.gd). GameHost.launch MUST get this, not `self` -
 ## passing the menu was v0.0.4's big-L bug: on_game_entered lives on main.
@@ -161,10 +170,10 @@ func on_splash_done() -> void:
 ## Android BACK (routed from main.gd): close the top-most layer, or ask to
 ## leave the box. Never kills the app without a confirm.
 func handle_back() -> void:
-        if _sheet_open:
-                _close_sheet()
-                return
         if _trophies_open:
+                _close_trophies()
+                return
+        if _sheet_open:
                 _close_sheet()
                 return
         _open_quit_confirm()
@@ -177,6 +186,11 @@ func has_open_overlay() -> bool:
 ## hard-stops all processing so BoxScroll can never swallow taps during play.
 func set_active(on: bool) -> void:
         visible = on
+        if not on:
+                # v040-4: a game is taking the screen - remember EXACTLY where
+                # the feed sits so the return lands on the same pixel.
+                if _feed_scroll != null and is_instance_valid(_feed_scroll):
+                        _saved_feed_scroll = _feed_scroll.scroll_vertical
         if _layer != null and is_instance_valid(_layer):
                 _layer.visible = on
         # the toast lives on its OWN layer-100 CanvasLayer (above sheets) -
@@ -1244,12 +1258,11 @@ func _open_quit_confirm() -> void:
         if _sheet_open or _trophies_open:
                 return
         var vb := _sheet_base()
+        # v040-4 (the owner): "too helpful details that not needed, let title
+        # and the buttons" - the reassurance line is gone.
         var t := Arc.label("LEAVE GOGABOX?", 40, Arc.INK)
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
-        var sub := Arc.label("your coins, batteries and progress\nare safe - everything saves instantly.", 21, Color("8a6a40"), false)
-        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(sub)
         vb.add_child(Arc.button("YES, BYE", Vector2(480, 80), 26, Arc.BAD, func():
                 get_tree().quit()))
         vb.add_child(Arc.button("STAY", Vector2(480, 80), 26, Arc.ACCENT,
@@ -1716,6 +1729,21 @@ func _sheet_base(h := 0.0) -> VBoxContainer:
         var kids := _root.get_children()
         _sheet_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
         return vb
+
+## v040-4: the trophies sheet's OWN close - frees ITS pair (the generic
+## _close_sheet freed _sheet_pair, which never held the trophies' nodes -
+## the owner's dead X button), clears the flags, unlocks the feed.
+func _close_trophies() -> void:
+        _trophies_open = false
+        _sheet_open = false
+        _set_feed_lock(false)
+        for n in _trophies_pair:
+                if n != null and is_instance_valid(n):
+                        n.queue_free()
+        _trophies_pair = []
+        if _dev_dirty:
+                _dev_dirty = false
+                _refresh()
 
 func _close_sheet() -> void:
         _sheet_open = false
@@ -2394,6 +2422,9 @@ func _open_trophies() -> void:
         panel.offset_top = 18
         panel.offset_bottom = -18
         _root.add_child(panel)
+        # v040-4: record OUR nodes so close/back can free them (see
+        # _close_trophies - the pair bookkeeping the sheet flow already has).
+        _trophies_pair = [dim, panel]
 
         var v := VBoxContainer.new()
         v.add_theme_constant_override("separation", 10)
@@ -2413,7 +2444,7 @@ func _open_trophies() -> void:
         sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         head.add_child(sp)
         head.add_child(Arc.button("X", Vector2(64, 64), 26, Color(0.42, 0.30, 0.16),
-                        func(): _close_sheet()))
+                        func(): _close_trophies()))
 
         var legend := Arc.label("GAME  ·  TIME  ·  PLAYS  ·  TROPHIES  ·  SPENT  ·  EARNED  ·  LAST  ·  BEST",
                         15, Color("8a6a40"), false)
@@ -2505,3 +2536,14 @@ func on_game_closed() -> void:
         Ads.refresh()       # re-preload interstitial + rewarded for next runs
         Roadmap.tick()
         _refresh()
+        # v040-4 THE EXACT-RESTORE LAW: after the rebuild's layout pass ran,
+        # put the feed back on the SAVED pixel (deferred - the ScrollContainer
+        # clamps on its own sort, so the set must land after it).
+        if _saved_feed_scroll >= 0:
+                _apply_saved_feed_scroll.call_deferred()
+
+func _apply_saved_feed_scroll() -> void:
+        if _feed_scroll != null and is_instance_valid(_feed_scroll) \
+                        and _saved_feed_scroll >= 0:
+                _feed_scroll.scroll_vertical = _saved_feed_scroll
+                _saved_feed_scroll = -1

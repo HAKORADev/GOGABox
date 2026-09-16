@@ -1,377 +1,259 @@
 class_name HWData
 extends RefCounted
-## HEAVY WAR - all the tables (v040-2). THE ORIGINAL'S OWN NUMBERS ride here,
-## read straight out of the source game's data files (waves.xml, craft.xml,
-## levels.xml, bosses.xml) - the owner's law: "the original has many xml and
-## plain-code files for logic of waves and enemies ... read everything for real".
-##
-## Score law (the owner's GDD): shared kills pay 1; the ten specials pay
-## 10..100; run bonus = score /500 (the registry coin_div); +1 life per
-## 1000 score, max 3; the tank wears 3 lives, each hit takes one.
+## HEAVY WAR: ROGUE ARSENAL (v040-4) - all the tables. 100% our own design
+## law (docs/goga_docs/gogames_ideas/heavywar/04_ROGUE_REWORK.md):
+##   * 10 places x 10 waves, a boss after every 10th wave, 10 bosses
+##   * waves ride TIME (max 3:00) and enemy budget; at the cap the budget
+##     keeps growing until the field is clear
+##   * health system (no lives), per-XP-level cards, kills = score
+##   * enemies scale with the tank's power (place + level + loop + shop)
+##   * shop = gogacoins: armor/cannon/mg/rockets/wheels/reload + 4 mini
+##     tanks + skins; the magnet is a MINI TANK, never an upgrade card
 
-const UPG_MAX := 5
+const ART := "res://assets/games/heavywar/"
 
-# THE SCALE LAW: the original screen is 640x480; ours is 1920x1080.
-# Every original pixel scales by 1080/480 = 2.25 - the SAME factor for
-# x and y (the owner's mis-scale report killed the mixed factors).
-const SC := 2.25
-# The original consumed its wave lengths at a stately cruise; the ground
-# carries 69 original px per second (a 1000px wave lasts ~14.5s, a
-# 10000px place ~2.4 min - the campaign's real rhythm).
-const ORIG_PX_PER_SEC := 69.0
-const GROUND_SPEED := ORIG_PX_PER_SEC * SC          # ~155 px/s on our road
+# ------------------------------------------------------------------- world
+const SC := 2.0                       # art native px -> design px (x4 pngs at 0.5)
+const GROUND_H := 118.0               # the ground band (clears the 52dp banner)
+const WORLD_SPEED := 190.0            # ground px/s of the scroll
+const PLANE_FAR := 0.16
+const PLANE_MID := 0.38
+const PLANE_NEAR := 0.62
+const PLANE_GROUND := 1.0
+
+const WAVE_MAX_TIME := 180.0          # the 3:00 law
+const WAVES_PER_PLACE := 10
+
+# ------------------------------------------------------------- the 10 places
+const PLACES := [
+	{"key": "iron", "name": "IRON WASTELAND", "ex": "hauler",
+		"sky_top": Color("0b0d16"), "sky_bot": Color("5a3a22"),
+		"sun": Color("ff7733"), "accent": Color("ff8844"),
+		"ground_top": Color("3a261a")},
+	{"key": "mesa", "name": "SCORCHED MESA", "ex": "dustdevil",
+		"sky_top": Color("2a1828"), "sky_bot": Color("e08a44"),
+		"sun": Color("ffd06a"), "accent": Color("ffb060"),
+		"ground_top": Color("8a5030")},
+	{"key": "tundra", "name": "FROZEN TUNDRA", "ex": "frostmoth",
+		"sky_top": Color("08182c"), "sky_bot": Color("88aacc"),
+		"sun": Color("f0f8ff"), "accent": Color("88ddff"),
+		"ground_top": Color("a0c0e0")},
+	{"key": "volcano", "name": "VOLCANIC CORE", "ex": "cinderbat",
+		"sky_top": Color("1a0404"), "sky_bot": Color("7a2a0a"),
+		"sun": Color("ff4400"), "accent": Color("ff6622"),
+		"ground_top": Color("ff4400")},
+	{"key": "swamp", "name": "TOXIC SWAMP", "ex": "sporewasp",
+		"sky_top": Color("08180f"), "sky_bot": Color("4a6a40"),
+		"sun": Color("88ff44"), "accent": Color("88ee44"),
+		"ground_top": Color("4a6a20")},
+	{"key": "crystal", "name": "CRYSTAL CAVERNS", "ex": "shardray",
+		"sky_top": Color("18082a"), "sky_bot": Color("5a3a7a"),
+		"sun": Color("dd88ff"), "accent": Color("cc66ff"),
+		"ground_top": Color("8844cc")},
+	{"key": "sky", "name": "SKY ARCHIPELAGO", "ex": "cloudray",
+		"sky_top": Color("4a7ab8"), "sky_bot": Color("ddeeff"),
+		"sun": Color("fff5cc"), "accent": Color("fff088"),
+		"ground_top": Color("88bb88")},
+	{"key": "trench", "name": "ABYSSAL TRENCH", "ex": "deptheel",
+		"sky_top": Color("020e18"), "sky_bot": Color("0e3a5a"),
+		"sun": Color("44aadd"), "accent": Color("44eeff"),
+		"ground_top": Color("1a4466")},
+	{"key": "neon", "name": "NEON SPRAWL", "ex": "holodrone",
+		"sky_top": Color("08021a"), "sky_bot": Color("3a0a5a"),
+		"sun": Color("ff44aa"), "accent": Color("ff44cc"),
+		"ground_top": Color("ff2288")},
+	{"key": "void", "name": "THE VOID", "ex": "voidmaw",
+		"sky_top": Color("000000"), "sky_bot": Color("200848"),
+		"sun": Color("ffffff"), "accent": Color("aa44ff"),
+		"ground_top": Color("6633cc")},
+]
 
 # ------------------------------------------------------------------ enemies
-# hp = the original craft.xml ARMOR (hit points against the basic gun).
-# pts = the owner's GDD law (shared fry pay 1, the ten specials 10..100).
-# kind drives the movement brain; weapon drives the firing brain.
+# shared pool + one exclusive per place. move: straight/sine/hover/dive/
+# ground/static.  weapon: none/aimed/spread/bomb/homing/arc.
+# hp/speed in design px; size = the sprite's collision radius driver.
 const ENEMIES := {
-        "scout":     {"name": "SCOUT",     "hp": 1,   "spd": 130.0, "pts": 1,
-                "kind": "sine",    "weapon": {},                          "w": 84,  "h": 30},
-        "dart":      {"name": "DART",      "hp": 1,   "spd": 155.0, "pts": 1,
-                "kind": "line",    "weapon": {"bomb": "dumb", "cd": 4.0}, "w": 80,  "h": 30},
-        "raider":    {"name": "RAIDER",    "hp": 10,  "spd": 75.0,  "pts": 1,
-                "kind": "line",    "weapon": {"bomb": "dumb", "cd": 3.2}, "w": 120, "h": 44},
-        "lynx":      {"name": "LYNX",      "hp": 6,   "spd": 115.0, "pts": 1,
-                "kind": "sine",    "weapon": {"bomb": "guided", "cd": 3.6}, "w": 80, "h": 28},
-        "komet":     {"name": "KOMET",     "hp": 10,  "spd": 200.0, "pts": 1,
-                "kind": "ballistic", "weapon": {},                        "w": 44,  "h": 84},
-        "skimmer":   {"name": "SKIMMER",   "hp": 75,  "spd": 220.0, "pts": 1,
-                "kind": "sea",     "weapon": {},                          "w": 104, "h": 26},
-        "fang":      {"name": "FANG",      "hp": 20,  "spd": 100.0, "pts": 1,
-                "kind": "sine",    "weapon": {"bomb": "armored", "cd": 3.4}, "w": 100, "h": 34},
-        "talon":     {"name": "TALON",     "hp": 30,  "spd": 95.0,  "pts": 1,
-                "kind": "sine",    "weapon": {"bomb": "frag", "cd": 3.0}, "w": 110, "h": 36},
-        "wasp":      {"name": "WASP",      "hp": 25,  "spd": 150.0, "pts": 1,
-                "kind": "swoop",   "weapon": {"gun": 0.9},                "w": 88,  "h": 60},
-        "hornet":    {"name": "HORNET",    "hp": 80,  "spd": 90.0,  "pts": 1,
-                "kind": "hover",   "weapon": {"missile": 2.6},            "w": 92,  "h": 40},
-        "mirror":    {"name": "MIRROR",    "hp": 80,  "spd": 85.0,  "pts": 1,
-                "kind": "guard",   "weapon": {"missile": 2.6},            "w": 100, "h": 33},
-        "strafer":   {"name": "STRAFER",   "hp": 20,  "spd": 170.0, "pts": 1,
-                "kind": "swoop",   "weapon": {"gun": 0.8},                "w": 88,  "h": 44},
-        "technical": {"name": "TECHNICAL", "hp": 40,  "spd": 65.0,  "pts": 10,
-                "kind": "ground",  "weapon": {"rpg": 2.8},                "w": 92,  "h": 50},
-        "carpet":    {"name": "CARPET",    "hp": 40,  "spd": 80.0,  "pts": 20,
-                "kind": "line",    "weapon": {"carpet": "dumb", "cd": 3.8}, "w": 150, "h": 48},
-        "viper":     {"name": "VIPER",     "hp": 180, "spd": 85.0,  "pts": 30,
-                "kind": "hover",   "weapon": {"missile": 2.4},            "w": 96,  "h": 50},
-        "mammoth":   {"name": "MAMMOTH",   "hp": 180, "spd": 65.0,  "pts": 40,
-                "kind": "hover",   "weapon": {"missile": 2.0},            "w": 140, "h": 72},
-        "fortress":  {"name": "FORTRESS",  "hp": 90,  "spd": 70.0,  "pts": 50,
-                "kind": "line",    "weapon": {"bomb": "armored", "cd": 2.8}, "w": 150, "h": 48},
-        "orbital":   {"name": "ORBITAL",   "hp": 200, "spd": 40.0,  "pts": 60,
-                "kind": "orbit",   "weapon": {"laser": 2.2},              "w": 96,  "h": 100},
-        "grinder":   {"name": "GRINDER",   "hp": 150, "spd": 55.0,  "pts": 70,
-                "kind": "ground",  "weapon": {"gun": 1.6},                "w": 92,  "h": 56},
-        "plowman":   {"name": "PLOWMAN",   "hp": 400, "spd": 48.0,  "pts": 80,
-                "kind": "plow",    "weapon": {},                          "w": 112, "h": 56},
-        "atomault":  {"name": "ATOMAULT",  "hp": 300, "spd": 60.0,  "pts": 90,
-                "kind": "line",    "weapon": {"bomb": "atom", "cd": 4.5}, "w": 190, "h": 75},
-        "zeppelin":  {"name": "ZEPPELIN",  "hp": 400, "spd": 40.0,  "pts": 100,
-                "kind": "line",    "weapon": {"bomb": "dumb", "cd": 2.4}, "w": 280, "h": 80},
+	"scout": {"hp": 14, "speed": 150, "size": 40, "xp": 6,
+		"move": "straight", "weapon": "none"},
+	"fighter": {"hp": 26, "speed": 120, "size": 56, "xp": 10,
+		"move": "sine", "weapon": "aimed"},
+	"bomber": {"hp": 48, "speed": 85, "size": 78, "xp": 16,
+		"move": "straight", "weapon": "bomb"},
+	"heli": {"hp": 34, "speed": 95, "size": 60, "xp": 13,
+		"move": "hover", "weapon": "aimed"},
+	"kamikaze": {"hp": 18, "speed": 210, "size": 42, "xp": 9,
+		"move": "dive", "weapon": "none"},
+	"gunship": {"hp": 80, "speed": 70, "size": 76, "xp": 22,
+		"move": "straight", "weapon": "spread"},
+	"shielded": {"hp": 40, "speed": 105, "size": 56, "xp": 18,
+		"move": "hover", "weapon": "aimed", "shield": 30},
+	"splitter": {"hp": 36, "speed": 125, "size": 52, "xp": 14,
+		"move": "sine", "weapon": "none", "split": true},
+	"missile": {"hp": 44, "speed": 90, "size": 58, "xp": 18,
+		"move": "hover", "weapon": "homing"},
+	"swarm": {"hp": 8, "speed": 230, "size": 26, "xp": 4,
+		"move": "straight", "weapon": "none"},
+	"gtank": {"hp": 110, "speed": 52, "size": 72, "xp": 26,
+		"move": "ground", "weapon": "arc"},
+	"turret": {"hp": 70, "speed": 0, "size": 60, "xp": 20,
+		"move": "static", "weapon": "aimed"},
+	# ---- place exclusives (key = the place's "ex")
+	"hauler": {"hp": 60, "speed": 80, "size": 72, "xp": 20,
+		"move": "hover", "weapon": "bomb"},
+	"dustdevil": {"hp": 24, "speed": 175, "size": 48, "xp": 11,
+		"move": "sine", "weapon": "none"},
+	"frostmoth": {"hp": 34, "speed": 115, "size": 60, "xp": 14,
+		"move": "sine", "weapon": "aimed"},
+	"cinderbat": {"hp": 22, "speed": 190, "size": 50, "xp": 12,
+		"move": "dive", "weapon": "none"},
+	"sporewasp": {"hp": 30, "speed": 145, "size": 52, "xp": 14,
+		"move": "sine", "weapon": "aimed"},
+	"shardray": {"hp": 44, "speed": 110, "size": 60, "xp": 16,
+		"move": "hover", "weapon": "spread"},
+	"cloudray": {"hp": 52, "speed": 100, "size": 66, "xp": 18,
+		"move": "straight", "weapon": "homing"},
+	"deptheel": {"hp": 40, "speed": 150, "size": 56, "xp": 16,
+		"move": "sine", "weapon": "none"},
+	"holodrone": {"hp": 26, "speed": 160, "size": 46, "xp": 12,
+		"move": "hover", "weapon": "aimed", "shield": 20},
+	"voidmaw": {"hp": 58, "speed": 120, "size": 62, "xp": 20,
+		"move": "sine", "weapon": "spread"},
 }
 
-## the ten specials (pts 10..100) - the study's tier map, ours named
-const SPECIALS := ["technical", "carpet", "viper", "mammoth", "fortress",
-        "orbital", "grinder", "plowman", "atomault", "zeppelin"]
+# shared pool every place draws from (small -> heavy), plus the exclusive
+const SHARED_POOL := ["scout", "fighter", "bomber", "heli", "kamikaze",
+	"gunship", "shielded", "splitter", "missile", "swarm", "gtank", "turret"]
 
-# ------------------------------------------------------------------ places
-# THE ORIGINAL'S OWN CAMPAIGN LENGTHS (levels.xml): FRIGISTAN 10000,
-# BLASTNYA 15000, PETROVAKIA 25000, DICTASTROIKA 20000, ZAMBLAMIA /
-# TANKYLVANIA / VODKAVANIA / ANTAGONISTAN / KILLINGRAD / RED STAR HQ 30000.
-# len = ORIGINAL ground px; the run consumes them at ORIG_PX_PER_SEC.
-const PLACES := [
-        {"id": "frostkrai", "name": "FROSTKRAI", "len_orig": 10000,
-                "exclusive": ["atomault"]},
-        {"id": "gulfgate", "name": "GULFGATE", "len_orig": 15000,
-                "exclusive": ["skimmer"]},
-        {"id": "oilreach", "name": "OILREACH", "len_orig": 25000,
-                "exclusive": ["technical"]},
-        {"id": "nukeflats", "name": "NUKEFLATS", "len_orig": 20000,
-                "exclusive": ["orbital"]},
-        {"id": "vinebelt", "name": "VINEBELT", "len_orig": 30000,
-                "exclusive": ["plowman"]},
-        {"id": "gloomkeep", "name": "GLOOMKEEP", "len_orig": 30000,
-                "exclusive": ["zeppelin"]},
-        {"id": "ashfall", "name": "ASHFALL", "len_orig": 30000,
-                "exclusive": ["grinder"]},
-        {"id": "dunefort", "name": "DUNEFORT", "len_orig": 30000,
-                "exclusive": ["carpet"]},
-        {"id": "steelcrown", "name": "STEELCROWN", "len_orig": 30000,
-                "exclusive": ["mammoth"]},
-        {"id": "ironhold", "name": "IRONHOLD", "len_orig": 30000,
-                "exclusive": ["viper", "fortress"]},
+# place index (0-based) -> the enemy pool the waves roll from
+static func pool_for(place_i: int) -> Array:
+	var base := ["scout", "fighter", "swarm"]
+	var unlock_at := 2
+	for e in SHARED_POOL:
+		if not base.has(e):
+			base.append(e)
+	var out := []
+	for i in base.size():
+		if i == 0 or place_i >= i - 1:
+			out.append(base[i])
+	out.append(String(PLACES[place_i % 10]["ex"]))
+	if place_i >= 10:
+		out.append_array(SHARED_POOL)          # loop 2: everyone comes
+	return out
+
+# ------------------------------------------------------------------- bosses
+# brain: flyer / dropship / sidewinder / fortress / weaver / prime
+const BOSSES := [
+	{"id": "colossus", "name": "SCRAP COLOSSUS", "brain": "flyer",
+		"hp": 900, "size": 170},
+	{"id": "reaver", "name": "DUST REAVER", "brain": "sidewinder",
+		"hp": 1050, "size": 150},
+	{"id": "titan", "name": "GLACIER TITAN", "brain": "dropship",
+		"hp": 1250, "size": 175},
+	{"id": "magma", "name": "MAGMA HEART", "brain": "fortress",
+		"hp": 1450, "size": 170},
+	{"id": "sporemother", "name": "SPORE MOTHER", "brain": "weaver",
+		"hp": 1650, "size": 165},
+	{"id": "prism", "name": "PRISM WARDEN", "brain": "fortress",
+		"hp": 1900, "size": 165},
+	{"id": "carrier", "name": "STORM CARRIER", "brain": "dropship",
+		"hp": 2150, "size": 190},
+	{"id": "leviathan", "name": "ABYSS LEVIATHAN", "brain": "weaver",
+		"hp": 2400, "size": 200},
+	{"id": "sovereign", "name": "GRID SOVEREIGN", "brain": "sidewinder",
+		"hp": 2700, "size": 175},
+	{"id": "avatar", "name": "THE NULL AVATAR", "brain": "prime",
+		"hp": 3100, "size": 195},
 ]
 
-# ------------------------------------------------------------------ waves
-# THE ORIGINAL'S OWN WAVES (data/waves.xml), VERBATIM: 19 levels, each a
-# list of {len (original ground px), u: [[enemy, qty], ...]}. The ids are
-# translated 1:1 onto our enemy table; nothing else is touched.
-const WAVES_XML := [
-        # Level 1
-        {"len": 1000, "u": [["scout", 6], ["dart", 8]]},
-        {"len": 1000, "u": [["raider", 2], ["scout", 3], ["dart", 5]]},
-        {"len": 1000, "u": [["raider", 4], ["dart", 8]]},
-        # Level 2
-        {"len": 1100, "u": [["raider", 4], ["lynx", 4], ["dart", 5]]},
-        {"len": 1100, "u": [["raider", 5], ["carpet", 2], ["dart", 4]]},
-        {"len": 1100, "u": [["lynx", 5], ["scout", 7]]},
-        {"len": 1000, "u": [["scout", 4], ["raider", 2], ["lynx", 2], ["carpet", 2]]},
-        # Level 3
-        {"len": 1200, "u": [["raider", 5], ["technical", 2], ["dart", 4]]},
-        {"len": 1200, "u": [["wasp", 4], ["carpet", 3]]},
-        {"len": 1200, "u": [["lynx", 5], ["raider", 4], ["carpet", 3]]},
-        {"len": 1200, "u": [["hornet", 2], ["scout", 4], ["lynx", 5]]},
-        # Level 4
-        {"len": 1300, "u": [["talon", 5], ["fang", 7]]},
-        {"len": 1300, "u": [["skimmer", 4], ["komet", 3], ["scout", 7]]},
-        {"len": 1300, "u": [["wasp", 5], ["hornet", 3], ["dart", 4]]},
-        {"len": 1300, "u": [["talon", 4], ["komet", 2], ["raider", 6], ["dart", 5]]},
-        # Level 5
-        {"len": 1400, "u": [["wasp", 3], ["hornet", 2], ["viper", 2]]},
-        {"len": 1400, "u": [["fortress", 4], ["carpet", 5]]},
-        {"len": 1400, "u": [["zeppelin", 4]]},
-        {"len": 1400, "u": [["technical", 3], ["raider", 6], ["lynx", 8]]},
-        # Level 6
-        {"len": 1500, "u": [["atomault", 2], ["talon", 5], ["dart", 4]]},
-        {"len": 1500, "u": [["strafer", 7], ["komet", 3]]},
-        {"len": 1500, "u": [["fang", 14], ["carpet", 10]]},
-        {"len": 1500, "u": [["mirror", 5], ["dart", 7]]},
-        # Level 7
-        {"len": 1600, "u": [["viper", 4], ["grinder", 3]]},
-        {"len": 1600, "u": [["fortress", 6], ["fang", 10], ["komet", 2]]},
-        {"len": 1600, "u": [["grinder", 3], ["skimmer", 8]]},
-        {"len": 1600, "u": [["hornet", 7], ["fortress", 5]]},
-        # Level 8
-        {"len": 1700, "u": [["zeppelin", 4], ["strafer", 8]]},
-        {"len": 1700, "u": [["carpet", 16], ["fortress", 8]]},
-        {"len": 1700, "u": [["atomault", 3], ["skimmer", 7], ["fang", 10]]},
-        {"len": 1700, "u": [["technical", 3], ["fortress", 5], ["viper", 3]]},
-        # Level 9
-        {"len": 1800, "u": [["orbital", 4], ["grinder", 3]]},
-        {"len": 1800, "u": [["plowman", 3], ["fortress", 6], ["komet", 3]]},
-        {"len": 1800, "u": [["skimmer", 8], ["viper", 5], ["hornet", 6]]},
-        {"len": 1800, "u": [["mirror", 5], ["komet", 3], ["talon", 6]]},
-        {"len": 1800, "u": [["zeppelin", 5], ["strafer", 10]]},
-        # Level 10
-        {"len": 2000, "u": [["wasp", 30]]},
-        {"len": 2000, "u": [["hornet", 26]]},
-        {"len": 2000, "u": [["viper", 16]]},
-        {"len": 2000, "u": [["talon", 50]]},
-        {"len": 2000, "u": [["fang", 50]]},
-        {"len": 2000, "u": [["fortress", 22]]},
-        {"len": 2000, "u": [["atomault", 7]]},
-        {"len": 2000, "u": [["orbital", 10]]},
-        {"len": 2000, "u": [["mirror", 10]]},
-        # Level 11
-        {"len": 2000, "u": [["carpet", 22], ["fortress", 10]]},
-        {"len": 2000, "u": [["raider", 40], ["atomault", 5]]},
-        {"len": 2000, "u": [["fortress", 10], ["talon", 13], ["carpet", 11]]},
-        # Level 12
-        {"len": 2000, "u": [["orbital", 4], ["zeppelin", 5], ["komet", 3]]},
-        {"len": 2000, "u": [["grinder", 4], ["plowman", 2], ["komet", 3]]},
-        {"len": 2000, "u": [["plowman", 4], ["skimmer", 12]]},
-        {"len": 2000, "u": [["technical", 5], ["fortress", 8], ["strafer", 10], ["grinder", 4]]},
-        # Level 13
-        {"len": 2000, "u": [["mirror", 6], ["hornet", 7], ["viper", 5]]},
-        {"len": 2000, "u": [["fortress", 8], ["carpet", 12], ["talon", 10], ["fang", 10]]},
-        {"len": 2000, "u": [["strafer", 16], ["orbital", 6]]},
-        {"len": 2000, "u": [["zeppelin", 4], ["skimmer", 9], ["fortress", 7]]},
-        # Level 14
-        {"len": 2000, "u": [["wasp", 15], ["hornet", 10], ["viper", 8]]},
-        {"len": 2000, "u": [["viper", 8], ["grinder", 6]]},
-        {"len": 2000, "u": [["plowman", 3], ["hornet", 4], ["wasp", 8]]},
-        {"len": 2000, "u": [["viper", 16], ["komet", 4]]},
-        {"len": 2000, "u": [["skimmer", 14], ["wasp", 10], ["viper", 6]]},
-        # Level 15
-        {"len": 2000, "u": [["mirror", 10], ["zeppelin", 4]]},
-        {"len": 2000, "u": [["plowman", 3], ["fang", 15], ["talon", 10]]},
-        {"len": 2000, "u": [["grinder", 4], ["strafer", 10], ["komet", 3]]},
-        {"len": 2000, "u": [["orbital", 5], ["atomault", 4]]},
-        # Level 16
-        {"len": 2000, "u": [["strafer", 9], ["wasp", 9], ["mirror", 5]]},
-        {"len": 2000, "u": [["orbital", 7], ["skimmer", 14]]},
-        {"len": 2000, "u": [["fortress", 14], ["carpet", 15], ["talon", 16]]},
-        {"len": 2000, "u": [["wasp", 10], ["hornet", 15], ["viper", 10]]},
-        # Level 17
-        {"len": 2000, "u": [["strafer", 10], ["grinder", 5], ["fortress", 10]]},
-        {"len": 2000, "u": [["zeppelin", 5], ["atomault", 4]]},
-        {"len": 2000, "u": [["fortress", 8], ["viper", 8], ["technical", 5]]},
-        {"len": 2000, "u": [["komet", 3], ["fang", 15], ["hornet", 10], ["grinder", 3]]},
-        # Level 18
-        {"len": 2000, "u": [["orbital", 5], ["grinder", 5], ["komet", 4]]},
-        {"len": 2000, "u": [["skimmer", 10], ["mirror", 8], ["viper", 8]]},
-        {"len": 2000, "u": [["plowman", 4], ["zeppelin", 6]]},
-        {"len": 2000, "u": [["fortress", 15], ["strafer", 20]]},
-        {"len": 2000, "u": [["talon", 18], ["viper", 10], ["komet", 4]]},
-        # Level 19
-        {"len": 2000, "u": [["orbital", 5], ["mirror", 8], ["fang", 10]]},
-        {"len": 2000, "u": [["fortress", 16], ["atomault", 6]]},
-        {"len": 2000, "u": [["orbital", 5], ["grinder", 5], ["komet", 5]]},
-        {"len": 1000, "u": [["hornet", 1], ["viper", 1], ["talon", 1],
-                ["fang", 1], ["komet", 1], ["fortress", 1], ["orbital", 1],
-                ["grinder", 1]]},
-        {"len": 2000, "u": [["komet", 5], ["fortress", 10], ["strafer", 10], ["viper", 5]]},
-        {"len": 2000, "u": [["plowman", 3], ["orbital", 5], ["skimmer", 10]]},
+# --------------------------------------------------------------- XP cards
+# THE NO-CHEAT LAW (the owner): no magnet / scrap / coin cards here - the
+# magnet is a mini tank in the shop. Combat-only temporary boosts.
+const CARDS := [
+	{"id": "dmg", "name": "+20% DAMAGE", "desc": "All weapons hit harder.", "icon": "dmg"},
+	{"id": "rate", "name": "+18% FIRE RATE", "desc": "Faster trigger pull.", "icon": "rate"},
+	{"id": "speed", "name": "+15% MOVE SPEED", "desc": "Wheels grip the road.", "icon": "speed"},
+	{"id": "hull", "name": "+25 MAX HULL", "desc": "Heal 25 and raise the cap.", "icon": "hull"},
+	{"id": "heal", "name": "FULL REPAIR", "desc": "Restore all hull.", "icon": "heal"},
+	{"id": "pierce", "name": "+1 PIERCE", "desc": "Shots pass through one enemy.", "icon": "pierce"},
+	{"id": "explosive", "name": "EXPLOSIVE SHELLS", "desc": "Shells burst on impact.", "icon": "boom"},
+	{"id": "lifesteal", "name": "LIFESTEAL 3%", "desc": "Damage repairs the hull.", "icon": "leech"},
+	{"id": "multi", "name": "+1 SHELL", "desc": "The cannon fires an extra ball.", "icon": "multi"},
+	{"id": "armor", "name": "+15% RESIST", "desc": "Take less damage.", "icon": "armor"},
+	{"id": "cd", "name": "-15% COOLDOWN", "desc": "Weapons recover quicker.", "icon": "cd"},
+	{"id": "shield", "name": "+40 SHIELD", "desc": "Absorbs hits before hull.", "icon": "shield"},
+	{"id": "crit", "name": "+10% CRITICAL", "desc": "Chance to deal double.", "icon": "crit"},
+	{"id": "bounce", "name": "RICOCHET", "desc": "Shells bounce to a second target.", "icon": "bounce"},
+	{"id": "slow", "name": "CRYO SHELLS", "desc": "Shots chill and slow enemies.", "icon": "slow"},
 ]
 
-# ------------------------------------------------------------------ waves
-# THE LEVEL LENS: how many of the flat WAVES_XML rows belong to each of
-# the source's 19 levels (3+4+4+4+4+4+4+4+5+9+3+4+4+5+4+4+4+5+6 = 84).
-const LEVEL_WAVE_COUNTS := [3, 4, 4, 4, 4, 4, 4, 4, 5, 9, 3, 4, 4, 5, 4,
-        4, 4, 5, 6]
+# -------------------------------------------------------------------- shop
+# permanent gogacoin shop. costs ramp base * step^level.
+const SHOP_UPG := {
+	"wheels": {"name": "REINFORCED WHEELS", "desc": "+1 wheel per level, +10% speed.",
+		"base": 60, "step": 1.55, "max": 4},
+	"armor": {"name": "HULL PLATING", "desc": "+20 max hull per level.",
+		"base": 70, "step": 1.6, "max": 8},
+	"cannon": {"name": "MAIN CANNON", "desc": "+20% shell damage per level.",
+		"base": 90, "step": 1.65, "max": 8},
+	"reload": {"name": "AUTO-LOADER", "desc": "-8% all weapon cooldowns.",
+		"base": 80, "step": 1.6, "max": 6},
+	"mg": {"name": "MG NESTS", "desc": "Twin machine guns on the hull.",
+		"base": 150, "step": 1.7, "max": 1, "unlock": true},
+	"mg_rack": {"name": "MG RACK", "desc": "+1 MG pair, +15% MG damage.",
+		"base": 90, "step": 1.6, "max": 2, "requires": "mg"},
+	"rockets": {"name": "ROCKET PODS", "desc": "Homing rocket pods.",
+		"base": 180, "step": 1.7, "max": 1, "unlock": true},
+	"rocket_rack": {"name": "POD RACK", "desc": "+1 rocket per salvo, +15% dmg.",
+		"base": 110, "step": 1.6, "max": 2, "requires": "rockets"},
+}
 
-## the source's own slicing: level 0 = the first three waves, etc.
-static func waves_for_level(lvl: int) -> Array:
-        var i := 0
-        var out: Array = []
-        var target := clampi(lvl, 0, LEVEL_WAVE_COUNTS.size() - 1)
-        for li in LEVEL_WAVE_COUNTS.size():
-                var n: int = LEVEL_WAVE_COUNTS[li]
-                if li == target:
-                        for k in n:
-                                out.append(WAVES_XML[i + k])
-                        break
-                i += n
-        return out
+# THE 4 MINI TANKS (the owner's law): expensive gogacoins, each carries
+# its own weapon on the tank's flank.
+const MINIS := {
+	"mt_rocket": {"name": "ROCKET MINI TANK", "desc": "A little brother that lobs heavy rockets.",
+		"price": 900, "icon": "r_mt_rocket"},
+	"mt_mg": {"name": "GUNNER MINI TANK", "desc": "Aim-able machine gun that tracks your aim.",
+		"price": 1100, "icon": "r_mt_mg"},
+	"mt_ice": {"name": "FROST MINI TANK", "desc": "Ice balls that slow whatever they touch.",
+		"price": 1300, "icon": "r_mt_ice"},
+	"mt_magnet": {"name": "MAGNET MINI TANK", "desc": "Collects every drop for the big tank.",
+		"price": 800, "icon": "r_mt_magnet"},
+}
 
-# the shop (skins; the weapon systems ride the UPGRADES locks)
 const SKINS := {
-        "olive":   {"name": "OLIVE",   "price": 0},
-        "desert":  {"name": "DESERT",  "price": 800},
-        "arctic":  {"name": "ARCTIC",  "price": 800},
-        "navy":    {"name": "NAVY",    "price": 1000},
-        "crimson": {"name": "CRIMSON", "price": 1200},
-        "gold":    {"name": "GOLD",    "price": 2500},
+	"olive": {"name": "THE OLIVE", "price": 0},
+	"dune": {"name": "DUNE RUNNER", "price": 300},
+	"frost": {"name": "WHITEOUT", "price": 450},
+	"night": {"name": "NIGHT OPS", "price": 600},
+	"magma": {"name": "MAGMA WORKS", "price": 900},
 }
 
-# every 5 places. THE ORIGINAL'S OWN NUMBERS (data/bosses.xml): Level1 =
-# the first meeting, Level2 = the comeback (the source's own escalation).
-# hp = the XML armor; parts carry the XML's armor + fire (frames/100 = s).
-const BOSS_ORDER := ["gunship", "dreadnought", "skystealer", "wreckball",
-        "warhead", "kongo", "eyebot", "mechworm", "warbot", "secretfist"]
+# ------------------------------------------------------------ the wave law
+# budget = enemies this wave pours; interval = seconds between spawns.
+# diff = the DYNAMIC ENEMY law: the tank grows, the war grows with it.
+static func shop_index(mg: int, rk: int, armor: int, cannon: int,
+		wheels: int, reload: int, minis: int) -> float:
+	return float(mg + rk + armor + cannon + wheels + reload + minis * 2)
 
-const BOSSES := {
-        "gunship":     {"name": "TWINBLADE", "hp": 300, "score": 10000,
-                "parts": {"turret": {"hp": 80, "fire": 1.75},
-                          "launcher": {"hp": 100, "fire": 2.5}}},
-        "dreadnought": {"name": "BATTLESHIP", "hp": 800, "score": 20000,
-                "parts": {"t1": {"hp": 60, "fire": 1.5}, "t2": {"hp": 60, "fire": 2.0},
-                          "t3": {"hp": 60, "fire": 2.0}, "t4": {"hp": 60, "fire": 1.5},
-                          "launcher": {"hp": 90, "fire": 2.5}}},
-        "skystealer":  {"name": "WAR BLIMP", "hp": 2700, "score": 30000,
-                "parts": {"dish": {"hp": 0, "fire": 0.8},
-                          "params": {"down": 8.0, "up": 4.0, "meteors": 15}}},
-        "wreckball":   {"name": "WAR WRECKER", "hp": 2500, "score": 40000,
-                "parts": {"params": {"chain": 0}}},
-        "warhead":     {"name": "BUSTCZAR", "hp": 2800, "score": 60000,
-                "parts": {"l1": {"hp": 0, "fire": 1.0}, "l2": {"hp": 0, "fire": 1.5},
-                          "params": {"delay": 5.0, "on": 0.3, "off": 0.3, "freq": 0.06}}},
-        "kongo":       {"name": "KOMMIE KONG", "hp": 2500, "score": 50000,
-                "parts": {"params": {"throw_cd": 1.6, "jump_cd": 6.0}}},
-        "eyebot":      {"name": "EYEBOT", "hp": 1500, "score": 50000,
-                "parts": {"hand": {"hp": 300, "fire": 0.2},
-                          "params": {"fire": 0.6}}},
-        "mechworm":    {"name": "MECHWORM", "hp": 2000, "score": 50000,
-                "parts": {"turret": {"hp": 500, "fire": 0.6},
-                          "params": {"depth": 500.0, "jump": 4.0, "boulders": 8}}},
-        "warbot":      {"name": "X-BOT", "hp": 2200, "score": 70000,
-                "parts": {"arm": {"hp": 750}, "launcher": {"hp": 700, "fire": 2.0},
-                          "params": {"eye": 3.0}}},
-        "secretfist":  {"name": "SECRET WEAPON", "hp": 15000, "score": 140000,
-                "parts": {"bomb": {"hp": 0, "fire": 2.0}, "laser": {"hp": 0, "fire": 0.5},
-                          "turret": {"hp": 0, "fire": 0.6}, "small": {"hp": 0, "fire": 1.2},
-                          "big": {"hp": 0, "fire": 1.6}}},
-}
+static func diff(place_i: int, level: int, loop: int, shop_i: float) -> float:
+	return float(place_i) * 0.5 + float(level - 1) * 0.30 \
+		+ float(loop - 1) * 1.5 + shop_i * 0.12
 
-## the comeback law rides the source's own Level2 blocks: the second
-## meeting of a face is harder (armor x2.5, fire x1.6, the XML pair), and
-## beyond that the loop compounds. boss_i = the global boss count.
-static func boss_stats(boss_i: int) -> Dictionary:
-        var face := boss_i % BOSS_ORDER.size()
-        var lap := boss_i / BOSS_ORDER.size()
-        var base: Dictionary = BOSSES[BOSS_ORDER[face]]
-        # Level1 armor for the first meeting, Level2 for every return
-        var armor_mul := 1.0 if lap == 0 else 2.5
-        var fire_mul := 1.0 if lap == 0 else 0.62
-        var spd_mul := 1.0 if lap == 0 else 1.25
-        var extra := pow(1.35, maxf(0.0, float(lap) - 1.0))
-        return {"id": BOSS_ORDER[face], "comeback": lap,
-                "hp": int(ceil(base["hp"] * armor_mul * extra)),
-                "hp_mul": armor_mul * extra, "fire_mul": fire_mul,
-                "spd_mul": spd_mul, "score": int(base.get("score", 100))}
+static func wave_budget(wave: int, place_i: int, loop: int, shop_i: float) -> int:
+	var b := 6 + int(float(wave) * 1.9) + int(float(place_i) * 0.8) \
+		+ (loop - 1) * 6 + int(shop_i * 1.2)
+	return mini(b, 46)
 
-# ---------------------------------------------------------------- upgrades
-# THE ORIGINAL'S SIX WEAPON SYSTEMS (the source binary's own words):
-# SHIELD (orbiting deflector spheres), ROCKETS (extra rocket per level),
-# FLAK CANNON, HOMING MISSILES, THE MEGALASER (four parts, "Increased
-# power"), SPEED. Six tracks x 5 levels = 30 points; first two born free,
-# four shop-locked (the GDD's price law; the laser costs the most).
-const UPGRADES := {
-        "speed":   {"name": "SPEED",   "open": true,  "icon": "upg_6",
-                "desc": "the tank rolls faster", "shop_price": 0},
-        "shield":  {"name": "SHIELD",  "open": true,  "icon": "upg_1",
-                "desc": "orbiting deflector spheres", "shop_price": 0},
-        "rockets": {"name": "ROCKETS", "open": false, "icon": "upg_4",
-                "desc": "extra rocket per level", "shop_price": 1500},
-        "flak":    {"name": "FLAK",    "open": false, "icon": "upg_3",
-                "desc": "every shell bursts into flak", "shop_price": 1800},
-        "homing":  {"name": "HOMING",  "open": false, "icon": "upg_2",
-                "desc": "the shells seek the enemy", "shop_price": 2200},
-        "laser":   {"name": "LASER",   "open": false, "icon": "upg_5",
-                "desc": "increased power", "shop_price": 5000},
-}
+static func wave_interval(wave: int, diffv: float) -> float:
+	return maxf(0.34, 1.05 - float(wave) * 0.045 - diffv * 0.012)
 
-# the per-level reads (lv 0..5) - one source of truth for the run
-static func engine_speed(lv: int) -> float:
-        return 900.0 + 130.0 * lv
+static func boss_hp(place_i: int, loop: int, shop_i: float) -> int:
+	var def: Dictionary = BOSSES[place_i % 10]
+	var hp := float(def["hp"]) * (1.0 + float(place_i) * 0.18) \
+		* (1.0 + float(loop - 1) * 1.1) * (1.0 + shop_i * 0.10)
+	return int(hp)
 
-static func shell_dmg(tier: int) -> int:
-        # THE GUN POWER LAW: the arm's five tiers (gun.png rows); the tier
-        # climbs with pickups in the run and drops one on a hit.
-        return 2 + 2 * clampi(tier, 0, 4)
-
-static func armor_layer_hp(lv: int) -> int:
-        return 1 + lv
-
-static func rocket_volley(lv: int) -> int:
-        return lv                      # rockets per auto-volley
-
-static func flak_frags(lv: int) -> int:
-        return lv * 2                  # fragments per shell burst
-
-static func homing_turn(lv: int) -> float:
-        return 2.2 * float(lv)         # rad/s the shell steers
-
-static func laser_need() -> int:
-        return 4                       # "Collect all four Megalaser parts"
-
-static func laser_burn(lv: int) -> float:
-        return 4.0 + 2.0 * lv          # "Increased power"
-
-static func start_nukes() -> int:
-        return 1                       # the mercy law: one in the magazine
-
-# ------------------------------------------------------------------ drops
-# the friend helicopter's crate table (weights; caps checked by the game)
-const DROPS := [
-        {"kind": "shield",   "w": 26, "icon": "pup_02", "crate": 0},
-        {"kind": "nuke",     "w": 22, "icon": "pup_01", "crate": 1},
-        {"kind": "gunpower", "w": 20, "icon": "pup_04", "crate": 2},
-        {"kind": "speedup",  "w": 10, "icon": "pup_03", "crate": 3},
-        {"kind": "laser",    "w": 12, "icon": "pup_07", "crate": 1},
-        {"kind": "life",     "w": 6,  "icon": "pup_12", "crate": 3},
-        {"kind": "coin",     "w": 14, "icon": "pup_05", "crate": 0},
-]
-const COIN_DROP := 30           # gogacoin per crate (the every-3-places law)
-const SUPPLY_PERIOD := 45.0     # a supply pass every ~45s in play
-
-# ------------------------------------------------------------------ economy
-const LIVES_MAX := 3
-const SHIELD_MAX := 3
-const NUKES_MAX := 3
-const LIFE_PER_SCORE := 1000
-const BOSS_PLACES := 5          # a boss every 5 places survived
-const LASER_PRICE := 5000
-const GUN_TIERS := 5            # the arm's five rows (gun power tiers)
+# the GOGACOIN law: after COIN_KILLS kills OR COIN_TIME seconds (whichever
+# first) the NEXT enemy death carries a coin.
+const COIN_KILLS := 22
+const COIN_TIME := 40.0

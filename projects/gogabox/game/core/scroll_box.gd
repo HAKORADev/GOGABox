@@ -115,9 +115,35 @@ func _hit_tappable(pos: Vector2) -> bool:
                 var c: Control = t["ctrl"]
                 if is_instance_valid(c) and c.is_visible_in_tree() \
                                 and c.get_global_rect().has_point(pos):
+                        # v040-4 THE ANCHOR LAW (the owner's "feed returns a
+                        # little up"): a tap fired while the inertia was still
+                        # gliding used to let the glide run on PAST the tap
+                        # spot (the menu slept and froze it mid-motion) - the
+                        # box came back a little higher than where he tapped.
+                        # The tap anchors the list: motion dies HERE, the
+                        # visible position at the tap IS the position the box
+                        # restores to.
+                        stop_motion()
                         t["cb"].call()
                         return true
         return false
+
+## The point must sit inside EVERY clipping ancestor's rect, not just mine.
+## ScrollContainer clips its content, but a CHILD scroll with
+## clip_contents = false (the carousel strip) keeps a GLOBAL RECT that pokes
+## above the feed's visible edge once the feed scrolls - taps aimed at the
+## TOP BAR (settings / batteries / trophies) landed on that ghost rect and
+## fired the invisible card underneath (the owner's "top bar buttons over
+## the feed tap through to the game"). A scroll never owns a tap that a
+## clipping ancestor hides.
+func _visible_point(pos: Vector2) -> bool:
+        var p: Node = get_parent()
+        while p != null and p is Control:
+                var c := p as Control
+                if c.clip_contents and not c.get_global_rect().has_point(pos):
+                        return false
+                p = c.get_parent()
+        return true
 
 # ---------------------------------------------------------------- input
 
@@ -149,6 +175,7 @@ func _mouse(m: InputEventMouseButton) -> void:
 
 func _owns(pos: Vector2) -> bool:
         return _idx == -1 and get_global_rect().has_point(pos) \
+                        and _visible_point(pos) \
                         and not _covered_by_overlay(pos)
 
 func _touch(t: InputEventScreenTouch) -> void:

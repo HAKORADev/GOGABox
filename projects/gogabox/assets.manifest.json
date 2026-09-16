@@ -137,6 +137,13 @@
       "url": "owner upload (GameMaker brick-breaker package: 403 sprites + 10 mp3 - ball, bat, 5 brick colors, boundaries, buttons, powerup capsules, hit FX, menu/ingame music, brick/wall/bat hits, powerup spawn/pickup, ball spawn, clicks)",
       "license": "owner-provided for GOGABox use",
       "used_for": "assets/audio/sfx/bb_brickhit.mp3 + bb_break.mp3 + bb_bathit.mp3 + bb_wall.mp3 + bb_pow_spawn.mp3 + bb_pow.mp3 + bb_serve.mp3 + bb_click.mp3 (verbatim, renamed) and assets/audio/music/bb_theme.mp3 + bb_menu.mp3 (the loops); assets/games/brickbreaker/brick_blue|green|pink|grey|yellow.png + ball.png + bat.png (recolored to the classic court palette) + pow_life|pow_multi|pow_size.png (the thumbnail stamps). The game art itself is CODE-DRAWN (the box law); the pack fed the palette study (brick tiers cyan/green/amber/pink, the steel grey) and the thumbnail."
+    },
+    {
+      "id": "heavywar-rogue-arsenal-v0404",
+      "name": "HEAVY WAR: ROGUE ARSENAL - 100% generated (v040-4)",
+      "url": "no external source - every pixel and sound is code-generated in-repo",
+      "license": "the owner's own",
+      "used_for": "assets/games/heavywar/** (tank + skins, 22 enemies x 2 frames, 10 bosses x 2 frames, 10 places x 4 env layers, shots, pickups, fx, card icons, the feed thumbnail), assets/audio/sfx/rw_* (20 sfx + 4 seamless music loops). Re-derive: python3 tools/v0404_rogue_art.py all && python3 tools/v0404_rogue_sfx.py. The old composed PopCap sprites (assets/games/heavywar/spr_*, assets/games/hwsrc/**) and the hws_* sfx died in this commit - zero original-game bytes remain."
     }
   ],
   "audit": {
