@@ -80,6 +80,28 @@ func _blocks_at(c: Control, pos: Vector2) -> bool:
                         return true
         return false
 
+## v040-3 THE CLIP LAW (the owner's battery-chip tap-through): a BoxScroll
+## that rides INSIDE another scroll (the carousel strip inside the feed)
+## keeps a live global rect even when the outer scroll's clip_contents has
+## slid it fully under the top bar - the strip is INVISIBLE there, yet a raw
+## has_point() on its rect (and on its cards' rects) handed the top-bar
+## button's tap to a hidden card and the game's pre-play page opened over
+## the battery chip. Reproduced on the rig: tap at the chip with the feed
+## scrolled 286px -> BRICK BREAK's page opened. Law: a point only belongs to
+## me if it survives EVERY clip_contents ancestor - if any such ancestor's
+## rect does not contain the point, the point is clipped away and the touch
+## is NOT MINE (never captured, never dispatched). Checked at capture AND at
+## tap dispatch (layout may shift between down and up).
+func _clipped_out(pos: Vector2) -> bool:
+        var n := get_parent()
+        while n != null:
+                if n is Control and (n as Control).clip_contents \
+                                and not (n as Control).get_global_rect() \
+                                                .has_point(pos):
+                        return true
+                n = n.get_parent()
+        return false
+
 func _init() -> void:
         horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -204,6 +226,10 @@ func _touch(t: InputEventScreenTouch) -> void:
         var ms := Time.get_ticks_msec() - _last_t
         if not _dragging:
                 if dist <= TAP_PX and ms <= TAP_MS:
+                        # the clip law re-checks at dispatch: a layout shift
+                        # between down and up must not fire a hidden tap
+                        if _clipped_out(t.position):
+                                return
                         get_viewport().set_input_as_handled()
                         tapped.emit(t.position)
                         _hit_tappable(t.position)

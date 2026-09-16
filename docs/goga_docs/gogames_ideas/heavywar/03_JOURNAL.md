@@ -464,6 +464,101 @@ NEXT (post-test):
 - The bosses' part anchors can wear per-face animation (copterblades
   for Twinblade's rotors) as polish.
 
+## v040-3 - THE NINE-MINUTE TRUTH (the owner filmed his whole run)
+
+The owner shipped a 251MB report: ten screenshots + nine minutes of real
+gameplay. Watched frame by frame. Every "stupid thing" in it traced to a
+structural law, and most of them to ONE line of code:
+
+1. THE LEAF LAW (his blue/white rectangles, the 'unreachable wall', the
+   4:10 brown pixels): `_layer_roll` stacked every leaf past the first at
+   the SAME x+period - the world periodically RAN OUT on his 20:9 canvas
+   and the raw void showed. Leaf k now tiles at x + k*period.
+2. THE DRIFT LAW (his 'world thing moved the opposite directions'): the
+   prop mx drift carried a flipped sign - penguins and fences SWAM
+   BACKWARDS against the scroll. Sign flipped; nothing moves opposite.
+3. THE GEOMETRY LAW (his 'weapons land on far land, the ground is up a
+   little'): TANK_Y sat 22 design px BELOW the band (half off-screen on
+   1080) and craters stamped mid-air. The source's own numbers now: tank
+   rides band-top +58, road face +104.
+4. THE CAST TRAP (his 'helicopter does not fly, the fans... not spinning'):
+   `_heli_tick` assigned the rotor HOLDER (Node2D) to a typed Sprite2D -
+   the whole function ABORTED every frame since v040-2. The heli never
+   flew because one cast threw. Untyped now; rotor spins at 30fps on the
+   mast, body bobs + tilts.
+5. THE FRIEND LAW: one crate only, released mid-range (35-75%), falling
+   from the cargo hook with drift; the pass enters LEFT and crosses right;
+   the heli is MORTAL - ten points of gun, hit flash + smoke + sfx, death
+   drops the cargo where it fell + 500 score.
+6. THE BOTH-SIDES LAW: the craft table carries per-type left-chances;
+   left entries spawn off the left edge and flip to face their travel.
+   Formation lanes (4 heights) replace the random scatter.
+7. THE TRUE FRAMES LAW: the strip frame counts were INVENTED (scout hf=4
+   on a 10-frame strip = sliced mid-sprite - his '2 images moving fast').
+   Every count now measured off the source's pixels (scout 10, wasp 9,
+   hornet 7, viper 9, strafer 10, grinder 10, plowman 10, satellite 10,
+   truck 10, dozer 10) and driven at real fps (props 30, rotors 16-24,
+   treads 10-12).
+8. THE PER-FAMILY KILL LAW (his 'same destroy effect? the exact same?'):
+   jets burst + spark, copters smoke down, bombers chain-fire, the
+   ATOMAULT nukelets, the ZEPPELIN showers the road with its cargo
+   bullets (craft.xml's own note), steel stamps a crater. Every struck
+   craft flashes white (the hit read).
+9. THE INTERCEPT LAW: tank shells SHOOT DOWN enemy bombs/bullets/grenades
+   (small air burst + sfx) - EXCEPT the pink hellfire family, untouchable
+   like the source.
+10. THE SLIDER LAW (his item 9): the steer zone is the hidden BOTTOM-LEFT
+    quarter; the finger's STROKE speed steers (gain 9), a resting finger
+    parks the tank. The arm reads the AIM FINGER ONLY and rests pointing
+    UP (col 12) with no finger.
+11. THE MISSING SHELF (his 'shop is currently empty... a bug'): the shop
+    scroll was built, filled... and never ADDED to the sheet. One line
+    (`vb.add_child(sc)`) opened the whole store - verified by still.
+12. THE ONE-COIN LAW: COIN_DROP 30 -> 1 AND the score->coins death bonus
+    is zeroed (score_bonus_enabled=false) - the wallet grows ONLY from
+    the helicopter's gogacoins. 'One coin is one coin.'
+13. THE DEATH RESET LAW: a lost life takes laser parts AND nukes to zero
+    (the owner guessed the original does - it does).
+14. THE LASER WIDGET (his own design, not the source's megameter): an
+    orange wavy I icon + a live nn% chip; parts +25% each, 100% fires the
+    beam itself, the burn drains the % live, dying zeroes it.
+15. THE TRUE ICONS: LIVES wears tankicon.png (the old pup_12 was a
+    powerup orb - his item 1), NUKES wears nukeicon.png.
+16. THE TAP SIGN: EVERY intro (fresh + replay) wears a flashing outlined
+    'TAP ANYWHERE TO START' - no more alive-looking dead wait.
+17. THE PLACE ORDER LAW: the source's own ten places in levels.xml order
+    (Frigistan first, Red Star HQ last) - the shuffle is dead.
+18. THE DOME EMBRACES: shield bubble 150x132 -> 260x226 (his 'shield is
+    smaller than the tank body'); the ORBITS only appear with the shield
+    upgrade at LV2+ (his 'the orbit is for the orbits upgrade').
+19. THE FLICKER-FADE LAW: expiring orbs flicker their last 2.5s and fade
+    their last 0.5s (his 'flickering effect then fade-out').
+20. THE ACTION SONG: AtomicTank.mo3 (the source's second song, the
+    action one) RENDERED at last - libopenmpt through ctypes (140.5s),
+    looped during the war; LoveTheme keeps the intro.
+
+THE BOX (the owner: 'GOGABox bugs are more important'):
+- THE CLIP LAW (scroll_box.gd): a BoxScroll only owns a point that
+  survives every clip_contents ancestor - the carousel strip scrolled
+  under the top bar was INVISIBLE but still ate the battery chip's tap
+  (reproduced on the rig: tap chip -> BRICK BREAK's page opened). Now
+  the chip's tap reaches the chip.
+- THE RETURN LAW (menu.gd): the feed snapshots scroll + strip + list +
+  ALL FOUR filters at launch and lands back on the SAME grid row after a
+  game closes (rig: deep_v 1475 -> restored 1475, exact).
+
+THE RIG: hw_probe 129 checks 0 fails (the 111 + leaf tiling at any roll,
+both-sides + flip, true frames, intercept + hellfire exception, friend
+law x4, one-coin + zero bonus, death reset, laser widget %, geometry,
+place order) + flow_test ALL TESTS PASSED + box_menu_probe
+(bug_a=true bug_b=true) + the film reviewed BY EYE (full-bleed world,
+tap sign, tank on the road, craters, the interceptor burst, the laser
+chip draining 38%, the heli pass) + the shop and armory stilled FULL.
+
+COLOR TRUTH: the composed assets are RGB-IDENTICAL to the source jpgs
+(measured: bomber/tank/bigbomber/smallcopter/ground/sky all exact) - the
+'washed out' look was the void bug + Frigistan's own near-white palette
+(orig ground = 204,232,240).
 ---
 
 ## v040-4 - ROGUE ARSENAL: THE REWORK (the owner's HTML prototype became law)

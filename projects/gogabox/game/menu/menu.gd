@@ -66,8 +66,15 @@ var _trophies_pair: Array = []
 # v040-4 THE EXACT-RESTORE LAW (the owner: "feed returns a little up"): the
 # feed's scroll position at the moment a game takes the screen is saved
 # here and re-applied after the return rebuild - one number, no drift.
-var _saved_feed_scroll := -1
 var _last_wide := false
+## v040-3 THE RETURN LAW (the owner: "it should not be just same position,
+## it should be exact same state, like if it was from search or filter"):
+## everything the feed looked like when a game launched, snapped back the
+## moment the game closes - scroll offset, carousel strip offset, carousel
+## list index, and ALL FOUR filters. _refresh() rebuilds every child and
+## used to drop the owner back at the top of the feed every single time.
+var _saved_feed := {}
+var _launch_row_y := -1.0   # the grid row the launched tile sat on
 ## The launch router (main.gd). GameHost.launch MUST get this, not `self` -
 ## passing the menu was v0.0.4's big-L bug: on_game_entered lives on main.
 var router: Node = null
@@ -186,11 +193,6 @@ func has_open_overlay() -> bool:
 ## hard-stops all processing so BoxScroll can never swallow taps during play.
 func set_active(on: bool) -> void:
         visible = on
-        if not on:
-                # v040-4: a game is taking the screen - remember EXACTLY where
-                # the feed sits so the return lands on the same pixel.
-                if _feed_scroll != null and is_instance_valid(_feed_scroll):
-                        _saved_feed_scroll = _feed_scroll.scroll_vertical
         if _layer != null and is_instance_valid(_layer):
                 _layer.visible = on
         # the toast lives on its OWN layer-100 CanvasLayer (above sheets) -
@@ -2057,6 +2059,7 @@ func _open_game_page(g: Dictionary) -> void:
                 Jukebox.sfx("click", -4.0)
                 if play_btn.disabled:
                         return
+                _save_feed_state()
                 _close_sheet()
                 GameHost.launch(router if router != null else self, id))
 
@@ -2535,15 +2538,68 @@ func on_game_closed() -> void:
         Ads.banner_show()   # back on the box: banner returns (fresh fill)
         Ads.refresh()       # re-preload interstitial + rewarded for next runs
         Roadmap.tick()
-        _refresh()
-        # v040-4 THE EXACT-RESTORE LAW: after the rebuild's layout pass ran,
-        # put the feed back on the SAVED pixel (deferred - the ScrollContainer
-        # clamps on its own sort, so the set must land after it).
-        if _saved_feed_scroll >= 0:
-                _apply_saved_feed_scroll.call_deferred()
+        _restore_feed_state()
 
-func _apply_saved_feed_scroll() -> void:
-        if _feed_scroll != null and is_instance_valid(_feed_scroll) \
-                        and _saved_feed_scroll >= 0:
-                _feed_scroll.scroll_vertical = _saved_feed_scroll
-                _saved_feed_scroll = -1
+## v040-3 THE RETURN LAW - snapshot right before GameHost.launch.
+func _save_feed_state() -> void:
+        _saved_feed = {
+                "v": _feed_scroll.scroll_vertical,
+                "sh": _strip_scroll.scroll_horizontal,
+                "list": _list_idx,
+                "genre": _filter_genre,
+                "sub": _filter_sub,
+                "state": _filter_state,
+                "text": _filter_text,
+        }
+        # which grid row owns the screen top at this offset (tiles are a
+        # fixed 326px pitch) - lets the restore land EXACTLY even if the
+        # rebuild grew/shrank content above the grid (daily picks changed)
+        _launch_row_y = -1.0
+        var top_item := _feed_vb.get_global_rect().position.y \
+                        + _feed_scroll.scroll_vertical
+        for c in _grid.get_children():
+                if c is Control and (c as Control).is_visible_in_tree():
+                        var y := (c as Control).get_global_rect().position.y
+                        if y + 40.0 >= _feed_scroll.get_global_rect().position.y:
+                                _launch_row_y = y + _feed_scroll.scroll_vertical \
+                                                - top_item
+                                break
+
+## v040-3 THE RETURN LAW - called INSTEAD of the raw _refresh() on game
+## close: filters + list index go back first (the rebuild honors them), the
+## scroll offsets go back after the rebuild's layout settles (two frames).
+func _restore_feed_state() -> void:
+        if not _saved_feed.is_empty():
+                _filter_genre = String(_saved_feed.get("genre", ""))
+                _filter_sub = String(_saved_feed.get("sub", ""))
+                _filter_state = String(_saved_feed.get("state", ""))
+                _filter_text = String(_saved_feed.get("text", ""))
+                _list_idx = int(_saved_feed.get("list", 0))
+        _refresh()
+        if _saved_feed.is_empty():
+                return
+        var v := float(_saved_feed.get("v", 0.0))
+        var sh := float(_saved_feed.get("sh", 0.0))
+        var row := float(_launch_row_y)
+        _saved_feed.clear()
+        _apply_saved_scroll(v, sh, row)
+
+func _apply_saved_scroll(v: float, sh: float, row: float) -> void:
+        await get_tree().process_frame
+        await get_tree().process_frame
+        if not is_instance_valid(_feed_scroll) \
+                        or not is_instance_valid(_strip_scroll):
+                return
+        # land on the SAME content anchor: the grid row that owned the top of
+        # the screen at launch gets the top of the screen again (content
+        # above the grid may have changed - the exact pixel cannot be
+        # trusted, the anchor can).
+        if row >= 0.0:
+                var grid_top := _grid.get_global_rect().position.y
+                var feed_top := _feed_scroll.get_global_rect().position.y
+                var anchor := grid_top + row - feed_top
+                _feed_scroll.scroll_vertical = clampi(int(round(anchor)), 0,
+                                1000000)
+        else:
+                _feed_scroll.scroll_vertical = clampi(int(round(v)), 0, 1000000)
+        _strip_scroll.scroll_horizontal = clampi(int(round(sh)), 0, 1000000)

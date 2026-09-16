@@ -842,3 +842,20 @@ asserts. The working loop, end to end:
        they wake up; the rig should have watched MORE gameplay than
        they will. Speedrunning the eye pass is how a patch becomes a
        report.
+
+**33. THE BOX TOUCH LAWS (v040-3) - the feed never eats a button's tap,
+and a game never steals the feed's place.**
+Two rig-verified laws born from the owner's v040-2 box report:
+(a) **THE CLIP LAW**: a BoxScroll owns a touch point ONLY if the point
+    survives every `clip_contents` ancestor (`_clipped_out`). The
+    carousel strip rides INSIDE the feed scroll; scrolled up, its global
+    rect (and its cards' rects) slides under the top bar while the feed
+    clips it invisible - a raw `has_point()` then hands the battery
+    chip's tap to a hidden card (reproduced: tap chip -> a game page
+    opened). Checked at capture AND at tap dispatch.
+(b) **THE RETURN LAW**: `_save_feed_state()` snapshots the feed's scroll,
+    the strip's scroll, the carousel list index and ALL FOUR filters at
+    the launch tap; `on_game_closed` -> `_restore_feed_state()` rebuilds
+    with the filters restored and lands the scroll on the SAME grid row
+    (rig: deep 1475 -> restored 1475 exact). "Not just same position -
+    exact same state."
