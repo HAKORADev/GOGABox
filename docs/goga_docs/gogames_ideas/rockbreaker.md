@@ -209,6 +209,56 @@ plays). Guide: the registry "controls" array carries the hold law.
   and the tap-anywhere gate with the best line.
 - Death menu: the host chrome (score, bonus, coins) — nothing custom.
 
+## THE STUDY (the teachers' real numbers, extracted v040-7)
+
+Sources: Gamesnacks Crazy Caves 1.0.0 (the Famobi APK's HTML5 bundle,
+readable JS) and Ball Blast 4.4.0 (Unity IL2CPP; sprites/nicknames
+extracted, code opaque — metadata v39). Study copies live outside the
+repo (`study_out/rockbreaker/`); what ships here is our own redrawn and
+rewritten work (the usage law).
+
+**Crazy Caves, verbatim from its own code:**
+- The first upgrade is BULLETS PER SECOND: `bulletsPerSec = upgrade + 4`
+  (base 4/s, +1 a level, hard cap 26/s). Price starts at 3, x1.5 a level
+  to level 15, then x1.2 a level — the "expensive fast" tail.
+- Damage: `damage = upgrade + 1` (base 1, +1 a level — the owner's "+1
+  damage point for each upgrade" IS crazy caves' second upgrade). Price
+  starts 50, x5 a level.
+- Coin multiplier (the third, the one the owner BANNED): x2 a level,
+  price 100 x2^n.
+- Rocks per level `= level + 12`; spawn interval `= max(3, 10 - 0.47 x
+  level)`; rock damage pool `= 1..(10 + 2 x level)` random, printed on
+  the rock's face; score pays `+ceil(damage)` per HIT.
+- Splits: big -> 2 medium -> 4 small (radii 105/75/50 px); smaller rocks
+  fly faster (speed coefficients 1.0 / 1.2 / 1.5).
+- Color IS the health tier: blue > 13, red > 6, green <= 6.
+- Powerups: shield, fire, helper (the double throw), freeze (rocks slow
+  to x0.1), coinrain (the extra cash). The owner keeps the slow-down and
+  the shield, swaps the double throw for a x2 throw speed, and drops the
+  cash rain — exactly the mystery trio of the spec.
+- Coins fall with gravity 500 and a random x-shove; the death is the
+  rock touching the cart/miner.
+- Skins: 9 carts, 9 miners, 4+ cave places, diamond + coin currencies.
+
+**Ball Blast, from its assets:**
+- The cannon is a two-wheeled carriage — the owner's "cannon with two
+  wheels" is literally Ball Blast's player shape.
+- Rocks are faceted boulders with CRACKED DAMAGE STATES (Boulder_damaged
+  1/2) and comet trails while flying at angles; coins are big round
+  discs; powerups ride egg-shaped carriers.
+- The bot nickname list (Nicknames.bin: Bender, Kraken, Big Papa, Mad
+  Dog...) — human-flavored names for non-player actors.
+
+**What we take, what we break:** the two-upgrade shape (rate capped,
+damage uncapped), the +1/level damage law, the printed damage number on
+every rock, the small-rocks-fly-faster rule, the color-as-heat law (ours
+is UNBOUNDED — no 3-color cap, the ramp keeps climbing), the cracked
+damage states, the comet trails, the two-wheeled cannon. We break: the
+level system (endless instead), the third upgrade, the diamond currency,
+the fixed big->medium->small family (ours: size N carries N children of
+sizes 1..N-1), and the despawn-on-exit (ours: a closed arena — rocks
+never leave, the herd only thins by breaking).
+
 ## THE SFX/VFX (the juice law)
 
 Synthesized in-house (the box law): the volley tick, the crack per hit,
