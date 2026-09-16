@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://hw5probe5"]
+
+[ext_resource type="Script" path="res://tests/hw5_probe.gd" id="1"]
+
+[node name="HW5Probe" type="Node"]
+script = ExtResource("1")

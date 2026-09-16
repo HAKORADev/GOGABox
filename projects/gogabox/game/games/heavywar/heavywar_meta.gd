@@ -1,9 +1,9 @@
 class_name HWMeta
 extends RefCounted
-## HEAVY WAR: ROGUE ARSENAL - the run ledger (v040-4). The boss-point
-## armory is gone (the shop carries progression now); this keeps the
-## records + the once-ever lore law. Lives in Box save under
-## games.heavywar.progress.hw.
+## HEAVY WAR: ROGUE ARSENAL - the run ledger (v040-5). The SCRAP BANK and
+## the scrap shop upgrades live here (the HTML prototype's localStorage is
+## the law: scrap / totalScrap / upgrades). The records + the once-ever
+## lore law ride along. Lives in Box save under games.heavywar.progress.hw.
 
 const KEY := "hw"
 const GAME := "heavywar"
@@ -26,14 +26,50 @@ func _heal() -> void:
 		"boss_kills": 0,
 		"runs": 0,
 		"lore_seen": false,
+		# v040-5 THE SCRAP BANK (the HTML save law)
+		"scrap": 0,
+		"total_scrap": 0,
+		"upg": {},
 	}
 	for k in base:
 		if not d.has(k):
 			d[k] = base[k]
+	if not (d["upg"] is Dictionary):
+		d["upg"] = {}
 
 func save() -> void:
 	Box.set_progress(GAME, KEY, d)
 
+# ------------------------------------------------------------ the scrap bank
+func scrap() -> int:
+	return int(d["scrap"])
+
+func total_scrap() -> int:
+	return int(d["total_scrap"])
+
+func bank_scrap(n: int) -> void:
+	if n <= 0:
+		return
+	d["scrap"] = int(d["scrap"]) + n
+	d["total_scrap"] = int(d["total_scrap"]) + n
+	save()
+
+func spend_scrap(n: int) -> bool:
+	if int(d["scrap"]) < n or n < 0:
+		return false
+	d["scrap"] = int(d["scrap"]) - n
+	save()
+	return true
+
+# ----------------------------------------------------------------- upgrades
+func upg_lvl(id: String) -> int:
+	return int((d["upg"] as Dictionary).get(id, 0))
+
+func set_upg(id: String, lvl: int) -> void:
+	(d["upg"] as Dictionary)[id] = lvl
+	save()
+
+# ------------------------------------------------------------------ records
 func record_run(kills: int, places: int, loops: int, bosses: int) -> void:
 	d["runs"] = int(d["runs"]) + 1
 	d["best_kills"] = maxi(int(d["best_kills"]), kills)

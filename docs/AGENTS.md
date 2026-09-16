@@ -859,3 +859,25 @@ Two rig-verified laws born from the owner's v040-2 box report:
     with the filters restored and lands the scroll on the SAME grid row
     (rig: deep 1475 -> restored 1475 exact). "Not just same position -
     exact same state."
+**34. THE TOLERANCE-HIDING LAW (v040-5) - a probe's pass margin can BE the
+bug.**
+The owner's "closing a game returns you a little up" survived two shipped
+fixes because the rig probe asserted `abs(restored - saved) <= 340` - a
+340px forgiveness wide enough to sleep through the very bug it existed
+for. The real defect was a 40px anchor fudge in _save_feed_state (the
+first tile "at least 40px inside" the screen got pinned TO the edge,
+losing the sub-row offset). THE METHOD: when the owner can see a drift
+the rig cannot, shrink the tolerance to the owner's eye (+-2px), then let
+the FAILING probe write the fix - the v040-5 exact-tile anchor (remember
+the straddler tile by index + its EXACT screen offset, rebuild, put it
+back) passes where the 340px probe passed and the owner still failed.
+
+**35. THE CHROMA-CUTOUT LAW (v040-5) - thumbnails are composed from the
+game's OWN renders, never re-drawn.**
+A thumbnail that "looks like the game" is a photograph of the game: the
+film rig stages one composed frame (full-loadout tank, staged enemies and
+drops, HUD hidden) and the thumb tool crops it. When cutouts are needed,
+render over pure magenta (`RenderingServer.set_default_clear_color`) and
+key it in PIL - never paste rectangular crops over a scene (the sky
+seam ships). And when a still must be cleaned, patch with a strip sampled
+from the SAME rows (the vertical gradient survives), never a flat fill.

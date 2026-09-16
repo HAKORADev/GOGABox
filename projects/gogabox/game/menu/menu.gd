@@ -74,7 +74,16 @@ var _last_wide := false
 ## list index, and ALL FOUR filters. _refresh() rebuilds every child and
 ## used to drop the owner back at the top of the feed every single time.
 var _saved_feed := {}
-var _launch_row_y := -1.0   # the grid row the launched tile sat on
+# v040-5 THE EXACT-TILE ANCHOR: the anchor is not "a row near the top" -
+# it is ONE grid tile, remembered by its INDEX in the rebuilt grid, plus
+# the EXACT screen offset its top edge had at launch (that offset can be
+# a few px negative - a partially scrolled-under tile). The v040-3 law
+# picked "the first tile at least 40px inside the screen" and pinned its
+# top TO the screen top - every launch made while the top tile rode
+# slightly under the edge came back up to 40px early (the owner's
+# "many times it returns you a little up", still there after v040-3/4).
+var _launch_tile_idx := -1
+var _launch_tile_off := 0.0
 ## The launch router (main.gd). GameHost.launch MUST get this, not `self` -
 ## passing the menu was v0.0.4's big-L bug: on_game_entered lives on main.
 var router: Node = null
@@ -2541,6 +2550,9 @@ func on_game_closed() -> void:
         _restore_feed_state()
 
 ## v040-3 THE RETURN LAW - snapshot right before GameHost.launch.
+## v040-5 THE EXACT-TILE ANCHOR: remember the tile that owns the top edge
+## of the screen (its top may sit UP TO A FULL PITCH above the edge - the
+## tile straddling it), by index, with the EXACT offset. No 40px guess.
 func _save_feed_state() -> void:
         _saved_feed = {
                 "v": _feed_scroll.scroll_vertical,
@@ -2551,19 +2563,27 @@ func _save_feed_state() -> void:
                 "state": _filter_state,
                 "text": _filter_text,
         }
-        # which grid row owns the screen top at this offset (tiles are a
-        # fixed 326px pitch) - lets the restore land EXACTLY even if the
-        # rebuild grew/shrank content above the grid (daily picks changed)
-        _launch_row_y = -1.0
-        var top_item := _feed_vb.get_global_rect().position.y \
-                        + _feed_scroll.scroll_vertical
+        _launch_tile_idx = -1
+        _launch_tile_off = 0.0
+        var feed_top := _feed_scroll.get_global_rect().position.y
+        var best_bottom := -1e12
+        var idx := 0
         for c in _grid.get_children():
                 if c is Control and (c as Control).is_visible_in_tree():
                         var y := (c as Control).get_global_rect().position.y
-                        if y + 40.0 >= _feed_scroll.get_global_rect().position.y:
-                                _launch_row_y = y + _feed_scroll.scroll_vertical \
-                                                - top_item
+                        # the straddler: the LAST tile whose top is above the
+                        # screen top (its bottom crosses the edge); when the
+                        # grid starts cleanly below the edge, the FIRST tile.
+                        if y <= feed_top:
+                                if y > best_bottom:
+                                        best_bottom = y
+                                        _launch_tile_idx = idx
+                                        _launch_tile_off = y - feed_top
+                        elif _launch_tile_idx == -1:
+                                _launch_tile_idx = idx
+                                _launch_tile_off = y - feed_top
                                 break
+                idx += 1
 
 ## v040-3 THE RETURN LAW - called INSTEAD of the raw _refresh() on game
 ## close: filters + list index go back first (the rebuild honors them), the
@@ -2580,26 +2600,31 @@ func _restore_feed_state() -> void:
                 return
         var v := float(_saved_feed.get("v", 0.0))
         var sh := float(_saved_feed.get("sh", 0.0))
-        var row := float(_launch_row_y)
+        var t_idx := int(_launch_tile_idx)
+        var t_off := float(_launch_tile_off)
         _saved_feed.clear()
-        _apply_saved_scroll(v, sh, row)
+        _apply_saved_scroll(v, sh, t_idx, t_off)
 
-func _apply_saved_scroll(v: float, sh: float, row: float) -> void:
+## v040-5 THE EXACT-TILE ANCHOR: after the rebuild's layout settles, put the
+## SAME tile (by index - the feed order is deterministic for the same
+## filters) at the SAME screen offset it had at launch. When the tile is
+## gone (filters were not restorable, catalog changed) fall back to the raw
+## launch offset - with unchanged content that number IS the exact answer.
+func _apply_saved_scroll(v: float, sh: float, t_idx: int, t_off: float) -> void:
         await get_tree().process_frame
         await get_tree().process_frame
         if not is_instance_valid(_feed_scroll) \
                         or not is_instance_valid(_strip_scroll):
                 return
-        # land on the SAME content anchor: the grid row that owned the top of
-        # the screen at launch gets the top of the screen again (content
-        # above the grid may have changed - the exact pixel cannot be
-        # trusted, the anchor can).
-        if row >= 0.0:
-                var grid_top := _grid.get_global_rect().position.y
-                var feed_top := _feed_scroll.get_global_rect().position.y
-                var anchor := grid_top + row - feed_top
-                _feed_scroll.scroll_vertical = clampi(int(round(anchor)), 0,
-                                1000000)
-        else:
-                _feed_scroll.scroll_vertical = clampi(int(round(v)), 0, 1000000)
+        var target := v
+        if t_idx >= 0 and t_idx < _grid.get_child_count():
+                var c := _grid.get_child(t_idx)
+                if c is Control and (c as Control).is_visible_in_tree():
+                        # off = tile_top - feed_top = tile_content_y - scroll.
+                        # scroll_new = scroll_now + (off_now - off_launch).
+                        var off_now := (c as Control).get_global_rect().position.y \
+                                - _feed_scroll.get_global_rect().position.y
+                        target = float(_feed_scroll.scroll_vertical) \
+                                + (off_now - t_off)
+        _feed_scroll.scroll_vertical = clampi(int(round(target)), 0, 1000000)
         _strip_scroll.scroll_horizontal = clampi(int(round(sh)), 0, 1000000)

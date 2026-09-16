@@ -106,7 +106,9 @@ func _goga_input(_event: InputEvent) -> void:
 
 func set_score(v: int) -> void:
         score = v
-        _score_label.text = str(v)
+        # null-safe: probes boot games without the host chrome
+        if _score_label != null:
+                _score_label.text = str(v)
 
 func add_score(v: int) -> void:
         set_score(score + v)
@@ -114,7 +116,8 @@ func add_score(v: int) -> void:
 ## In-world GOGACoin pickups go through here (they ARE GOGACoins).
 func add_run_coins(v: int) -> void:
         run_coins += v
-        _coins_label.text = str(run_coins)
+        if _coins_label != null:
+                _coins_label.text = str(run_coins)
 
 ## End the run. Host handles economy, saves, ads, and the UI.
 func finish_run(final_score: int, final_coins := -1) -> void:
