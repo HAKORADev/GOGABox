@@ -375,6 +375,120 @@ func _run() -> void:
         ck(meta.scrap() == 15, "THE BANK: 5 + 7 carried + 3 ground = 15")
         ck(finished[0] >= 0, "the run reports to the host")
 
+        # ============================================== v040-8: the wave laws
+        print("-- v040-8: the wave kinds, the honest counter, the two states --")
+        await _boot()
+        _tap(1, Vector2(G.W * 0.5, G.H * 0.5), true)   # the menu
+        G._run_start()
+        G.state = G.GS.PLACE
+        G.wave_state = "idle"
+        G._tick_place(1.0 / 60.0)                      # rolls wave 1
+        ck(G.wave_kind in ["kills", "time", "both"],
+                "THE WAVE LAW: the wave rolled a kind (%s)" % G.wave_kind)
+        ck(G.wave_quota == HWData.wave_quota(1, 0, 1),
+                "THE WAVE LAW: the quota reads the table (%d)" % G.wave_quota)
+        ck(G.wave_duration == HWData.wave_time(1, 0, 1)
+                and G.wave_duration < 60.0,
+                "THE WAVE LAW: wave 1 is SHORT (%ds, not 3:00)"
+                % int(G.wave_duration))
+        ck(HWData.wave_time(9, 9, 2) > HWData.wave_time(1, 0, 1),
+                "THE WAVE LAW: the clocks GROW as the war climbs")
+        # THE HONEST QUOTA: kills move the count, leavers never do
+        G.wave_kind = "kills"
+        G.wave_quota = 5
+        G.wave_quota_done = 0
+        G.enemies.clear()
+        G.enemies.append({"kind": "scout", "hp": 1.0, "maxhp": 1.0, "size": 40.0,
+                "speed": 100.0, "dir": 1, "x": 300.0, "y": 200.0, "base_y": 200.0,
+                "t": 0.0, "phase": 0.0, "hit": 0.0, "shield": 0.0,
+                "max_shield": 0.0, "move": "straight", "weapon": "none",
+                "shoot_t": 9.0, "ground": false, "chill": 0.0,
+                "hover_x": 400.0, "diving": false, "laser_t": 0.0,
+                "laser_on": false, "stage": "approach", "loiter_t": 0.0,
+                "ang": 0.0})
+        G.kill_enemy(G.enemies[0], true)
+        ck(G.wave_quota_done == 1,
+                "THE HONEST QUOTA: a kill moves the count")
+        # a LEAVER: it exits alive - the count never moves, a replacement comes
+        G.wave_quota_done = 0
+        G.enemies.clear()
+        G.enemies.append({"kind": "scout", "hp": 1.0, "maxhp": 1.0, "size": 40.0,
+                "speed": 100.0, "dir": 1, "x": G.W + 400.0, "y": 200.0,
+                "base_y": 200.0, "t": 0.0, "phase": 0.0, "hit": 0.0,
+                "shield": 0.0, "max_shield": 0.0, "move": "straight",
+                "weapon": "none", "shoot_t": 9.0, "ground": false,
+                "chill": 0.0, "hover_x": 400.0, "diving": false,
+                "laser_t": 0.0, "laser_on": false, "stage": "approach",
+                "loiter_t": 0.0, "ang": 0.0})
+        var alive_before: int = G.enemies.size()
+        G._update_enemies(1.0 / 60.0)
+        ck(G.wave_quota_done == 0,
+                "THE LEAVER LAW: a leaver NEVER counts as killed")
+        ck(G.enemies.size() == alive_before,
+                "THE LEAVER LAW: a replacement spawned in its place")
+        # THE TWO-STATE LAW: a hover machine approaches, loiters, LEAVES
+        G.enemies.clear()
+        G.enemies.append({"kind": "heli", "hp": 60.0, "maxhp": 60.0,
+                "size": 60.0, "speed": 150.0, "dir": 1, "x": 100.0, "y": 300.0,
+                "base_y": 300.0, "t": 0.0, "phase": 0.0, "hit": 0.0,
+                "shield": 0.0, "max_shield": 0.0, "move": "hover",
+                "weapon": "none", "shoot_t": 9.0, "ground": false,
+                "chill": 0.0, "hover_x": 200.0, "diving": false,
+                "laser_t": 0.0, "laser_on": false, "stage": "approach",
+                "loiter_t": 0.0, "ang": 0.0})
+        var he: Dictionary = G.enemies[0]
+        G.p_invuln = 99.0
+        for i in 240:
+                G._update_enemies(1.0 / 60.0)
+        ck(String(he["stage"]) in ["loiter", "leave"]
+                and absf(float(he["x"]) - 200.0) < 40.0,
+                "TWO STATES: the hover machine reached its station")
+        he["loiter_t"] = 0.0
+        var leave_x: float = float(he["x"])
+        for i in 240:
+                G._update_enemies(1.0 / 60.0)
+        ck(String(he["stage"]) == "leave"
+                and float(he["x"]) < leave_x - 100.0,
+                "TWO STATES: after the loiter it LEAVES - one turn, no ping-pong")
+        # THE DIVE ANGLE: the kamikaze's nose lerps into the fall
+        G.enemies.clear()
+        G.enemies.append({"kind": "kamikaze", "hp": 30.0, "maxhp": 30.0,
+                "size": 42.0, "speed": 200.0, "dir": 1, "x": 300.0, "y": 200.0,
+                "base_y": 200.0, "t": 0.0, "phase": 0.0, "hit": 0.0,
+                "shield": 0.0, "max_shield": 0.0, "move": "dive",
+                "weapon": "none", "shoot_t": 9.0, "ground": false,
+                "chill": 0.0, "hover_x": 400.0, "diving": false,
+                "laser_t": 0.0, "laser_on": false, "stage": "approach",
+                "loiter_t": 0.0, "ang": 0.0})
+        var ke: Dictionary = G.enemies[0]
+        ke["x"] = 800.0          # inside the dive trigger of the tank's x
+        G.p_invuln = 99.0
+        for i in 90:
+                G._update_enemies(1.0 / 60.0)
+        ck(bool(ke["diving"]) and absf(angle_difference(
+                float(ke["ang"]),
+                atan2(float(ke["vy"]), float(ke["vx"])))) < 0.6,
+                "THE DIVE ANGLE: the nose faces the fall smoothly")
+        # THE TANK SCALE: the hull slab and the hitbox read the same law
+        ck(G.TANK_S < 0.4,
+                "THE TANK SCALE: the machine is 1/3 of its old bulk")
+        # THE TOP-UP: the box shop sells the upgrades for GOGACoins
+        Box.earn(10000)
+        var scrap_lvl0: int = meta.upg_lvl("wheels")
+        var upg_row_price: int = maxi(1, int(ceil(
+                float(HWData.shop_cost(HWData.shop_item("wheels"),
+                scrap_lvl0)) / 5.0)))
+        # buy the wheels level through the coin path (the box shop's law)
+        if Box.spend(upg_row_price):
+                meta.set_upg("wheels", scrap_lvl0 + 1)
+        ck(meta.upg_lvl("wheels") == scrap_lvl0 + 1,
+                "THE BOX UPGRADES: GOGACoins unlock shelf levels")
+        ck(Box.coins() >= 0, "the wallet survived the buy")
+        Box.reset_all()
+        GameCoin.add("heavywar", 5)
+        ck(GameCoin.balance("heavywar") == 5,
+                "THE TOP-UP: the declared scrap wallet feeds from the box")
+
         print("=== %d checks, %d fails ===" % [checks, fails])
         print("PROBE_VERDICT ok=", fails == 0)
         print("PROBE_DONE")

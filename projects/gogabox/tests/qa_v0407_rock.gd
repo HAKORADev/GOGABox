@@ -349,11 +349,95 @@ func _sim_laws() -> void:
                 G.rp, G.rc_wallet(), G.md["upg_proj"], G.md["upg_dmg"],
                 G.md["golden_total"], sim])
 
+func _v0408_laws() -> void:
+        print("\n-- the v040-8 laws (bounce, open walls, bursts, top-up) --")
+        await _boot(true)
+        _tap(1, Vector2(400, 900), true)
+        G.probe_reset(11)
+        # THE BOUNCE LAW: the ground is a trampoline - a falling rock
+        # bounces and lives (nothing shatters on the floor anymore)
+        G.probe_spawn(0, 2, 90)
+        G.rocks[0]["x"] = G.W * 0.5
+        G.rocks[0]["y"] = G.ground_y - 260.0
+        G.rocks[0]["vx"] = 0.0
+        G.rocks[0]["vy"] = 300.0 * G.us
+        var alive0: int = G.rocks.size()
+        for i in 40:
+                G._rock_physics(1.0 / 60.0)
+        ck(G.rocks.size() == alive0, "BOUNCE LAW: the ground eats nothing")
+        ck(float(G.rocks[0]["vy"]) < 0.0,
+                "BOUNCE LAW: the rock rides UP off the floor")
+        # THE OPEN WALLS: a regular rock exits and frees its side seat
+        G.probe_spawn(1, 1, 40)
+        G.rocks[-1]["x"] = G.W - 30.0
+        G.rocks[-1]["vx"] = 620.0 * G.us
+        G.rocks[-1]["vy"] = 0.0
+        var side_before: int = G.side_count[1]
+        var n_before: int = G.rocks.size()
+        for i in 30:
+                G._rock_physics(1.0 / 60.0)
+        ck(G.rocks.size() == n_before - 1,
+                "OPEN WALLS: a regular rock leaves through the wall")
+        ck(G.side_count[1] == side_before - 1,
+                "OPEN WALLS: the side ledger frees the seat")
+        # THE PERSISTENCE LAW: a golden never leaves - it bounces back
+        G.probe_reset(12)
+        G.probe_spawn(1, 3, 400, true)
+        G.rocks[-1]["x"] = G.W - 60.0
+        G.rocks[-1]["vx"] = 800.0 * G.us
+        G.rocks[-1]["vy"] = 0.0
+        var g_before: int = G.rocks.size()
+        for i in 40:
+                G._rock_physics(1.0 / 60.0)
+        ck(G.rocks.size() == g_before and float(G.rocks[0]["vx"]) < 0.0,
+                "PERSISTENCE: the golden bounces off the wall, never leaves")
+        # THE BURST LAW: one director event pours 1..4 rocks
+        G.probe_reset(13)
+        G.heat = 0
+        var pours := 0
+        for i in 12:
+                G.spawn_t = 0.0
+                var b0: int = G.rocks.size()
+                G._spawn_director(0.016)
+                pours += G.rocks.size() - b0
+        ck(pours >= 12 and pours <= 48,
+                "BURST LAW: the spawner pours 1..4 an event (%d in 12)" % pours)
+        # THE GROUND LAUNCH: a rock thrown up, arcing, falling
+        var l0: int = G.rocks.size()
+        G._launch_up()
+        ck(G.rocks.size() == l0 + 1 and float(G.rocks[-1]["vy"]) < 0.0
+                and float(G.rocks[-1]["y"]) > G.ground_y - 300.0 * G.us
+                and int(G.rocks[-1]["side"]) == -1,
+                "GROUND LAUNCH: thrown up from the floor, no side seat")
+        # THE SHOT LAW: the ball is visible and flies at a visible speed
+        ck(G.BULLET_R == 13.0 and G.BULLET_SPEED == 920.0,
+                "SHOT LAW: 13px balls at 920px/s - seen climbing")
+        # THE TOP-UP FRAMEWORK: the adapters and the convert math
+        var rb0: int = GameCoin.balance("rockbreaker")
+        GameCoin.add("rockbreaker", 50)
+        ck(GameCoin.balance("rockbreaker") == rb0 + 50,
+                "TOPUP: rockbreaker's wallet grows through GameCoin")
+        ck(RBMeta.coin_balance() == rb0 + 50,
+                "TOPUP: the game reads the SAME store")
+        var hw0: int = GameCoin.balance("heavywar")
+        GameCoin.add("heavywar", 25)
+        ck(GameCoin.balance("heavywar") == hw0 + 25,
+                "TOPUP: heavywar's scrap grows through GameCoin")
+        ck(GameCoin.convert(10, 5.0) == 50,
+                "TOPUP: 10 GOGACoins at 5.0 = 50 game coins")
+        var carriers := GameCoin.games()
+        var ids := []
+        for r in carriers:
+                ids.append(String(r["id"]))
+        ck(ids.has("heavywar") and ids.has("rockbreaker"),
+                "TOPUP: both carriers declared - no hardcoded ids")
+
 func _ready() -> void:
         print("=== qa_v0407_rock: the ROCK BREAKER battery ===")
         await _static_laws()
         await _scene_laws()
         await _finish_laws()
+        await _v0408_laws()
         await _sim_laws()
         print("\n=== %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)

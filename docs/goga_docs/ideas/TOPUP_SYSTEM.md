@@ -1,5 +1,13 @@
 # TOP-UP SYSTEM — GOGACoins into game currencies (owner spec, v040-7 round)
 
+> **BUILT in v040-8.** The doc below is the contract it shipped against;
+> the living reference for the declaration is `core/game_coin.gd` + the
+> two `currency`/`coin_api` entries in `core/registry.gd`. The rates:
+> 1 GOGACoin = 5 SCRAP (Heavy War), 1 GOGACoin = 5 ROCKCOINS (Rock
+> Breaker) — the owner's "1 gogacoin is just 5 game coins depending on
+> what game". The game picker renders VERTICAL CARDS (the guide-view
+> law, the owner's v040-8 note).
+
 > The owner's own spec, verbatim-shaped into laws. DOCUMENT ONLY — nothing
 > here is built yet ("i will not do it now ofc"). When the owner
 > green-lights it, it becomes a `plans/PLAN_vX.Y.Z.md` task list and this
@@ -71,18 +79,22 @@ deep.
    currencies" preview updates as you type.
 6. TOP-UP → confirmation → done: GOGACoins consumed, game coins grown.
 
-## THE DECLARATION (what a game adds to join)
+## THE DECLARATION (what a game adds to join) — SHIPPED SHAPE (v040-8)
 
-The registry entry grows two fields (names final at build time):
+The registry entry grows two optional fields (exactly as built):
 
-- `currency`: the game's currency id + display name + icon (the widget
-  draws the game's own coin, not the GOGACoin).
-- `topup_rate`: the exchange rate — GOGACoins → one unit of the game's
-  currency (nn or 0.nnn).
+- `currency`: `{"name": "SCRAP", "rate": 5.0, "tint": Color}` — the
+  currency's display name, the exchange rate (GOGACoins → one unit),
+  and the tint the menus wear.
+- `coin_api`: the script path carrying the TWO STATIC CALLS the box
+  reads/writes:
+  - `static func coin_balance() -> int`
+  - `static func coin_add(n: int) -> void`
 
-The first carriers when this ships: Heavy War (scrap) and Rock Breaker
-(rockCoins) — the shelf's wallets, declared. Any future game with an
-in-game currency joins by declaring the pair.
+`GameCoin.games()` is the whole picker - a game with the declaration is
+in the list, a game without it is not. No game ids anywhere in the menu
+code. The adapters: `heavywar_meta.gd` (scrap) and
+`rockbreaker_meta.gd` (rockCoins).
 
 ## THE OPEN TECH NOTES (for the plan that builds this)
 

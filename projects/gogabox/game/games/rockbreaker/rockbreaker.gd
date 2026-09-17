@@ -86,14 +86,20 @@ const HP_BASE := 10.0           # THE HEAT CURVE: hp = (10 + 0.4 x heat)
 const HP_SLOPE := 0.4           #   x size x wobble - linear, unbounded
 const WOBBLE := 0.20            #   (+-20% per rock)
 
-const GRAVITY := 460.0          # the bounce physics
-const SPEED_MIN := 140.0
+const GRAVITY := 560.0          # the bounce physics
+const SPEED_MIN := 120.0
 const SPEED_MAX := 980.0
 const SPIN_RATE := 0.55         # the flip law: omega = vx / r * rate
+const FLOOR_BOUNCE := 0.82      # v040-8 THE BOUNCE LAW: the ground is a
+const GROUND_MIN_KICK := 320.0  # trampoline, never a shatterer (the
+                                # original's law): every rock bounces
 
 const SIDE_BUDGET := 15         # THE SIDES LAW: 15 alive spawns per side
 const SCREEN_CAP := 50          #   50 on screen, hold at 45+
 const HOLD_AT := 45
+const BURST_MAX := 4            # v040-8 THE BURST LAW: the spawner pours
+                                # 1..4 rocks per event (the original's
+                                # "tons of them at one time")
 
 const GOLDEN_EVERY := 300       # THE GOLDEN LAW (rockPoints since collect)
 const GOLDEN_HP_MIN := 300
@@ -102,8 +108,9 @@ const MYSTERY_EVERY := 120      # the mystery rock's counter
 const MYSTERY_HP_MIN := 250
 const MYSTERY_HP_MAX := 500
 
-const BULLET_SPEED := 1350.0
-const BULLET_R := 7.0
+const BULLET_SPEED := 920.0       # v040-8: a VISIBLE shot, not a laser
+const BULLET_R := 13.0            # v040-8: a real ball (was 7 - too small)
+const BULLET_TRAIL := 9           # the comet trail's points
 const FIRE_BASE := 4.0          # shots/s at projectile level 0 (CC law)
 const PROJ_CAP := 50            # THE UPGRADE LAW: the projectile cap
 const PROJ_PRICE0 := 12         #   12 x 1.75^n
@@ -510,6 +517,62 @@ func _skin_id() -> String:
 func _skin() -> Dictionary:
         return SKINS[_skin_id()]
 
+# =============================================== THE ASSETS (v040-8)
+## THE REAL ASSET LAW: the rocks, the cannon and the world are BAKED
+## textures (tools/v0408_rock_art.py + v0408_rock_world.py - the Crazy
+## Caves study sprites code-modified into our own), tinted at runtime by
+## the heat ramp. The sky is a real shader (fx/rock_sky.gdshader).
+const A := "res://assets/games/rockbreaker/"
+const STYLE_PREFIX := {"stone": "cave", "wood": "forest", "pixel": "pixel",
+        "neon": "neon", "candy": "candy"}
+const SIZE_TEX := {1: "s", 2: "s", 3: "m", 4: "l", 5: "l"}
+
+var _tex := {}                     # path -> Texture2D (loaded lazily)
+var _sky_a: ColorRect = null       # the two sky layers (the crossfade pair)
+var _sky_b: ColorRect = null
+var _sky_mat_a: ShaderMaterial = null
+var _sky_mat_b: ShaderMaterial = null
+
+func _tex_at(rel: String) -> Texture2D:
+        if not _tex.has(rel):
+                _tex[rel] = load(A + rel)
+        return _tex[rel]
+
+func _rock_tex(style: String, size: int) -> Texture2D:
+        return _tex_at("rocks/rock_%s_%s.png" % [style, SIZE_TEX[size]])
+
+func _far_prefix() -> String:
+        return STYLE_PREFIX.get(String(_theme()["style"]), "cave")
+
+## the place's sky recipe (derived from the place's own palette - dark
+## skies earn the stars and the moon automatically)
+const SUN_POS := [Vector2(0.78, 0.15), Vector2(0.24, 0.13),
+        Vector2(0.62, 0.11), Vector2(0.82, 0.18), Vector2(0.32, 0.14)]
+
+func _sky_params(p: Dictionary, i: int) -> Dictionary:
+        var top: Color = (p["sky"] as Array)[0]
+        var bot: Color = (p["sky"] as Array)[1]
+        var dark: bool = top.get_luminance() < 0.22
+        var glow: Color = p["glow"]
+        var sun := Color(1.0, 0.88, 0.55) if glow.a <= 0.0 \
+                else Color(glow.r, glow.g, glow.b)
+        return {
+                "col_top": Vector3(top.r, top.g, top.b),
+                "col_bot": Vector3(bot.r, bot.g, bot.b),
+                "sun_col": Vector3(sun.r, sun.g, sun.b),
+                "sun_pos": SUN_POS[i % 5],
+                "moon": 1.0 if dark else 0.0,
+                "stars": 1.0 if dark else 0.0,
+                "cloud_col": Vector3(minf(1.0, bot.r + 0.25),
+                        minf(1.0, bot.g + 0.25), minf(1.0, bot.b + 0.25)),
+                "cloud_amt": 0.42 if dark else 0.6,
+                "seed": float(p["seed"]),
+        }
+
+func _apply_sky(mat: ShaderMaterial, prm: Dictionary) -> void:
+        for k in prm:
+                mat.set_shader_parameter(k, prm[k])
+
 ## the pause END is a RUN-LIVE row only (the endless run banks here)
 func _goga_pause_end_ok() -> bool:
         return phase == "play"
@@ -550,6 +613,26 @@ func _layout() -> void:
 
 func _build_world() -> void:
         _layout()
+        # THE SKY (the shader law): two full-screen layers - the crossfade
+        # blends the place's sky recipe from A into B while the run walks
+        var sh: Shader = load("res://game/games/rockbreaker/fx/rock_sky.gdshader")
+        _sky_mat_a = ShaderMaterial.new()
+        _sky_mat_a.shader = sh
+        _sky_mat_b = ShaderMaterial.new()
+        _sky_mat_b.shader = sh
+        _sky_a = ColorRect.new()
+        _sky_a.material = _sky_mat_a
+        _sky_a.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _sky_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _sky_b = ColorRect.new()
+        _sky_b.material = _sky_mat_b
+        _sky_b.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _sky_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        add_child(_sky_a)
+        add_child(_sky_b)
+        _apply_sky(_sky_mat_a, _sky_params(_place(), place_i))
+        _apply_sky(_sky_mat_b, _sky_params(_place(), place_i))
+        _sky_b.modulate.a = 0.0
         bg_layer = Node2D.new()
         add_child(bg_layer)
         bg_layer.draw.connect(_draw_bg)
@@ -780,7 +863,9 @@ func _total_rocks() -> int:
 
 # ------------------------------------------------- the place walker
 ## THE FIVE PLACES LAW: the run walks the theme's five views on
-## rockPoints, a calm crossfade between them.
+## rockPoints, a calm crossfade between them - the SKY crossfades through
+## the two shader layers while the far strip + ground crossfade in the
+## draw pass.
 func _place_walk() -> void:
         if rp >= place_next:
                 place_next += PLACE_EVERY
@@ -788,8 +873,18 @@ func _place_walk() -> void:
                 var th: Dictionary = _theme()
                 place_i = (place_i + 1) % (th["places"] as Array).size()
                 place_fade = 0.0
+                # the sky handover: A keeps the old recipe, B takes the new
+                if _sky_mat_a != null:
+                        var ps: Array = th["places"]
+                        _apply_sky(_sky_mat_a, _sky_params(
+                                ps[place_from % ps.size()], place_from))
+                        _apply_sky(_sky_mat_b, _sky_params(
+                                ps[place_i % ps.size()], place_i))
+                        _sky_b.modulate.a = 0.0
         if place_fade < 1.0:
                 place_fade = minf(1.0, place_fade + _goga_dt() / PLACE_FADE)
+                if _sky_b != null:
+                        _sky_b.modulate.a = place_fade
 
 var _dt_acc := 1.0 / 60.0
 var _save_t := 0.0
@@ -798,9 +893,12 @@ func _goga_dt() -> float:
 
 # ------------------------------------------------- the spawn director
 ## THE SIDES LAW: rocks enter from the LEFT and RIGHT walls at random
-## heights, angles and speeds; at most 15 alive side-spawns per side;
-## the screen holds at most 50; at 45+ the spawner holds its breath
-## until the herd thins. Golden and mystery ride their own counters.
+## heights, angles and speeds (wide ranges - no fixed lanes); at most 15
+## alive side-spawns per side; the screen holds at most 50; at 45+ the
+## spawner holds its breath until the herd thins. v040-8 THE BURST LAW:
+## each spawn event pours 1..4 rocks (the original's "tons of them at
+## one time"), and every event can also LAUNCH a rock up from the
+## ground - it flies, arcs, and falls (the original's throw law).
 func _spawn_director(delta: float) -> void:
         _dt_acc = delta
         # THE GOLDEN LAW: after every 300 rockPoints (counted from the
@@ -819,13 +917,41 @@ func _spawn_director(delta: float) -> void:
         spawn_t -= delta
         if spawn_t > 0.0:
                 return
-        var interval := maxf(1.15, 3.4 - float(heat) * 0.004)
-        spawn_t = interval * rng.randf_range(0.78, 1.25)
+        # THE WIDE CLOCK: the interval breathes over a wide range and
+        # tightens as the heat climbs (dynamic for long gameplay)
+        var interval := maxf(0.55, 1.9 - float(heat) * 0.003)
+        spawn_t = interval * rng.randf_range(0.55, 1.5)
         if rocks.size() >= HOLD_AT:
                 return                     # the hold law: 45+ waits
-        if side_count[0] >= SIDE_BUDGET or side_count[1] >= SIDE_BUDGET:
-                return                     # 15 alive spawns per side
-        _spawn_side_rock(-1 if rng.randf() < 0.5 else 1)
+        if rocks.size() >= SCREEN_CAP:
+                return
+        # THE BURST: 1..4 rocks per event, mixed sides and launches
+        var burst := mini(rng.randi_range(1, BURST_MAX),
+                HOLD_AT - rocks.size())
+        for i in burst:
+                var roll := rng.randf()
+                if roll < 0.3:
+                        _launch_up()       # thrown up, arcing, falling
+                else:
+                        var side := rng.randi_range(0, 1)
+                        if side_count[side] >= SIDE_BUDGET:
+                                side = 1 - side
+                        if side_count[side] >= SIDE_BUDGET:
+                                continue   # 15 alive spawns per side
+                        _spawn_side_rock(side)
+
+## THE GROUND LAUNCH (v040-8): a rock thrown UP from the ground - it
+## climbs, arcs, and falls back (the original's "throwed up then fall")
+func _launch_up() -> void:
+        var size := _pick_size()
+        var hp := rock_hp(heat, size, rng)
+        var r := _radius(size)
+        var x := rng.randf_range(120.0 * us, W - 120.0 * us)
+        var vy := -rng.randf_range(720.0, 1250.0) * us
+        var vx := rng.randf_range(-260.0, 260.0) * us
+        _add_rock(x, ground_y - r - 10.0 * us, vx, vy, size, hp, -1)
+        _dust(x, ground_y - 14.0 * us, size)
+        Jukebox.sfx("rb_ground", -12.0, rng.randf_range(0.8, 1.05))
 
 func _spawn_side_rock(side: int) -> void:
         var size := _pick_size()
@@ -844,17 +970,22 @@ func _spawn_special(kind: String) -> void:
 func _spawn_side_rock_ex(side: int, size: int, hp: int, golden: bool,
                 mystery: bool, gift: String) -> void:
         var r := _radius(size, golden, mystery)
-        # the upper band: a long descent - the shoot window is the run's
-        # bread and butter (the ground eats what you leave)
-        var y := rng.randf_range(arena_top + r + 60.0 * us,
-                minf(ground_y - r - 240.0 * us, arena_top + 640.0 * us))
-        var speed_base := rng.randf_range(240.0, 340.0)
+        # THE WIDE BAND: heights spread across the whole upper arena - no
+        # fixed lanes (the owner: "there is no high randomized ranges")
+        var y := rng.randf_range(arena_top + r + 40.0 * us,
+                minf(ground_y - r - 200.0 * us, arena_top + 760.0 * us))
+        # THE WIDE SPEED: the full design range, size-coefficient shaped
+        var speed_base := rng.randf_range(200.0, 760.0)
         speed_base *= float(SIZE_COEFF[size - 1])
         speed_base *= minf(1.6, 1.0 + float(heat) / 2500.0)
         speed_base *= us
-        var ang := rng.randf_range(-0.6, 0.6)    # into the arena, mixed
+        # THE WIDE ANGLE: mixed in-angles, sometimes thrown DOWN along the
+        # wall, sometimes flat - never one behavior
+        var ang := rng.randf_range(-0.75, 0.75)
         var vx := cos(ang) * speed_base
-        var vy := sin(ang) * speed_base * (0.5 if rng.randf() < 0.5 else -0.4)
+        var vy := sin(ang) * speed_base
+        if rng.randf() < 0.3:
+                vy = -absf(vy)            # lobbed upward as it enters
         if side == 1:
                 vx = -absf(vx)
         else:
@@ -904,20 +1035,20 @@ func _add_rock(x: float, y: float, vx: float, vy: float, size: int,
         })
 
 # ------------------------------------------------- the bounce physics
-## THE JUICE LAW: gravity, elastic walls, spin flips and squash. THE
-## PERSISTENCE LAW: only the golden and the mystery rocks never leave
-## - they bounce off the floor forever. A regular rock that reaches
-## the ground SHATTERS on it (dust, no pay - the ground eats it): the
-## herd thins by breaking AND by the floor, and the flood stays a flood.
+## THE JUICE LAW: gravity, spin flips and squash. v040-8 THE BOUNCE LAW:
+## the GROUND IS A TRAMPOLINE - every rock bounces off it (the original's
+## law, the owner: "rocks when hit the ground they get broken instead of
+## bouncing like the original game"). THE OPEN WALLS LAW: the side walls
+## are OPEN - a regular rock that slides past an edge EXITS (its side
+## seat frees), only the golden and the mystery rocks never leave (they
+## bounce off walls + floor forever, the persistence law).
 func _rock_physics(delta: float) -> void:
         if phase == "boot":
                 return
         var sf := (SLOW_FACTOR if slow_t > 0.0 else 1.0)
         var left := WALL_T * us
         var right := W - WALL_T * us
-        var top := arena_top
         var floor_y := ground_y - 8.0 * us
-        var min_bounce := 300.0 * us
         var gone: Array = []
         for rk in rocks:
                 rk["cd"] = maxf(0.0, float(rk["cd"]) - delta)
@@ -928,56 +1059,66 @@ func _rock_physics(delta: float) -> void:
                 var y := float(d["y"]) + vy * delta
                 var r := float(d["r"])
                 var bounced := false
-                if x - r < left:
-                        x = left + r
-                        vx = absf(vx)
-                        bounced = true
-                elif x + r > right:
-                        x = right - r
-                        vx = -absf(vx)
-                        bounced = true
-                if y - r < top:
-                        y = top + r
-                        vy = absf(vy)
-                        bounced = true
                 var special := bool(d["golden"]) or bool(d["mystery"])
-                if y + r > floor_y:
-                        if special:
-                                y = floor_y - r
-                                vy = -maxf(absf(vy) * 0.98, min_bounce)
-                                vx *= 1.02
-                                bounced = true
-                        else:
-                                gone.append(rk)   # the ground eats it
+                # THE OPEN WALLS: regular rocks pass and exit; specials
+                # bounce (THE PERSISTENCE LAW)
+                if x - r > right + 40.0 * us or x + r < left - 40.0 * us:
+                        if not special:
+                                gone.append(rk)   # a clean exit - no dust
                                 continue
+                if special:
+                        if x - r < left:
+                                x = left + r
+                                vx = absf(vx)
+                                bounced = true
+                        elif x + r > right:
+                                x = right - r
+                                vx = -absf(vx)
+                                bounced = true
+                        if y - r < arena_top:
+                                y = arena_top + r
+                                vy = absf(vy)
+                                bounced = true
+                # THE BOUNCE LAW: every rock dances on the ground
+                if y + r > floor_y:
+                        y = floor_y - r
+                        var kick := maxf(absf(vy) * FLOOR_BOUNCE,
+                                GROUND_MIN_KICK * us)
+                        vy = -kick
+                        vx *= 0.985                        # the floor's grip
+                        bounced = true
+                        d["ground_hits"] = int(d.get("ground_hits", 0)) + 1
+                # the spin obeys the surface: a bounce flips it, the ride
+                # rolls it (the flip law)
                 var sp := Vector2(vx, vy).length()
                 if sp > SPEED_MAX * us:
                         var k := SPEED_MAX * us / sp
                         vx *= k
                         vy *= k
-                elif sp < SPEED_MIN * us and sp > 0.01:
-                        var k2 := SPEED_MIN * us / sp
-                        vx *= k2
-                        vy *= k2
                 d["x"] = x
                 d["y"] = y
                 d["vx"] = vx
                 d["vy"] = vy
                 if bounced:
                         d["omega"] = -float(d["omega"]) \
-                                * rng.randf_range(0.85, 1.15)
+                                * rng.randf_range(0.85, 1.15) \
+                                + vx / maxf(20.0, r) * SPIN_RATE
                         d["sq"] = 0.82
                         if absf(vx) > 240.0 * us or absf(vy) > 240.0 * us:
-                                Jukebox.sfx("rb_bounce", -18.0,
+                                Jukebox.sfx("rb_bounce", -16.0,
                                         rng.randf_range(0.9, 1.15))
+                                if float(d["y"]) > ground_y - r - 30.0 * us:
+                                        _ground_puff(x, floor_y, r)
+                else:
+                        d["omega"] = vx / maxf(20.0, r) * SPIN_RATE
                 d["rot"] = float(d["rot"]) + float(d["omega"]) * delta
                 d["sq"] = minf(1.0, float(d["sq"]) + delta * 2.2)
         for rk in gone:
-                _ground_shatter(rk)
+                _rock_exit(rk)
 
-## a regular rock meets the ground: dust, the side ledger frees, the
-## family tree dies with it (no rockPoints, no rockCoins)
-func _ground_shatter(rk: Dictionary) -> void:
+## a regular rock exits through an open wall: the side ledger frees, the
+## rock is gone quietly (no pay, no dust - the flood stays honest)
+func _rock_exit(rk: Dictionary) -> void:
         var i := rocks.find(rk)
         if i == -1:
                 return
@@ -985,8 +1126,19 @@ func _ground_shatter(rk: Dictionary) -> void:
         var side := int(rk["side"])
         if side >= 0 and side < 2:
                 side_count[side] = maxi(0, side_count[side] - 1)
-        _dust(float(rk["x"]), ground_y - 10.0 * us, int(rk["size"]))
-        Jukebox.sfx("rb_ground", -14.0, rng.randf_range(0.85, 1.1))
+
+## the ground bounce's dust puff (the floor is alive)
+func _ground_puff(x: float, floor_y: float, r: float) -> void:
+        for i in 3:
+                _push_fx("dust", x + rng.randf_range(-r, r) * 0.5,
+                        floor_y, rng.randf_range(-60.0, 60.0) * us,
+                        -rng.randf_range(20.0, 70.0) * us,
+                        rng.randf_range(0.3, 0.6), rng.randf_range(6.0, 13.0)
+                        * us, Color(0.7, 0.64, 0.56, 0.42))
+
+## THE FLOOR EATS NOTHING anymore (v040-8) - the old ground-shatter is
+## dead: every rock bounces (THE BOUNCE LAW), the herd thins by breaking
+## and by the open walls.
 
 # ------------------------------------------------------ the hold fire
 ## THE HOLD LAW: the right half fires ONLY while held; the cadence is
@@ -1006,17 +1158,23 @@ func _fire(delta: float) -> void:
                 _shoot()
 
 func _shoot() -> void:
-        var jitter := rng.randf_range(-1.0, 1.0) * 15.0 * us
+        var jitter := rng.randf_range(-1.0, 1.0) * 12.0 * us
+        # the muzzle rides the carriage texture's barrel top (v040-8)
+        var body_t := _tex_at("cannon/body_%s.png" % _skin_id())
+        var k := 226.0 * us / float(body_t.get_width())
+        var muzzle_y := ground_y - 4.0 * us \
+                - float(body_t.get_height()) * k + 12.0 * k
         bullets.append({
                 "x": cannon_x + jitter,
-                "y": ground_y - 104.0 * us,
+                "y": muzzle_y,
                 "vy": -BULLET_SPEED * us,
                 "r": BULLET_R * us,
                 "dmg": dmg_for(_dmg_lvl()),
+                "trail": [],
         })
         muzzle_t = 0.05
         muzzle_big = clampf((_proj_lvl()) / 50.0, 0.0, 1.0)
-        Jukebox.sfx("rb_shoot", -13.0, rng.randf_range(0.94, 1.08))
+        Jukebox.sfx("rb_shoot", -11.0, rng.randf_range(0.94, 1.08))
 
 func _proj_lvl() -> int:
         return int(md.get("upg_proj", 0))
@@ -1044,6 +1202,12 @@ func _bullets_tick(delta: float) -> void:
                         hit_i = _bullet_hit(d)
                         if hit_i != -1:
                                 break
+                # THE TRAIL: the comet remembers its climb
+                var tr: Array = d.get("trail", [])
+                tr.append(Vector2(float(d["x"]), float(d["y"])))
+                while tr.size() > BULLET_TRAIL:
+                        tr.pop_front()
+                d["trail"] = tr
                 if hit_i == -1 and float(d["y"]) >= arena_top - 60.0:
                         keep.append(b)
         bullets = keep
@@ -1434,17 +1598,23 @@ func _shop_open() -> void:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.add_child(box)
         sheet.add_child(sc)
-        box.add_child(Arc.fit_label("CANNON SKINS - the shots stay the "
-                        + "same, the carriage dresses up", 24, Arc.HOT, 560))
+        box.add_child(Arc.fit_label("CANNON SKINS", 24, Arc.HOT, 560))
         for id in SKINS:
                 box.add_child(_skin_row(id))
-        box.add_child(Arc.fit_label("THEMES - each owns its five places "
-                        + "AND its rock pack", 24, Arc.HOT, 560))
+        box.add_child(Arc.fit_label("THEMES", 24, Arc.HOT, 560))
         for id in THEMES:
                 box.add_child(_theme_row(id))
         var back := Arc.button("CLOSE", Vector2(560, 72), 26, Arc.GOOD,
                 func(): sheet_pop())
         sheet.add_child(back)
+        # THE TAP LAW (v040-8): a BoxScroll swallows raw touches - every
+        # button inside registers as a tappable (the heavywar shop law).
+        # Without this the buttons freeze on press and never activate.
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
 
 func _shop_reopen() -> void:
         sheet_pop()
@@ -1537,9 +1707,7 @@ func _upgrades_fill(sheet: VBoxContainer) -> void:
         sheet.add_child(sc)
         var pl := _proj_lvl()
         var pmax := pl >= PROJ_CAP
-        box.add_child(Arc.fit_label("PROJECTILE - more shots per second "
-                + "(now %d/s) - prices in rockcoins" % int(bps_for(pl)),
-                24, Arc.HOT, 560))
+        box.add_child(Arc.fit_label("PROJECTILE", 24, Arc.HOT, 560))
         if pmax:
                 box.add_child(Arc.on_row("PROJECTILE  %d/50  (MAX)" % pl))
         else:
@@ -1551,20 +1719,23 @@ func _upgrades_fill(sheet: VBoxContainer) -> void:
                         pb.disabled = true
                 box.add_child(pb)
         var dl := _dmg_lvl()
-        box.add_child(Arc.fit_label("DAMAGE - each shot hits for %d, "
-                + "the next level hits for %d" % [dmg_for(dl), dmg_for(dl + 1)],
-                24, Arc.HOT, 560))
+        box.add_child(Arc.fit_label("DAMAGE", 24, Arc.HOT, 560))
         var dp := dmg_price(dl)
         var db := Arc.button("DAMAGE  %d  -  %s" % [dl, fmt(dp)],
                 Vector2(560, 64), 22, Arc.ACCENT, func(): _buy_dmg())
         if rc_wallet() < dp:
                 db.disabled = true
         box.add_child(db)
-        box.add_child(Arc.fit_label("no third shelf - the cash upgrade "
-                + "stays in crazy caves", 20, Color(0.5, 0.42, 0.3), 560))
         var back := Arc.button("CLOSE", Vector2(560, 72), 26, Arc.GOOD,
                 func(): sheet_pop())
         sheet.add_child(back)
+        # THE TAP LAW (v040-8): registered tappables inside the scroll -
+        # the freeze-on-press is dead
+        for b in Arc._buttons_in(sc):
+                if b.disabled:
+                        continue
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                sc.register_tappable(b, Arc._tap_emitter(b))
 
 func _upgrades_reopen() -> void:
         sheet_pop()
@@ -1640,234 +1811,30 @@ func _draw_bg() -> void:
 
 func _draw_place(p: Dictionary, th: Dictionary, alpha: float) -> void:
         var d := bg_layer
-        var sky: Array = p["sky"]
-        var bands := 34
-        var band_h := H / float(bands)
-        for i in bands:
-                var tt := float(i) / float(bands - 1)
-                var col: Color = (sky[0] as Color).lerp(sky[1] as Color, tt)
-                col.a = alpha
-                d.draw_rect(Rect2(0, float(i) * band_h, W, band_h + 1.0), col)
-        var glow: Color = p["glow"]
-        if glow.a > 0.0:
-                var g := glow
-                g.a = glow.a * alpha
-                d.draw_rect(Rect2(0, 0, W, H), g)
-        var style := String(th["style"])
-        var rng := RandomNumberGenerator.new()
-        rng.seed = int(p["seed"])
-        _decor_far(d, style, p, rng, alpha)
-        _decor_near(d, style, p, rng, alpha)
-        # the ground: two tones + a lit top edge
-        var gcol: Color = p["ground"]
-        gcol.a = alpha
-        d.draw_rect(Rect2(0, ground_y, W, H - ground_y), gcol)
-        var g2: Color = p["ground2"]
-        g2.a = alpha
-        d.draw_rect(Rect2(0, ground_y + 46.0 * us, W, H - ground_y), g2)
-        var edge: Color = p["deco"]
-        edge.a = alpha
-        d.draw_rect(Rect2(0, ground_y - 6.0 * us, W, 8.0 * us), edge)
-        _decor_ground(d, style, p, rng, alpha)
+        var pi: int = (th["places"] as Array).find(p)
+        var prefix: String = STYLE_PREFIX.get(String(th["style"]), "cave")
+        # THE FAR LAYER: the baked scene strip (the cave theme wears the
+        # recolored study backgrounds) cover-cropped above the ground
+        var far: Texture2D = _tex_at("world/far_%s_%d.png" % [prefix, maxi(0, pi) % 5])
+        var fw := float(far.get_width())
+        var fh := float(far.get_height())
+        var dst_h := ground_y + 10.0
+        var dst_w := W
+        # COVER-CROP: the full height stays, the width slices to the aspect
+        var src_w := minf(fw, fh * dst_w / dst_h)
+        var src_x := (fw - src_w) * 0.5
+        d.draw_texture_rect_region(far,
+                Rect2(0, ground_y + 10.0 - dst_h, dst_w, dst_h),
+                Rect2(src_x, 0, src_w, fh), _alpha(Color(1, 1, 1, 1), alpha))
+        # THE GROUND: the baked strip (per theme), the cannon rides it
+        var gt: Texture2D = _tex_at("world/ground_%s.png" % prefix)
+        d.draw_texture_rect(gt, Rect2(0, ground_y - 4.0, W,
+                H - ground_y + 4.0), false, _alpha(Color(1, 1, 1, 1), alpha))
         # the side walls (the arena's skin)
         var wcol: Color = p["wall"]
         wcol.a = alpha
         d.draw_rect(Rect2(0, 0, WALL_T * us, ground_y), wcol)
         d.draw_rect(Rect2(W - WALL_T * us, 0, WALL_T * us, ground_y), wcol)
-
-## the far depth: silhouettes behind everything
-func _decor_far(d: Node2D, style: String, p: Dictionary,
-                rng: RandomNumberGenerator, alpha: float) -> void:
-        var col: Color = p["far"]
-        col.a = alpha * 0.9
-        var deco: Color = p["deco"]
-        deco.a = alpha * 0.75
-        match style:
-                "stone":
-                        # stalactites + wall bumps
-                        var n := rng.randi_range(5, 7)
-                        for i in n:
-                                var x := rng.randf_range(40.0, W - 40.0)
-                                var w2 := rng.randf_range(30.0, 78.0) * us
-                                var h2 := rng.randf_range(70.0, 190.0) * us
-                                d.draw_colored_polygon(PackedVector2Array([
-                                        Vector2(x - w2 * 0.5, arena_top - 4),
-                                        Vector2(x + w2 * 0.5, arena_top - 4),
-                                        Vector2(x + w2 * 0.12,
-                                                arena_top + h2)]), col)
-                        for i in 6:
-                                var x2 := rng.randf_range(30.0, W - 30.0)
-                                var y2 := rng.randf_range(arena_top + 120.0
-                                        * us, ground_y - 300.0 * us)
-                                var r2 := rng.randf_range(26.0, 70.0) * us
-                                d.draw_circle(Vector2(x2, y2), r2,
-                                        _alpha(col, 0.55))
-                "wood":
-                        for i in 5:
-                                var x := rng.randf_range(30.0, W - 30.0)
-                                var w2 := rng.randf_range(26.0, 52.0) * us
-                                d.draw_rect(Rect2(x - w2 * 0.5, arena_top
-                                        + 40.0 * us, w2, ground_y
-                                        - arena_top - 260.0 * us), col)
-                                var cy := arena_top + rng.randf_range(30.0,
-                                        90.0) * us
-                                d.draw_circle(Vector2(x, cy),
-                                        w2 * rng.randf_range(1.7, 2.4), deco)
-                                d.draw_circle(Vector2(x - w2, cy + 22.0 * us),
-                                        w2 * 1.3, _alpha(deco, 0.7))
-                                d.draw_circle(Vector2(x + w2, cy + 26.0 * us),
-                                        w2 * 1.25, _alpha(deco, 0.7))
-                "pixel":
-                        # blocky clouds + a stepped hill range
-                        for i in 4:
-                                var x := rng.randf_range(40.0, W - 120.0)
-                                var y := rng.randf_range(arena_top + 30.0
-                                        * us, arena_top + 220.0 * us)
-                                var cw := rng.randf_range(70.0, 150.0) * us
-                                var ch := 22.0 * us
-                                d.draw_rect(Rect2(x, y, cw, ch), col)
-                                d.draw_rect(Rect2(x + cw * 0.18, y - ch,
-                                        cw * 0.5, ch), col)
-                        var steps := 9
-                        for i in steps:
-                                var x := float(i) * W / float(steps)
-                                var hgt := (70.0 + 46.0 * float((i * 5 + 3)
-                                        % 4)) * us
-                                d.draw_rect(Rect2(x, ground_y - hgt,
-                                        W / float(steps) + 1.0, hgt), col)
-                "neon":
-                        # skyline with lit windows
-                        var x := 0.0
-                        while x < W:
-                                var bw := rng.randf_range(70.0, 150.0) * us
-                                var bh := rng.randf_range(120.0, 330.0) * us
-                                var rect := Rect2(x, ground_y - bh, bw + 2.0,
-                                        bh)
-                                d.draw_rect(rect, col)
-                                var wl: Color = p["glow"]
-                                wl.a = alpha * 0.5
-                                var wy := ground_y - bh + 18.0 * us
-                                while wy < ground_y - 16.0 * us:
-                                        var wx := x + 10.0 * us
-                                        while wx < x + bw - 14.0 * us:
-                                                if rng.randf() < 0.35:
-                                                        d.draw_rect(Rect2(wx,
-                                                                wy, 9.0 * us,
-                                                                12.0 * us), wl)
-                                                wx += 20.0 * us
-                                        wy += 26.0 * us
-                                x += bw + rng.randf_range(14.0, 50.0) * us
-                "candy":
-                        for i in 5:
-                                var x := rng.randf_range(20.0, W - 20.0)
-                                var r2 := rng.randf_range(50.0, 110.0) * us
-                                var y2 := ground_y - rng.randf_range(180.0,
-                                        330.0) * us
-                                d.draw_circle(Vector2(x, y2), r2, col)
-                                d.draw_circle(Vector2(x, y2), r2 * 0.62,
-                                        _alpha(deco, 0.6))
-
-## the near depth: accents in front of the far depth
-func _decor_near(d: Node2D, style: String, p: Dictionary,
-                rng: RandomNumberGenerator, alpha: float) -> void:
-        var col: Color = p["near"]
-        col.a = alpha
-        var deco: Color = p["deco"]
-        deco.a = alpha * 0.9
-        match style:
-                "stone":
-                        for i in 4:
-                                var x := rng.randf_range(40.0, W - 40.0)
-                                var w2 := rng.randf_range(22.0, 46.0) * us
-                                var h2 := rng.randf_range(40.0, 110.0) * us
-                                d.draw_colored_polygon(PackedVector2Array([
-                                        Vector2(x - w2 * 0.5, arena_top + 8),
-                                        Vector2(x + w2 * 0.5, arena_top + 8),
-                                        Vector2(x, arena_top + 8 + h2)]), col)
-                        for i in 3:
-                                var cx := rng.randf_range(60.0, W - 60.0)
-                                var cy := rng.randf_range(arena_top + 200.0
-                                        * us, ground_y - 340.0 * us)
-                                d.draw_circle(Vector2(cx, cy),
-                                        rng.randf_range(7.0, 14.0) * us, deco)
-                "wood":
-                        for i in 6:
-                                var x := rng.randf_range(20.0, W - 20.0)
-                                var y := rng.randf_range(arena_top + 160.0
-                                        * us, ground_y - 300.0 * us)
-                                var r2 := rng.randf_range(14.0, 34.0) * us
-                                d.draw_circle(Vector2(x, y), r2, col)
-                "pixel":
-                        for i in 5:
-                                var x := rng.randf_range(30.0, W - 70.0)
-                                var y := rng.randf_range(arena_top + 150.0
-                                        * us, ground_y - 330.0 * us)
-                                var s2 := rng.randf_range(16.0, 40.0) * us
-                                d.draw_rect(Rect2(x, y, s2, s2), col)
-                                if rng.randf() < 0.5:
-                                        d.draw_rect(Rect2(x + s2, y + s2
-                                                * 0.4, s2 * 0.6, s2 * 0.6),
-                                                deco)
-                "neon":
-                        var gl: Color = p["glow"]
-                        gl.a = alpha * 0.4
-                        for i in 3:
-                                var x := rng.randf_range(60.0, W - 60.0)
-                                d.draw_rect(Rect2(x - 3.0 * us, arena_top,
-                                        6.0 * us, ground_y - arena_top), gl)
-                "candy":
-                        for i in 4:
-                                var x := rng.randf_range(40.0, W - 40.0)
-                                var y := rng.randf_range(arena_top + 170.0
-                                        * us, ground_y - 320.0 * us)
-                                var stick := rng.randf_range(60.0, 130.0) * us
-                                d.draw_rect(Rect2(x - 4.0 * us, y, 8.0 * us,
-                                        stick), _alpha(deco, 0.8))
-                                d.draw_circle(Vector2(x, y),
-                                        rng.randf_range(20.0, 38.0) * us, col)
-
-func _decor_ground(d: Node2D, style: String, p: Dictionary,
-                rng: RandomNumberGenerator, alpha: float) -> void:
-        var deco: Color = p["deco"]
-        deco.a = alpha * 0.8
-        match style:
-                "stone":
-                        for i in 7:
-                                var x := rng.randf_range(20.0, W - 20.0)
-                                var y := rng.randf_range(ground_y + 20.0 * us,
-                                        H - 12.0 * us)
-                                d.draw_circle(Vector2(x, y),
-                                        rng.randf_range(6.0, 16.0) * us,
-                                        _alpha(deco, 0.6))
-                "wood":
-                        for i in 12:
-                                var x := rng.randf_range(14.0, W - 14.0)
-                                var y := rng.randf_range(ground_y + 10.0 * us,
-                                        H - 10.0 * us)
-                                d.draw_rect(Rect2(x, y, 4.0 * us,
-                                        12.0 * us), _alpha(deco, 0.7))
-                "pixel":
-                        for i in 8:
-                                var x := rng.randf_range(10.0, W - 30.0)
-                                var y := rng.randf_range(ground_y + 12.0 * us,
-                                        H - 24.0 * us)
-                                d.draw_rect(Rect2(x, y, 20.0 * us, 12.0 * us),
-                                        _alpha(deco, 0.55))
-                "neon":
-                        var gl: Color = p["glow"]
-                        gl.a = alpha * 0.35
-                        var y := ground_y + 18.0 * us
-                        while y < H:
-                                d.draw_rect(Rect2(0, y, W, 2.0 * us), gl)
-                                y += 26.0 * us
-                "candy":
-                        for i in 10:
-                                var x := rng.randf_range(14.0, W - 14.0)
-                                var y := rng.randf_range(ground_y + 14.0 * us,
-                                        H - 14.0 * us)
-                                d.draw_circle(Vector2(x, y),
-                                        rng.randf_range(5.0, 11.0) * us,
-                                        _alpha(deco, 0.75))
 
 func _alpha(c: Color, a: float) -> Color:
         var out := c
@@ -1884,6 +1851,27 @@ func _draw_rocks() -> void:
         rock_layer.draw_set_transform(Vector2(shk.x, shk.y), 0.0, Vector2.ONE)
         var th: Dictionary = _theme()
         var style := String(th["style"])
+        # THE PIXEL LAW reads crisp: nearest filtering while the pixel pack
+        # is on stage (the other materials keep the smooth sampling)
+        rock_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST \
+                if style == "pixel" else CanvasItem.TEXTURE_FILTER_LINEAR
+        # THE SHOTS: bigger balls with a comet trail (v040-8) - a shot you
+        # can SEE climbing (the owner: "i do not even see it going up")
+        for b in bullets:
+                var bd := b as Dictionary
+                var trail: Array = bd.get("trail", [])
+                for ti in trail.size():
+                        var tp: Vector2 = trail[ti]
+                        var ta := float(ti + 1) / float(trail.size() + 1)
+                        rock_layer.draw_circle(tp, float(bd["r"]) * (0.3
+                                + 0.5 * ta), Color(1.0, 0.86, 0.5,
+                                0.30 * ta))
+                rock_layer.draw_circle(Vector2(float(bd["x"]),
+                        float(bd["y"])), float(bd["r"]),
+                        Color(1.0, 0.94, 0.78))
+                rock_layer.draw_circle(Vector2(float(bd["x"]),
+                        float(bd["y"])), float(bd["r"]) * 0.45,
+                        Color(1, 1, 1))
         for rk in rocks:
                 _paint_rock(rock_layer, rk, style)
         rock_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -1905,99 +1893,54 @@ func _paint_rock(d: Node2D, rk: Dictionary, style: String) -> void:
         var sq := float(rk["sq"])
         var seed_v := float(rk["seed"])
         var ramp := ramp_color(ramp_index(hp0))
-        var body: Color = ramp["body"]
-        var facet: Color = ramp["facet"]
         var hot: float = ramp["hot"]
-        var outline := body.darkened(0.45)
-        # the theme's pack: the same heat, the theme's material
+        var tex := _rock_tex(style, size)
+        # THE TINT LAW: the baked grayscale base x the heat color = the
+        # rock's material wearing its heat (the color IS the level). Each
+        # material reads the ramp its own way (the theme's pack).
+        var tint: Color
         match style:
                 "wood":
-                        body = body.lerp(Color(0.52, 0.36, 0.2), 0.62)
-                        facet = facet.lerp(Color(0.72, 0.54, 0.32), 0.62)
-                        outline = body.darkened(0.42)
-                "pixel":
-                        body = body.lerp(Color(0.4, 0.55, 0.75), 0.3)
-                        facet = facet.lightened(0.08)
+                        tint = Color(0.62, 0.44, 0.26).lerp(
+                                Color(1.0, 0.62, 0.3), hot)
                 "neon":
-                        body = Color.from_hsv(wrapf(0.62 - hot * 0.62,
-                                0.0, 1.0), 0.62, 1.0)
-                        facet = body.lightened(0.45)
-                        outline = body.lightened(0.3)
+                        tint = Color.from_hsv(wrapf(0.62 - hot * 0.62,
+                                0.0, 1.0), 0.55, 1.0)
                 "candy":
-                        body = Color.from_hsv(wrapf(0.95 - hot * 0.62,
-                                0.0, 1.0), 0.34 + 0.3 * hot, 1.0)
-                        facet = body.lightened(0.4)
-                        outline = body.darkened(0.3)
+                        tint = Color.from_hsv(wrapf(0.95 - hot * 0.62,
+                                0.0, 1.0), 0.30 + 0.3 * hot, 1.0)
+                _:
+                        tint = ramp["body"].lightened(0.14)
         if golden:
-                body = Color(0.95, 0.78, 0.24)
-                facet = Color(1.0, 0.92, 0.55)
-                outline = Color(0.62, 0.44, 0.1)
+                tint = Color(1.0, 0.84, 0.3)
         if mystery:
-                body = Color(0.44, 0.3, 0.5)
-                facet = Color(0.62, 0.45, 0.68)
-                outline = Color(0.24, 0.15, 0.28)
+                tint = Color(0.62, 0.44, 0.72)
         # THE NEON FILL LAW: the glow is a filled halo, the body stays SOLID
         if style == "neon" or golden:
-                var gl := body
+                var gl := tint
                 gl.a = 0.16 + 0.06 * sin(_time * 5.0 + seed_v)
                 d.draw_circle(Vector2(x, y), r * 1.5, gl)
                 gl.a = 0.12
                 d.draw_circle(Vector2(x, y), r * 1.9, gl)
-        # the body: 9 faceted verts, rotated, squashed on bounce
+        # THE BODY: the baked texture, rotated, squashed on bounce - the
+        # sprite reads a touch wider than the collision circle (the art's
+        # irregular silhouette)
+        var s := r * 2.3
         d.draw_set_transform(Vector2(x, y), rot, Vector2(1.0, sq))
-        var n := 9
-        var pts := PackedVector2Array()
-        for i in n:
-                var a := TAU * float(i) / float(n)
-                var rr := r * _facet_k(seed_v, i)
-                pts.append(Vector2(cos(a) * rr, sin(a) * rr))
-        d.draw_colored_polygon(pts, body)
-        # the facets (the lighter faces)
-        for f in 3:
-                var i0 := (f * 3 + int(seed_v)) % n
-                var i1 := (i0 + 1) % n
-                var i2 := (i0 + 2) % n
-                var tri := PackedVector2Array([pts[i0] * 0.94,
-                        pts[i1] * 0.94, Vector2(0, 0)])
-                d.draw_colored_polygon(tri, _alpha(facet, 0.5 + 0.16 * f))
-        # the outline
-        var closed := pts.duplicate()
-        closed.append(pts[0])
-        d.draw_polyline(closed, outline, 3.0 * us)
-        d.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-        # the material extras
-        if style == "wood" and not golden and not mystery:
-                d.draw_circle(Vector2(x, y), r * 0.55,
-                        _alpha(facet, 0.55))
-                d.draw_arc(Vector2(x, y), r * 0.72, 0, TAU, 24,
-                        _alpha(outline, 0.5), 2.5 * us)
-                d.draw_arc(Vector2(x, y), r * 0.4, 0, TAU, 20,
-                        _alpha(outline, 0.35), 2.0 * us)
-        if style == "candy" and not golden and not mystery:
-                d.draw_circle(Vector2(x - r * 0.3, y - r * 0.34),
-                        r * 0.22, Color(1, 1, 1, 0.5))
-                for i in 5:
-                        var a := seed_v * 3.0 + float(i) * 2.4
-                        d.draw_circle(Vector2(x + cos(a) * r * 0.5,
-                                y + sin(a) * r * 0.5), 2.6 * us,
-                                Color(1, 1, 1, 0.65))
-        if style == "pixel" and not golden and not mystery:
-                d.draw_rect(Rect2(x - r * 0.5, y - r * 0.5, r, r),
-                        _alpha(facet, 0.4))
-        # THE CRACK LAW: the damage shows as dark webs
+        d.draw_texture_rect(tex, Rect2(-s * 0.5, -s * 0.5, s, s),
+                false, tint)
+        # THE CRACK LAW: the damage shows as baked webs over the body
         var frac := float(hp) / float(hp0)
         if frac < 0.72 and not golden and not mystery:
-                var cw := 2.4 * us
-                var col := _alpha(outline, 0.8)
-                d.draw_line(Vector2(x - r * 0.4, y - r * 0.2),
-                        Vector2(x + r * 0.05, y + r * 0.1), col, cw)
-                d.draw_line(Vector2(x + r * 0.05, y + r * 0.1),
-                        Vector2(x - r * 0.12, y + r * 0.5), col, cw)
-                if frac < 0.4:
-                        d.draw_line(Vector2(x + r * 0.1, y - r * 0.55),
-                                Vector2(x + r * 0.3, y - r * 0.05), col, cw)
-                        d.draw_line(Vector2(x + r * 0.3, y - r * 0.05),
-                                Vector2(x + r * 0.55, y + r * 0.3), col, cw)
+                var lvl := 1
+                if frac < 0.2:
+                        lvl = 3
+                elif frac < 0.4:
+                        lvl = 2
+                var ct := _tex_at("rocks/crack_%d.png" % lvl)
+                d.draw_texture_rect(ct, Rect2(-s * 0.5, -s * 0.5, s, s),
+                        false)
+        d.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
         # the heat shimmer on the hottest ramp (the top wears the glow)
         if hot > 0.86 and not golden and not mystery:
                 var hg := Color(1.0, 0.6, 0.2, 0.14 + 0.07
@@ -2043,56 +1986,47 @@ func _draw_char() -> void:
                 Vector2.ONE)
         var sk := _skin()
         var x := cannon_x
-        var body_y := ground_y - 52.0 * us
-        # the two wheels (THE RIDE LAW) - spoked and rolling
+        # THE CANNON (v040-8): the real carriage texture - the study's
+        # cart body rebuilt with our barrel, tinted by the skin, riding on
+        # our own SPINNING spoked wheels (the ride law)
+        var body_t := _tex_at("cannon/body_%s.png" % _skin_id())
+        var wheel_t := _tex_at("cannon/wheel_%s.png" % _skin_id())
+        var k := 226.0 * us / float(body_t.get_width())   # carriage scale
+        var bw := float(body_t.get_width()) * k
+        var bh := float(body_t.get_height()) * k
+        # the wheels sit on the ground, the carriage hangs on them; the
+        # barrel occupies the sprite's headroom above the cart
+        var wheel_y := ground_y - 46.0 * k
+        var body_bottom := ground_y - 4.0 * us
         for side: float in [-1.0, 1.0]:
-                var wx := x + side * 42.0 * us
-                var wy := ground_y - 28.0 * us
-                var wr := 27.0 * us
-                char_layer.draw_circle(Vector2(wx, wy), wr,
-                        sk["wheel"] as Color)
-                char_layer.draw_arc(Vector2(wx, wy), wr, 0, TAU, 24,
-                        (sk["rim"] as Color).darkened(0.2), 3.0 * us)
-                for i in 6:
-                        var a := wheel_rot + TAU * float(i) / 6.0
-                        char_layer.draw_line(Vector2(wx, wy),
-                                Vector2(wx + cos(a) * wr, wy + sin(a) * wr),
-                                _alpha(sk["rim"] as Color, 0.7), 3.0 * us)
-                char_layer.draw_circle(Vector2(wx, wy), 8.0 * us,
-                        sk["rim"] as Color)
-        # the carriage body
-        var bw := 128.0 * us
-        var bh := 44.0 * us
-        var brect := Rect2(x - bw * 0.5, body_y - bh * 0.5, bw, bh)
-        char_layer.draw_rect(brect, sk["body"] as Color)
-        char_layer.draw_rect(brect, Color(0, 0, 0, 0.25), false,
-                3.0 * us)
-        char_layer.draw_rect(Rect2(x - bw * 0.5, body_y - bh * 0.5, bw,
-                8.0 * us), _alpha(sk["rim"] as Color, 0.55))
-        # the barrel (up, the space invaders law) with the muzzle rim
-        var mw := 34.0 * us
-        var mh := 58.0 * us
-        var mrect := Rect2(x - mw * 0.5, body_y - bh * 0.5 - mh, mw, mh)
-        char_layer.draw_rect(mrect, sk["barrel"] as Color)
-        char_layer.draw_rect(mrect, Color(0, 0, 0, 0.28), false, 3.0 * us)
-        char_layer.draw_rect(Rect2(x - mw * 0.5 - 4.0 * us,
-                mrect.position.y, mw + 8.0 * us, 10.0 * us),
-                sk["rim"] as Color)
-        # the muzzle flash
+                var wx := x + side * 82.0 * k
+                var wr := 46.0 * k
+                var wsz := wr * 2.0
+                char_layer.draw_set_transform(Vector2(wx, wheel_y),
+                        wheel_rot * side, Vector2.ONE)
+                char_layer.draw_texture_rect(wheel_t,
+                        Rect2(-wsz * 0.5, -wsz * 0.5, wsz, wsz), false)
+        char_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+        # the carriage + barrel (one baked sprite, the barrel already seated)
+        char_layer.draw_texture_rect(body_t,
+                Rect2(x - bw * 0.5, body_bottom - bh, bw, bh), false)
+        # the muzzle flash rides the barrel top
+        var muzzle_y := body_bottom - bh + 12.0 * k
         if muzzle_t > 0.0:
                 var fl := clampf(muzzle_t / 0.05, 0.0, 1.0)
-                var fr := (10.0 + 16.0 * muzzle_big) * us * fl
-                char_layer.draw_circle(Vector2(x, mrect.position.y), fr,
+                var fr := (12.0 + 18.0 * muzzle_big) * k * 2.2 * fl
+                char_layer.draw_circle(Vector2(x, muzzle_y), fr,
                         Color(1.0, 0.88, 0.5, 0.8 * fl))
-                char_layer.draw_circle(Vector2(x, mrect.position.y),
+                char_layer.draw_circle(Vector2(x, muzzle_y),
                         fr * 0.5, Color(1, 1, 1, 0.9 * fl))
         # the shield bubble (the mystery gift)
         if shield > 0:
-                var sr := 92.0 * us
+                var sr := 110.0 * us
                 var pulse := 0.5 + 0.14 * sin(_time * 6.0)
-                char_layer.draw_circle(Vector2(x, body_y - 14.0 * us), sr,
+                var scy := body_bottom - bh * 0.55
+                char_layer.draw_circle(Vector2(x, scy), sr,
                         Color(0.5, 0.85, 1.0, 0.10 + 0.05 * pulse))
-                char_layer.draw_arc(Vector2(x, body_y - 14.0 * us), sr,
+                char_layer.draw_arc(Vector2(x, scy), sr,
                         0, TAU, 40, Color(0.6, 0.9, 1.0, 0.6 + 0.2 * pulse),
                         4.0 * us)
         char_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

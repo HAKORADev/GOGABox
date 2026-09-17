@@ -26,6 +26,21 @@ static func font_ui() -> FontFile:
                 _font_ui = load("res://assets/fonts/Kenney_Mini.ttf")
         return _font_ui
 
+## THE NUMBER LAW, box-side (v040-8): big counts read at a glance -
+## 999 stays "999", 1500 becomes "1.50K", 2500000 becomes "2.50M".
+static func short_num(n: int) -> String:
+        var v := float(absi(n))
+        var s := ""
+        if v < 1000.0:
+                s = str(n)
+        elif v < 1000000.0:
+                s = "%.2fK" % (v / 1000.0)
+        elif v < 1000000000.0:
+                s = "%.2fM" % (v / 1000000.0)
+        else:
+                s = "%.2fB" % (v / 1000000000.0)
+        return ("-" + s) if n < 0 else s
+
 # ------------------------------------------------------------------ builders
 
 static func label(txt: String, size: int, color := INK, use_display := true) -> Label:

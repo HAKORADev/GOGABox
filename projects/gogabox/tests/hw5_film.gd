@@ -7,7 +7,7 @@ extends Node
 ##        res://tests/hw5_film.tscn
 
 var G: GogaGame = null
-var shot_dir := "/home/z/my-project/gogabox/films/v040-6"
+var shot_dir := "/home/z/my-project/gogabox/films/v040-8hw"
 
 func _wait(t: float) -> void:
         await get_tree().create_timer(t, true).timeout
@@ -72,14 +72,16 @@ func _run() -> void:
         await _wait(0.5)
         await _shot("02_menu")
 
-        # the scrap shop sheet (menu button 2), then the box shop (button 3)
+        # the scrap shop sheet (menu button 2), then the box shop opens
+        # from the IN-GAME top bar (v040-8: the shop left the menu)
         G._menu_tap(Vector2(G.W / 2, G.H * 0.42 + 88.0 + 20.0 + 44.0))
         await _wait(0.7)
         await _shot("03_scrap_shop")
         if G._sheet_stack.size() > 0:
                 G.sheet_pop()
         await _wait(0.4)
-        G._menu_tap(Vector2(G.W / 2, G.H * 0.42 + (88.0 + 20.0) * 2.0 + 44.0))
+        Box.earn(2000)           # the upgrades shelf wears live GOGACoin prices
+        G._box_shop_open()
         await _wait(0.7)
         await _shot("03b_box_shop")
         if G._sheet_stack.size() > 0:

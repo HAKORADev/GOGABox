@@ -114,8 +114,15 @@ var cd_main := 0.0
 var cd_mg := 0.0
 var cd_rk := 0.0
 
-# wave director
+# wave director (v040-8 THE WAVE LAW: each wave rolls its own kind -
+# "kills" ends on the kill quota, "time" ends on the clock, "both" needs
+# BOTH; the clocks grow as the waves climb)
 var wave_state := "idle"       # idle/spawning/clearing/boss
+var wave_kind := "kills"
+var wave_quota := 0            # the kills the wave demands
+var wave_quota_done := 0
+var wave_duration := 60.0      # the time-limited waves' clock
+var drip_t := 0.0              # the time-kind's steady pour clock
 var spawn_list: Array = []
 var spawn_t := 0.0
 var wave_clock := 0.0
@@ -141,6 +148,12 @@ var touch_ui := false          # a real touch screen: the emulated mouse is dead
 # parallax scroll
 var scroll_x := 0.0
 
+# v040-8: the top-bar scrap chip's label + the tank scale law
+var scrap_lbl: Label = null
+const TANK_S := 0.34          # THE TANK SCALE: everything about the tank
+                              # is drawn 1/3 (the owner: "scale it down by
+                              # 3 times will make it good")
+
 func _goga_setup() -> void:
         ScaleRule.apply(get_window())
         var vp := get_viewport_rect().size
@@ -160,6 +173,17 @@ func _goga_setup() -> void:
         _run_reset()
         _build_world()
         _build_hw_hud()
+        # v040-8 THE SHOP SEAT LAW: the GOGABox SHOP is an IN-GAME top-bar
+        # button (top left, the usual seat) - it left the main menu (the
+        # menu is DEPLOY + SCRAP SHOP only).
+        add_hud_button("SHOP", func(): _box_shop_open())
+        # THE SCRAP WIDGET (the pop siege law): a chip in the TOP BAR next
+        # to the score/coins widgets - the bottom-left canvas widget is dead.
+        scrap_lbl = add_hud_chip("0")
+        _scrap_icon_in_chip()
+        # THE SCORE ICON LAW: the warbird rides INSIDE the box score chip
+        # (the pop siege icon law) - the separate kills panel is dead.
+        _score_icon_in_chip()
         _enter_intro()
 
 # =================================================================
@@ -702,7 +726,6 @@ func _draw_tank() -> void:
         if state == GS.OVER:
                 return
         var sk: Dictionary = _skin()
-        var o := _tank_origin()
         var edge: Color = sk["edge"]
         var lo: Color = sk["lo"]
         var mid: Color = sk["mid"]
@@ -710,11 +733,17 @@ func _draw_tank() -> void:
         var band: Color = sk["band"]
         var blink := _tank_blink()
         var alpha := 0.45 if blink else 1.0
-        # ground shadow: a soft squashed ellipse, not a blob
-        tank_draw.draw_set_transform(o + Vector2(0, -4), 0.0, Vector2(1.0, 0.20))
-        tank_draw.draw_circle(Vector2(0, 0), 200.0, Color(0, 0, 0, 0.34 * alpha))
-        tank_draw.draw_set_transform(Vector2(0, 0), 0.0, Vector2(1.0, 1.0))
         tank_draw.modulate = Color(1, 1, 1, alpha)
+        # v040-8 THE TANK SCALE: the whole machine draws through a 1/3
+        # transform in LOCAL coordinates - every proportion survives, the
+        # size obeys the owner's law
+        var org := _tank_origin()
+        tank_draw.draw_set_transform(org + Vector2(0, -4.0 * TANK_S), 0.0,
+                Vector2(TANK_S, TANK_S * 0.2))
+        tank_draw.draw_circle(Vector2(0, 0), 200.0,
+                Color(0, 0, 0, 0.34 * alpha))
+        tank_draw.draw_set_transform(org, 0.0, Vector2(TANK_S, TANK_S))
+        var o := Vector2.ZERO
 
         # ---------- WHEELS (big, visible, spinning) ----------
         for wx in _wheel_xs():
@@ -771,6 +800,7 @@ func _draw_tank() -> void:
                         Color(THEME["shield"], 0.10 * pulse))
                 tank_draw.draw_arc(sc, 235.0, 0, TAU, 48,
                         Color(THEME["shield"], 0.55 * pulse), 3.0)
+        tank_draw.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _steel_slab(o: Vector2, r: Rect2, top_c: Color, bot_c: Color,
                 edge: Color, band: Color, rivets: int) -> void:
@@ -993,6 +1023,11 @@ func _start_place() -> void:
 func _goga_tick(delta: float) -> void:
         if paused or state == GS.OVER:
                 return
+        # the top-bar scrap chip lives (the pop siege chip law)
+        if scrap_lbl != null and is_instance_valid(scrap_lbl):
+                var sv := str(p_scrap)
+                if scrap_lbl.text != sv:
+                        scrap_lbl.text = sv
         t_state += delta
         banner_t = maxf(0.0, banner_t - delta)
         p_recoil = maxf(0.0, p_recoil - delta * 8.0)
@@ -1038,6 +1073,10 @@ func _banner(txt: String, dur: float) -> void:
         banner_t = dur
 
 # ------------------------------------------------------------------ waves
+## v040-8 THE WAVE LAW: a wave rolls ONE of three kinds. KILLS: the wave
+## ends when the quota is killed (a leaver never counts - a replacement
+## spawns). TIME: survive the clock. BOTH: the clock AND the quota. The
+## clocks grow as the waves climb (no more 3:00 from wave one).
 func _tick_place(delta: float) -> void:
         _tick_world_scroll(delta, 1.0 + move_force * 0.0)
         wave_clock += delta
@@ -1052,45 +1091,115 @@ func _tick_place(delta: float) -> void:
                                 spawn_list.pop_front()
                                 _spawn_enemy()
                                 guard += 1
-                        if spawn_list.is_empty():
+                        # the TIME kind pours on a steady drip the whole clock
+                        if wave_kind == "time":
+                                drip_t -= delta
+                                if drip_t <= 0.0:
+                                        drip_t = HWData.wave_interval(wave,
+                                                _diff()) * randf_range(0.8, 1.25)
+                                        _spawn_enemy()
+                        if spawn_list.is_empty() and wave_kind != "time":
                                 wave_state = "clearing"
-                        # THE 3:00 LAW: at the cap the pour never stops
-                        if wave_clock >= HWData.WAVE_MAX_TIME:
-                                overbudget += 1
-                                if overbudget % 2 == 1:
-                                        spawn_list.append(spawn_t + 0.6)
-                                        spawn_list.append(spawn_t + 1.2)
-                                        if overbudget % 6 == 1:
-                                                wave_state = "spawning"
+                        if wave_clock >= wave_duration and wave_kind == "time":
+                                # the TIME kind's clock ran out: the wave wraps
+                                spawn_list.clear()
+                                _wave_wrap()
                 "clearing":
-                        if enemies.is_empty():
-                                if wave >= HWData.WAVES_PER_PLACE:
-                                        _spawn_boss()
-                                else:
-                                        wave += 1
-                                        wave_state = "idle"
-                                        _banner("WAVE %d / %d" % [wave, HWData.WAVES_PER_PLACE], 1.6)
-                                        p_hp = minf(p_hp_max, p_hp + 6.0)
-                                        Jukebox.sfx("rw_clear", -6.0)
+                        # BOTH keeps a slow drip until the quota is met
+                        if wave_kind == "both" and wave_quota_done < wave_quota:
+                                drip_t -= delta
+                                if drip_t <= 0.0:
+                                        drip_t = maxf(1.6, HWData.wave_interval(
+                                                wave, _diff()) * 2.0)
+                                        if enemies.size() < 60:
+                                                _spawn_enemy()
+                        var quota_ok := wave_quota_done >= wave_quota
+                        var clock_ok := wave_clock >= wave_duration
+                        var done := false
+                        match wave_kind:
+                                "kills":
+                                        done = quota_ok
+                                "both":
+                                        done = quota_ok and clock_ok
+                                _:
+                                        done = true
+                        if done:
+                                _wave_end()
+                        elif wave_clock >= wave_duration + 45.0:
+                                # the runaway brake: a wave can not stall forever
+                                _wave_end()
                 "boss":
                         pass
         # the press music rides the back half of the place
         if wave >= 6 and wave_state != "boss":
                 Jukebox.music(MUSIC_PRESS)
 
+## the TIME kind's clock ended: survivors retreat, the wave wraps
+func _wave_wrap() -> void:
+        _retreat_survivors()
+        _wave_end()
+
+## THE RETREAT (v040-8): a time/both wave that hits its clock sends its
+## survivors home - they turn around and LEAVE (they never count as
+## kills, they never come back)
+func _retreat_survivors() -> void:
+        for e in enemies:
+                var d: Dictionary = e
+                if String(d.get("kind", "")) == "boss":
+                        continue
+                d["leaving"] = true
+                d["dir"] = -1.0 if float(d["x"]) > W * 0.5 else 1.0
+                d["weapon"] = "none"
+
+func _wave_end() -> void:
+        if wave >= HWData.WAVES_PER_PLACE:
+                _retreat_survivors()
+                _spawn_boss()
+        else:
+                wave += 1
+                wave_state = "idle"
+                _banner("WAVE %d / %d" % [wave, HWData.WAVES_PER_PLACE], 1.6)
+                p_hp = minf(p_hp_max, p_hp + 6.0)
+                Jukebox.sfx("rw_clear", -6.0)
+
 func _wave_start() -> void:
-        var budget := HWData.wave_budget(wave, place_i, loop)
-        var iv := HWData.wave_interval(wave, _diff())
-        spawn_list = []
-        var tt := 0.0
-        for i in budget:
-                tt += iv * randf_range(0.7, 1.3)
-                spawn_list.append(tt)
-        spawn_t = 0.0
+        # THE ROLL: every wave draws its own kind (kills 4 / time 3 / both 3)
+        var roll := randi() % 10
+        wave_kind = "kills" if roll < 4 else ("time" if roll < 7 else "both")
+        wave_quota = HWData.wave_quota(wave, place_i, loop)
+        wave_quota_done = 0
+        wave_duration = HWData.wave_time(wave, place_i, loop)
         wave_clock = 0.0
         overbudget = 0
+        spawn_t = 0.0
+        drip_t = 0.0
+        var iv := HWData.wave_interval(wave, _diff())
+        spawn_list = []
+        if wave_kind == "time":
+                pass                                  # the drip pours it live
+        else:
+                # the quota (all of it, or the BOTH share) rides the list
+                var n := wave_quota if wave_kind == "kills" \
+                        else int(ceil(wave_quota * 0.7))
+                var tt := 0.0
+                for i in n:
+                        tt += iv * randf_range(0.7, 1.3)
+                        spawn_list.append(tt)
         wave_state = "spawning"
-        _banner("WAVE %d / %d" % [wave, HWData.WAVES_PER_PLACE], 1.6)
+        var kind_txt: String = {"kills": "DESTROY %d", "time": "SURVIVE %d:%02d",
+                "both": "DESTROY %d  IN  %d:%02d"}[wave_kind]
+        var kind_arg: Array
+        match wave_kind:
+                "kills":
+                        kind_arg = [wave_quota]
+                "time":
+                        kind_arg = [int(wave_duration) / 60,
+                                int(wave_duration) % 60]
+                "both":
+                        kind_arg = [wave_quota, int(wave_duration) / 60,
+                                int(wave_duration) % 60]
+        _banner("WAVE %d / %d  -  " % [wave, HWData.WAVES_PER_PLACE]
+                + (kind_txt % kind_arg), 2.2)
         Jukebox.sfx("rw_wave", -6.0)
 
 # ------------------------------------------------------------------ spawns
@@ -1118,7 +1227,10 @@ func _spawn_enemy(kind := "") -> void:
                 "shoot_t": randf_range(0.9, 2.2), "ground": def["move"] in ["ground", "static"],
                 "chill": 0.0, "hover_x": randf_range(W * 0.2, W * 0.8),
                 "diving": false, "laser_t": 0.0, "laser_on": false,
+                "stage": "approach", "loiter_t": 0.0, "ang": 0.0,
         }
+        if String(def["move"]) == "dive":
+                e["ang"] = 0.0 if int(e["dir"]) > 0 else PI
         e["base_y"] = e["y"]
         if e["move"] == "static":
                 e["x"] = randf_range(W * 0.2, W * 0.8)
@@ -1157,6 +1269,15 @@ func _update_enemies(delta: float) -> void:
                 if d["chill"] > 0.0:
                         d["chill"] -= delta
                 var spd: float = d["speed"] * (0.5 if d["chill"] > 0.0 else 1.0)
+                # THE RETREAT / LEAVE (v040-8): a leaver turns ONCE and goes
+                # - it never comes back, it never shoots again
+                if bool(d.get("leaving", false)):
+                        d["x"] += float(d["dir"]) * spd * 1.6 * delta
+                        d["y"] = float(d["base_y"]) \
+                                + sin(d["t"] * 1.7) * 10.0
+                        if d["x"] < -380.0 or d["x"] > W + 380.0:
+                                dead.append(d)
+                        continue
                 match String(d["move"]):
                         "straight":
                                 d["x"] += d["dir"] * spd * delta
@@ -1172,27 +1293,40 @@ func _update_enemies(delta: float) -> void:
                                 d["x"] += d["dir"] * spd * delta
                                 d["y"] = d["base_y"] + sin(d["t"] * 1.8 + d["phase"]) * 30.0
                         "hover":
-                                if absf(d["x"] - float(d["hover_x"])) > 26.0 \
-                                                and not bool(d.get("arrived", false)):
-                                        d["x"] += signf(float(d["hover_x"]) - float(d["x"])) \
-                                                * spd * delta
-                                        if absf(d["x"] - float(d["hover_x"])) <= 26.0:
-                                                d["arrived"] = true
-                                                d["dir"] = 1 if randf() < 0.5 else -1
-                                else:
-                                        d["x"] += d["dir"] * spd * 0.55 * delta
-                                        if d["x"] < 130.0:
-                                                d["x"] = 130.0
-                                                d["dir"] = 1
-                                        elif d["x"] > W - 130.0:
-                                                d["x"] = W - 130.0
-                                                d["dir"] = -1
+                                # THE TWO-STATE LAW (v040-8): a station machine
+                                # APPROACHES its hover point, LOITERS there
+                                # shooting for a while, then LEAVES for good -
+                                # it never ping-pongs across the sky (the
+                                # owner: "make it two behavior states")
+                                var stage := String(d.get("stage", "approach"))
+                                match stage:
+                                        "approach":
+                                                d["x"] += signf(float(d["hover_x"]) \
+                                                        - float(d["x"])) * spd * delta
+                                                if absf(d["x"] \
+                                                                - float(d["hover_x"])) <= 24.0:
+                                                        d["stage"] = "loiter"
+                                                        d["arrived"] = true
+                                                        d["loiter_t"] = \
+                                                                randf_range(6.0, 9.5)
+                                        "loiter":
+                                                d["loiter_t"] = float(d.get(
+                                                        "loiter_t", 7.0)) - delta
+                                                if float(d["loiter_t"]) <= 0.0:
+                                                        d["stage"] = "leave"
+                                                        d["weapon"] = "none"
+                                                        d["laser_on"] = false
+                                                        d["dir"] = -1 \
+                                                                if float(d["x"]) < W * 0.5 else 1
+                                        "leave":
+                                                d["x"] += float(d["dir"]) \
+                                                        * spd * 1.55 * delta
                                 d["y"] = d["base_y"] + sin(d["t"] * 1.7) * 14.0
                         "dive":
                                 if not bool(d["diving"]) and absf(d["x"] - p_x) < 340.0:
                                         d["diving"] = true
-                                        var ang := atan2((GROUND_Y - 90.0) - float(d["y"]),
-                                                p_x - float(d["x"]))
+                                        var ang := atan2((GROUND_Y - 90.0 * TANK_S) \
+                                                - float(d["y"]), p_x - float(d["x"]))
                                         d["vx"] = cos(ang) * 380.0
                                         d["vy"] = sin(ang) * 380.0
                                 if bool(d["diving"]):
@@ -1206,23 +1340,52 @@ func _update_enemies(delta: float) -> void:
                         "static":
                                 pass
                         "shadow":
-                                # the SHADOW LANCER: it haunts the sky ABOVE
-                                # the tank, drifting toward the tank's x
-                                if not bool(d.get("arrived", false)):
-                                        d["x"] += d["dir"] * spd * delta
-                                        if (d["dir"] > 0 and d["x"] >= p_x - 60.0) \
-                                                        or (d["dir"] < 0 and d["x"] <= p_x + 60.0):
-                                                d["arrived"] = true
-                                else:
-                                        var dx := p_x - float(d["x"])
-                                        d["x"] += clampf(dx, -spd * 0.62, spd * 0.62) * delta
+                                # the SHADOW LANCER: the same two-state law -
+                                # it haunts above the tank, then leaves
+                                var sstage := String(d.get("stage", "approach"))
+                                match sstage:
+                                        "approach":
+                                                d["x"] += d["dir"] * spd * delta
+                                                if (d["dir"] > 0 and d["x"] >= p_x - 60.0) \
+                                                                or (d["dir"] < 0 \
+                                                                and d["x"] <= p_x + 60.0):
+                                                        d["stage"] = "loiter"
+                                                        d["arrived"] = true
+                                                        d["loiter_t"] = \
+                                                                randf_range(6.5, 9.0)
+                                        "loiter":
+                                                var dx := p_x - float(d["x"])
+                                                d["x"] += clampf(dx, -spd * 0.62,
+                                                        spd * 0.62) * delta
+                                                d["loiter_t"] = float(d.get(
+                                                        "loiter_t", 7.0)) - delta
+                                                if float(d["loiter_t"]) <= 0.0:
+                                                        d["stage"] = "leave"
+                                                        d["weapon"] = "none"
+                                                        d["laser_on"] = false
+                                                        d["dir"] = -1 \
+                                                                if float(d["x"]) < W * 0.5 else 1
+                                        "leave":
+                                                d["x"] += float(d["dir"]) \
+                                                        * spd * 1.5 * delta
                                 d["y"] = d["base_y"] + sin(d["t"] * 1.3) * 12.0
+                # THE DIVE ANGLE (v040-8): the suicidal machines FACE the
+                # dive - their nose lerps smoothly into the fall
+                if String(d["move"]) == "dive":
+                        var want := 0.0 if float(d["dir"]) > 0.0 else PI
+                        if bool(d["diving"]):
+                                want = atan2(float(d.get("vy", 0.0)),
+                                        float(d.get("vx", 1.0)))
+                        d["ang"] = lerp_angle(float(d.get("ang", want)),
+                                want, minf(1.0, delta * 6.5))
                 # weapons
                 if String(d["weapon"]) != "none" and p_invuln <= 0.0:
                         var can := true
                         if String(d["move"]) in ["hover", "shadow"] \
                                         and not bool(d.get("arrived", false)):
                                 can = false
+                        if String(d.get("stage", "")) == "leave":
+                                can = false          # a leaver never shoots
                         if can:
                                 d["shoot_t"] -= delta
                                 if float(d["shoot_t"]) <= 0.0:
@@ -1253,7 +1416,7 @@ func _update_enemies(delta: float) -> void:
                 if String(d["move"]) == "dive" and bool(d["diving"]) \
                                 and d["y"] > GROUND_Y - 30.0:
                         _explode(d["x"], GROUND_Y - 20.0, 0.9)
-                        if absf(d["x"] - p_x) < 110.0:
+                        if absf(d["x"] - p_x) < 110.0 * TANK_S:
                                 _damage_player(14.0)
                         kill_enemy(d, false)
                         dead.append(d)
@@ -1263,10 +1426,20 @@ func _update_enemies(delta: float) -> void:
                         continue
         for d in dead:
                 _enemy_dead_cleanup(d)
+                # THE LEAVER LAW (v040-8): an enemy that leaves the screen
+                # alive NEVER counts toward the wave - a replacement spawns
+                # so the quota stays honest and reachable (the owner: "it
+                # should not get counted and it should spawn another one")
+                if state == GS.PLACE and wave_state in ["spawning", "clearing"] \
+                                and wave_quota_done < wave_quota \
+                                and not bool(d.get("leaving", false)) \
+                                and String(d.get("kind", "")) != "boss" \
+                                and enemies.size() < 70:
+                        _spawn_enemy()
 
 func _enemy_fire(e: Dictionary) -> void:
         var src := Vector2(e["x"], e["y"] + e["size"] * 0.2)
-        var tgt := Vector2(p_x, GROUND_Y - 100.0)
+        var tgt := Vector2(p_x, GROUND_Y - 100.0 * TANK_S)
         var ang := (tgt - src).angle()
         var col: Color = HWData.PLACES[place_i % 10]["accent"]
         match String(e["weapon"]):
@@ -1467,7 +1640,7 @@ func _update_boss(b: Dictionary, delta: float) -> void:
                 _spawn_enemy()
 
 func _boss_attack(b: Dictionary, enraged: bool) -> void:
-        var aim := atan2((GROUND_Y - 100.0) - float(b["y"]), p_x - float(b["x"]))
+        var aim := atan2((GROUND_Y - 100.0 * TANK_S) - float(b["y"]), p_x - float(b["x"]))
         var cycle := int(b["weapon_cycle"])
         b["weapon_cycle"] = cycle + 1
         var n := 9 if enraged else 7
@@ -1584,11 +1757,12 @@ func _update_player(delta: float) -> void:
         # move: the analog force from the LEFT zone
         var spd := 240.0 * (1.0 + _shop_lvl("wheels") * 0.12) \
                 * (1.0 + float(buffs["speed"]))
-        p_x = clampf(p_x + move_force * spd * delta, 140.0, W - 140.0)
+        p_x = clampf(p_x + move_force * spd * delta, 110.0, W - 110.0)
         if absf(move_force) > 0.02:
                 p_wheel_spin += move_force * delta * 11.0
-        # aim: the RIGHT zone finger, else dead ahead
-        var pivot := Vector2(p_x, GROUND_Y - 284.0)
+        # aim: the RIGHT zone finger, else dead ahead (the pivot rides the
+        # tower top - SCALED with the tank since v040-8)
+        var pivot := Vector2(p_x, GROUND_Y - 284.0 * TANK_S)
         if aim_ptr != -1 or mouse_aim:
                 var a := (aim_pos - pivot).angle()
                 if a > -0.06 and a < PI / 2:
@@ -1628,14 +1802,14 @@ func _main_dmg() -> float:
                 * (1.0 + float(buffs["dmg"]) + float(c) * 0.22)
 
 func _fire_main() -> void:
-        var pivot := Vector2(p_x, GROUND_Y - 284.0)
+        var pivot := Vector2(p_x, GROUND_Y - 284.0 * TANK_S)
         var n := 1 + int(buffs["multi"])
         for i in n:
                 var a := p_aim + (i - (n - 1) / 2.0) * 0.09 + randf_range(-0.008, 0.008)
                 var crit := randf() < float(buffs["crit"])
                 var s := {
-                        "x": pivot.x + cos(p_aim) * 128.0,
-                        "y": pivot.y + sin(p_aim) * 128.0,
+                        "x": pivot.x + cos(p_aim) * 44.0,
+                        "y": pivot.y + sin(p_aim) * 44.0,
                         "vx": cos(a) * 1250.0, "vy": sin(a) * 1250.0,
                         "dmg": _main_dmg() * (2.0 if crit else 1.0),
                         "crit": crit, "pierce": int(buffs["pierce"]),
@@ -1646,7 +1820,7 @@ func _fire_main() -> void:
         p_recoil = 1.0
         shake = minf(shake + 0.7, 5.0)
         Jukebox.sfx("rw_cannon", -4.0)
-        _muzzle(pivot + Vector2.from_angle(p_aim) * 130.0)
+        _muzzle(pivot + Vector2.from_angle(p_aim) * 45.0)
 
 ## THE MG LAW: the barrels point UP ONLY - a fixed small splay outward,
 ## never the aim. The rack levels add one more barrel per side.
@@ -1655,8 +1829,8 @@ func _fire_mg() -> void:
         var dmg := 3.2 * (1.0 + float(_shop_lvl("mg_rack")) * 0.15) \
                 * (1.0 + float(buffs["dmg"]))
         for mx in xs:
-                var bx := p_x + float(mx)
-                var by := GROUND_Y - 208.0
+                var bx := p_x + float(mx) * TANK_S
+                var by := GROUND_Y - 208.0 * TANK_S
                 var a := -PI / 2 + (0.10 if float(mx) < 0.0 else -0.10) \
                         + randf_range(-0.035, 0.035)
                 shots.append({
@@ -1679,8 +1853,8 @@ func _fire_rockets() -> void:
         var alive := enemies.duplicate()
         alive.shuffle()
         for i in xs.size():
-                var rx := p_x + float(xs[i])
-                var by := GROUND_Y - 124.0
+                var rx := p_x + float(xs[i]) * TANK_S
+                var by := GROUND_Y - 124.0 * TANK_S
                 var tgt: Dictionary = {}
                 if not alive.is_empty():
                         tgt = alive[i % alive.size()]
@@ -1792,7 +1966,7 @@ func _update_eshots(delta: float) -> void:
                 var d: Dictionary = s
                 d["t"] += delta
                 if float(d.get("homing", 0.0)) > 0.0:
-                        var ang := (Vector2(p_x, GROUND_Y - 90.0)
+                        var ang := (Vector2(p_x, GROUND_Y - 90.0 * TANK_S)
                                 - Vector2(d["x"], d["y"])).angle()
                         var cur := Vector2(d["vx"], d["vy"]).angle()
                         var na := cur + clampf(angle_difference(cur, ang),
@@ -1823,20 +1997,22 @@ func _update_eshots(delta: float) -> void:
                                 shake = minf(shake + 7.0, 15.0)
                                 Jukebox.sfx("rw_boom_big", -4.0)
                                 var dist: float = absf(d["x"] - p_x)
-                                if dist < 175.0:
-                                        _damage_player(roundf(22.0 * (1.0 - dist / 175.0)) + 6.0)
+                                if dist < 175.0 * TANK_S:
+                                        _damage_player(roundf(22.0 * (1.0 - dist / (175.0 * TANK_S))) + 6.0)
                         elif d["kind"] == "bomb":
                                 _explode(d["x"], GROUND_Y - 8.0, 0.75)
-                                if absf(d["x"] - p_x) < 110.0:
+                                if absf(d["x"] - p_x) < 110.0 * TANK_S:
                                         _damage_player(float(d["dmg"]))
                         else:
                                 _explode(d["x"], GROUND_Y - 8.0, 0.5)
                         dead.append(d)
                         continue
-                # tank hitbox: the wide hull slabs + the tall turret column
-                if (absf(d["x"] - p_x) < 188.0 and d["y"] > GROUND_Y - 140.0) \
-                                or (absf(d["x"] - p_x) < 62.0 \
-                                and d["y"] > GROUND_Y - 316.0):
+                # tank hitbox (v040-8: scaled with the tank) - the wide hull
+                # slabs + the tall turret column
+                if (absf(d["x"] - p_x) < 188.0 * TANK_S \
+                                and d["y"] > GROUND_Y - 140.0 * TANK_S) \
+                                or (absf(d["x"] - p_x) < 62.0 * TANK_S \
+                                and d["y"] > GROUND_Y - 316.0 * TANK_S):
                         _damage_player(float(d["dmg"]))
                         _explode(d["x"], d["y"], 0.5)
                         dead.append(d)
@@ -1957,6 +2133,12 @@ func kill_enemy(e: Dictionary, pay: bool) -> void:
         # SCORE = KILLS (the owner's law): one kill, one point
         set_score(score + 1)
         coin_kills += 1
+        # THE HONEST QUOTA (v040-8): only a real kill moves the wave's
+        # kill count - a leaver never counts (a replacement keeps the
+        # field full instead)
+        if not is_boss and state == GS.PLACE \
+                        and wave_state in ["spawning", "clearing"]:
+                wave_quota_done += 1
         # XP ORBS: one orb = ONE point (the owner's law). No +XP cheats.
         var def: Dictionary = HWData.ENEMIES.get(String(e["kind"]), {})
         var xp_base: int = int(def.get("xp", 8)) if not is_boss \
@@ -2048,7 +2230,7 @@ func _drop(pos: Vector2, kind: String, value: int) -> void:
 func _update_drops(delta: float) -> void:
         var dead: Array = []
         var mag := _magnet_radius()
-        var center := Vector2(p_x, GROUND_Y - 120.0)
+        var center := Vector2(p_x, GROUND_Y - 120.0 * TANK_S)
         for p in drops:
                 var d: Dictionary = p
                 d["t"] += delta
@@ -2075,7 +2257,7 @@ func _update_drops(delta: float) -> void:
                         var dirv := (center - Vector2(d["x"], d["y"])).normalized()
                         d["x"] += dirv.x * pull
                         d["y"] += dirv.y * pull
-                if dist < 52.0:
+                if dist < 34.0:
                         match String(d["kind"]):
                                 "xp":
                                         _gain_xp(int(d["value"]))
@@ -2580,11 +2762,21 @@ func _flashed(e: Dictionary, base: Color) -> Color:
         return Color(6, 6, 6) if float(e.get("hit", 0.0)) > 0.0 else base
 
 func _epts(e: Dictionary, pts: Array) -> PackedVector2Array:
-        # enemy-local points -> world, mirrored by dir
+        # enemy-local points -> world, mirrored by dir; a rotated machine
+        # (the diving kamikaze) turns its nose toward e["ang"] - the mirror
+        # keeps the base facing, the rotation adds only the DELTA past it,
+        # so the body never flips upside down mid-turn
         var out := PackedVector2Array()
+        var has_rot: bool = e.has("ang") and String(e.get("move", "")) == "dive"
+        var dir := float(e["dir"])
+        var base := 0.0 if dir > 0.0 else PI
+        var delta_a := angle_difference(base, float(e.get("ang", base))) \
+                if has_rot else 0.0
         for p in pts:
-                out.append(Vector2(float(e["x"]) + float(p[0]) * float(e["dir"]),
-                        float(e["y"]) + float(p[1])))
+                var v := Vector2(float(p[0]) * dir, float(p[1]))
+                if has_rot:
+                        v = v.rotated(delta_a)
+                out.append(Vector2(float(e["x"]), float(e["y"])) + v)
         return out
 
 func _epoly(e: Dictionary, pts: Array, col: Color) -> void:
@@ -2768,7 +2960,7 @@ func _draw_enemy_kind(e: Dictionary) -> void:
                         ent_draw.draw_circle(Vector2(float(e["x"]), GROUND_Y + 2.0),
                                 float(e["size"]) * 0.7, Color(0, 0, 0, 0.35))
                         _ecirc(e, 0, 0, float(e["size"]) * 0.85, Color("1a1a1a"))
-                        var ta := atan2((GROUND_Y - 120.0) - float(e["y"]),
+                        var ta := atan2((GROUND_Y - 120.0 * TANK_S) - float(e["y"]),
                                 p_x - float(e["x"]))
                         if float(e["dir"]) < 0.0:
                                 ta = PI - ta
@@ -3306,6 +3498,14 @@ func _box_shop_open() -> void:
         box.add_child(_shop_lbl("TANK SKINS"))
         for id in HWData.SKINS:
                 box.add_child(_shop_skin_row(id))
+        # v040-8 THE UPGRADES SHELF (the owner: "they were there so user
+        # pay GOGACoins to be able to unlock specific upgrades"): the same
+        # 8 shelf items, priced in GOGACoins at the box rate - 1 GOGACoin
+        # is worth 5 scrap (the top-up law), so a GOGACoin buy is never a
+        # cheat, it is the same price paid in the box's own coin.
+        box.add_child(_shop_lbl("UPGRADES"))
+        for it in HWData.SHOP_ITEMS:
+                box.add_child(_shop_coin_upg_row(it))
         var close_b := Arc.button("CLOSE", Vector2(560, 70), 24, Arc.ACCENT,
                 func(): sheet_pop())
         var cc := HBoxContainer.new()
@@ -3317,6 +3517,80 @@ func _box_shop_open() -> void:
                         continue
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
+
+## one GOGACoin-priced upgrade row: the same levels the SCRAP SHOP sells,
+## the price converted at the box rate (1 GOGACoin = 5 scrap)
+func _shop_coin_upg_row(it: Dictionary) -> Control:
+        var id := String(it["id"])
+        var lvl := _shop_lvl(id)
+        var is_unlock := bool(it.get("unlock", false))
+        var maxed: bool = lvl >= int(it.get("max", 1)) if not is_unlock \
+                else lvl >= 1
+        var locked: bool = it.has("requires") and _shop_lvl(String(it["requires"])) <= 0
+        var row := PanelContainer.new()
+        var sb := StyleBoxFlat.new()
+        sb.bg_color = THEME["panel"]
+        sb.set_corner_radius_all(10)
+        sb.border_color = THEME["good"] if maxed else THEME["border"]
+        sb.set_border_width_all(2 if maxed else 1)
+        sb.content_margin_left = 14
+        sb.content_margin_right = 14
+        sb.content_margin_top = 8
+        sb.content_margin_bottom = 8
+        row.add_theme_stylebox_override("panel", sb)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 4)
+        row.add_child(v)
+        var top := HBoxContainer.new()
+        top.add_theme_constant_override("separation", 10)
+        v.add_child(top)
+        var name_l := Arc.label(String(it["name"]), 22,
+                THEME["text"] if not locked else THEME["mute"])
+        name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        top.add_child(name_l)
+        if not is_unlock:
+                var pips := HBoxContainer.new()
+                pips.add_theme_constant_override("separation", 4)
+                for k in int(it.get("max", 1)):
+                        var pip := ColorRect.new()
+                        pip.custom_minimum_size = Vector2(16, 8)
+                        pip.color = THEME["accent"] if k < lvl \
+                                else Color(0.47, 0.5, 0.55, 0.18)
+                        pips.add_child(pip)
+                top.add_child(pips)
+        else:
+                var st := Arc.label("INSTALLED" if lvl > 0 else "-", 18,
+                        THEME["good"] if lvl > 0 else THEME["mute"])
+                top.add_child(st)
+        var desc := Arc.label(String(it["desc"]), 16,
+                THEME["dim"] if not locked else THEME["mute"], false)
+        v.add_child(desc)
+        if maxed:
+                var ml := Arc.label("MAX", 22, THEME["good"])
+                ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                v.add_child(ml)
+        elif locked:
+                var req := String(HWData.shop_item(String(it["requires"])).get("name",
+                        String(it["requires"])))
+                var ll := Arc.label("LOCKED - needs %s" % req, 17, THEME["cost_no"])
+                ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                v.add_child(ll)
+        else:
+                var scrap_cost := HWData.shop_cost(it, lvl)
+                var coin_cost := maxi(1, int(ceil(float(scrap_cost) / 5.0)))
+                var bl := Arc.coin_button("BUY  %s  %d" % [String(it["name"]),
+                        coin_cost], Vector2(600, 54), 20, Arc.ACCENT, func():
+                        if maxed:
+                                Jukebox.sfx("rw_no", -6.0)
+                                return
+                        if Box.spend(coin_cost):
+                                meta.set_upg(id, lvl + 1)
+                                Jukebox.sfx("rw_buy", -4.0)
+                        _box_shop_reopen())
+                if Box.coins() < coin_cost:
+                        bl.disabled = true   # a dry wallet never buys
+                v.add_child(bl)
+        return row
 
 func _shop_skin_row(id: String) -> Control:
         var sk: Dictionary = HWData.SKINS[id]
@@ -3382,6 +3656,78 @@ func _build_hw_hud() -> void:
         hud_draw.draw.connect(_draw_hud)
         _overlay_root_ref().add_child(hud_draw)
 
+## THE CHIP ICON LAW (the pop siege way, v040-8): an icon Control rides
+## INSIDE a top-bar chip's HBox (index 0) and paints itself.
+func _chip_icon(chip: Control, px: float, paint: Callable) -> void:
+        if chip == null or not is_instance_valid(chip):
+                return
+        var h := chip.get_child(0)
+        if h == null or not is_instance_valid(h) or (h as Control).get_child_count() == 0:
+                return
+        var ic := Control.new()
+        ic.custom_minimum_size = Vector2(px, px)
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        ic.draw.connect(func():
+                paint.call(ic, Vector2(px * 0.5, px * 0.5)))
+        (h as Control).add_child(ic)
+        (h as Control).move_child(ic, 0)
+
+## the warbird inside the SCORE chip
+func _score_icon_in_chip() -> void:
+        _chip_icon(_score_chip_ref(), 34, func(cv: Control, c: Vector2):
+                _paint_plane(cv, c))
+
+## the brass cog inside the SCRAP chip (the chip that owns scrap_lbl)
+func _scrap_icon_in_chip() -> void:
+        if scrap_lbl == null or not is_instance_valid(scrap_lbl):
+                return
+        var chip := (scrap_lbl.get_parent().get_parent() as Control)
+        _chip_icon(chip, 30, func(cv: Control, c: Vector2):
+                _paint_scrap(cv, c))
+
+## the warbird (canvas parameterized - it serves the HUD and the chip)
+func _paint_plane(cv: Control, c: Vector2) -> void:
+        var body := THEME["accent"]
+        var dark := Color(0.06, 0.07, 0.09)
+        var glass := Color("bfe8ff")
+        var s := 0.62
+        var P := func(v: Vector2) -> Vector2:
+                return c + v * s
+        cv.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(2, 0)), P.call(Vector2(-6, -22)),
+                P.call(Vector2(-13, -22)), P.call(Vector2(-12, 0)),
+                P.call(Vector2(-13, 22)), P.call(Vector2(-6, 22)),
+                P.call(Vector2(2, 0))]), dark)
+        cv.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(-14, 0)), P.call(Vector2(-22, -12)),
+                P.call(Vector2(-25, -12)), P.call(Vector2(-20, 0)),
+                P.call(Vector2(-25, 12)), P.call(Vector2(-22, 12)),
+                P.call(Vector2(-14, 0))]), dark)
+        cv.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(26, 0)), P.call(Vector2(10, -6)),
+                P.call(Vector2(-12, -5)), P.call(Vector2(-20, -2)),
+                P.call(Vector2(-20, 2)), P.call(Vector2(-12, 5)),
+                P.call(Vector2(10, 6)),
+        ]), body)
+        cv.draw_colored_polygon(PackedVector2Array([
+                P.call(Vector2(14, -1)), P.call(Vector2(8, -4)),
+                P.call(Vector2(2, -4)), P.call(Vector2(2, 2)),
+                P.call(Vector2(12, 2)),
+        ]), glass)
+        cv.draw_circle(P.call(Vector2(24, 0)), 2.2 * s, Color(1, 1, 1, 0.9))
+
+## the brass cog (canvas parameterized)
+func _paint_scrap(cv: Control, c: Vector2) -> void:
+        var gear := PackedVector2Array()
+        for gi in 8:
+                var ga := float(gi) / 8.0 * TAU
+                gear.append(c + Vector2(cos(ga) * 13.0, sin(ga) * 13.0))
+                gear.append(c + Vector2(cos(ga + 0.22) * 8.8,
+                        sin(ga + 0.22) * 8.8))
+        cv.draw_colored_polygon(gear, Color("c8a86a"))
+        cv.draw_circle(c, 5.4, Color("504028"))
+        cv.draw_circle(c + Vector2(-3.4, -3.4), 2.6, Color("f0dc9c"))
+
 ## THE OUTLINED TEXT LAW (the owner: "bigger text and better contrast,
 ## like giving the text a black outlines"): every HUD string wears a hard
 ## black outline under its fill - readable over any sky, never huge.
@@ -3391,14 +3737,16 @@ func _htxt(pos: Vector2, txt: String, fsize: int, col: Color,
                 fsize, 6, Color(0, 0, 0, 0.9))
         hud_draw.draw_string(Arc.font_ui(), pos, txt, align, width, fsize, col)
 
-## THE REMAINING WIDGET (the owner: "design 'remaining' widget which shows
-## two, time and enemies, make it accurately"): the wave's remaining clock
-## (the 3:00 law counting down) and the enemies still alive + incoming.
+## THE REMAINING WIDGET (v040-8): the wave's own limiter - the clock for
+## the time kinds, the honest kill count for the kill kinds. A leaver
+## never shrinks the kill count (the quota only moves on a real kill).
 func _remaining_secs() -> float:
-        return maxf(0.0, HWData.WAVE_MAX_TIME - wave_clock)
+        return maxf(0.0, wave_duration - wave_clock)
 
 func _remaining_enemies() -> int:
-        return enemies.size() + spawn_list.size()
+        if wave_kind == "time":
+                return enemies.size()      # info only - the clock decides
+        return maxi(0, wave_quota - wave_quota_done)
 
 func _draw_hud() -> void:
         if state == GS.INTRO:
@@ -3413,7 +3761,7 @@ func _draw_hud() -> void:
         # one panel: hull, the weapon slots, LVL + XP, the REMAINING pair
         var w := 372.0
         var pw := w + 24
-        var ph := 236.0
+        var ph := 258.0
         hud_draw.draw_rect(Rect2(x - 6, y - 8, pw, ph), Color(0.02, 0.024, 0.03, 0.62))
         hud_draw.draw_rect(Rect2(x - 6, y - 8, pw, ph), THEME["border"], false, 1.5)
         # ---------- HULL ----------
@@ -3444,42 +3792,31 @@ func _draw_hud() -> void:
         hud_draw.draw_rect(Rect2(x + 118, ly + 26, maxf(0.0,
                 (w - 122) * clampf(float(p_xp) / float(p_xp_next), 0, 1)), 7),
                 THEME["xp"])
-        # ---------- THE REMAINING WIDGET: time + enemies ----------
+        # ---------- THE REMAINING WIDGET: the wave's own limiter ----------
+        # THE WAVE LAW (v040-8): a wave is KILLS-limited, TIME-limited or
+        # BOTH - the widget shows exactly what the wave asks for, and the
+        # WAVE row lives here now (the old top-right panel is dead).
         var my := ly + 46.0
-        _draw_clock_icon(Vector2(x + 16, my + 16))
-        var rem := _remaining_secs()
-        var time_txt := "%d:%02d" % [int(rem) / 60, int(rem) % 60]
-        var tcol: Color = Color(1.0, 0.62, 0.4) if rem <= 30.0 else THEME["text"]
-        if state == GS.PLACE:
+        var kind := String(wave_kind)
+        if state == GS.PLACE and (kind == "time" or kind == "both"):
+                _draw_clock_icon(Vector2(x + 16, my + 16))
+                var rem := _remaining_secs()
+                var time_txt := "%d:%02d" % [int(rem) / 60, int(rem) % 60]
+                var tcol: Color = Color(1.0, 0.62, 0.4) if rem <= 10.0 \
+                        else THEME["text"]
                 _htxt(Vector2(x + 40, my + 25), time_txt, 22, tcol)
-        _draw_jet_icon(Vector2(x + 168, my + 14), 0.62, Color("d88878"))
-        _htxt(Vector2(x + 192, my + 25), "x %d" % _remaining_enemies(),
-                22, THEME["text"])
-        # ================= THE TOP-RIGHT PANEL =================
-        var rpw := 330.0
-        var rpx := W - rpw - 14.0
-        hud_draw.draw_rect(Rect2(rpx - 6, y - 8, rpw + 6, 108),
-                Color(0.02, 0.024, 0.03, 0.62))
-        hud_draw.draw_rect(Rect2(rpx - 6, y - 8, rpw + 6, 108),
-                THEME["border"], false, 1.5)
-        _htxt(Vector2(rpx, y + 14),
-                String(HWData.PLACES[place_i % 10]["name"])
-                + ("  II" if place_i >= 10 else ""),
-                16, THEME["text"], HORIZONTAL_ALIGNMENT_RIGHT, rpw)
-        # THE SCORE: kills are the score, one widget, a DESIGNED plane icon
-        _draw_plane_icon(Vector2(rpx + 34, y + 52))
-        _htxt(Vector2(rpx + 64, y + 68), str(score), 40, THEME["accent_hi"])
-        _htxt(Vector2(rpx, y + 66), "WAVE %d / %d"
-                % [wave, HWData.WAVES_PER_PLACE], 16, THEME["dim"],
-                HORIZONTAL_ALIGNMENT_RIGHT, rpw - 4)
-        # ---------- THE SCRAP WIDGET (a real widget with its icon -
-        # the brick breaker / pop siege law; the BANK lives in the shop) ----------
-        var sw := 176.0
-        var shy := H - 66.0
-        hud_draw.draw_rect(Rect2(x - 2, shy, sw, 52), Color(0.02, 0.024, 0.03, 0.66))
-        hud_draw.draw_rect(Rect2(x - 2, shy, sw, 52), THEME["border"], false, 1.5)
-        _draw_scrap_icon(Vector2(x + 26, shy + 26))
-        _htxt(Vector2(x + 52, shy + 35), str(p_scrap), 26, THEME["cost"])
+        if state == GS.PLACE and (kind == "kills" or kind == "both"):
+                var jx := x + 168.0
+                if kind == "kills":
+                        jx = x + 40.0
+                _draw_jet_icon(Vector2(jx + 16, my + 14), 0.62, Color("d88878"))
+                _htxt(Vector2(jx + 40, my + 25), "x %d" % _remaining_enemies(),
+                        22, THEME["text"])
+        if state == GS.PLACE:
+                _htxt(Vector2(x, my + 62), "WAVE %d / %d  -  %s" % [wave,
+                        HWData.WAVES_PER_PLACE,
+                        String(HWData.PLACES[place_i % 10]["name"])],
+                        15, THEME["dim"])
         # ---------- the boss bar (with its shield overlay) ----------
         for e in enemies:
                 var d: Dictionary = e
@@ -3538,40 +3875,7 @@ func _weapon_pips(name_txt: String, at: Vector2, n: int, maxn: int,
 
 ## THE SCORE ICON (the owner: "design an icon for it, not the shitty way"):
 ## a real warbird - swept wings, a tailfin, a canopy, a hard outline.
-func _draw_plane_icon(c: Vector2) -> void:
-        var body := THEME["accent"]
-        var dark := Color(0.06, 0.07, 0.09)
-        var glass := Color("bfe8ff")
-        var s := 1.25
-        var P := func(v: Vector2) -> Vector2:
-                return c + v * s
-        # the swept main wings
-        hud_draw.draw_colored_polygon(PackedVector2Array([
-                P.call(Vector2(2, 0)), P.call(Vector2(-6, -22)),
-                P.call(Vector2(-13, -22)), P.call(Vector2(-12, 0)),
-                P.call(Vector2(-13, 22)), P.call(Vector2(-6, 22)),
-                P.call(Vector2(2, 0))]), dark)
-        # the tailfins
-        hud_draw.draw_colored_polygon(PackedVector2Array([
-                P.call(Vector2(-14, 0)), P.call(Vector2(-22, -12)),
-                P.call(Vector2(-25, -12)), P.call(Vector2(-20, 0)),
-                P.call(Vector2(-25, 12)), P.call(Vector2(-22, 12)),
-                P.call(Vector2(-14, 0))]), dark)
-        # the fuselage (a swept dart)
-        hud_draw.draw_colored_polygon(PackedVector2Array([
-                P.call(Vector2(26, 0)), P.call(Vector2(10, -6)),
-                P.call(Vector2(-12, -5)), P.call(Vector2(-20, -2)),
-                P.call(Vector2(-20, 2)), P.call(Vector2(-12, 5)),
-                P.call(Vector2(10, 6)),
-        ]), body)
-        # the canopy
-        hud_draw.draw_colored_polygon(PackedVector2Array([
-                P.call(Vector2(14, -1)), P.call(Vector2(8, -4)),
-                P.call(Vector2(2, -4)), P.call(Vector2(2, 2)),
-                P.call(Vector2(12, 2)),
-        ]), glass)
-        # the nose flash
-        hud_draw.draw_circle(P.call(Vector2(24, 0)), 2.2 * s, Color(1, 1, 1, 0.9))
+## (v040-8: it lives INSIDE the box score chip - _paint_plane paints it.)
 
 ## a small jet glyph for the REMAINING widget (enemies left)
 func _draw_jet_icon(c: Vector2, s: float, col: Color) -> void:
@@ -3593,15 +3897,7 @@ func _draw_clock_icon(c: Vector2) -> void:
                 THEME["text"], 2.2)
 
 ## the scrap icon: a brass cog with a hard edge
-func _draw_scrap_icon(c: Vector2) -> void:
-        var gear := PackedVector2Array()
-        for gi in 8:
-                var ga := float(gi) / 8.0 * TAU
-                gear.append(c + Vector2(cos(ga) * 13.0, sin(ga) * 13.0))
-                gear.append(c + Vector2(cos(ga + 0.22) * 8.8, sin(ga + 0.22) * 8.8))
-        hud_draw.draw_colored_polygon(gear, Color("c8a86a"))
-        hud_draw.draw_circle(c, 5.4, Color("504028"))
-        hud_draw.draw_circle(c + Vector2(-3.4, -3.4), 2.6, Color("f0dc9c"))
+## (v040-8: it lives inside the top-bar scrap chip - _paint_scrap paints it.)
 
 ## THE AIM CURSOR: ring + ticks + dot, the HTML crosshair, theme white
 func _draw_crosshair(at: Vector2) -> void:
@@ -3631,9 +3927,9 @@ func _draw_intro() -> void:
                 "TAP ANYWHERE TO START", HORIZONTAL_ALIGNMENT_CENTER, W, 38,
                 Color(1, 1, 1, a))
 
-## THE MENU: DEPLOY + SCRAP SHOP + the normal GOGABox SHOP + the best line.
-## The scrap total lives ON the scrap shop button; the coin shop opens the
-## box's own shelf (skins, GOGACoins, LOCKED until bought).
+## THE MENU (v040-8): DEPLOY + SCRAP SHOP + the best line. The GOGABox
+## SHOP left the menu - it is an IN-GAME top-bar button now (the usual
+## seat), the menu stays lean.
 func _draw_menu() -> void:
         hud_draw.draw_rect(Rect2(0, 0, W, H), Color(0.016, 0.02, 0.027, 0.72))
         hud_draw.draw_string_outline(Arc.font_ui(), Vector2(0, H * 0.24 + 3),
@@ -3647,8 +3943,6 @@ func _draw_menu() -> void:
         _menu_button(Rect2(W / 2 - bw / 2.0, by, bw, bh), "DEPLOY", true)
         _menu_button(Rect2(W / 2 - bw / 2.0, by + bh + 20.0, bw, bh),
                 "SCRAP SHOP   %d" % meta.scrap(), false)
-        _menu_button(Rect2(W / 2 - bw / 2.0, by + (bh + 20.0) * 2.0, bw, bh),
-                "SHOP", false)
         hud_draw.draw_string_outline(Arc.font_ui(), Vector2(0, H - 28),
                 "BEST: PLACE %d   -   SCORE %d   -   TOTAL SCRAP %d"
                         % [int(meta.d["best_place"]), int(meta.d["best_kills"]),
@@ -3679,16 +3973,12 @@ func _menu_tap(pos: Vector2) -> void:
         var bh := 88.0
         var b1 := Rect2(W / 2 - bw / 2.0, by, bw, bh)
         var b2 := Rect2(W / 2 - bw / 2.0, by + bh + 20.0, bw, bh)
-        var b3 := Rect2(W / 2 - bw / 2.0, by + (bh + 20.0) * 2.0, bw, bh)
         if b1.has_point(pos):
                 Jukebox.sfx("rw_click", -4.0)
                 _run_start()
         elif b2.has_point(pos):
                 Jukebox.sfx("rw_click", -4.0)
                 _shop_open()
-        elif b3.has_point(pos):
-                Jukebox.sfx("rw_click", -4.0)
-                _box_shop_open()
 
 func _run_start() -> void:
         _run_reset()
@@ -3707,8 +3997,8 @@ func _game_over() -> void:
                 tunnel_node = null
         Jukebox.stop_music()
         Jukebox.sfx("rw_gameover", -2.0)
-        _explode(p_x, GROUND_Y - 150.0, 1.8)
-        _explode(p_x - 60.0, GROUND_Y - 120.0, 1.3)
+        _explode(p_x, GROUND_Y - 55.0, 1.8)
+        _explode(p_x - 24.0, GROUND_Y - 42.0, 1.3)
         # THE SCRAP BANK: the carried scrap + everything still on the ground
         # banks for the SCRAP SHOP (the HTML gameOver law)
         var banked := p_scrap

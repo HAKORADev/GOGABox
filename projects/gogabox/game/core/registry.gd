@@ -1293,6 +1293,12 @@ const GAMES := [
                 "coin_div": 500, "price": 600, "fee": 20, "shop": true,
                 "banner": true,
                 "charge_unlock": 300,
+                # v040-8 THE TOP-UP DECLARATION: heavywar carries SCRAP -
+                # 1 GOGACoin = 5 scrap (the owner's rate law). GameCoin
+                # reads/writes the wallet through the coin_api statics.
+                "currency": {"name": "SCRAP", "rate": 5.0,
+                        "tint": Color("c8a86a")},
+                "coin_api": "res://game/games/heavywar/heavywar_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 8,
         "needs_games": 11},
                 "desc": "THE TANK THAT NEVER STOPS: a survival rogue-like through 10 places - iron wasteland, scorched mesa, frozen tundra, volcanic core, toxic swamp, crystal caverns, sky archipelago, abyssal trench, neon sprawl and THE VOID - 10 waves each, a BOSS after every 10th wave, then the tank DRIVES through the tunnel into the next place, and after place 10 the whole war loops harder. The left half of the screen is your analog roll (touch and slide), the right half is the aim - hold to fire the main cannon; it is the only weapon that follows the aim. Every XP orb is one point - level up and pick your boost cards. Every scrap piece is one scrap - it banks when the run ends and the SCRAP SHOP spends it: wheels, hull plating, the main cannon, the auto-loader, MG barrels + racks and rocket pods + racks, all with the honest MAX and LOCKED states. The SHOP sells the tank skins for GOGACoins. Enemies grow with your power and start wearing shields - carpet bombers, shred bombers, shadow lancers, the rocket rain of the raiders, suicidal divers from wave one, and heavy machines that burst into falling shreds. Bosses arrive with a WARNING and an escort wing and slam shields up at 66% and 33%. Kills are the score; a GOGACoin drops after every 500 kills - bosses pay 5.",
@@ -1338,6 +1344,11 @@ const GAMES := [
                 # score bonus will be /250").
                 "coin_div": 250, "price": 500, "fee": 8, "shop": true,
                 "banner": true,
+                # v040-8 THE TOP-UP DECLARATION: rockbreaker carries
+                # ROCKCOINS - 1 GOGACoin = 5 rockCoins (the rate law).
+                "currency": {"name": "ROCKCOINS", "rate": 5.0,
+                        "tint": Color("d8c8a8")},
+                "coin_api": "res://game/games/rockbreaker/rockbreaker_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 14,
         "needs_games": 15},
                 "desc": "THE ENDLESS ROCK FLOOD: a closed arena where boulders of every size, heat and speed ride in from the walls and bounce forever - and your two-wheeled cannon rolls the ground below. Rocks carry their damage on their face (a rock's level IS its color: the intense-er the longer, and the damage pool never stops growing); break one and its family pops out - a size-5 rock carries five children of smaller sizes, over and over, until only the pebbles remain. The left half of the screen rolls the cannon, the right half FIRES while held (tapping never spams). One touch of a rock and the run is over - unless a mystery rock's SHIELD forgives one. Every break pays rockCoins by the rock's damage (a 120-damage rock pays 12) - spend them on exactly two upgrades: PROJECTILE (more shots per second, capped at 50) and DAMAGE (+1 per level, no cap) - the prices climb steep, this is a long-term war. Mystery rocks carry SLOW, SHIELD or RUSH x2 (never the double throw, never the cash); a GOLDEN rock with a hidden 300-1000 damage pool arrives after every 300 rock points and pays a real GOGACoin. 5 cannon skins, 5 themes (CAVE, FOREST, PIXEL, NEON, CANDY) each owning five places and its own rock pack.",

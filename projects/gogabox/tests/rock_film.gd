@@ -7,7 +7,7 @@ extends Node
 ##        res://tests/rock_film.tscn
 
 var G: GogaGame = null
-var shot_dir := "/home/z/my-project/gogabox/films/v040-7"
+var shot_dir := "/home/z/my-project/gogabox/films/v040-8"
 
 func _wait(t: float) -> void:
         await get_tree().create_timer(t, true).timeout

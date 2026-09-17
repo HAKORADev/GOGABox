@@ -267,3 +267,45 @@ gift, the shield save, the death crunch, the coin chime. VFX: shards and
 dust on break, crack webs as damage lands, spin trails on fast rocks,
 coin-fly arcs, the heat shimmer on hot rocks, the touch flash on death,
 the ground dust when the cannon moves fast.
+
+## THE v040-8 CORRECTIONS (the owner's playtest, binding)
+
+The first build misread four laws. The owner's own words, now the law:
+
+- **THE BOUNCE LAW (corrected)**: "rocks when hit the ground they get
+  broken instead of bouncing like the original game". The GROUND IS A
+  TRAMPOLINE — EVERY rock bounces off the floor (restitution, a minimum
+  kick, spin from the surface). NOTHING shatters on the ground anymore.
+- **THE OPEN WALLS LAW (corrected)**: "the rocks currently bounce on
+  walls". The side walls are OPEN: a regular rock that slides past an
+  edge EXITS (quietly, its side seat frees). Only the golden and the
+  mystery rocks never leave (THE PERSISTENCE LAW) — they bounce off
+  walls, ceiling and floor forever.
+- **THE SPAWN LAW (corrected)**: "their spawn are from one side while
+  should be both, and they are always spawn falling while original can
+  spawn them throwed up then fall, also currently spawn happen from
+  specific range and with specific speed, there is no high randomized
+  ranges, original also can spawn tons of them at one time like 3 or 4
+  or even more". So: both sides (the 15/side ledger), wide random
+  heights across the whole upper arena, speeds across the full design
+  range, in-angles mixed (some lobbed upward on entry), GROUND LAUNCHES
+  (a rock thrown UP from the floor - it climbs, arcs, falls), and every
+  spawn event pours a BURST of 1..4 rocks. The 45-hold and the 50-cap
+  are untouched.
+- **THE SHOT LAW (corrected)**: "canon projectiles looks small as shit
+  and feels instant i do not even see it going up". The ball is 13px at
+  920px/s with a comet trail - a shot you SEE climb.
+- **THE SHELF TRUTH LAW (corrected)**: no essays on the shelves. The
+  buttons speak in names, levels and prices - no em-dash explainer
+  lines, no meta text ("no third shelf..." is banned).
+- **THE TAP LAW (fixed)**: every button inside the shop/upgrade scrolls
+  registers as a tappable (the BoxScroll law) - the freeze-on-press is
+  dead.
+- **THE REAL ASSET LAW**: the rocks, the cannon and the world are BAKED
+  textures (tools/v0408_rock_art.py + v0408_rock_world.py - the Crazy
+  Caves study sprites code-modified into our own: desaturated,
+  re-lit, re-outlined, tinted at runtime by the heat ramp; the carriage
+  rebuilt from the carts with our barrel; the cave backgrounds
+  recolored into the five places). The sky is a real canvas_item
+  shader (fx/rock_sky.gdshader: gradient, drifting fbm clouds, stars,
+  sun/moon). No more flat runtime polygons - Godot does the pretty.

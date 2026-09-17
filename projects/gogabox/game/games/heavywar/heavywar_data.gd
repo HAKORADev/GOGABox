@@ -29,7 +29,13 @@ const PLANE_MID := 0.38
 const PLANE_NEAR := 0.62
 const PLANE_GROUND := 1.0
 
-const WAVE_MAX_TIME := 180.0          # the 3:00 law
+# v040-8 THE WAVE LAW: no more fixed 3:00. A wave rolls ONE of three
+# kinds - KILLS (a quota of kills ends it), TIME (survive the clock) or
+# BOTH - and the clocks GROW as the waves climb (wave 1 is short, the
+# owner: "waves will go up in time").
+const WAVE_TIME_BASE := 34.0         # wave 1's clock
+const WAVE_TIME_STEP := 7.0          # +7s a wave
+const WAVE_TIME_CAP := 165.0
 const WAVES_PER_PLACE := 10
 
 # ------------------------------------------------------------- the 10 places
@@ -299,6 +305,16 @@ const SKIN_COLORS := {
 }
 
 # ------------------------------------------------------------ the wave law
+# the wave-kind clock + quota (v040-8): the wave's TIME grows with the
+# wave/place/loop; the KILL quota grows with them too.
+static func wave_time(wave: int, place_i: int, loop: int) -> float:
+        var t := WAVE_TIME_BASE + float(wave - 1) * WAVE_TIME_STEP \
+                + float(place_i) * 2.5 + float(loop - 1) * 18.0
+        return minf(t, WAVE_TIME_CAP)
+
+static func wave_quota(wave: int, place_i: int, loop: int) -> int:
+        return 7 + wave * 2 + int(float(place_i) * 0.8) + (loop - 1) * 5
+
 static func diff(place_i: int, level: int, loop: int, scrap_spent: int) -> float:
         # enemies scale with place + level + loop + the tank's SHOP power
         return float(place_i) * 0.5 + float(level - 1) * 0.30 \

@@ -378,7 +378,21 @@ func _build_top_bar() -> void:
         wh.add_child(coin)
         _wallet_label = Arc.label(Box.coins_display(), 30, Arc.COIN, false)
         wh.add_child(_wallet_label)
-        bar.add_child(wchip)
+        # v040-8 THE WALLET TAP LAW: the wallet chip is TAPPABLE - it opens
+        # the top-up menu (the owner: "tapping gogacoins in the GOGABox main
+        # menu will open a menu"). The chip keeps its place and size.
+        var wbtn := Button.new()
+        wbtn.flat = true
+        wbtn.custom_minimum_size = Vector2(0, 56)
+        wchip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        wbtn.add_child(wchip)
+        wchip.set_anchors_preset(Control.PRESET_FULL_RECT)
+        wbtn.custom_minimum_size = Vector2(
+                        ceilf(wchip.get_combined_minimum_size().x) + 4.0, 56.0)
+        wbtn.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                _open_topup())
+        bar.add_child(wbtn)
 
         bar.add_child(_icon_button("res://assets/meta/icon_search.png",
                         func(): _open_search()))
@@ -1608,6 +1622,299 @@ func _open_guide(g: Dictionary) -> void:
                                 _close_sheet()
                                 _open_help()))
         Arc.fit_sheet(vb)
+
+# ============================================================ TOP-UP (v040-8)
+## THE TOP-UP SYSTEM, built exactly per docs/goga_docs/ideas/TOPUP_SYSTEM.md:
+## the main-menu GOGACoin wallet opens the top-up menu (BALANCE = nn),
+## a TOP-UP button opens the game picker (vertical cards, the guide-view
+## law), a game opens its exchange screen (both wallets, the rate, an
+## amount hard-capped at the GOGACoins total with the live "= nn" preview),
+## a confirmation, then THE SETTLE: GOGACoins down, the game's coins up.
+## Games join by DECLARING `currency` + `coin_api` in the registry - no
+## game ids live here (GameCoin.games() is the whole list).
+
+func _open_topup() -> void:
+        if _sheet_open:
+                _close_sheet()
+        var h := _sheet_height(760.0)
+        var vb := _sheet_base(h)
+        var title := Arc.label("TOP-UP", 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        # THE BALANCE LAW: balance = nn beside the gogacoin icon
+        var bal := HBoxContainer.new()
+        bal.alignment = BoxContainer.ALIGNMENT_CENTER
+        bal.add_theme_constant_override("separation", 12)
+        var ic := TextureRect.new()
+        ic.texture = load(COIN_ICON)
+        ic.custom_minimum_size = Vector2(40, 40)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        bal.add_child(ic)
+        bal.add_child(Arc.label("BALANCE = " + Box.coins_display(), 32,
+                Arc.COIN))
+        vb.add_child(bal)
+        var why := Arc.label("play the box, collect GOGACoins, feed the "
+                + "games you love", 20, Color("8a6a40"), false)
+        why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(why)
+        # THE TOP-UP BUTTON LAW: one button, under the balance
+        vb.add_child(Arc.button("TOP-UP", Vector2(540, 84), 32, Arc.GOOD,
+                func():
+                        _close_sheet()
+                        _open_topup_picker()))
+        Arc.fit_sheet(vb, 1)
+
+## THE GAME PICKER LAW: every currency-carrying game, as VERTICAL CARDS
+## (the guide-view law) - thumb on top, name, the game's wallet, the rate.
+func _open_topup_picker() -> void:
+        if _sheet_open:
+                _close_sheet()
+        var h := _sheet_height()
+        var vb := _sheet_base(h)
+        var title := Arc.label("TOP-UP", 38, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var sub := Arc.label("pick the game to feed", 20,
+                Color("8a6a40"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, h - 250)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 16)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
+        var carriers := GameCoin.games()
+        for r in carriers:
+                var rec: Dictionary = r
+                v.add_child(_topup_card(rec))
+        vb.add_child(Arc.button("BACK", Vector2(540, 64), 24,
+                Color(0.42, 0.30, 0.16), func():
+                        _close_sheet()
+                        _open_topup()))
+        Arc.fit_sheet(vb)
+
+## one vertical card: the game's thumb, its name, its live wallet and the
+## exchange rate - a tap enters the exchange screen
+func _topup_card(rec: Dictionary) -> Control:
+        var card := Button.new()
+        card.custom_minimum_size = Vector2(560, 0)
+        var sb := Arc.panel_style(Color(0.98, 0.95, 0.9, 0.97), 24, 0)
+        sb.shadow_color = Color(0, 0, 0, 0.28)
+        sb.shadow_size = 8
+        sb.shadow_offset = Vector2(0, 5)
+        sb.content_margin_left = 0
+        sb.content_margin_right = 0
+        sb.content_margin_top = 0
+        sb.content_margin_bottom = 14
+        card.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = Color(0.94, 0.89, 0.8, 0.97)
+        card.add_theme_stylebox_override("pressed", sbp)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
+        card.add_child(v)
+        if ResourceLoader.exists(String(rec["thumb"])):
+                var th := TextureRect.new()
+                th.texture = load(String(rec["thumb"]))
+                th.custom_minimum_size = Vector2(560, 220)
+                th.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+                th.clip_contents = true
+                th.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                v.add_child(th)
+        var name_l := Arc.label(String(rec["title"]).to_upper(), 28, Arc.INK)
+        name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        v.add_child(name_l)
+        var wallet := HBoxContainer.new()
+        wallet.alignment = BoxContainer.ALIGNMENT_CENTER
+        wallet.add_theme_constant_override("separation", 8)
+        var dot := ColorRect.new()
+        dot.custom_minimum_size = Vector2(22, 22)
+        dot.color = rec["tint"]
+        dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        wallet.add_child(dot)
+        wallet.add_child(Arc.label("%s %s" % [Arc.short_num(
+                GameCoin.balance(String(rec["id"]))), String(rec["name"])],
+                24, Color("6a4a28")))
+        v.add_child(wallet)
+        var rate_l := Arc.label("1 GOGACoin = %s %s" % [Arc.short_num(
+                int(rec["rate"])), String(rec["name"])], 19,
+                Color("8a6a40"), false)
+        rate_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        v.add_child(rate_l)
+        var gid := String(rec["id"])
+        card.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                _open_topup_game(gid))
+        return card
+
+## THE EXCHANGE SCREEN: the game's coins first, the GOGACoins under, the
+## rate line, the amount field (capped at the wallet, always), the live
+## "= nn" preview, and the TOP-UP button that opens the confirmation.
+func _open_topup_game(gid: String) -> void:
+        if _sheet_open:
+                _close_sheet()
+        var rec := GameCoin.record(gid)
+        if rec.is_empty():
+                return
+        var h := _sheet_height(860.0)
+        var vb := _sheet_base(h)
+        var title := Arc.label(String(rec["title"]).to_upper(), 36, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var sub := Arc.label("TOP-UP  %s" % String(rec["name"]), 22,
+                Color("8a6a40"))
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+        # THE TWO WALLETS LAW: the game's coins first, the GOGACoins under
+        var tint: Color = rec["tint"]
+        var w1 := PanelContainer.new()
+        w1.add_theme_stylebox_override("panel",
+                Arc.panel_style(Color(tint, 0.16), 20, 10))
+        var hw := HBoxContainer.new()
+        hw.alignment = BoxContainer.ALIGNMENT_CENTER
+        hw.add_theme_constant_override("separation", 10)
+        var dot := ColorRect.new()
+        dot.custom_minimum_size = Vector2(26, 26)
+        dot.color = tint
+        dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        hw.add_child(dot)
+        var w1l := Arc.label("%s  %s" % [Arc.short_num(
+                GameCoin.balance(gid)), String(rec["name"])], 28,
+                Color("5a4020"))
+        hw.add_child(w1l)
+        w1.add_child(hw)
+        vb.add_child(w1)
+        var w2 := PanelContainer.new()
+        w2.add_theme_stylebox_override("panel",
+                Arc.panel_style(Color(Arc.COIN, 0.14), 20, 10))
+        var hw2 := HBoxContainer.new()
+        hw2.alignment = BoxContainer.ALIGNMENT_CENTER
+        hw2.add_theme_constant_override("separation", 10)
+        var ic := TextureRect.new()
+        ic.texture = load(COIN_ICON)
+        ic.custom_minimum_size = Vector2(28, 28)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        hw2.add_child(ic)
+        var w2l := Arc.label("%s  GOGACOINS" % Box.coins_display(), 26,
+                Arc.COIN)
+        hw2.add_child(w2l)
+        w2.add_child(hw2)
+        vb.add_child(w2)
+        # THE RATE LAW: plain in the widget
+        var rate_v := GameCoin.rate(gid)
+        var rate_txt := "%s" % Arc.short_num(int(rate_v))
+        if absf(rate_v - roundf(rate_v)) > 0.0001:
+                rate_txt = "%.3f" % rate_v
+        var rl := Arc.label("each GOGACoin = %s %s" % [rate_txt,
+                String(rec["name"])], 20, Color("8a6a40"), false)
+        rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(rl)
+        # THE AMOUNT LAW: the number, hard-capped at the wallet, with the
+        # live "= nn" preview beside it
+        var cap := Box.coins()
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 12)
+        var field := LineEdit.new()
+        field.custom_minimum_size = Vector2(300, 72)
+        field.max_length = 9
+        field.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+        field.add_theme_font_override("font", Arc.font_big())
+        field.add_theme_font_size_override("font_size", 30)
+        field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+        field.placeholder_text = "0"
+        row.add_child(field)
+        var prev := Arc.label("=  0", 26, Color("5a4020"))
+        prev.custom_minimum_size = Vector2(240, 0)
+        row.add_child(prev)
+        vb.add_child(row)
+        var maxb := Arc.button("MAX", Vector2(240, 56), 22, Arc.ACCENT,
+                func(): field.text = str(cap))
+        var mc := HBoxContainer.new()
+        mc.alignment = BoxContainer.ALIGNMENT_CENTER
+        mc.add_child(maxb)
+        vb.add_child(mc)
+        var state := {"amount": 0}
+        field.text_changed.connect(func(t: String):
+                var digits := ""
+                for ch in t:
+                        if ch >= "0" and ch <= "9":
+                                digits += ch
+                var n := mini(int(digits) if digits != "" else 0, cap)
+                # THE CAP: never more than the current total GOGACoins
+                if t != "" and digits != "" and int(digits) > cap:
+                        field.text = str(cap)
+                        field.caret_column = field.text.length()
+                elif t != str(n):
+                        field.text = str(n)
+                        field.caret_column = field.text.length()
+                state["amount"] = n
+                maxb.disabled = cap <= 0
+                prev.text = "=  %s %s" % [Arc.short_num(
+                        GameCoin.convert(n, rate_v)), String(rec["name"])])
+        # THE CONFIRM LAW: the top-up button opens the confirmation first
+        var top := Arc.button("TOP-UP", Vector2(540, 84), 30, Arc.GOOD,
+                func():
+                        var n := int(state["amount"])
+                        if n <= 0 or cap <= 0:
+                                Jukebox.sfx("error", -4.0)
+                                return
+                        _topup_confirm(gid, n))
+        vb.add_child(top)
+        vb.add_child(Arc.button("BACK", Vector2(540, 64), 24,
+                Color(0.42, 0.30, 0.16), func():
+                        _close_sheet()
+                        _open_topup_picker()))
+        Arc.fit_sheet(vb, 2)
+
+## the confirmation sheet: the two wallets, the amount, the result line,
+## CONFIRM / CANCEL - nothing moves before this
+func _topup_confirm(gid: String, n: int) -> void:
+        var rec := GameCoin.record(gid)
+        var rate_v := GameCoin.rate(gid)
+        var out := GameCoin.convert(n, rate_v)
+        var h := _sheet_height(620.0)
+        var vb := _sheet_base(h)
+        var title := Arc.label("CONFIRM TOP-UP", 36, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var lines := "%d GOGACoins  ->  %s %s\ninto %s" % [n,
+                Arc.short_num(out), String(rec["name"]), String(rec["title"])]
+        var body := Arc.label(lines, 26, Color("5a4020"), false)
+        body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        vb.add_child(body)
+        var row := HBoxContainer.new()
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        row.add_theme_constant_override("separation", 16)
+        row.add_child(Arc.button("CANCEL", Vector2(260, 76), 26,
+                Color(0.42, 0.30, 0.16), func(): _close_sheet()))
+        row.add_child(Arc.button("CONFIRM", Vector2(260, 76), 26, Arc.GOOD,
+                func(): _topup_settle(gid, n, out)))
+        vb.add_child(row)
+        Arc.fit_sheet(vb, 2)
+
+## THE SETTLE LAW: exactly two writes - GOGACoins down, the game's coins
+## up - then the exchange screen rebuilds with the fresh wallets
+func _topup_settle(gid: String, n: int, out: int) -> void:
+        if n <= 0 or out <= 0:
+                _close_sheet()
+                return
+        if not Box.spend(n):
+                _close_sheet()
+                return
+        GameCoin.add(gid, out)
+        Jukebox.sfx("coin", -2.0)
+        _wallet_label.text = Box.coins_display()
+        _close_sheet()
+        _open_topup_game(gid)
 
 # ---------------------------------------------------------------- sheets
 
