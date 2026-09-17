@@ -2608,19 +2608,23 @@ func _sheet_open(sheet_height: float, id: String, sheet_width: float, build: Cal
 ## THE SCROLL TRUTH (v0.3.5-4): the refresh keeps the scroll - the owner
 ## buys down at row 50, the refreshed list opens AT row 50, never at the
 ## top again (shop AND maps ride the same law).
-var _sheet_scroll := {}      # sheet id -> the scroll offset to restore
-
 func _sheet_refresh(sheet_height: float, id: String, sheet_width: float, build: Callable) -> void:
+        # v040-11 THE CONTINUITY LAW: the dying list REMEMBERS its offset
+        # (BoxScroll.remember under the sheet's own key) and the rebuilt one
+        # reinstates it the same frame - the pending restore lands on the
+        # first sort, BEFORE the first draw. No 2-frame dance, no blink.
         if not _sheet_stack.is_empty() and String((_sheet_stack.back() as Dictionary).get("id", "")) == id:
                 var old_sc := _find_box_scroll((_sheet_stack.back() as Dictionary)["cc"])
                 if old_sc != null:
-                        _sheet_scroll[id] = old_sc.scroll_vertical
+                        old_sc.preserve_key = "ps_" + id
+                        old_sc.remember()
                 sheet_pop()
         _sheet_open(sheet_height, id, sheet_width, build)
-        if _sheet_scroll.has(id):
-                var want: int = int(_sheet_scroll[id])
-                _sheet_scroll.erase(id)
-                _restore_scroll_later(want)
+        if not _sheet_stack.is_empty():
+                var sc := _find_box_scroll((_sheet_stack.back() as Dictionary)["cc"])
+                if sc != null:
+                        sc.preserve_key = "ps_" + id
+                        sc.reinstate()
 
 func _find_box_scroll(root: Node) -> BoxScroll:
         if root is BoxScroll:
@@ -2630,16 +2634,6 @@ func _find_box_scroll(root: Node) -> BoxScroll:
                 if f != null:
                         return f
         return null
-
-func _restore_scroll_later(want: int) -> void:
-        # the offset only sticks once the rebuilt sheet has laid out twice
-        await get_tree().process_frame
-        await get_tree().process_frame
-        if _sheet_stack.is_empty():
-                return
-        var sc := _find_box_scroll((_sheet_stack.back() as Dictionary)["cc"])
-        if sc != null:
-                sc.scroll_vertical = want
 
 func _goga_sheet_popped(_id: String) -> void:
         if _sheet_stack.is_empty() and not over:

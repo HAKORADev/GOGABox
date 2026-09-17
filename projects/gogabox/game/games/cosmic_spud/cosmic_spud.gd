@@ -544,21 +544,28 @@ func _cs_reopen(build: Callable) -> void:
         # v0.3.8-4 THE SCROLL SEAT LAW (the owner: "in the shop, if i buy
         # something from the bottom, the shop menu refreshes and returns me
         # to the top... make it just let me in my place while updating the
-        # list normally"): the rebuild CAPTURES the old sheet's scroll
-        # offset and seats the rebuilt one back at it (the pop-siege law).
-        var want := -1
+        # list normally"). v040-11 THE CONTINUITY LAW: the dying list
+        # REMEMBERS under the CS key and the rebuilt one reinstates the
+        # same frame - the pending restore lands before the first draw,
+        # so the old 2-frame blink is dead too.
+        var had_scroll := false
         if not cs_sheets.is_empty():
                 var s: Dictionary = cs_sheets.pop_back()
                 var old_sc := _cs_find_scroll(s["dim"])
                 if old_sc != null:
-                        want = int(old_sc.scroll_vertical)
+                        old_sc.preserve_key = "cs_sheet"
+                        old_sc.remember()
+                        had_scroll = true
                 (s["dim"] as Control).queue_free()
                 if cs_sheets.is_empty():
                         get_tree().paused = false
                         paused = false
         build.call()
-        if want >= 0:
-                _cs_restore_scroll(want)
+        if had_scroll and not cs_sheets.is_empty():
+                var sc := _cs_find_scroll((cs_sheets.back() as Dictionary)["dim"])
+                if sc != null:
+                        sc.preserve_key = "cs_sheet"
+                        sc.reinstate()
 
 func _cs_find_scroll(root: Node) -> BoxScroll:
         if root is BoxScroll:
@@ -568,16 +575,6 @@ func _cs_find_scroll(root: Node) -> BoxScroll:
                 if f != null:
                         return f
         return null
-
-func _cs_restore_scroll(want: int) -> void:
-        # the offset only sticks once the rebuilt sheet has laid out twice
-        await get_tree().process_frame
-        await get_tree().process_frame
-        if cs_sheets.is_empty():
-                return
-        var sc := _cs_find_scroll((cs_sheets.back() as Dictionary)["dim"])
-        if sc != null:
-                sc.scroll_vertical = want
 
 ## THE BACK LAW (v0.3.4-2 - THE DOOR): the HUD "<" and the Android back both
 ## land here. Over a RUNNING game a CS sheet closes first, else the box pause
