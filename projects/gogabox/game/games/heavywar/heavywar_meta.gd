@@ -69,6 +69,22 @@ func set_upg(id: String, lvl: int) -> void:
         (d["upg"] as Dictionary)[id] = lvl
         save()
 
+# ------------------------------------------ THE GOGA UNLOCKS (v040-10)
+## THE TWO-KEY LAW (the owner: "two expensive upgrades one to unlock
+## rockets weapon to be able to be bought/upgraded in scrap shop and the
+## other for machine guns"): the GOGACoin SHOP sells exactly TWO keys -
+## ROCKETS and MACHINE GUNS. A key does NOT grant the weapon; it opens
+## that weapon's shelf rows in the SCRAP SHOP, where the scrap pays for
+## the real pods and racks.
+func goga_ok(id: String) -> bool:
+        return int((d.get("goga", {}) as Dictionary).get(id, 0)) > 0
+
+func set_goga(id: String) -> void:
+        if not d.has("goga"):
+                d["goga"] = {}
+        (d["goga"] as Dictionary)[id] = 1
+        save()
+
 # ------------------------------------------------------------------ records
 func record_run(kills: int, places: int, loops: int, bosses: int) -> void:
         d["runs"] = int(d["runs"]) + 1

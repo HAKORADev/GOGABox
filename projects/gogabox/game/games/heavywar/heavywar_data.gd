@@ -33,9 +33,9 @@ const PLANE_GROUND := 1.0
 # kinds - KILLS (a quota of kills ends it), TIME (survive the clock) or
 # BOTH - and the clocks GROW as the waves climb (wave 1 is short, the
 # owner: "waves will go up in time").
-const WAVE_TIME_BASE := 34.0         # wave 1's clock
-const WAVE_TIME_STEP := 7.0          # +7s a wave
-const WAVE_TIME_CAP := 165.0
+const WAVE_TIME_BASE := 30.0         # wave 1's clock (v040-10: tighter - the EITHER law ends waves the moment their target is met)
+const WAVE_TIME_STEP := 6.0          # +6s a wave
+const WAVE_TIME_CAP := 135.0
 const WAVES_PER_PLACE := 10
 
 # ------------------------------------------------------------- the 10 places

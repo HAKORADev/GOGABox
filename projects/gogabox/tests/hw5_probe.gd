@@ -469,20 +469,58 @@ func _run() -> void:
                 float(ke["ang"]),
                 atan2(float(ke["vy"]), float(ke["vx"])))) < 0.6,
                 "THE DIVE ANGLE: the nose faces the fall smoothly")
+        # v040-10 THE FACING LAW (the owner: "it goes first from left to
+        # right but it's body is facing the left side"): every dir-signed
+        # mover's nose must agree with its actual velocity - simulated a
+        # full wave of combat, no machine may outrun its own facing
+        var facing_ok := true
+        var bad_kind := ""
+        for i in 240:
+                G._spawn_enemy()
+                G._update_enemies(1.0 / 60.0)
+        for e in G.enemies:
+                var d: Dictionary = e
+                if String(d.get("kind", "")) == "boss":
+                        continue
+                if String(d.get("move", "")) in ["static"]:
+                        continue
+                if bool(d.get("diving", false)):
+                        continue
+                # the law: dir == the sign of the body's travel for every
+                # mover (the hover approach moves toward hover_x - its dir
+                # must agree with that travel)
+                if String(d.get("move", "")) == "hover" \
+                                and String(d.get("stage", "")) == "approach":
+                        var want_dir := 1 if float(d["x"]) \
+                                < float(d["hover_x"]) else -1
+                        if int(d["dir"]) != want_dir:
+                                facing_ok = false
+                                bad_kind = String(d["kind"])
+        ck(facing_ok, "THE FACING LAW: every mover's nose agrees with its travel%s"
+                % ("" if facing_ok else " (%s)" % bad_kind))
         # THE TANK SCALE: the hull slab and the hitbox read the same law
         ck(G.TANK_S < 0.4,
                 "THE TANK SCALE: the machine is 1/3 of its old bulk")
-        # THE TOP-UP: the box shop sells the upgrades for GOGACoins
+        # v040-10 THE TWO-KEY LAW: the GOGACoin SHOP sells EXACTLY TWO
+        # keys (rockets + machine guns); a key OPENS the scrap shop's
+        # weapon rows - it does not grant the weapon
         Box.earn(10000)
-        var scrap_lvl0: int = meta.upg_lvl("wheels")
-        var upg_row_price: int = maxi(1, int(ceil(
-                float(HWData.shop_cost(HWData.shop_item("wheels"),
-                scrap_lvl0)) / 5.0)))
-        # buy the wheels level through the coin path (the box shop's law)
-        if Box.spend(upg_row_price):
-                meta.set_upg("wheels", scrap_lvl0 + 1)
-        ck(meta.upg_lvl("wheels") == scrap_lvl0 + 1,
-                "THE BOX UPGRADES: GOGACoins unlock shelf levels")
+        ck(G.GOGA_KEYS.size() == 2 and G.GOGA_KEYS.has("rockets") \
+                and G.GOGA_KEYS.has("mg"),
+                "THE TWO-KEY LAW: the GOGA shop sells exactly two keys")
+        ck(not meta.goga_ok("rockets"),
+                "THE KEY LAW: the rockets shelf starts sealed")
+        var key_price: int = int(G.GOGA_KEYS["rockets"]["price"])
+        ck(key_price >= 1000, "THE KEY LAW: the key is EXPENSIVE (%d)" % key_price)
+        if Box.spend(key_price):
+                meta.set_goga("rockets")
+        ck(meta.goga_ok("rockets"),
+                "THE KEY LAW: the bought key opens the weapon's rows")
+        ck(not meta.goga_ok("mg"),
+                "THE KEY LAW: the OTHER weapon stays sealed until its key")
+        # the scrap unlocks still need their scrap - the key only permits
+        ck(meta.upg_lvl("rockets") == 0,
+                "THE SPLIT LAW: the key permits; the scrap still pays for the pods")
         ck(Box.coins() >= 0, "the wallet survived the buy")
         Box.reset_all()
         GameCoin.add("heavywar", 5)

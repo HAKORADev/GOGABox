@@ -118,3 +118,57 @@ thirteen vehicles, nine shots, twelve explosion frames, five place bakes with
 our buried decals, the shop previews, the coin/dot/pow icons, the composed
 960x640 thumbnail. `tools/v0409_worm_sfx.py` — the 15 dw_* voices + two place
 beds (numpy synth, the house law).
+
+---
+
+## THE V040-10 ROUND (the owner's report, worked to the bone)
+
+The teacher's own numbers took over. The official APK was re-pulled
+(com.playcreek.DeathWorm_Free 3.0.021), the atlases + the DragonBones
+worm rigs cut 1:1 (tools/v0410_worm_study.py), and the forge rebuilt
+every asset from the REAL pieces (tools/v0410_worm_art.py): the ten
+worms wear the original's own heads/jaws/bodies/tails (hue-graded into
+ours), the humans run their real 10-frame cycles, the helicopters and
+planes fly their real rotor/prop frames, the explosions are the source's
+own 24-frame blast, and every place bakes the ORIGINAL's own layer stack
+(sky_back base + sky_03/sky_02 clouds + the sky_01 props skyline + the
+road tile + the dirt tile + the real bound walls + the buried tomb and
+bones decals).
+
+New laws this round:
+
+1. **THE WORLD LAW** - the place is x3.2 the screen width, the sky 1.25
+   screens above the line, the dirt 1.4 screens below (the original's
+   own bounds: -1300..1300 wide, sky to -1184, dirt to +500). The camera
+   follows the worm on BOTH axes; the far props ride a light parallax.
+2. **THE FULL-SCREEN LAW** - W/H seat from the LIVE viewport. No brown
+   fallback bars, on any phone, ever.
+3. **THE SPAWN + DESPAWN LAW** - everything spawns fully off-camera and
+   dies (record + sprite) once far outside it.
+4. **THE FACING LAW** - things art faces LEFT natively (flip when moving
+   right); the worm faces RIGHT (rotate + flip_v only). Baked at the
+   forge, asserted in the probe.
+5. **THE SILHOUETTE LAW** - the deeper the worm swims the darker it goes
+   (the original's underground read), dragging a fading dirt trail.
+6. **THE ANIM LAW** - human/animal/vehicle animation steps follow their
+   bodies' speeds.
+7. **THE TEN LEVELS** - every worm caps at level 10; the curve is ~6x
+   slower (~6.1K points to max - "i maxed the worm in two plays").
+8. **THE COIN HONESTY** - a collected wormCoin frees its sprite the same
+   frame (v040-9's stuck coins died here) and pulses the wallet chip.
+9. **THE BUTTON LAW** - SHOP sits directly after BACK; WORMS after it.
+10. **THE POWER-UP LAW** - power-ups price in real GOGACoins (the box
+    coin), the coin icon on the button, the dry wallet gray-out.
+11. **THE NEXT-ROUND LAW** - a mid-run place/worm switch only ARMS; the
+    world rebuilds for the next round (at the intro it applies at once).
+12. **THE MUSIC LAW** - five place beds (desert/ice/city/jungle/kingdom)
+    looping under the hunt.
+13. **THE SCALE LAW** - measured off real gameplay: humans ~6.5% of the
+    screen height, the worm head ~11% (HEAD_H 118 at scale 1), the girth
+    law sizes every chain piece to the worm's own body width.
+
+The dead v040-9 bugs (for the record): the DOUBLE-OFFSET render bug (the
+chain/things painted camera-relative INSIDE the camera-translated world
+- hidden in v040-9 by the tiny 192px camera range, fatal at the new
+width), the "animal" spawn roll crashing into the vehicle table, the
+birds hitting the missing VEH_HP key.

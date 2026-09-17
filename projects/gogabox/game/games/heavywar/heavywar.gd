@@ -1120,10 +1120,19 @@ func _tick_place(delta: float) -> void:
                                 "kills":
                                         done = quota_ok
                                 "both":
-                                        done = quota_ok and clock_ok
+                                        # v040-10 THE EITHER LAW (the owner:
+                                        # "if one target done then it should
+                                        # end") - the wave dies the MOMENT
+                                        # either the quota or the clock is
+                                        # met; waiting for both was the bug.
+                                        done = quota_ok or clock_ok
                                 _:
                                         done = true
                         if done:
+                                # a clock-out (quota unmet) sends the
+                                # survivors home - the retreat law
+                                if not quota_ok and clock_ok:
+                                        _retreat_survivors()
                                 _wave_end()
                         elif wave_clock >= wave_duration + 45.0:
                                 # the runaway brake: a wave can not stall forever
@@ -2503,9 +2512,13 @@ var tunnel_node: Node2D
 
 func _enter_tunnel() -> void:
         state = GS.TUNNEL
-        tunnel = {"t": 0.0, "phase": "approach", "portal_x": W + 520.0,
-                "inside_t": 0.0, "out_t": 0.0, "swapped": false,
-                "coin_t": 0.0}
+        # v040-10 THE PLAIN PASSAGE LAW (the owner: "it should be part of
+        # place to make you go from-to normally and not like the current
+        # weird AISlop thing"): NO portal mouth, NO pillar show, NO lamp
+        # glow - the road simply runs UNDER the place's own rock overpass,
+        # the same rock the world is made of, and comes out in daylight.
+        tunnel = {"t": 0.0, "phase": "inside", "inside_t": 0.0,
+                "out_t": 0.0, "swapped": false, "coin_t": 0.0}
         enemies.clear()
         eshots.clear()
         boss_ent = {}
@@ -2529,112 +2542,55 @@ func _draw_tunnel() -> void:
                 return
         var t: Dictionary = tunnel
         var phase := String(t["phase"])
-        var rock := Color(0.13, 0.145, 0.175)
-        var rock_hi := Color(0.30, 0.33, 0.40)
-        var rock_lo := Color(0.07, 0.08, 0.10)
-        if phase == "approach":
-                # ---- the MOUTH rides the world: pillars + a dark maw ----
-                var px: float = float(t["portal_x"])
-                if px < W + 120.0:
-                        var mouth_top := GROUND_Y - 540.0
-                        # the dark interior beyond the mouth
-                        tunnel_node.draw_rect(Rect2(px, -40, W + 80 - px,
-                                GROUND_Y + 40), Color(0.045, 0.05, 0.065, 0.98))
-                        # the concrete frame: near pillar + arch + far lip
-                        tunnel_node.draw_rect(Rect2(px - 54.0, mouth_top,
-                                54.0, GROUND_Y - mouth_top), rock)
-                        tunnel_node.draw_rect(Rect2(px - 54.0, mouth_top,
-                                54.0, 26.0), rock_hi)
-                        tunnel_node.draw_rect(Rect2(px - 120.0, mouth_top - 34.0,
-                                174.0, 34.0), rock)
-                        tunnel_node.draw_rect(Rect2(px - 120.0, mouth_top - 34.0,
-                                174.0, 8.0), rock_hi)
-                        tunnel_node.draw_rect(Rect2(px - 62.0, mouth_top,
-                                8.0, GROUND_Y - mouth_top), rock_lo)
-                        # hazard chevrons on the pillar
-                        for ci in 5:
-                                var cy := mouth_top + 70.0 + float(ci) * 92.0
-                                tunnel_node.draw_colored_polygon(
-                                        PackedVector2Array([
-                                                Vector2(px - 40.0, cy),
-                                                Vector2(px - 14.0, cy + 26.0),
-                                                Vector2(px - 14.0, cy + 44.0),
-                                                Vector2(px - 40.0, cy + 18.0)]),
-                                        Color(0.85, 0.62, 0.14, 0.85))
-                        # the mouth lamp
-                        tunnel_node.draw_circle(Vector2(px - 27.0, mouth_top + 18.0),
-                                9.0, Color(1.0, 0.85, 0.5, 0.9))
-                        tunnel_node.draw_circle(Vector2(px - 27.0, mouth_top + 18.0),
-                                26.0, Color(1.0, 0.8, 0.4, 0.12))
-        else:
-                # ---- INSIDE / OUT: the rock ceiling closes over the world ----
-                var opening := 0.0
-                if phase == "out":
-                        opening = clampf(float(t["out_t"]) / 0.85, 0.0, 1.0)
-                var ceil_bot: float = lerpf(GROUND_Y - 74.0, -60.0, opening)
-                # the rock body (covers the sky; the road stays open)
-                tunnel_node.draw_rect(Rect2(-40, -40, W + 80, ceil_bot + 40.0),
-                        Color(0.05, 0.055, 0.07, 0.99))
-                # the jagged rock edge riding the world scroll
-                var step := 96.0
-                var off := fposmod(scroll_x, step)
-                var pts := PackedVector2Array()
-                pts.append(Vector2(-40, ceil_bot - 42.0))
-                var x := -off
-                while x < W + step:
-                        var jag := 26.0 + sin(x * 0.045 + scroll_x * 0.01) * 14.0
-                        pts.append(Vector2(x, ceil_bot - jag))
-                        x += step
-                pts.append(Vector2(W + 40, ceil_bot - 42.0))
-                tunnel_node.draw_colored_polygon(pts, rock)
-                for i in range(1, pts.size() - 1):
-                        tunnel_node.draw_line(pts[i], pts[i + 1], rock_hi, 4.0)
-                # warm lights every 250px
-                var lo := fposmod(scroll_x, 250.0)
-                var lx := -lo
-                while lx < W + 250.0:
-                        tunnel_node.draw_circle(Vector2(lx, ceil_bot - 44.0),
-                                8.0, Color(1.0, 0.85, 0.5, 0.92))
-                        tunnel_node.draw_circle(Vector2(lx, ceil_bot - 44.0),
-                                30.0, Color(1.0, 0.8, 0.4, 0.10))
-                        lx += 250.0
-                # steel ribs every 300px
-                var ro := fposmod(scroll_x, 300.0)
-                var rx := -ro
-                while rx < W + 300.0:
-                        tunnel_node.draw_line(Vector2(rx, -40),
-                                Vector2(rx, ceil_bot - 30.0),
-                                Color(0.24, 0.26, 0.32, 0.85), 7.0)
-                        tunnel_node.draw_line(Vector2(rx + 7, -40),
-                                Vector2(rx + 7, ceil_bot - 30.0),
-                                Color(0.10, 0.11, 0.14, 0.9), 3.0)
-                        rx += 300.0
-                # the EXIT: a growing daylight at the right edge
-                var exit_a: float = clampf((float(t["inside_t"]) - 2.1) / 1.3,
-                        0.0, 1.0) if phase == "inside" else 1.0
-                if exit_a > 0.0:
-                        var glow_w := 240.0 * exit_a
-                        tunnel_node.draw_rect(Rect2(W - glow_w, -40,
-                                glow_w + 40.0, GROUND_Y + 40.0),
-                                Color(HWData.PLACES[place_i % 10]["sky_bot"],
-                                        0.85 * exit_a))
-                        tunnel_node.draw_rect(Rect2(W - glow_w * 0.5, -40,
-                                glow_w * 0.5 + 40.0, GROUND_Y + 40.0),
-                                Color(1, 1, 1, 0.16 * exit_a))
+        # the overpass rock wears the PLACE'S OWN stone colors - it is part
+        # of the place, not a stage prop
+        var pc: Dictionary = HWData.PLACES[place_i % 10]
+        var rock := Color(pc["ground"])
+        var rock_hi := Color(pc["ground_top"])
+        var rock_lo := Color(pc["ground"].darkened(0.45))
+        # ---- INSIDE / OUT: the rock ceiling closes over the world ----
+        var opening := 0.0
+        if phase == "out":
+                opening = clampf(float(t["out_t"]) / 0.7, 0.0, 1.0)
+        var ceil_bot: float = lerpf(GROUND_Y - 96.0, -80.0, opening)
+        # the rock body (covers the sky; the road stays open)
+        tunnel_node.draw_rect(Rect2(-40, -40, W + 80, ceil_bot + 40.0),
+                Color(rock.r * 0.55, rock.g * 0.55, rock.b * 0.55, 0.99))
+        # the jagged rock edge riding the world scroll (the place's stone)
+        var step := 96.0
+        var off := fposmod(scroll_x, step)
+        var pts := PackedVector2Array()
+        pts.append(Vector2(-40, ceil_bot - 42.0))
+        var x := -off
+        while x < W + step:
+                var jag := 26.0 + sin(x * 0.045 + scroll_x * 0.01) * 14.0
+                pts.append(Vector2(x, ceil_bot - jag))
+                x += step
+        pts.append(Vector2(W + 40, ceil_bot - 42.0))
+        tunnel_node.draw_colored_polygon(pts, rock)
+        for i in range(1, pts.size() - 1):
+                tunnel_node.draw_line(pts[i], pts[i + 1], rock_hi, 4.0)
+        # steel ribs every 300px - the tunnel's honest bones, dim and quiet
+        var ro := fposmod(scroll_x, 300.0)
+        var rx := -ro
+        while rx < W + 300.0:
+                tunnel_node.draw_line(Vector2(rx, -40),
+                        Vector2(rx, ceil_bot - 30.0),
+                        Color(0.18, 0.19, 0.22, 0.55), 6.0)
+                rx += 300.0
+        # the day's light spills in from the far end while the walls close
+        var spill: float = clampf((float(t["inside_t"]) - 2.2) / 1.2,
+                0.0, 1.0) if phase == "inside" else 0.0
+        if spill > 0.0:
+                tunnel_node.draw_rect(Rect2(W - 300.0 * spill, -40,
+                        300.0 * spill + 40.0, ceil_bot + 40.0),
+                        Color(HWData.PLACES[(place_i + 1) % 10]["sky_bot"],
+                                0.5 * spill))
 
 func _tick_tunnel(delta: float) -> void:
         var t: Dictionary = tunnel
         t["t"] += delta
         match String(t["phase"]):
-                "approach":
-                        # the world scroll carries the mouth toward the tank
-                        _tick_world_scroll(delta, 2.2)
-                        t["portal_x"] = float(t["portal_x"]) \
-                                - HWData.WORLD_SPEED * 2.2 * delta
-                        if float(t["portal_x"]) <= p_x - 60.0:
-                                t["phase"] = "inside"
-                                t["inside_t"] = 0.0
-                                Jukebox.sfx("rw_tunnel", -8.0)
                 "inside":
                         _tick_world_scroll(delta, 2.6)
                         t["inside_t"] = float(t["inside_t"]) + delta
@@ -2660,7 +2616,7 @@ func _tick_tunnel(delta: float) -> void:
                 "out":
                         _tick_world_scroll(delta, 2.2)
                         t["out_t"] = float(t["out_t"]) + delta
-                        if float(t["out_t"]) >= 0.9:
+                        if float(t["out_t"]) >= 0.8:
                                 _end_tunnel()
         if tunnel_node != null and is_instance_valid(tunnel_node):
                 tunnel_node.queue_redraw()
@@ -3392,6 +3348,15 @@ func _shop_scrap_row(it: Dictionary) -> Control:
         var maxed: bool = lvl >= int(it.get("max", 1)) if not is_unlock \
                 else lvl >= 1
         var locked: bool = it.has("requires") and _shop_lvl(String(it["requires"])) <= 0
+        # v040-10 THE KEY GATE: the weapons' own unlock rows (and their
+        # racks) stay sealed until the GOGACoin SHOP's key for that weapon
+        # is bought - the two-key law
+        var key_id := ""
+        if id == "rockets" or id == "rocket_rack":
+                key_id = "rockets"
+        elif id == "mg" or id == "mg_rack":
+                key_id = "mg"
+        var key_needed: bool = key_id != "" and not meta.goga_ok(key_id)
         var row := PanelContainer.new()
         var sb := StyleBoxFlat.new()
         sb.bg_color = THEME["panel"]
@@ -3435,6 +3400,11 @@ func _shop_scrap_row(it: Dictionary) -> Control:
                 var ml := Arc.label("MAX", 22, THEME["good"])
                 ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
                 v.add_child(ml)
+        elif key_needed:
+                var kn := Arc.label("LOCKED - buy the %s KEY in the SHOP "
+                        % String(GOGA_KEYS[key_id]["name"]), 17, THEME["cost_no"])
+                kn.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+                v.add_child(kn)
         elif locked:
                 var req := String(HWData.shop_item(String(it["requires"])).get("name",
                         String(it["requires"])))
@@ -3443,12 +3413,12 @@ func _shop_scrap_row(it: Dictionary) -> Control:
                 v.add_child(ll)
         else:
                 var cost := HWData.shop_cost(it, lvl)
-                var can := meta.scrap() >= cost
+                var can := meta.scrap() >= cost and not key_needed
                 var bl := Arc.button("BUY   %d scrap" % cost, Vector2(600, 54), 20,
                         THEME["cost"] if can else THEME["cost_no"], Callable())
                 bl.disabled = not can
                 bl.pressed.connect(func():
-                        if maxed or meta.scrap() < cost:
+                        if maxed or key_needed or meta.scrap() < cost:
                                 Jukebox.sfx("rw_no", -6.0)
                                 return
                         if meta.spend_scrap(cost):
@@ -3498,14 +3468,17 @@ func _box_shop_open() -> void:
         box.add_child(_shop_lbl("TANK SKINS"))
         for id in HWData.SKINS:
                 box.add_child(_shop_skin_row(id))
-        # v040-8 THE UPGRADES SHELF (the owner: "they were there so user
-        # pay GOGACoins to be able to unlock specific upgrades"): the same
-        # 8 shelf items, priced in GOGACoins at the box rate - 1 GOGACoin
-        # is worth 5 scrap (the top-up law), so a GOGACoin buy is never a
-        # cheat, it is the same price paid in the box's own coin.
-        box.add_child(_shop_lbl("UPGRADES"))
-        for it in HWData.SHOP_ITEMS:
-                box.add_child(_shop_coin_upg_row(it))
+        # v040-10 THE TWO-KEY LAW (the owner: "you misunderstood it and
+        # putted the scrap shop upgrades in it but for GOGACoins... i meant
+        # two expensive upgrades one to unlock rockets weapon to be able to
+        # be bought/upgraded in scrap shop and the other for machine
+        # guns"): the GOGACoin shelf sells EXACTLY TWO keys - the rockets
+        # key and the machine-guns key. Nothing else. A key opens that
+        # weapon's rows in the SCRAP SHOP; the scrap still pays for the
+        # pods and the racks.
+        box.add_child(_shop_lbl("WEAPON KEYS"))
+        box.add_child(_shop_goga_key_row("rockets"))
+        box.add_child(_shop_goga_key_row("mg"))
         var close_b := Arc.button("CLOSE", Vector2(560, 70), 24, Arc.ACCENT,
                 func(): sheet_pop())
         var cc := HBoxContainer.new()
@@ -3518,21 +3491,26 @@ func _box_shop_open() -> void:
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
 
-## one GOGACoin-priced upgrade row: the same levels the SCRAP SHOP sells,
-## the price converted at the box rate (1 GOGACoin = 5 scrap)
-func _shop_coin_upg_row(it: Dictionary) -> Control:
-        var id := String(it["id"])
-        var lvl := _shop_lvl(id)
-        var is_unlock := bool(it.get("unlock", false))
-        var maxed: bool = lvl >= int(it.get("max", 1)) if not is_unlock \
-                else lvl >= 1
-        var locked: bool = it.has("requires") and _shop_lvl(String(it["requires"])) <= 0
+## one GOGACoin KEY row (v040-10): expensive, one-shot, permanent -
+## "UNLOCK ROCKETS" / "UNLOCK MACHINE GUNS"; owned rows read INSTALLED
+const GOGA_KEYS := {
+        "rockets": {"name": "ROCKET SYSTEMS", "price": 1200,
+                "line": "the key that lets the SCRAP SHOP sell you the "
+                + "ROCKET PODS and their racks"},
+        "mg": {"name": "MACHINE GUN SYSTEMS", "price": 1500,
+                "line": "the key that lets the SCRAP SHOP sell you the "
+                + "MG BARRELS and their racks"},
+}
+
+func _shop_goga_key_row(id: String) -> Control:
+        var k: Dictionary = GOGA_KEYS[id]
+        var owned := meta.goga_ok(id)
         var row := PanelContainer.new()
         var sb := StyleBoxFlat.new()
         sb.bg_color = THEME["panel"]
         sb.set_corner_radius_all(10)
-        sb.border_color = THEME["good"] if maxed else THEME["border"]
-        sb.set_border_width_all(2 if maxed else 1)
+        sb.border_color = THEME["good"] if owned else THEME["border"]
+        sb.set_border_width_all(2 if owned else 1)
         sb.content_margin_left = 14
         sb.content_margin_right = 14
         sb.content_margin_top = 8
@@ -3544,50 +3522,31 @@ func _shop_coin_upg_row(it: Dictionary) -> Control:
         var top := HBoxContainer.new()
         top.add_theme_constant_override("separation", 10)
         v.add_child(top)
-        var name_l := Arc.label(String(it["name"]), 22,
-                THEME["text"] if not locked else THEME["mute"])
+        var name_l := Arc.label(String(k["name"]), 22,
+                THEME["text"] if not owned else THEME["good"])
         name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         top.add_child(name_l)
-        if not is_unlock:
-                var pips := HBoxContainer.new()
-                pips.add_theme_constant_override("separation", 4)
-                for k in int(it.get("max", 1)):
-                        var pip := ColorRect.new()
-                        pip.custom_minimum_size = Vector2(16, 8)
-                        pip.color = THEME["accent"] if k < lvl \
-                                else Color(0.47, 0.5, 0.55, 0.18)
-                        pips.add_child(pip)
-                top.add_child(pips)
-        else:
-                var st := Arc.label("INSTALLED" if lvl > 0 else "-", 18,
-                        THEME["good"] if lvl > 0 else THEME["mute"])
-                top.add_child(st)
-        var desc := Arc.label(String(it["desc"]), 16,
-                THEME["dim"] if not locked else THEME["mute"], false)
+        var st := Arc.label("OWNED" if owned else "LOCKED", 18,
+                THEME["good"] if owned else THEME["mute"])
+        top.add_child(st)
+        var desc := Arc.label(String(k["line"]), 16, THEME["dim"], false)
         v.add_child(desc)
-        if maxed:
-                var ml := Arc.label("MAX", 22, THEME["good"])
+        if owned:
+                var ml := Arc.label("OPEN IN THE SCRAP SHOP", 18, THEME["good"])
                 ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
                 v.add_child(ml)
-        elif locked:
-                var req := String(HWData.shop_item(String(it["requires"])).get("name",
-                        String(it["requires"])))
-                var ll := Arc.label("LOCKED - needs %s" % req, 17, THEME["cost_no"])
-                ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-                v.add_child(ll)
         else:
-                var scrap_cost := HWData.shop_cost(it, lvl)
-                var coin_cost := maxi(1, int(ceil(float(scrap_cost) / 5.0)))
-                var bl := Arc.coin_button("BUY  %s  %d" % [String(it["name"]),
-                        coin_cost], Vector2(600, 54), 20, Arc.ACCENT, func():
-                        if maxed:
-                                Jukebox.sfx("rw_no", -6.0)
-                                return
-                        if Box.spend(coin_cost):
-                                meta.set_upg(id, lvl + 1)
-                                Jukebox.sfx("rw_buy", -4.0)
-                        _box_shop_reopen())
-                if Box.coins() < coin_cost:
+                var price := int(k["price"])
+                var bl := Arc.coin_button("UNLOCK  %d" % price,
+                        Vector2(600, 54), 20, Arc.ACCENT, func():
+                                if Box.spend(price):
+                                        meta.set_goga(id)
+                                        Jukebox.sfx("rw_buy", -4.0)
+                                        _banner("%s UNLOCKED - the SCRAP SHOP "
+                                                + "sells them now"
+                                                % String(k["name"]), 2.4)
+                                _box_shop_reopen())
+                if Box.coins() < price:
                         bl.disabled = true   # a dry wallet never buys
                 v.add_child(bl)
         return row

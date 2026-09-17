@@ -368,1569 +368,1569 @@
    "provenance": "v0.3.6 GEOMETRY FLASH: 100% original neon-filled redesigns by tools/v036_gf_art.py (study-informed anatomy per docs/goga_docs/gogames_ideas/geometry.md + docs/DECOMPILATION.md). Re-derive: python3 tools/v036_gf_art.py && python3 tools/v036_gf_sfx.py. The owner's laws live in the game header (game/games/geometry/geometry.gd). | v0.3.6-1: the p1 pass is 100% original too - tools/v036p1_gf_art.py (the p_soft/p_streak/p_puff/p_star particle vocabulary, the shield_core mark, the pow_* capsule icons, and the re-filled block/line/strip/pusher surfaces) + tools/v036p1_gf_sfx.py (gf_pow/gf_pow_end/gf_save/gf_reentry, all synthesized).",
    "notes": "edges/glow drawn near-white so the THEMES recolor the world by modulate; skins carry their own identity colors and are never theme-tinted; no faces on the square (owner law)"
   },
+  "assets/games/rockbreaker/world/rockcoin.png": {
+   "source": "deathworm-study",
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+  },
   "assets/games/deathworm/coin.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/dot.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
-  "assets/games/deathworm/things/animals/bear_0.png": {
+  "assets/games/deathworm/places/city_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_1.png": {
+  "assets/games/deathworm/places/city_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_2.png": {
+  "assets/games/deathworm/places/city_dirt.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_3.png": {
+  "assets/games/deathworm/places/city_far.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_4.png": {
+  "assets/games/deathworm/places/city_road.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_5.png": {
+  "assets/games/deathworm/places/city_sky.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bear_6.png": {
+  "assets/games/deathworm/places/dec_bones.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bird_0.png": {
+  "assets/games/deathworm/places/dec_tomb.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bird_1.png": {
+  "assets/games/deathworm/places/desert_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bird_2.png": {
+  "assets/games/deathworm/places/desert_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bird_3.png": {
+  "assets/games/deathworm/places/desert_dirt.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/bird_4.png": {
+  "assets/games/deathworm/places/desert_far.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_0.png": {
+  "assets/games/deathworm/places/desert_road.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_1.png": {
+  "assets/games/deathworm/places/desert_sky.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_2.png": {
+  "assets/games/deathworm/places/jungle_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_3.png": {
+  "assets/games/deathworm/places/jungle_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_4.png": {
+  "assets/games/deathworm/places/jungle_dirt.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_5.png": {
+  "assets/games/deathworm/places/jungle_far.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_6.png": {
+  "assets/games/deathworm/places/jungle_road.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_7.png": {
+  "assets/games/deathworm/places/jungle_sky.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_8.png": {
+  "assets/games/deathworm/places/medieval_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/camel_9.png": {
+  "assets/games/deathworm/places/medieval_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_0.png": {
+  "assets/games/deathworm/places/medieval_dirt.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_1.png": {
+  "assets/games/deathworm/places/medieval_far.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_2.png": {
+  "assets/games/deathworm/places/medieval_road.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_3.png": {
+  "assets/games/deathworm/places/medieval_sky.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_4.png": {
+  "assets/games/deathworm/places/polar_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/lizard_5.png": {
+  "assets/games/deathworm/places/polar_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/mole_0.png": {
+  "assets/games/deathworm/places/polar_dirt.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/mole_1.png": {
+  "assets/games/deathworm/places/polar_far.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/mole_2.png": {
+  "assets/games/deathworm/places/polar_road.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/mole_3.png": {
+  "assets/games/deathworm/places/polar_sky.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_0.png": {
+  "assets/games/deathworm/things/animals/bear_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_1.png": {
+  "assets/games/deathworm/things/animals/bear_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_2.png": {
+  "assets/games/deathworm/things/animals/bear_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_3.png": {
+  "assets/games/deathworm/things/animals/bear_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_4.png": {
+  "assets/games/deathworm/things/animals/bear_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/penguin_5.png": {
+  "assets/games/deathworm/things/animals/bear_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_0.png": {
+  "assets/games/deathworm/things/animals/bear_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_1.png": {
+  "assets/games/deathworm/things/animals/camel_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_2.png": {
+  "assets/games/deathworm/things/animals/camel_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_3.png": {
+  "assets/games/deathworm/things/animals/camel_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_4.png": {
+  "assets/games/deathworm/things/animals/camel_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_5.png": {
+  "assets/games/deathworm/things/animals/camel_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_6.png": {
+  "assets/games/deathworm/things/animals/penguin_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_7.png": {
+  "assets/games/deathworm/things/animals/penguin_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/puma_8.png": {
+  "assets/games/deathworm/things/animals/penguin_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_0.png": {
+  "assets/games/deathworm/things/animals/penguin_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_1.png": {
+  "assets/games/deathworm/things/animals/penguin_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_2.png": {
+  "assets/games/deathworm/things/animals/penguin_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_3.png": {
+  "assets/games/deathworm/things/animals/puma_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_4.png": {
+  "assets/games/deathworm/things/animals/puma_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_5.png": {
+  "assets/games/deathworm/things/animals/puma_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_6.png": {
+  "assets/games/deathworm/things/animals/tiger_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_7.png": {
+  "assets/games/deathworm/things/animals/tiger_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/tiger_8.png": {
+  "assets/games/deathworm/things/animals/tiger_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_0.png": {
+  "assets/games/deathworm/things/animals/yeti_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_1.png": {
+  "assets/games/deathworm/things/animals/yeti_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_2.png": {
+  "assets/games/deathworm/things/animals/yeti_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_3.png": {
+  "assets/games/deathworm/things/animals/yeti_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_4.png": {
+  "assets/games/deathworm/things/animals/yeti_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/animals/yeti_5.png": {
+  "assets/games/deathworm/things/animals/yeti_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/btr.png": {
+  "assets/games/deathworm/things/humans/arab_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/car_body.png": {
+  "assets/games/deathworm/things/humans/arab_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/car_wheel.png": {
+  "assets/games/deathworm/things/humans/arab_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/drone.png": {
+  "assets/games/deathworm/things/humans/arab_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/heli_body.png": {
+  "assets/games/deathworm/things/humans/arab_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/heli_body2.png": {
+  "assets/games/deathworm/things/humans/arab_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/heli_police.png": {
+  "assets/games/deathworm/things/humans/arab_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/launcher.png": {
+  "assets/games/deathworm/things/humans/arab_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/plane.png": {
+  "assets/games/deathworm/things/humans/arab_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/tank.png": {
+  "assets/games/deathworm/things/humans/arab_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/truck_body.png": {
+  "assets/games/deathworm/things/humans/casual1_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/truck_wheel.png": {
+  "assets/games/deathworm/things/humans/casual1_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/vehicles/ufo.png": {
+  "assets/games/deathworm/things/humans/casual1_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_0.png": {
+  "assets/games/deathworm/things/humans/casual1_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_1.png": {
+  "assets/games/deathworm/things/humans/casual1_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_2.png": {
+  "assets/games/deathworm/things/humans/casual1_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_3.png": {
+  "assets/games/deathworm/things/humans/casual1_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_4.png": {
+  "assets/games/deathworm/things/humans/casual1_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_5.png": {
+  "assets/games/deathworm/things/humans/casual1_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_6.png": {
+  "assets/games/deathworm/things/humans/casual1_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/bazooka_7.png": {
+  "assets/games/deathworm/things/humans/casual2_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_0.png": {
+  "assets/games/deathworm/things/humans/casual2_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_1.png": {
+  "assets/games/deathworm/things/humans/casual2_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_2.png": {
+  "assets/games/deathworm/things/humans/casual2_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_3.png": {
+  "assets/games/deathworm/things/humans/casual2_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_4.png": {
+  "assets/games/deathworm/things/humans/casual2_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_5.png": {
+  "assets/games/deathworm/things/humans/casual2_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_6.png": {
+  "assets/games/deathworm/things/humans/casual2_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual1_7.png": {
+  "assets/games/deathworm/things/humans/casual2_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_0.png": {
+  "assets/games/deathworm/things/humans/casual2_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_1.png": {
+  "assets/games/deathworm/things/humans/casual3_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_2.png": {
+  "assets/games/deathworm/things/humans/casual3_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_3.png": {
+  "assets/games/deathworm/things/humans/casual3_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_4.png": {
+  "assets/games/deathworm/things/humans/casual3_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_5.png": {
+  "assets/games/deathworm/things/humans/casual3_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_6.png": {
+  "assets/games/deathworm/things/humans/casual3_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual2_7.png": {
+  "assets/games/deathworm/things/humans/casual3_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_0.png": {
+  "assets/games/deathworm/things/humans/casual3_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_1.png": {
+  "assets/games/deathworm/things/humans/casual3_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_2.png": {
+  "assets/games/deathworm/things/humans/casual3_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_3.png": {
+  "assets/games/deathworm/things/humans/jungle1_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_4.png": {
+  "assets/games/deathworm/things/humans/jungle1_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_5.png": {
+  "assets/games/deathworm/things/humans/jungle1_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_6.png": {
+  "assets/games/deathworm/things/humans/jungle1_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/casual3_7.png": {
+  "assets/games/deathworm/things/humans/jungle1_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_0.png": {
+  "assets/games/deathworm/things/humans/jungle1_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_1.png": {
+  "assets/games/deathworm/things/humans/jungle1_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_2.png": {
+  "assets/games/deathworm/things/humans/jungle1_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_3.png": {
+  "assets/games/deathworm/things/humans/jungle1_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_4.png": {
+  "assets/games/deathworm/things/humans/jungle1_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_5.png": {
+  "assets/games/deathworm/things/humans/jungle2_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_6.png": {
+  "assets/games/deathworm/things/humans/jungle2_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/jetpack_7.png": {
+  "assets/games/deathworm/things/humans/jungle2_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_0.png": {
+  "assets/games/deathworm/things/humans/jungle2_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_1.png": {
+  "assets/games/deathworm/things/humans/jungle2_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_2.png": {
+  "assets/games/deathworm/things/humans/jungle2_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_3.png": {
+  "assets/games/deathworm/things/humans/jungle2_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_4.png": {
+  "assets/games/deathworm/things/humans/jungle2_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_5.png": {
+  "assets/games/deathworm/things/humans/jungle2_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_6.png": {
+  "assets/games/deathworm/things/humans/jungle2_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/police_7.png": {
+  "assets/games/deathworm/things/humans/punk_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_0.png": {
+  "assets/games/deathworm/things/humans/punk_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_1.png": {
+  "assets/games/deathworm/things/humans/punk_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_2.png": {
+  "assets/games/deathworm/things/humans/punk_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_3.png": {
+  "assets/games/deathworm/things/humans/punk_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_4.png": {
+  "assets/games/deathworm/things/humans/punk_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_5.png": {
+  "assets/games/deathworm/things/humans/punk_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_6.png": {
+  "assets/games/deathworm/things/humans/punk_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/soldier_7.png": {
+  "assets/games/deathworm/things/humans/punk_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_0.png": {
+  "assets/games/deathworm/things/humans/punk_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_1.png": {
+  "assets/games/deathworm/things/humans/woman_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_2.png": {
+  "assets/games/deathworm/things/humans/woman_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_3.png": {
+  "assets/games/deathworm/things/humans/woman_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_4.png": {
+  "assets/games/deathworm/things/humans/woman_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/humans/villager_5.png": {
+  "assets/games/deathworm/things/humans/woman_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/bullet.png": {
+  "assets/games/deathworm/things/humans/woman_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/bullet2.png": {
+  "assets/games/deathworm/things/humans/woman_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/drill.png": {
+  "assets/games/deathworm/things/humans/woman_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/drone_bullet.png": {
+  "assets/games/deathworm/things/humans/woman_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/mine.png": {
+  "assets/games/deathworm/things/humans/woman_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/rocket.png": {
+  "assets/games/deathworm/things/ground/lizard_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/rocket_heavy.png": {
+  "assets/games/deathworm/things/ground/lizard_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/shell.png": {
+  "assets/games/deathworm/things/ground/lizard_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/things/shots/tank_bullet.png": {
+  "assets/games/deathworm/things/ground/lizard_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_00.png": {
+  "assets/games/deathworm/things/ground/lizard_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_01.png": {
+  "assets/games/deathworm/things/ground/lizard_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_02.png": {
+  "assets/games/deathworm/things/ground/mole_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_03.png": {
+  "assets/games/deathworm/things/ground/mole_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_04.png": {
+  "assets/games/deathworm/things/ground/mole_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_05.png": {
+  "assets/games/deathworm/things/ground/mole_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_06.png": {
+  "assets/games/deathworm/things/vehicles/btr_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_07.png": {
+  "assets/games/deathworm/things/vehicles/btr_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_08.png": {
+  "assets/games/deathworm/things/vehicles/btr_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_09.png": {
+  "assets/games/deathworm/things/vehicles/btr_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_10.png": {
+  "assets/games/deathworm/things/vehicles/btr_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_11.png": {
+  "assets/games/deathworm/things/vehicles/btr_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_12.png": {
+  "assets/games/deathworm/things/vehicles/btr_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_13.png": {
+  "assets/games/deathworm/things/vehicles/btr_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_body_14.png": {
+  "assets/games/deathworm/things/vehicles/btr_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/car_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_head_open.png": {
+  "assets/games/deathworm/things/vehicles/car_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_preview.png": {
+  "assets/games/deathworm/things/vehicles/car_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w01_tail.png": {
+  "assets/games/deathworm/things/vehicles/car_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_00.png": {
+  "assets/games/deathworm/things/vehicles/car_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_01.png": {
+  "assets/games/deathworm/things/vehicles/dozer_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_02.png": {
+  "assets/games/deathworm/things/vehicles/dozer_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_03.png": {
+  "assets/games/deathworm/things/vehicles/dozer_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_04.png": {
+  "assets/games/deathworm/things/vehicles/heli_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_05.png": {
+  "assets/games/deathworm/things/vehicles/heli_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_06.png": {
+  "assets/games/deathworm/things/vehicles/heli_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_07.png": {
+  "assets/games/deathworm/things/vehicles/heli_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_08.png": {
+  "assets/games/deathworm/things/vehicles/heli_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_09.png": {
+  "assets/games/deathworm/things/vehicles/heli_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_10.png": {
+  "assets/games/deathworm/things/vehicles/heli_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_11.png": {
+  "assets/games/deathworm/things/vehicles/heli_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_12.png": {
+  "assets/games/deathworm/things/vehicles/heli_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_13.png": {
+  "assets/games/deathworm/things/vehicles/heli_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_body_14.png": {
+  "assets/games/deathworm/things/vehicles/heli_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/heli_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_head_open.png": {
+  "assets/games/deathworm/things/vehicles/heli_assault_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_preview.png": {
+  "assets/games/deathworm/things/vehicles/heli_assault_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w02_tail.png": {
+  "assets/games/deathworm/things/vehicles/heli_assault_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_00.png": {
+  "assets/games/deathworm/things/vehicles/heli_assault_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_01.png": {
+  "assets/games/deathworm/things/vehicles/jet_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_02.png": {
+  "assets/games/deathworm/things/vehicles/jet_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_03.png": {
+  "assets/games/deathworm/things/vehicles/jet_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_04.png": {
+  "assets/games/deathworm/things/vehicles/jet_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_05.png": {
+  "assets/games/deathworm/things/vehicles/jet_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_06.png": {
+  "assets/games/deathworm/things/vehicles/jet_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_07.png": {
+  "assets/games/deathworm/things/vehicles/jet_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_08.png": {
+  "assets/games/deathworm/things/vehicles/jet_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_09.png": {
+  "assets/games/deathworm/things/vehicles/jet_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_10.png": {
+  "assets/games/deathworm/things/vehicles/jet_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_11.png": {
+  "assets/games/deathworm/things/vehicles/jet_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_12.png": {
+  "assets/games/deathworm/things/vehicles/jet_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_13.png": {
+  "assets/games/deathworm/things/vehicles/jet_12.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_body_14.png": {
+  "assets/games/deathworm/things/vehicles/mech_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/mech_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_head_open.png": {
+  "assets/games/deathworm/things/vehicles/mech_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_preview.png": {
+  "assets/games/deathworm/things/vehicles/mech_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w03_tail.png": {
+  "assets/games/deathworm/things/vehicles/mech_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_00.png": {
+  "assets/games/deathworm/things/vehicles/mech_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_01.png": {
+  "assets/games/deathworm/things/vehicles/mech_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_02.png": {
+  "assets/games/deathworm/things/vehicles/mech_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_03.png": {
+  "assets/games/deathworm/things/vehicles/mech_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_04.png": {
+  "assets/games/deathworm/things/vehicles/mech_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_05.png": {
+  "assets/games/deathworm/things/vehicles/mech_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_06.png": {
+  "assets/games/deathworm/things/vehicles/mech_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_07.png": {
+  "assets/games/deathworm/things/vehicles/mech_12.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_08.png": {
+  "assets/games/deathworm/things/vehicles/mech_13.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_09.png": {
+  "assets/games/deathworm/things/vehicles/mech_14.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_10.png": {
+  "assets/games/deathworm/things/vehicles/mech_15.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_11.png": {
+  "assets/games/deathworm/things/vehicles/mech_16.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_12.png": {
+  "assets/games/deathworm/things/vehicles/mech_17.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_13.png": {
+  "assets/games/deathworm/things/vehicles/mech_18.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_body_14.png": {
+  "assets/games/deathworm/things/vehicles/mech_19.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/mech_20.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_head_open.png": {
+  "assets/games/deathworm/things/vehicles/plane_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_preview.png": {
+  "assets/games/deathworm/things/vehicles/plane_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w04_tail.png": {
+  "assets/games/deathworm/things/vehicles/plane_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_00.png": {
+  "assets/games/deathworm/things/vehicles/plane_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_01.png": {
+  "assets/games/deathworm/things/vehicles/plane_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_02.png": {
+  "assets/games/deathworm/things/vehicles/plane_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_03.png": {
+  "assets/games/deathworm/things/vehicles/plane_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_04.png": {
+  "assets/games/deathworm/things/vehicles/plane_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_05.png": {
+  "assets/games/deathworm/things/vehicles/plane_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_06.png": {
+  "assets/games/deathworm/things/vehicles/plane_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_07.png": {
+  "assets/games/deathworm/things/vehicles/plane_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_08.png": {
+  "assets/games/deathworm/things/vehicles/plane_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_09.png": {
+  "assets/games/deathworm/things/vehicles/police_car_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_10.png": {
+  "assets/games/deathworm/things/vehicles/police_car_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_11.png": {
+  "assets/games/deathworm/things/vehicles/police_car_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_12.png": {
+  "assets/games/deathworm/things/vehicles/tank_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_13.png": {
+  "assets/games/deathworm/things/vehicles/tank_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_body_14.png": {
+  "assets/games/deathworm/things/vehicles/tank_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/truck_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_head_open.png": {
+  "assets/games/deathworm/things/vehicles/truck_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_preview.png": {
+  "assets/games/deathworm/things/vehicles/ufo_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w05_tail.png": {
+  "assets/games/deathworm/things/vehicles/ufo_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_00.png": {
+  "assets/games/deathworm/things/vehicles/ufo_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_01.png": {
+  "assets/games/deathworm/things/vehicles/ufo_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_02.png": {
+  "assets/games/deathworm/things/vehicles/ufo_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_03.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_04.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_05.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_06.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_07.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_08.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_09.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_10.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_11.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_12.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_13.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_body_14.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_12.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_head_open.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_13.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_preview.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_14.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w06_tail.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_15.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_00.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_16.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_01.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_17.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_02.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_18.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_03.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_19.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_04.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_20.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_05.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_21.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_06.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_22.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_07.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_23.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_08.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_24.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_09.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_25.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_10.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_26.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_11.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_27.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_12.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_28.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_13.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_29.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_body_14.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_30.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_head_closed.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_31.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_head_open.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_32.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_preview.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_33.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w07_tail.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_34.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_00.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_35.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_01.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_36.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_02.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_37.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_03.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_38.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_04.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_39.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_05.png": {
+  "assets/games/deathworm/things/vehicles/ufojet_40.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_06.png": {
+  "assets/games/deathworm/things/fx/expl_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_07.png": {
+  "assets/games/deathworm/things/fx/expl_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_08.png": {
+  "assets/games/deathworm/things/fx/expl_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_09.png": {
+  "assets/games/deathworm/things/fx/expl_03.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_10.png": {
+  "assets/games/deathworm/things/fx/expl_04.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_11.png": {
+  "assets/games/deathworm/things/fx/expl_05.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_12.png": {
+  "assets/games/deathworm/things/fx/expl_06.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_13.png": {
+  "assets/games/deathworm/things/fx/expl_07.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_body_14.png": {
+  "assets/games/deathworm/things/fx/expl_08.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_head_closed.png": {
+  "assets/games/deathworm/things/fx/expl_09.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_head_open.png": {
+  "assets/games/deathworm/things/fx/expl_10.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_preview.png": {
+  "assets/games/deathworm/things/fx/expl_11.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w08_tail.png": {
+  "assets/games/deathworm/things/fx/expl_12.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_00.png": {
+  "assets/games/deathworm/things/fx/expl_13.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_01.png": {
+  "assets/games/deathworm/things/fx/expl_14.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_02.png": {
+  "assets/games/deathworm/things/fx/expl_15.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_03.png": {
+  "assets/games/deathworm/things/fx/expl_16.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_04.png": {
+  "assets/games/deathworm/things/fx/expl_17.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_05.png": {
+  "assets/games/deathworm/things/fx/expl_18.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_06.png": {
+  "assets/games/deathworm/things/fx/expl_19.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_07.png": {
+  "assets/games/deathworm/things/fx/expl_20.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_08.png": {
+  "assets/games/deathworm/things/fx/expl_21.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_09.png": {
+  "assets/games/deathworm/things/fx/expl_22.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_10.png": {
+  "assets/games/deathworm/things/fx/expl_23.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_11.png": {
+  "assets/games/deathworm/things/shots/bullet_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_12.png": {
+  "assets/games/deathworm/things/shots/bullet_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_13.png": {
+  "assets/games/deathworm/things/shots/drone_ball_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_14.png": {
+  "assets/games/deathworm/things/shots/drone_ball_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_15.png": {
+  "assets/games/deathworm/things/shots/drone_ball_02.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_16.png": {
+  "assets/games/deathworm/things/shots/rocket_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_17.png": {
+  "assets/games/deathworm/things/shots/rocket_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_18.png": {
+  "assets/games/deathworm/things/shots/tank_bullet_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_19.png": {
+  "assets/games/deathworm/things/shots/ufo_ball_00.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/worms/w09_body_20.png": {
+  "assets/games/deathworm/things/shots/ufo_ball_01.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w09_body_21.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w09_head_closed.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w09_head_open.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w09_preview.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w09_tail.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_00.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_01.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_02.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_03.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_04.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_05.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_06.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_07.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_08.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_09.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_10.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_11.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_body_12.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_head_closed.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_head_open.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_preview.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/worms/w10_tail.png": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
   "assets/games/deathworm/shop/city.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
   },
   "assets/games/deathworm/shop/desert.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
   },
   "assets/games/deathworm/shop/jungle.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
   },
   "assets/games/deathworm/shop/medieval.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
   },
   "assets/games/deathworm/shop/polar.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
   },
-  "assets/games/deathworm/fx/expl_00.png": {
+  "assets/games/deathworm/worms/w01_body_0.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_01.png": {
+  "assets/games/deathworm/worms/w01_head.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_02.png": {
+  "assets/games/deathworm/worms/w01_head_open.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_03.png": {
+  "assets/games/deathworm/worms/w01_preview.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_04.png": {
+  "assets/games/deathworm/worms/w01_tail.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_05.png": {
+  "assets/games/deathworm/worms/w02_body_0.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_06.png": {
+  "assets/games/deathworm/worms/w02_head.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_07.png": {
+  "assets/games/deathworm/worms/w02_head_open.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_08.png": {
+  "assets/games/deathworm/worms/w02_preview.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_09.png": {
+  "assets/games/deathworm/worms/w02_tail.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_10.png": {
+  "assets/games/deathworm/worms/w03_body_0.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
-  "assets/games/deathworm/fx/expl_11.png": {
+  "assets/games/deathworm/worms/w03_head.png": {
    "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w03_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w03_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w03_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w04_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w04_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w04_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w04_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w04_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_body_1.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_body_2.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w05_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w06_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w06_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w06_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w06_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w06_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_body_1.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_body_2.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w07_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_body_1.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_body_2.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w08_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_body_1.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_body_2.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w09_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w10_body_0.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w10_head.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w10_head_open.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w10_preview.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+  },
+  "assets/games/deathworm/worms/w10_tail.png": {
+   "source": "deathworm-study",
+   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
   },
   "assets/games/deathworm/pows/frenzy.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/pows/ghost.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/pows/magnet.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/pows/shield.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/pows/size.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   },
   "assets/games/deathworm/pows/speed.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0409_worm_art.py (our own, no study bytes)"
-  },
-  "assets/games/deathworm/places/city_bg.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/city_bound_bl.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/city_bound_br.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/city_road.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/city_sky.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/desert_bg.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/desert_bound_bl.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/desert_bound_br.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/desert_road.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/desert_sky.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/jungle_bg.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/jungle_bound_bl.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/jungle_bound_br.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/jungle_road.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/jungle_sky.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/medieval_bg.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/medieval_bound_bl.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/medieval_bound_br.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/medieval_road.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/medieval_sky.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/polar_bg.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/polar_bound_bl.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/polar_bound_br.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/polar_road.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
-  },
-  "assets/games/deathworm/places/polar_sky.webp": {
-   "source": "deathworm-study",
-   "origin": "code-modified derivative - tools/v0409_worm_art.py"
+   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
   }
  },
  "assets": {

@@ -484,10 +484,15 @@ func coins() -> int:
         return int(data["coins"])
 
 ## What the UI prints (owner spec: the cheat wallet shows the 0 number).
+## v040-10 THE COMPACTION LAW (the owner: "when it reach 999, it then
+## make it 1.00K then 1.23M and B and like that so it still three
+## numbers"): the wallet never grows past ~3 digits + its suffix. The
+## law is Arc.short_num's own - every seat (top bar, shops, top-up)
+## reads the same digits.
 func coins_display() -> String:
         if dev_cheat("gogacoins") == 1:
                 return "0"
-        return str(int(data["coins"]))
+        return Arc.short_num(int(data["coins"]))
 
 func earn(amount: int) -> void:
         if dev_cheat("gogacoins") == 1:

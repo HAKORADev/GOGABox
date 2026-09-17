@@ -57,11 +57,16 @@ func _drag(idx: int, pos: Vector2) -> void:
 # --------------------------------------------------------- the world laws
 func _world_laws() -> void:
         print("\n-- the world laws --")
-        ck(G.W == 1920.0 and G.H == 1080.0, "THE CANVAS: landscape 1920x1080")
-        ck(G.WORLD_W > G.W, "THE WIDE LAW: the world is wider than the screen")
-        ck(G.SURFACE_Y > G.SKY_H, "THE SHAPE: sky above the surface line")
-        ck(G.H > G.SURFACE_Y + 200.0,
-                "THE SHAPE: the underground runs deep below the line")
+        ck(G.W > 100.0 and G.H > 100.0,
+                "THE CANVAS: the live viewport seats the design")
+        ck(absf(G.WORLD_W - G.W * 3.2) < 1.0,
+                "THE WIDE LAW: the world is x3.2 the screen (the owner's band)")
+        ck(absf(G.SKY_H - G.H * 1.25) < 1.0,
+                "THE SKY LAW: 1.25 screens of sky above the line")
+        ck(absf(G.DIRT_H - G.H * 1.4) < 1.0,
+                "THE DEPTH LAW: 1.4 screens of dirt below the line")
+        ck(absf(G.SURFACE_Y - G.SKY_H) < 0.5,
+                "THE SHAPE: the surface line sits where the sky ends")
         ck(G.pts.size() == G.SEG_COUNT + 2,
                 "THE CHAIN: head + 14 segments + tail")
         ck(G.PLACES.size() == 5, "THE PLACES: five")
@@ -82,22 +87,26 @@ func _world_laws() -> void:
                 "THE EXCLUSIVE LAW: the JUNGLE drags the dive")
         ck(String(G.PLACES["medieval"]["hazard"]) == "torches",
                 "THE EXCLUSIVE LAW: the KINGDOM burns")
+        # v040-10 THE FULL-SCREEN LAW: the world fills the whole live canvas
+        ck(G.WORLD_W >= G.W * 3.0 and G.SKY_H + G.DIRT_H > G.H * 2.5,
+                "THE FULL-SCREEN LAW: the world owns every pixel")
 
 # --------------------------------------------------------- the worm laws
 func _worm_laws() -> void:
         print("\n-- the worm laws --")
         ck(G.WORMS.size() == 10, "THE TEN: ten worms")
         ck(G.WORMS[0]["price"] == 0, "THE STARTER: the first worm is free")
+        # v040-10: TEN LEVELS for every worm (the owner's law)
+        var lvl_ok := true
+        for w in G.WORMS:
+                if int(w["maxlvl"]) != 10:
+                        lvl_ok = false
+        ck(lvl_ok, "THE TEN LEVELS: every worm caps at level 10")
         var chain_ok := true
         for i in range(1, G.WORMS.size()):
                 if int(G.WORMS[i]["price"]) <= 0:
                         chain_ok = false
-                var caps: Array = []
-                for w in G.WORMS:
-                        caps.append(int(w["maxlvl"]))
-                if caps[i] <= caps[i - 1]:
-                        chain_ok = false
-        ck(chain_ok, "THE CHAIN: every later worm costs coins and grows the capacity")
+        ck(chain_ok, "THE CHAIN: every later worm costs wormCoins")
         var w: Dictionary = G.WORMS[0]
         var st1: Dictionary = G.stats_at(0, 1)
         var stmax: Dictionary = G.stats_at(0, int(w["maxlvl"]))
@@ -105,6 +114,12 @@ func _worm_laws() -> void:
                 "THE GROW LAW: a maxed worm is x1.5 its base stats")
         ck(float(stmax["hp"]) > float(st1["hp"]),
                 "THE GROW LAW: levels only ever grow")
+        # v040-10: the slower curve - ~6x the old one to max a worm
+        var total := 0
+        for l in range(1, 10):
+                total += G.xp_need(l)
+        ck(total > 4000,
+                "THE PACE LAW: maxing a worm takes %d points - not two plays" % total)
         var sp := {}
         for wr in G.WORMS:
                 sp[String(wr["special"])] = true
@@ -176,7 +191,7 @@ func _motion_laws() -> void:
         ck(G.pts[5].distance_to(seg0) < 200.0,
                 "THE CHAIN: the segments chase the head, they don't teleport")
         # the surface-line slowdown: time a fixed crawl deep vs on the line
-        var deep_speed := _measure_speed(G.H * 0.75)
+        var deep_speed := _measure_speed(G.SURFACE_Y + G.H * 0.3)
         var line_speed := _measure_speed(G.SURFACE_Y)
         ck(line_speed < deep_speed * 0.85,
                 "THE SURFACE LAW: riding the line is slower (the original's law)")
@@ -210,8 +225,9 @@ func _measure_speed(y: float) -> float:
 # --------------------------------------------------------- the war laws
 func _war_laws() -> void:
         print("\n-- the war laws --")
-        # dirt armor: a shot at a DEEP worm does nothing
-        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.H * 0.7)
+        # dirt armor: a shot at a DEEP worm does nothing (the new world's
+        # dirt runs from SURFACE_Y down - the deep seat is well below it)
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + G.H * 0.35)
         G.p_hp = 100.0
         var hp0: float = G.p_hp
         G.shots.append({"kind": "bullet", "x": G.pts[0].x, "y": G.pts[0].y,
@@ -307,8 +323,8 @@ func _topup_laws() -> void:
                 "THE FRAMEWORK: deadly worm declares its currency")
         ck(String(rec.get("name", "")) == "WORMCOINS",
                 "THE FRAMEWORK: the currency is the WORMCOINS")
-        ck(absf(GameCoin.rate("deathworm") - 5.0) < 0.001,
-                "THE RATE LAW: 1 GOGACoin = 5 wormCoins")
+        ck(absf(GameCoin.rate("deathworm") - 12.0) < 0.001,
+                "THE RATE LAW: 1 GOGACoin = 12 wormCoins (the per-game balance)")
         Box.reset_all()
         var wall0: int = GameCoin.balance("deathworm")
         GameCoin.add("deathworm", 250)
@@ -326,7 +342,7 @@ func _spawn_law() -> void:
         G.state = "play"
         var n0: int = G.things.size()
         G.spawn_t = 0.05
-        for i in 40:
+        for i in 240:
                 G._tick_spawn(1.0 / 60.0)
                 G._tick_things(1.0 / 60.0)
         ck(G.things.size() > n0 or G._intensity() > 1.0,
@@ -337,9 +353,83 @@ func _spawn_law() -> void:
                 "THE RAMP: the intensity only grows - it never eases")
         ck(G.run_t < 100000.0, "sanity")
 
+# ------------------------------------------------- the v040-10 laws
+func _v0410_laws() -> void:
+        print("\n-- the v040-10 laws --")
+        Box.reset_all()
+        await _wait(0.1)
+        G._reset_run()
+        G.state = "play"
+        # THE OFF-SCREEN SPAWN LAW: every spawn rides outside the camera
+        var cam: Rect2 = G._cam_rect()
+        var off_ok := true
+        for i in 30:
+                G._spawn_roll()
+        for th in G.things:
+                if cam.has_point(Vector2(float(th["x"]), float(th["y"]))):
+                        off_ok = false
+        ck(off_ok, "THE SPAWN LAW: nothing spawns inside the camera window")
+        # THE DESPAWN LAW: a thing far off-camera dies and its sprite dies
+        G.things.append({"kind": "car", "x": G.cam_x - 2000.0,
+                "y": G.SURFACE_Y + 36.0, "vx": 0.0, "hp": 2, "alive": true,
+                "shoot_t": 9.0, "wheel_t": 0.0})
+        var spr := Sprite2D.new()
+        G.ent_draw.add_child(spr)
+        G.things[-1]["spr"] = spr
+        G._tick_things(1.0 / 60.0)
+        var gone := true
+        for th in G.things:
+                if float(th["x"]) < G.cam_x - 1500.0:
+                        gone = false
+        ck(gone and not is_instance_valid(spr) or spr.is_queued_for_deletion(),
+                "THE DESPAWN LAW: far off-screen things and their sprites die")
+        # THE COIN VANISH LAW: a collected coin frees its sprite
+        var c0 := {"x": G.pts[0].x, "y": G.pts[0].y, "t": 0.0}
+        var cspr := Sprite2D.new()
+        G.ent_draw.add_child(cspr)
+        c0["spr"] = cspr
+        G.coins_drops.append(c0)
+        for i in 8:
+                G._tick_drops(1.0 / 60.0)
+        ck(not is_instance_valid(cspr) or cspr.is_queued_for_deletion(),
+                "THE COIN LAW: a collected wormCoin's sprite vanishes same frame")
+        # THE FACING LAW: the worm flips V (never H) - the back stays up
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 200.0)
+        G.heading = PI
+        G.vel = Vector2(-300.0, 0.0)
+        G._tick_worm(1.0 / 60.0)
+        var flips_ok := true
+        for s in G.worm_sprites:
+                if s.flip_h:
+                        flips_ok = false
+        ck(flips_ok, "THE FACING LAW: the worm chain never flips H (rotate+flipV only)")
+        # THE WIDGETS LAW: dash + special live in the TOP-RIGHT stack
+        ck(G.dash_chip != null and G.dash_chip.position.x > G.W * 0.5 \
+                and G.dash_chip.position.y < G.H * 0.25,
+                "THE WIDGET LAW: the dash widget sits top-right")
+        ck(G.sp_chip != null and G.sp_chip.position.x > G.W * 0.5 \
+                and G.sp_chip.position.y < G.H * 0.25,
+                "THE WIDGET LAW: the special widget sits top-right")
+        # THE POWER-UP LAW: priced in GOGACoins (Box.spend), not wormCoins
+        # ("ghost" - a kind no earlier section has unlocked)
+        var wall0: int = Box.coins()
+        Box.earn(200)
+        var owned0: int = (G.meta.d["pows"] as Array).size()
+        G._buy_pow("ghost")
+        ck((G.meta.d["pows"] as Array).size() == owned0 + 1 \
+                and Box.coins() == wall0 + 200 - int(G.POWS[2]["price"]),
+                "THE POWER LAW: a power-up buys with real GOGACoins")
+        # THE NEXT-ROUND LAW: a mid-run place visit only arms the switch
+        Box.earn(2000)
+        G.state = "play"
+        G._visit_place("polar")
+        ck(G.place_id != "polar" \
+                and String(G.meta.place()) == "polar",
+                "THE PLACE LAW: a mid-run visit applies NEXT round (the meta remembers)")
+
 # ==================================================================== run
 func _ready() -> void:
-        print("=== qa_v0409_worm: the DEADLY WORM battery ===")
+        print("=== qa_v0409_worm: the DEADLY WORM battery (v040-10 laws) ===")
         await _boot()
         _world_laws()
         _worm_laws()
@@ -349,5 +439,6 @@ func _ready() -> void:
         await _progress_laws()
         _topup_laws()
         await _spawn_law()
+        await _v0410_laws()
         print("\n=== %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)

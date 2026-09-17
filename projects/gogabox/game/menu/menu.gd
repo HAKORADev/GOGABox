@@ -387,8 +387,18 @@ func _build_top_bar() -> void:
         wchip.mouse_filter = Control.MOUSE_FILTER_IGNORE
         wbtn.add_child(wchip)
         wchip.set_anchors_preset(Control.PRESET_FULL_RECT)
-        wbtn.custom_minimum_size = Vector2(
-                        ceilf(wchip.get_combined_minimum_size().x) + 4.0, 56.0)
+        # v040-10 THE FIXED SEAT LAW (the owner: "the gogacoin icon in main
+        # menu when have 3 numbers, it overlaps with the search button"):
+        # the chip's width is seeded from the COMPACTED wallet - with the
+        # compaction law the text never grows past "999"/"1.00K", and the
+        # seat is fixed ONCE at build time so the balance digits can never
+        # push the coin icon into the search button. A small right margin
+        # keeps honest air before the search icon.
+        var seat_probe := Arc.label(Box.coins_display(), 30, Arc.COIN, false)
+        var seat_w := maxf(150.0, ceilf(seat_probe.get_minimum_size().x)
+                + 62.0 + 10.0)
+        seat_probe.queue_free()
+        wbtn.custom_minimum_size = Vector2(seat_w, 56.0)
         wbtn.pressed.connect(func():
                 Jukebox.sfx("click", -4.0)
                 _open_topup())
@@ -1664,10 +1674,18 @@ func _open_topup() -> void:
                 func():
                         _close_sheet()
                         _open_topup_picker()))
-        Arc.fit_sheet(vb, 1)
+        # v040-10 THE CLOSE LAW (the owner: "in the first menu, the top up,
+        # it has no close button, the only way to close it is to tap
+        # android back button"): a real CLOSE button rides every sheet.
+        vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24,
+                Color(0.42, 0.30, 0.16), func(): _close_sheet()))
+        Arc.fit_sheet(vb, 2)
 
-## THE GAME PICKER LAW: every currency-carrying game, as VERTICAL CARDS
-## (the guide-view law) - thumb on top, name, the game's wallet, the rate.
+## THE GAME PICKER LAW (v040-10 REBUILD - the owner: "the games list is
+## totally broken, no way it is like the guide list design"): the picker
+## wears THE GUIDE LIST DESIGN - one horizontal row per game, the guide
+## row's own anatomy: white panel, thumb left, the title, the wallet and
+## the rate as the row's second line, the whole row tappable.
 func _open_topup_picker() -> void:
         if _sheet_open:
                 _close_sheet()
@@ -1684,74 +1702,68 @@ func _open_topup_picker() -> void:
         scroll.custom_minimum_size = Vector2(0, h - 250)
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
         vb.add_child(scroll)
-        var v := VBoxContainer.new()
-        v.add_theme_constant_override("separation", 16)
-        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        scroll.add_child(v)
+        var list := VBoxContainer.new()
+        list.add_theme_constant_override("separation", 10)
+        list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(list)
         var carriers := GameCoin.games()
         for r in carriers:
                 var rec: Dictionary = r
-                v.add_child(_topup_card(rec))
+                list.add_child(_topup_row(rec, scroll))
+        if carriers.is_empty():
+                var e := Arc.label("no games carry a wallet yet", 20,
+                        Color("8a6a40"), false)
+                e.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                list.add_child(e)
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24,
                 Color(0.42, 0.30, 0.16), func():
                         _close_sheet()
                         _open_topup()))
         Arc.fit_sheet(vb)
 
-## one vertical card: the game's thumb, its name, its live wallet and the
-## exchange rate - a tap enters the exchange screen
-func _topup_card(rec: Dictionary) -> Control:
-        var card := Button.new()
-        card.custom_minimum_size = Vector2(560, 0)
-        var sb := Arc.panel_style(Color(0.98, 0.95, 0.9, 0.97), 24, 0)
-        sb.shadow_color = Color(0, 0, 0, 0.28)
-        sb.shadow_size = 8
-        sb.shadow_offset = Vector2(0, 5)
-        sb.content_margin_left = 0
-        sb.content_margin_right = 0
-        sb.content_margin_top = 0
-        sb.content_margin_bottom = 14
-        card.add_theme_stylebox_override("normal", sb)
-        var sbp := sb.duplicate() as StyleBoxFlat
-        sbp.bg_color = Color(0.94, 0.89, 0.8, 0.97)
-        card.add_theme_stylebox_override("pressed", sbp)
+## one guide-style row: the game's thumb (the guide row's own 96x64
+## cover crop), its name, and its live wallet + rate line - a tap
+## enters the exchange screen
+func _topup_row(rec: Dictionary, scroll: BoxScroll) -> Control:
+        var row := PanelContainer.new()
+        row.add_theme_stylebox_override("panel",
+                Arc.panel_style(Color(1, 1, 1, 0.5), 18, 10))
         var v := VBoxContainer.new()
-        v.add_theme_constant_override("separation", 6)
-        card.add_child(v)
-        if ResourceLoader.exists(String(rec["thumb"])):
-                var th := TextureRect.new()
-                th.texture = load(String(rec["thumb"]))
-                th.custom_minimum_size = Vector2(560, 220)
-                th.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-                th.clip_contents = true
-                th.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                v.add_child(th)
-        var name_l := Arc.label(String(rec["title"]).to_upper(), 28, Arc.INK)
-        name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        v.add_child(name_l)
-        var wallet := HBoxContainer.new()
-        wallet.alignment = BoxContainer.ALIGNMENT_CENTER
-        wallet.add_theme_constant_override("separation", 8)
+        v.add_theme_constant_override("separation", 4)
+        row.add_child(v)
+        var head := HBoxContainer.new()
+        head.add_theme_constant_override("separation", 12)
+        v.add_child(head)
+        var ic := TextureRect.new()
+        var tp := String(rec.get("thumb", ""))
+        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        ic.custom_minimum_size = Vector2(96, 64)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        ic.clip_contents = true
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        head.add_child(ic)
+        head.add_child(Arc.label(String(rec["title"]), 26, Arc.INK))
+        var tint: Color = rec["tint"]
+        var line := HBoxContainer.new()
+        line.add_theme_constant_override("separation", 8)
         var dot := ColorRect.new()
-        dot.custom_minimum_size = Vector2(22, 22)
-        dot.color = rec["tint"]
+        dot.custom_minimum_size = Vector2(18, 18)
+        dot.color = tint
         dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        wallet.add_child(dot)
-        wallet.add_child(Arc.label("%s %s" % [Arc.short_num(
+        line.add_child(dot)
+        line.add_child(Arc.label("%s %s" % [Arc.short_num(
                 GameCoin.balance(String(rec["id"]))), String(rec["name"])],
-                24, Color("6a4a28")))
-        v.add_child(wallet)
-        var rate_l := Arc.label("1 GOGACoin = %s %s" % [Arc.short_num(
-                int(rec["rate"])), String(rec["name"])], 19,
-                Color("8a6a40"), false)
-        rate_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        v.add_child(rate_l)
+                18, Color("6a4a28"), false))
+        line.add_child(Arc.label("  -  1 GOGACoin = %s %s" % [Arc.short_num(
+                int(rec["rate"])), String(rec["name"])], 18,
+                Color("8a6a40"), false))
+        v.add_child(line)
         var gid := String(rec["id"])
-        card.pressed.connect(func():
+        scroll.register_tappable(row, func():
                 Jukebox.sfx("click", -4.0)
                 _open_topup_game(gid))
-        return card
+        return row
 
 ## THE EXCHANGE SCREEN: the game's coins first, the GOGACoins under, the
 ## rate line, the amount field (capped at the wallet, always), the live

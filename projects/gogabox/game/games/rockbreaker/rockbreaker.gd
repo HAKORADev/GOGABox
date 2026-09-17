@@ -647,20 +647,15 @@ func _build_world() -> void:
         fx_layer.draw.connect(_draw_fx)
 
 # ------------------------------------------------------------- the HUD
-## The in-world widgets are canvas-drawn with hard black outlines (the
-## heavywar law): the rockCoins wallet sits bottom-left with its own
-## rock-coin icon, the live powerup chips ride above it.
+## v040-10 THE TOP BAR LAW (the owner: "the rockCoins widget still at
+## bottom left while it should be upper right after the score widget"):
+## the rockCoins wallet is a TOP-BAR chip now - add_hud_chip seats it
+## right before the GOGACoins chip, after the score cluster, with the
+## rock-coin icon on it. The live powerup chips stay under the top bar.
+var rockcoin_icon := "res://assets/games/rockbreaker/world/rockcoin.png"
+
 func _build_hud_extra() -> void:
-        var lbl := Label.new()
-        lbl.add_theme_font_override("font", Arc.font_big())
-        lbl.add_theme_font_size_override("font_size", int(30 * us) + 8)
-        lbl.add_theme_color_override("font_color", Color(1, 1, 1))
-        lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-        lbl.add_theme_constant_override("outline_size", int(8 * us) + 2)
-        lbl.position = Vector2(86 * us, H - 74 * us)
-        lbl.text = "0"
-        add_child(lbl)
-        wallet_lbl = lbl
+        wallet_lbl = add_hud_chip("0", rockcoin_icon)
         for k in ["slow", "rush", "shield"]:
                 var c := Label.new()
                 c.add_theme_font_override("font", Arc.font_big())
@@ -669,7 +664,7 @@ func _build_hud_extra() -> void:
                 c.add_theme_color_override("font_outline_color",
                         Color(0, 0, 0, 0.9))
                 c.add_theme_constant_override("outline_size", int(6 * us) + 2)
-                c.position = Vector2(86 * us, (H - 150 - 44 * (1 +
+                c.position = Vector2(86 * us, (hud_h + 14 + 44 * (1 +
                         ["slow", "rush", "shield"].find(k))) * 1.0 * us)
                 add_child(c)
                 c.visible = false
@@ -683,7 +678,6 @@ func _hud_tick() -> void:
                 if _wallet_shown != w:
                         _wallet_shown = w
                         wallet_lbl.text = fmt(w)
-                wallet_lbl.visible = ui_on
         _chip("slow", slow_t, "SLOW", Color(0.45, 0.75, 1.0), ui_on)
         _chip("rush", rush_t, "RUSH x2", Color(1.0, 0.55, 0.3), ui_on)
         var sh: Label = pow_lbls["shield"]
@@ -823,6 +817,7 @@ func _goga_tick(delta: float) -> void:
                 _fire(delta)
                 _powerups_tick(delta)
                 _place_walk()
+                _launch_marks_tick(delta)
                 _auto_tick(delta)
                 _save_t += delta
                 if _save_t >= 15.0:
@@ -867,15 +862,28 @@ func _total_rocks() -> int:
 ## the two shader layers while the far strip + ground crossfade in the
 ## draw pass.
 func _place_walk() -> void:
+        # v040-10 THE PREWARM LAW (the owner's "extra background things
+        # then they get deleted" report): both places' far strips load
+        # BEFORE the fade begins - the handover never lazy-loads mid-
+        # transition, so nothing pops in late and nothing vanishes after.
         if rp >= place_next:
                 place_next += PLACE_EVERY
                 place_from = place_i
                 var th: Dictionary = _theme()
                 place_i = (place_i + 1) % (th["places"] as Array).size()
+                var prefix: String = STYLE_PREFIX.get(String(th["style"]),
+                        "cave")
+                var ps: Array = th["places"]
+                var pi_from: int = ps.find(ps[place_from % ps.size()])
+                var pi_to: int = ps.find(ps[place_i % ps.size()])
+                pi_from = maxi(0, pi_from if pi_from >= 0 else place_from)
+                pi_to = maxi(0, pi_to if pi_to >= 0 else place_i)
+                _tex_at("world/far_%s_%d.png" % [prefix, pi_from % 5])
+                _tex_at("world/far_%s_%d.png" % [prefix, pi_to % 5])
+                _tex_at("world/ground_%s.png" % prefix)
                 place_fade = 0.0
                 # the sky handover: A keeps the old recipe, B takes the new
                 if _sky_mat_a != null:
-                        var ps: Array = th["places"]
                         _apply_sky(_sky_mat_a, _sky_params(
                                 ps[place_from % ps.size()], place_from))
                         _apply_sky(_sky_mat_b, _sky_params(
@@ -940,18 +948,47 @@ func _spawn_director(delta: float) -> void:
                                 continue   # 15 alive spawns per side
                         _spawn_side_rock(side)
 
-## THE GROUND LAUNCH (v040-8): a rock thrown UP from the ground - it
-## climbs, arcs, and falls back (the original's "throwed up then fall")
+## THE GROUND LAUNCH (v040-8, v040-10 THE FAIR THROW LAW): a rock thrown
+## UP from the ground - it climbs, arcs, and falls back. The throw never
+## lands on the tank: the seat keeps a wide safe ring around the cannon,
+## and a dust telegraph blooms at the spot before the rock leaves the
+## ground (the owner: "something comes and kills me" - never again
+## without warning)
+const LAUNCH_TELEGRAPH := 0.5
+var launch_marks: Array = []      # [{x, t}] the dust warnings
+
 func _launch_up() -> void:
+        # the SAFE RING: pick a seat at least 360 design-px from the cannon
+        var lo_x := 120.0 * us
+        var hi_x := W - 120.0 * us
+        var x := 0.0
+        for attempt in 12:
+                x = rng.randf_range(lo_x, hi_x)
+                if absf(x - cannon_x) > 360.0 * us:
+                        break
         var size := _pick_size()
         var hp := rock_hp(heat, size, rng)
-        var r := _radius(size)
-        var x := rng.randf_range(120.0 * us, W - 120.0 * us)
-        var vy := -rng.randf_range(720.0, 1250.0) * us
-        var vx := rng.randf_range(-260.0, 260.0) * us
-        _add_rock(x, ground_y - r - 10.0 * us, vx, vy, size, hp, -1)
+        launch_marks.append({"x": x, "t": LAUNCH_TELEGRAPH, "size": size,
+                "hp": hp})
         _dust(x, ground_y - 14.0 * us, size)
-        Jukebox.sfx("rb_ground", -12.0, rng.randf_range(0.8, 1.05))
+
+## the telegraphed throws fire when their clock runs out
+func _launch_marks_tick(delta: float) -> void:
+        for m in launch_marks:
+                m["t"] = float(m["t"]) - delta
+        var fired: Array = []
+        for m in launch_marks:
+                if float(m["t"]) <= 0.0:
+                        fired.append(m)
+        for m in fired:
+                launch_marks.erase(m)
+                var r := _radius(int(m["size"]))
+                var vy := -rng.randf_range(720.0, 1250.0) * us
+                var vx := rng.randf_range(-260.0, 260.0) * us
+                _add_rock(float(m["x"]), ground_y - r - 10.0 * us, vx, vy,
+                        int(m["size"]), int(m["hp"]), -1)
+                _dust(float(m["x"]), ground_y - 14.0 * us, int(m["size"]))
+                Jukebox.sfx("rb_ground", -12.0, rng.randf_range(0.8, 1.05))
 
 func _spawn_side_rock(side: int) -> void:
         var size := _pick_size()
@@ -1828,6 +1865,16 @@ func _draw_bg() -> void:
                 _draw_place(ps[place_i % ps.size()], th, place_fade)
         else:
                 _draw_place(ps[place_i % ps.size()], th, 1.0)
+        # v040-10 THE TELEGRAPH: the ground throws warn before they fire -
+        # a pulsing warning ring grows at the seat (never an unseen kill)
+        for m in launch_marks:
+                var k := 1.0 - float(m["t"]) / LAUNCH_TELEGRAPH
+                var pulse := 0.5 + 0.5 * sin(_time * 18.0)
+                var rr := (26.0 + 30.0 * k) * us
+                bg_layer.draw_arc(Vector2(float(m["x"]), ground_y - 6.0 * us),
+                        rr, 0, TAU, 26,
+                        Color(1.0, 0.5 + 0.3 * pulse, 0.2, 0.55 + 0.3 * k),
+                        4.0 * us)
         bg_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_place(p: Dictionary, th: Dictionary, alpha: float) -> void:
@@ -2018,7 +2065,11 @@ func _draw_char() -> void:
         # the wheels sit on the ground, the carriage hangs on them; the
         # barrel occupies the sprite's headroom above the cart
         var wheel_y := ground_y - 46.0 * k
-        var body_bottom := ground_y - 4.0 * us
+        # v040-10 THE SEAT LAW (the owner: "canon body overlaps with it's
+        # wheels"): the carriage rests ON the wheel tops - its floor line
+        # sits at the axle top minus a breath, never down at the ground
+        # where it painted over the wheels
+        var body_bottom := wheel_y - 26.0 * k
         for side: float in [-1.0, 1.0]:
                 var wx := x + side * 82.0 * k
                 var wr := 46.0 * k

@@ -26,8 +26,10 @@ static func font_ui() -> FontFile:
                 _font_ui = load("res://assets/fonts/Kenney_Mini.ttf")
         return _font_ui
 
-## THE NUMBER LAW, box-side (v040-8): big counts read at a glance -
-## 999 stays "999", 1500 becomes "1.50K", 2500000 becomes "2.50M".
+## THE NUMBER LAW, box-side (v040-8, v040-10): big counts read at a
+## glance - 999 stays "999", 1500 becomes "1.50K", 2500000 becomes
+## "2.50M". The store's coins_display wears the same law (kept in sync
+## by the probe: both print identical digits for the same wallet).
 static func short_num(n: int) -> String:
         var v := float(absi(n))
         var s := ""

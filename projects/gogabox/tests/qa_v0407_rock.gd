@@ -425,13 +425,23 @@ func _v0408_laws() -> void:
                 pours += G.rocks.size() - b0
         ck(pours >= 12 and pours <= 48,
                 "BURST LAW: the spawner pours 1..4 an event (%d in 12)" % pours)
-        # THE GROUND LAUNCH: a rock thrown up, arcing, falling
+        # THE GROUND LAUNCH: a rock thrown up, arcing, falling - v040-10
+        # THE FAIR THROW: the throw is TELEGRAPHED (a 0.5s warning ring,
+        # never an unseen kill) and the seat keeps a safe ring around the
+        # cannon
         var l0: int = G.rocks.size()
+        G.launch_marks.clear()          # the burst test may have left marks
+        var m0: int = G.launch_marks.size()
         G._launch_up()
+        ck(G.launch_marks.size() == m0 + 1 \
+                and float(G.launch_marks[-1]["t"]) > 0.0,
+                "FAIR THROW: the launch is telegraphed first")
+        for i in 40:
+                G._launch_marks_tick(1.0 / 60.0)
         ck(G.rocks.size() == l0 + 1 and float(G.rocks[-1]["vy"]) < 0.0
                 and float(G.rocks[-1]["y"]) > G.ground_y - 300.0 * G.us
                 and int(G.rocks[-1]["side"]) == -1,
-                "GROUND LAUNCH: thrown up from the floor, no side seat")
+                "GROUND LAUNCH: thrown up from the floor after the warning")
         # THE SHOT LAW: the ball is visible and flies at a visible speed
         ck(G.BULLET_R == 13.0 and G.BULLET_SPEED == 920.0,
                 "SHOT LAW: 13px balls at 920px/s - seen climbing")

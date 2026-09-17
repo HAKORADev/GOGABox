@@ -1296,7 +1296,7 @@ const GAMES := [
                 # v040-8 THE TOP-UP DECLARATION: heavywar carries SCRAP -
                 # 1 GOGACoin = 5 scrap (the owner's rate law). GameCoin
                 # reads/writes the wallet through the coin_api statics.
-                "currency": {"name": "SCRAP", "rate": 5.0,
+                "currency": {"name": "SCRAP", "rate": 6.0,
                         "tint": Color("c8a86a")},
                 "coin_api": "res://game/games/heavywar/heavywar_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 8,
@@ -1346,7 +1346,7 @@ const GAMES := [
                 "banner": true,
                 # v040-8 THE TOP-UP DECLARATION: rockbreaker carries
                 # ROCKCOINS - 1 GOGACoin = 5 rockCoins (the rate law).
-                "currency": {"name": "ROCKCOINS", "rate": 5.0,
+                "currency": {"name": "ROCKCOINS", "rate": 9.0,
                         "tint": Color("d8c8a8")},
                 "coin_api": "res://game/games/rockbreaker/rockbreaker_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 14,
@@ -1408,7 +1408,7 @@ const GAMES := [
                 "banner": true,
                 # THE TOP-UP DECLARATION: deadly worm carries WORMCOINS -
                 # 1 GOGACoin = 5 wormCoins (the rate law).
-                "currency": {"name": "WORMCOINS", "rate": 5.0,
+                "currency": {"name": "WORMCOINS", "rate": 12.0,
                         "tint": Color("e8ba54")},
                 "coin_api": "res://game/games/deathworm/deathworm_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 8,

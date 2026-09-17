@@ -1,33 +1,36 @@
 extends GogaGame
-## DEADLY WORM (v040-9) - the survival cross-section. You ARE the worm.
+## DEADLY WORM (v040-10) - the survival cross-section, rebuilt on the REAL
+## study assets (tools/v0410_worm_art.py) and the REAL world law.
 ##
-## THE OWNER'S GDD (docs/goga_docs/gogames_ideas/deadlyworm.md), the laws:
-##   - SURVIVAL, not stages: the round ends only when the worm dies; the
-##     spawner never rests and "always becomes much harder".
-##   - THE WORLD: a fixed 2D place, wide but not endless - sky, surface,
-##     underground. Five places; the desert is the default, the other four
-##     cost real GOGACoins; places are NOT just views - each carries its
-##     own exclusive hazard/handicap.
-##   - TEN WORMS: different size / speed / power / health; leveling
-##     multiplies the stats toward x1.5 of base across each worm's own
-##     level capacity; the next worm unlocks only when the previous one is
-##     MAXED; unlocks cost WORMCOINS.
-##   - THE ECONOMY: a wormCoin drops from edible things after every 10
-##     eaten; humans pay 1 point each, land animals 3, ground animals 1
-##     per 3; vehicles are destroyed (never eaten, never health) and pay
-##     their own points; the score bonus is /500 at the box gate.
-##   - THE HEALTH: fixed limit - eating never heals; the HUD shows nn%,
-##     the worms menu shows the real numbers and the next level's.
-##   - THE CONTROLS: left half = the hidden analog (steer like the
-##     original), right half = TAP to dash (per-worm cooldown + length,
-##     its own widget), the middle strip = TAP for the worm's special
-##     ability (one charge per 100 points, each worm's is unique).
-##   - THE POWER-UPS: bought first from the shop (wormCoins), then they
-##     spawn in the run every 60..120s (random pick among the unlocked).
-##   - THE FEEL: physics-heavy like the original - weight matters, riding
-##     the surface line slows the worm down.
-##   - THE ART: the study's assets, code-modified into ours (the usage
-##     law) - forge: tools/v0409_worm_art.py.
+## THE OWNER'S V040-10 REPORT, WORKED TO THE BONE:
+##   * THE WORLD LAW: "the original has too big underground and big sky
+##     with too wide place, a place is likely x3-x4 the screen width...
+##     camera follows worm" - the world is 3.2 screens wide, the sky 1.25
+##     screens tall above the line, the dirt 1.4 screens tall below it,
+##     and the camera follows the worm on BOTH axes (the original's own
+##     deserts: bounds -1300..1300 wide, sky to -1184, dirt to +500).
+##   * THE FULL-SCREEN LAW: W/H seat from the LIVE viewport (the box's
+##     stretch law) - no brown fallback bars, ever.
+##   * THE SPAWN LAW: everything spawns COMPLETELY off-camera and
+##     despawns (record + sprite freed) once far outside it.
+##   * THE FACING LAW: things art faces LEFT natively (flip when moving
+##     right), the worm faces RIGHT (it rotates by its heading) - the
+##     chronic backwards-body bug dies here for good.
+##   * THE SCALE LAW (measured off the real gameplay video): humans
+##     ~6.5% of the screen height, the worm head ~11%, the surface line
+##     rides the upper-middle band, the underground worm is a DARK
+##     SILHOUETTE dragging a dirt trail.
+##   * THE ANIM LAW: humans wear their REAL 10-frame run cycles and the
+##     step follows the speed (a sprinting human runs its legs faster).
+##   * THE COIN LAW's honesty: collected wormCoins FREE their sprite
+##     (v040-9's stuck coins), and a +1 chip pulse says where it went.
+##   * THE TEN LEVELS: every worm caps at 10 levels; the curve is ~6x
+##     slower ("i maxed the worm in two plays").
+##   * THE BUTTON LAW: SHOP sits directly after BACK, WORMS after it.
+##   * THE POWER-UP LAW: bought with real GOGACoins (the box coin).
+##   * THE PLACE LAW: switching applies to the NEXT round (the active
+##     run keeps its place).
+##   * THE MUSIC LAW: every place has its own looping bed.
 
 const S := "res://assets/games/deathworm/"
 
@@ -36,27 +39,28 @@ const S := "res://assets/games/deathworm/"
 # speed = x the base crawl (px/s at scale 1)
 # power = bite damage per hit (vehicles' HP and the specials read it)
 # hp    = the fixed health pool (never heals, the owner's law)
-# maxlvl= the worm's leveling capacity - per level mult = 1.5^(1/maxlvl)
+# maxlvl= 10 LEVELS for every worm (the owner: "worms should be 10
+#         levels and not 5"); a maxed worm is EXACTLY x1.5 base
 # price = wormCoins to unlock (0 = the starter); the chain gates it
 const WORMS := [
         {"id": "w01", "name": "THE WORM", "size": 1.0, "speed": 1.0,
-                "power": 1.0, "hp": 100, "maxlvl": 5, "price": 0,
+                "power": 1.0, "hp": 100, "maxlvl": 10, "price": 0,
                 "special": "roar",
                 "line": "the classic desert earthworm - balanced"},
         {"id": "w02", "name": "AQUA", "size": 0.9, "speed": 1.15,
-                "power": 0.9, "hp": 90, "maxlvl": 6, "price": 250,
+                "power": 0.9, "hp": 90, "maxlvl": 10, "price": 250,
                 "special": "surge",
                 "line": "quick, light, fragile - a hunter's worm"},
         {"id": "w03", "name": "DUNE", "size": 1.1, "speed": 0.95,
-                "power": 1.1, "hp": 115, "maxlvl": 7, "price": 600,
+                "power": 1.1, "hp": 115, "maxlvl": 10, "price": 600,
                 "special": "geyser",
                 "line": "heavy sand reaver, hits like a landslide"},
         {"id": "w04", "name": "IVORY", "size": 0.85, "speed": 1.25,
-                "power": 0.95, "hp": 95, "maxlvl": 8, "price": 1100,
+                "power": 0.95, "hp": 95, "maxlvl": 10, "price": 1100,
                 "special": "ghost",
                 "line": "the pale sprinter - hard to catch, hard to hit"},
         {"id": "w05", "name": "CRIMSON", "size": 1.0, "speed": 1.05,
-                "power": 1.3, "hp": 105, "maxlvl": 9, "price": 1800,
+                "power": 1.3, "hp": 105, "maxlvl": 10, "price": 1800,
                 "special": "frenzy",
                 "line": "the red bite - teeth sharper than the rest"},
         {"id": "w06", "name": "TITAN", "size": 1.4, "speed": 0.85,
@@ -64,19 +68,19 @@ const WORMS := [
                 "special": "quake",
                 "line": "the ground shakes where it swims"},
         {"id": "w07", "name": "VIPER", "size": 0.8, "speed": 1.35,
-                "power": 1.0, "hp": 85, "maxlvl": 11, "price": 4200,
+                "power": 1.0, "hp": 85, "maxlvl": 10, "price": 4200,
                 "special": "venom",
                 "line": "thin, fast, poisonous"},
         {"id": "w08", "name": "GOLIATH", "size": 1.5, "speed": 0.9,
-                "power": 1.45, "hp": 160, "maxlvl": 12, "price": 6500,
+                "power": 1.45, "hp": 160, "maxlvl": 10, "price": 6500,
                 "special": "devour",
                 "line": "the pit with a mouth"},
         {"id": "w09", "name": "WRAITH", "size": 0.95, "speed": 1.2,
-                "power": 1.15, "hp": 100, "maxlvl": 13, "price": 9500,
+                "power": 1.15, "hp": 100, "maxlvl": 10, "price": 9500,
                 "special": "voidpull",
                 "line": "the dusk crawler - the world bends toward it"},
         {"id": "w10", "name": "DRAGON", "size": 1.3, "speed": 1.1,
-                "power": 1.6, "hp": 150, "maxlvl": 14, "price": 14000,
+                "power": 1.6, "hp": 150, "maxlvl": 10, "price": 14000,
                 "special": "firebreath",
                 "line": "the last worm - it breathes what it hunts"},
 ]
@@ -112,20 +116,21 @@ const PLACES := {
 }
 
 # ------------------------------------------------------------ the power-ups
-# bought first from the shop (wormCoins), then they spawn in-run every
-# 60..120s - a random pick among the UNLOCKED kinds only.
+# v040-10: bought FIRST with real GOGACOINS (the box coin - the owner:
+# "the powerups should be bought using real GOGACoins and not the
+# wormCoin"), then they spawn in-run every 60..120s among the unlocked.
 const POWS := [
-        {"k": "size", "name": "MEGAWORM", "price": 150, "dur": 25.0,
+        {"k": "size", "name": "MEGAWORM", "price": 40, "dur": 25.0,
                 "line": "grow x1.6 - eat the big ones whole"},
-        {"k": "speed", "name": "ADRENALINE", "price": 150, "dur": 25.0,
+        {"k": "speed", "name": "ADRENALINE", "price": 40, "dur": 25.0,
                 "line": "crawl x1.7 - the world crawls past you"},
-        {"k": "ghost", "name": "GHOST SKIN", "price": 250, "dur": 8.0,
+        {"k": "ghost", "name": "GHOST SKIN", "price": 60, "dur": 8.0,
                 "line": "nothing can touch you for a breath"},
-        {"k": "magnet", "name": "HUNGER CALL", "price": 250, "dur": 10.0,
+        {"k": "magnet", "name": "HUNGER CALL", "price": 60, "dur": 10.0,
                 "line": "the prey walks toward the mouth"},
-        {"k": "frenzy", "name": "FRENZY", "price": 350, "dur": 25.0,
+        {"k": "frenzy", "name": "FRENZY", "price": 90, "dur": 25.0,
                 "line": "the dash recovers twice as fast"},
-        {"k": "shield", "name": "STONE SCALE", "price": 350, "dur": 0.0,
+        {"k": "shield", "name": "STONE SCALE", "price": 90, "dur": 0.0,
                 "line": "the next hit that would hurt - doesn't"},
 ]
 
@@ -137,29 +142,34 @@ const POINTS := {
         "car": 2, "truck": 3, "tank": 5, "btr": 4, "heli": 4,
         "plane": 5, "drone": 2, "ufo": 6, "launcher": 5,
 }
-# vehicle structural HP - bites = power per bite
+# vehicle structural HP - bites = power per bite (birds are EDIBLE, not
+# vehicles - the mouth eats them out of the air)
 const VEH_HP := {
         "car": 2, "truck": 3, "tank": 5, "btr": 4, "heli": 3,
         "plane": 3, "drone": 2, "ufo": 8, "launcher": 4,
 }
 
-# ------------------------------------------------------------ live canvas
-const W := 1920.0
-const H := 1080.0
-const WORLD_W := 2112.0          # every place bakes to this width
-const SKY_H := 118.0
-const SURFACE_Y := 148.0         # the line the world pivots on
-const DIRT_TOP := 962.0          # the baked cross-section's height
+# ------------------------------------------------------------ the world law
+# THE LIVE CANVAS: W/H seat from the viewport in _goga_setup (the box's
+# stretch law EXPANDS the design on any phone - the full-screen law).
+var W := 1920.0
+var H := 1080.0
+var WORLD_W := 6144.0            # x3.2 the design width (the owner's band)
+var SKY_H := 1350.0              # the sky: 1.25 screens above the line
+var DIRT_H := 1512.0             # the dirt: 1.4 screens below the line
+var SURFACE_Y := 1350.0          # the line the world pivots on (= SKY_H)
 
 const BASE_SPEED := 340.0        # px/s at scale 1 underground
 const AIR_G := 1500.0            # gravity above the surface
 const TURN_RATE := 3.4           # rad/s at grip 1.0
-const LINE_BAND := 22.0          # the surface-line slowdown band
+const LINE_BAND := 26.0          # the surface-line slowdown band
 const LINE_SLOW := 0.62          #   the original's crawl-at-the-line law
 const SEG_COUNT := 14            # the drawn chain (head + 14 + tail)
 const EAT_R := 1.0               # mouth radius in head-widths
 const SPECIAL_AT := 100          # one charge per 100 points
 const SPECIAL_MAX := 2
+# the head-size law (measured: the original's head ~= 11% of screen h)
+const HEAD_H := 118.0            # the head draw height at scale 1
 
 # ------------------------------------------------------------ run state
 var meta: DWMeta
@@ -204,7 +214,9 @@ var shots: Array = []            # enemy shots
 var coins_drops: Array = []      # the wormCoin drops
 var pows_live: Array = []        # the power-up pickups
 var fx: Array = []               # dirt/blood/sparks
+var trail: Array = []            # the underground dirt trail [{x,y,t}]
 var cam_x := 0.0
+var cam_y := 0.0
 var spawn_t := 2.0
 var pow_t := 0.0
 
@@ -215,10 +227,10 @@ var steer_mag := 0.0
 
 # drawing
 var world: Node2D
+var far_draw: Node2D
 var ent_draw: Node2D
 var worm_draw: Node2D
 var fx_draw: Node2D
-var hud_draw: Control
 var worm_sprites: Array = []     # the chain's Sprite2Ds
 var hp_lbl: Label = null
 var wc_lbl: Label = null
@@ -232,13 +244,24 @@ var banners: Array = []          # [{msg, t, col}]
 var shake := 0.0
 var flash := 0.0
 
-# the audit probe seat (qa_v0409_worm reads these)
+# the audit probe seat (qa probes read these)
 var probe := false
 
 # ===================================================================== setup
 func _goga_setup() -> void:
         rng.randomize()
         meta = DWMeta.load_meta()
+        # THE LIVE CANVAS LAW: the design seat is the REAL viewport - the
+        # game owns every pixel of the screen (no brown bars, ever)
+        var vp := get_viewport_rect().size
+        W = vp.x
+        H = vp.y
+        WORLD_W = W * 3.2
+        SKY_H = H * 1.25
+        DIRT_H = H * 1.4
+        SURFACE_Y = SKY_H
+        # the deferred place law: the saved place applies NOW (the start of
+        # a fresh round is the next round)
         place_id = meta.place()
         if not meta.owns_place(place_id):
                 place_id = "desert"
@@ -313,58 +336,150 @@ func _reset_run() -> void:
         coins_drops.clear()
         pows_live.clear()
         fx.clear()
+        trail.clear()
         spawn_t = 2.2
         pow_t = rng.randf_range(24.0, 40.0)
-        cam_x = 0.0
+        cam_x = clampf(WORLD_W * 0.5 - W * 0.5, 0.0, maxf(0.0, WORLD_W - W))
+        cam_y = clampf(SURFACE_Y - H * 0.6, 0.0, SURFACE_Y + DIRT_H - H)
         # the chain spawns mid-world underground
         var hx := WORLD_W * 0.5
-        var hy := SURFACE_Y + 240.0
+        var hy := SURFACE_Y + H * 0.25
         pts.clear()
         for i in SEG_COUNT + 2:
                 pts.append(Vector2(hx + float(i) * 26.0, hy))
         _seed_things()
         set_score(0)
+        # the camera seats ITSELF before the first frame (the intro opens
+        # on the horizon, not the top of the sky)
+        if world != null and is_instance_valid(world):
+                world.position = Vector2(-cam_x, -cam_y)
+                if far_draw != null:
+                        far_draw.position.x = cam_x * 0.14
 
-## the place's bed (the desert drone everywhere, the ice sings elsewhere)
+## the place's bed - every place sings its own loop (the music law)
 func _music_track() -> String:
-        return "res://assets/audio/sfx/dw_music_ice.wav" if place_id == "polar" \
-                else "res://assets/audio/sfx/dw_music_desert.wav"
+        match place_id:
+                "polar":
+                        return "res://assets/audio/sfx/dw_music_ice.wav"
+                "city":
+                        return "res://assets/audio/sfx/dw_music_city.wav"
+                "jungle":
+                        return "res://assets/audio/sfx/dw_music_jungle.wav"
+                "medieval":
+                        return "res://assets/audio/sfx/dw_music_kingdom.wav"
+                _:
+                        return "res://assets/audio/sfx/dw_music_desert.wav"
 
 func _goga_intro() -> void:
         state = "intro"
         Jukebox.music(_music_track())
         _show_intro_sheet()
 
-## the place's layered world: sky strip, the baked cross-section, the
-## surface road, the rock bounds - all OUR forged derivatives
+## THE LAYERED WORLD (the original's stack): the tiled sky, the far
+## parallax strip, the tiled dirt, the surface road, the edge bounds and
+## the buried decals - all REAL study layers, code-modified into ours.
 func _build_world() -> void:
         world = Node2D.new()
         add_child(world)
         var p: Dictionary = PLACES[place_id]
-        var sky := Sprite2D.new()
-        sky.texture = load(S + "places/%s_sky.webp" % place_id)
-        sky.centered = false
-        sky.position = Vector2(0, 0)
+        # ---- THE SKY: tiled to the sky's full height (1.25 screens)
+        var sky_tex: Texture2D = load(S + "places/%s_sky.png" % place_id)
+        var sh := float(sky_tex.get_height())
+        var sky := Node2D.new()
+        sky.name = "sky"
+        var n_sky := int(ceil(WORLD_W / float(sky_tex.get_width()))) + 1
+        for i in n_sky:
+                var sp := Sprite2D.new()
+                sp.texture = sky_tex
+                sp.centered = false
+                sp.position = Vector2(float(i) * float(sky_tex.get_width()),
+                        0.0)
+                sky.add_child(sp)
         world.add_child(sky)
-        var bg := Sprite2D.new()
-        bg.texture = load(S + "places/%s_bg.webp" % place_id)
-        bg.centered = false
-        bg.position = Vector2(0, SKY_H)
-        world.add_child(bg)
-        var road := Sprite2D.new()
-        road.texture = load(S + "places/%s_road.webp" % place_id)
-        road.centered = false
-        road.position = Vector2(0, SURFACE_Y - 8.0)
+        # ---- THE FAR STRIP: the original's own surface-props skyline
+        # (tents, palms, sphinx, pyramids, ruins) rides just above the
+        # road at its true scale - the horizon's jewelry row
+        far_draw = Node2D.new()
+        far_draw.name = "far"
+        var far_tex: Texture2D = load(S + "places/%s_far.png" % place_id)
+        var fh := float(far_tex.get_height())
+        var fk := (H * 0.115) / fh
+        var fw := float(far_tex.get_width()) * fk
+        var n_far := int(ceil(WORLD_W / fw)) + 1
+        for i in n_far:
+                var sp2 := Sprite2D.new()
+                sp2.texture = far_tex
+                sp2.centered = false
+                sp2.scale = Vector2.ONE * fk
+                sp2.position = Vector2(float(i) * fw,
+                        SURFACE_Y - fh * fk + 12.0)
+                far_draw.add_child(sp2)
+        world.add_child(far_draw)
+        # ---- THE DIRT: tiled from the surface line to the dirt's floor
+        var dirt_tex: Texture2D = load(S + "places/%s_dirt.png" % place_id)
+        var dirt := Node2D.new()
+        var n_dx := int(ceil(WORLD_W / float(dirt_tex.get_width()))) + 1
+        var n_dy := int(ceil(DIRT_H / float(dirt_tex.get_height()))) + 1
+        for i in n_dx:
+                for j in n_dy:
+                        var sp3 := Sprite2D.new()
+                        sp3.texture = dirt_tex
+                        sp3.centered = false
+                        sp3.position = Vector2(
+                                float(i) * float(dirt_tex.get_width()),
+                                SURFACE_Y + float(j)
+                                * float(dirt_tex.get_height()))
+                        dirt.add_child(sp3)
+        world.add_child(dirt)
+        # ---- THE BURIED DECALS: the study's own tomb + bones, planted
+        # at deterministic seats (our own dirt keeps the original's dead)
+        var decs := ["places/dec_tomb.png", "places/dec_bones.png"]
+        var dseed := rng.randi()
+        for i in 7:
+                var dpath: String = decs[i % decs.size()]
+                if not ResourceLoader.exists(S + dpath):
+                        continue
+                var dc := Sprite2D.new()
+                dc.texture = load(S + dpath)
+                dc.rotation = float((dseed + i * 37) % 20 - 10) * 0.02
+                var dk := rng.randf_range(0.5, 0.9)
+                dc.scale = Vector2.ONE * dk
+                dc.position = Vector2(
+                        fposmod(float(dseed) * (float(i) + 1.3), WORLD_W),
+                        SURFACE_Y + DIRT_H * rng.randf_range(0.3, 0.85))
+                dc.modulate = Color(0.85, 0.82, 0.78, 1.0)
+                world.add_child(dc)
+        # ---- THE ROAD: the surface line strip, tiled
+        var road_tex: Texture2D = load(S + "places/%s_road.png" % place_id)
+        var n_road := int(ceil(WORLD_W / float(road_tex.get_width()))) + 1
+        var road := Node2D.new()
+        for i in n_road:
+                var sp4 := Sprite2D.new()
+                sp4.texture = road_tex
+                sp4.centered = false
+                sp4.position = Vector2(
+                        float(i) * float(road_tex.get_width()),
+                        SURFACE_Y - float(road_tex.get_height()) * 0.5)
+                road.add_child(sp4)
         world.add_child(road)
+        # ---- THE BOUNDS: the level's edge walls (the original's own)
         for side in 2:
                 var bnd := Sprite2D.new()
-                bnd.texture = load(S + "places/%s_bound_%s.webp"
-                        % [place_id, "bl" if side == 0 else "br"])
+                var key := "bl" if side == 0 else "br"
+                bnd.texture = load(S + "places/%s_bound_%s.png"
+                        % [place_id, "l" if side == 0 else "r"])
                 bnd.centered = false
                 bnd.flip_h = side == 1
-                bnd.position = Vector2(-14.0 if side == 0 else WORLD_W - 200.0,
-                        SKY_H)
-                bnd.scale = Vector2.ONE * (DIRT_TOP / 512.0) * 1.16
+                var bw := float(bnd.texture.get_width())
+                var bh := float(bnd.texture.get_height())
+                var bk := clampf((SKY_H * 0.3 + DIRT_H * 0.5) / bh,
+                        0.6, 2.2)
+                bnd.scale = Vector2.ONE * bk
+                bnd.position = Vector2(
+                        (-bw * bk * 0.35) if side == 0
+                        else (WORLD_W - bw * bk * 0.65),
+                        SURFACE_Y - SKY_H * 0.22)
+                bnd.name = "bound_" + key
                 world.add_child(bnd)
         ent_draw = Node2D.new()
         world.add_child(ent_draw)
@@ -374,7 +489,8 @@ func _build_world() -> void:
         world.add_child(fx_draw)
         _build_worm_sprites()
 
-## the chain's sprites: closed head, segments, tail - the FORGED parts
+## the chain's sprites: closed head, segments, tail - the REAL DragonBones
+## parts (each worm's own skin), the head faces RIGHT (the rotation law)
 func _build_worm_sprites() -> void:
         for s in worm_sprites:
                 if is_instance_valid(s):
@@ -384,27 +500,30 @@ func _build_worm_sprites() -> void:
         for i in SEG_COUNT + 2:
                 var sp := Sprite2D.new()
                 if i == 0:
-                        sp.texture = load(S + "worms/%s_head_closed.png" % id)
+                        sp.texture = load(S + "worms/%s_head.png" % id)
                 elif i == SEG_COUNT + 1:
                         sp.texture = load(S + "worms/%s_tail.png" % id)
                 else:
-                        sp.texture = load(S + "worms/%s_body_%02d.png"
-                                % [id, i % _seg_count_of(id)])
+                        sp.texture = load(S + "worms/%s_body_%d.png"
+                                % [id, (i - 1) % _seg_count_of(id)])
                 sp.z_index = 20 - i
                 worm_draw.add_child(sp)
                 worm_sprites.append(sp)
 
-## how many baked segment frames this worm's atlas carries
+## how many baked segment frames this worm carries (1..3)
 func _seg_count_of(id: String) -> int:
-        match id:
-                "w09": return 22
-                "w10": return 13
-                _: return 15
+        var n := 1
+        while n < 3 and ResourceLoader.exists(
+                        S + "worms/%s_body_%d.png" % [id, n]):
+                n += 1
+        return n
 
 # =============================================================== the level math
-## the worm's next level costs points eaten with it (the curve)
+## the worm's next level costs points eaten with it - v040-10's curve is
+## ~6x the v040-9 one ("levelling up is too fast i maxed the worm in two
+## plays"). Ten levels: 55 * lvl^1.5 a level, ~6.1K points to max.
 func xp_need(lvl: int) -> int:
-        return int(round(40.0 * pow(float(lvl), 1.35)))
+        return int(round(55.0 * pow(float(lvl), 1.5)))
 
 ## the next worm's stats preview (the worms menu's "next level" numbers)
 func stats_at(w_i: int, lvl: int) -> Dictionary:
@@ -418,18 +537,20 @@ func stats_at(w_i: int, lvl: int) -> Dictionary:
         }
 
 # ==================================================================== spawning
-## the spawn table walks the STUDY's real probabilities (the auto-scenario
-## spawn rows) reshaped into our weights. intensity grows forever - the
-## spawner never rests, never eases (the owner: "spawn things over and
-## over without resting and always becomes much harder").
+## a calm opening: a few walkers so the first seconds already hunt
 func _seed_things() -> void:
-        # a calm opening: a few walkers so the first seconds already hunt
         for i in 3:
                 _spawn_walker(true)
         _spawn_vehicle("car", true)
 
 func _intensity() -> float:
         return 1.0 + run_t / 42.0
+
+## THE CAMERA WINDOW (design px): everything spawns OUTSIDE it, everything
+## despawns well beyond it - "the spawn area should be out of screen
+## completely" + "when thing move out, it's body" dies
+func _cam_rect() -> Rect2:
+        return Rect2(cam_x, cam_y, W, H)
 
 func _spawn_roll() -> void:
         # the table: [kind, weight] - the tilt shifts the mix per place
@@ -475,72 +596,94 @@ func _spawn_roll() -> void:
                 "drone": _spawn_flyer("drone")
                 "ufo": _spawn_flyer("ufo")
                 "ground": _spawn_digger()
+                "animal": _spawn_animal()
                 _: _spawn_vehicle(pick, false)
 
-## a surface human - casuals, villagers, cops (wounded variations per place)
+## a surface human - the REAL run cycles (10-frame runs from the study).
+## THE OFF-SCREEN LAW: the spawn seat rides JUST outside the camera
+## window on the x axis, never inside it.
 func _spawn_walker(calm: bool, force := "") -> void:
         var kind := force
         if kind == "":
-                var humans := ["casual1", "casual2", "casual3", "villager"]
+                var humans := ["casual1", "casual2", "casual3", "arab",
+                        "woman", "punk"]
                 if place_id == "city":
-                        humans = ["police", "police", "casual1", "police"]
+                        humans = ["police", "police", "casual1", "casual2",
+                                "woman"]
+                elif place_id == "jungle":
+                        humans = ["jungle1", "jungle2", "casual1"]
+                elif place_id == "polar":
+                        humans = ["polar1", "polar2", "casual1"]
+                elif place_id == "medieval":
+                        humans = ["arab", "punk", "woman"]
                 kind = humans[rng.randi_range(0, humans.size() - 1)]
         var from_right := rng.randf() < 0.5
-        var x := (cam_x + W + 60.0) if from_right else (cam_x - 60.0)
-        var fr := sorted_walk_frames(kind)
+        var x := (cam_x + W + 90.0) if from_right else (cam_x - 90.0)
+        var fr := walk_frames(kind)
+        if fr.is_empty():
+                fr = walk_frames("casual1")
         things.append({
-                "kind": "human", "skin": kind, "x": x, "y": SURFACE_Y + 42.0,
-                "vx": (rng.randf_range(46.0, 96.0)
+                "kind": "human", "skin": kind, "x": x,
+                "y": SURFACE_Y + 34.0,
+                "vx": (rng.randf_range(52.0, 110.0)
                         * (-1.0 if from_right else 1.0)
                         * float(PLACES[place_id]["enemy_mult"])),
                 "fr": fr, "fi": rng.randi_range(0, fr.size() - 1),
                 "ft": 0.0, "alive": true, "flee": 0.0,
         })
 
-func sorted_walk_frames(skin: String) -> Array:
-        # the baked walk frames (8 per skin; villager has 6)
-        var n := 6 if skin == "villager" else 8
+## the walk frames: the study's real runs, cached per skin
+var _fr_cache := {}
+func walk_frames(skin: String) -> Array:
+        if _fr_cache.has(skin):
+                return _fr_cache[skin]
         var out: Array = []
-        for i in n:
-                out.append(load(S + "things/humans/%s_%d.png" % [skin, i]))
+        var i := 0
+        while i < 24:
+                var p := S + "things/humans/%s_%02d.png" % [skin, i]
+                if not ResourceLoader.exists(p):
+                        break
+                out.append(load(p))
+                i += 1
+        _fr_cache[skin] = out
         return out
 
-## an air thing: bird / heli / plane / drone / ufo
+## an air thing: bird / heli / plane / drone / ufo - the REAL fly cycles
+## (the heli's rotor and the planes' props are IN the frames)
 func _spawn_flyer(kind: String) -> void:
         var from_right := rng.randf() < 0.5
-        var x := (cam_x + W + 80.0) if from_right else (cam_x - 80.0)
+        var x := (cam_x + W + 120.0) if from_right else (cam_x - 120.0)
         var y := 0.0
         var vx := 0.0
-        var sp := 1.0
         match kind:
                 "bird":
-                        y = rng.randf_range(60.0, SURFACE_Y - 60.0)
+                        y = SURFACE_Y - rng.randf_range(160.0, SKY_H * 0.55)
                         vx = rng.randf_range(150.0, 230.0)
                 "heli":
-                        y = rng.randf_range(50.0, SURFACE_Y - 90.0)
+                        y = SURFACE_Y - rng.randf_range(200.0, SKY_H * 0.62)
                         vx = rng.randf_range(90.0, 130.0)
                 "plane":
-                        y = rng.randf_range(40.0, 90.0)
+                        y = SURFACE_Y - rng.randf_range(260.0, SKY_H * 0.72)
                         vx = rng.randf_range(260.0, 330.0)
                 "drone":
-                        y = rng.randf_range(60.0, SURFACE_Y - 70.0)
+                        y = SURFACE_Y - rng.randf_range(160.0, SKY_H * 0.5)
                         vx = rng.randf_range(60.0, 100.0)
                 "ufo":
-                        y = rng.randf_range(70.0, SURFACE_Y - 110.0)
+                        y = SURFACE_Y - rng.randf_range(220.0, SKY_H * 0.66)
                         vx = rng.randf_range(70.0, 110.0)
         vx *= (-1.0 if from_right else 1.0) * float(PLACES[place_id]["enemy_mult"])
         things.append({
                 "kind": kind, "x": x, "y": y, "vx": vx, "vy": 0.0,
-                "hp": int(VEH_HP[kind]), "alive": true,
+                "hp": int(VEH_HP.get(kind, 1)), "alive": true,
                 "shoot_t": rng.randf_range(1.2, 3.0) / _intensity(),
-                "bob": rng.randf_range(0.0, TAU), "sp": sp,
+                "bob": rng.randf_range(0.0, TAU),
                 "frame": 0.0,
         })
 
 ## a ground vehicle: car / truck / tank / btr / launcher (tanks+shoot)
 func _spawn_vehicle(kind: String, calm: bool) -> void:
         var from_right := rng.randf() < 0.5
-        var x := (cam_x + W + 90.0) if from_right else (cam_x - 90.0)
+        var x := (cam_x + W + 140.0) if from_right else (cam_x - 140.0)
         var spd := 0.0
         match kind:
                 "car": spd = rng.randf_range(150.0, 200.0)
@@ -550,11 +693,27 @@ func _spawn_vehicle(kind: String, calm: bool) -> void:
                 "launcher": spd = rng.randf_range(60.0, 90.0)
         spd *= float(PLACES[place_id]["enemy_mult"])
         things.append({
-                "kind": kind, "x": x, "y": SURFACE_Y + 44.0,
+                "kind": kind, "x": x, "y": SURFACE_Y + 36.0,
                 "vx": spd * (-1.0 if from_right else 1.0),
                 "hp": int(VEH_HP[kind]), "alive": true,
                 "shoot_t": rng.randf_range(2.0, 4.5), "wheel_t": 0.0,
                 "bob": 0.0, "frame": 0.0,
+        })
+
+## a land animal on the surface line - the place's own cast wearing its
+## REAL run frames (the v040-9 latent crash: "animal" rolls fell into
+## the vehicle spawner and died on the missing table key)
+func _spawn_animal() -> void:
+        var skin := _animal_skin()
+        var from_right := rng.randf() < 0.5
+        var x := (cam_x + W + 110.0) if from_right else (cam_x - 110.0)
+        things.append({
+                "kind": "animal", "skin": skin, "x": x,
+                "y": SURFACE_Y + 38.0,
+                "vx": rng.randf_range(80.0, 150.0)
+                        * (-1.0 if from_right else 1.0)
+                        * float(PLACES[place_id]["enemy_mult"]),
+                "alive": true, "ft": 0.0, "frame": 0.0,
         })
 
 ## the underground animals (the mole and the lizard) - the owner's
@@ -562,8 +721,9 @@ func _spawn_vehicle(kind: String, calm: bool) -> void:
 func _spawn_digger() -> void:
         var kind := "mole" if rng.randf() < 0.55 else "lizard"
         var from_right := rng.randf() < 0.5
-        var x := (cam_x + W + 60.0) if from_right else (cam_x - 60.0)
-        var y := rng.randf_range(SURFACE_Y + 90.0, H - 90.0)
+        var x := (cam_x + W + 100.0) if from_right else (cam_x - 100.0)
+        var y := rng.randf_range(SURFACE_Y + 120.0,
+                SURFACE_Y + DIRT_H - 90.0)
         things.append({
                 "kind": "ground", "skin": kind, "x": x, "y": y,
                 "vx": rng.randf_range(70.0, 120.0)
@@ -591,9 +751,6 @@ func _process(delta: float) -> void:
                 if p_hp <= 0.0:
                         _die()
         _tick_banners(delta)
-        queue_redraw_worlds()
-
-func queue_redraw_worlds() -> void:
         if fx_draw != null:
                 fx_draw.queue_redraw()
         if ent_draw != null:
@@ -636,16 +793,16 @@ func _tick_worm(delta: float) -> void:
         var head := pts[0] + vel * delta
         # the world's bounds (wide, not endless - the rock walls hold)
         var r := _head_r()
-        head.x = clampf(head.x, r + 40.0, WORLD_W - r - 40.0)
-        if head.y < 30.0 + r:
-                head.y = 30.0 + r
+        head.x = clampf(head.x, r + 70.0, WORLD_W - r - 70.0)
+        if head.y < 40.0 + r:
+                head.y = 40.0 + r
                 vel.y = maxf(vel.y, 40.0)
-        if head.y > H - r * 0.5:
-                head.y = H - r * 0.5
+        if head.y > SURFACE_Y + DIRT_H - r * 0.4:
+                head.y = SURFACE_Y + DIRT_H - r * 0.4
                 vel.y = minf(vel.y, -40.0)
         pts[0] = head
         # the chain: each node follows the one before (the swim)
-        var seg_gap := 30.0 * p_scale
+        var seg_gap := _seg_gap()
         for i in range(1, pts.size()):
                 var prev: Vector2 = pts[i - 1]
                 var cur: Vector2 = pts[i]
@@ -672,11 +829,24 @@ func _tick_worm(delta: float) -> void:
                 ghost_t -= delta
         if hit_cd > 0.0:
                 hit_cd -= delta
-        _place_worm_sprites()
+        # THE DIRT TRAIL: the underground worm drags its tunnel behind it
+        if underground:
+                trail.append({"x": pts[0].x, "y": pts[0].y, "t": 2.6})
+                if trail.size() > 160:
+                        trail.pop_front()
+        for tr in trail:
+                tr["t"] -= delta
+        trail = trail.filter(func(t): return float(t["t"]) > 0.0)
+        _place_worm_sprites(underground)
         _eat_check()
 
 func _head_r() -> float:
-        return 52.0 * p_scale
+        return HEAD_H * 0.42 * p_scale
+
+## the chain's seat: half a head-width per node (the real anatomy's law
+## - the segments overlap into one continuous body)
+func _seg_gap() -> float:
+        return HEAD_H * 0.5 * p_scale
 
 ## is anything edible close enough to lunge at?
 func _prey_near() -> bool:
@@ -690,29 +860,55 @@ func _prey_near() -> bool:
                                 return true
         return false
 
-## paint the chain: each node rides its point, rotated by its travel
-func _place_worm_sprites() -> void:
+## paint the chain: each node rides its point, rotated by its travel.
+## THE FACING LAW: the worm art faces RIGHT; the chain rotates by its
+## heading and flips V (never H) when traveling left - the back stays up.
+## THE SILHOUETTE LAW: the deeper the worm swims, the darker it goes (the
+## original's underground read).
+func _place_worm_sprites(underground: bool) -> void:
         var id := String(worm_d["id"])
+        var depth_dark := 0.0
+        if underground:
+                depth_dark = clampf((pts[0].y - SURFACE_Y)
+                        / (H * 0.22), 0.0, 1.0) * 0.82
+        var ghost_a := 0.62 if ghost_t > 0.0 else 1.0
         for i in worm_sprites.size():
                 var sp: Sprite2D = worm_sprites[i]
-                var p := Vector2(pts[i].x - cam_x, pts[i].y)
-                sp.position = p
+                # the chain lives INSIDE world (world itself translates by
+                # the camera) - the paint is the raw world seat; subtracting
+                # the camera here doubled the offset and threw the worm off
+                # every moved screen (the v040-9 render bug, hidden then by
+                # the tiny 192px camera range)
+                sp.position = Vector2(pts[i].x, pts[i].y)
                 var ang := heading
                 if i > 0:
                         ang = (pts[i - 1] - pts[i]).angle()
                 sp.rotation = ang
-                # the art faces RIGHT by default; flip when traveling left
                 var f := absf(wrapf(ang, -PI, PI)) > PI * 0.5
                 sp.flip_v = f
-                sp.scale = Vector2.ONE * p_scale * (1.6 if i == 0 else 1.3)
+                # THE GIRTH LAW (the video's own read): every piece draws
+                # at the worm's girth - the head at HEAD_H, the body a
+                # breath slimmer, the tail tapered - whatever the source
+                # part's native size was
+                var tex: Texture2D = sp.texture
+                var target_h := HEAD_H * p_scale
+                if i == worm_sprites.size() - 1:
+                        target_h *= 0.6
+                elif i > 0:
+                        target_h *= 0.92
+                var k := target_h / maxf(1.0, float(tex.get_height()))
+                sp.scale = Vector2.ONE * k
+                var dark := 1.0 - depth_dark
+                sp.modulate = Color(dark, dark, dark * 1.04, ghost_a)
                 if i == 0:
-                        var tex_path := S + "worms/%s_head_%s.png"
-                        var want_open := mouth_open
-                        var cur: String = sp.texture.resource_path
-                        var want: String = tex_path % [id,
-                                "open" if want_open else "closed"]
-                        if cur != want:
-                                sp.texture = load(want)
+                        # closed = the plain head; open = the open variant
+                        var want_path: String
+                        if mouth_open:
+                                want_path = S + "worms/%s_head_open.png" % id
+                        else:
+                                want_path = S + "worms/%s_head.png" % id
+                        if sp.texture.resource_path != want_path:
+                                sp.texture = load(want_path)
 
 ## THE MOUTH LAW - overlap = eat (edibles) or bite (vehicles)
 func _eat_check() -> void:
@@ -744,6 +940,11 @@ func _eat_check() -> void:
                                 _eaten_book(POINTS["ground"], "ground", tp)
                         else:
                                 _push_fx("gut", tp.x, tp.y, 0.0, -30.0, 0.4)
+                elif k == "bird":
+                        # the bird is a SNACK - snapped out of the air
+                        th["alive"] = false
+                        eaten_animals += 1
+                        _eaten_book(1, "animal", tp)
                 elif VEH_HP.has(k):
                         # vehicles are BITTEN, not eaten - power breaks them
                         th["hp"] = int(th["hp"]) - maxi(1, int(round(p_power)))
@@ -810,8 +1011,8 @@ func _apply_worm_live(lvl: int) -> void:
 # ================================================================ the things
 func _thing_r(th: Dictionary) -> float:
         match String(th["kind"]):
-                "human": return 26.0
-                "animal": return 34.0
+                "human": return 22.0
+                "animal": return 30.0
                 "ground": return 24.0
                 "car": return 52.0
                 "truck": return 70.0
@@ -826,6 +1027,7 @@ func _thing_r(th: Dictionary) -> float:
 
 func _tick_things(delta: float) -> void:
         var im := _intensity()
+        var cam := _cam_rect()
         for th in things:
                 if not bool(th["alive"]):
                         if th.get("spr") != null and is_instance_valid(th["spr"]):
@@ -837,7 +1039,9 @@ func _tick_things(delta: float) -> void:
                 match k:
                         "human":
                                 # walkers stroll; they FLEE when the worm
-                                # surfaces close (the original's panic)
+                                # surfaces close (the original's panic);
+                                # THE ANIM LAW: the legs keep pace with the
+                                # body - the step shortens as the speed grows
                                 var wp := pts[0]
                                 if wp.y > SURFACE_Y - 30.0 \
                                                 and wp.distance_to(tp) < 340.0:
@@ -847,21 +1051,34 @@ func _tick_things(delta: float) -> void:
                                         th["flee"] = 0.6
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
+                                var spd := absf(float(th["vx"]))
+                                var fleeing: bool = float(th.get("flee", 0.0)) > 0.0
+                                var step := 0.09 * (68.0 / maxf(20.0, spd))
+                                if fleeing:
+                                        step *= 0.7
                                 th["ft"] = float(th["ft"]) + delta
-                                if float(th["ft"]) > 0.12:
+                                if float(th["ft"]) > step:
                                         th["ft"] = 0.0
                                         var fr: Array = th["fr"]
                                         th["fi"] = (int(th["fi"]) + 1) \
                                                 % fr.size()
-                                th["y"] = SURFACE_Y + 42.0
+                                th["y"] = SURFACE_Y + 34.0
                         "animal":
-                                # land animals wander the surface line
+                                # land animals wander the surface line -
+                                # the REAL run frames, pace-matched
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
                                 if rng.randf() < 0.004:
                                         th["vx"] = -float(th["vx"])
-                                th["y"] = SURFACE_Y + 40.0 \
-                                        + sin(run_t * 3.0) * 3.0
+                                th["ft"] = float(th.get("ft", 0.0)) + delta
+                                var aspd := absf(float(th["vx"]))
+                                if float(th["ft"]) > 0.085 \
+                                                * (110.0 / maxf(30.0, aspd)):
+                                        th["ft"] = 0.0
+                                        th["frame"] = float(int(
+                                                float(th.get("frame", 0.0))
+                                                + 1.0))
+                                th["y"] = SURFACE_Y + 38.0
                         "ground":
                                 # diggers roam the underground, wobbling
                                 th["x"] = float(th["x"]) \
@@ -869,18 +1086,46 @@ func _tick_things(delta: float) -> void:
                                 th["y"] = float(th["y"]) \
                                         + sin(run_t * 2.2
                                         + float(th["wob"])) * 18.0 * delta
+                                th["ft"] = float(th.get("ft", 0.0)) + delta
+                                if float(th["ft"]) > 0.16:
+                                        th["ft"] = 0.0
+                                        th["frame"] = float(int(
+                                                float(th.get("frame", 0.0))
+                                                + 1.0))
                         "ufo", "drone":
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
                                 th["y"] = float(th["y"]) \
                                         + sin(run_t * 2.0
                                         + float(th["bob"])) * 14.0 * delta
+                                th["ft"] = float(th.get("ft", 0.0)) + delta
+                                if float(th["ft"]) > 0.14:
+                                        th["ft"] = 0.0
+                                        th["frame"] = float(int(
+                                                float(th.get("frame", 0.0))
+                                                + 1.0))
                         "bird":
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
+                                th["ft"] = float(th.get("ft", 0.0)) + delta
+                                if float(th["ft"]) > 0.12:
+                                        th["ft"] = 0.0
+                                        th["frame"] = float(int(
+                                                float(th.get("frame", 0.0))
+                                                + 1.0))
                         "heli", "plane":
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
+                                # THE FLY CYCLE: the rotor/prop is IN the
+                                # real frames - the step rides the speed
+                                th["ft"] = float(th.get("ft", 0.0)) + delta
+                                var fspd := absf(float(th["vx"]))
+                                if float(th["ft"]) > 0.05 \
+                                                * (300.0 / maxf(60.0, fspd)):
+                                        th["ft"] = 0.0
+                                        th["frame"] = float(int(
+                                                float(th.get("frame", 0.0))
+                                                + 1.0))
                                 th["shoot_t"] = float(th["shoot_t"]) - delta
                                 if float(th["shoot_t"]) <= 0.0 \
                                                 and _surfaced_near(tp, 900.0):
@@ -902,9 +1147,12 @@ func _tick_things(delta: float) -> void:
                                                 else ("rocket"
                                                 if k == "launcher"
                                                 else "bullet"))
-                # despawn far off-camera (both directions)
-                if float(th["x"]) < cam_x - 260.0 \
-                                or float(th["x"]) > cam_x + W + 260.0:
+                # THE DESPAWN LAW: far off the camera on BOTH axes - the
+                # record dies and the sprite dies with it
+                if not cam.grow(520.0).has_point(Vector2(float(th["x"]),
+                        float(th["y"]))):
+                        if th.get("spr") != null and is_instance_valid(th["spr"]):
+                                th["spr"].queue_free()
                         th["alive"] = false
                         continue
                 _paint_thing(th)
@@ -921,56 +1169,96 @@ func _paint_thing(th: Dictionary) -> void:
                 sp = Sprite2D.new()
                 ent_draw.add_child(sp)
                 th["spr"] = sp
-        var path := ""
+        # THE FACING LAW: things art faces LEFT natively - flip when the
+        # body moves right. One law for every family, no exceptions.
+        var moving_right: bool = float(th["vx"]) > 0.0
+        var frames: Array = []
+        var fi := 0
         match k:
                 "human":
-                        var fr: Array = th["fr"]
-                        sp.texture = fr[int(th["fi"]) % fr.size()]
-                        sp.flip_h = float(th["vx"]) > 0.0
-                        sp.position = Vector2(float(th["x"]) - cam_x,
-                                float(th["y"]))
-                        sp.scale = Vector2.ONE * 1.25
-                        return
-                "animal":
-                        if sp.get_meta("p", "") == "":
-                                path = "things/animals/%s_0.png" \
-                                        % String(th.get("skin", _animal_skin()))
-                        sp.flip_h = float(th["vx"]) > 0.0
-                "ground":
-                        path = "things/animals/%s_0.png" % String(th["skin"])
-                        sp.flip_h = float(th["vx"]) > 0.0
-                        sp.flip_v = true      # the diggers ride the roof
-                "car":
-                        path = "things/vehicles/car_body.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
-                "truck":
-                        path = "things/vehicles/truck_body.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
-                "tank":
-                        path = "things/vehicles/tank.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
-                "btr":
-                        path = "things/vehicles/btr.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
-                "launcher":
-                        path = "things/vehicles/launcher.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
+                        frames = th["fr"]
+                        fi = int(th["fi"]) % maxi(1, frames.size())
+                "animal", "ground":
+                        var skin := String(th.get("skin",
+                                _animal_skin() if k == "animal" else "mole"))
+                        var key := "animals/%s" % skin if k == "animal" \
+                                else "ground/%s" % skin
+                        frames = _family_frames(key)
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
                 "heli":
-                        path = "things/vehicles/heli_body.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
+                        frames = _family_frames("vehicles/heli")
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
                 "plane":
-                        path = "things/vehicles/plane.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
+                        frames = _family_frames("vehicles/plane")
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
                 "drone":
-                        path = "things/vehicles/drone.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
+                        frames = _family_frames("shots/drone_ball")
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
                 "ufo":
-                        path = "things/vehicles/ufo.png"
-                        sp.flip_h = float(th["vx"]) > 0.0
-        if path != "" and String(sp.get_meta("p", "")) != path:
-                sp.texture = load(S + path)
-                sp.set_meta("p", path)
-        sp.position = Vector2(float(th["x"]) - cam_x, float(th["y"]))
+                        frames = _family_frames("vehicles/ufo")
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
+                "car":
+                        frames = _family_frames("vehicles/car")
+                        fi = 0
+                "truck":
+                        frames = _family_frames("vehicles/truck")
+                        fi = 0
+                "tank":
+                        frames = _family_frames("vehicles/tank")
+                        fi = 0
+                "btr":
+                        frames = _family_frames("vehicles/btr")
+                        fi = 0
+                "launcher":
+                        frames = _family_frames("vehicles/mech")
+                        fi = int(float(th.get("wheel_t", 0.0)) / 0.18) \
+                                % maxi(1, frames.size())
+        if frames.is_empty():
+                sp.visible = false
+                return
+        sp.visible = true
+        var tex: Texture2D = frames[fi]
+        if sp.texture != tex:
+                sp.texture = tex
+        sp.flip_h = moving_right
+        # THE SCALE LAW (the video's own numbers): the humans ~6.5% of the
+        # screen height (their raw art is ~68px tall at the 1080 design);
+        # everything else seats by its kind's true size.
+        var tk := 1.0
+        match k:
+                "human": tk = H * 0.065 / maxf(1.0, float(tex.get_height()))
+                "animal": tk = H * 0.085 / maxf(1.0, float(tex.get_height()))
+                "ground": tk = H * 0.055 / maxf(1.0, float(tex.get_height()))
+                "car", "truck", "btr", "launcher":
+                        tk = H * 0.085 / maxf(1.0, float(tex.get_height()))
+                "tank": tk = H * 0.1 / maxf(1.0, float(tex.get_height()))
+                "heli": tk = H * 0.11 / maxf(1.0, float(tex.get_height()))
+                "plane": tk = H * 0.1 / maxf(1.0, float(tex.get_height()))
+                "drone": tk = H * 0.05 / maxf(1.0, float(tex.get_height()))
+                "ufo": tk = H * 0.09 / maxf(1.0, float(tex.get_height()))
+        sp.scale = Vector2.ONE * tk
+        sp.position = Vector2(float(th["x"]), float(th["y"]))
+
+## the frame cache: every family's real cycle, loaded once
+var _fam_cache := {}
+func _family_frames(rel: String) -> Array:
+        if _fam_cache.has(rel):
+                return _fam_cache[rel]
+        var out: Array = []
+        var i := 0
+        while i < 48:
+                var p := S + "things/%s_%02d.png" % [rel, i]
+                if not ResourceLoader.exists(p):
+                        break
+                out.append(load(p))
+                i += 1
+        _fam_cache[rel] = out
+        return out
 
 ## the land-animal cast shifts with the place (the owner: exclusive casts)
 func _animal_skin() -> String:
@@ -995,6 +1283,7 @@ func _shoot(at: Vector2, kind: String) -> void:
         Jukebox.sfx("dw_shot", -14.0, rng.randf_range(0.9, 1.1))
 
 func _tick_shots(delta: float) -> void:
+        var cam := _cam_rect()
         for s in shots:
                 s["x"] = float(s["x"]) + float(s["vx"]) * delta
                 s["y"] = float(s["y"]) + float(s["vy"]) * delta
@@ -1003,7 +1292,7 @@ func _tick_shots(delta: float) -> void:
                 if sp == null or not is_instance_valid(sp):
                         sp = Sprite2D.new()
                         var s_kind := String(s["kind"])
-                        var path: String = "things/shots/%s.png" \
+                        var path: String = "things/shots/%s_00.png" \
                                 % ("rocket" if s_kind == "rocket"
                                 else ("tank_bullet" if s_kind == "tank"
                                 else "bullet"))
@@ -1012,7 +1301,7 @@ func _tick_shots(delta: float) -> void:
                                 float(s["vy"])).angle() + PI * 0.5
                         ent_draw.add_child(sp)
                         s["spr"] = sp
-                sp.position = Vector2(float(s["x"]) - cam_x, float(s["y"]))
+                sp.position = Vector2(float(s["x"]), float(s["y"]))
                 # the hit: bullets only bite the SURFACED worm (dirt is
                 # armor - deep under the line nothing reaches you)
                 var p := pts[0]
@@ -1021,15 +1310,11 @@ func _tick_shots(delta: float) -> void:
                 if surfaced and sp2.distance_to(p) < _head_r():
                         s["t"] = 99.0
                         _hurt(_shot_dmg(String(s["kind"])), sp2)
-                if float(s["t"]) > 4.0 or float(s["x"]) < cam_x - 300.0 \
-                                or float(s["x"]) > cam_x + W + 300.0:
+                if float(s["t"]) > 4.0 or not cam.grow(340.0).has_point(sp2):
                         if sp != null and is_instance_valid(sp):
                                 sp.queue_free()
                         s["kind"] = "dead"
         shots = shots.filter(func(s): return String(s["kind"]) != "dead")
-
-func _shot_kind(s: Dictionary) -> String:
-        return String(s["kind"])
 
 func _shot_dmg(kind: String) -> float:
         match kind:
@@ -1066,7 +1351,11 @@ func _coin_tex() -> Texture2D:
                 _coin_tex_cache = load(S + "coin.png")
         return _coin_tex_cache
 
+## THE DROP LAW (v040-10's honesty fix): a collected coin FREES its
+## sprite the same frame - nothing ever sticks on the screen again
 func _tick_drops(delta: float) -> void:
+        var cam := _cam_rect()
+        var got := false
         for c in coins_drops:
                 c["t"] = float(c["t"]) + delta
                 var cp := Vector2(float(c["x"]), float(c["y"]))
@@ -1076,28 +1365,43 @@ func _tick_drops(delta: float) -> void:
                         c["x"] = float(c["x"]) + dir.x * 520.0 * delta
                         c["y"] = float(c["y"]) + dir.y * 520.0 * delta
                 if cp.distance_to(pts[0]) < _head_r() + 20.0:
+                        # COLLECTED: bank it, pulse the wallet, kill BOTH
+                        # the record and the sprite - the stuck-coin bug
+                        # died here
                         c["t"] = 99.0
+                        got = true
                         wormcoins_run += 1
                         meta.add_coins(1)
                         _push_fx("coin", float(c["x"]), float(c["y"]),
                                 0.0, -70.0, 0.5)
                         Jukebox.sfx("dw_coin", -6.0,
                                 rng.randf_range(0.95, 1.1))
+                        if c.get("spr") != null \
+                                        and is_instance_valid(c["spr"]):
+                                c["spr"].queue_free()
+                        c["spr"] = null
+                        continue
                 var sp: Sprite2D = c.get("spr")
                 if sp == null or not is_instance_valid(sp):
                         sp = Sprite2D.new()
                         sp.texture = _coin_tex()
                         ent_draw.add_child(sp)
                         c["spr"] = sp
-                if float(c["t"]) < 90.0:
-                        sp.position = Vector2(float(c["x"]) - cam_x,
-                                float(c["y"]))
-                        sp.scale = Vector2.ONE * (1.0
-                                + sin(c["t"] * 6.0) * 0.12)
+                sp.position = Vector2(float(c["x"]), float(c["y"]))
+                sp.scale = Vector2.ONE * (1.0 + sin(c["t"] * 6.0) * 0.12)
+                # a drop nobody takes still dies when far off the camera
+                if not cam.grow(400.0).has_point(cp):
+                        c["t"] = 99.0
+                        if is_instance_valid(sp):
+                                sp.queue_free()
+                        c["spr"] = null
+        if got and wc_lbl != null:
+                wc_lbl.scale = Vector2.ONE * 1.25   # the +1 pulse
         coins_drops = coins_drops.filter(func(c): return float(c["t"]) < 90.0)
 
 # ============================================================== the power-ups
 func _tick_pows(delta: float) -> void:
+        var cam := _cam_rect()
         # the spawn clock: one every 60..120s, a random UNLOCKED kind
         pow_t -= delta
         if pow_t <= 0.0:
@@ -1112,9 +1416,11 @@ func _tick_pows(delta: float) -> void:
                         var from_right := rng.randf() < 0.5
                         pows_live.append({
                                 "k": String(pk["k"]),
-                                "x": cam_x + (W + 60.0 if from_right
-                                        else -60.0),
-                                "y": rng.randf_range(40.0, SURFACE_Y - 40.0),
+                                "x": cam_x + (W + 90.0 if from_right
+                                        else -90.0),
+                                "y": rng.randf_range(
+                                        SURFACE_Y - SKY_H * 0.5,
+                                        SURFACE_Y - 60.0),
                                 "vx": rng.randf_range(70.0, 110.0)
                                         * (-1.0 if from_right else 1.0),
                                 "t": 0.0,
@@ -1130,14 +1436,13 @@ func _tick_pows(delta: float) -> void:
                         sp.texture = load(S + "pows/%s.png" % String(pw["k"]))
                         ent_draw.add_child(sp)
                         pw["spr"] = sp
-                sp.position = Vector2(float(pw["x"]) - cam_x, float(pw["y"]))
+                sp.position = Vector2(float(pw["x"]), float(pw["y"]))
                 sp.scale = Vector2.ONE * (1.0 + sin(pw["t"] * 5.0) * 0.1)
                 var pp := Vector2(float(pw["x"]), float(pw["y"]))
                 if pp.distance_to(pts[0]) < _head_r() + 34.0:
                         pw["t"] = 99.0
                         _grab_pow(String(pw["k"]))
-                if float(pw["t"]) > 30.0 or float(pw["x"]) < cam_x - 200.0 \
-                                or float(pw["x"]) > cam_x + W + 200.0:
+                if float(pw["t"]) > 30.0 or not cam.grow(300.0).has_point(pp):
                         if sp != null and is_instance_valid(sp):
                                 sp.queue_free()
                         pw["k"] = "gone"
@@ -1211,7 +1516,7 @@ func _push_fx(kind: String, x: float, y: float, vx: float, vy: float,
                 "coin": sp.modulate = Color(1.0, 0.8, 0.25, 0.95)
                 "snow": sp.modulate = Color(0.9, 0.95, 1.0, 0.6)
                 _: sp.modulate = Color(0.8, 0.8, 0.8, 0.7)
-        sp.position = Vector2(x - cam_x, y)
+        sp.position = Vector2(x, y)
         sp.scale = Vector2.ONE * rng.randf_range(0.5, 1.3)
         if kind == "coin":
                 sp.scale = Vector2.ONE * 2.2
@@ -1224,14 +1529,15 @@ func _dot_tex() -> Texture2D:
                 _dot_tex_cache = load(S + "dot.png")
         return _dot_tex_cache
 
+## THE REAL EXPLOSIONS: the study's own 24-frame blast, code-modified
 func _explode(at: Vector2, sc: float) -> void:
         var sp := Sprite2D.new()
-        sp.texture = load(S + "fx/expl_00.png")
-        sp.position = Vector2(at.x - cam_x, at.y)
+        sp.texture = load(S + "things/fx/expl_00.png")
+        sp.position = Vector2(at.x, at.y)
         sp.scale = Vector2.ONE * sc
         fx_draw.add_child(sp)
         fx.append({"spr": sp, "vx": 0.0, "vy": 0.0, "t": 0.0,
-                "life": 12.0 / 24.0, "boom": true})
+                "life": 0.72, "boom": true})
         shake = maxf(shake, 10.0)
         Jukebox.sfx("dw_boom", -6.0, rng.randf_range(0.9, 1.1))
 
@@ -1242,13 +1548,14 @@ func _tick_fx(delta: float) -> void:
                 if not is_instance_valid(sp):
                         continue
                 if f.has("boom"):
-                        # the explosion rides its baked frames
+                        # the explosion rides its 24 real frames
                         var fi := int(float(f["t"])
-                                / (float(f["life"]) / 12.0))
-                        if fi > 11:
+                                / (float(f["life"]) / 24.0))
+                        if fi > 23:
                                 sp.visible = false
                         else:
-                                sp.texture = load(S + "fx/expl_%02d.png" % fi)
+                                sp.texture = load(S
+                                        + "things/fx/expl_%02d.png" % fi)
                         continue
                 f["vy"] = float(f["vy"]) + 380.0 * delta
                 sp.position.x += float(f["vx"]) * delta
@@ -1266,12 +1573,20 @@ func _tick_fx(delta: float) -> void:
         fx = fx.filter(func(f): return float(f["t"]) < float(f["life"]))
 
 # ============================================================== camera + hud
+## THE CAMERA LAW: both axes follow the head with a soft lag, clamped to
+## the world. The surface line rides the upper-middle band (the video's
+## own framing), the dives and the jumps pull the view with the worm.
 func _tick_camera(_delta: float) -> void:
-        # the camera follows the head, clamped to the world (wide, not
-        # endless - the pan sells the width)
-        var want := clampf(pts[0].x - W * 0.5, 0.0, WORLD_W - W)
-        cam_x = lerpf(cam_x, want, 0.08)
-        world.position = Vector2(-cam_x, 0.0)
+        var want_x := clampf(pts[0].x - W * 0.5, 0.0, maxf(0.0, WORLD_W - W))
+        cam_x = lerpf(cam_x, want_x, 0.08)
+        var want_y := clampf(pts[0].y - H * 0.55, 0.0,
+                maxf(0.0, SURFACE_Y + DIRT_H - H))
+        cam_y = lerpf(cam_y, want_y, 0.06)
+        world.position = Vector2(-cam_x, -cam_y)
+        # THE PARALLAX: the props strip rides almost with the world (it
+        # sits ON the road's horizon - the drift is subtle)
+        if far_draw != null:
+                far_draw.position.x = cam_x * 0.86
 
 ## the place's EXCLUSIVE life: the hazards + the ambience (the owner's
 ## "places are not just different views" law)
@@ -1281,76 +1596,83 @@ func _place_flavor(delta: float) -> void:
                         if rng.randf() < 0.5:
                                 _push_fx("snow", cam_x
                                         + rng.randf_range(0.0, W),
-                                        rng.randf_range(-20.0, 80.0),
+                                        cam_y + rng.randf_range(-20.0, 80.0),
                                         rng.randf_range(-30.0, 30.0),
                                         rng.randf_range(60.0, 130.0), 3.2)
                 "sparks":
                         # the subway strip bites the tail at the bottom
-                        if pts[0].y > H - 46.0:
+                        if pts[0].y > SURFACE_Y + DIRT_H - 60.0:
                                 _hurt(6.0 * delta * 3.0, pts[0])
                 "torches":
                         # the wall torches burn the surfaced worm
                         if pts[0].y < SURFACE_Y + 20.0:
-                                for tx in [180.0, 960.0, WORLD_W - 180.0]:
+                                for tx in [WORLD_W * 0.12, WORLD_W * 0.5,
+                                        WORLD_W * 0.88]:
                                         if absf(pts[0].x - tx) < 70.0:
                                                 _hurt(4.0 * delta * 3.0,
                                                         pts[0])
                 _:
                         pass
 
-## the top-bar chips: WORMS next to the SHOP (the owner's seat law), the
-## health %, the wormCoins wallet with its icon
+## the top bar: SHOP directly after BACK (the owner's seat law), WORMS
+## after it, then the health % and the wormCoins wallet with its icon
 func _build_hud_extra() -> void:
-        add_hud_button("WORMS", _open_worms)
         add_hud_button("SHOP", _open_shop)
+        add_hud_button("WORMS", _open_worms)
         hp_lbl = add_hud_chip("100%")
         wc_lbl = add_hud_chip("0", S + "coin.png")
-        # ---- THE DASH WIDGET (bottom right, above the banner strip)
+        _build_widgets()
+
+## THE TOP-RIGHT WIDGET STACK (the owner: "they should be at the top
+## right like the others"): the DASH cooldown and the SPECIAL charge
+## stack under the top bar's right edge, with the power chips after.
+func _build_widgets() -> void:
         var safe := banner_bottom()
+        var top_y := 108.0 + safe
+        # ---- THE DASH WIDGET
         dash_chip = PanelContainer.new()
         var st := StyleBoxFlat.new()
         st.bg_color = Color(0.08, 0.05, 0.03, 0.72)
-        st.set_corner_radius_all(18)
-        st.set_content_margin_all(10)
+        st.set_corner_radius_all(16)
+        st.set_content_margin_all(8)
         dash_chip.add_theme_stylebox_override("panel", st)
-        dash_chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-        dash_chip.position = Vector2(W - 210.0, H - safe - 96.0)
-        dash_chip.size = Vector2(180.0, 78.0)
         var dv := VBoxContainer.new()
         dash_chip.add_child(dv)
         var dt := Label.new()
         dt.text = "DASH"
-        dt.add_theme_font_size_override("font_size", 20)
+        dt.add_theme_font_size_override("font_size", 17)
         dt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         dv.add_child(dt)
         dash_lbl = Label.new()
         dash_lbl.text = "READY"
-        dash_lbl.add_theme_font_size_override("font_size", 26)
+        dash_lbl.add_theme_font_size_override("font_size", 23)
         dash_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         dv.add_child(dash_lbl)
+        dash_chip.position = Vector2(W - 150.0, top_y)
+        dash_chip.size = Vector2(126, 82)
         _hud.add_child(dash_chip)
-        # ---- THE SPECIAL WIDGET (bottom middle)
+        # ---- THE SPECIAL WIDGET
         sp_chip = PanelContainer.new()
         var st2 := st.duplicate()
         st2.bg_color = Color(0.10, 0.06, 0.02, 0.72)
         sp_chip.add_theme_stylebox_override("panel", st2)
-        sp_chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-        sp_chip.position = Vector2(W * 0.5 - 110.0, H - safe - 96.0)
-        sp_chip.size = Vector2(220.0, 78.0)
         var sv := VBoxContainer.new()
         sp_chip.add_child(sv)
         var stl := Label.new()
-        stl.text = "SPECIAL  (tap the middle)"
-        stl.add_theme_font_size_override("font_size", 18)
+        stl.text = "SPECIAL"
+        stl.add_theme_font_size_override("font_size", 17)
         stl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sv.add_child(stl)
         sp_lbl = Label.new()
-        sp_lbl.add_theme_font_size_override("font_size", 26)
+        sp_lbl.add_theme_font_size_override("font_size", 23)
         sp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sv.add_child(sp_lbl)
+        sp_chip.position = Vector2(W - 292.0, top_y)
+        sp_chip.size = Vector2(130, 82)
         _hud.add_child(sp_chip)
-        # ---- the power chips seat (they appear under the top bar)
-        for p in POWS:
+        # ---- the power chips seat (under the widget stack)
+        for i in POWS.size():
+                var p: Dictionary = POWS[i]
                 var kind := String(p["k"])
                 var panel := PanelContainer.new()
                 var st3 := StyleBoxFlat.new()
@@ -1360,14 +1682,15 @@ func _build_hud_extra() -> void:
                 panel.add_theme_stylebox_override("panel", st3)
                 var ic := TextureRect.new()
                 ic.texture = load(S + "pows/%s.png" % kind)
-                ic.custom_minimum_size = Vector2(44, 44)
+                ic.custom_minimum_size = Vector2(40, 40)
                 ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
                 ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
                 panel.add_child(ic)
                 var lbl := Label.new()
-                lbl.add_theme_font_size_override("font_size", 20)
+                lbl.add_theme_font_size_override("font_size", 19)
                 panel.add_child(lbl)
-                panel.position = Vector2(24.0 + pow_chips.size() * 150.0, 92.0)
+                panel.position = Vector2(W - 150.0,
+                        top_y + 96.0 + float(i) * 58.0)
                 panel.visible = false
                 _hud.add_child(panel)
                 pow_chips[kind] = {"panel": panel, "label": lbl}
@@ -1378,6 +1701,7 @@ func _tick_hud() -> void:
                         / maxf(1.0, p_hp_max)))
         if wc_lbl != null:
                 wc_lbl.text = str(meta.coins())
+                wc_lbl.scale = wc_lbl.scale.lerp(Vector2.ONE, 0.12)
         # the dash widget lives its cooldown
         if dash_lbl != null:
                 if dash_cd > 0.0:
@@ -1427,12 +1751,22 @@ func _tick_banners(delta: float) -> void:
         banners = banners.filter(func(b): return float(b["t"]) > 0.0)
         queue_redraw()
 
-## the game's own canvas paints the banners + the hurt flash (always alive)
+## the game's own canvas paints the banners + the hurt flash + THE DIRT
+## TRAIL (the underground tunnel the worm drags behind it, like the
+## original's own read)
 func _draw() -> void:
         var vp := get_viewport_rect().size
         if flash > 0.0:
                 draw_rect(Rect2(Vector2.ZERO, vp),
                         Color(0.7, 0.1, 0.1, 0.28 * flash))
+        # the trail strokes (they live in the world's seat)
+        for tr in trail:
+                var a := clampf(float(tr["t"]) / 2.6, 0.0, 1.0) * 0.5
+                var p := Vector2(float(tr["x"]) - cam_x,
+                        float(tr["y"]) - cam_y)
+                if p.x < -80.0 or p.x > vp.x + 80.0:
+                        continue
+                draw_circle(p, _head_r() * 0.42, Color(0.24, 0.16, 0.09, a))
         var y := vp.y * 0.34
         for b in banners:
                 var a := clampf(float(b["t"]) / 0.4, 0.0, 1.0)
@@ -1453,23 +1787,21 @@ func _draw() -> void:
 # ================================================================== input
 ## THE ZONES (the owner's law): LEFT half = the hidden analog, RIGHT half =
 ## TAP to dash, the MIDDLE strip = TAP for the special
-const ZONE_SPLIT_L := 620.0
-const ZONE_SPLIT_R := 1300.0
-var move_anchor := Vector2.ZERO
-
 func _goga_input(event: InputEvent) -> void:
         if state != "play":
                 return
+        var split_l := W * 0.32
+        var split_r := W * 0.68
         if event is InputEventScreenTouch:
                 var t := event as InputEventScreenTouch
                 var p := _to_design(t.position)
                 if t.pressed:
-                        if p.x < ZONE_SPLIT_L:
+                        if p.x < split_l:
                                 move_ptr = t.index
                                 move_anchor = p
                                 move_vec = Vector2.ZERO
                                 steer_mag = 0.0
-                        elif p.x > ZONE_SPLIT_R:
+                        elif p.x > split_r:
                                 _do_dash()
                         else:
                                 _do_special()
@@ -1488,6 +1820,8 @@ func _goga_input(event: InputEvent) -> void:
                                 rel = rel.normalized()
                         move_vec = rel
                         steer_mag = rel.length()
+
+var move_anchor := Vector2.ZERO
 
 func _to_design(screen_p: Vector2) -> Vector2:
         var vp := get_viewport_rect().size
@@ -1711,7 +2045,8 @@ func _blast_all_vehicles(dmg: float) -> void:
                                 _explode(tp, 1.2)
 
 # ================================================================ the sheets
-## the TAP ANYWHERE TO START sheet (the owner's law: the game opens on it)
+## the TAP ANYWHERE TO START sheet (the owner's law: the game opens on it;
+## v040-10: the title text is OUTLINED for the contrast law)
 var _intro_pair: Array = []
 func _show_intro_sheet() -> void:
         if not _intro_pair.is_empty():
@@ -1736,18 +2071,34 @@ func _show_intro_sheet() -> void:
         t.text = String(worm_d["name"]) + "  -  " + String(PLACES[place_id]["name"])
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         t.add_theme_font_size_override("font_size", 34)
+        t.add_theme_color_override("font_color", Color(1, 1, 1))
+        t.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+        t.add_theme_constant_override("outline_size", 10)
         vb.add_child(t)
         var t2 := Label.new()
         t2.text = "TAP ANYWHERE TO START"
         t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         t2.add_theme_font_size_override("font_size", 52)
+        t2.add_theme_color_override("font_color", Color(1, 1, 1))
+        t2.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+        t2.add_theme_constant_override("outline_size", 14)
         vb.add_child(t2)
         var t3 := Label.new()
         t3.text = "left: steer   -   right: dash   -   middle: special"
         t3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         t3.add_theme_font_size_override("font_size", 24)
-        t3.modulate = Color(1, 1, 1, 0.7)
+        t3.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+        t3.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+        t3.add_theme_constant_override("outline_size", 8)
         vb.add_child(t3)
+        var t4 := Label.new()
+        t4.text = "a wormCoin banks after every 10 eaten - vehicles pay score only"
+        t4.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        t4.add_theme_font_size_override("font_size", 19)
+        t4.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+        t4.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+        t4.add_theme_constant_override("outline_size", 6)
+        vb.add_child(t4)
         _intro_pair = [_sheet_stack.back()["dim"], _sheet_stack.back()["cc"]]
 
 func _start_run() -> void:
@@ -1920,6 +2271,8 @@ func _worm_row(i: int) -> Control:
         hb.add_child(act)
         return row
 
+## v040-10 THE ROUND LAW: an owned worm switch mid-run applies to the NEXT
+## round - the active hunt is never corrupted by a body swap
 func _worm_action(i: int, chain_ok: bool) -> void:
         var w: Dictionary = WORMS[i]
         var id := String(w["id"])
@@ -1927,15 +2280,21 @@ func _worm_action(i: int, chain_ok: bool) -> void:
                 if i != worm_i:
                         meta.d["worm"] = id
                         meta.save()
-                        worm_i = i
-                        _apply_worm()
-                        _build_worm_sprites()
-                        _reset_run()
-                        _banner("%s RIDES" % String(w["name"]),
-                                Color("ffd76a"))
+                        if state == "intro":
+                                # between rounds: the swap is safe now
+                                worm_i = i
+                                _apply_worm()
+                                _build_worm_sprites()
+                                _reset_run()
+                                _banner("%s RIDES" % String(w["name"]),
+                                        Color("ffd76a"))
+                        else:
+                                _banner("%s rides NEXT ROUND"
+                                        % String(w["name"]), Color("ffd76a"))
                         sheet_pop()
                         _worms_open = false
-                        _show_intro_sheet()
+                        if state == "intro":
+                                _show_intro_sheet()
                 return
         if not chain_ok:
                 game_toast("max out the previous worm first")
@@ -1948,15 +2307,17 @@ func _worm_action(i: int, chain_ok: bool) -> void:
         meta.unlock_worm(id)
         meta.d["worm"] = id
         meta.save()
-        worm_i = i
-        _apply_worm()
-        _build_worm_sprites()
-        _reset_run()
         Jukebox.sfx("dw_unlock", -2.0)
         _banner("%s UNLOCKED" % String(w["name"]), Color("ffd76a"))
+        if state == "intro":
+                worm_i = i
+                _apply_worm()
+                _build_worm_sprites()
+                _reset_run()
         sheet_pop()
         _worms_open = false
-        _show_intro_sheet()
+        if state == "intro":
+                _show_intro_sheet()
 
 func _open_shop() -> void:
         if _shop_open or state == "dead":
@@ -1966,7 +2327,8 @@ func _open_shop() -> void:
         _fill_shop(vb)
 
 ## THE SHOP: the PLACES (real GOGACoins, the coin icon law, the dry-wallet
-## gray-out law) + the POWER-UPS (wormCoins, bought first, then they spawn)
+## gray-out law) + the POWER-UPS (also real GOGACoins - the owner's
+## v040-10 law) - one currency, the box's own
 func _fill_shop(vb: VBoxContainer) -> void:
         for c in vb.get_children():
                 c.queue_free()
@@ -1993,7 +2355,7 @@ func _fill_shop(vb: VBoxContainer) -> void:
         for pid in PLACES:
                 box.add_child(_place_row(pid))
         var ph2 := Label.new()
-        ph2.text = "POWER-UPS  -  wormCoins"
+        ph2.text = "POWER-UPS  -  GOGACoins"
         ph2.add_theme_font_size_override("font_size", 26)
         ph2.modulate = Color("ffd76a")
         box.add_child(ph2)
@@ -2066,14 +2428,26 @@ func _place_row(pid: String) -> Control:
         hb.add_child(act)
         return row
 
+## v040-10 THE NEXT-ROUND LAW (the owner: "switching to be applied for the
+## next round and not the active one"): mid-run a visit only ARMS the
+## place - the world rebuilds when the round ends (or right away when
+## nobody is hunting yet)
 func _visit_place(pid: String) -> void:
         meta.set_place(pid)
-        place_id = pid
-        _reset_run()
-        _banner("%s" % String(PLACES[pid]["name"]), Color("9ad8ff"))
-        sheet_pop()
-        _shop_open = false
-        _show_intro_sheet()
+        if state == "intro":
+                place_id = pid
+                _rebuild_place()
+                _banner("%s" % String(PLACES[pid]["name"]), Color("9ad8ff"))
+                sheet_pop()
+                _shop_open = false
+                _show_intro_sheet()
+        else:
+                _banner("%s NEXT ROUND" % String(PLACES[pid]["name"]),
+                        Color("9ad8ff"))
+                game_toast("%s opens on your next round"
+                        % String(PLACES[pid]["name"]))
+                sheet_pop()
+                _shop_open = false
 
 func _buy_place(pid: String) -> void:
         var price := int(PLACES[pid]["price"])
@@ -2083,14 +2457,28 @@ func _buy_place(pid: String) -> void:
                 return
         meta.unlock_place(pid)
         meta.set_place(pid)
-        place_id = pid
-        _reset_run()
         Jukebox.sfx("dw_unlock", -2.0)
         _banner("WELCOME TO %s" % String(PLACES[pid]["name"]),
                 Color("9ad8ff"))
-        sheet_pop()
-        _shop_open = false
-        _show_intro_sheet()
+        if state == "intro":
+                place_id = pid
+                _rebuild_place()
+                sheet_pop()
+                _shop_open = false
+                _show_intro_sheet()
+        else:
+                game_toast("%s opens on your next round"
+                        % String(PLACES[pid]["name"]))
+                sheet_pop()
+                _shop_open = false
+
+## the world's full rebuild for a new place (fresh sky/dirt/far/bounds)
+func _rebuild_place() -> void:
+        if world != null and is_instance_valid(world):
+                world.queue_free()
+        _fr_cache.clear()
+        _fam_cache.clear()
+        _build_world()
 
 func _pow_row(p: Dictionary) -> Control:
         var k := String(p["k"])
@@ -2132,10 +2520,13 @@ func _pow_row(p: Dictionary) -> Control:
                         Color(0.25, 0.2, 0.12), func(): pass)
                 Arc.gray_out_button(act)
         else:
-                act = Arc.coin_button("%d wc" % int(p["price"]),
+                # THE REAL COIN LAW (v040-10): power-ups price in
+                # GOGACoins - the box's own coin, the coin icon on the
+                # button, the dry wallet gray-out
+                act = Arc.coin_button("%d" % int(p["price"]),
                         Vector2(190, 62), 24, Color(0.2, 0.25, 0.14),
                         func(): _buy_pow(k))
-                if meta.coins() < int(p["price"]):
+                if Box.coins() < int(p["price"]):
                         Arc.gray_out_button(act)
         hb.add_child(act)
         return row
@@ -2145,8 +2536,8 @@ func _buy_pow(k: String) -> void:
         for p in POWS:
                 if String(p["k"]) == k:
                         price = int(p["price"])
-        if not meta.spend_coins(price):
-                game_toast("not enough wormCoins")
+        if not Box.spend(price):
+                game_toast("not enough GOGACoins")
                 Jukebox.sfx("dw_click", -8.0)
                 return
         meta.unlock_pow(k)
@@ -2169,4 +2560,3 @@ func _die() -> void:
         # the /500 gate bonus is the HOST's math (coin_div) - the game never
         # double-pays it. The wormCoins banked live during the run.
         finish_run(score, 0)
-
