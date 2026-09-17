@@ -403,13 +403,13 @@ func _v0410_laws() -> void:
                 if s.flip_h:
                         flips_ok = false
         ck(flips_ok, "THE FACING LAW: the worm chain never flips H (rotate+flipV only)")
-        # THE WIDGETS LAW: dash + special live in the TOP-RIGHT stack
-        ck(G.dash_chip != null and G.dash_chip.position.x > G.W * 0.5 \
-                and G.dash_chip.position.y < G.H * 0.25,
-                "THE WIDGET LAW: the dash widget sits top-right")
-        ck(G.sp_chip != null and G.sp_chip.position.x > G.W * 0.5 \
-                and G.sp_chip.position.y < G.H * 0.25,
-                "THE WIDGET LAW: the special widget sits top-right")
+        # v040-11 THE WIDGETS LAW: dash + special are TOP-BAR CHIPS after WORMS
+        ck(G.dash_chip != null and G._hud_row.is_ancestor_of(G.dash_chip) \
+                and G._hud_row.get_children().find(G.dash_chip) == 3,
+                "THE WIDGET LAW: the dash chip rides the top bar")
+        ck(G.sp_chip != null and G._hud_row.is_ancestor_of(G.sp_chip) \
+                and G._hud_row.get_children().find(G.sp_chip) == 4,
+                "THE WIDGET LAW: the special chip sits right after DASH (top-left, after WORMS)")
         # THE POWER-UP LAW: priced in GOGACoins (Box.spend), not wormCoins
         # ("ghost" - a kind no earlier section has unlocked)
         var wall0: int = Box.coins()
@@ -440,5 +440,93 @@ func _ready() -> void:
         _topup_laws()
         await _spawn_law()
         await _v0410_laws()
+        await _v0411_laws()
         print("\n=== %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)
+
+
+# ====================================================== the v040-11 laws
+func _v0411_laws() -> void:
+        print("\n-- the v040-11 laws --")
+        # THE CAMPING LAW: riding the surface crust decays the crawl
+        # toward a near-stop; a dive or a dash washes it off
+        G.camp_t = 0.0
+        G.pts[0].y = G.SURFACE_Y
+        G.dash_t = 0.0
+        for i in 300:
+                G._tick_worm(1.0 / 60.0)
+                if G.state != "play":
+                        G.state = "play"
+        ck(G.camp_t > 4.0,
+                "THE CAMPING LAW: 5s of crust-riding fills the grind clock (%.2f)" % G.camp_t)
+        var grind: float = lerpf(1.0, 0.05, G.camp_t / G.CAMP_MAX)
+        ck(grind < 0.12,
+                "THE CAMPING LAW: the crawl decays to a near-stop (x%.2f)" % grind)
+        G.camp_t = 4.5
+        G.dash_t = 0.4
+        G._tick_worm(1.0 / 60.0)
+        ck(G.camp_t == 0.0, "THE CAMPING LAW: the dash scours the grind off")
+        G.camp_t = 4.5
+        G.dash_t = 0.0
+        G.pts[0].y = G.SURFACE_Y + 300.0
+        G._tick_worm(1.0 / 60.0)
+        ck(G.camp_t < 4.5, "THE CAMPING LAW: a dive washes the grind off")
+        # THE COIN LAWS: no chase-magnet; 10s life; the run chip counts
+        # THIS ROUND only
+        G.state = "play"
+        G.place_id = "desert"
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 60.0)
+        G.cam_x = G.pts[0].x - G.W * 0.5
+        G.cam_y = G.pts[0].y - G.H * 0.4
+        var far_x: float = G.pts[0].x + 500.0
+        G.coins_drops = [{"x": far_x, "y": G.SURFACE_Y + 60.0, "t": 0.0}]
+        var wc0: int = G.wormcoins_run
+        for i in 60:
+                G._tick_drops(1.0 / 60.0)
+        ck(G.wormcoins_run == wc0 \
+                and absf(float(G.coins_drops[0]["x"]) - far_x) < 2.0,
+                "THE COIN LAW: a coin sits where it popped - no chase-magnet")
+        G.coins_drops[0]["t"] = 9.7
+        G._tick_drops(1.0 / 60.0)
+        ck(is_instance_valid(G.coins_drops[0].get("spr")),
+                "THE COIN LAW: a coin at 9.7s still blinks on screen")
+        G.coins_drops[0]["t"] = 10.2
+        var spr_ref: Sprite2D = G.coins_drops[0]["spr"]
+        G._tick_drops(1.0 / 60.0)
+        ck(G.coins_drops.is_empty() \
+                or not is_instance_valid(G.coins_drops[0].get("spr")),
+                "THE COIN LAW: an unclaimed coin dies at 10s (sprite freed)")
+        if is_instance_valid(spr_ref):
+                spr_ref.queue_free()
+        # the honest chip
+        G.wormcoins_run = 7
+        G.meta.d["wormcoins"] = 999
+        G._tick_hud()
+        ck(G.wc_lbl != null and G.wc_lbl.text == "7",
+                "THE HONEST CHIP: the coin widget shows THIS ROUND (7), not the wallet")
+        # the intro sheet is CLEAN (no controls/coin notes - they live in the guide)
+        G._show_intro_sheet()
+        var texts := ""
+        for lbl in G._intro_pair[1].find_children("*", "Label", true, false):
+                texts += (lbl as Label).text + "|"
+        ck(not texts.contains("left: steer") \
+                and not texts.contains("wormCoin banks")
+                and texts.contains("TAP ANYWHERE TO START"),
+                "THE CLEAN START: the intro wears the tap line only (details in the guide)")
+        G._start_run()
+        # THE TUNNEL MARKS: per-place mud colors exist and the trail wears them
+        ck(G.TUNNEL_COL.has("desert") and G.TUNNEL_COL.has("medieval") \
+                and G.TUNNEL_COL["polar"] != G.TUNNEL_COL["desert"],
+                "THE TUNNEL LAW: every place wears its own eaten-mud palette")
+        # THE OURS LAW: the art is OURS - the worm sprite set loads and the
+        # bird family exists (the v040-10 invisible-flyer bug is dead)
+        var bird_frames: Array = G._family_frames("vehicles/bird")
+        ck(bird_frames.size() >= 6,
+                "THE OURS LAW: the bird flies (8 flap frames load, %d)" % bird_frames.size())
+        var sold: Array = G.walk_frames("soldier")
+        var pol: Array = G.walk_frames("polar1")
+        ck(sold.size() == 10 and pol.size() == 10,
+                "THE OURS LAW: the soldier and the polar folk wear their own skins")
+        var head_tex: Texture2D = load(G.S + "worms/w01_head.png")
+        ck(head_tex != null and head_tex.get_width() > 80,
+                "THE OURS LAW: the worm head loads (our own drawn jaw)")

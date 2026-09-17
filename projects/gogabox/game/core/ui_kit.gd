@@ -16,6 +16,12 @@ const DIM_BG := Color(0.09, 0.05, 0.02, 0.72)
 static var _font_big: FontFile
 static var _font_ui: FontFile
 
+## v040-11 THE SHEET KEY HANDSHAKE: sheet_push / menu._sheet_base publish
+## the sheet's id here; the next fit_sheet hands it to the BoxScroll it
+## wraps, so every sheet's list remembers its own scroll across refreshes
+## (the CONTINUITY LAW in scroll_box.gd). Consumed on use.
+static var pending_key := ""
+
 static func font_big() -> FontFile:
         if _font_big == null:
                 _font_big = load("res://assets/fonts/Kenney_Rocket.ttf")
@@ -361,12 +367,16 @@ static func confetti(parent: Control, at: Vector2, n := 26) -> void:
 ##      owns taps inside scrolls - an unregistered button is the "refill
 ##      hangs pressed forever" bug class).
 ##   4. CLAMP the panel inside the screen edges for any rotation / aspect.
-static func fit_sheet(vb: VBoxContainer, keep_tail := 1) -> void:
+static func fit_sheet(vb: VBoxContainer, keep_tail := 1, preserve_key := "") -> void:
         var pc: PanelContainer = vb.get_parent() as PanelContainer
         var cc: Control = (pc.get_parent() as Control) if pc != null else null
         var root: Control = (cc.get_parent() as Control) if cc != null else null
         if pc == null or cc == null or root == null:
                 return
+        # v040-11: the key handshake happens even when nothing wraps - a
+        # builder that pre-rolled its own BoxScroll reads the id itself.
+        var want_key := preserve_key if preserve_key != "" else pending_key
+        pending_key = ""
         for c in vb.get_children():
                 if c is BoxScroll:
                         return      # already fitted - idempotent
@@ -397,6 +407,10 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1) -> void:
                         tail_h += (c as Control).get_combined_minimum_size().y
         var sc := BoxScroll.new()
         sc.game_safe = true    # game-owned sheets run while the host is active
+        # v040-11 THE CONTINUITY LAW: this scroll is THE list of the sheet
+        # whose id sheet_push published - it remembers its offset across the
+        # buy-refresh cycle (the owner's global top-jump nuke).
+        sc.preserve_key = want_key
         sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         sc.custom_minimum_size = Vector2(0,
                         maxf(140.0, avail_h - margins - tail_h - sep * float(keep_tail + 1)))
@@ -414,6 +428,7 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1) -> void:
         for b in _buttons_in(sc):
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, _tap_emitter(b))
+        sc.reinstate()
 
 ## Make an existing button LOOK disabled while staying clickable (owner rule
 ## for the rewarded button: after an early close it turns gray and says what

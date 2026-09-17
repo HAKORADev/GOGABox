@@ -305,7 +305,31 @@ def bake_place(theme, p):
     return im
 
 
+def _lum(c):
+    return 0.2126 * c[0] / 255 + 0.7152 * c[1] / 255 + 0.0722 * c[2] / 255
+
+
+def _lift(c, target=0.21):
+    """v040-11 THE READABLE DARK LAW: lift a too-dark palette color to a
+    real luminance (the owner: the places look "too shitty and dark"),
+    hue preserved."""
+    l = max(_lum(c), 0.004)
+    if l >= target:
+        return c
+    f = min(2.6, target / l)
+    return tuple(min(255, int(round(v * f))) for v in c)
+
+
 def main():
+    # v040-11: the cave + neon palettes ride the readable-dark lift before
+    # the bake - same seeds, same layouts, readable skies
+    for theme in ("cave", "neon"):
+        for p in THEMES[theme]["places"]:
+            for key in ("sky", "r1", "r2", "r3", "deco"):
+                if key == "sky":
+                    p[key] = tuple(_lift(v) for v in p[key])
+                elif p[key] is not None:
+                    p[key] = _lift(p[key], 0.17)
     for theme, cfg in THEMES.items():
         for i, p in enumerate(cfg["places"]):
             im = bake_place(theme, p)

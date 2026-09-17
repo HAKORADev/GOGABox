@@ -29,6 +29,42 @@ var _vel := Vector2.ZERO
 var _dragging := false
 var _tappables: Array = []         # [{ctrl: Control, cb: Callable}]
 
+# ================================================== v040-11 THE CONTINUITY LAW
+## THE OWNER'S GLOBAL NUKE ("i bought something, it refreshed the list and
+## returned me to the top - happens everywhere, in games and in the main
+## menu - eliminate it so it NEVER happens again"). Every BoxScroll carries
+## an identity key. Leaving the tree writes its offset into a class-level
+## ledger; the refreshed rebuild of the SAME list restores it THE SAME
+## FRAME it fills its content - verified on the rig (tests/scroll_law_probe.gd):
+## a same-frame restore survives the ScrollContainer's sort clamp, so there
+## is no top-jump, no 2-frame dance, no flicker. Anywhere. Forever.
+static var _ledger := {}          # preserve_key -> {"v": int, "h": int}
+
+var preserve_key := ""            # set by the sheet/list builder (its id)
+
+## drop a list's memory (a brand-new context: a search, a filter change)
+static func forget(key: String) -> void:
+        _ledger.erase(key)
+
+## write the CURRENT offset under my key (called automatically on
+## tree-exit; also callable right before an in-place teardown)
+func remember() -> void:
+        if preserve_key == "":
+                return
+        _ledger[preserve_key] = {"v": scroll_vertical, "h": scroll_horizontal}
+
+## restore the remembered offset - call right AFTER the refreshed content
+## is in the tree. Same frame, zero flash.
+func reinstate() -> void:
+        if preserve_key == "" or not _ledger.has(preserve_key):
+                return
+        var s: Dictionary = _ledger[preserve_key]
+        scroll_vertical = int(s["v"])
+        scroll_horizontal = int(s["h"])
+
+func _exit_tree() -> void:
+        remember()
+
 ## While a sheet/overlay covers this scroll, ALL input processing here is
 ## suspended so the overlay's controls (sliders, buttons) work normally.
 var input_locked := false

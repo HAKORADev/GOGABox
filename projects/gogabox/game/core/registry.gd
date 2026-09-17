@@ -1417,7 +1417,7 @@ const GAMES := [
                 "controls": [
                         "tap anywhere to start the hunt",
                         "LEFT half: touch and slide - the hidden analog steers the worm (small slide = gentle turn, big slide = hard turn); the worm always swims forward",
-                        "RIGHT half: TAP to DASH - a burst of speed; every worm has its own cooldown and length, the widget bottom-right lives it",
+                        "RIGHT half: TAP to DASH - a burst of speed; every worm has its own cooldown and length, the DASH chip in the top bar lives it",
                         "MIDDLE strip: TAP for the SPECIAL - one charge banks per 100 points (hold 2); every worm's special is its own",
                         "ride the SURFACE LINE and you crawl slower (the original's law); the dirt below is armor - bullets only bite the surfaced worm",
                         "eat: humans 1 point, land animals 3, ground animals 1 per 3; vehicles are bitten apart (power = damage) and pay their own points",

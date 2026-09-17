@@ -1,3 +1,8 @@
+# RETIRED (v040-11): the owner ordered the original-cut art pipeline DEAD
+# ("nuke all original_art and make our own one"). This tool cut/modded the
+# original's own sprites - it must NEVER run again. Our art lives in
+# tools/v0411_worm_ours.py (drawn by code, zero original bytes).
+# =====================================================================================
 #!/usr/bin/env python3
 """contact sheets of the death worm study sprites - the eyes before the hands."""
 import os, math, sys

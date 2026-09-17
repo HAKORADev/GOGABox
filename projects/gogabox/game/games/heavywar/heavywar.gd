@@ -370,13 +370,20 @@ func _draw_clouds() -> void:
         var speeds := [0.07, 0.12]
         for li in 2:
                 var period: float = periods[li]
-                var off := fposmod(scroll_x * speeds[li], period)
+                # v040-11 THE SHAPE ANCHOR LAW: the seed rides the ABSOLUTE
+                # world slot, never the wrapped loop slot - the old re-key at
+                # every wrap made every cloud morph into its neighbor and
+                # back (the owner's "uncanny as hell").
+                var base_off: float = scroll_x * float(speeds[li])
+                var off := fposmod(base_off, period)
+                var k_abs0 := int(floor(base_off / period))
                 var k := 0
                 var x := -off
                 while x < W + period:
-                        var hy := 60.0 + hpos(k * 3 + li * 17) * 180.0
-                        var cw := 90.0 + hpos(k + li * 7) * 120.0
-                        var a := 0.16 + 0.08 * hpos(k * 5 + li)
+                        var kk := k + k_abs0
+                        var hy := 60.0 + hpos(kk * 3 + li * 17) * 180.0
+                        var cw := 90.0 + hpos(kk + li * 7) * 120.0
+                        var a := 0.16 + 0.08 * hpos(kk * 5 + li)
                         _cloud_puff(Vector2(x, hy), cw, Color(cc, a))
                         x += period
                         k += 1
@@ -407,12 +414,17 @@ func _draw_env() -> void:
                 Color(pl["sky_bot"], 0.30))
         for li in planes.size():
                 var plane: Dictionary = planes[li]
-                var off := fposmod(scroll_x * float(plane["spd"]),
-                        float(plane["period"]))
+                # v040-11 THE SHAPE ANCHOR LAW: the seed rides the ABSOLUTE
+                # world slot - when off wraps a period, the loop slots re-key
+                # but the world slots do not, so every silhouette keeps its
+                # shape while it slides (the shape-shifting props are dead).
+                var base_off := scroll_x * float(plane["spd"])
+                var off := fposmod(base_off, float(plane["period"]))
+                var k_abs0 := int(floor(base_off / float(plane["period"])))
                 var k := 0
                 var x := -off
                 while x < W + float(plane["period"]):
-                        _env_shape(String(pl["key"]), li, k, x,
+                        _env_shape(String(pl["key"]), li, k + k_abs0, x,
                                 plane["base"])
                         x += float(plane["period"])
                         k += 1
@@ -420,9 +432,7 @@ func _draw_env() -> void:
         _draw_decals()
 
 func _env_shape(key: String, li: int, k: int, x: float, base: Color) -> void:
-        # deterministic per (key, layer, k)
-        var h := fposmod(float(k * 37 + li * 11), 97.0) / 97.0
-        var h2 := fposmod(float(k * 53 + li * 7 + 13), 91.0) / 91.0
+        # deterministic per (key, layer, ABSOLUTE world slot - v040-11)
         var edge := base.darkened(0.25)
         var lit := base.lightened(0.12)
         match key:
@@ -1526,7 +1536,11 @@ func _spawn_boss() -> void:
                 "name": String(def["name"]), "brain": brain,
                 "hp": float(hp), "maxhp": float(hp), "size": float(def["size"]),
                 "x": ex, "y": ey, "base_y": ey, "t": 0.0,
-                "dir": -1, "hit": 0.0,
+                # v040-11 THE FACING LAW (the owner's standing order - the
+                # first boss flew left-to-right wearing a LEFT-facing body,
+                # again): a boss faces its REAL travel. Entrance velocity
+                # seeds it; _update_boss keeps following the actual motion.
+                "dir": 1 if evx > 0.0 else -1, "hit": 0.0,
                 "arrived": false, "vx": evx, "vy": evy,
                 "weapon_t": 1.6, "weapon_cycle": 0, "spawn_t": 5.0,
                 "enraged": false, "chill": 0.0, "dash_dir": -1,
@@ -1566,6 +1580,11 @@ func _update_boss(b: Dictionary, delta: float) -> void:
         var enraged: bool = float(b["hp"]) < float(b["maxhp"]) * 0.4
         b["enraged"] = enraged
         var rage := 0.72 if enraged else 1.0
+        # v040-11 THE FACING LAW, live half: the boss's facing follows its
+        # REAL horizontal motion every tick - entrance, hover drift, the
+        # sidewinder's wall-to-wall dash. A 30px/s dead-band keeps the sine
+        # hovers from jittering at their turn-around points.
+        var face_x0 := float(b["x"])
         # THE SHIELD PHASES: at 66% and 33% the boss slams a shield up and
         # calls its wing - the fight has acts, not a flat health bar
         var breaks := int(b.get("shield_breaks", 0))
@@ -1635,6 +1654,9 @@ func _update_boss(b: Dictionary, delta: float) -> void:
                         else:
                                 b["y"] = 190.0 + sin(b["t"] * 1.2) * 44.0
                                 b["x"] += sin(b["t"] * 0.55) * 80.0 * delta
+        var face_v := (float(b["x"]) - face_x0) / maxf(0.0001, delta)
+        if absf(face_v) > 30.0:
+                b["dir"] = 1 if face_v > 0.0 else -1
         if not bool(b["arrived"]):
                 return
         # weapons
@@ -2494,6 +2516,17 @@ func _goga_sheet_popped(id: String) -> void:
                                 _open_cards()
                 # the ticker accrues again exactly here
         elif id == "shop":
+                if paused:
+                        paused = false
+                        get_tree().paused = false
+                _apply_skin()
+        elif id == "boxshop":
+                # v040-11 THE UNPAUSE LAW (the owner's freeze): the GOGABox
+                # shop pauses the tree mid-run like any other sheet - its
+                # close MUST lift that pause too. (The missing branch left
+                # the tree paused forever: the frozen game.) The raw-tap
+                # leak that could start a run behind the shop is dead in
+                # the base's SHEET INPUT LAW.
                 if paused:
                         paused = false
                         get_tree().paused = false

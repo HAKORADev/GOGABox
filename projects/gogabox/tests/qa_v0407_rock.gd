@@ -136,11 +136,11 @@ func _scene_laws() -> void:
         ck(G.phase == "play", "TAP ANYWHERE starts")
         # the sides law through the real director
         G.probe_reset(123)
-        for i in 15:
+        for i in 18:
                 G.probe_spawn(0, 2, 50)
                 G.probe_spawn(1, 2, 50)
-        ck(G.side_count[0] == 15 and G.side_count[1] == 15,
-                "SIDES LAW: 15 alive spawns a side")
+        ck(G.side_count[0] == 18 and G.side_count[1] == 18,
+                "SIDES LAW: 18 alive spawns a side")
         var n0: int = G.rocks.size()
         G.heat = 0
         G.spawn_t = 0.0
@@ -179,8 +179,12 @@ func _scene_laws() -> void:
         while G.rocks.size() > 0:
                 G._damage_rock(0, 99999, 10.0, 10.0)
         ck(G.rp > rp0, "SCORE LAW: every break is a rockPoint")
+        # v040-11 THE GROUND COIN LAW: the pay DROPS - it banks only after
+        # the coins fall, rest, and ride the magnet into the wallet
+        for i in 300:
+                G._coins_tick(1.0 / 60.0)
         ck(G.rc_wallet() == rc0 + maxi(1, int(round(float(hp_before) / 10.0)))
-                + 2, "ROCKCOIN LAW: the pool / 10 flies (children pay too)")
+                + 2, "ROCKCOIN LAW: the pool / 10 lands and banks (children pay too)")
         G.probe_reset(9)
         var rp1: int = G.rp
         G.probe_spawn(1, 1, 120)     # size 1: terminal, exact pay
@@ -188,8 +192,10 @@ func _scene_laws() -> void:
         var hp1: int = int(G.rocks[0]["hp"])
         while G.rocks.size() > 0:
                 G._damage_rock(0, 99999, 10.0, 10.0)
+        for i in 300:
+                G._coins_tick(1.0 / 60.0)
         ck(G.rc_wallet() == rc1 + maxi(1, int(round(float(hp1) / 10.0))),
-                "ROCKCOIN LAW: a 120 rock pays 12 - exact")
+                "ROCKCOIN LAW: a 120 rock pays 12 - exact (after the coin beat)")
         ck(G.rp == rp1 + 1,
                 "SCORE LAW: one broken rock is one rockPoint (exact)")
         ck(G.score == G.rp, "SCORE LAW: the score IS the rockPoints")
@@ -423,25 +429,22 @@ func _v0408_laws() -> void:
                 var b0: int = G.rocks.size()
                 G._spawn_director(0.016)
                 pours += G.rocks.size() - b0
-        ck(pours >= 12 and pours <= 48,
-                "BURST LAW: the spawner pours 1..4 an event (%d in 12)" % pours)
-        # THE GROUND LAUNCH: a rock thrown up, arcing, falling - v040-10
-        # THE FAIR THROW: the throw is TELEGRAPHED (a 0.5s warning ring,
-        # never an unseen kill) and the seat keeps a safe ring around the
-        # cannon
-        var l0: int = G.rocks.size()
-        G.launch_marks.clear()          # the burst test may have left marks
-        var m0: int = G.launch_marks.size()
-        G._launch_up()
-        ck(G.launch_marks.size() == m0 + 1 \
-                and float(G.launch_marks[-1]["t"]) > 0.0,
-                "FAIR THROW: the launch is telegraphed first")
-        for i in 40:
-                G._launch_marks_tick(1.0 / 60.0)
-        ck(G.rocks.size() == l0 + 1 and float(G.rocks[-1]["vy"]) < 0.0
-                and float(G.rocks[-1]["y"]) > G.ground_y - 300.0 * G.us
-                and int(G.rocks[-1]["side"]) == -1,
-                "GROUND LAUNCH: thrown up from the floor after the warning")
+        ck(pours >= 12 and pours <= 60,
+                "BURST LAW: the spawner pours 1..5 an event (%d in 12)" % pours)
+        # v040-11 THE WALLS-ONLY LAW (the owner, third strike): "why the
+        # fuck you still spawn rocks from the ground, they should be from
+        # two wall sides, the ground thing should never ever happen".
+        # Every spawn must ride a WALL side; no side == -1 ground birth
+        # exists anywhere in the director, and no launch/telegraph system
+        # survives at all.
+        var ground_births := 0
+        for r in G.rocks:
+                if int(r["side"]) == -1:
+                        ground_births += 1
+        ck(ground_births == 0 and not ("_launch_up" in G)
+                and not ("_launch_marks_tick" in G),
+                "WALLS-ONLY: no ground spawn path exists (0 ground births,"
+                + " no launch system)")
         # THE SHOT LAW: the ball is visible and flies at a visible speed
         ck(G.BULLET_R == 13.0 and G.BULLET_SPEED == 920.0,
                 "SHOT LAW: 13px balls at 920px/s - seen climbing")

@@ -370,1567 +370,1567 @@
   },
   "assets/games/rockbreaker/world/rockcoin.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/coin.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/dot.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_dirt.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_far.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_road.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/city_sky.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/dec_bones.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/dec_tomb.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_dirt.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_far.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_road.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/desert_sky.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_dirt.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_far.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_road.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/jungle_sky.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_dirt.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_far.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_road.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/medieval_sky.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_bound_l.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_bound_r.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_dirt.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_far.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_road.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/places/polar_sky.png": {
    "source": "deathworm-study",
-   "origin": "re-tiled + code-modified from the official location layers (dirt/road/sky/far/bounds; the decals cropped from the desert cross-section) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/bear_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/camel_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/camel_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/camel_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/camel_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/camel_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/penguin_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/puma_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/puma_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/puma_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/tiger_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/tiger_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/tiger_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/animals/yeti_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/arab_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual1_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual2_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/casual3_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle1_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/jungle2_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/punk_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/humans/woman_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/car_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/car_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/car_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/car_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/car_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/dozer_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/dozer_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/dozer_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_assault_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_assault_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_assault_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/heli_assault_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/jet_12.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_12.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_13.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_14.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_15.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_16.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_17.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_18.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_19.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/mech_20.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/plane_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/police_car_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/police_car_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/police_car_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/tank_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/tank_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/tank_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/truck_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/truck_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufo_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufo_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufo_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufo_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufo_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_12.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_13.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_14.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_15.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_16.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_17.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_18.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_19.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_20.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_21.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_22.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_23.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_24.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_25.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_26.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_27.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_28.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_29.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_30.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_31.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_32.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_33.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_34.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_35.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_36.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_37.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_38.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_39.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/ufojet_40.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_03.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_04.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_05.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_06.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_07.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_08.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_09.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_10.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_11.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_12.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_13.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_14.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_15.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_16.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_17.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_18.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_19.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_20.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_21.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_22.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/fx/expl_23.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/bullet_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/bullet_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/drone_ball_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/drone_ball_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/drone_ball_02.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/rocket_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/rocket_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/tank_bullet_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/ufo_ball_00.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/shots/ufo_ball_01.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official atlases (tools/v0410_worm_study.py) then code-modified (hue + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/shop/city.png": {
    "source": "deathworm-study",
-   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/shop/desert.png": {
    "source": "deathworm-study",
-   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/shop/jungle.png": {
    "source": "deathworm-study",
-   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/shop/medieval.png": {
    "source": "deathworm-study",
-   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/shop/polar.png": {
    "source": "deathworm-study",
-   "origin": "composed from our own re-tiled place layers in tools/v0410_worm_art.py (our own)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_body_1.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_body_2.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_body_1.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_body_2.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_body_1.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_body_2.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_body_1.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_body_2.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_body_0.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_head.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_head_open.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_preview.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_tail.png": {
    "source": "deathworm-study",
-   "origin": "cut from the official DragonBones skin pages (tools/v0410_worm_study.py) then code-modified (hue identity + grade + grain) in tools/v0410_worm_art.py - our own derivative"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/frenzy.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/ghost.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/magnet.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/shield.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/size.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/speed.png": {
    "source": "deathworm-study",
-   "origin": "drawn with PIL in tools/v0410_worm_art.py (our own, no study bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
   }
  },
  "assets": {

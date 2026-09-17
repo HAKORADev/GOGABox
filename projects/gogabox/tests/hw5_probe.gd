@@ -498,6 +498,37 @@ func _run() -> void:
                                 bad_kind = String(d["kind"])
         ck(facing_ok, "THE FACING LAW: every mover's nose agrees with its travel%s"
                 % ("" if facing_ok else " (%s)" % bad_kind))
+        # v040-11 THE BOSS FACING LAW (the owner's standing order - the
+        # first boss flew left-to-right wearing a LEFT-facing body): every
+        # brain's entrance flies dir == the travel sign; the live law then
+        # follows the hover/dash motion
+        var boss_ok := true
+        var bad_brain := ""
+        for brain in ["flyer", "sidewinder", "weaver", "fortress"]:
+                G.enemies = G.enemies.filter(func(e): return String(e.get("kind", "")) != "boss")
+                for pi in HWData.BOSSES.size():
+                        if String(HWData.BOSSES[pi]["brain"]) == brain:
+                                G.place_i = pi
+                                break
+                G._spawn_boss()
+                var b: Dictionary = G.boss_ent
+                for f in 90:
+                        G._update_boss(b, 1.0 / 60.0)
+                var vx := 0.0
+                var x0: float = float(b["x"])
+                G._update_boss(b, 1.0 / 60.0)
+                vx = (float(b["x"]) - x0) / (1.0 / 60.0)
+                if absf(vx) > 30.0 and int(b["dir"]) != (1 if vx > 0.0 else -1):
+                        boss_ok = false
+                        bad_brain = brain
+        ck(boss_ok, "THE BOSS FACING LAW: every boss flies nose-first%s"
+                % ("" if boss_ok else " (%s)" % bad_brain))
+        # v040-11 THE UNPAUSE LAW: the box shop pause dies with the sheet
+        G.paused = true
+        G.get_tree().paused = true
+        G._goga_sheet_popped("boxshop")
+        ck(not G.paused and not G.get_tree().paused,
+                "THE UNPAUSE LAW: closing the box shop lifts the freeze")
         # THE TANK SCALE: the hull slab and the hitbox read the same law
         ck(G.TANK_S < 0.4,
                 "THE TANK SCALE: the machine is 1/3 of its old bulk")

@@ -419,9 +419,9 @@ func _t_registry() -> int:
                 "the golden law: every 300 rockPoints, hidden 300-1000 pool")
         ok += _check(int(RB.MYSTERY_HP_MIN) == 250 and int(RB.MYSTERY_HP_MAX) == 500,
                 "the mystery law: hidden 250-500 pool")
-        ok += _check(int(RB.SIDE_BUDGET) == 15 and int(RB.SCREEN_CAP) == 50
+        ok += _check(int(RB.SIDE_BUDGET) == 18 and int(RB.SCREEN_CAP) == 50
                         and int(RB.HOLD_AT) == 45,
-                "the sides law: 15 a side, 50 on screen, the 45 hold")
+                "the sides law: 18 a side, 50 on screen, the 45 hold")
         ok += _check(int(RB.SIZES) == 5 and (RB.RADII as Array).size() == 5,
                 "the size law: five sizes")
         ok += _check(absf(float(RB.HP_SLOPE) - 0.4) < 0.0001,

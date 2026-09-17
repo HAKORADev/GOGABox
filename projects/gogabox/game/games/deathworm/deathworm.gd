@@ -164,6 +164,9 @@ const AIR_G := 1500.0            # gravity above the surface
 const TURN_RATE := 3.4           # rad/s at grip 1.0
 const LINE_BAND := 26.0          # the surface-line slowdown band
 const LINE_SLOW := 0.62          #   the original's crawl-at-the-line law
+const CAMP_MAX := 5.0            # v040-11 THE CAMPING LAW: seconds of
+                                 #   continuous crust-riding until the
+                                 #   crawl decays to a near-stop (x0.05)
 const SEG_COUNT := 14            # the drawn chain (head + 14 + tail)
 const EAT_R := 1.0               # mouth radius in head-widths
 const SPECIAL_AT := 100          # one charge per 100 points
@@ -215,6 +218,16 @@ var coins_drops: Array = []      # the wormCoin drops
 var pows_live: Array = []        # the power-up pickups
 var fx: Array = []               # dirt/blood/sparks
 var trail: Array = []            # the underground dirt trail [{x,y,t}]
+var camp_t := 0.0                # v040-11: the crust-grind clock
+# v040-11 THE TUNNEL PALETTES: the eaten-mud colors per place (core = the
+# bitten dark, rim = the fresh-eaten lip)
+const TUNNEL_COL := {
+        "desert": {"core": Color(0.30, 0.20, 0.10), "rim": Color(0.58, 0.44, 0.24)},
+        "polar": {"core": Color(0.22, 0.32, 0.44), "rim": Color(0.62, 0.76, 0.86)},
+        "city": {"core": Color(0.20, 0.18, 0.20), "rim": Color(0.46, 0.44, 0.48)},
+        "jungle": {"core": Color(0.13, 0.20, 0.10), "rim": Color(0.38, 0.52, 0.26)},
+        "medieval": {"core": Color(0.26, 0.20, 0.16), "rim": Color(0.54, 0.45, 0.35)},
+}
 var cam_x := 0.0
 var cam_y := 0.0
 var spawn_t := 2.0
@@ -337,6 +350,7 @@ func _reset_run() -> void:
         pows_live.clear()
         fx.clear()
         trail.clear()
+        camp_t = 0.0
         spawn_t = 2.2
         pow_t = rng.randf_range(24.0, 40.0)
         cam_x = clampf(WORLD_W * 0.5 - W * 0.5, 0.0, maxf(0.0, WORLD_W - W))
@@ -387,13 +401,20 @@ func _build_world() -> void:
         var sh := float(sky_tex.get_height())
         var sky := Node2D.new()
         sky.name = "sky"
-        var n_sky := int(ceil(WORLD_W / float(sky_tex.get_width()))) + 1
+        # v040-11 THE FULL-SKY LAW: the sky texture STRETCHES to the whole
+        # sky band (SURFACE_Y) - a short texture never leaves brown void
+        # above the horizon (the film caught it: 540px of sky over a 1350px
+        # sky band = the brown bar the owner banned in v040-9).
+        var sky_k := SURFACE_Y / float(sky_tex.get_height())
+        var n_sky := int(ceil(WORLD_W / (float(sky_tex.get_width()) \
+                * minf(1.0, sky_k)))) + 1
         for i in n_sky:
                 var sp := Sprite2D.new()
                 sp.texture = sky_tex
                 sp.centered = false
-                sp.position = Vector2(float(i) * float(sky_tex.get_width()),
-                        0.0)
+                sp.scale = Vector2(maxf(1.0, sky_k), sky_k)
+                sp.position = Vector2(float(i) * float(sky_tex.get_width())
+                        * maxf(1.0, sky_k), 0.0)
                 sky.add_child(sp)
         world.add_child(sky)
         # ---- THE FAR STRIP: the original's own surface-props skyline
@@ -774,12 +795,25 @@ func _tick_worm(delta: float) -> void:
         var base := BASE_SPEED * p_speed
         if pts[0].y < SURFACE_Y - 10.0:
                 base *= 0.86                      # air is freer but lighter
+        # v040-11 THE SURFACE CAMPING LAW (the owner: "the original has
+        # the eating ground surface speed slow-down-till-stop - it exists
+        # to prevent players from living on the surface and eating every
+        # single thing"): riding the crust crawls (LINE_SLOW) AND keeps
+        # decaying toward a near-stop the longer the worm grinds along it;
+        # a dive underground washes the grind off, and the dash scours it
+        # in one burst.
+        if on_line and dash_t <= 0.0:
+                camp_t = minf(CAMP_MAX, camp_t + delta)
+        else:
+                camp_t = maxf(0.0, camp_t - delta * 2.2)
         if on_line:
-                base *= LINE_SLOW                 # the original's law
+                var grind := lerpf(1.0, 0.05, camp_t / CAMP_MAX)
+                base *= LINE_SLOW * grind         # the original's law, both halves
         if underground and float(PLACES[place_id]["roots"]) < 1.0:
                 base *= float(PLACES[place_id]["roots"])
         if dash_t > 0.0:
                 base *= 2.6
+                camp_t = 0.0
         var dir := Vector2(cos(heading), sin(heading))
         if pts[0].y < SURFACE_Y - 10.0:
                 # air: gravity owns the body, heading follows velocity
@@ -829,10 +863,15 @@ func _tick_worm(delta: float) -> void:
                 ghost_t -= delta
         if hit_cd > 0.0:
                 hit_cd -= delta
-        # THE DIRT TRAIL: the underground worm drags its tunnel behind it
+        # THE MUD-EATEN TUNNEL (v040-11, the owner: "the original has a
+        # cool thing for the underground where the worm leaves marks like
+        # it ATE the mud, in proper way and different coloring and VFXs
+        # based on place"): the tunnel lives 6s, wears the PLACE'S OWN
+        # dirt colors, and carries its own deterministic flecks.
         if underground:
-                trail.append({"x": pts[0].x, "y": pts[0].y, "t": 2.6})
-                if trail.size() > 160:
+                trail.append({"x": pts[0].x, "y": pts[0].y, "t": 6.0,
+                        "s": rng.randf()})
+                if trail.size() > 260:
                         trail.pop_front()
         for tr in trail:
                 tr["t"] -= delta
@@ -1186,6 +1225,13 @@ func _paint_thing(th: Dictionary) -> void:
                         frames = _family_frames(key)
                         fi = int(float(th.get("frame", 0.0))) \
                                 % maxi(1, frames.size())
+                "bird":
+                        # v040-11: the bird had NO paint branch and no art -
+                        # it flew INVISIBLE (the v040-10 latent bug). Our
+                        # own 8-frame flap cycle now carries it.
+                        frames = _family_frames("vehicles/bird")
+                        fi = int(float(th.get("frame", 0.0))) \
+                                % maxi(1, frames.size())
                 "heli":
                         frames = _family_frames("vehicles/heli")
                         fi = int(float(th.get("frame", 0.0))) \
@@ -1232,6 +1278,7 @@ func _paint_thing(th: Dictionary) -> void:
         var tk := 1.0
         match k:
                 "human": tk = H * 0.065 / maxf(1.0, float(tex.get_height()))
+                "bird": tk = H * 0.042 / maxf(1.0, float(tex.get_height()))
                 "animal": tk = H * 0.085 / maxf(1.0, float(tex.get_height()))
                 "ground": tk = H * 0.055 / maxf(1.0, float(tex.get_height()))
                 "car", "truck", "btr", "launcher":
@@ -1351,20 +1398,21 @@ func _coin_tex() -> Texture2D:
                 _coin_tex_cache = load(S + "coin.png")
         return _coin_tex_cache
 
-## THE DROP LAW (v040-10's honesty fix): a collected coin FREES its
-## sprite the same frame - nothing ever sticks on the screen again
+## THE DROP LAW v040-11 (the owner, on the original: "coins were
+## spawning a little up and not forward - this makes collecting them
+## requires really going to them; they vanish after 10 seconds if not
+## collected with proper flickering and fade-out"): NO chase-magnet
+## anymore - a coin sits where it popped up (a little UP, never thrown
+## forward) and the worm's head must really come take it. Unclaimed
+## coins live 10s: they blink, then fade, then they are gone.
+const COIN_LIFE_S := 10.0
 func _tick_drops(delta: float) -> void:
         var cam := _cam_rect()
         var got := false
         for c in coins_drops:
                 c["t"] = float(c["t"]) + delta
                 var cp := Vector2(float(c["x"]), float(c["y"]))
-                # a drop drifts to the worm when close (the flow law)
-                if cp.distance_to(pts[0]) < 280.0:
-                        var dir := (pts[0] - cp).normalized()
-                        c["x"] = float(c["x"]) + dir.x * 520.0 * delta
-                        c["y"] = float(c["y"]) + dir.y * 520.0 * delta
-                if cp.distance_to(pts[0]) < _head_r() + 20.0:
+                if cp.distance_to(pts[0]) < _head_r() + 22.0:
                         # COLLECTED: bank it, pulse the wallet, kill BOTH
                         # the record and the sprite - the stuck-coin bug
                         # died here
@@ -1387,14 +1435,31 @@ func _tick_drops(delta: float) -> void:
                         sp.texture = _coin_tex()
                         ent_draw.add_child(sp)
                         c["spr"] = sp
-                sp.position = Vector2(float(c["x"]), float(c["y"]))
+                # the little UP hop on birth (never forward): the coin
+                # rises ~30px then rests - the original's pop
+                var hop := clampf(float(c["t"]) / 0.35, 0.0, 1.0)
+                sp.position = Vector2(float(c["x"]),
+                        float(c["y"]) - sin(hop * PI) * 30.0)
                 sp.scale = Vector2.ONE * (1.0 + sin(c["t"] * 6.0) * 0.12)
-                # a drop nobody takes still dies when far off the camera
-                if not cam.grow(400.0).has_point(cp):
+                # v040-11 the 10s clock: blink after 7s, fade the tail
+                var left := COIN_LIFE_S - float(c["t"])
+                if left < 3.0:
+                        var blink := 1.0 if fmod(float(c["t"]), 0.24) < 0.12 \
+                                        else 0.35
+                        sp.modulate = Color(1, 1, 1, blink)
+                if left < 1.0:
+                        sp.modulate.a = maxf(0.0, left)
+                # a drop nobody takes still dies when FAR off the camera
+                # (gone for good - the world does not carry it)
+                if not cam.grow(900.0).has_point(cp):
                         c["t"] = 99.0
+                if float(c["t"]) >= COIN_LIFE_S:
+                        c["t"] = 99.0
+                if float(c["t"]) >= 99.0:
                         if is_instance_valid(sp):
                                 sp.queue_free()
                         c["spr"] = null
+                        continue
         if got and wc_lbl != null:
                 wc_lbl.scale = Vector2.ONE * 1.25   # the +1 pulse
         coins_drops = coins_drops.filter(func(c): return float(c["t"]) < 90.0)
@@ -1623,54 +1688,32 @@ func _build_hud_extra() -> void:
         wc_lbl = add_hud_chip("0", S + "coin.png")
         _build_widgets()
 
-## THE TOP-RIGHT WIDGET STACK (the owner: "they should be at the top
-## right like the others"): the DASH cooldown and the SPECIAL charge
-## stack under the top bar's right edge, with the power chips after.
+## v040-11 THE TOP-BAR WIDGET LAW (the owner: "put them at the top left
+## after worms button and make them horizontal"): the DASH cooldown and
+## the SPECIAL charge are CHIPS IN THE TOP BAR, right after WORMS - one
+## line each, nothing stacked, nothing word-on-word. The power chips
+## keep their under-bar stack at the right edge.
 func _build_widgets() -> void:
+        # v040-11 THE WIDGET SEAT LAW (the owner: "put them at the top left
+        # after worms button and make them horizontal and not word on each
+        # other, like this: 'special: name nn' 'dash: ready/ dash:
+        # count_down'"): the two chips ride the TOP BAR ITSELF, right after
+        # the WORMS button, one line each - the old stacked panels died.
         var safe := banner_bottom()
         var top_y := 108.0 + safe
-        # ---- THE DASH WIDGET
-        dash_chip = PanelContainer.new()
-        var st := StyleBoxFlat.new()
-        st.bg_color = Color(0.08, 0.05, 0.03, 0.72)
-        st.set_corner_radius_all(16)
-        st.set_content_margin_all(8)
-        dash_chip.add_theme_stylebox_override("panel", st)
-        var dv := VBoxContainer.new()
-        dash_chip.add_child(dv)
-        var dt := Label.new()
-        dt.text = "DASH"
-        dt.add_theme_font_size_override("font_size", 17)
-        dt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        dv.add_child(dt)
-        dash_lbl = Label.new()
-        dash_lbl.text = "READY"
-        dash_lbl.add_theme_font_size_override("font_size", 23)
-        dash_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        dv.add_child(dash_lbl)
-        dash_chip.position = Vector2(W - 150.0, top_y)
-        dash_chip.size = Vector2(126, 82)
-        _hud.add_child(dash_chip)
-        # ---- THE SPECIAL WIDGET
-        sp_chip = PanelContainer.new()
-        var st2 := st.duplicate()
-        st2.bg_color = Color(0.10, 0.06, 0.02, 0.72)
-        sp_chip.add_theme_stylebox_override("panel", st2)
-        var sv := VBoxContainer.new()
-        sp_chip.add_child(sv)
-        var stl := Label.new()
-        stl.text = "SPECIAL"
-        stl.add_theme_font_size_override("font_size", 17)
-        stl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sv.add_child(stl)
-        sp_lbl = Label.new()
-        sp_lbl.add_theme_font_size_override("font_size", 23)
-        sp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sv.add_child(sp_lbl)
-        sp_chip.position = Vector2(W - 292.0, top_y)
-        sp_chip.size = Vector2(130, 82)
-        _hud.add_child(sp_chip)
-        # ---- the power chips seat (under the widget stack)
+        dash_chip = Arc.chip("DASH: READY", "", Color(0, 0, 0, 0.4), 19,
+                Arc.CARD)
+        _hud_row.add_child(dash_chip)
+        _hud_row.move_child(dash_chip, 3)   # back, SHOP, WORMS, DASH
+        dash_lbl = dash_chip.get_child(0).get_child(
+                dash_chip.get_child(0).get_child_count() - 1)
+        sp_chip = Arc.chip("SPECIAL: -", "", Color(0, 0, 0, 0.4), 19,
+                Arc.CARD)
+        _hud_row.add_child(sp_chip)
+        _hud_row.move_child(sp_chip, 4)     # ...then SPECIAL
+        sp_lbl = sp_chip.get_child(0).get_child(
+                sp_chip.get_child(0).get_child_count() - 1)
+        # ---- the power chips seat (under the bar's right edge, unchanged)
         for i in POWS.size():
                 var p: Dictionary = POWS[i]
                 var kind := String(p["k"])
@@ -1700,14 +1743,18 @@ func _tick_hud() -> void:
                 hp_lbl.text = "%d%%" % int(round(100.0 * p_hp
                         / maxf(1.0, p_hp_max)))
         if wc_lbl != null:
-                wc_lbl.text = str(meta.coins())
+                # v040-11 THE HONEST COIN CHIP (the owner: "the coins widget
+                # shows total coins instead of collected this round - make it
+                # shows only the collected, total coins be in the worms menu
+                # only"): the run chip counts THIS ROUND's pickups.
+                wc_lbl.text = str(wormcoins_run)
                 wc_lbl.scale = wc_lbl.scale.lerp(Vector2.ONE, 0.12)
-        # the dash widget lives its cooldown
+        # the dash chip lives its cooldown (the horizontal top-bar format)
         if dash_lbl != null:
                 if dash_cd > 0.0:
-                        dash_lbl.text = "%.1fs" % dash_cd
+                        dash_lbl.text = "DASH: %.1f" % dash_cd
                 else:
-                        dash_lbl.text = "READY"
+                        dash_lbl.text = "DASH: READY"
         if sp_lbl != null:
                 var names := {"roar": "ROAR", "surge": "SURGE",
                         "geyser": "GEYSER", "ghost": "GHOST DIVE",
@@ -1715,7 +1762,7 @@ func _tick_hud() -> void:
                         "venom": "VENOM SPIT", "devour": "DEVOUR",
                         "voidpull": "VOID PULL", "firebreath": "FIRE BREATH"}
                 var nm: String = names.get(String(worm_d["special"]), "?")
-                sp_lbl.text = "%s x%d" % [nm, special_charges]
+                sp_lbl.text = "SPECIAL: %s x%d" % [nm, special_charges]
         # the power chips tick their countdowns (the geometry law)
         for k in pow_chips:
                 var seat: Dictionary = pow_chips[k]
@@ -1759,14 +1806,35 @@ func _draw() -> void:
         if flash > 0.0:
                 draw_rect(Rect2(Vector2.ZERO, vp),
                         Color(0.7, 0.1, 0.1, 0.28 * flash))
-        # the trail strokes (they live in the world's seat)
+        # v040-11 the MUD-EATEN tunnel marks (the world's seat): each
+        # mark is a bitten pocket of the place's own dirt - a dark core,
+        # a lighter eaten rim riding the top, and flecks that read as the
+        # crumbs the worm left behind
+        var tcol: Dictionary = TUNNEL_COL.get(place_id,
+                TUNNEL_COL["desert"])
+        var hr := _head_r()
         for tr in trail:
-                var a := clampf(float(tr["t"]) / 2.6, 0.0, 1.0) * 0.5
+                var life := clampf(float(tr["t"]) / 6.0, 0.0, 1.0)
+                var a := life * 0.72
                 var p := Vector2(float(tr["x"]) - cam_x,
                         float(tr["y"]) - cam_y)
-                if p.x < -80.0 or p.x > vp.x + 80.0:
+                if p.x < -90.0 or p.x > vp.x + 90.0:
                         continue
-                draw_circle(p, _head_r() * 0.42, Color(0.24, 0.16, 0.09, a))
+                var rr := hr * (0.40 + 0.10 * life)
+                draw_circle(p, rr, Color(tcol["core"], a))
+                # the eaten rim: a light lip on the pocket's upper edge
+                draw_arc(p + Vector2(0.0, -rr * 0.28), rr * 0.82,
+                        PI + 0.35, TAU - 0.35, 10,
+                        Color(tcol["rim"], a * 0.8), hr * 0.09)
+                # the crumb flecks (deterministic per mark)
+                var seedv := float(tr.get("s", 0.5))
+                for fi in 3:
+                        var fa := TAU * (seedv * 7.3 + float(fi) * 2.4)
+                        var fd := rr * (0.55 + 0.4 * fmod(seedv * 13.1
+                                + float(fi) * 0.37, 1.0))
+                        draw_circle(p + Vector2(cos(fa), sin(fa)) * fd,
+                                maxf(1.5, hr * 0.05),
+                                Color(tcol["rim"], a * 0.55))
         var y := vp.y * 0.34
         for b in banners:
                 var a := clampf(float(b["t"]) / 0.4, 0.0, 1.0)
@@ -2083,22 +2151,11 @@ func _show_intro_sheet() -> void:
         t2.add_theme_color_override("font_outline_color", Color(0, 0, 0))
         t2.add_theme_constant_override("outline_size", 14)
         vb.add_child(t2)
-        var t3 := Label.new()
-        t3.text = "left: steer   -   right: dash   -   middle: special"
-        t3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        t3.add_theme_font_size_override("font_size", 24)
-        t3.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-        t3.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-        t3.add_theme_constant_override("outline_size", 8)
-        vb.add_child(t3)
-        var t4 := Label.new()
-        t4.text = "a wormCoin banks after every 10 eaten - vehicles pay score only"
-        t4.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        t4.add_theme_font_size_override("font_size", 19)
-        t4.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
-        t4.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-        t4.add_theme_constant_override("outline_size", 6)
-        vb.add_child(t4)
+        # v040-11 THE CLEAN START LAW (the owner: "remove the extra details
+        # of controls and wormcoins note, if they not exist in the guide,
+        # put them there"): the intro wears the worm, its name, and the
+        # tap-to-start only - the controls and the coin law live in the
+        # registry desc/controls (the guide), where they already were.
         _intro_pair = [_sheet_stack.back()["dim"], _sheet_stack.back()["cc"]]
 
 func _start_run() -> void:

@@ -782,6 +782,13 @@ func _build_grid() -> void:
 # ---------------------------------------------------------------- feed
 
 func _refresh() -> void:
+        # v040-11 THE CONTINUITY LAW (the owner: "i bought something, it
+        # refreshed the list and returned me to the top - eliminate it"): the
+        # feed + the carousel strip keep their offsets across every refresh
+        # (a purchase, an unlock, a seen-mark) - the grid's tiles are torn
+        # down and rebuilt, the OFFSET is re-applied the same frame.
+        var keep_feed := _feed_scroll.scroll_vertical
+        var keep_strip := _strip_scroll.scroll_horizontal
         _layout()
         for c in _grid.get_children():
                 _grid.remove_child(c)
@@ -868,6 +875,9 @@ func _refresh() -> void:
                 {"items": never},
         ]
         _apply_list()
+        # the carousel keeps its page offset on a refresh (a fresh page-turn
+        # via the arrows still resets it inside _apply_list itself)
+        _strip_scroll.scroll_horizontal = keep_strip
         # remember the live ready-state of every owned game (the 2s tick
         # re-checks it - see _refresh_ready_cache)
         _refresh_ready_cache()
@@ -909,6 +919,9 @@ func _refresh() -> void:
                 _grid.add_child(empty)
         _wallet_label.text = Box.coins_display()
         _update_battery_chip()
+        # v040-11: the feed lands EXACTLY where the owner left it - the same
+        # frame, no top-jump, no flicker (verified: tests/scroll_law_probe.gd)
+        _feed_scroll.scroll_vertical = keep_feed
 
 func _passes_filters(g: Dictionary) -> bool:
         # MYSTERY tiles bypass metadata filters: a black box carries no public
@@ -1366,6 +1379,10 @@ func _open_search() -> void:
         # it lights up the moment any filter/state/name query is chosen.
         var apply_btn := Arc.button("APPLY FILTERS", Vector2(480, 78), 26, Arc.ACCENT, func():
                 _close_sheet()
+                # v040-11: a filter change is a NEW context - the feed reads
+                # from the top (the continuity law preserves refreshes, not
+                # filter re-seats)
+                _feed_scroll.scroll_vertical = 0
                 _refresh()
                 Arc.toast(_toast, "filters applied"))
         apply_btn.disabled = not _filters_dirty()
@@ -1377,6 +1394,7 @@ func _open_search() -> void:
                 _filter_state = ""
                 _filter_text = ""
                 _close_sheet()
+                _feed_scroll.scroll_vertical = 0
                 _refresh()))
 
 func _filters_dirty() -> bool:
@@ -1646,8 +1664,11 @@ func _open_guide(g: Dictionary) -> void:
 func _open_topup() -> void:
         if _sheet_open:
                 _close_sheet()
+        # v040-11: a FRESH top-up chain starts at the top of the picker; the
+        # back-and-forth inside the chain keeps the offsets (the continuity law).
+        BoxScroll.forget("topup_picker")
         var h := _sheet_height(760.0)
-        var vb := _sheet_base(h)
+        var vb := _sheet_base(h, "topup")
         var title := Arc.label("TOP-UP", 40, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
@@ -1690,7 +1711,7 @@ func _open_topup_picker() -> void:
         if _sheet_open:
                 _close_sheet()
         var h := _sheet_height()
-        var vb := _sheet_base(h)
+        var vb := _sheet_base(h, "topup_picker")
         var title := Arc.label("TOP-UP", 38, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
@@ -1699,6 +1720,7 @@ func _open_topup_picker() -> void:
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(sub)
         var scroll := BoxScroll.new()
+        scroll.preserve_key = "topup_picker"
         scroll.custom_minimum_size = Vector2(0, h - 250)
         scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
         vb.add_child(scroll)
@@ -1768,14 +1790,16 @@ func _topup_row(rec: Dictionary, scroll: BoxScroll) -> Control:
 ## THE EXCHANGE SCREEN: the game's coins first, the GOGACoins under, the
 ## rate line, the amount field (capped at the wallet, always), the live
 ## "= nn" preview, and the TOP-UP button that opens the confirmation.
-func _open_topup_game(gid: String) -> void:
+## v040-11: prefill re-opens the sheet with the amount still typed in (the
+## CANCEL-from-confirm round trip keeps the owner's number alive).
+func _open_topup_game(gid: String, prefill := 0) -> void:
         if _sheet_open:
                 _close_sheet()
         var rec := GameCoin.record(gid)
         if rec.is_empty():
                 return
         var h := _sheet_height(860.0)
-        var vb := _sheet_base(h)
+        var vb := _sheet_base(h, "topup_exchange_" + gid)
         var title := Arc.label(String(rec["title"]).to_upper(), 36, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
@@ -1847,14 +1871,15 @@ func _open_topup_game(gid: String) -> void:
         prev.custom_minimum_size = Vector2(240, 0)
         row.add_child(prev)
         vb.add_child(row)
-        var maxb := Arc.button("MAX", Vector2(240, 56), 22, Arc.ACCENT,
-                func(): field.text = str(cap))
-        var mc := HBoxContainer.new()
-        mc.alignment = BoxContainer.ALIGNMENT_CENTER
-        mc.add_child(maxb)
-        vb.add_child(mc)
+        var maxb: Button = null
+        var top: Button = null
         var state := {"amount": 0}
-        field.text_changed.connect(func(t: String):
+        # THE LIVE AMOUNT LAW (v040-11): one update body feeds the preview,
+        # the MAX button's state and the TOP-UP button's gray - the MAX tap
+        # runs THE SAME body (a programmatic field.text never fired
+        # text_changed, so the counter read 0 until a manual edit - the
+        # owner's report).
+        var apply_amount := func(t: String) -> void:
                 var digits := ""
                 for ch in t:
                         if ch >= "0" and ch <= "9":
@@ -1868,32 +1893,59 @@ func _open_topup_game(gid: String) -> void:
                         field.text = str(n)
                         field.caret_column = field.text.length()
                 state["amount"] = n
-                maxb.disabled = cap <= 0
+                if maxb != null:
+                        maxb.disabled = cap <= 0
                 prev.text = "=  %s %s" % [Arc.short_num(
-                        GameCoin.convert(n, rate_v)), String(rec["name"])])
+                        GameCoin.convert(n, rate_v)), String(rec["name"])]
+                # THE HONEST BUTTON LAW (the owner: "do not accept top-up if
+                # entered gogacoins are 0 or less than 1 in-game-currency,
+                # gray-out the button i mean"): the confirm grays when the
+                # exchange moves nothing - no coins typed, or less than one
+                # whole game coin at this game's rate.
+                if top != null:
+                        top.disabled = n <= 0 \
+                                        or GameCoin.convert(n, rate_v) < 1
+        field.text_changed.connect(apply_amount)
+
+        maxb = Arc.button("MAX", Vector2(240, 56), 22, Arc.ACCENT,
+                func():
+                        field.text = str(cap)
+                        apply_amount.call(str(cap)))
+        var mc := HBoxContainer.new()
+        mc.alignment = BoxContainer.ALIGNMENT_CENTER
+        mc.add_child(maxb)
+        vb.add_child(mc)
+
         # THE CONFIRM LAW: the top-up button opens the confirmation first
-        var top := Arc.button("TOP-UP", Vector2(540, 84), 30, Arc.GOOD,
+        top = Arc.button("TOP-UP", Vector2(540, 84), 30, Arc.GOOD,
                 func():
                         var n := int(state["amount"])
                         if n <= 0 or cap <= 0:
                                 Jukebox.sfx("error", -4.0)
                                 return
                         _topup_confirm(gid, n))
+        top.add_theme_color_override("font_disabled_color",
+                        Color(1, 1, 1, 0.72))
         vb.add_child(top)
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24,
                 Color(0.42, 0.30, 0.16), func():
                         _close_sheet()
                         _open_topup_picker()))
         Arc.fit_sheet(vb, 2)
+        # the honest seat: gray until a real exchange is typed (or the
+        # prefilled CANCEL round-trip fills one in)
+        apply_amount.call(str(mini(prefill, cap)) if prefill > 0 else "")
 
 ## the confirmation sheet: the two wallets, the amount, the result line,
-## CONFIRM / CANCEL - nothing moves before this
+## CONFIRM / CANCEL - nothing moves before this. v040-11: the confirm
+## REPLACES the exchange sheet (the one-sheet law) and CANCEL walks back
+## to a rebuilt exchange WITH the typed amount intact.
 func _topup_confirm(gid: String, n: int) -> void:
         var rec := GameCoin.record(gid)
         var rate_v := GameCoin.rate(gid)
         var out := GameCoin.convert(n, rate_v)
         var h := _sheet_height(620.0)
-        var vb := _sheet_base(h)
+        var vb := _sheet_base(h, "topup_confirm")
         var title := Arc.label("CONFIRM TOP-UP", 36, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
@@ -1907,7 +1959,9 @@ func _topup_confirm(gid: String, n: int) -> void:
         row.alignment = BoxContainer.ALIGNMENT_CENTER
         row.add_theme_constant_override("separation", 16)
         row.add_child(Arc.button("CANCEL", Vector2(260, 76), 26,
-                Color(0.42, 0.30, 0.16), func(): _close_sheet()))
+                Color(0.42, 0.30, 0.16), func():
+                        _close_sheet()
+                        _open_topup_game(gid, n)))
         row.add_child(Arc.button("CONFIRM", Vector2(260, 76), 26, Arc.GOOD,
                 func(): _topup_settle(gid, n, out)))
         vb.add_child(row)
@@ -2052,7 +2106,17 @@ func _open_dev_sheet() -> void:
                                 get_tree().call_deferred(
                                                 "reload_current_scene")))
 
-func _sheet_base(h := 0.0) -> VBoxContainer:
+func _sheet_base(h := 0.0, id := "") -> VBoxContainer:
+        # v040-11 THE ONE-SHEET LAW: a live pair is NEVER orphaned. The top-up
+        # confirm sheet used to build straight over the exchange sheet - the
+        # exchange pair left the tracker, stayed alive underneath, and every
+        # later back/close desynced the Android back until it hit the EXIT
+        # menu over an open sheet (the owner's report). A build while one is
+        # up closes it first.
+        if not _sheet_pair.is_empty():
+                _close_sheet()
+        # v040-11: publish the sheet's id for fit_sheet's continuity key.
+        Arc.pending_key = id
         _sheet_open = true
         _set_feed_lock(true)
         var vb := Arc.sheet(_root, h)
@@ -2079,6 +2143,13 @@ func _close_sheet() -> void:
         _sheet_open = false
         _trophies_open = false
         _set_feed_lock(false)
+        # v040-11 THE CONTINUITY LAW: write the dying sheet's list offsets
+        # before the frees - a chain (_close_sheet + _open_*) that rebuilds
+        # the next sheet the same frame restores them (the top-jump nuke).
+        for n in _sheet_pair:
+                if n != null and is_instance_valid(n):
+                        for sc in (n as Control).find_children("*", "BoxScroll", true, false):
+                                (sc as BoxScroll).remember()
         # free EXACTLY the pair this sheet appended (see _sheet_pair) -
         # never "the last children of _root"
         for n in _sheet_pair:

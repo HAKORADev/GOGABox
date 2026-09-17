@@ -139,6 +139,10 @@ func quit_to_box() -> void:
 ## THIS sheet.
 func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxContainer:
         var root := _overlay_root_ref()
+        # v040-11: publish this sheet's id - the Arc.fit_sheet pass that wraps
+        # the sheet's content hands it to the BoxScroll (the CONTINUITY LAW:
+        # the list remembers its own offset across the buy-refresh cycle).
+        Arc.pending_key = id
         var vb := Arc.sheet(root, sheet_height, sheet_width)
         var kids := root.get_children()
         var dim: Control = kids[kids.size() - 2]
@@ -155,6 +159,13 @@ func sheet_pop() -> void:
         if _sheet_stack.is_empty():
                 return
         var s: Dictionary = _sheet_stack.pop_back()
+        # v040-11 THE CONTINUITY LAW: write the dying sheet's list offsets
+        # BEFORE the deferred frees - a same-frame rebuild of the same sheet
+        # id then restores them (the global top-jump nuke).
+        for k in [s["dim"], s["cc"]]:
+                if k != null and is_instance_valid(k):
+                        for sc in (k as Control).find_children("*", "BoxScroll", true, false):
+                                (sc as BoxScroll).remember()
         for k in [s["dim"], s["cc"]]:
                 if k != null and is_instance_valid(k):
                         k.queue_free()
@@ -406,6 +417,16 @@ func _pause_close() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
         if over:
+                return
+        # v040-11 THE SHEET INPUT LAW (the owner's heavy war freeze): raw
+        # touches leaked PAST a sheet's dim (the GUI stage eats the emulated
+        # mouse, but the raw ScreenTouch still arrived here) - a stray tap on
+        # the intro screen STARTED A RUN BEHIND the open box shop, the next
+        # shop open then paused the tree, and its close had no unpause branch:
+        # the frozen game. Law: while one of MY sheets (or the pause pair, or
+        # the story card) owns the screen, the game hears NOTHING raw.
+        if not _sheet_stack.is_empty() or not _pause_pair.is_empty() \
+                                or box_story_open():
                 return
         tk.feed(event)
         _goga_input(event)
