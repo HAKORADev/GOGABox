@@ -312,21 +312,23 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 26,
-                "26 playable games (rock breaker joined, v040-7)")
+        var ok := _check(GameReg.playable().size() == 27,
+                "27 playable games (deadly worm joined, v040-9)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
         # feed sorts by this file's order; the newest game walks last)
-        ok += _check(GameReg.workshop().size() == 3,
-                "3 workshop teasers (death worm / zuma / gold miner - "
-                + "craze caves graduated as rock breaker, v040-7)")
+        ok += _check(GameReg.workshop().size() == 2,
+                "2 workshop teasers (zuma / gold miner - death worm "
+                + "graduated as DEADLY WORM, v040-9)")
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
         ok += _check(ids[ids.size() - 1] == "goldminer"
-                        and ids.find("rockbreaker") == ids.size() - 4,
-                "rock breaker walks last of the playable, teasers after it")
+                        and ids.find("rockbreaker") == ids.size() - 4
+                        and ids.find("deathworm") == ids.size() - 3
+                        and ids.find("zuma") == ids.size() - 2,
+                "deadly worm walks last of the playable, teasers after it")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -338,7 +340,6 @@ func _t_registry() -> int:
         # v040-7: CRAZE CAVES graduated as ROCK BREAKER - three teasers left
         ok += _check(GameReg.get_game("crazecaves").is_empty()
                         and String(GameReg.get_game("rockbreaker")["title"]) == "Rock Breaker"
-                        and String(GameReg.get_game("deathworm")["title"]) == "DEATH WORM"
                         and String(GameReg.get_game("zuma")["title"]) == "ZUMA"
                         and String(GameReg.get_game("goldminer")["title"]) == "GOLD MINER",
                 "the SOON teasers wear their shelf names; craze caves is ROCK BREAKER (v040-7)")
@@ -372,6 +373,30 @@ func _t_registry() -> int:
                 "heavy war wears the owner's economy (bonus /500, fee 20)")
         ok += _check(String(GameReg.get_game("heavywar")["orientation"]) == "landscape",
                 "heavy war is landscape (the horizontal law)")
+        # v040-9: DEADLY WORM graduates (the death-worm teaser renamed per
+        # the owner's law; the survival cross-section, ten worms, five places)
+        var dw_reg: Dictionary = GameReg.get_game("deathworm")
+        ok += _check(not bool(dw_reg.get("coming_soon", false)) \
+                        and String(dw_reg["orientation"]) == "landscape",
+                "deadly worm is PLAYABLE now: landscape (the horizontal law)")
+        ok += _check(String(dw_reg["title"]) == "DEADLY WORM",
+                "the death-worm teaser ships as DEADLY WORM (the owner's rename law)")
+        ok += _check(int(dw_reg["coin_div"]) == 500 and int(dw_reg["fee"]) == 8,
+                "deadly worm wears the owner's economy (bonus /500, fee 8)")
+        ok += _check(bool(dw_reg["shop"]) and bool(dw_reg["banner"]),
+                "deadly worm wears the shop + the banner")
+        ok += _check(dw_reg["ach"].size() == 18,
+                "deadly worm wears the tiered ladder (18)")
+        var DW: GDScript = load("res://game/games/deathworm/deathworm.gd")
+        ok += _check((DW.WORMS as Array).size() == 10,
+                "deadly worm wears THE TEN")
+        ok += _check((DW.PLACES as Dictionary).size() == 5
+                        and int(DW.PLACES["desert"]["price"]) == 0
+                        and int(DW.PLACES["polar"]["price"]) > 0,
+                "deadly worm wears the five places, one free four priced")
+        ok += _check(int(DW.SPECIAL_AT) == 100 and int(DW.POINTS["human"]) == 1
+                        and int(DW.POINTS["animal"]) == 3,
+                "deadly worm wears the point + charge laws (1/3, per 100)")
         # v040-7: ROCK BREAKER graduates (the craze-caves teaser renamed;
         # the mechanic follows Ball Blast, not the dig loop)
         var rb_reg: Dictionary = GameReg.get_game("rockbreaker")
@@ -2349,9 +2374,9 @@ func _t_feed_order() -> int:
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
         # v0.4.0-1 THE SOON SHELF IS BACK: the four next names parked
         # again (the owner's v040 report catch)
-        ok += _check(GameReg.workshop().size() == 3,
-                "the workshop wears the three soon teasers again "
-                + "(craze caves graduated v040-7)")
+        ok += _check(GameReg.workshop().size() == 2,
+                "the workshop wears the two soon teasers again "
+                + "(death worm graduated as DEADLY WORM v040-9)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2360,10 +2385,10 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                # v040-7: death worm leads the shelf (FUTURE_GAMES.md file
-                # order after craze caves' graduation)
-                ok += _check(String(ids[soon_first_at]) == "deathworm",
-                        "the SOON block wears death worm first (%s)" % [ids.slice(soon_first_at)])
+                # v040-9: zuma leads the shelf (FUTURE_GAMES.md file order
+                # after death worm's graduation as DEADLY WORM)
+                ok += _check(String(ids[soon_first_at]) == "zuma",
+                        "the SOON block wears zuma first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

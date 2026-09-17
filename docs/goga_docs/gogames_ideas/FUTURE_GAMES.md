@@ -236,11 +236,11 @@ stay.
   ball blast by voodoo that shares the same core mechanics") - the vertical
   bouncing-rock cannon shooter. The owner's full spec, GDD:
   gogames_ideas/rockbreaker.md.
-- **death-worm-like** (owner, v0.3.9-2 round) — the Death Worm energy: YOU
-  ARE THE WORM - dive, tunnel and burst out of the ground to devour the
-  walkers, snap at the birds, dodge the bullets; the surface is the
-  hunting ground, the underground is the highway. Combo chains for eating
-  mid-air, the humans run, the machines shoot back.
+- **death-worm-like** (owner, v0.3.9-2 round) — GRADUATED as DEADLY WORM
+  (v040-9, the owner's rename law: "first, rename it to deadly worm").
+  The survival cross-section with THE TEN worms, THE FIVE places, the
+  wormCoins chain and the never-resting spawner. GDD:
+  gogames_ideas/deadlyworm.md.
 - **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
   chain, match 3 of a color, pop the run - never let the chain reach the
   hole.

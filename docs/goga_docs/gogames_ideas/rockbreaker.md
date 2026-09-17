@@ -276,11 +276,15 @@ The first build misread four laws. The owner's own words, now the law:
   broken instead of bouncing like the original game". The GROUND IS A
   TRAMPOLINE — EVERY rock bounces off the floor (restitution, a minimum
   kick, spin from the surface). NOTHING shatters on the ground anymore.
-- **THE OPEN WALLS LAW (corrected)**: "the rocks currently bounce on
-  walls". The side walls are OPEN: a regular rock that slides past an
-  edge EXITS (quietly, its side seat frees). Only the golden and the
-  mystery rocks never leave (THE PERSISTENCE LAW) — they bounce off
-  walls, ceiling and floor forever.
+- **THE OPEN WALLS LAW (corrected twice)**: "the rocks currently bounce on
+  walls" made the v040-8 walls fully open — then the owner re-studied the
+  original: "actually there original was letting the normal rocks to bounce
+  on walls for like 3-5 bounces? i am not sure what is the range but 3 and
+  4th it goes out looks better?" THE WALL BUDGET LAW (v040-9): every regular
+  rock rolls a budget of 3..5 wall bounces (the 3rd/4th exit reads best),
+  dances off the walls until the budget is spent, then slides through and
+  EXITS (quietly, its side seat frees). Only the golden and the mystery
+  rocks never leave (THE PERSISTENCE LAW).
 - **THE SPAWN LAW (corrected)**: "their spawn are from one side while
   should be both, and they are always spawn falling while original can
   spawn them throwed up then fall, also currently spawn happen from

@@ -1031,6 +1031,11 @@ func _add_rock(x: float, y: float, vx: float, vy: float, size: int,
                 "rot": rng.randf_range(0.0, TAU),
                 "omega": vx / r * SPIN_RATE,
                 "sq": 1.0, "cd": 0.0, "side": side,
+                # THE WALL BUDGET LAW (v040-9): regular rocks bounce on the
+                # walls 3..5 times (the 3rd/4th exit reads best, the owner)
+                # before they slide out; the specials never leave.
+                "wall_bounce": (0 if (golden or mystery)
+                        else rng.randi_range(3, 5)),
                 "seed": rng.randf_range(0.0, 100.0),
         })
 
@@ -1038,10 +1043,13 @@ func _add_rock(x: float, y: float, vx: float, vy: float, size: int,
 ## THE JUICE LAW: gravity, spin flips and squash. v040-8 THE BOUNCE LAW:
 ## the GROUND IS A TRAMPOLINE - every rock bounces off it (the original's
 ## law, the owner: "rocks when hit the ground they get broken instead of
-## bouncing like the original game"). THE OPEN WALLS LAW: the side walls
-## are OPEN - a regular rock that slides past an edge EXITS (its side
-## seat frees), only the golden and the mystery rocks never leave (they
-## bounce off walls + floor forever, the persistence law).
+## bouncing like the original game"). THE WALL BUDGET LAW (v040-9, the
+## owner's correction on the v040-8 open walls): the original let the
+## regular rocks bounce on the WALLS a few times before they slide out -
+## every regular rock carries a budget of 3..5 wall bounces (the 3rd/4th
+## exit reads best, the owner), then it passes through and EXITS (its
+## side seat frees). Only the golden and the mystery rocks never leave
+## (they bounce off walls + floor forever, the persistence law).
 func _rock_physics(delta: float) -> void:
         if phase == "boot":
                 return
@@ -1060,8 +1068,10 @@ func _rock_physics(delta: float) -> void:
                 var r := float(d["r"])
                 var bounced := false
                 var special := bool(d["golden"]) or bool(d["mystery"])
-                # THE OPEN WALLS: regular rocks pass and exit; specials
-                # bounce (THE PERSISTENCE LAW)
+                # THE WALL BUDGET LAW: a regular rock whose budget still
+                # has bounces dances off the wall; once the budget is spent
+                # it slides through and exits (its side seat frees). The
+                # specials bounce forever (THE PERSISTENCE LAW).
                 if x - r > right + 40.0 * us or x + r < left - 40.0 * us:
                         if not special:
                                 gone.append(rk)   # a clean exit - no dust
@@ -1078,6 +1088,17 @@ func _rock_physics(delta: float) -> void:
                         if y - r < arena_top:
                                 y = arena_top + r
                                 vy = absf(vy)
+                                bounced = true
+                elif int(d.get("wall_bounce", 0)) > 0:
+                        if x - r < left:
+                                x = left + r
+                                vx = absf(vx)
+                                d["wall_bounce"] = int(d["wall_bounce"]) - 1
+                                bounced = true
+                        elif x + r > right:
+                                x = right - r
+                                vx = -absf(vx)
+                                d["wall_bounce"] = int(d["wall_bounce"]) - 1
                                 bounced = true
                 # THE BOUNCE LAW: every rock dances on the ground
                 if y + r > floor_y:

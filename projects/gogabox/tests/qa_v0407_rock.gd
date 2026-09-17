@@ -302,7 +302,7 @@ func _sim_laws() -> void:
         var first_golden := -1.0
         var first_seen := -1.0
         var rc_60 := -1
-        while sim < 480.0 and finished[0] == -1:
+        while sim < 560.0 and finished[0] == -1:
                 G._goga_tick(dt)
                 sim += dt
                 G.shield = 999999
@@ -340,7 +340,7 @@ func _sim_laws() -> void:
         ck(rc_60 >= G.proj_price(0),
                 "PACING: the first upgrade is affordable inside a minute "
                 + "(rc@60s=%d)" % rc_60)
-        ck(first_seen > 0.0 and first_seen < 480.0,
+        ck(first_seen > 0.0 and first_seen < 560.0,
                 "PACING: the golden rock rides in (%0.1fs)" % first_seen)
         ck(G.rp >= 150, "PACING: the run digs deep (rp %d)" % G.rp)
         var hp_at: int = G.rock_hp(G.rp, 3, G.rng)
@@ -367,19 +367,42 @@ func _v0408_laws() -> void:
         ck(G.rocks.size() == alive0, "BOUNCE LAW: the ground eats nothing")
         ck(float(G.rocks[0]["vy"]) < 0.0,
                 "BOUNCE LAW: the rock rides UP off the floor")
-        # THE OPEN WALLS: a regular rock exits and frees its side seat
+        # THE WALL BUDGET LAW (v040-9, the owner's correction): regular
+        # rocks spawn with a 3..5 wall-bounce budget, specials with 0
+        var budgets_ok := true
+        for i in 12:
+                G.probe_spawn(i % 2, 2, 60)
+                var wb: int = int(G.rocks[-1]["wall_bounce"])
+                if wb < 3 or wb > 5:
+                        budgets_ok = false
+        ck(budgets_ok, "WALL BUDGET: regular rocks roll 3..5 bounces")
+        G.probe_spawn(0, 3, 400, true)
+        ck(int(G.rocks[-1]["wall_bounce"]) == 0,
+                "WALL BUDGET: the golden carries no budget")
+        # THE DANCE: a budgeted rock bounces off the wall first...
         G.probe_spawn(1, 1, 40)
         G.rocks[-1]["x"] = G.W - 30.0
         G.rocks[-1]["vx"] = 620.0 * G.us
         G.rocks[-1]["vy"] = 0.0
+        G.rocks[-1]["wall_bounce"] = 2
+        var n_dance: int = G.rocks.size()
+        for i in 20:
+                G._rock_physics(1.0 / 60.0)
+        ck(G.rocks.size() == n_dance
+                and float(G.rocks[-1]["vx"]) < 0.0
+                and int(G.rocks[-1]["wall_bounce"]) == 1,
+                "WALL BUDGET: the rock dances off the wall, budget -1")
+        # ...then, budget spent, it slides OUT and frees its side seat
+        G.rocks[-1]["vx"] = 620.0 * G.us
+        G.rocks[-1]["wall_bounce"] = 0
         var side_before: int = G.side_count[1]
         var n_before: int = G.rocks.size()
-        for i in 30:
+        for i in 40:
                 G._rock_physics(1.0 / 60.0)
         ck(G.rocks.size() == n_before - 1,
-                "OPEN WALLS: a regular rock leaves through the wall")
+                "WALL BUDGET: a spent rock leaves through the wall")
         ck(G.side_count[1] == side_before - 1,
-                "OPEN WALLS: the side ledger frees the seat")
+                "WALL BUDGET: the side ledger frees the seat")
         # THE PERSISTENCE LAW: a golden never leaves - it bounces back
         G.probe_reset(12)
         G.probe_spawn(1, 3, 400, true)

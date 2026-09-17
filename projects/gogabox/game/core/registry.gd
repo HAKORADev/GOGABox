@@ -1351,7 +1351,7 @@ const GAMES := [
                 "coin_api": "res://game/games/rockbreaker/rockbreaker_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 14,
         "needs_games": 15},
-                "desc": "THE ENDLESS ROCK FLOOD: a closed arena where boulders of every size, heat and speed ride in from the walls and bounce forever - and your two-wheeled cannon rolls the ground below. Rocks carry their damage on their face (a rock's level IS its color: the intense-er the longer, and the damage pool never stops growing); break one and its family pops out - a size-5 rock carries five children of smaller sizes, over and over, until only the pebbles remain. The left half of the screen rolls the cannon, the right half FIRES while held (tapping never spams). One touch of a rock and the run is over - unless a mystery rock's SHIELD forgives one. Every break pays rockCoins by the rock's damage (a 120-damage rock pays 12) - spend them on exactly two upgrades: PROJECTILE (more shots per second, capped at 50) and DAMAGE (+1 per level, no cap) - the prices climb steep, this is a long-term war. Mystery rocks carry SLOW, SHIELD or RUSH x2 (never the double throw, never the cash); a GOLDEN rock with a hidden 300-1000 damage pool arrives after every 300 rock points and pays a real GOGACoin. 5 cannon skins, 5 themes (CAVE, FOREST, PIXEL, NEON, CANDY) each owning five places and its own rock pack.",
+                "desc": "THE ENDLESS ROCK FLOOD: a closed arena where boulders of every size, heat and speed ride in from the walls, dance a few bounces on them and slide out - and your two-wheeled cannon rolls the ground below. Rocks carry their damage on their face (a rock's level IS its color: the intense-er the longer, and the damage pool never stops growing); break one and its family pops out - a size-5 rock carries five children of smaller sizes, over and over, until only the pebbles remain. The left half of the screen rolls the cannon, the right half FIRES while held (tapping never spams). One touch of a rock and the run is over - unless a mystery rock's SHIELD forgives one. Every break pays rockCoins by the rock's damage (a 120-damage rock pays 12) - spend them on exactly two upgrades: PROJECTILE (more shots per second, capped at 50) and DAMAGE (+1 per level, no cap) - the prices climb steep, this is a long-term war. Mystery rocks carry SLOW, SHIELD or RUSH x2 (never the double throw, never the cash); a GOLDEN rock with a hidden 300-1000 damage pool arrives after every 300 rock points and pays a real GOGACoin. 5 cannon skins, 5 themes (CAVE, FOREST, PIXEL, NEON, CANDY) each owning five places and its own rock pack.",
                 "controls": [
                         "tap anywhere to start - then the flood begins",
                         "LEFT half of the screen: touch and slide - the cannon rolls the ground with your thumb (the Snowy Tower analog)",
@@ -1395,17 +1395,58 @@ const GAMES := [
         # v040-7: CRAZE CAVES graduated - as ROCK BREAKER (the owner's
         # rename law; the mechanic follows Ball Blast, not the dig loop)
         # - its teaser seat is the real game above now.
-        {"id": "deathworm", "title": "DEATH WORM",
+        # v040-9: DEATH WORM graduated as DEADLY WORM (the owner's rename
+        # law: "first, rename it to deadly worm") - the survival
+        # cross-section built on the study's real spawn tables. The teaser
+        # seat above is the real game now.
+        {"id": "deathworm", "title": "DEADLY WORM",
                 "tag": "you are the worm",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+                "script": "res://game/games/deathworm/deathworm.gd",
+                "thumb": "res://assets/thumbs/deathworm.png",
+                "orientation": "landscape", "dim": "2d",
+                "coin_div": 500, "price": 450, "fee": 8, "shop": true,
+                "banner": true,
+                # THE TOP-UP DECLARATION: deadly worm carries WORMCOINS -
+                # 1 GOGACoin = 5 wormCoins (the rate law).
+                "currency": {"name": "WORMCOINS", "rate": 5.0,
+                        "tint": Color("e8ba54")},
+                "coin_api": "res://game/games/deathworm/deathworm_meta.gd",
                 "reveal": {"kind": "direct", "appear_after": 8,
-                        "needs_games": 11},
-                "desc": "dive, tunnel and burst out of the ground to "
-                        + "devour the walkers, snap at the birds, dodge "
-                        + "the bullets - the surface is the hunting "
-                        + "ground, the underground is the highway, the "
-                        + "workshop version is baking"},
+        "needs_games": 11},
+                "desc": "YOU ARE THE WORM: a survival cross-section under five places - sky, surface, underground - and the spawn never rests, never eases. Ten worms live here, each with its own size, speed, power and health; each one levels toward x1.5 of its base stats across its own level capacity, and the next worm unlocks only when the previous one is MAXED - pay wormCoins to open it. Humans pay 1 point each, land animals 3, ground animals 1 per 3; vehicles are bitten apart, never eaten, and pay their own bounty. A wormCoin drops from the prey after every 10 eaten - spend them on the next worm and on power-ups in the shop (bought first, then they drop in your runs every minute or two). The left half of the screen is the hidden analog (steer like the original), the right half is TAP to dash (every worm has its own cooldown and length - watch the widget), the middle strip is TAP for the worm's special ability - one charge per 100 points, each worm's is unique. Riding the surface line slows the crawl like the original; the dirt under the line is armor against the bullets; the health is fixed - eating never heals. The desert is free; the ICE, the CITY, the JUNGLE and the KINGDOM cost GOGACoins and each plays by its own rules.",
+                "controls": [
+                        "tap anywhere to start the hunt",
+                        "LEFT half: touch and slide - the hidden analog steers the worm (small slide = gentle turn, big slide = hard turn); the worm always swims forward",
+                        "RIGHT half: TAP to DASH - a burst of speed; every worm has its own cooldown and length, the widget bottom-right lives it",
+                        "MIDDLE strip: TAP for the SPECIAL - one charge banks per 100 points (hold 2); every worm's special is its own",
+                        "ride the SURFACE LINE and you crawl slower (the original's law); the dirt below is armor - bullets only bite the surfaced worm",
+                        "eat: humans 1 point, land animals 3, ground animals 1 per 3; vehicles are bitten apart (power = damage) and pay their own points",
+                        "a wormCoin drops after every 10 eaten - it flies to you; WORMS spends them on the ten worms (the chain gates the unlocks), the SHOP spends them on power-ups",
+                        "the SHOP also sells the places for GOGACoins: the ICE drifts the worm, the CITY bites with the subway, the JUNGLE drags the dive but pays half more, the KINGDOM shoots faster and burns",
+                        "the spawn never rests and always grows - the run ends only when the worm dies",
+                ],
+                "genres": {"main": ["action", "arcade"], "sub": ["survival", "physics"]},
+                "ach": [
+    {"id": "score_t1", "title": "First Taste", "desc": "Score 100 in one run", "tier": 1, "rule": {"k": "max", "key": "dw_score", "v": 100}},
+    {"id": "score_t2", "title": "The Hunter", "desc": "Score 500 in one run", "tier": 2, "rule": {"k": "max", "key": "dw_score", "v": 500}},
+    {"id": "score_t3", "title": "The Apex", "desc": "Score 2000 in one run", "tier": 3, "rule": {"k": "max", "key": "dw_score", "v": 2000}},
+    {"id": "score_t4", "title": "THE LEGEND OF THE DIRT", "desc": "Score 5000 in one run", "tier": 4, "rule": {"k": "max", "key": "dw_score", "v": 5000}},
+    {"id": "eat_t1", "title": "Snacker", "desc": "Eat 100 things total", "tier": 1, "rule": {"k": "cnt", "key": "dw_eaten", "v": 100}},
+    {"id": "eat_t2", "title": "The Feast", "desc": "Eat 1000 things total", "tier": 2, "rule": {"k": "cnt", "key": "dw_eaten", "v": 1000}},
+    {"id": "eat_t3", "title": "The Swarm's End", "desc": "Eat 10000 things total", "tier": 3, "rule": {"k": "cnt", "key": "dw_eaten", "v": 10000}},
+    {"id": "veh_t1", "title": "Metal Cruncher", "desc": "Destroy 10 vehicles total", "tier": 1, "rule": {"k": "cnt", "key": "dw_vehicles", "v": 10}},
+    {"id": "veh_t2", "title": "The War on Wheels", "desc": "Destroy 100 vehicles total", "tier": 2, "rule": {"k": "cnt", "key": "dw_vehicles", "v": 100}},
+    {"id": "worms_t1", "title": "The Collection", "desc": "Own 3 worms", "tier": 1, "rule": {"k": "max", "key": "dw_worms_owned", "v": 3}},
+    {"id": "worms_t2", "title": "The Pit", "desc": "Own 6 worms", "tier": 2, "rule": {"k": "max", "key": "dw_worms_owned", "v": 6}},
+    {"id": "worms_t3", "title": "THE TEN", "desc": "Own all 10 worms", "tier": 3, "rule": {"k": "max", "key": "dw_worms_owned", "v": 10}},
+    {"id": "place_t1", "title": "The Traveler", "desc": "Own 2 places", "tier": 1, "rule": {"k": "max", "key": "dw_places_owned", "v": 2}},
+    {"id": "place_t2", "title": "THE FIVE", "desc": "Own all 5 places", "tier": 3, "rule": {"k": "max", "key": "dw_places_owned", "v": 5}},
+    {"id": "time_t1", "title": "Dug In", "desc": "Survive 120s in one run", "tier": 1, "rule": {"k": "max", "key": "dw_time", "v": 120}},
+    {"id": "time_t2", "title": "The Long Night", "desc": "Survive 300s in one run", "tier": 2, "rule": {"k": "max", "key": "dw_time", "v": 300}},
+    {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
+    {"id": "plays_t2", "title": "The Resident", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
+],
+        },
         {"id": "zuma", "title": "ZUMA",
                 "tag": "spit and pop the chain",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",
