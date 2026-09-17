@@ -54,13 +54,38 @@ func remember() -> void:
         _ledger[preserve_key] = {"v": scroll_vertical, "h": scroll_horizontal}
 
 ## restore the remembered offset - call right AFTER the refreshed content
-## is in the tree. Same frame, zero flash.
+## is in the tree. If this scroll's layout is already live (an in-place
+## content rebuild) the value sticks THIS frame; on a brand-new scroll
+## node the first set clamps to 0 (the child has no size until its first
+## sort) - so the want rides PENDING and re-applies on the first
+## NOTIFICATION_SORT_CHILDREN, which still lands BEFORE the first draw:
+## zero flash either way.
+var _pending_v := -1
+var _pending_h := -1
+var _applying := false
+
 func reinstate() -> void:
         if preserve_key == "" or not _ledger.has(preserve_key):
                 return
         var s: Dictionary = _ledger[preserve_key]
-        scroll_vertical = int(s["v"])
-        scroll_horizontal = int(s["h"])
+        _pending_v = int(s["v"])
+        _pending_h = int(s["h"])
+        _apply_pending()
+
+func _apply_pending() -> void:
+        if _applying or _pending_v < 0:
+                return
+        _applying = true
+        scroll_vertical = _pending_v
+        scroll_horizontal = maxi(0, _pending_h)
+        _applying = false
+        if scroll_vertical == _pending_v:
+                _pending_v = -1          # stuck this frame - no re-apply needed
+                _pending_h = -1
+
+func _notification(what: int) -> void:
+        if what == NOTIFICATION_SORT_CHILDREN:
+                _apply_pending()
 
 func _exit_tree() -> void:
         remember()
