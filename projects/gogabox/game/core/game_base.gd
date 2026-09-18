@@ -56,6 +56,7 @@ var bonus_div_override := -1
 var _hud: CanvasLayer
 var _score_label: Label
 var _coins_label: Label
+var _score_prefix := ""           # v040-14: the widget's word survives set_score
 var _overlay_root: Control
 var _toast: Dictionary
 var _ach_clock := 0.0
@@ -108,7 +109,7 @@ func set_score(v: int) -> void:
         score = v
         # null-safe: probes boot games without the host chrome
         if _score_label != null:
-                _score_label.text = str(v)
+                _score_label.text = _score_prefix + str(v)
 
 func add_score(v: int) -> void:
         set_score(score + v)
@@ -293,7 +294,9 @@ func _build_hud() -> void:
 ## death menu (host_node.gd) - and nowhere else.
 
 func set_hud_score_prefix(prefix: String) -> void:
-        _score_label.text = prefix + " " + str(score)
+        _score_prefix = prefix + " "     # re-applied on EVERY set_score now
+        if _score_label != null:
+                _score_label.text = _score_prefix + str(score)
 
 ## v0.2.6 THE SHARED BANNER STRIP: the 52dp Unity banner is a NATIVE view
 ## in REAL px (the menu.gd math) - every game that wears one (registry

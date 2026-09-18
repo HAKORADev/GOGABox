@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://rbprobe14"]
+
+[ext_resource type="Script" path="res://tests/qa_v0414_laws.gd" id="1"]
+
+[node name="L14Probe" type="Node"]
+script = ExtResource("1")

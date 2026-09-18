@@ -2033,19 +2033,20 @@ func _dev_tap() -> void:
 ## One switch row. A flip NEVER rebuilds the sheet (the rebuild-inside-a-tap
 ## is what crashed the owner's build after every option toggle) - the row
 ## rewrites its own label + repaints itself, and the dirty flag reloads the
-## box on close.
-func _dev_switch_row(scroll: BoxScroll, n: String) -> Button:
+## box on close. `label` overrides the printed name (the EXTRAS rows).
+func _dev_switch_row(scroll: BoxScroll, n: String, label := "") -> Button:
+        var shown := label if label != "" else n.to_upper()
         # built in two steps ON PURPOSE: the flip lambda reads the button
         # itself (self-noting row), and a lambda can never reference the var
         # its own Arc.button(...) initializer is still declaring
-        var b := Arc.button("%s  =  %d" % [n.to_upper(), Box.dev_cheat(n)],
+        var b := Arc.button("%s  =  %d" % [shown, Box.dev_cheat(n)],
                         Vector2(560, 64), 22,
                         Arc.GOOD if Box.dev_cheat(n) == 1
                                         else Color(0.45, 0.42, 0.38))
         b.pressed.connect(func():
                 var nv := 1 - Box.dev_cheat(n)
                 Box.dev_set_cheat(n, nv)
-                b.text = "%s  =  %d" % [n.to_upper(), nv]
+                b.text = "%s  =  %d" % [shown, nv]
                 Arc.repaint_button(b, Arc.GOOD if nv == 1
                                 else Color(0.45, 0.42, 0.38))
                 _dev_dirty = true
@@ -2053,6 +2054,9 @@ func _dev_switch_row(scroll: BoxScroll, n: String) -> Button:
                 if n == "code":
                         msg = "CODE %d - the 5-tap knock %s" % [nv,
                                         "armed" if nv == 1 else "DEAD"]
+                elif n == Box.DEV_EXTRA_PARENT:
+                        msg = "EXTRAS %d - every extra %s" % [nv,
+                                        "on" if nv == 1 else "OFF"]
                 Arc.toast(_toast, msg))
         scroll.register_tappable(b, Arc._tap_emitter(b))
         b.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2085,6 +2089,26 @@ func _open_dev_sheet() -> void:
         v.add_child(Arc.label("SWITCHES", 24, Arc.HOT))
         for name in Box.DEV_CHEATS:
                 v.add_child(_dev_switch_row(scroll, String(name)))
+        # v040-14 THE EXTRAS LIST: the parent 0/1 first (it gates them
+        # all), then every game's own extras straight from the registry -
+        # a future game registers an "extras" array and shows up here
+        v.add_child(Arc.label("EXTRAS", 24, Arc.HOT))
+        v.add_child(_dev_switch_row(scroll, Box.DEV_EXTRA_PARENT,
+                        "ALL EXTRAS (PARENT)"))
+        var any_extra := false
+        for g in GameReg.GAMES:
+                for ex in g.get("extras", []):
+                        any_extra = true
+                        var gid := String(g["id"])
+                        var exd: Dictionary = ex
+                        v.add_child(_dev_switch_row(scroll,
+                                        "x_%s_%s" % [gid, String(exd["id"])],
+                                        "%s - %s" % [gid.to_upper(),
+                                        String(exd.get("title", exd["id"]))
+                                        .to_upper()]))
+        if not any_extra:
+                v.add_child(Arc.label("(no extras registered yet)", 18,
+                                Color(0.55, 0.48, 0.38), false))
         # the games index
         v.add_child(Arc.label("GAMES INDEX", 24, Arc.HOT))
         for g in GameReg.GAMES:

@@ -1,8 +1,62 @@
-# MARBLE POPPER — PROGRESS (v040-13)
+# MARBLE POPPER — PROGRESS (v040-13 -> v040-14)
 
 The owner's GDD laws -> implemented -> verified. One line per law.
 
-## The owner's laws (all SHIPPED)
+## v040-14 — the owner's test report worked to the bone (all SHIPPED)
+
+- [x] Intro screen: the "too helpful" hint line REMOVED (the no-helper law);
+      the how-to already lives in the guide
+- [x] Shop: the register-after-build fix — every button was unregistered
+      (registered on an EMPTY scroll), taps hung at button-hold forever;
+      buys/equips/close all live now
+- [x] Death flow: the private broken card is DEAD; the collapse law runs the
+      whole chain into the hole animated, then a toast tells WHICH loss
+      (life lost + retry / all lives + ladder reset), then the UNIVERSAL box
+      death menu (finish_run) — no LEVELS button anywhere in it
+- [x] HUD widget says LEVEL (not LEVELS) — and the prefix survives set_score
+      (game_base now re-applies it every update)
+- [x] THE FULL RUN LAW: +5 in a row pops ALL of them (the old walk compared
+      against the inserted marble, so only 3 ever popped)
+- [x] THE PUSH LAW: inserts slide the rear part back one spacing instantly —
+      the "marble flashes at the top-left then vanishes" ghost is dead
+      (no more lerp wave pushing marbles past the entry)
+- [x] THE ENTRY LAW: hole entries grow marbles small->full; edge entries roll
+      in from off-screen; pushed-back marbles hide inside the entry
+- [x] Mouth/back seats: the loaded marble sits IN the totem's mouth (measured
+      hole at head-local (4,49)), the next marble at the collar notch (4,118),
+      both CHILDREN of the rotating head; shots spawn at the lips with the
+      shot layer ABOVE the shooter z
+- [x] Idol: jaw TUCKED into the head's mouth arch (was floating below),
+      widened 1.16x to fill the arch; the whole idol ROTATES to face the
+      incoming chain (the owner's "road left-right -> head looks left")
+- [x] Path preview: a GHOST CHAIN of the level's own marbles rolls the full
+      route, looping until the tap (the old 3-arrow 1.6s blink was invisible)
+- [x] THE LOCKED LADDER LAW (second telling): the levels menu shows ALL 100
+      cards LOCKED (with previews + progress) until literally every level is
+      beaten; jumping + challenge + free play open together at 100%
+- [x] THE LEVELS FORGE REBUILT (tools/v0414_marble_levels.py): ten REAL zuma
+      archetypes (serpent / spiral / horseshoe / S-curve / twin rivers /
+      mirrored serpent / twin-shooter ring / the well / 4-lane grind / twin
+      finale), paths 1061-3834px (avg 2337; level 1 is now a 3-lane ~2900px
+      serpent, not a short line), VALIDATED at forge time (sample step, turn
+      <= 30deg/50px, coil >= 150px, shooter >= 180, hole >= 130, margins,
+      length window) — a fail raises, nothing ships blind
+- [x] Dev cheats THE EXTRAS LAW: a PARENT toggle ("ALL EXTRAS (PARENT)") plus
+      per-game extras straight from the registry (marble: "unlock all
+      levels"); Box.extra_on() gates them; future games self-register
+- [x] Tests: marble_probe 38/38 (push law, full-run law, entry law, collapse,
+      facing), qa_v0414_laws 20/20 (EXTRAS, entry, idol, chaos, stay-open),
+      flow_test ALL PASSED, rock 56/0, worm 94/0; 16-still film re-eyed
+
+## The bugs the v040-14 tests caught (fixed the same round)
+
+1. join-cascade stale-index crash (the movement loop walked a shrunk array)
+2. the join return skipped the bond write -> join events fired every tick
+3. the chaos bounce v1 was TOO wild — the pacing probe caught rc@60s 18->5;
+   retuned to 0.62-1.22 (+20% power hops, vx walk 0.85-1.25 +/-110) -> 56/0
+4. the flow gate's stale RB.HOLD_AT expectation aborted the rock law block
+
+## v040-13 — the owner's GDD laws (all SHIPPED)
 
 - [x] Rename to MARBLE POPPER, the zuma seat graduated (registry law)
 - [x] Vertical design (portrait, the box design space 1080x1920)

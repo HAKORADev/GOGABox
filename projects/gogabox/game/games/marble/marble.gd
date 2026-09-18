@@ -17,6 +17,8 @@ const SHOT_SPEED_FAST := 2900.0
 const POW_FIRST_DELAY := 20.0
 const POW_DELAY_LO := 26.0
 const POW_DELAY_HI := 40.0
+const COLLAPSE_SPEED := 1500.0  # the loss run: the whole chain dives into the hole
+const GROW_IN := MarbleData.CONTACT * 1.2  # the entry grow-in band (the hole spawn law)
 
 # ---------------------------------------------------------------- state
 var meta: MBMeta
@@ -45,7 +47,8 @@ var track_draw: Node2D
 var shooter: Node2D
 var shooter_head: Sprite2D
 var shooter_base: Sprite2D
-var next_spr: Sprite2D
+var load_spr: Sprite2D          # THE MOUTH SEAT: the loaded marble rides IN the totem's mouth
+var next_spr: Sprite2D          # THE BACK SEAT: the next marble rides the hole on the totem's back
 var load_c := 1
 var next_c := 1
 var fire_cd := 0.0
@@ -58,6 +61,11 @@ var twin_fading := false
 var pads: Array = []               # the twin spot rings (the pad law)
 var slider := false
 var shots: Array = []              # {pos, vel, c, spr, rainbow}
+
+# the totem art's seats, measured off the 502x502 texture (same layout on
+# every skin): the mouth hole center and the back-notch hole, in head-LOCAL px
+const MOUTH_LOCAL := Vector2(4, 49)
+const BACK_LOCAL := Vector2(4, 118)
 
 # powers (the shop-spawned law)
 var owned_pows: Array = []
@@ -136,7 +144,7 @@ func _goga_setup() -> void:
         rng.randomize()
         meta = MBMeta.load_meta()
         pause_end_run = false
-        set_hud_score_prefix("LEVELS")
+        set_hud_score_prefix("LEVEL")   # the widget counts ONE level (the owner's accuracy law)
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("LEVELS", func(): _levels_open())
         _build_lives_chip()
@@ -204,9 +212,8 @@ func _build_intro() -> void:
         tap.add_theme_color_override("font_outline_color", Color(0, 0, 0))
         tap.add_theme_constant_override("outline_size", 12)
         vb.add_child(tap)
-        var hint := Arc.label("match 3+ - never feed the idol", 24, Color(0.8, 0.75, 0.65))
-        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(hint)
+        # THE NO-HELPER LAW (v040-14, the owner): no info line under the tap
+        # prompt - the how-to lives in the guide (it already does), never here
         if not bool(meta.d["seen_story"]) and DisplayServer.get_name() != "headless":
                 meta.mark_story()
                 box_story_show("THE OLD IDOL",
@@ -216,6 +223,11 @@ func _build_intro() -> void:
                         + "the chain slides home. Ten places guard the gate. "
                         + "One hundred paths. The idol waits.",
                         func(): pass, "PLAY", Color(0.85, 0.65, 0.3))
+
+func _cheat_open() -> bool:
+        # THE EXTRAS LAW: the dev-cheat parent (extras) AND this game's own
+        # unlock-all extra both on -> the whole ladder opens in the menu
+        return Box.extra_on(game_id, "unlock_all")
 
 func _intro_go() -> void:
         if ready_ui != null and is_instance_valid(ready_ui):
@@ -288,7 +300,7 @@ func _build_world() -> void:
         marble_layer.z_index = 2
         shot_layer = Node2D.new()
         world.add_child(shot_layer)
-        shot_layer.z_index = 4
+        shot_layer.z_index = 9   # ABOVE the shooter (7): the shot leaves the lips visible
         fx_layer = Node2D.new()
         world.add_child(fx_layer)
         fx_layer.z_index = 8
@@ -344,19 +356,28 @@ func _build_hole(pi: int) -> void:
         var bot := Sprite2D.new()
         bot.texture = _t("hole_%s_bot.png" % skin)
         bot.name = "bot"
+        bot.scale = Vector2(1.16, 1.0)   # the jaw fills the head's mouth arch
         h.add_child(bot)
         world.add_child(h)
         holes.append(h)
         _hole_pose(h, 0.0)
+        # THE IDOL FACING LAW (v040-14, the owner): the head LOOKS up the
+        # path - the road arrives left-to-right, the head looks left; any
+        # angle, always. The art's mouth opens DOWN, so the rotation maps
+        # local down onto -D (D = the path's arrival direction).
+        var d_end: Vector2 = (cp.pts[cp.pts.size() - 1]
+                - cp.pts[cp.pts.size() - 2]).normalized()
+        h.rotation = atan2(d_end.x, -d_end.y)
 
 func _hole_pose(h: Node2D, open_amt: float) -> void:
-        # both jaws anchor AT the hole center (the arch meets the fangs);
-        # open_amt slides them apart (the chew)
+        # THE JAW TUCK (v040-14): the jaw sits INSIDE the head's mouth arch
+        # (measured: the arch spans local y +34..+148), not floating under
+        # the head; open_amt slides it down the arch (the chew)
         var top: Sprite2D = h.get_node("top")
         var bot: Sprite2D = h.get_node("bot")
-        var gap := 4.0 + open_amt * 26.0
-        top.position.y = -(top.texture.get_size().y * 0.5) - gap
-        bot.position.y = bot.texture.get_size().y * 0.5 + gap
+        var gap := open_amt * 30.0
+        top.position = Vector2.ZERO
+        bot.position = Vector2(0, 100.0 + gap)
 
 # ------------------------------------------------------------------ shooter
 func _build_shooter() -> void:
@@ -381,10 +402,21 @@ func _build_shooter() -> void:
         shooter_head.texture = _t("shooter_%s.png" % _player_skin())
         shooter_head.position.y = -34
         shooter.add_child(shooter_head)
+        # THE MOUTH SEAT LAW (v040-14, the owner: "use code to make sure
+        # where it actually is and put it in the mouth"): the loaded marble
+        # is a CHILD of the rotating head, seated exactly on the measured
+        # mouth hole - it can never hide under the totem again, and it
+        # rides every aim angle with the face
+        load_spr = Sprite2D.new()
+        load_spr.position = MOUTH_LOCAL
+        load_spr.scale = Vector2(0.94, 0.94)
+        shooter_head.add_child(load_spr)
+        # THE BACK SEAT LAW: the next marble shows at the hole on the
+        # totem's BACK (the collar notch), not floating under the base
         next_spr = Sprite2D.new()
         next_spr.scale = Vector2(0.62, 0.62)
-        next_spr.position = Vector2(0, 86)
-        shooter.add_child(next_spr)
+        next_spr.position = BACK_LOCAL
+        shooter_head.add_child(next_spr)
         world.add_child(shooter)
         aim = Vector2(0, -1)
         shooter_head.rotation = aim.angle() + PI / 2
@@ -401,8 +433,16 @@ func _build_shooter() -> void:
 
 func _refresh_shooter_marbles() -> void:
         shooter_head.texture = _t("shooter_%s.png" % _player_skin())
+        load_spr.texture = _marble_tex(load_c)
+        load_spr.modulate.a = 1.0
         next_spr.texture = _marble_tex(next_c)
         next_spr.modulate.a = 0.95
+
+## the mouth's WORLD seat (design space) right now - the head's rotation
+## carries the mouth around the face, so the shot always leaves the lips
+func _mouth_world() -> Vector2:
+        return shooter.position + Vector2(0, -34) \
+                + MOUTH_LOCAL.rotated(shooter_head.rotation)
 
 func _swap_loaded() -> void:
         var t := load_c
@@ -431,7 +471,10 @@ func _shoot_at(world_pos: Vector2) -> void:
         _refresh_shooter_marbles()
         var spr := Sprite2D.new()
         spr.texture = _marble_tex(c)
-        spr.position = shooter.position + aim * 64.0
+        # THE LIPS LAW: the shot is born at the mouth seat, so it reads as
+        # leaving the totem's lips - never under the character (the shot
+        # layer rides ABOVE the shooter's z since v040-14)
+        spr.position = _mouth_world()
         shot_layer.add_child(spr)
         shots.append({"pos": spr.position, "vel": aim * (SHOT_SPEED_FAST if speed_t > 0.0 else SHOT_SPEED),
                 "c": c, "spr": spr, "rainbow": rainbow})
@@ -440,17 +483,42 @@ func _shoot_at(world_pos: Vector2) -> void:
 
 # ------------------------------------------------------------------ preview
 func _build_preview() -> void:
+        # THE PATH PREVIEW LAW (v040-14, the owner: "show the user the exact
+        # marble path of the level"): a GHOST CHAIN of the level's own
+        # marbles rolls the whole route, entry to idol, looping until the
+        # tap - the exact path, the exact direction, unmissable
         for a in preview_arrows:
                 if is_instance_valid(a):
                         a.queue_free()
         preview_arrows.clear()
-        for cp in chains:
-                for k in 3:
+        for ci in chains.size():
+                var cp: ChainPath = chains[ci]
+                var cols: Array = cp.colors
+                for k in 8:
                         var s := Sprite2D.new()
-                        s.texture = _t("arrow.png")
+                        s.texture = _marble_tex(cols[k % cols.size()])
+                        s.scale = Vector2(0.9, 0.9)
+                        s.modulate.a = 0.85
                         s.z_index = 3
                         marble_layer.add_child(s)
                         preview_arrows.append(s)
+        _preview_roll(0.0)
+
+func _preview_roll(t: float) -> void:
+        # the ghost chain rides each path (loops the full length)
+        for ci in chains.size():
+                var cp: ChainPath = chains[ci]
+                for k in 8:
+                        var ai := ci * 8 + k
+                        if ai >= preview_arrows.size():
+                                continue
+                        var s: Sprite2D = preview_arrows[ai]
+                        var span := cp.length + MarbleData.CONTACT * 10.0
+                        var d := fmod(t * 560.0 + k * MarbleData.CONTACT * 1.15, span)
+                        s.visible = d <= cp.length
+                        if s.visible:
+                                s.position = cp.pos_at(d)
+                                s.rotation = d / (MarbleData.MARBLE_D * 0.5)
 
 # ================================================================= HUD
 func _show_pop_score(reset: bool) -> void:
@@ -536,11 +604,22 @@ func _shop_body(vb: VBoxContainer) -> VBoxContainer:
         box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         box.add_theme_constant_override("separation", 8)
         sc.add_child(box)
+        # THE REGISTER-AFTER-BUILD LAW (v040-14, the owner's button-hold
+        # hang): tappables register AFTER the content exists - registering
+        # an empty scroll left every button unregistered, its emulated press
+        # hung at button-hold and BoxScroll ate the release forever
+        _pending_scroll = sc
+        return box
+
+var _pending_scroll: BoxScroll = null
+
+func _register_scroll_buttons(sc: BoxScroll) -> void:
+        if sc == null or not is_instance_valid(sc):
+                return
         for b in Arc._buttons_in(sc):
                 if not b.disabled:
                         b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         sc.register_tappable(b, Arc._tap_emitter(b))
-        return box
 
 func _skin_row(cat: String, item: Dictionary, apply_cb: Callable) -> Control:
         var owned := Box.item_owned(game_id, cat, String(item["id"])) or int(item["price"]) == 0
@@ -601,6 +680,8 @@ func _build_shop(vb: VBoxContainer) -> void:
         for p in MarbleData.POWERS:
                 box.add_child(_pow_row(p))
         box.add_child(Arc.button("CLOSE", Vector2(560, 72), 26, Arc.GOOD, func(): sheet_pop()))
+        _register_scroll_buttons(_pending_scroll)
+        _pending_scroll = null
 
 func _pow_row(p: Dictionary) -> Control:
         var owned := Box.item_owned(game_id, "power", String(p["id"]))
@@ -659,13 +740,10 @@ func _build_places(vb: VBoxContainer) -> void:
         grid.add_theme_constant_override("v_separation", 12)
         grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         sc.add_child(grid)
-        var done_all := meta.all_cleared()
+        var done_all := meta.all_cleared() or _cheat_open()
         for pi in MarbleData.PLACES.size():
                 grid.add_child(_place_card(pi, done_all))
-        for b in Arc._buttons_in(sc):
-                if not b.disabled:
-                        b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                        sc.register_tappable(b, Arc._tap_emitter(b))
+        _register_scroll_buttons(sc)
 
 func _place_card(pi: int, done_all: bool) -> Control:
         var place := MarbleData.place(pi)
@@ -673,8 +751,10 @@ func _place_card(pi: int, done_all: bool) -> Control:
         for lv in range(pi * 10 + 1, pi * 10 + 11):
                 if meta.is_cleared(lv):
                         done_n += 1
-        # a place is playable when its first level is unlocked (the ladder law)
-        var unlocked := done_all or meta.is_unlocked(pi * 10 + 1)
+        # THE LOCKED LADDER LAW (v040-14, the owner's second telling): the
+        # menu is a LOCKED preview until the whole 100 are beaten - no
+        # entering, no challenge, then everything opens at once (free play)
+        var unlocked := done_all
         var box := PanelContainer.new()
         var st := Arc.panel_style(Color(0.98, 0.94, 0.86, 0.97) if unlocked
                 else Color(0.62, 0.60, 0.58, 0.9), 14, 8)
@@ -731,17 +811,16 @@ func _build_place_levels(vb: VBoxContainer, pi: int) -> void:
         grid.add_theme_constant_override("v_separation", 12)
         grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
         sc.add_child(grid)
-        var done_all := meta.all_cleared()
+        var done_all := meta.all_cleared() or _cheat_open()
         for lv in range(pi * 10 + 1, pi * 10 + 11):
                 grid.add_child(_level_card(lv, done_all))
-        for b in Arc._buttons_in(sc):
-                if not b.disabled:
-                        b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                        sc.register_tappable(b, Arc._tap_emitter(b))
+        _register_scroll_buttons(sc)
 
 func _level_card(lv: int, done_all: bool) -> Control:
-        # lv is 1-based level number; the locked law rides the ladder
-        var unlocked := done_all or meta.is_unlocked(lv)
+        # lv is 1-based; THE LOCKED LADDER LAW: every card locks until the
+        # 100 are beaten (jumping + challenge open together at 100%); the
+        # progress marks stay visible the whole way (stars / best / cleared)
+        var unlocked := done_all
         var cleared := meta.is_cleared(lv)
         var map := MarbleData.level(lv - 1)
         var box := PanelContainer.new()
@@ -780,7 +859,7 @@ func _level_card(lv: int, done_all: bool) -> Control:
                 lock.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
                 lock.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
                 vb.add_child(lock)
-                var why := Arc.label("clear level %d first" % (lv - 1), 14, Color(0.5, 0.45, 0.38))
+                var why := Arc.label("beats all 100 first", 14, Color(0.5, 0.45, 0.38))
                 why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 vb.add_child(why)
         else:
@@ -904,45 +983,6 @@ func _stars_earned() -> int:
                 s += 1
         return s
 
-# ------------------------------------------------------------------ lost
-func _show_lost() -> void:
-        phase = "lost"
-        Jukebox.sfx("mb_lose", -4.0)
-        var lost_a_life: bool = meta.lose_life()
-        _set_lives_chip()
-        if challenge:
-                meta.record_challenge_wave(level_idx + 1, challenge_wave - 1, false)
-        var card := _card_overlay()
-        cleared_card = card[0]
-        var vb: VBoxContainer = card[1]
-        var t := Arc.label("THE IDOL FED", 44, Arc.BAD)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        vb.add_child(t)
-        if meta.wiped_out():
-                phase = "wiped"
-                vb.add_child(Arc.label("ALL LIVES LOST - THE LADDER RESETS", 24, Arc.HOT))
-                var go := Arc.button("BACK TO LEVEL 1", Vector2(480, 76), 26, Arc.ACCENT, func():
-                        meta.reset_ladder()
-                        _set_lives_chip()
-                        _close_card()
-                        _start_level(0, false, 1))
-                vb.add_child(go)
-        else:
-                if lost_a_life and lives_lbl != null:
-                        vb.add_child(Arc.label("A LIFE IS GONE - %d LEFT" % meta.lives(), 24, Arc.HOT))
-                if challenge:
-                        vb.add_child(Arc.label("CHALLENGE ENDED AT WAVE %d" % (challenge_wave - 1),
-                                22, Arc.INK))
-                var row := HBoxContainer.new()
-                row.add_theme_constant_override("separation", 10)
-                vb.add_child(row)
-                row.add_child(Arc.button("RETRY", Vector2(230, 68), 24, Arc.GOOD, func():
-                        _close_card()
-                        _start_level(level_idx, false, 1)))
-                row.add_child(Arc.button("LEVELS", Vector2(230, 68), 24, Arc.CARD, func():
-                        _close_card()
-                        _levels_open()))
-
 # ------------------------------------------------------------------ challenge wave clear
 func _show_wave_cleared() -> void:
         phase = "cleared"
@@ -1024,13 +1064,25 @@ func _goga_tick(delta: float) -> void:
                         _tick_preview(delta)
                 "play":
                         _tick_play(delta)
-                "eating":
-                        eat_t -= delta
-                        if eat_t <= 0.0:
-                                phase = "lost"
-                                _show_lost()
+                "collapse":
+                        _tick_collapse(delta)
                 _:
                         pass
+
+## the loss run: every chain charges into its hole; when the last marble
+## dives, the death resolves (the animated whole-chain swallow)
+func _tick_collapse(delta: float) -> void:
+        collapse_t += delta
+        var any_left := false
+        for cp in chains:
+                for m in cp.marbles:
+                        m["d"] += COLLAPSE_SPEED * delta
+                if not cp.marbles.is_empty():
+                        any_left = true
+                cp.sync_sprites(delta)
+        if not any_left or collapse_t > 5.0:
+                phase = "dead_wait"
+                _resolve_death()
 
 func _begin_play() -> void:
         for a in preview_arrows:
@@ -1042,21 +1094,19 @@ func _begin_play() -> void:
 
 func _tick_preview(delta: float) -> void:
         preview_t += delta
-        var t := preview_t
-        for ci in chains.size():
-                var cp: ChainPath = chains[ci]
-                for k in 3:
-                        var ai := ci * 3 + k
-                        if ai >= preview_arrows.size():
-                                continue
-                        var s: Sprite2D = preview_arrows[ai]
-                        var d := fmod(t * 640.0 + cp.length * k / 3.0, cp.length)
-                        s.position = cp.pos_at(d)
-                        s.rotation = cp.angle_at(d) + PI / 2
-        if t >= 1.6:
-                _begin_play()
+        _preview_roll(preview_t)          # the ghost chain loops until the tap
+
+## the entry flavor of a path: an ON-SCREEN entry is a hole (marbles grow
+## in); a path that starts off-screen is an edge (marbles roll in)
+func _entry_is_hole(pi: int) -> bool:
+        if pi < 0 or pi >= chains.size():
+                return false
+        var p0: Vector2 = chains[pi].pts[0]
+        return p0.x > -40.0 and p0.x < DESIGN.x + 40.0 \
+                and p0.y > -40.0 and p0.y < DESIGN.y + 40.0
 
 var eat_t := 0.0
+var collapse_t := 0.0
 
 func _tick_play(delta: float) -> void:
         fire_cd = maxf(0.0, fire_cd - delta)
@@ -1146,9 +1196,15 @@ func _tick_chain(cp: ChainPath, delta: float) -> void:
                                         nb = true
                                 elif gap > MarbleData.CONTACT * 1.05:
                                         nb = false
+                                # the bond state settles BEFORE the join pop -
+                                # the hysteresis machine never repeats an event
+                                m["bonded"] = nb
                                 if nb and not prev:
                                         _on_join(cp, i)
-                                m["bonded"] = nb
+                                        # the run popped - the array shrank,
+                                        # the rest re-ticks next frame (the
+                                        # stale-index crash is dead)
+                                        return
                         else:
                                 m["bonded"] = true
         # ---- the eat law
@@ -1224,11 +1280,21 @@ func _insert_shot(cp: ChainPath, hit_i: int, shot: Dictionary) -> void:
         var c: int = hit["c"] if int(shot["c"]) < 0 else int(shot["c"])
         var m := {"c": c, "d": 0.0, "kind": "m", "life": -1.0, "pow": "",
                 "spr": null, "glow": null, "bonded": true}
-        var new_d: float = hit["d"] + (MarbleData.CONTACT if front_side else -MarbleData.CONTACT)
-        if not cp.marbles.is_empty():
-                new_d = minf(new_d, cp.marbles.back()["d"] + MarbleData.CONTACT)
-        m["d"] = new_d
-        cp.marbles.insert(hit_i + (1 if front_side else 0), m)
+        # THE PUSH LAW (v040-14): an insert slides the REAR part back one
+        # contact spacing, INSTANTLY - one solid push, no lerp wave, no
+        # marbles floating past the entry (the top-left ghost is dead).
+        # front-side: m takes hit's old slot (hit steps back); rear-side:
+        # m slots behind hit (the rearmost steps back). The rearmost may
+        # step behind the entry (d < 0 = inside the entrance) - it hides
+        # there and grows back in when the chain advances (the entry law)
+        var insert_i := hit_i + (1 if front_side else 0)
+        m["d"] = hit["d"] if front_side else hit["d"] - MarbleData.CONTACT
+        var rear_last := hit_i if front_side else hit_i - 1
+        for k in range(rear_last, -1, -1):
+                if cp.marbles[k]["kind"] == "m" or cp.marbles[k]["kind"] == "coin" \
+                                or cp.marbles[k]["kind"] == "pow":
+                        cp.marbles[k]["d"] -= MarbleData.CONTACT
+        cp.marbles.insert(insert_i, m)
         cp.ensure_sprite(m)
         Jukebox.sfx("mb_insert", -8.0, 1.2)
         _match_check(cp, cp.marbles.find(m))
@@ -1239,15 +1305,19 @@ func _match_check(cp: ChainPath, i: int) -> void:
         var m: Dictionary = cp.marbles[i]
         if m["kind"] != "m":
                 return
+        # THE FULL RUN LAW (v040-14, the owner: "+3 matched, only 3 popped
+        # is very wrong"): the walk compares each NEW edge against the
+        # RUNNING edge of the run - never against the inserted marble -
+        # so the whole contiguous same-color run pops, whatever its size
         var left := i
         while left > 0 and cp.marbles[left - 1]["kind"] == "m" \
                         and cp.marbles[left - 1]["c"] == m["c"] \
-                        and (m["d"] - cp.marbles[left - 1]["d"]) <= MarbleData.CONTACT * 1.12:
+                        and (cp.marbles[left]["d"] - cp.marbles[left - 1]["d"]) <= MarbleData.CONTACT * 1.12:
                 left -= 1
         var right := i
         while right < cp.marbles.size() - 1 and cp.marbles[right + 1]["kind"] == "m" \
                         and cp.marbles[right + 1]["c"] == m["c"] \
-                        and (cp.marbles[right + 1]["d"] - m["d"]) <= MarbleData.CONTACT * 1.12:
+                        and (cp.marbles[right + 1]["d"] - cp.marbles[right]["d"]) <= MarbleData.CONTACT * 1.12:
                 right += 1
         if right - left + 1 >= 3:
                 combo += 1
@@ -1425,24 +1495,62 @@ func _spawn_pow_carrier() -> void:
 
 # ------------------------------------------------------------------ eat / complete
 func _on_marble_eaten(cp: ChainPath) -> void:
-        # the idol chomps - the round ends (the owner's lives law)
-        phase = "eating"
-        eat_t = 0.9
+        # THE COLLAPSE LAW (v040-14, the owner: "when marbles go through the
+        # hole, make it animated as the whole marbles in-screen go running
+        # and falling in the hole fast then lose"): the first marble over
+        # the lip starts the run - the WHOLE chain dives, then the death
+        # resolves through the universal box flow
+        if phase == "collapse":
+                return
+        phase = "collapse"
+        collapse_t = 0.0
         Jukebox.sfx("mb_danger", 0.0, 0.8)
         var ci := chains.find(cp)
         if ci >= 0 and ci < holes.size():
                 var h: Node2D = holes[ci]
                 var tw := create_tween()
-                tw.tween_property(h, "scale", Vector2(1.25, 1.25), 0.12)
-                tw.tween_property(h, "scale", Vector2(0.9, 0.9), 0.14)
-                tw.tween_property(h, "scale", Vector2.ONE, 0.2)
-        var front: Dictionary = cp.marbles.back()
-        if front["spr"] != null and is_instance_valid(front["spr"]):
-                var spr: Sprite2D = front["spr"]
-                var tw2 := create_tween()
-                tw2.tween_property(spr, "position", cp.end_pos(), 0.3)
-                tw2.parallel().tween_property(spr, "scale", Vector2(0.1, 0.1), 0.3)
-        cp.marbles.pop_back()
+                tw.set_loops(6)
+                tw.tween_property(h, "scale", Vector2(1.22, 1.22), 0.09)
+                tw.tween_property(h, "scale", Vector2(0.94, 0.94), 0.09)
+
+## one marble crosses the lip during the collapse: shrink + drop into the
+## hole (a real swallow, not a vanish)
+func _dive_marble(cp: ChainPath, m: Dictionary) -> void:
+        if m.get("diving", false):
+                return
+        m["diving"] = true
+        var spr: Sprite2D = m["spr"]
+        cp.marbles.erase(m)
+        if spr == null or not is_instance_valid(spr):
+                return
+        var ci := chains.find(cp)
+        var tgt := cp.end_pos()
+        if ci >= 0 and ci < holes.size():
+                tgt = holes[ci].position
+        var tw := create_tween()
+        tw.set_parallel(true)
+        tw.tween_property(spr, "position", tgt, 0.16).set_trans(Tween.TRANS_QUAD) \
+                .set_ease(Tween.EASE_IN)
+        tw.tween_property(spr, "scale", Vector2(0.08, 0.08), 0.16)
+        tw.chain().tween_callback(spr.queue_free)
+
+func _resolve_death() -> void:
+        # the collapse is done - notify which loss this is (the owner's
+        # law), then hand the run to the UNIVERSAL box death menu
+        var lost := meta.lose_life()
+        _set_lives_chip()
+        if challenge:
+                meta.record_challenge_wave(level_idx + 1, challenge_wave - 1, false)
+        if meta.wiped_out():
+                meta.reset_ladder()
+                _set_lives_chip()
+                game_toast("ALL LIVES LOST - THE LADDER RESETS - NEXT RUN STARTS FROM LEVEL 1")
+        else:
+                if lost:
+                        game_toast("A LIFE IS GONE - %d LEFT - YOU CAN RETRY THIS LEVEL" % meta.lives())
+                else:
+                        game_toast("THE IDOL FED - FREE PLAY")
+        finish_run(score)
 
 func _on_level_complete() -> void:
         if challenge:
@@ -1668,12 +1776,30 @@ class ChainPath extends RefCounted:
         func sync_sprites(delta: float) -> void:
                 var t := Time.get_ticks_msec() / 1000.0
                 var gone: Array = []
+                var entry_hole: bool = game._entry_is_hole(idx)
                 for m in marbles:
                         ensure_sprite(m)
                         var spr: Sprite2D = m["spr"]
                         if spr == null or not is_instance_valid(spr):
                                 continue
-                        spr.position = pos_at(m["d"])
+                        # THE ENTRY LAW (v040-14, the owner): a marble behind
+                        # the entry (d < 0) is INSIDE the entrance - hidden;
+                        # crossing the entry it grows from small to full (a
+                        # hole birth) or rolls in from off-screen (an edge
+                        # entry, no grow needed - the path starts out there)
+                        var md: float = m["d"]
+                        if md < 0.0:
+                                spr.visible = false
+                        else:
+                                if not spr.visible:
+                                        spr.visible = true
+                                if entry_hole and md < float(game.GROW_IN):
+                                        var g: float = 0.25 + 0.75 \
+                                                * (md / float(game.GROW_IN))
+                                        spr.scale = Vector2(g, g)
+                                elif m["kind"] == "m":
+                                        spr.scale = Vector2.ONE
+                        spr.position = game_path_pos(m)
                         if m["kind"] == "m":
                                 spr.rotation = m["d"] / (MarbleData.MARBLE_D * 0.5)
                         elif m["kind"] == "coin":
@@ -1687,7 +1813,9 @@ class ChainPath extends RefCounted:
                                         spr.modulate.a = maxf(0.0, lf)
                                 elif lf < 2.0:
                                         spr.modulate.a = 1.0 if fmod(t, 0.22) > 0.1 else 0.25
-                                spr.scale = Vector2(1.15, 1.15) * (1.0 + sin(t * 7.0) * 0.07)
+                                if not (entry_hole and md < float(game.GROW_IN)):
+                                        spr.scale = Vector2(1.15, 1.15) \
+                                                * (1.0 + sin(t * 7.0) * 0.07)
                         else:
                                 m["life"] -= delta
                                 if m["life"] <= 0.0:
@@ -1709,6 +1837,22 @@ class ChainPath extends RefCounted:
                         if m["kind"] == "coin":
                                 # the missed coin re-appears in a later wave
                                 game.coin_pending = true
+
+                # THE COLLAPSE DIVE (v040-14): during the loss run every
+                # marble slides into the hole shrinking - nothing just
+                # pops out of existence
+                if game.phase == "collapse":
+                        for m in marbles:
+                                if m["d"] >= length - 2.0:
+                                        game._dive_marble(self, m)
+
+        func game_path_pos(m: Dictionary) -> Vector2:
+                # the sprite's world seat; a diving marble owns its sprite
+                # (the dive tween drives it into the hole)
+                if game.phase == "collapse" and m.get("diving", false) \
+                                and m["spr"] != null and is_instance_valid(m["spr"]):
+                        return m["spr"].position
+                return pos_at(m["d"])
 
         func dispose() -> void:
                 marbles.clear()

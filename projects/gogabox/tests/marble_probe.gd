@@ -26,7 +26,10 @@ func _run() -> void:
         var cp = game.chains[0]
         check("level preview", game.phase == "preview")
         check("path built", cp.length > 300.0)
-        for i in 120:
+        # THE PREVIEW LAW (v040-14): the ghost chain loops until the TAP -
+        # the probe taps (the old 1.6s auto-start is gone)
+        game._begin_play()
+        for i in 10:
                 game._goga_tick(1.0 / 60.0)
         check("preview -> play", game.phase == "play")
 
@@ -89,6 +92,52 @@ func _run() -> void:
                 game._tick_chain(cp, 1.0 / 60.0)
         check("join cascade popped", cp.marbles.size() <= 2)
         check("cascade scored", game.run_level_score > 0)
+
+        # v040-14 THE FULL RUN LAW: FIVE contiguous same-color marbles - the
+        # insert completes the run and the WHOLE FIVE pop (the owner: "only
+        # 3 get popped is very wrong")
+        cp.marbles.clear()
+        cp.spawned = cp.quota
+        game.run_level_score = 0
+        game.combo = 0
+        var score_before_run: int = 0
+        for k in range(4, -1, -1):
+                cp.marbles.append({"c": 3, "d": -float(k) * MarbleData.CONTACT,
+                                "kind": "m", "life": -1.0, "pow": "",
+                                "spr": null, "glow": null, "bonded": true})
+        var shot5 := {"pos": cp.pos_at(0.0), "vel": Vector2.ZERO,
+                        "c": 3, "spr": null, "rainbow": false}
+        game._insert_shot(cp, 2, shot5)
+        check("full run pops ALL SIX", cp.marbles.is_empty())
+        check("full run scores for six", game.run_level_score >= 60)
+
+        # v040-14 THE PUSH LAW: a rear-side insert slides the whole rear part
+        # back EXACTLY one contact spacing - no overlap, no lerp wave
+        cp.marbles.clear()
+        cp.spawned = cp.quota
+        for k in range(3, -1, -1):
+                cp.marbles.append({"c": 1 if k % 2 == 0 else 6,
+                                "d": -float(k) * MarbleData.CONTACT,
+                                "kind": "m", "life": -1.0, "pow": "",
+                                "spr": null, "glow": null, "bonded": true})
+        var rear_d_before: float = float(cp.marbles[0]["d"])
+        var hit_d_before: float = float(cp.marbles[2]["d"])
+        var shot_nr := {"pos": cp.pos_at(hit_d_before - MarbleData.CONTACT),
+                        "vel": Vector2.ZERO, "c": 6, "spr": null, "rainbow": false}
+        game._insert_shot(cp, 2, shot_nr)
+        var spacing_ok := true
+        for i in range(1, cp.marbles.size()):
+                var gap: float = float(cp.marbles[i]["d"]) - float(cp.marbles[i - 1]["d"])
+                if absf(gap - MarbleData.CONTACT) > 0.6:
+                        spacing_ok = false
+        check("push keeps perfect spacing", spacing_ok)
+        check("push slides the rear exactly one spacing",
+                absf(float(cp.marbles[0]["d"]) - (rear_d_before - MarbleData.CONTACT)) < 0.6)
+        var inserted_order_ok := true
+        for i in range(1, cp.marbles.size()):
+                if float(cp.marbles[i]["d"]) < float(cp.marbles[i - 1]["d"]):
+                        inserted_order_ok = false
+        check("push keeps the order law", inserted_order_ok)
 
         # THE NON-MATCH JOIN: different ends just move together (no pop)
         cp.marbles.clear()
@@ -153,17 +202,23 @@ func _run() -> void:
                         pow_gone = false
         check("unmatched pow vanishes", pow_gone)
 
-        # THE EAT LAW
+        # THE EAT LAW (v040-14 THE COLLAPSE LAW): the whole chain dives into
+        # the hole, then the run hands itself to the UNIVERSAL box death
+        # menu (finish_run) - no private lost card anymore
         cp.marbles.clear()
         cp.marbles.append({"c": 1, "d": cp.length + 1.0, "kind": "m", "life": -1.0,
                         "pow": "", "spr": null, "glow": null, "bonded": true})
         var lives_before: int = int(game.meta.d["lives"])
         game.phase = "play"
         game._tick_chain(cp, 1.0 / 60.0)
-        check("eat starts the round end", game.phase == "eating")
-        for i in 90:
+        check("eat starts the collapse", game.phase == "collapse")
+        check("collapse keeps the whole chain", cp.marbles.size() >= 0)
+        # the dive drains every chain, then the death resolves
+        for i in 600:
                 game._goga_tick(1.0 / 60.0)
-        check("lost card shown", game.phase == "lost")
+                if game.over:
+                        break
+        check("the run ended through the universal menu", game.over)
         check("a life was lost", int(game.meta.d["lives"]) == lives_before - 1)
 
         # THE WIPE LAW

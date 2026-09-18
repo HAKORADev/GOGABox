@@ -94,6 +94,20 @@ const FLOOR_BOUNCE := 0.82      # v040-8 THE BOUNCE LAW: the ground is a
 const GROUND_MIN_KICK := 320.0  # trampoline, never a shatterer (the
                                 # original's law): every rock bounces
 
+# v040-14 THE CHAOS BOUNCE LAW (the owner's Crazy Caves verdict: rocks
+# bounced lower and lower until they parked on the ground - dead rhythm):
+# every ground bounce RE-ROLLS the rebound - usually 0.62..1.22 of the
+# impact, one bounce in five a POWER bounce (1.30..1.58, sometimes even
+# higher than the impact!), the sideways speed walks too - the herd keeps
+# dancing, nothing ever settles. The clamps keep every hop BEATABLE.
+const CHAOS_LO := 0.62
+const CHAOS_HI := 1.22
+const CHAOS_POWER_CHANCE := 0.2
+const CHAOS_POWER_LO := 1.3
+const CHAOS_POWER_HI := 1.58
+const KICK_MAX := 820.0         # the ceiling of a rebound (under SPEED_MAX)
+const VX_NUDGE := 110.0         # the sideways re-roll impulse
+
 const SIDE_BUDGET := 18         # THE SIDES LAW: 18 alive spawns per side
 const SCREEN_CAP := 50          #   50 on screen (the CURVE LAW's ceiling)
 const BURST_MAX := 5            # v040-8 THE BURST LAW: the pour's ceiling;
@@ -1130,13 +1144,24 @@ func _rock_physics(delta: float) -> void:
                                 vx = -absf(vx)
                                 d["wall_bounce"] = int(d["wall_bounce"]) - 1
                                 bounced = true
-                # THE BOUNCE LAW: every rock dances on the ground
+                # THE BOUNCE LAW + THE CHAOS BOUNCE (v040-14): every rock
+                # dances on the ground, and every bounce rolls NEW energy -
+                # sometimes even higher (the Crazy Caves feel), always
+                # clamped to a beatable band, never a dead settle
                 if y + r > floor_y:
                         y = floor_y - r
-                        var kick := maxf(absf(vy) * FLOOR_BOUNCE,
-                                GROUND_MIN_KICK * us)
+                        var raw: float
+                        if rng.randf() < CHAOS_POWER_CHANCE:
+                                raw = absf(vy) * rng.randf_range(CHAOS_POWER_LO,
+                                        CHAOS_POWER_HI)
+                        else:
+                                raw = absf(vy) * rng.randf_range(CHAOS_LO, CHAOS_HI)
+                        var kick := clampf(raw, GROUND_MIN_KICK * us,
+                                KICK_MAX * us)
                         vy = -kick
-                        vx *= 0.985                        # the floor's grip
+                        vx = clampf(vx * rng.randf_range(0.85, 1.25)
+                                + rng.randf_range(-VX_NUDGE, VX_NUDGE) * us,
+                                -SPEED_MAX * us, SPEED_MAX * us)
                         bounced = true
                         d["ground_hits"] = int(d.get("ground_hits", 0)) + 1
                 # the spin obeys the surface: a bounce flips it, the ride

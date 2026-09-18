@@ -2350,6 +2350,7 @@ func _open_worms() -> void:
                 return
         _worms_open = true
         var vb := sheet_push(0.0, "worms", 940.0)
+        _worms_vb = vb
         _fill_worms_menu(vb)
 
 ## THE WORMS MENU (the owner: "a cool menu showing an image of the worm
@@ -2357,6 +2358,7 @@ func _open_worms() -> void:
 ## remaining") - the real numbers live here, the % stays in the run
 func _fill_worms_menu(vb: VBoxContainer, scroll := true) -> void:
         for c in vb.get_children():
+                vb.remove_child(c)
                 c.queue_free()
         var title := Label.new()
         title.text = "THE WORMS"
@@ -2516,10 +2518,9 @@ func _worm_action(i: int, chain_ok: bool) -> void:
                         else:
                                 _banner("%s rides NEXT ROUND"
                                         % String(w["name"]), Color("ffd76a"))
-                        sheet_pop()
-                        _worms_open = false
-                        if state == "intro":
-                                _show_intro_sheet()
+                        # THE STAY-OPEN LAW: the menu refreshes in place
+                        if _worms_vb != null and is_instance_valid(_worms_vb):
+                                _fill_worms_menu(_worms_vb)
                 return
         if not chain_ok:
                 game_toast("max out the previous worm first")
@@ -2539,23 +2540,31 @@ func _worm_action(i: int, chain_ok: bool) -> void:
                 _apply_worm()
                 _build_worm_sprites()
                 _reset_run()
-        sheet_pop()
-        _worms_open = false
-        if state == "intro":
-                _show_intro_sheet()
+        # THE STAY-OPEN LAW: the unlock refreshes the rows in place
+        if _worms_vb != null and is_instance_valid(_worms_vb):
+                _fill_worms_menu(_worms_vb)
 
 func _open_shop() -> void:
         if _shop_open or state == "dead":
                 return
         _shop_open = true
         var vb := sheet_push(0.0, "shop", 940.0)
+        _shop_vb = vb
         _fill_shop(vb)
+
+# v040-14 THE STAY-OPEN LAW (the owner: "when something get bought, do not
+# make it quit shop by itself, close button is there for this thing"):
+# every purchase/visit refreshes the sheet IN PLACE - the sheet only ever
+# closes through its own BACK / X button
+var _shop_vb: VBoxContainer = null
+var _worms_vb: VBoxContainer = null
 
 ## THE SHOP: the PLACES (real GOGACoins, the coin icon law, the dry-wallet
 ## gray-out law) + the POWER-UPS (also real GOGACoins - the owner's
 ## v040-10 law) - one currency, the box's own
 func _fill_shop(vb: VBoxContainer) -> void:
         for c in vb.get_children():
+                vb.remove_child(c)
                 c.queue_free()
         var title := Label.new()
         title.text = "THE SHOP"
@@ -2663,16 +2672,16 @@ func _visit_place(pid: String) -> void:
                 place_id = pid
                 _rebuild_place()
                 _banner("%s" % String(PLACES[pid]["name"]), Color("9ad8ff"))
-                sheet_pop()
-                _shop_open = false
-                _show_intro_sheet()
+                # THE STAY-OPEN LAW: the shop refreshes, it never quits itself
+                if _shop_vb != null and is_instance_valid(_shop_vb):
+                        _fill_shop(_shop_vb)
         else:
                 _banner("%s NEXT ROUND" % String(PLACES[pid]["name"]),
                         Color("9ad8ff"))
                 game_toast("%s opens on your next round"
                         % String(PLACES[pid]["name"]))
-                sheet_pop()
-                _shop_open = false
+                if _shop_vb != null and is_instance_valid(_shop_vb):
+                        _fill_shop(_shop_vb)
 
 func _buy_place(pid: String) -> void:
         var price := int(PLACES[pid]["price"])
@@ -2688,14 +2697,12 @@ func _buy_place(pid: String) -> void:
         if state == "intro":
                 place_id = pid
                 _rebuild_place()
-                sheet_pop()
-                _shop_open = false
-                _show_intro_sheet()
         else:
                 game_toast("%s opens on your next round"
                         % String(PLACES[pid]["name"]))
-                sheet_pop()
-                _shop_open = false
+        # THE STAY-OPEN LAW: the buy refreshes the rows in place
+        if _shop_vb != null and is_instance_valid(_shop_vb):
+                _fill_shop(_shop_vb)
 
 ## the world's full rebuild for a new place (fresh sky/dirt/far/bounds)
 func _rebuild_place() -> void:
@@ -2769,8 +2776,9 @@ func _buy_pow(k: String) -> void:
         Jukebox.sfx("dw_unlock", -2.0)
         game_toast("%s unlocked - it can drop in your runs now"
                 % _pow_name(k))
-        sheet_pop()
-        _shop_open = false
+        # THE STAY-OPEN LAW: the buy refreshes the rows in place
+        if _shop_vb != null and is_instance_valid(_shop_vb):
+                _fill_shop(_shop_vb)
 
 # ==================================================================== death
 func _die() -> void:

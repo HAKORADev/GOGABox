@@ -471,6 +471,17 @@ func _sync_battery_notifications() -> void:
 const DEV_CHEATS := ["all_owned", "gogacoins", "battery", "code"]
 const DEV_CHEAT_DEFAULTS := {"code": 1}
 
+# v040-14 THE EXTRAS LAW: the dev sheet's EXTRAS list - a PARENT toggle
+# ("extras") gates every per-game extra (keys "x_<game>_<extra>"). A game
+# asks Box.extra_on(...) - the parent AND its own extra must both be 1.
+# Modular: a future game adds an "extras" array to its registry entry and
+# the dev sheet renders it - no cheat code ever names a game.
+const DEV_EXTRA_PARENT := "extras"
+
+func extra_on(game_id: String, extra_id: String) -> bool:
+        return dev_cheat(DEV_EXTRA_PARENT) == 1 \
+                and dev_cheat("x_%s_%s" % [game_id, extra_id]) == 1
+
 func dev_cheat(name: String) -> int:
         return int(get_progress("__dev__", "cheat_" + name,
                         int(DEV_CHEAT_DEFAULTS.get(name, 0))))

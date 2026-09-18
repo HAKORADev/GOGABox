@@ -1481,6 +1481,11 @@ const GAMES := [
                         "Never let a marble reach the idol's mouth - it costs a life.",
                 ],
                 "genres": {"main": ["puzzle", "action"], "sub": ["marble-shooter", "singleplayer"]},
+                # v040-14 THE EXTRAS LAW: dev-cheat extras render in the
+                # dev sheet's EXTRAS list (parent-gated, per-game keys)
+                "extras": [
+                        {"id": "unlock_all", "title": "unlock all levels"},
+                ],
                 "ach": [
         {"id": "mb_first", "title": "First Pop", "desc": "Clear your first level", "tier": 1, "rule": {"k": "cnt", "key": "levels_cleared", "v": 1}},
         {"id": "mb_ten", "title": "Path Breaker", "desc": "Clear 10 levels (lifetime)", "tier": 1, "rule": {"k": "cnt", "key": "levels_cleared", "v": 10}},
