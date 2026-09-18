@@ -1447,16 +1447,49 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Resident", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
         },
-        {"id": "zuma", "title": "ZUMA",
-                "tag": "spit and pop the chain",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+        # v040-13 THE GRADUATION: the zuma teaser seat renamed as MARBLE
+        # POPPER (the owner's rename law, the rock breaker precedent)
+        {"id": "marble", "title": "MARBLE POPPER",
+                "tag": "roll, match, pop the chain",
+                "script": "res://game/games/marble/marble.gd",
+                "thumb": "res://assets/thumbs/marble.png",
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 5, "price": 350, "fee": 5, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
-                "desc": "the stone frog spits balls into the rolling "
-                        + "chain, match 3 of a color, pop the run - never "
-                        + "let the chain reach the hole, the workshop "
-                        + "version is baking"},
+                "desc": "Marbles roll carved paths toward a hungry idol - "
+                        + "fire your totem launcher, match 3 of a color and "
+                        + "pop the runs before the chain slides home. One "
+                        + "hundred levels across ten places, each place "
+                        + "revealing harder matches and more colors. Skins "
+                        + "for your totem, your marbles and the idol's mouth; "
+                        + "owned powers spawn as glowing marbles inside the "
+                        + "chains; a GOGACoin rides the chain every 10 waves. "
+                        + "3 lives, one extra every 10 levels, the ladder "
+                        + "resets when they run dry - and when all 100 are "
+                        + "cleared the lives system retires and every level "
+                        + "opens. Challenge mode replays a level as 10 waves, "
+                        + "each faster and harder.",
+                "controls": [
+                        "Tap anywhere to shoot the loaded marble toward the tap.",
+                        "Tap the totem to swap its loaded marble with the next one.",
+                        "Match 3+ of a color to pop; closed gaps that join matching ends cascade.",
+                        "Shoot the glowing marbles to take powers; shoot the GOGACoin to bank it.",
+                        "Slider levels: drag along the bottom rail to move the totem.",
+                        "Twin-spot levels: tap the other pad to move the totem there.",
+                        "Watch the path preview - the marbles follow exactly that route.",
+                        "Never let a marble reach the idol's mouth - it costs a life.",
+                ],
+                "genres": {"main": ["puzzle", "action"], "sub": ["marble-shooter", "singleplayer"]},
+                "ach": [
+        {"id": "mb_first", "title": "First Pop", "desc": "Clear your first level", "tier": 1, "rule": {"k": "cnt", "key": "levels_cleared", "v": 1}},
+        {"id": "mb_ten", "title": "Path Breaker", "desc": "Clear 10 levels (lifetime)", "tier": 1, "rule": {"k": "cnt", "key": "levels_cleared", "v": 10}},
+        {"id": "mb_combo", "title": "Combo Artist", "desc": "Reach a x5 combo", "tier": 2, "rule": {"k": "max", "key": "combo_best", "v": 5}},
+        {"id": "mb_coins", "title": "Chain Snatcher", "desc": "Collect 10 chain GOGACoins", "tier": 2, "rule": {"k": "cnt", "key": "coins_taken", "v": 10}},
+        {"id": "mb_wave", "title": "Wave Rider", "desc": "Survive a full challenge", "tier": 3, "rule": {"k": "cnt", "key": "challenges_won", "v": 1}},
+        {"id": "mb_all", "title": "The Box Is Clean", "desc": "Clear all 100 levels", "tier": 4, "rule": {"k": "max", "key": "levels_max", "v": 100}},
+],
+        },
         {"id": "goldminer", "title": "GOLD MINER",
                 "tag": "swing, drop, reel the gold",
                 "coming_soon": true, "orientation": "auto", "dim": "2d",
