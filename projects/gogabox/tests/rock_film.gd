@@ -7,7 +7,7 @@ extends Node
 ##        res://tests/rock_film.tscn
 
 var G: GogaGame = null
-var shot_dir := "/home/z/my-project/gogabox/films/v040-8"
+var shot_dir := "/tmp/rock_film"
 
 func _wait(t: float) -> void:
         await get_tree().create_timer(t, true).timeout
@@ -97,7 +97,7 @@ func _run() -> void:
         var ps: Array = th["places"]
         for i in ps.size():
                 G.place_i = i
-                G.place_fade = 1.0
+                G.veil_t = -1.0
                 await _wait(0.35)
                 await _shot("10_place_%d" % i)
 

@@ -142,11 +142,19 @@ const POINTS := {
         "car": 2, "truck": 3, "tank": 5, "btr": 4, "heli": 4,
         "plane": 5, "drone": 2, "ufo": 6, "launcher": 5,
 }
-# vehicle structural HP - bites = power per bite (birds are EDIBLE, not
-# vehicles - the mouth eats them out of the air)
+# v040-12 THE HUNT LAW (the owner: "make humans give 1 HP and animals give
+# 2 HP and under ground animals give 0.5 HP, the game will feel more fun")
+# - eating FEEDS the worm's health now (capped at the max pool).
+const HEAL := {
+        "human": 1.0, "animal": 2.0, "ground": 0.5, "bird": 0.5,
+}
+# vehicle structural HP - v040-12 THE MASS LAW (the owner: "a tank can get
+# up to 3-4 hits to get destroyed, same logic for other vehicles, depending
+# on speed"): bites to break, by the machine's real toughness. Birds are
+# EDIBLE, not vehicles - the mouth eats them out of the air.
 const VEH_HP := {
-        "car": 2, "truck": 3, "tank": 5, "btr": 4, "heli": 3,
-        "plane": 3, "drone": 2, "ufo": 8, "launcher": 4,
+        "car": 2, "truck": 3, "tank": 4, "btr": 3, "heli": 2,
+        "plane": 2, "drone": 1, "ufo": 5, "launcher": 3,
 }
 
 # ------------------------------------------------------------ the world law
@@ -162,7 +170,11 @@ var SURFACE_Y := 1350.0          # the line the world pivots on (= SKY_H)
 const BASE_SPEED := 340.0        # px/s at scale 1 underground
 const AIR_G := 1500.0            # gravity above the surface
 const TURN_RATE := 3.4           # rad/s at grip 1.0
-const LINE_BAND := 26.0          # the surface-line slowdown band
+# v040-12: the crust band widened - the worm cruising JUST under the line
+# (head.y = SURFACE_Y + 10..50) is what "riding the surface" really is;
+# the old 26px band missed most of the cruise and the mud-eating decay
+# never engaged (the owner: "the mud eating is not working").
+const LINE_BAND := 55.0          # the surface-line slowdown band
 const LINE_SLOW := 0.62          #   the original's crawl-at-the-line law
 const CAMP_MAX := 5.0            # v040-11 THE CAMPING LAW: seconds of
                                  #   continuous crust-riding until the
@@ -171,8 +183,19 @@ const SEG_COUNT := 14            # the drawn chain (head + 14 + tail)
 const EAT_R := 1.0               # mouth radius in head-widths
 const SPECIAL_AT := 100          # one charge per 100 points
 const SPECIAL_MAX := 2
-# the head-size law (measured: the original's head ~= 11% of screen h)
-const HEAD_H := 118.0            # the head draw height at scale 1
+# THE SCALE LAW v040-12 (the owner: "in original, worms were not that big,
+# i mean currently i am playing with first worm, and it is too huge, in
+# original they be much smaller, they still be fast as small worms, but
+# they are also much weaker"): the head drops from 118 to 78 - the first
+# worm reads ~7% of the screen (a whisker over the humans' 6.5%), the
+# original's own ratio, and the whole chain follows the girth law.
+const HEAD_H := 78.0             # the head draw height at scale 1
+# THE FALL LAW v040-12 (the owner: "if fell on something, the gravity
+# force is much higher than jumping to it bottom-to-top, like real life"):
+# a bite delivered while FALLING onto the prey hits 2.5x; a bite rising
+# from below lands at 0.7x; level bites at 1.0.
+const FALL_DMG_MULT := 2.5
+const RISE_DMG_MULT := 0.7
 
 # ------------------------------------------------------------ run state
 var meta: DWMeta
@@ -241,6 +264,7 @@ var steer_mag := 0.0
 # drawing
 var world: Node2D
 var far_draw: Node2D
+var tunnel_draw: Node2D
 var ent_draw: Node2D
 var worm_draw: Node2D
 var fx_draw: Node2D
@@ -436,21 +460,21 @@ func _build_world() -> void:
                         SURFACE_Y - fh * fk + 12.0)
                 far_draw.add_child(sp2)
         world.add_child(far_draw)
-        # ---- THE DIRT: tiled from the surface line to the dirt's floor
-        var dirt_tex: Texture2D = load(S + "places/%s_dirt.png" % place_id)
-        var dirt := Node2D.new()
-        var n_dx := int(ceil(WORLD_W / float(dirt_tex.get_width()))) + 1
-        var n_dy := int(ceil(DIRT_H / float(dirt_tex.get_height()))) + 1
-        for i in n_dx:
-                for j in n_dy:
-                        var sp3 := Sprite2D.new()
-                        sp3.texture = dirt_tex
-                        sp3.centered = false
-                        sp3.position = Vector2(
-                                float(i) * float(dirt_tex.get_width()),
-                                SURFACE_Y + float(j)
-                                * float(dirt_tex.get_height()))
-                        dirt.add_child(sp3)
+        # ---- THE DIRT: v040-12 THE ONE-PIECE LAW (the owner: "the under
+        # ground design is inaccurate, you used something like grid or
+        # repeating them, the correct design from you should be one big
+        # design for the whole place ground as one piece"): each place's
+        # underground is ONE unique baked cross-section - strata, hollows,
+        # roots, veins, bones - stretched to the world's real size. The
+        # same-dirt-repeated-7-times look is dead.
+        var dirt_tex: Texture2D = load(S + "places/%s_dirt_big.png"
+                % place_id)
+        var dirt := Sprite2D.new()
+        dirt.texture = dirt_tex
+        dirt.centered = false
+        dirt.scale = Vector2(WORLD_W / float(dirt_tex.get_width()),
+                DIRT_H / float(dirt_tex.get_height()))
+        dirt.position = Vector2(0.0, SURFACE_Y)
         world.add_child(dirt)
         # ---- THE BURIED DECALS: the study's own tomb + bones, planted
         # at deterministic seats (our own dirt keeps the original's dead)
@@ -470,6 +494,16 @@ func _build_world() -> void:
                         SURFACE_Y + DIRT_H * rng.randf_range(0.3, 0.85))
                 dc.modulate = Color(0.85, 0.82, 0.78, 1.0)
                 world.add_child(dc)
+        # ---- THE TUNNEL LAYER (v040-12 THE VISIBLE TUNNEL LAW): the
+        # mud-eaten marks lived on the GAME node's _draw - which paints
+        # UNDER the world's opaque dirt tiles (children draw over their
+        # parent), so the trail was INVISIBLE the whole time (the owner:
+        # "the dust trail is not working at all"). The tunnel now paints
+        # on its own layer INSIDE the world, right on top of the dirt.
+        tunnel_draw = Node2D.new()
+        tunnel_draw.name = "tunnel"
+        tunnel_draw.draw.connect(_draw_tunnel)
+        world.add_child(tunnel_draw)
         # ---- THE ROAD: the surface line strip, tiled
         var road_tex: Texture2D = load(S + "places/%s_road.png" % place_id)
         var n_road := int(ceil(WORLD_W / float(road_tex.get_width()))) + 1
@@ -483,29 +517,39 @@ func _build_world() -> void:
                         SURFACE_Y - float(road_tex.get_height()) * 0.5)
                 road.add_child(sp4)
         world.add_child(road)
-        # ---- THE BOUNDS: the level's edge walls (the original's own)
+        # ---- THE BOUNDS: the level's edge walls (the original's own).
+        # v040-12 THE FULL-HEIGHT WALL LAW (the owner: "walls should cover
+        # from the bottom of the ground to the top of the sky with proper
+        # look") + THE OCCLUDER LAW ("the things that spawn and move
+        # through it should be hidden, i mean it should be on-top of them
+        # accurately"): the walls span the WHOLE world height and ride a
+        # node ABOVE the entities - anything sliding through an edge is
+        # swallowed by the wall art, exactly like the original.
+        var walls_top := Node2D.new()
+        walls_top.name = "walls_top"
         for side in 2:
                 var bnd := Sprite2D.new()
-                var key := "bl" if side == 0 else "br"
                 bnd.texture = load(S + "places/%s_bound_%s.png"
                         % [place_id, "l" if side == 0 else "r"])
                 bnd.centered = false
                 bnd.flip_h = side == 1
                 var bw := float(bnd.texture.get_width())
                 var bh := float(bnd.texture.get_height())
-                var bk := clampf((SKY_H * 0.3 + DIRT_H * 0.5) / bh,
-                        0.6, 2.2)
+                var bk := (SKY_H + DIRT_H) / bh
                 bnd.scale = Vector2.ONE * bk
                 bnd.position = Vector2(
-                        (-bw * bk * 0.35) if side == 0
-                        else (WORLD_W - bw * bk * 0.65),
-                        SURFACE_Y - SKY_H * 0.22)
-                bnd.name = "bound_" + key
-                world.add_child(bnd)
+                        (-bw * bk * 0.4) if side == 0
+                        else (WORLD_W - bw * bk * 0.6),
+                        0.0)
+                bnd.name = "bound_" + ("l" if side == 0 else "r")
+                walls_top.add_child(bnd)
         ent_draw = Node2D.new()
         world.add_child(ent_draw)
         worm_draw = Node2D.new()
         world.add_child(worm_draw)
+        # THE OCCLUDER SEAT: the walls join the world ABOVE the worm and
+        # the entities - they paint over anything that slides through them
+        world.add_child(walls_top)
         fx_draw = Node2D.new()
         world.add_child(fx_draw)
         _build_worm_sprites()
@@ -645,7 +689,7 @@ func _spawn_walker(calm: bool, force := "") -> void:
                 fr = walk_frames("casual1")
         things.append({
                 "kind": "human", "skin": kind, "x": x,
-                "y": SURFACE_Y + 34.0,
+                "y": _surf_seat("human"),
                 "vx": (rng.randf_range(52.0, 110.0)
                         * (-1.0 if from_right else 1.0)
                         * float(PLACES[place_id]["enemy_mult"])),
@@ -714,7 +758,7 @@ func _spawn_vehicle(kind: String, calm: bool) -> void:
                 "launcher": spd = rng.randf_range(60.0, 90.0)
         spd *= float(PLACES[place_id]["enemy_mult"])
         things.append({
-                "kind": kind, "x": x, "y": SURFACE_Y + 36.0,
+                "kind": kind, "x": x, "y": _surf_seat(kind),
                 "vx": spd * (-1.0 if from_right else 1.0),
                 "hp": int(VEH_HP[kind]), "alive": true,
                 "shoot_t": rng.randf_range(2.0, 4.5), "wheel_t": 0.0,
@@ -730,7 +774,7 @@ func _spawn_animal() -> void:
         var x := (cam_x + W + 110.0) if from_right else (cam_x - 110.0)
         things.append({
                 "kind": "animal", "skin": skin, "x": x,
-                "y": SURFACE_Y + 38.0,
+                "y": _surf_seat("animal"),
                 "vx": rng.randf_range(80.0, 150.0)
                         * (-1.0 if from_right else 1.0)
                         * float(PLACES[place_id]["enemy_mult"]),
@@ -776,6 +820,8 @@ func _process(delta: float) -> void:
                 fx_draw.queue_redraw()
         if ent_draw != null:
                 ent_draw.queue_redraw()
+        if tunnel_draw != null and not trail.is_empty():
+                tunnel_draw.queue_redraw()
 
 ## THE WORM PHYSICS - the heart. The head drives, the chain follows.
 func _tick_worm(delta: float) -> void:
@@ -923,8 +969,12 @@ func _place_worm_sprites(underground: bool) -> void:
                 if i > 0:
                         ang = (pts[i - 1] - pts[i]).angle()
                 sp.rotation = ang
-                var f := absf(wrapf(ang, -PI, PI)) > PI * 0.5
-                sp.flip_v = f
+                # v040-12 THE NO-FLIP LAW (the owner: "worm body when switch
+                # sides, the worm head and body parts really get flipped
+                # instantly, it actually should not, it is ok for a worm to
+                # be upside down ofc"): the chain ROTATES continuously and
+                # nothing mirrors - crossing the vertical just leaves the
+                # worm upside down for a beat, like a real swimmer.
                 # THE GIRTH LAW (the video's own read): every piece draws
                 # at the worm's girth - the head at HEAD_H, the body a
                 # breath slimmer, the tail tapered - whatever the source
@@ -949,10 +999,23 @@ func _place_worm_sprites(underground: bool) -> void:
                         if sp.texture.resource_path != want_path:
                                 sp.texture = load(want_path)
 
-## THE MOUTH LAW - overlap = eat (edibles) or bite (vehicles)
+## THE MOUTH LAW v040-12 - overlap = eat (edibles) or bite (vehicles):
+## THE SURFACE GATE: the mouth must be OUT of the dirt to eat the surface
+## world (the owner: "the people/vehicles on the surface are actually under
+## the surface... i could eat everything without going out of the ground")
+## - the head's tip must break the line for humans/animals/birds.
 func _eat_check() -> void:
         var hr := _head_r() * EAT_R
         var mouth := pts[0] + Vector2(cos(heading), sin(heading)) * hr * 0.4
+        var mouth_out := mouth.y < SURFACE_Y + _head_r() * 0.15
+        # THE FALL LAW: the bite's real force - falling onto prey weighs
+        # 2.5x, rising from below only 0.7x (like real life - the gravity
+        # axis decides, wherever the worm is)
+        var bite_mult := 1.0
+        if vel.y > 140.0:
+                bite_mult = FALL_DMG_MULT
+        elif vel.y < -140.0:
+                bite_mult = RISE_DMG_MULT
         for th in things:
                 if not bool(th["alive"]):
                         continue
@@ -962,10 +1025,14 @@ func _eat_check() -> void:
                 if mouth.distance_to(tp) > hr + rad:
                         continue
                 if k == "human":
+                        if not mouth_out:
+                                continue
                         th["alive"] = false
                         eaten_humans += 1
                         _eaten_book(POINTS["human"], "human", tp)
                 elif k == "animal":
+                        if not mouth_out:
+                                continue
                         th["alive"] = false
                         eaten_animals += 1
                         _eaten_book(int(POINTS["animal"]
@@ -974,6 +1041,9 @@ func _eat_check() -> void:
                         th["alive"] = false
                         eaten_ground += 1
                         ground_run += 1
+                        # v040-12: EVERY digger heals its 0.5 - the per-3
+                        # gate only gates the SCORE payout
+                        p_hp = minf(p_hp_max, p_hp + float(HEAL["ground"]))
                         if ground_run >= 3:
                                 ground_run -= 3
                                 _eaten_book(POINTS["ground"], "ground", tp)
@@ -985,8 +1055,10 @@ func _eat_check() -> void:
                         eaten_animals += 1
                         _eaten_book(1, "animal", tp)
                 elif VEH_HP.has(k):
-                        # vehicles are BITTEN, not eaten - power breaks them
-                        th["hp"] = int(th["hp"]) - maxi(1, int(round(p_power)))
+                        # vehicles are BITTEN, not eaten - the bite's own
+                        # force (the FALL LAW) breaks them
+                        th["hp"] = int(th["hp"]) \
+                                - maxi(1, int(round(p_power * bite_mult)))
                         _push_fx("spark", tp.x, tp.y, 0.0, -40.0, 0.35)
                         Jukebox.sfx("dw_bite", -8.0,
                                 rng.randf_range(0.9, 1.15))
@@ -996,14 +1068,33 @@ func _eat_check() -> void:
                                 _eaten_book(int(POINTS[k]), "vehicle", tp)
                                 _explode(tp, 1.2)
 
-## the shared book: points, the coin law (every 10th edible), the charge law
+## THE REAL BITE (the owner: "make it bite for real, currently things get
+## vanished when eaten, not realistic enough"): the prey tears into gibs
+## and blood spray at the mouth - nothing just pops out of existence.
+func _bite_fx(at: Vector2) -> void:
+        for i in 6:
+                var a := rng.randf_range(0.0, TAU)
+                var spd := rng.randf_range(70.0, 260.0)
+                _push_fx("gib", at.x, at.y, cos(a) * spd,
+                        sin(a) * spd - 120.0, rng.randf_range(0.4, 0.8))
+        for i in 4:
+                _push_fx("blood", at.x, at.y,
+                        rng.randf_range(-90.0, 90.0),
+                        rng.randf_range(-160.0, -40.0), 0.6)
+        Jukebox.sfx("dw_chomp", -4.0, rng.randf_range(0.9, 1.2))
+
+## the shared book: points, THE HUNT LAW's heal, the coin law (every 10th
+## edible), the charge law
 func _eaten_book(points: int, cat: String, at: Vector2) -> void:
         if points > 0:
                 add_score(points)
                 _gain_xp(points)
-        _push_fx("blood", at.x, at.y, rng.randf_range(-50.0, 50.0),
-                -60.0, 0.5)
-        Jukebox.sfx("dw_chew", -6.0, rng.randf_range(0.9, 1.2))
+        # v040-12 THE HUNT LAW: eating feeds the worm - humans 1 HP,
+        # animals 2, underground animals 0.5 (the ground's 0.5 heals at
+        # the bite site - the per-3 score gate must not gate the heal)
+        if HEAL.has(cat) and cat != "ground":
+                p_hp = minf(p_hp_max, p_hp + float(HEAL[cat]))
+        _bite_fx(at)
         if cat != "vehicle":
                 eaten_all += 1
                 if eaten_all % 10 == 0:
@@ -1064,6 +1155,24 @@ func _thing_r(th: Dictionary) -> float:
                 "launcher": return 62.0
         return 30.0
 
+## THE SURFACE SEAT (v040-12): feet ON the line - the old constant +34/+38
+## offsets buried everything waist-deep into the dirt (the owner: "the
+## people/vehicles on the surface, they are actually under the surface,
+## they literally overlapping with the surface top and the under ground").
+func _surf_seat(kind: String) -> float:
+        var half := H * 0.085 * 0.5
+        match kind:
+                "human":
+                        half = H * 0.065 * 0.5
+                "animal":
+                        half = H * 0.085 * 0.5
+                "tank":
+                        half = H * 0.1 * 0.5
+                "heli", "plane":
+                        half = H * 0.1 * 0.5
+        # a hair sunk into the crust - standing ON the ground, not on stilts
+        return SURFACE_Y - half + half * 0.18
+
 func _tick_things(delta: float) -> void:
         var im := _intensity()
         var cam := _cam_rect()
@@ -1101,7 +1210,7 @@ func _tick_things(delta: float) -> void:
                                         var fr: Array = th["fr"]
                                         th["fi"] = (int(th["fi"]) + 1) \
                                                 % fr.size()
-                                th["y"] = SURFACE_Y + 34.0
+                                th["y"] = _surf_seat("human")
                         "animal":
                                 # land animals wander the surface line -
                                 # the REAL run frames, pace-matched
@@ -1117,7 +1226,7 @@ func _tick_things(delta: float) -> void:
                                         th["frame"] = float(int(
                                                 float(th.get("frame", 0.0))
                                                 + 1.0))
-                                th["y"] = SURFACE_Y + 38.0
+                                th["y"] = _surf_seat("animal")
                         "ground":
                                 # diggers roam the underground, wobbling
                                 th["x"] = float(th["x"]) \
@@ -1172,7 +1281,17 @@ func _tick_things(delta: float) -> void:
                                                 1.6, 3.2) / im
                                         _shoot(tp, "heli" if k == "heli"
                                                 else "bullet")
-                        "car", "truck", "btr", "launcher", "tank":
+                        "car", "truck":
+                                # v040-12 THE CIVILIAN LAW (the owner: "a
+                                # normal vehicle, normal car, and weirdly
+                                # shots bullets? illogical"): civilians
+                                # NEVER shoot - they just drive (and flee
+                                # is the walker's business)
+                                th["x"] = float(th["x"]) \
+                                        + float(th["vx"]) * delta
+                                th["wheel_t"] = float(th.get("wheel_t", 0.0)) \
+                                        + absf(float(th["vx"])) * delta
+                        "btr", "launcher", "tank":
                                 th["x"] = float(th["x"]) \
                                         + float(th["vx"]) * delta
                                 th["wheel_t"] = float(th.get("wheel_t", 0.0)) \
@@ -1197,9 +1316,13 @@ func _tick_things(delta: float) -> void:
                 _paint_thing(th)
         things = things.filter(func(t): return bool(t["alive"]))
 
-## does the worm threaten the surface near this spot? (the shooters open fire)
+## does the worm threaten the shooters? v040-12 THE LINE-OF-SIGHT LAW
+## (the owner: "the shooters shoot me under ground like as they are seeing
+## me from under ground? that's wrong"): a shooter only opens fire when
+## the worm is actually SURFACED - the dirt hides you completely.
 func _surfaced_near(at: Vector2, dist: float) -> bool:
-        return pts[0].y > SURFACE_Y - 200.0 and pts[0].distance_to(at) < dist
+        return pts[0].y < SURFACE_Y + _head_r() * 0.8 \
+                and pts[0].distance_to(at) < dist
 
 func _paint_thing(th: Dictionary) -> void:
         var k := String(th["kind"])
@@ -1326,6 +1449,7 @@ func _shoot(at: Vector2, kind: String) -> void:
         shots.append({
                 "kind": kind, "x": at.x, "y": at.y - 10.0,
                 "vx": dir.x * spd, "vy": dir.y * spd, "t": 0.0,
+                "ft": 0.0,
         })
         Jukebox.sfx("dw_shot", -14.0, rng.randf_range(0.9, 1.1))
 
@@ -1335,6 +1459,7 @@ func _tick_shots(delta: float) -> void:
                 s["x"] = float(s["x"]) + float(s["vx"]) * delta
                 s["y"] = float(s["y"]) + float(s["vy"]) * delta
                 s["t"] = float(s["t"]) + delta
+                s["ft"] = float(s.get("ft", 0.0)) + delta
                 var sp: Sprite2D = s.get("spr")
                 if sp == null or not is_instance_valid(sp):
                         sp = Sprite2D.new()
@@ -1344,10 +1469,24 @@ func _tick_shots(delta: float) -> void:
                                 else ("tank_bullet" if s_kind == "tank"
                                 else "bullet"))
                         sp.texture = load(S + path)
-                        sp.rotation = Vector2(float(s["vx"]),
-                                float(s["vy"])).angle() + PI * 0.5
                         ent_draw.add_child(sp)
                         s["spr"] = sp
+                # v040-12 THE TRUE ANGLE LAW (the owner: "the bullets shotted
+                # by anything are static, and made horizontal, they actually
+                # should be angled toward the worm from where it was the
+                # moment the shot got out"): the sprite rides its REAL
+                # velocity angle - the art faces RIGHT, no magic quarter
+                # turn - and the 2-frame cycle keeps it alive in the air.
+                var vdir := Vector2(float(s["vx"]), float(s["vy"]))
+                sp.rotation = vdir.angle()
+                var base_path: String = (sp.texture as Texture2D) \
+                        .resource_path
+                var alt_i := int(float(s["ft"]) / 0.07) % 2
+                var alt_path := base_path.replace("_00.png",
+                        "_%02d.png" % alt_i)
+                if alt_i > 0 and ResourceLoader.exists(alt_path) \
+                                and sp.texture.resource_path != alt_path:
+                        sp.texture = load(alt_path)
                 sp.position = Vector2(float(s["x"]), float(s["y"]))
                 # the hit: bullets only bite the SURFACED worm (dirt is
                 # armor - deep under the line nothing reaches you)
@@ -1579,14 +1718,21 @@ func _push_fx(kind: String, x: float, y: float, vx: float, vy: float,
                 "spark": sp.modulate = Color(1.0, 0.85, 0.4, 0.9)
                 "gut": sp.modulate = Color(0.5, 0.55, 0.3, 0.7)
                 "coin": sp.modulate = Color(1.0, 0.8, 0.25, 0.95)
-                "snow": sp.modulate = Color(0.9, 0.95, 1.0, 0.6)
+                "snow": sp.modulate = Color(0.95, 0.97, 1.0, 0.75)
+                # v040-12 THE REAL BITE: torn chunks (bigger, darker red)
+                "gib": sp.modulate = Color(0.62, 0.08, 0.1, 0.95)
                 _: sp.modulate = Color(0.8, 0.8, 0.8, 0.7)
         sp.position = Vector2(x, y)
         sp.scale = Vector2.ONE * rng.randf_range(0.5, 1.3)
         if kind == "coin":
                 sp.scale = Vector2.ONE * 2.2
+        if kind == "gib":
+                sp.scale = Vector2.ONE * rng.randf_range(1.6, 3.0)
+        if kind == "snow":
+                sp.scale = Vector2.ONE * rng.randf_range(0.35, 0.8)
         fx_draw.add_child(sp)
-        fx.append({"spr": sp, "vx": vx, "vy": vy, "t": 0.0, "life": life})
+        fx.append({"spr": sp, "vx": vx, "vy": vy, "t": 0.0, "life": life,
+                "k": kind})
 
 var _dot_tex_cache: Texture2D = null
 func _dot_tex() -> Texture2D:
@@ -1621,6 +1767,19 @@ func _tick_fx(delta: float) -> void:
                         else:
                                 sp.texture = load(S
                                         + "things/fx/expl_%02d.png" % fi)
+                        continue
+                var fk := String(f.get("k", ""))
+                if fk == "snow":
+                        # v040-12 THE PHYSICAL SNOW LAW (the owner: "snow
+                        # effect in ice place weirdly looks golden and
+                        # illogically the VFX reach the under ground... it
+                        # is screen effect and not physical-based one"):
+                        # a real flake - constant fall, no gravity, it dies
+                        # AT the surface line (the ground stops it)
+                        sp.position.x += float(f["vx"]) * delta
+                        sp.position.y += float(f["vy"]) * delta
+                        if sp.position.y >= SURFACE_Y - 4.0:
+                                f["t"] = float(f["life"]) + 1.0
                         continue
                 f["vy"] = float(f["vy"]) + 380.0 * delta
                 sp.position.x += float(f["vx"]) * delta
@@ -1658,12 +1817,19 @@ func _tick_camera(_delta: float) -> void:
 func _place_flavor(delta: float) -> void:
         match String(PLACES[place_id]["hazard"]):
                 "snow":
+                        # v040-12: flakes spawn ONLY in the sky above the
+                        # line and die at it (the physical snow law)
                         if rng.randf() < 0.5:
-                                _push_fx("snow", cam_x
-                                        + rng.randf_range(0.0, W),
-                                        cam_y + rng.randf_range(-20.0, 80.0),
-                                        rng.randf_range(-30.0, 30.0),
-                                        rng.randf_range(60.0, 130.0), 3.2)
+                                var sy := minf(cam_y
+                                        + rng.randf_range(-20.0, 80.0),
+                                        SURFACE_Y - 60.0)
+                                if sy < SURFACE_Y - 20.0:
+                                        _push_fx("snow", cam_x
+                                                + rng.randf_range(0.0, W),
+                                                sy,
+                                                rng.randf_range(-30.0, 30.0),
+                                                rng.randf_range(60.0, 130.0),
+                                                6.0)
                 "sparks":
                         # the subway strip bites the tail at the bottom
                         if pts[0].y > SURFACE_Y + DIRT_H - 60.0:
@@ -1688,19 +1854,16 @@ func _build_hud_extra() -> void:
         wc_lbl = add_hud_chip("0", S + "coin.png")
         _build_widgets()
 
-## v040-11 THE TOP-BAR WIDGET LAW (the owner: "put them at the top left
-## after worms button and make them horizontal"): the DASH cooldown and
-## the SPECIAL charge are CHIPS IN THE TOP BAR, right after WORMS - one
-## line each, nothing stacked, nothing word-on-word. The power chips
-## keep their under-bar stack at the right edge.
+## v040-11 THE TOP-BAR WIDGET LAW + v040-12 THE GEOMETRY WIDGET LAW: the
+## DASH cooldown and the SPECIAL charge are CHIPS IN THE TOP BAR, right
+## after WORMS - one line each, nothing stacked; the power-ups wear the
+## geometry format (icon: nn) in the same bar.
 func _build_widgets() -> void:
         # v040-11 THE WIDGET SEAT LAW (the owner: "put them at the top left
         # after worms button and make them horizontal and not word on each
         # other, like this: 'special: name nn' 'dash: ready/ dash:
         # count_down'"): the two chips ride the TOP BAR ITSELF, right after
         # the WORMS button, one line each - the old stacked panels died.
-        var safe := banner_bottom()
-        var top_y := 108.0 + safe
         dash_chip = Arc.chip("DASH: READY", "", Color(0, 0, 0, 0.4), 19,
                 Arc.CARD)
         _hud_row.add_child(dash_chip)
@@ -1713,29 +1876,32 @@ func _build_widgets() -> void:
         _hud_row.move_child(sp_chip, 4)     # ...then SPECIAL
         sp_lbl = sp_chip.get_child(0).get_child(
                 sp_chip.get_child(0).get_child_count() - 1)
-        # ---- the power chips seat (under the bar's right edge, unchanged)
+        # ---- the power chips: v040-12 THE GEOMETRY WIDGET LAW (the
+        # owner: "the powerup widget is wrong, in games like geometry flash
+        # or snowy tower, powerup widget is at top left showing 'icon: nn'")
+        # - each active power rides the TOP BAR as an icon + countdown
+        # chip, exactly the geometry format, seated before the score chips.
         for i in POWS.size():
                 var p: Dictionary = POWS[i]
                 var kind := String(p["k"])
                 var panel := PanelContainer.new()
-                var st3 := StyleBoxFlat.new()
-                st3.bg_color = Color(0.08, 0.06, 0.14, 0.78)
-                st3.set_corner_radius_all(14)
-                st3.set_content_margin_all(6)
-                panel.add_theme_stylebox_override("panel", st3)
+                panel.add_theme_stylebox_override("panel",
+                        Arc.panel_style(Color(0, 0, 0, 0.4), 18))
+                panel.visible = false
+                var hb := HBoxContainer.new()
+                hb.add_theme_constant_override("separation", 4)
                 var ic := TextureRect.new()
                 ic.texture = load(S + "pows/%s.png" % kind)
                 ic.custom_minimum_size = Vector2(40, 40)
                 ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
                 ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                panel.add_child(ic)
-                var lbl := Label.new()
-                lbl.add_theme_font_size_override("font_size", 19)
-                panel.add_child(lbl)
-                panel.position = Vector2(W - 150.0,
-                        top_y + 96.0 + float(i) * 58.0)
-                panel.visible = false
-                _hud.add_child(panel)
+                ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                hb.add_child(ic)
+                var lbl := Arc.label("10", 20, Color(1, 1, 1, 0.95))
+                hb.add_child(lbl)
+                panel.add_child(hb)
+                _hud_row.add_child(panel)
+                _hud_row.move_child(panel, _hud_row.get_child_count() - 2)
                 pow_chips[kind] = {"panel": panel, "label": lbl}
 
 func _tick_hud() -> void:
@@ -1798,33 +1964,26 @@ func _tick_banners(delta: float) -> void:
         banners = banners.filter(func(b): return float(b["t"]) > 0.0)
         queue_redraw()
 
-## the game's own canvas paints the banners + the hurt flash + THE DIRT
-## TRAIL (the underground tunnel the worm drags behind it, like the
-## original's own read)
-func _draw() -> void:
-        var vp := get_viewport_rect().size
-        if flash > 0.0:
-                draw_rect(Rect2(Vector2.ZERO, vp),
-                        Color(0.7, 0.1, 0.1, 0.28 * flash))
-        # v040-11 the MUD-EATEN tunnel marks (the world's seat): each
-        # mark is a bitten pocket of the place's own dirt - a dark core,
-        # a lighter eaten rim riding the top, and flecks that read as the
-        # crumbs the worm left behind
+## THE MUD-EATEN TUNNEL (v040-12 THE VISIBLE TUNNEL LAW): painted on the
+## tunnel_draw layer INSIDE the world (world coordinates - the layer's
+## parent already carries the camera), ABOVE the dirt, BELOW the worm.
+## Each mark is a bitten pocket of the place's own dirt - a dark core,
+## a lighter eaten rim riding the top, and the crumb flecks.
+func _draw_tunnel() -> void:
+        if tunnel_draw == null:
+                return
         var tcol: Dictionary = TUNNEL_COL.get(place_id,
                 TUNNEL_COL["desert"])
         var hr := _head_r()
         for tr in trail:
                 var life := clampf(float(tr["t"]) / 6.0, 0.0, 1.0)
                 var a := life * 0.72
-                var p := Vector2(float(tr["x"]) - cam_x,
-                        float(tr["y"]) - cam_y)
-                if p.x < -90.0 or p.x > vp.x + 90.0:
-                        continue
+                var p := Vector2(float(tr["x"]), float(tr["y"]))
                 var rr := hr * (0.40 + 0.10 * life)
-                draw_circle(p, rr, Color(tcol["core"], a))
+                tunnel_draw.draw_circle(p, rr, Color(tcol["core"], a))
                 # the eaten rim: a light lip on the pocket's upper edge
-                draw_arc(p + Vector2(0.0, -rr * 0.28), rr * 0.82,
-                        PI + 0.35, TAU - 0.35, 10,
+                tunnel_draw.draw_arc(p + Vector2(0.0, -rr * 0.28),
+                        rr * 0.82, PI + 0.35, TAU - 0.35, 10,
                         Color(tcol["rim"], a * 0.8), hr * 0.09)
                 # the crumb flecks (deterministic per mark)
                 var seedv := float(tr.get("s", 0.5))
@@ -1832,9 +1991,18 @@ func _draw() -> void:
                         var fa := TAU * (seedv * 7.3 + float(fi) * 2.4)
                         var fd := rr * (0.55 + 0.4 * fmod(seedv * 13.1
                                 + float(fi) * 0.37, 1.0))
-                        draw_circle(p + Vector2(cos(fa), sin(fa)) * fd,
+                        tunnel_draw.draw_circle(
+                                p + Vector2(cos(fa), sin(fa)) * fd,
                                 maxf(1.5, hr * 0.05),
                                 Color(tcol["rim"], a * 0.55))
+
+## the game's own canvas paints the banners + the hurt flash (the world
+## layers live inside `world`, the tunnel on its own layer there)
+func _draw() -> void:
+        var vp := get_viewport_rect().size
+        if flash > 0.0:
+                draw_rect(Rect2(Vector2.ZERO, vp),
+                        Color(0.7, 0.1, 0.1, 0.28 * flash))
         var y := vp.y * 0.34
         for b in banners:
                 var a := clampf(float(b["t"]) / 0.4, 0.0, 1.0)

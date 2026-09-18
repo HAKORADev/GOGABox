@@ -95,12 +95,9 @@ const GROUND_MIN_KICK := 320.0  # trampoline, never a shatterer (the
                                 # original's law): every rock bounces
 
 const SIDE_BUDGET := 18         # THE SIDES LAW: 18 alive spawns per side
-const SCREEN_CAP := 50          #   50 on screen, hold at 45+
-const HOLD_AT := 45
-const BURST_MAX := 5            # v040-8 THE BURST LAW: the spawner pours
-                                # 1..5 rocks per event (the original's
-                                # "tons of them at one time"); v040-11 the
-                                # burst grew because the ground throws died
+const SCREEN_CAP := 50          #   50 on screen (the CURVE LAW's ceiling)
+const BURST_MAX := 5            # v040-8 THE BURST LAW: the pour's ceiling;
+                                # the CURVE LAW walks the burst up to it
 
 const GOLDEN_EVERY := 300       # THE GOLDEN LAW (rockPoints since collect)
 const GOLDEN_HP_MIN := 300
@@ -124,7 +121,14 @@ const RUSH_TIME := 8.0
 const SLOW_FACTOR := 0.45
 
 const PLACE_EVERY := 200        # the five places rotate on rockPoints
-const PLACE_FADE := 0.9       # v040-11: the ghost window shrinks
+# v040-12 THE VEIL CUT: the place switch is a HARD SWAP under a quick
+# dark veil - the old crossfade superimposed two whole scenes (two suns,
+# two skylines, every prop doubled) and read as "the background doing
+# weird layer-removal" (the owner, every version since the first). A
+# 0.14s dim-in, the one-frame swap at the peak, a 0.24s dim-out: no
+# ghosts, no erasure, one clean beat - the game never stops.
+const VEIL_IN := 0.14
+const VEIL_OUT := 0.24
 
 const COOLDOWN := 0.045         # per-rock hit immunity (the brick law)
 
@@ -453,10 +457,11 @@ var shield := 0                  # the shield charges (0/1)
 
 var place_i := 0                 # the five places walker
 var place_next := PLACE_EVERY
-var place_fade := 1.0            # the crossfade hand (1 = settled)
-var place_from := 0
+var veil_t := -1.0               # the veil-cut hand (-1 = idle)
+var veil_swapped := false        # the swap fires AT the veil's peak
 
 var spawn_t := 1.2               # the spawner's clock
+var run_time := 0.0              # the run's clock (THE CURVE LAW)
 var fire_cd := 0.0               # the hold-fire clock
 var shake := 0.0                 # the earned screen shake
 var _time := 0.0                 # the living clock
@@ -862,41 +867,43 @@ func _total_rocks() -> int:
 
 # ------------------------------------------------- the place walker
 ## THE FIVE PLACES LAW: the run walks the theme's five views on
-## rockPoints, a calm crossfade between them - the SKY crossfades through
-## the two shader layers while the far strip + ground crossfade in the
-## draw pass.
+## rockPoints. v040-12 THE VEIL CUT: the switch is a HARD SWAP under a
+## quick dark veil (see VEIL_IN/VEIL_OUT) - the ghost crossfade is dead.
 func _place_walk() -> void:
-        # v040-10 THE PREWARM LAW (the owner's "extra background things
-        # then they get deleted" report): both places' far strips load
-        # BEFORE the fade begins - the handover never lazy-loads mid-
-        # transition, so nothing pops in late and nothing vanishes after.
-        if rp >= place_next:
+        # v040-10 THE PREWARM LAW: the next place's far strip loads BEFORE
+        # the veil begins - the swap never lazy-loads mid-beat.
+        if rp >= place_next and veil_t < 0.0:
                 place_next += PLACE_EVERY
-                place_from = place_i
                 var th: Dictionary = _theme()
-                place_i = (place_i + 1) % (th["places"] as Array).size()
+                var ni := (place_i + 1) % (th["places"] as Array).size()
                 var prefix: String = STYLE_PREFIX.get(String(th["style"]),
                         "cave")
-                var ps: Array = th["places"]
-                var pi_from: int = ps.find(ps[place_from % ps.size()])
-                var pi_to: int = ps.find(ps[place_i % ps.size()])
-                pi_from = maxi(0, pi_from if pi_from >= 0 else place_from)
-                pi_to = maxi(0, pi_to if pi_to >= 0 else place_i)
-                _tex_at("world/far_%s_%d.png" % [prefix, pi_from % 5])
-                _tex_at("world/far_%s_%d.png" % [prefix, pi_to % 5])
+                _tex_at("world/far_%s_%d.png" % [prefix, ni % 5])
+                _tex_at("world/far_%s_%d.png" % [prefix, place_i % 5])
                 _tex_at("world/ground_%s.png" % prefix)
-                place_fade = 0.0
-                # the sky handover: A keeps the old recipe, B takes the new
-                if _sky_mat_a != null:
-                        _apply_sky(_sky_mat_a, _sky_params(
-                                ps[place_from % ps.size()], place_from))
-                        _apply_sky(_sky_mat_b, _sky_params(
-                                ps[place_i % ps.size()], place_i))
-                        _sky_b.modulate.a = 0.0
-        if place_fade < 1.0:
-                place_fade = minf(1.0, place_fade + _goga_dt() / PLACE_FADE)
-                if _sky_b != null:
-                        _sky_b.modulate.a = place_fade
+                _tex_at("world/wall_%s.png" % prefix)
+                veil_t = 0.0
+                veil_swapped = false
+                Jukebox.sfx("rb_place", -10.0)
+        if veil_t >= 0.0:
+                veil_t += _goga_dt()
+                if not veil_swapped and veil_t >= VEIL_IN:
+                        # THE SWAP: one frame, at the veil's peak - the world
+                        # is dark, nobody sees the seams
+                        veil_swapped = true
+                        place_i = (place_i + 1) \
+                                % (_theme()["places"] as Array).size()
+                        var ps: Array = _theme()["places"]
+                        if _sky_mat_a != null:
+                                _apply_sky(_sky_mat_a,
+                                        _sky_params(ps[place_i % ps.size()],
+                                        place_i))
+                                _apply_sky(_sky_mat_b,
+                                        _sky_params(ps[place_i % ps.size()],
+                                        place_i))
+                                _sky_b.modulate.a = 0.0
+                if veil_t >= VEIL_IN + VEIL_OUT:
+                        veil_t = -1.0
 
 var _dt_acc := 1.0 / 60.0
 var _save_t := 0.0
@@ -904,42 +911,66 @@ func _goga_dt() -> float:
         return _dt_acc
 
 # ------------------------------------------------- the spawn director
+## THE CURVE LAW (v040-12, the owner's own numbers): the run starts
+## GENTLE - 1..3 rocks per 3..5s, 10 on screen - and every 30 seconds
+## the pressure climbs one step: the in-screen maximum +2 (10 -> 12 ->
+## 14 ...), the burst grows (2..3 at the first step, wider every other
+## step), the interval slides toward the old 0.55..1.9 band - until the
+## CURRENT limits (50 on screen, hold at cap-5, bursts up to 5) are
+## reached. "Will feel good curve somehow" - a curve you can FEEL
+## instead of the fatal flood from the first second.
+static func curve_step(t: float) -> int:
+        return int(t / 30.0)
+
+static func curve_cap(step: int) -> int:
+        return mini(SCREEN_CAP, 10 + 2 * step)
+
+static func curve_hold(cap: int) -> int:
+        return maxi(4, cap - 5)
+
+static func curve_burst(step: int, rng: RandomNumberGenerator) -> int:
+        var lo := clampi(1 + (step + 1) / 2, 1, 3)
+        var hi := clampi(3 + step / 2, 3, BURST_MAX)
+        return rng.randi_range(mini(lo, hi), hi)
+
+static func curve_interval(step: int, rng: RandomNumberGenerator) -> float:
+        var k := clampf(float(step) / 6.0, 0.0, 1.0)   # there in 3 minutes
+        return rng.randf_range(lerpf(3.0, 0.55, k), lerpf(5.0, 1.9, k))
+
 ## THE SIDES LAW (v040-11 THE WALLS-ONLY LAW): rocks enter from the LEFT
 ## and RIGHT walls at random heights, angles and speeds (wide ranges - no
-## fixed lanes); at most 18 alive side-spawns per side; the screen holds
-## at most 50; at 45+ the spawner holds its breath until the herd thins.
-## THE BURST LAW: each spawn event pours 1..5 rocks (the original's "tons
-## of them at one time"). The ground NEVER births a rock - no throw, no
-## telegraph, no pre-spawn anything (the owner's third strike).
+## fixed lanes); the CURVE LAW owns how many. The ground NEVER births a
+## rock - no throw, no telegraph, no pre-spawn anything (the owner's
+## third strike).
 func _spawn_director(delta: float) -> void:
         _dt_acc = delta
+        run_time += delta
+        var step := curve_step(run_time)
+        var cap := curve_cap(step)
         # THE GOLDEN LAW: after every 300 rockPoints (counted from the
         # last COLLECTION) the golden rock rides in and never leaves.
         if not golden_alive and rp - rp_last_golden >= GOLDEN_EVERY \
-                        and rocks.size() < SCREEN_CAP:
+                        and rocks.size() < cap:
                 golden_alive = true
                 _spawn_special("golden")
                 game_toast("A GOLDEN ROCK APPEARS")
         # THE MYSTERY LAW: the gift carrier on its own counter, also
         # never leaves the screen.
         if not mystery_alive and rp - rp_last_mystery >= MYSTERY_EVERY \
-                        and rocks.size() < SCREEN_CAP:
+                        and rocks.size() < cap:
                 mystery_alive = true
                 _spawn_special("mystery")
         spawn_t -= delta
         if spawn_t > 0.0:
                 return
-        # THE WIDE CLOCK: the interval breathes over a wide range and
-        # tightens as the heat climbs (dynamic for long gameplay)
-        var interval := maxf(0.55, 1.9 - float(heat) * 0.003)
-        spawn_t = interval * rng.randf_range(0.55, 1.5)
-        if rocks.size() >= HOLD_AT:
-                return                     # the hold law: 45+ waits
-        if rocks.size() >= SCREEN_CAP:
+        spawn_t = curve_interval(step, rng)
+        if rocks.size() >= curve_hold(cap):
+                return                     # the hold law: cap-5 waits
+        if rocks.size() >= cap:
                 return
-        # THE BURST: 1..4 rocks per event, mixed sides and launches
-        var burst := mini(rng.randi_range(1, BURST_MAX),
-                HOLD_AT - rocks.size())
+        # THE BURST: the curve's range, mixed sides and launches
+        var burst := mini(curve_burst(step, rng),
+                curve_hold(cap) - rocks.size())
         for i in burst:
                 # v040-11 THE WALLS-ONLY LAW (the owner, third time):
                 # "why the fuck you still spawn rocks from the ground, they
@@ -1664,7 +1695,9 @@ func probe_reset(seed_v: int) -> void:
         shield = 0
         place_i = 0
         place_next = PLACE_EVERY
-        place_fade = 1.0
+        veil_t = -1.0
+        veil_swapped = false
+        run_time = 0.0
         spawn_t = 1.2
         cannon_x = W * 0.5
         cannon_vx = 0.0
@@ -1898,7 +1931,7 @@ func _rc_icon_widget(px: int) -> Control:
 # ============================================================ THE ART
 ## Everything is code-drawn (the box law). All colors come from the
 ## theme's place; the five places walk while the run lives (THE FIVE
-## PLACES LAW) on a calm crossfade.
+## PLACES LAW) on the VEIL CUT.
 var _drng := RandomNumberGenerator.new()
 
 func _draw_bg() -> void:
@@ -1910,12 +1943,19 @@ func _draw_bg() -> void:
         bg_layer.draw_set_transform(Vector2(shk.x, shk.y), 0.0, Vector2.ONE)
         var th: Dictionary = _theme()
         var ps: Array = th["places"]
-        if place_fade < 1.0:
-                _draw_place(ps[place_from % ps.size()], th, 1.0)
-                _draw_place(ps[place_i % ps.size()], th, place_fade)
-        else:
-                _draw_place(ps[place_i % ps.size()], th, 1.0)
+        _draw_place(ps[place_i % ps.size()], th, 1.0)
         bg_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+        # THE VEIL: the place-cut's dark beat - drawn OVER the whole
+        # background but UNDER the rocks (the game never stops reading)
+        if veil_t >= 0.0:
+                var a := 0.0
+                if not veil_swapped:
+                        a = clampf(veil_t / VEIL_IN, 0.0, 1.0)
+                else:
+                        a = clampf(1.0 - (veil_t - VEIL_IN) / VEIL_OUT,
+                                0.0, 1.0)
+                bg_layer.draw_rect(Rect2(0, 0, W, H),
+                        Color(0.03, 0.02, 0.05, 0.94 * a))
 
 func _draw_place(p: Dictionary, th: Dictionary, alpha: float) -> void:
         var d := bg_layer
@@ -1938,11 +1978,14 @@ func _draw_place(p: Dictionary, th: Dictionary, alpha: float) -> void:
         var gt: Texture2D = _tex_at("world/ground_%s.png" % prefix)
         d.draw_texture_rect(gt, Rect2(0, ground_y - 4.0, W,
                 H - ground_y + 4.0), false, _alpha(Color(1, 1, 1, 1), alpha))
-        # the side walls (the arena's skin)
-        var wcol: Color = p["wall"]
-        wcol.a = alpha
-        d.draw_rect(Rect2(0, 0, WALL_T * us, ground_y), wcol)
-        d.draw_rect(Rect2(W - WALL_T * us, 0, WALL_T * us, ground_y), wcol)
+        # the side walls: the baked wall skins (v040-12 THE RICH WORLD) -
+        # real material on the arena's edges instead of flat slivers
+        var wt: Texture2D = _tex_at("world/wall_%s.png" % prefix)
+        var ww := WALL_T * us
+        d.draw_texture_rect(wt, Rect2(0, 0, ww, ground_y), false,
+                _alpha(Color(1, 1, 1, 1), alpha))
+        d.draw_texture_rect(wt, Rect2(W - ww, 0, ww, ground_y), false,
+                _alpha(Color(1, 1, 1, 1), alpha))
 
 func _alpha(c: Color, a: float) -> Color:
         var out := c
@@ -2084,11 +2127,15 @@ func _paint_rock(d: Node2D, rk: Dictionary, style: String) -> void:
                         Color(0.55, 0.38, 0.08), 2.0 * us)
 
 # ====================================================== THE CANNON
-## v040-11 THE ONE SEAT: the draw and the SHOT read the same math - the
-## carriage scale, the wheel radius (40k, smaller than the body - the
-## owner's ratio law), the wheel spread (64k), the texture's REAL alpha
-## bottom pad (the cart's visible floor lands ON the wheel tops - no air
-## between body and wheels), and the muzzle seat at the barrel tip.
+## v040-12 THE SEAT LAW v3 - THE ARCH LAW. v040-11 landed the body's
+## visible floor ON the wheel tops, but the body texture has real WHEEL
+## ARCHES cut into its underside - the wheels floated BELOW the arches
+## with air around them (the owner, third time: "the canon is not
+## physically sitting on its wheels"). The seat now MEASURES the arches
+## out of the texture (the two bottom notches: centers, radius, height)
+## and the wheels are drawn CONCENTRIC inside them: the wheel's visual
+## radius = the arch radius, the wheel centers = the arch centers, the
+## visual bottom touches the ground - a real carriage, tucked and rolling.
 var _seat_cache := {}   # skin_id -> pad_px (the texture's transparent bottom)
 
 func _body_bottom_pad(t: Texture2D) -> float:
@@ -2115,17 +2162,146 @@ func _body_bottom_pad(t: Texture2D) -> float:
         _seat_cache[id] = pad
         return pad
 
+## THE ARCH METRICS: walk the texture's bottom edge, find the two wheel-
+## arch notches, and FIT each one's circle: arch top + the half-height
+## chord give R = (m^2 + d^2) / 2d (d = half the arch rise, m = the chord
+## half-width) and the center height c = top - R. Verified on the skins:
+## R=26.2px, c=35.8px, centers x=79/203 of 283 - identical for all five.
+func _arch_metrics(t: Texture2D) -> Dictionary:
+        var id := _skin_id()
+        var key := "arch_" + id
+        if _seat_cache.has(key):
+                return _seat_cache[key] as Dictionary
+        var out := {}
+        var img := t.get_image()
+        if img != null:
+                if img.is_compressed():
+                        img.decompress()
+                var w := img.get_width()
+                var h := img.get_height()
+                # the visible bottom start per column (first alpha walking
+                # UP from the bottom edge - the silhouette's bottom)
+                var starts := {}
+                for cx in range(0, w, 2):
+                        var row := -1
+                        for ry in range(h - 1, -1, -1):
+                                if img.get_pixel(cx, ry).a > 0.05:
+                                        row = ry
+                                        break
+                        if row >= 0:
+                                starts[cx] = h - 1 - row
+                # the chassis baseline: the modal bottom height (the flat
+                # rail the arches are cut into)
+                var counts := {}
+                for cx in starts:
+                        var v := int(starts[cx])
+                        counts[v] = int(counts.get(v, 0)) + 1
+                var baseline := 0
+                var best := 0
+                for v in counts:
+                        if int(counts[v]) > best:
+                                best = int(counts[v])
+                                baseline = int(v)
+                # each half hunts its notch: columns whose bottom sits
+                # above the baseline (the cut)
+                var arches: Array = []
+                for half in 2:
+                        var pts := {}
+                        for cx in starts:
+                                var v2 := int(starts[cx])
+                                if v2 <= baseline + 4:
+                                        continue
+                                if (half == 0 and cx >= w / 2) \
+                                                or (half == 1 and cx < w / 2):
+                                        continue
+                                pts[cx] = v2
+                        if pts.is_empty():
+                                continue
+                        var lo := w
+                        var hi := 0
+                        var top := 0
+                        for cx in pts:
+                                lo = mini(lo, cx)
+                                hi = maxi(hi, cx)
+                                top = maxi(top, int(pts[cx]))
+                        var acx := float(lo + hi) * 0.5
+                        var mid := float(top + baseline) * 0.5
+                        var m := 0.0
+                        for cx in pts:
+                                if float(pts[cx]) >= mid:
+                                        m = maxf(m, absf(float(cx) - acx))
+                        var dd := float(top - baseline) * 0.5
+                        if dd <= 0.0 or m <= 0.0:
+                                continue
+                        var r := (m * m + dd * dd) / (2.0 * dd)
+                        var c := float(top) - r
+                        arches.append({"cx": acx, "r": r, "c": c})
+                if arches.size() == 2:
+                        out = {"arches": arches, "baseline": float(baseline)}
+        _seat_cache[key] = out
+        return out
+
 func _cannon_seat() -> Dictionary:
         var body_t := _tex_at("cannon/body_%s.png" % _skin_id())
         var k := 226.0 * us / float(body_t.get_width())
-        var wr := 40.0 * k
         var pad := _body_bottom_pad(body_t) * k
         var bh := float(body_t.get_height()) * k
-        var wheel_y := ground_y - wr                  # the wheels TOUCH the ground
-        var body_bottom := wheel_y - wr + pad         # the visible cart floor ON the wheel tops
-        return {"k": k, "wr": wr, "bw": float(body_t.get_width()) * k,
-                "bh": bh, "wheel_y": wheel_y, "body_bottom": body_bottom,
-                "muzzle_y": body_bottom - bh + 12.0 * k}
+        var arch := _arch_metrics(body_t)
+        if not arch.is_empty():
+                # THE ARCH LAW: the wheels live IN the arches
+                var arches: Array = arch["arches"]
+                var a0: Dictionary = arches[0]
+                var a1: Dictionary = arches[arches.size() - 1]
+                var r_px: float = minf(float(a0["r"]), float(a1["r"]))
+                var wr := r_px * k / 0.92   # draw half-size: the wheel art's
+                                        # visual radius lands on the arch r
+                var wheel_y := ground_y - r_px * k   # the visual bottom
+                                        # kisses the ground
+                # the body's bottom edge so the arch centers sit EXACTLY on
+                # the wheel centers (concentric - tucked, no air)
+                var c_px := (float(a0["c"]) + float(a1["c"])) * 0.5
+                var body_bottom := wheel_y + c_px * k
+                # the arch spread around the texture's center
+                var vis_cx := (float(a0["cx"]) + float(a1["cx"])) * 0.5
+                # the barrel tip: the texture's real top content
+                var top_pad := _top_pad(body_t) * k
+                return {"k": k, "wr": wr, "bw": float(body_t.get_width()) * k,
+                        "bh": bh, "wheel_y": wheel_y,
+                        "body_bottom": body_bottom,
+                        "wheel_dx_a": (float(a0["cx"]) - vis_cx) * k,
+                        "wheel_dx_b": (float(a1["cx"]) - vis_cx) * k,
+                        "muzzle_y": body_bottom - bh + top_pad + 6.0 * k}
+        # the no-arch fallback: v040-11's floor-on-wheel-tops seat
+        var wr2 := 40.0 * k
+        var wheel_y2 := ground_y - wr2
+        var body_bottom2 := wheel_y2 - wr2 + pad
+        return {"k": k, "wr": wr2, "bw": float(body_t.get_width()) * k,
+                "bh": bh, "wheel_y": wheel_y2, "body_bottom": body_bottom2,
+                "wheel_dx_a": -64.0 * k, "wheel_dx_b": 64.0 * k,
+                "muzzle_y": body_bottom2 - bh + 12.0 * k}
+
+func _top_pad(t: Texture2D) -> float:
+        var id := "top_" + _skin_id()
+        if _seat_cache.has(id):
+                return float(_seat_cache[id])
+        var pad := 0.0
+        var img := t.get_image()
+        if img != null:
+                if img.is_compressed():
+                        img.decompress()
+                var h := img.get_height()
+                var w := img.get_width()
+                for row in range(h):
+                        var found := false
+                        for cx in range(0, w, 2):
+                                if img.get_pixel(cx, row).a > 0.05:
+                                        found = true
+                                        break
+                        if found:
+                                pad = float(row)
+                                break
+        _seat_cache[id] = pad
+        return pad
 
 func _draw_char() -> void:
         if char_layer == null:
@@ -2155,12 +2331,12 @@ func _draw_char() -> void:
         var bh: float = seat["bh"]
         var wheel_y: float = seat["wheel_y"]
         var body_bottom: float = seat["body_bottom"]
-        for side: float in [-1.0, 1.0]:
-                var wx := x + side * 64.0 * k
+        for dx: float in [float(seat["wheel_dx_a"]), float(seat["wheel_dx_b"])]:
+                var wx := x + dx
                 var wr: float = seat["wr"]
                 var wsz := wr * 2.0
                 char_layer.draw_set_transform(Vector2(wx, wheel_y),
-                        wheel_rot * side, Vector2.ONE)
+                        wheel_rot * signf(dx), Vector2.ONE)
                 char_layer.draw_texture_rect(wheel_t,
                         Rect2(-wsz * 0.5, -wsz * 0.5, wsz, wsz), false)
         char_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

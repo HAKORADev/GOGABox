@@ -1871,61 +1871,73 @@ func _open_topup_game(gid: String, prefill := 0) -> void:
         prev.custom_minimum_size = Vector2(240, 0)
         row.add_child(prev)
         vb.add_child(row)
-        var maxb: Button = null
-        var top: Button = null
+        # v040-12 THE CAPTURE LAW: GDScript lambdas capture locals BY
+        # VALUE - `top`/`maxb` were null inside apply_amount forever (they
+        # are assigned AFTER the lambda), so the honest gray NEVER fired:
+        # the owner saw a live-green button at 0 GOGACoins. The buttons
+        # ride a Dictionary holder - reference semantics, mutations land.
+        var btns := {"max": null, "top": null}
         var state := {"amount": 0}
-        # THE LIVE AMOUNT LAW (v040-11): one update body feeds the preview,
-        # the MAX button's state and the TOP-UP button's gray - the MAX tap
-        # runs THE SAME body (a programmatic field.text never fired
-        # text_changed, so the counter read 0 until a manual edit - the
-        # owner's report).
+        # THE LIVE AMOUNT LAW (v040-11) + THE WRITTEN-NUMBER LAW (v040-12):
+        # one update body feeds the preview, the MAX button's state and the
+        # TOP-UP button's gray - and the FIELD is always rewritten to the
+        # canonical number when it does not already hold it (the CANCEL
+        # round trip used to keep the "= nn" preview while the field read
+        # 0: apply_amount compared the INCOMING text against the number and
+        # skipped the write on a fresh sheet - the owner's report).
+        # The number in the field is THE TRUTH - no silent cap rewrite
+        # anymore: an over-wallet number stays written and the TOP-UP
+        # button GRAYS (the owner: "the number if more than max or number
+        # is less than one in-game coin or the number is 0").
         var apply_amount := func(t: String) -> void:
                 var digits := ""
                 for ch in t:
                         if ch >= "0" and ch <= "9":
                                 digits += ch
-                var n := mini(int(digits) if digits != "" else 0, cap)
-                # THE CAP: never more than the current total GOGACoins
-                if t != "" and digits != "" and int(digits) > cap:
-                        field.text = str(cap)
-                        field.caret_column = field.text.length()
-                elif t != str(n):
-                        field.text = str(n)
+                var n := int(digits) if digits != "" else 0
+                var canon := digits if digits != "" else "0"
+                if field.text != canon:
+                        field.text = canon
                         field.caret_column = field.text.length()
                 state["amount"] = n
+                var maxb: Button = btns["max"]
                 if maxb != null:
                         maxb.disabled = cap <= 0
                 prev.text = "=  %s %s" % [Arc.short_num(
                         GameCoin.convert(n, rate_v)), String(rec["name"])]
-                # THE HONEST BUTTON LAW (the owner: "do not accept top-up if
-                # entered gogacoins are 0 or less than 1 in-game-currency,
-                # gray-out the button i mean"): the confirm grays when the
-                # exchange moves nothing - no coins typed, or less than one
-                # whole game coin at this game's rate.
-                if top != null:
-                        top.disabled = n <= 0 \
+                # THE HONEST BUTTON LAW v2 (the owner, again): the gray is
+                # ruled by the WRITTEN number - 0, more than the wallet,
+                # or an exchange that buys less than one whole game coin.
+                var top_b: Button = btns["top"]
+                if top_b != null:
+                        top_b.disabled = n <= 0 or n > cap \
                                         or GameCoin.convert(n, rate_v) < 1
         field.text_changed.connect(apply_amount)
 
-        maxb = Arc.button("MAX", Vector2(240, 56), 22, Arc.ACCENT,
+        var maxb2 := Arc.button("MAX", Vector2(240, 56), 22, Arc.ACCENT,
                 func():
                         field.text = str(cap)
                         apply_amount.call(str(cap)))
+        btns["max"] = maxb2
         var mc := HBoxContainer.new()
         mc.alignment = BoxContainer.ALIGNMENT_CENTER
-        mc.add_child(maxb)
+        mc.add_child(maxb2)
         vb.add_child(mc)
 
         # THE CONFIRM LAW: the top-up button opens the confirmation first
-        top = Arc.button("TOP-UP", Vector2(540, 84), 30, Arc.GOOD,
+        # (the guard mirrors THE HONEST BUTTON LAW v2 exactly - the button
+        # is disabled for these same cases, this is the belt to the brace)
+        var top := Arc.button("TOP-UP", Vector2(540, 84), 30, Arc.GOOD,
                 func():
                         var n := int(state["amount"])
-                        if n <= 0 or cap <= 0:
+                        if n <= 0 or n > cap \
+                                        or GameCoin.convert(n, rate_v) < 1:
                                 Jukebox.sfx("error", -4.0)
                                 return
                         _topup_confirm(gid, n))
+        btns["top"] = top
         top.add_theme_color_override("font_disabled_color",
-                        Color(1, 1, 1, 0.72))
+                        Color(1, 1, 1, 0.45))
         vb.add_child(top)
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24,
                 Color(0.42, 0.30, 0.16), func():
@@ -1933,8 +1945,9 @@ func _open_topup_game(gid: String, prefill := 0) -> void:
                         _open_topup_picker()))
         Arc.fit_sheet(vb, 2)
         # the honest seat: gray until a real exchange is typed (or the
-        # prefilled CANCEL round-trip fills one in)
-        apply_amount.call(str(mini(prefill, cap)) if prefill > 0 else "")
+        # prefilled CANCEL round-trip fills one in - the field now wears
+        # the number TOO, the keep-preview-reset-field desync is dead)
+        apply_amount.call(str(prefill) if prefill > 0 else "")
 
 ## the confirmation sheet: the two wallets, the amount, the result line,
 ## CONFIRM / CANCEL - nothing moves before this. v040-11: the confirm

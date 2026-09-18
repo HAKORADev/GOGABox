@@ -950,43 +950,43 @@
   },
   "assets/games/deathworm/things/ground/lizard_00.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_01.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_02.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_03.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_04.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/lizard_05.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_00.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_01.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_02.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/ground/mole_03.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/things/vehicles/btr_00.png": {
    "source": "deathworm-study",
@@ -1678,235 +1678,223 @@
   },
   "assets/games/deathworm/worms/w01_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w01_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w02_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w03_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w04_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
-  "assets/games/deathworm/worms/w05_body_1.png": {
-   "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
-  },
+  "assets/games/deathworm/worms/w05_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
   "assets/games/deathworm/worms/w05_body_2.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w05_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w06_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
-  "assets/games/deathworm/worms/w07_body_1.png": {
-   "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
-  },
+  "assets/games/deathworm/worms/w07_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
   "assets/games/deathworm/worms/w07_body_2.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w07_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
-  "assets/games/deathworm/worms/w08_body_1.png": {
-   "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
-  },
+  "assets/games/deathworm/worms/w08_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
   "assets/games/deathworm/worms/w08_body_2.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w08_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
-  "assets/games/deathworm/worms/w09_body_1.png": {
-   "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
-  },
+  "assets/games/deathworm/worms/w09_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
   "assets/games/deathworm/worms/w09_body_2.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w09_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_body_0.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_head.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_head_open.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_preview.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/worms/w10_tail.png": {
    "source": "deathworm-study",
-   "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
+   "origin": "ours: drawn by code in tools/v0411_worm_ours.py + v0412_worm_species.py reforges (v040-12) (v040-11 THE OURS LAW - zero original bytes)"
   },
   "assets/games/deathworm/pows/frenzy.png": {
    "source": "deathworm-study",
@@ -1931,7 +1919,23 @@
   "assets/games/deathworm/pows/speed.png": {
    "source": "deathworm-study",
    "origin": "ours: drawn by code in tools/v0411_worm_ours.py (v040-11 THE OURS LAW - zero original bytes)"
-  }
+  },
+  "assets/games/deathworm/places/desert_dirt_big.png": "ours: one-piece underground cross-section drawn by code in tools/v0412_worm_places.py (v040-12 THE ONE-PIECE GROUND LAW - zero original bytes)",
+  "assets/games/deathworm/places/polar_dirt_big.png": "ours: one-piece underground cross-section drawn by code in tools/v0412_worm_places.py (v040-12 THE ONE-PIECE GROUND LAW - zero original bytes)",
+  "assets/games/deathworm/places/city_dirt_big.png": "ours: one-piece underground cross-section drawn by code in tools/v0412_worm_places.py (v040-12 THE ONE-PIECE GROUND LAW - zero original bytes)",
+  "assets/games/deathworm/places/jungle_dirt_big.png": "ours: one-piece underground cross-section drawn by code in tools/v0412_worm_places.py (v040-12 THE ONE-PIECE GROUND LAW - zero original bytes)",
+  "assets/games/deathworm/places/medieval_dirt_big.png": "ours: one-piece underground cross-section drawn by code in tools/v0412_worm_places.py (v040-12 THE ONE-PIECE GROUND LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w01_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w02_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w03_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w04_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w06_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/deathworm/worms/w10_body_1.png": "ours: drawn by code in tools/v0412_worm_species.py (v040-12 THE SPECIES LAW - zero original bytes)",
+  "assets/games/rockbreaker/world/wall_cave.png": "ours: drawn by code in tools/v0412_rock_world_rich.py (v040-12 THE RICH WORLD LAW)",
+  "assets/games/rockbreaker/world/wall_forest.png": "ours: drawn by code in tools/v0412_rock_world_rich.py (v040-12 THE RICH WORLD LAW)",
+  "assets/games/rockbreaker/world/wall_pixel.png": "ours: drawn by code in tools/v0412_rock_world_rich.py (v040-12 THE RICH WORLD LAW)",
+  "assets/games/rockbreaker/world/wall_neon.png": "ours: drawn by code in tools/v0412_rock_world_rich.py (v040-12 THE RICH WORLD LAW)",
+  "assets/games/rockbreaker/world/wall_candy.png": "ours: drawn by code in tools/v0412_rock_world_rich.py (v040-12 THE RICH WORLD LAW)"
  },
  "assets": {
   "assets/games/chess": {

@@ -131,6 +131,12 @@ func _eat_laws() -> void:
         G._start_run()
         await _wait(0.1)
         G.state = "play"
+        # v040-12 THE SURFACE GATE: the mouth must be OUT of the dirt to
+        # eat the surface world - the battery hunts from a surfaced head
+        # (the whole chain re-seats with it - no stretched-chain artifacts)
+        G.pts[0].y = G.SURFACE_Y - 70.0
+        for i in range(1, G.pts.size()):
+                G.pts[i] = G.pts[0] + Vector2(float(i) * 26.0, 0.0)
         var s0: int = G.score
         # a human: 1 point
         G.things.append({"kind": "human", "skin": "casual1", "x": G.pts[0].x,
@@ -427,7 +433,162 @@ func _v0410_laws() -> void:
                 and String(G.meta.place()) == "polar",
                 "THE PLACE LAW: a mid-run visit applies NEXT round (the meta remembers)")
 
-# ==================================================================== run
+# ====================================================== the v040-12 laws
+func _v0412_laws() -> void:
+        print("\n-- the v040-12 laws --")
+        Box.reset_all()
+        await _wait(0.1)
+        G._reset_run()
+        G.state = "play"
+        # THE SCALE LAW: the head dropped to 78 (the owner: "worms were not
+        # that big... in original they be much smaller")
+        ck(int(G.HEAD_H) == 78, "THE SCALE LAW: the worm head reads the smaller original ratio")
+        # THE SURFACE GATE: a deep mouth cannot eat the surface world
+        G.things.clear()
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 300.0)
+        G.heading = PI
+        G.things.append({"kind": "human", "skin": "casual1",
+                "x": G.pts[0].x, "y": G.SURFACE_Y - 60.0, "vx": 0.0,
+                "fr": [], "fi": 0, "ft": 0.0, "alive": true, "flee": 0.0})
+        var ate0: int = G.eaten_humans
+        G._eat_check()
+        ck(G.eaten_humans == ate0, "THE SURFACE GATE: a buried mouth eats nothing on the surface")
+        # surfaced: the mouth eats
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y - 70.0)
+        G._eat_check()
+        ck(G.eaten_humans == ate0 + 1, "THE SURFACE GATE: the surfaced mouth eats")
+        # THE HUNT LAW: eating heals - humans 1, animals 2, ground 0.5
+        G.p_hp = G.p_hp_max - 10.0
+        var hp0: float = G.p_hp
+        G.things.append({"kind": "human", "skin": "casual1",
+                "x": G.pts[0].x, "y": G.pts[0].y, "vx": 0.0,
+                "fr": [], "fi": 0, "ft": 0.0, "alive": true, "flee": 0.0})
+        G._eat_check()
+        ck(absf(G.p_hp - (hp0 + 1.0)) < 0.001, "THE HUNT LAW: a human heals 1 HP")
+        hp0 = G.p_hp
+        G.things.append({"kind": "animal", "skin": "camel",
+                "x": G.pts[0].x, "y": G.pts[0].y, "vx": 0.0, "alive": true})
+        G._eat_check()
+        ck(absf(G.p_hp - (hp0 + 2.0)) < 0.001, "THE HUNT LAW: an animal heals 2 HP")
+        hp0 = G.p_hp
+        G.things.append({"kind": "ground", "skin": "mole",
+                "x": G.pts[0].x, "y": G.pts[0].y, "vx": 0.0, "vy": 0.0,
+                "alive": true, "wob": 0.0})
+        G._eat_check()
+        ck(absf(G.p_hp - (hp0 + 0.5)) < 0.001, "THE HUNT LAW: a ground animal heals 0.5 HP")
+        # THE FALL LAW: falling onto a machine weighs 2.5x a rising bite
+        G.p_power = 2.0
+        G.things.clear()
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y - 220.0)
+        G.vel = Vector2(0.0, 400.0)          # falling
+        G.heading = PI * 0.5
+        G.things.append({"kind": "tank", "x": G.pts[0].x, "y": G.pts[0].y,
+                "vx": 0.0, "hp": 99, "alive": true, "shoot_t": 9.0,
+                "wheel_t": 0.0})
+        G._eat_check()
+        var fell_hp: int = int(G.things[0]["hp"])
+        ck(fell_hp == 99 - int(round(2.0 * G.FALL_DMG_MULT)),
+                "THE FALL LAW: a falling bite weighs x2.5 onto the prey")
+        G.things.clear()
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 120.0)
+        G.vel = Vector2(0.0, -400.0)         # rising from below
+        G.heading = -PI * 0.5
+        G.things.append({"kind": "tank", "x": G.pts[0].x, "y": G.pts[0].y,
+                "vx": 0.0, "hp": 99, "alive": true, "shoot_t": 9.0,
+                "wheel_t": 0.0})
+        G._eat_check()
+        ck(int(G.things[0]["hp"]) == 99 - maxi(1, int(round(2.0 * G.RISE_DMG_MULT))),
+                "THE FALL LAW: a rising bite from below lands soft")
+        # THE CIVILIAN LAW: a car NEVER shoots
+        G.shots.clear()
+        G.things.clear()
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y - 70.0)
+        G.things.append({"kind": "car", "x": G.pts[0].x + 200.0,
+                "y": G._surf_seat("car"), "vx": 30.0, "hp": 2,
+                "alive": true, "shoot_t": 0.01, "wheel_t": 0.0})
+        for i in 30:
+                G._tick_things(1.0 / 60.0)
+        ck(G.shots.is_empty(), "THE CIVILIAN LAW: a normal car never fires")
+        # THE LINE-OF-SIGHT LAW: the shooters cannot see a buried worm
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 300.0)
+        ck(not G._surfaced_near(Vector2(G.pts[0].x, G.SURFACE_Y), 900.0),
+                "THE LINE-OF-SIGHT LAW: the dirt hides the worm from the shooters")
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y - 60.0)
+        ck(G._surfaced_near(Vector2(G.pts[0].x, G.SURFACE_Y), 900.0),
+                "THE LINE-OF-SIGHT LAW: a surfaced worm is seen")
+        # THE VISIBLE TUNNEL LAW: the tunnel layer lives INSIDE the world,
+        # above the dirt, and the marks append while underground
+        ck(G.tunnel_draw != null and G.world.is_ancestor_of(G.tunnel_draw),
+                "THE TUNNEL LAW: the tunnel paints on its own world layer")
+        var tr0: int = G.trail.size()
+        G.pts[0] = Vector2(G.WORLD_W * 0.5, G.SURFACE_Y + 240.0)
+        G._tick_worm(1.0 / 60.0)
+        ck(G.trail.size() > tr0, "THE TUNNEL LAW: underground travel leaves marks")
+        # THE ONE-PIECE DIRT LAW: every place carries its single-piece bake
+        var dirt_ok := true
+        for pl in G.PLACES:
+                if not ResourceLoader.exists(G.S + "places/%s_dirt_big.png" % pl):
+                        dirt_ok = false
+        ck(dirt_ok, "THE ONE-PIECE DIRT LAW: one unique underground per place")
+        # THE FULL-HEIGHT WALL LAW: the walls span the whole world height
+        var walls_ok := false
+        for c in G.world.get_children():
+                if String(c.name) == "walls_top":
+                        walls_ok = true
+        ck(walls_ok, "THE WALL LAW: the bounds ride the occluder layer")
+        # THE NO-FLIP LAW: the chain never mirrors on a side switch
+        G.pts.clear()
+        for i in G.SEG_COUNT + 2:
+                G.pts.append(Vector2(G.WORLD_W * 0.5 + float(i) * 26.0,
+                        G.SURFACE_Y + 200.0))
+        G.heading = PI
+        G.vel = Vector2(-300.0, 0.0)
+        G._tick_worm(1.0 / 60.0)
+        G._place_worm_sprites(true)
+        var no_flip := true
+        for s in G.worm_sprites:
+                if s.flip_v or s.flip_h:
+                        no_flip = false
+        ck(no_flip, "THE NO-FLIP LAW: the worm rotates, nothing mirrors")
+        # THE SPECIES LAW: the ten heads are ten DIFFERENT designs
+        var hashes := {}
+        var distinct := true
+        for wr in G.WORMS:
+                var path: String = G.S + "worms/%s_head.png" % String(wr["id"])
+                var img := (load(path) as Texture2D).get_image()
+                var hsh := img.get_data().hex_encode()
+                if hashes.has(hsh):
+                        distinct = false
+                hashes[hsh] = true
+        ck(distinct and hashes.size() == 10,
+                "THE SPECIES LAW: ten worms, ten different looks")
+        # THE GEOMETRY WIDGET LAW: the power chips live in the top bar as
+        # icon + countdown chips
+        var pow_in_bar := true
+        for k in G.pow_chips:
+                var panel: Control = G.pow_chips[k]["panel"]
+                if not G._hud_row.is_ancestor_of(panel):
+                        pow_in_bar = false
+        ck(pow_in_bar and G.pow_chips.size() == G.POWS.size(),
+                "THE GEOMETRY WIDGET LAW: the power chips ride the top bar (icon: nn)")
+        # THE PHYSICAL SNOW LAW: a flake dies at the surface, never below
+        G.fx.clear()
+        G.place_id = "polar"
+        G.cam_x = G.WORLD_W * 0.25
+        G.cam_y = G.SURFACE_Y - G.H
+        G._push_fx("snow", G.cam_x + 40.0, G.SURFACE_Y - 30.0, 0.0, 100.0, 6.0)
+        for i in 90:
+                G._tick_fx(1.0 / 60.0)
+        var below := false
+        for f2 in G.fx:
+                if String(f2.get("k", "")) == "snow" \
+                                and (f2["spr"] as Sprite2D).position.y > G.SURFACE_Y:
+                        below = true
+        ck(not below, "THE PHYSICAL SNOW LAW: no flake ever crosses the surface")
+        G.place_id = "desert"
+        # THE MASS LAW: the tank takes 3-4 bites, not 5
+        ck(int(G.VEH_HP["tank"]) <= 4,
+                "THE MASS LAW: the tank breaks in 3-4 bites")
 func _ready() -> void:
         print("=== qa_v0409_worm: the DEADLY WORM battery (v040-10 laws) ===")
         await _boot()
@@ -441,6 +602,7 @@ func _ready() -> void:
         await _spawn_law()
         await _v0410_laws()
         await _v0411_laws()
+        await _v0412_laws()
         print("\n=== %d checks, %d fails ===" % [checks, fails])
         get_tree().quit(1 if fails > 0 else 0)
 

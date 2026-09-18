@@ -151,10 +151,14 @@ func _scene_laws() -> void:
                 G.probe_spawn(1, 2, 50)
         var n1: int = G.rocks.size()
         ck(n1 >= 45, "the screen sits over the hold line (%d)" % n1)
+        # v040-12 THE CURVE LAW: the spawner owns the pressure - the probe
+        # drives the run clock to the final step (cap 50, hold 45) where
+        # the old limits apply
+        G.run_time = 400.0
         G.heat = 0
         G.spawn_t = 0.0
         G._spawn_director(0.016)
-        ck(G.rocks.size() == n1, "SIDES LAW: 45+ holds the spawner")
+        ck(G.rocks.size() == n1, "SIDES LAW: 45+ holds the spawner (the curve's top)")
         while G.rocks.size() > 24:
                 G._break_rock(0, true)
         G.side_count = [0, 0]        # the probe owns the ledger here
@@ -162,6 +166,19 @@ func _scene_laws() -> void:
         G.spawn_t = 0.0
         G._spawn_director(0.016)
         ck(G.rocks.size() >= 25, "the spawner breathes under the hold line")
+        # THE CURVE LAW's own battery: a gentle start, a felt ramp
+        G.probe_reset(421)
+        ck(G.curve_cap(0) == 10 and G.curve_cap(1) == 12,
+                "CURVE LAW: 10 on screen at the start, +2 every 30s")
+        ck(G.curve_interval(0, G.rng) >= 2.9 \
+                and G.curve_interval(0, G.rng) <= 5.1,
+                "CURVE LAW: the first pour is a calm 3-5s")
+        var b0: int = G.curve_burst(0, G.rng)
+        ck(b0 >= 1 and b0 <= 3, "CURVE LAW: 1-3 rocks an event at the start")
+        var b1: int = G.curve_burst(1, G.rng)
+        ck(b1 >= 2 and b1 <= 3, "CURVE LAW: 2-3 an event after 30s (the owner's numbers)")
+        ck(G.curve_burst(20, G.rng) >= 3 and G.curve_cap(20) == 50,
+                "CURVE LAW: long runs reach the current limits")
         # the bullet damage law
         G.probe_reset(5)
         G.probe_spawn(0, 2, 100)
@@ -420,9 +437,12 @@ func _v0408_laws() -> void:
                 G._rock_physics(1.0 / 60.0)
         ck(G.rocks.size() == g_before and float(G.rocks[0]["vx"]) < 0.0,
                 "PERSISTENCE: the golden bounces off the wall, never leaves")
-        # THE BURST LAW: one director event pours 1..4 rocks
+        # THE BURST LAW: one director event pours the curve's burst
+        # (the probe rides the run clock to the TOP step - 1..5 rocks,
+        # hold at 45 - where the classic pour lives)
         G.probe_reset(13)
         G.heat = 0
+        G.run_time = 400.0
         var pours := 0
         for i in 12:
                 G.spawn_t = 0.0

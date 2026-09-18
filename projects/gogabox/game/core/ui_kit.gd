@@ -132,8 +132,13 @@ static func button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
         sbp.shadow_size = 2
         b.add_theme_stylebox_override("pressed", sbp)
         var sbd := sb.duplicate() as StyleBoxFlat
-        sbd.bg_color = Color(0.45, 0.42, 0.38)
+        # v040-12 THE HONEST GRAY: a disabled button must LOOK dead at a
+        # glance - darker slab, no shadow lift, dim text (the owner read the
+        # old gray-green as "not grayed out")
+        sbd.bg_color = Color(0.34, 0.32, 0.30)
+        sbd.shadow_size = 0
         b.add_theme_stylebox_override("disabled", sbd)
+        b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.38))
         if on_press.is_valid():
                 b.pressed.connect(func():
                         Jukebox.sfx("click", -4.0)

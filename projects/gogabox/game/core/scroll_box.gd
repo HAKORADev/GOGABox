@@ -90,6 +90,71 @@ func _notification(what: int) -> void:
 func _exit_tree() -> void:
         remember()
 
+# ============================================== v040-12 THE HANDOFF LAW
+## THE SCROLL NUKE'S ROOT KILL. Most game shops rebuild their whole sheet
+## on every buy: the old sheet's BoxScroll dies and a NEW scroll is born
+## in the same frame. Keyed scrolls ride the ledger (preserve_key + the
+## sheet_pop remember), but the games roll their shop scrolls BY HAND -
+## keyless - so remember() wrote nothing and every buy jumped the list
+## back to the top (the owner, again: "it is still as it is").
+## Law: a keyless BoxScroll entering the tree ADOPTS the offset of a
+## dying keyless BoxScroll in the same overlay scope (when exactly one is
+## dying - two at once means nested lists, not my case). The rebuild of
+## the same list continues at the same place: zero per-game keys, and the
+## restore rides the PENDING machinery so it lands before the first draw
+## (no top flash, no clamp-to-0).
+func _ready() -> void:
+        _adopt_dying_sibling()
+
+func _adopt_dying_sibling() -> void:
+        if preserve_key != "":
+                return
+        var scope := _overlay_scope()
+        if scope == null:
+                return
+        var found: Array = []
+        _collect_dying_keyless(scope, found)
+        if found.size() != 1:
+                return
+        var other := found[0] as BoxScroll
+        var v := other.scroll_vertical
+        var h := other.scroll_horizontal
+        if v <= 0 and h <= 0:
+                return                      # the dead list never moved
+        _pending_v = v
+        _pending_h = h
+        _apply_pending()
+
+## the topmost Control ancestor whose parent is not a Control - the one
+## scope every sheet/overlay of this screen lives under (same walk the
+## topmost law uses)
+func _overlay_scope() -> Control:
+        var scope: Control = self
+        var parent := scope.get_parent()
+        while parent is Control:
+                scope = parent
+                parent = scope.get_parent()
+        return scope if parent != null else null
+
+func _collect_dying_keyless(n: Node, out: Array) -> void:
+        for c in n.get_children():
+                if c == self or not is_instance_valid(c):
+                        continue
+                if c is BoxScroll and (c as BoxScroll).preserve_key == "" \
+                                and _is_dying(c):
+                        out.append(c)
+                _collect_dying_keyless(c, out)
+
+## a scroll is dying when IT or any ancestor carries the deletion mark
+## (the sheet teardown queues the sheet - the scroll inside dies with it)
+func _is_dying(n: Node) -> bool:
+        var cur := n
+        while cur != null:
+                if cur.is_queued_for_deletion():
+                        return true
+                cur = cur.get_parent()
+        return false
+
 ## While a sheet/overlay covers this scroll, ALL input processing here is
 ## suspended so the overlay's controls (sliders, buttons) work normally.
 var input_locked := false

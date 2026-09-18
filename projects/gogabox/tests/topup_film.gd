@@ -4,7 +4,7 @@ extends Node
 ## owner has to see it.
 
 var menu: Node2D
-var shot_dir := "/home/z/my-project/gogabox/films/v040-8topup"
+var shot_dir := "/tmp/topup_film"
 
 func _wait(t: float) -> void:
         await get_tree().create_timer(t, true).timeout
@@ -59,6 +59,13 @@ func _run() -> void:
         menu.call("_topup_confirm", "rockbreaker", 100)
         await _wait(0.5)
         await _shot("06_confirm")
+
+        # v040-12 THE CANCEL ROUND TRIP: CANCEL walks back to a rebuilt
+        # exchange WITH the typed amount in the FIELD too (the old bug:
+        # the preview kept the number, the field read 0)
+        menu.call("_open_topup_game", "rockbreaker", 100)
+        await _wait(0.5)
+        await _shot("06b_cancel_roundtrip")
 
         # settle for real: the wallets move
         menu.call("_topup_settle", "rockbreaker", 100, 500)
