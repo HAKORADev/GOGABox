@@ -1,0 +1,38 @@
+{
+	"features": {
+		"highscores": 1,
+		"credits": 0,
+		"leaderboard": 0,
+		"multiplayer": 0,
+		"rewarded": 0,
+		"standalone": 1,
+		"multiplayer_local": 1,
+		"audio": 1
+	},
+	"game_i18n": {
+		"default": {
+			"txt_produced_and_published": "Produced and published by",
+			"txt_developed": "Developed by"
+		},
+		"ru": {
+			"txt_produced_and_published": "Продюсирование и публикация",
+			"txt_developed": "Разработка"
+		}
+	},
+	"aid": "A1234-5",
+	"logging": true,
+	"api": "famobi",
+	"name": "Google GameSnacks",
+	"more_games_url": "",
+	"more_games_button_image": "logo",
+	"show_splash": false,
+	"splash_duration": 9999,
+	"branch": "offline",
+	"gameParams": {
+		"ad_type": "off"
+	},
+	"menuless": true,
+	"disable_console": false,
+	"version": "5c540970",
+	"supportedLanguages": []
+}

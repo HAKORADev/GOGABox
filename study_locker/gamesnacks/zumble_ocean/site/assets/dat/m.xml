@@ -1,0 +1,667 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<stringresources>
+	<languages>
+		<language>en</language>
+		<language>sk</language>
+		<language>es</language>
+		<language>cz</language>
+		<language>de</language>
+		<language>it</language>
+		<language>fr</language>
+		<language>ru</language>
+		<language>pt</language>
+		<language>tr</language>
+	</languages>
+	<strings>
+		<string id="1" index="0">
+			<en>en</en>
+			<sk>sk</sk>
+			<es>es</es>
+			<cz>cz</cz>
+			<de>de</de>
+			<it>it</it>
+			<fr>fr</fr>
+			<ru>ru</ru>
+			<pt>pt</pt>
+			<tr>tr</tr>
+		</string>
+		<string id="2" index="1">
+			<en>EXIT?</en>
+			<sk>KONIEC?</sk>
+			<es>¿FINAL?</es>			
+			<de>ENDE?</de>
+			<it>FINE?</it>
+			<fr>QUITTER?</fr>
+			<ru>ВЫХОД?</ru>
+			<pt>FECHAR?</pt>
+		</string>
+		<string id="3" index="2">
+			<en>ENABLE MUSIC?</en>
+			<sk>ZAPNÚŤ HUDBU?</sk>
+			<es>¿ACTIVAR MÚSICA?</es>			
+			<de>MUSIK AKTIVIEREN?</de>
+			<it>ABILITARE MUSICA?</it>
+			<fr>ACTIVER LA MUSIQUE?</fr>
+			<ru>ВКЛЮЧИТЬ МУЗЫКУ?</ru>
+			<pt>LIGAR MÚSICA?</pt>			
+		</string>
+		<string id="4" index="3">
+			<en>YES</en>
+			<sk>ÁNO</sk>
+			<es>SÍ</es>			
+			<de>JA</de>
+			<it>SÌ</it>
+			<fr>OUI</fr>
+			<ru>ДА</ru>
+			<pt>SIM</pt>	
+		</string>
+		<string id="5" index="4">
+			<en>NO</en>
+			<sk>NIE</sk>
+			<es>NO</es>			
+			<de>NEIN</de>
+			<it>NO</it>
+			<fr>NON</fr>
+			<ru>Нет</ru>
+			<pt>NÃO</pt>			
+		</string>
+		<string id="6" index="5">
+			<en>PLAY</en>			
+			<es>JUGAR</es>			
+			<de>SPIELEN</de>
+			<it>GIOCA</it>
+			<fr>JOUER</fr>			
+			<pt>JOGAR</pt>			
+		</string>
+		<string id="7" index="6">
+			<en>SETTINGS</en>			
+			<es>AJUSTES</es>			
+			<de>EINSTELLUNGEN</de>
+			<it>IMPOSTAZIONI</it>
+			<fr>PARAMÈTRES</fr>			
+			<pt>DEFINIÇÕES</pt>			
+		</string>
+		<string id="INSTRUCTIONS" index="7">
+			<en>INSTRUCTIONS</en>			
+			<es>INSTRUCCIONES</es>			
+			<de>ANWEISUNGEN</de>
+			<it>ISTRUZIONI</it>
+			<fr>INSTRUCTIONS</fr>			
+			<pt>INSTRUÇÕES</pt>			
+		</string>
+		<string id="9" index="8">
+			<en>ABOUT</en>			
+			<es>INFORMACIÓN</es>			
+			<de>INFO</de>
+			<it>INFO</it>
+			<fr>À PROPOS</fr>			
+			<pt>ACERCA DE</pt>			
+		</string>
+		<string id="10" index="9">
+			<en>MORE GAMES</en>			
+			<es>MÁS JUEGOS</es>			
+			<de>WEITERE SPIELE</de>
+			<it>ALTRI GIOCHI</it>
+			<fr>PLUS DE JEUX</fr>			
+			<pt>MAIS JOGOS</pt>			
+		</string>
+		<string id="11" index="11">
+			<en>SOUND</en>			
+			<es>SONIDO</es>			
+			<de>TON</de>
+			<it>SONORO</it>
+			<fr>SON</fr>			
+			<pt>SOM</pt>			
+		</string>
+		<string id="14" index="14">
+			<en>RESET</en>			
+			<es>RESTABLECER</es>			
+			<de>ZURÜCKSETZEN</de>
+			<it>AZZERA</it>
+			<fr>RÉINITIALISER</fr>			
+			<pt>RETOMAR</pt>			
+		</string>
+		<string id="15" index="15">
+			<en>QUIT TO MENU</en>			
+			<es>SALIR AL MENÚ</es>			
+			<de>ZUM MENÜ</de>
+			<it>ESCI AL MENU</it>
+			<fr>RETOUR AU MENU</fr>			
+			<pt>SAIR PARA MENU</pt>			
+		</string>
+		<string id="16" index="16">
+			<en>QUIT TO MENU?\nYOUR CURRENT GAME PROGRESS WILL BE LOST.</en>			
+			<es>¿SALIR AL MENÚ?\nSE PERDERÁ EL PROGRESO ACTUAL.</es>			
+			<de>ZUM MENÜ?\nDEIN AKTUELLER SPIELFORTSCHRITT WIRD GELÖSCHT.</de>
+			<it>ESCI AL MENU?\nI TUOI PROGRESSI DI GIOCO ATTUALI ANDRANNO PERDUTI.</it>
+			<fr>RETOUR AU MENU?\nVOTRE PROGRESSION ACTUELLE DANS LE JEU SERA PERDUE.</fr>			
+			<pt>SAIR PARA MENU?\nA TUA ACTUAL EVOLUÇÃO DO JOGO SERÁ PERDIDA!</pt>			
+		</string>
+		<string id="LEVEL" index="17">
+			<en>LEVEL</en>			
+			<es>NIVEL</es>			
+			<de>LEVEL</de>
+			<it>LIVELLO</it>
+			<fr>NIVEAU</fr>			
+			<pt>NÍVEL</pt>			
+		</string>
+		<string id="18" index="18">
+			<en>ON</en>			
+			<es>SÍ</es>			
+			<de>EIN</de>
+			<it>ON</it>
+			<fr>OUI</fr>			
+			<pt>LIG.</pt>			
+		</string>
+		<string id="19" index="19">
+			<en>OFF</en>			
+			<es>NO</es>			
+			<de>AUS</de>
+			<it>OFF</it>
+			<fr>NON</fr>			
+			<pt>DESL.</pt>			
+		</string>
+		<string id="20" index="20">
+			<en>VERSION</en>
+			<es>VERSIÓN</es>			
+			<de>VERSION</de>
+			<it>VERSIONE</it>
+			<fr>VERSION</fr>			
+			<pt>VERSÃO</pt>			
+		</string>
+		<string id="EASY" index="23">
+			<en>EASY</en>			
+			<es>FÁCIL</es>			
+			<de>LEICHT</de>
+			<it>FACILE</it>
+			<fr>FACILE</fr>			
+			<pt>FÁCIL</pt>			
+		</string>
+		<string id="MEDIUM" index="24">
+			<en>MEDIUM</en>			
+			<es>MEDIO</es>			
+			<de>MITTEL</de>
+			<it>NORMALE</it>
+			<fr>MOYEN</fr>			
+			<pt>MÉDIO</pt>			
+		</string>
+		<string id="HARD" index="25">
+			<en>HARD</en>			
+			<es>DIFÍCIL</es>
+			<de>SCHWER</de>
+			<it>DIFFICILE</it>
+			<fr>DIFFICILE</fr>			
+			<pt>DIFÍCIL</pt>			
+		</string>
+		<string id="33" index="26">
+			<en>TUTORIAL</en>			
+			<es>TUTORIAL</es>			
+			<de>TUTORIAL</de>
+			<it>TUTORIAL</it>
+			<fr>TUTORIEL</fr>			
+			<pt>TUTORIAL</pt>			
+		</string>
+		<string id="MATCHES" index="28">
+			<en>MATCHES</en>			
+			<es>PAREJAS</es>			
+			<de>PAARE</de>
+			<it>ABBINAMENTI</it>
+			<fr>CONNEXIONS</fr>			
+			<pt>CORRESPONDÊNCIAS</pt>			
+		</string>
+		<string id="TIME" index="30">
+			<en>TIME</en>			
+			<es>TIEMPO</es>			
+			<de>ZEIT</de>
+			<it>TEMPO</it>
+			<fr>TEMPS</fr>			
+			<pt>TEMPO</pt>			
+		</string>
+		<string id="42" index="31">
+			<en>TOTAL:</en>			
+			<es>TOTAL:</es>			
+			<de>GESAMT:</de>
+			<it>TOTALE:</it>
+			<fr>TOTAL:</fr>			
+			<pt>TOTAL:</pt>			
+		</string>
+		<string id="43" index="32">
+			<en>NEW RECORD!</en>			
+			<es>¡NUEVO RÉCORD!</es>			
+			<de>NEUER REKORD!</de>
+			<it>NUOVO RECORD!</it>
+			<fr>NOUVEAU RECORD!</fr>			
+			<pt>NOVO RECORDE!</pt>			
+		</string>
+		<string id="44" index="33">
+			<en>RECORD:</en>			
+			<es>RÉCORD:</es>			
+			<de>REKORD:</de>
+			<it>RECORD:</it>
+			<fr>RECORD:</fr>			
+			<pt>RECORDE:</pt>			
+		</string>
+		<string id="117" index="68">
+			<en>NICELY DONE!</en>
+			<es>¡BIEN HECHO!</es>
+			<de>GUT GEMACHT!</de>
+			<it>OTTIMO LAVORO!</it>
+			<fr>BIEN JOUÉ!</fr>
+			<pt>MUITO BEM!</pt>
+		</string>
+		<string id="118" index="69">
+			<en>EXCELLENT!</en>
+			<es>¡EXCELENTE!</es>
+			<de>AUSGEZEICHNET!</de>
+			<it>ECCELLENTE!</it>
+			<fr>EXCELLENT!</fr>
+			<pt>EXCELENTE!</pt>
+		</string>
+		<string id="119" index="70">
+			<en>WELL DONE!</en>
+			<es>¡MUY BIEN!</es>
+			<de>SEHR GUT!</de>
+			<it>BEN FATTO!</it>
+			<fr>INCROYABLE!</fr>
+			<pt>BOA!</pt>
+		</string>
+		<string id="120" index="71">
+			<en>CONGRATULATIONS!</en>
+			<es>¡ENHORABUENA!</es>
+			<de>GLÜCKWUNSCH!</de>
+			<it>COMPLIMENTI!</it>
+			<fr>FÉLICITATIONS!</fr>
+			<pt>PARABÉNS!</pt>
+		</string>
+		<string id="121" index="72">
+			<en>HURRAY!</en>
+			<es>¡ESTUPENDO!</es>
+			<de>HURRAH!</de>
+			<it>EVVIVA!</it>
+			<fr>HOURRA!</fr>
+			<pt>URRA!</pt>
+		</string>
+		<string id="COMBO1_TEXT" index="73">
+			<en>EXCEPTIONAL!</en>
+			<es>¡EXCEPCIONAL!</es>
+			<de>EINZIGARTIG!</de>
+			<it>ECCEZIONALE!</it>
+			<fr>EXCEPTIONNEL!</fr>
+			<pt>EXCEPCIONAL!</pt>
+		</string>
+		<string id="COMBO2_TEXT" index="74">
+			<en>TOP NOTCH!</en>
+			<es>¡SUBLIME!</es>
+			<de>SPITZE!</de>
+			<it>FUORICLASSE!</it>
+			<fr>MERVEILLEUX!</fr>
+			<pt>TOP!</pt>
+		</string>
+		<string id="COMBO3_TEXT" index="75">
+			<en>BRAVO!</en>
+			<es>¡BRAVO!</es>
+			<de>BRAVO!</de>
+			<it>BRAVO!</it>
+			<fr>BRAVO!</fr>
+			<pt>BRAVO!</pt>
+		</string>
+		<string id="COMBO4_TEXT" index="76">
+			<en>STUNNING!</en>
+			<es>¡INCREÍBLE!</es>
+			<de>WAHNSINN!</de>
+			<it>SPETTACOLARE!</it>
+			<fr>SUPERBE!</fr>
+			<pt>BRILHANTE!</pt>
+		</string>
+		<string id="COMBO5_TEXT" index="77">
+			<en>GENIUS!</en>
+			<es>¡GENIAL!</es>
+			<de>GENIAL!</de>
+			<it>GENIO!</it>
+			<fr>QUEL GÉNIE!</fr>
+			<pt>GENIAL!</pt>
+		</string>
+		<string id="127" index="79">
+			<en>COMBO</en>
+			<es>COMBO</es>
+			<de>KOMBINATION</de>
+			<it>COMBO</it>
+			<fr>COMBO</fr>
+			<pt>COMBINAÇÃO</pt>
+		</string>
+		<string id="130" index="83">
+			<en>MENU</en>
+			<es>MENÚ</es>			
+			<de>MENÜ</de>
+			<it>MENU</it>
+			<fr>MENU</fr>			
+			<pt>MENU</pt>			
+		</string>
+		<string id="131" index="84">
+			<en>BACK</en>
+			<es>ATRÁS</es>			
+			<de>ZURÜCK</de>
+			<it>INDIETRO</it>
+			<fr>RETOUR</fr>			
+			<pt>VOLTAR</pt>			
+		</string>
+		<string id="132" index="85">
+			<en>CONTINUE</en>
+			<es>CONTINUAR</es>			
+			<de>WEITER</de>
+			<it>CONTINUARE</it>
+			<fr>CONTINUER</fr>			
+			<pt>CONTINUAR</pt>			
+		</string>
+		<string id="133" index="86">
+			<en>CONTINUE?</en>
+			<es>¿CONTINUAR?</es>			
+			<de>WEITER?</de>
+			<it>CONTINUARE?</it>
+			<fr>CONTINUER?</fr>
+			<pt>CONTINUAR?</pt>			
+		</string>
+		<string id="134" index="87">
+			<en>RESET?</en>
+			<es>¿RESTABLECER?</es>			
+			<de>ZURÜCKSETZEN?</de>
+			<it>AZZERARE?</it>
+			<fr>RÉINITIALISER?</fr>			
+			<pt>RETOMAR?</pt>			
+		</string>
+		<string id="135" index="88">
+			<en>RESTART</en>
+			<es>REINICIAR</es>			
+			<de>NEUSTART</de>
+			<it>RIAVVIA</it>
+			<fr>RECOMMENCER</fr>			
+			<pt>REINICIAR</pt>			
+		</string>
+		<string id="136" index="89">
+			<en>RESTART?</en>
+			<es>¿REINICIAR?</es>			
+			<de>NEUSTART?</de>
+			<it>RIAVVIARE?</it>
+			<fr>RECOMMENCER?</fr>			
+			<pt>REINICIAR?</pt>			
+		</string>
+
+		<string id="LEVEL_COMPLETED">
+			<en>Level\ncompleted</en>			
+			<es>Nivel\nCompletado</es>			
+			<de>Level\nAbgeschlossen</de>
+			<it>Livello\nCompletato</it>
+			<fr>Niveau\nTerminé</fr>			
+			<pt>Nível\nConcluído</pt>			
+		</string>
+		<string id="LEVEL_FAILED">
+			<en>Level\nfailed</en>			
+			<es>Nivel\nfallido</es>			
+			<de>Level nicht\ngeschafft</de>
+			<it>Livello\nfallito</it>
+			<fr>Niveau\néchoué</fr>			
+			<pt>Nível\nfracassado</pt>			
+		</string>
+        <string id="USE">
+            <en>Use</en>
+            <es>Usar</es>
+            <de>Verwenden</de>
+            <it>Usa</it>
+            <fr>Utiliser</fr>
+            <pt>Use</pt>
+            <ru>Исп.</ru>
+            <nl></nl>
+            <no></no>
+        </string>
+
+        <string id="USING">
+            <en>Using</en>
+            <es>En uso</es>
+            <de>Verwendet</de>
+            <it>In uso</it>
+            <fr>Utilisé</fr>
+            <pt>Usando</pt>
+            <ru>Исп.</ru>
+            <nl></nl>
+            <no></no>
+        </string>
+		<string id="PAUSE">
+			<en>Pause</en>
+			<es>Pausa</es>
+			<de>Pause</de>
+			<it>Pausa</it>
+			<fr>Pause</fr>
+			<pt>Pausar</pt>
+			<ru>Пауза</ru>
+		</string>
+		<string id="SUCCESS">
+			<en>Success!</en>
+			<es>¡Éxito!</es>
+			<de>Erfolg!</de>
+			<it>Successo</it>
+			<fr>Réussi</fr>
+			<pt>Sucesso</pt>
+			<ru>Успех!</ru>
+		</string>
+		<string id="FAILED">
+			<en>Failed</en>
+			<es>Fallido</es>
+			<de>Niederlage</de>
+			<it>Falliti</it>
+			<fr>Échoué</fr>
+			<pt>Falhou</pt>
+			<ru>Неудача</ru>
+		</string>
+        <string id="VOID">
+			<en></en>			
+			<es></es>			
+			<de></de>
+			<it></it>
+			<fr></fr>			
+			<pt></pt>			
+		</string>
+		<string id="INSTRUCTIONS_TEXT">
+			<en>Tap to shoot. Match 3 or more same-coloured gems to eliminate them. Destroy all gems in the chain before it hits the end. Tap the cannon to swap between the current and next gem. Use power-ups to clear the board faster.</en>
+			<de>Tippe zum Schießen. Kombiniere 3 oder mehr gleiche Edelsteine, um sie zu entfernen. Zerstöre alle Edelsteine in der Kette, bevor sie das Ende erreicht. Tippe auf die Kanone, um zwischen dem aktuellen und dem nächsten Edelstein umzuschalten. Verwende Power-ups, um das Spielfeld schneller zu leeren.</de>
+			<es>Toca para disparar. Combina 3 o más gemas del mismo color para que desaparezcan. Destruye todas las gemas de la cadena antes de que llegue al final. Toca en cañón para cambiar entre la gema actual y la siguiente. Usa potenciadores para despejar el tablero con más rapidez.</es>
+			<fr>Touchez pour tirer. Associez au moins 3 gemmes de même couleur pour les éliminer. Détruisez toutes les gemmes de la chaîne avant qu'elle n'atteigne la fin. Touchez le canon pour basculer entre la gemme actuelle et la suivante. Utilisez des bonus pour vider le plateau plus rapidement.</fr>
+			<it>Tocca per sparare. Abbina 3 o più gemme dello stesso colore per eliminarle. Distruggi tutte le gemme della catena prima che arrivi alla fine. Tocca il cannone per passare dalla gemma attuale a quella successiva. Usa i potenziamenti per eliminare le gemme più velocemente.</it>
+			<pt>Toque para atirar. Combine 3 ou mais gemas da mesma cor para eliminá-las. Destrua todas as gemas da corrente antes que ela chegue ao fim. Toque no canhão para trocar a gema atual e a próxima. Use power-ups para limpar o tabuleiro mais rápido.</pt>
+			<ru>Нажмите, чтобы выстрелить. Составляйте ряды из 3 или более драгоценных камней одного цвета, чтобы уничтожить их. Уничтожьте все драгоценные камни в цепочке до того, как она дойдет до конца. Нажмите на пушку, чтобы переключаться между текущим и следующим драгоценным камнем. Используйте бонусы, чтобы быстрее очистить доску.</ru>
+		</string>
+
+		<string id="BOOSTER_DESC_LASER">
+			<en>Clears all jewels in straight line</en>
+			<de>Entfernt alle Edelsteine in einer geraden Linie</de>
+			<es>Elimina todas las gemas en línea recta</es>
+			<fr>Retire tous les bijoux en lignes droites</fr>
+			<it>Elimina tutte le gemme in una fila dritta</it>
+			<pt>Limpa todas as gemas em linha reta</pt>
+			<ru>Удаляет все драгоценности по прямой</ru>
+		</string>
+
+		<string id="BOOSTER_DESC_BOMB">
+			<en>Clears all jewels in circular radius</en>
+			<de>Entfernt alle Edelsteine in einem Kreis</de>
+			<es>Elimina todas las gemas en un radio.</es>
+			<fr>Retire tous les bijoux en cercles</fr>
+			<it>Elimina tutte le gemme in un raggio circolare</it>
+			<pt>Limpa todas as gemas em raio circular</pt>
+			<ru>Удаляет все драгоценности в круговом радиусе</ru>
+		</string>
+
+		<string id="BOOSTER_DESC_DESTROYER">
+			<en>Destroys single jewel on impact</en>
+			<de>Zerstört beim Auftreffen einen Edelstein</de>
+			<es>Destruye una sola gema al impactar.</es>
+			<fr>Détruit un seul bijou à l'impact</fr>
+			<it>Distrugge una singola gemma all'impatto</it>
+			<pt>Destrói uma única gema no impacto</pt>
+			<ru>Уничтожает отдельный драгоценный камень</ru>
+		</string>
+
+		<string id="BOOSTER_DESC_RAINBOW">
+			<en>Destroys all same coloured jewels</en>
+			<de>Zerstört alle Edelsteine einer Farbe</de>
+			<es>Destruye todas las gemas del mismo color</es>
+			<fr>Détruit tous les bijoux de même couleur</fr>
+			<it>Distrugge tutte le gemme dello stesso colore</it>
+			<pt>Destrói todas as gemas da mesma cor</pt>
+			<ru>Уничтожает все драгоценности одного цвета</ru>
+		</string>
+
+		<string id="TASK_DESTROY_GEMS">
+			<en>Destroy all jewels in the chain</en>
+			<de>Zerstöre alle Edelsteine in der Kette</de>
+			<es>Destruye todas las gemas de la cadena.</es>
+			<fr>Détruit tous les bijoux de la chaîne</fr>
+			<it>Distrugge tutte le gemme della catena</it>
+			<pt>Destrua todas as gemas da corrente</pt>
+			<ru>Уничтожьте все драгоценности в цепочке</ru>
+		</string>
+
+		<string id="TASK_REACH_SCORE_X">
+			<en>Get [X] score</en>
+			<de>Erziele [X] Punkte</de>
+			<es>Obtén [X] puntos</es>
+			<fr>Marquez [X] points</fr>
+			<it>Ottieni [X] punti</it>
+			<pt>Obtenha [X] pontos</pt>
+			<ru>Набрать [X] очков</ru>
+		</string>
+
+		<string id="TASK_MORE_THAN_X_COMBOS">
+			<en>More than [X] combos</en>
+			<de>Mehr als [X] Kombos</de>
+			<es>Más de [X] combos</es>
+			<fr>Plus de [X] combos</fr>
+			<it>Più di [X] combo</it>
+			<pt>Mais de [X] combos</pt>
+			<ru>Более [X] комбинаций</ru>
+		</string>
+
+		<string id="TASK_REACH_COMBO_X">
+			<en>Reach combo x[X]</en>
+			<de>Erziele eine x[X]-Kombo</de>
+			<es>Consigue un combo x[X]</es>
+			<fr>Atteignez le combo x[X]</fr>
+			<it>Raggiungi la combo x[X]</it>
+			<pt>Alcance um combo x[X]</pt>
+			<ru>Достичь комбо x[X]</ru>
+		</string>
+
+		<string id="TUTORIAL1">
+			<en>Tap to match</en>
+			<de>Tippe, um zu kombinieren</de>
+			<es>Toca para combinar</es>
+			<fr>Touchez pour combiner</fr>
+			<it>Tocca per abbinare</it>
+			<pt>Toque para corresponder</pt>
+			<ru>Нажмите, чтобы соединить</ru>
+		</string>
+
+		<string id="TUTORIAL2">
+			<en>Tap to change color</en>
+			<de>Tippe, um Farbe zu wechseln</de>
+			<es>Toca para cambiar de color</es>
+			<fr>Touchez pour changer de couleur</fr>
+			<it>Tocca per cambiare colore</it>
+			<pt>Toque para alterar a cor</pt>
+			<ru>Нажмите, чтобы изменить цвет</ru>
+		</string>
+
+		<string id="TUTORIAL3">
+			<en>Tap to use</en>
+			<de>Tippe, um zu verwenden</de>
+			<es>Toca para usar</es>
+			<fr>Touchez pour utiliser</fr>
+			<it>Tocca per utilizzare</it>
+			<pt>Toque para usar</pt>
+			<ru>Нажмите, чтобы использовать</ru>
+		</string>
+
+
+		<string id="BOOSTER_SLOW">
+			<en>Slow</en>
+			<de>Langsamer</de>
+			<es>Frenar</es>
+			<fr>Ralentir</fr>
+			<it>Rallenta</it>
+			<pt>Desacelere</pt>
+			<ru>Замедление</ru>
+		</string>
+
+		<string id="BOOSTER_REVERSE">
+			<en>Reverse</en>
+			<de>Rückwärts</de>
+			<es>Marcha atrás</es>
+			<fr>Inversé</fr>
+			<it>Rovescio</it>
+			<pt>Reverter</pt>
+			<ru>Реверс</ru>
+		</string>
+
+		<string id="BOOSTER_PAUSE">
+			<en>Pause</en>
+			<de>Pause</de>
+			<es>Pausa</es>
+			<fr>Pause</fr>
+			<it>Pausa</it>
+			<pt>Pausar</pt>
+			<ru>Пауза</ru>
+		</string>
+
+		<string id="WELL_DONE">
+			<en>Well done!</en>
+			<de>Sehr gut!</de>
+			<es>¡Bien hecho!</es>
+			<it>Trés bien joué!</it>
+			<fr>Ben fatto!</fr>
+			<pt>Boa!</pt>
+			<ru>ОТЛИЧНО СРАБОТАНО!</ru>
+		</string>
+
+		<string id="REWARD">
+			<en>Reward</en>
+			<de>Belohnung</de>
+			<es>Recompensa</es>
+			<it>Récompense</it>
+			<fr>Ricompensa</fr>
+			<pt>Recompensa</pt>
+			<ru>Вознаграждение</ru>
+		</string>
+
+		<string id="INSTR_TUT1">
+			<en>Tap to shoot marbles.\n\nMatch 3 or more same-colored marbles to eliminate them.</en>
+			<de></de>
+			<es></es>
+			<it></it>
+			<fr></fr>
+			<pt></pt>
+			<ru></ru>
+		</string>
+
+		<string id="INSTR_TUT2">
+			<en>Tap the frog to swap between the current and next marble.\n\nUse power-ups to clear the board faster.</en>
+			<de></de>
+			<es></es>
+			<it></it>
+			<fr></fr>
+			<pt></pt>
+			<ru></ru>
+		</string>
+
+		<string id="INSTR_TUT3">
+			<en>Destroy all marbles in the chain before it hits the end.</en>
+			<de></de>
+			<es></es>
+			<it></it>
+			<fr></fr>
+			<pt></pt>
+			<ru></ru>
+		</string>
+
+	</strings>
+
+
+</stringresources>
