@@ -312,23 +312,22 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 27,
-                "27 playable games (deadly worm joined, v040-9)")
+        var ok := _check(GameReg.playable().size() == 28,
+                "28 playable games (marble popper joined, v040-13)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
         # feed sorts by this file's order; the newest game walks last)
-        ok += _check(GameReg.workshop().size() == 2,
-                "2 workshop teasers (zuma / gold miner - death worm "
-                + "graduated as DEADLY WORM, v040-9)")
+        ok += _check(GameReg.workshop().size() == 1,
+                "1 workshop teaser (gold miner - zuma graduated as MARBLE POPPER, v040-13)")
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
         ok += _check(ids[ids.size() - 1] == "goldminer"
                         and ids.find("rockbreaker") == ids.size() - 4
                         and ids.find("deathworm") == ids.size() - 3
-                        and ids.find("zuma") == ids.size() - 2,
-                "deadly worm walks last of the playable, teasers after it")
+                        and ids.find("marble") == ids.size() - 2,
+                "marble popper walks last of the playable, the teaser after it")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -340,9 +339,10 @@ func _t_registry() -> int:
         # v040-7: CRAZE CAVES graduated as ROCK BREAKER - three teasers left
         ok += _check(GameReg.get_game("crazecaves").is_empty()
                         and String(GameReg.get_game("rockbreaker")["title"]) == "Rock Breaker"
-                        and String(GameReg.get_game("zuma")["title"]) == "ZUMA"
+                        and GameReg.get_game("zuma").is_empty()
+                        and String(GameReg.get_game("marble")["title"]) == "MARBLE POPPER"
                         and String(GameReg.get_game("goldminer")["title"]) == "GOLD MINER",
-                "the SOON teasers wear their shelf names; craze caves is ROCK BREAKER (v040-7)")
+                "the SOON teasers wear their shelf names; zuma graduated as MARBLE POPPER (v040-13)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -2374,9 +2374,9 @@ func _t_feed_order() -> int:
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
         # v0.4.0-1 THE SOON SHELF IS BACK: the four next names parked
         # again (the owner's v040 report catch)
-        ok += _check(GameReg.workshop().size() == 2,
-                "the workshop wears the two soon teasers again "
-                + "(death worm graduated as DEADLY WORM v040-9)")
+        ok += _check(GameReg.workshop().size() == 1,
+                "the workshop wears the last soon teaser "
+                + "(zuma graduated as MARBLE POPPER v040-13)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2385,10 +2385,10 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                # v040-9: zuma leads the shelf (FUTURE_GAMES.md file order
-                # after death worm's graduation as DEADLY WORM)
-                ok += _check(String(ids[soon_first_at]) == "zuma",
-                        "the SOON block wears zuma first (%s)" % [ids.slice(soon_first_at)])
+                # v040-13: goldminer leads the shelf (zuma graduated as
+                # MARBLE POPPER)
+                ok += _check(String(ids[soon_first_at]) == "goldminer",
+                        "the SOON block wears goldminer first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:

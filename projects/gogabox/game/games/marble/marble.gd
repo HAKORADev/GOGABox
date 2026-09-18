@@ -55,6 +55,7 @@ var twin_a := Vector2.ZERO
 var twin_b := Vector2.ZERO
 var twin_active := 0
 var twin_fading := false
+var pads: Array = []               # the twin spot rings (the pad law)
 var slider := false
 var shots: Array = []              # {pos, vel, c, spr, rainbow}
 
@@ -255,6 +256,8 @@ func _clear_world() -> void:
         for c in chains:
                 c.dispose()
         chains.clear()
+        holes.clear()
+        pads.clear()
         shots.clear()
         if world != null and is_instance_valid(world):
                 world.queue_free()
@@ -385,6 +388,16 @@ func _build_shooter() -> void:
         world.add_child(shooter)
         aim = Vector2(0, -1)
         shooter_head.rotation = aim.angle() + PI / 2
+        # THE TWIN PAD LAW: both legal spots wear visible pads - the idle one
+        # pulses so the player knows the tap-to-swap is there
+        if not twin_a.is_zero_approx():
+                for spot in [twin_a, twin_b]:
+                        var pad := PadRing.new()
+                        pad.position = spot
+                        pad.z_index = 6
+                        world.add_child(pad)
+                        pads.append(pad)
+                _paint_pads()
 
 func _refresh_shooter_marbles() -> void:
         shooter_head.texture = _t("shooter_%s.png" % _player_skin())
@@ -541,10 +554,11 @@ func _skin_row(cat: String, item: Dictionary, apply_cb: Callable) -> Control:
                         Jukebox.sfx("mb_click", -6.0)
                         apply_cb.call()
                         _shop_refresh())
+        # the buy row: the NAME rides the button, the coin price sits beside it
+        var price := int(item["price"])
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 8)
-        var price := int(item["price"])
-        row.add_child(Arc.coin_button(str(price), Vector2(420, 60), 22, Arc.ACCENT, func():
+        var buy := Arc.button(String(item["name"]), Vector2(0, 60), 20, Arc.ACCENT, func():
                 if Box.spend(price):
                         Box.buy_item(game_id, cat, String(item["id"]), price)
                         Jukebox.sfx("mb_coin", -4.0)
@@ -552,8 +566,24 @@ func _skin_row(cat: String, item: Dictionary, apply_cb: Callable) -> Control:
                         _shop_refresh()
                 else:
                         Jukebox.sfx("mb_deny", -6.0)
-                        game_toast("NOT ENOUGH GOGACOINS")))
+                        game_toast("NOT ENOUGH GOGACOINS"))
+        buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        row.add_child(buy)
+        row.add_child(_coin_price(str(price)))
         return row
+
+func _coin_price(txt: String) -> Control:
+        var h := HBoxContainer.new()
+        h.add_theme_constant_override("separation", 5)
+        var ic := TextureRect.new()
+        ic.texture = load("res://assets/ui/coin.png")
+        ic.custom_minimum_size = Vector2(30, 30)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        h.add_child(ic)
+        h.add_child(Arc.label(txt, 22, Color(0.75, 0.5, 0.05)))
+        return h
 
 func _build_shop(vb: VBoxContainer) -> void:
         _shop_head(vb, "MARBLE POPPER SHOP")
@@ -662,8 +692,8 @@ func _place_card(pi: int, done_all: bool) -> Control:
         var name_row := HBoxContainer.new()
         name_row.add_theme_constant_override("separation", 6)
         vb.add_child(name_row)
-        name_row.add_child(Arc.label(String(place["name"]), 18, Arc.INK))
-        name_row.add_child(Arc.label("%d/10" % done_n, 16, Color(0.55, 0.4, 0.16)))
+        name_row.add_child(Arc.fit_label(String(place["name"]), 16, Arc.INK, 200))
+        name_row.add_child(Arc.label("%d/10" % done_n, 14, Color(0.55, 0.4, 0.16)))
         if not unlocked:
                 var lock := TextureRect.new()
                 lock.texture = load("res://assets/ui/icon_lock.png")
@@ -973,10 +1003,16 @@ func _twin_swap(target: Vector2) -> void:
         tw.tween_property(shooter, "modulate:a", 0.0, 0.22)
         tw.tween_callback(func():
                 shooter.position = target
-                twin_active = 1 - twin_active)
+                twin_active = 1 - twin_active
+                _paint_pads())
         tw.tween_property(shooter, "modulate:a", 1.0, 0.22)
         tw.tween_callback(func(): twin_fading = false)
         Jukebox.sfx("mb_swap", -8.0)
+
+func _paint_pads() -> void:
+        for i in pads.size():
+                if is_instance_valid(pads[i]):
+                        (pads[i] as PadRing).active = i == twin_active
 
 # ================================================================ TICK
 func _goga_tick(delta: float) -> void:
@@ -1081,39 +1117,40 @@ func _tick_chain(cp: ChainPath, delta: float) -> void:
                                 _spawn_one(cp, rear - MarbleData.CONTACT)
         # ---- the movement pass (front to back; the smooth-contact law)
         var n := cp.marbles.size()
-        var front_group_from := n - 1
-        while front_group_from > 0 and (cp.marbles[front_group_from]["d"]
-                        - cp.marbles[front_group_from - 1]["d"]) <= MarbleData.CONTACT:
-                front_group_from -= 1
-        # the whole front group rides ONE speed (its own front's position
-        # decides the slow zone) - no intra-group compression, so no fake joins
-        var group_mult := _slow_mult(cp.marbles[n - 1]["d"], cp)
-        for i in range(n - 1, -1, -1):
-                var m: Dictionary = cp.marbles[i]
-                var in_front := i >= front_group_from
-                var spd := cp.speed * (group_mult if in_front else 1.0) \
-                        * (1.0 if in_front else MarbleData.CATCH_UP)
-                m["d"] += spd * delta
-                if i < n - 1:
-                        var ahead: Dictionary = cp.marbles[i + 1]
-                        var target: float = ahead["d"] - MarbleData.CONTACT
-                        if m["d"] > target:
-                                m["d"] = lerpf(m["d"], target, minf(1.0, delta * 20.0))
-                        # THE BOND LAW: a pair carries a bonded state with
-                        # hysteresis; the false->true transition IS the join
-                        # event (first touch), immune to float noise
-                        var gap: float = ahead["d"] - m["d"]
-                        var prev: bool = m.get("bonded", true)
-                        var nb := prev
-                        if gap <= MarbleData.CONTACT * 1.001:
-                                nb = true
-                        elif gap > MarbleData.CONTACT * 1.05:
-                                nb = false
-                        if nb and not prev:
-                                _on_join(cp, i)
-                        m["bonded"] = nb
-                else:
-                        m["bonded"] = true
+        if n > 0:
+                var front_group_from := n - 1
+                while front_group_from > 0 and (cp.marbles[front_group_from]["d"]
+                                - cp.marbles[front_group_from - 1]["d"]) <= MarbleData.CONTACT:
+                        front_group_from -= 1
+                # the whole front group rides ONE speed (its own front's position
+                # decides the slow zone) - no intra-group compression, no fake joins
+                var group_mult := _slow_mult(cp.marbles[n - 1]["d"], cp)
+                for i in range(n - 1, -1, -1):
+                        var m: Dictionary = cp.marbles[i]
+                        var in_front := i >= front_group_from
+                        var spd := cp.speed * (group_mult if in_front else 1.0) \
+                                * (1.0 if in_front else MarbleData.CATCH_UP)
+                        m["d"] += spd * delta
+                        if i < n - 1:
+                                var ahead: Dictionary = cp.marbles[i + 1]
+                                var target: float = ahead["d"] - MarbleData.CONTACT
+                                if m["d"] > target:
+                                        m["d"] = lerpf(m["d"], target, minf(1.0, delta * 20.0))
+                                # THE BOND LAW: a pair carries a bonded state with
+                                # hysteresis; the false->true transition IS the join
+                                # event (first touch), immune to float noise
+                                var gap: float = ahead["d"] - m["d"]
+                                var prev: bool = m.get("bonded", true)
+                                var nb := prev
+                                if gap <= MarbleData.CONTACT * 1.001:
+                                        nb = true
+                                elif gap > MarbleData.CONTACT * 1.05:
+                                        nb = false
+                                if nb and not prev:
+                                        _on_join(cp, i)
+                                m["bonded"] = nb
+                        else:
+                                m["bonded"] = true
         # ---- the eat law
         if not cp.marbles.is_empty() and phase == "play":
                 var front: Dictionary = cp.marbles.back()
@@ -1675,6 +1712,29 @@ class ChainPath extends RefCounted:
 
         func dispose() -> void:
                 marbles.clear()
+
+# ================================================================ THE TWIN PAD
+class PadRing extends Node2D:
+        ## the twin-spot ring: solid under the ACTIVE totem, pulsing at the
+        ## idle spot (the tap-there invitation)
+        var active := false
+        var _t := 0.0
+
+        func _process(delta: float) -> void:
+                _t += delta
+                queue_redraw()
+
+        func _draw() -> void:
+                var glow := Color(0.95, 0.85, 0.55, 0.9)
+                if active:
+                        draw_circle(Vector2.ZERO, 78.0, Color(0.2, 0.14, 0.08, 0.55))
+                        draw_arc(Vector2.ZERO, 78.0, 0.0, TAU, 32, glow, 6.0)
+                else:
+                        var pulse := 1.0 + sin(_t * 4.0) * 0.08
+                        draw_arc(Vector2.ZERO, 74.0 * pulse, 0.0, TAU, 32,
+                                Color(glow, 0.55), 5.0)
+                        draw_arc(Vector2.ZERO, 46.0 * pulse, 0.0, TAU, 24,
+                                Color(glow, 0.3), 3.0)
 
 # ================================================================ THE TRACK PAINT
 class TrackDraw extends Node2D:
