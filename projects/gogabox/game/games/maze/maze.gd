@@ -582,6 +582,25 @@ func _cell_path_dist(cell: Vector2i) -> int:
 func _goga_input(event: InputEvent) -> void:
         if sheet_open_count() > 0:
                 return
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                # THE PC LAW (the windows return): the ARROW keys walk - one
+                # press, one queued step (the swipe law); SPACE starts the run
+                if event.is_action_pressed("ui_left"):
+                        _swipe_dir(Vector2i(-1, 0))
+                elif event.is_action_pressed("ui_right"):
+                        _swipe_dir(Vector2i(1, 0))
+                elif event.is_action_pressed("ui_up"):
+                        _swipe_dir(Vector2i(0, -1))
+                elif event.is_action_pressed("ui_down"):
+                        _swipe_dir(Vector2i(0, 1))
+                elif event.is_action_pressed("ui_accept") and phase == "ready":
+                        phase = "run"
+                        if ready_ui != null:
+                                ready_ui.queue_free()
+                                ready_ui = null
+                        Jukebox.sfx("m_start", -4.0)
+                return
         if event is InputEventScreenTouch and event.pressed:
                 if phase == "ready":
                         phase = "run"

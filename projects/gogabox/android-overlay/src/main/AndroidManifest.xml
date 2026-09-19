@@ -6,11 +6,9 @@
     android:installLocation="auto" >
 
     <!-- GOGABox overlay: the box rotates freely (fullSensor; games force their
-         own orientation at runtime via GameHost) + network + Unity Ads plugin
-         registration + local notification system (Notify plugin). -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+         own orientation at runtime via GameHost) + local notification system
+         (Notify plugin). THE 0-ADS LAW: no ad plugin, and the box is fully
+         offline - no INTERNET permission at all. -->
 
     <!-- local notifications (timed game reveals + return reminders) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -40,11 +38,6 @@
             android:shell="true"
             android:enabled="true"
             tools:targetApi="29" />
-
-        <!-- Unity Ads v1 plugin registration (value = GodotPlugin subclass) -->
-        <meta-data
-            android:name="org.godotengine.plugin.v1.UnityAds"
-            android:value="org.godotengine.plugin.unityads.UnityAdsPlugin" />
 
         <!-- Local notification plugin registration -->
         <meta-data

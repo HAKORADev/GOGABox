@@ -2149,6 +2149,18 @@ func _exit_tree() -> void:
 func _goga_input(event: InputEvent) -> void:
         if over:
                 return
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                # THE PC LAW (the windows return): the ARROW keys steer
+                if event.is_action_pressed("ui_left"):
+                        _swipe_dir(Vector2i(-1, 0))
+                elif event.is_action_pressed("ui_right"):
+                        _swipe_dir(Vector2i(1, 0))
+                elif event.is_action_pressed("ui_up"):
+                        _swipe_dir(Vector2i(0, -1))
+                elif event.is_action_pressed("ui_down"):
+                        _swipe_dir(Vector2i(0, 1))
+                return
         if event is InputEventScreenTouch and event.pressed:
                 # the gate also answers raw touches (the tap-anywhere law)
                 if phase == "boot":

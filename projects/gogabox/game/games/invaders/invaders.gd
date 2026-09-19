@@ -385,6 +385,7 @@ var move_anchor := Vector2.ZERO       # the dario walk law: first left-half touc
 var move_idx := -1                    # owns the analog move anchor
 var move_axis := 0.0                  # the tower law: the drag's analog -1..1
 var fire_idx := -1
+var _kb_fire := false   # THE PC LAW: the keyboard's own fire latch (v0.3.4-3)
 var firing := false
 var ship_v := Vector2.ZERO            # for the tail + bank
 var dodge_side := 0.0                 # THE DODGE LAW: the committed sidestep side
@@ -750,12 +751,15 @@ func _goga_input(event: InputEvent) -> void:
                                 if d.index == move_idx:
                                                 _set_axis(d.position.x - move_anchor.x)
 
-## the snowy-tower analog law: a dead zone, then a full axis at AXIS_FULL px
+## the snowy-tower analog law - NOW THE FIXED-SPEED LAW (v0.3.4-3, the
+## owner: "moving the finger faster meant make moving faster, you can fix
+## this by making the arrow button make the move in fixed proper speed"):
+## past the dead zone the ship steers at FULL speed, the drag distance
+## never scales it.
 func _set_axis(dx_px: float) -> void:
-                var a := 0.0
+                move_axis = 0.0
                 if absf(dx_px) > AXIS_DEAD:
-                                a = clampf((absf(dx_px) - AXIS_DEAD) / maxf(1.0, AXIS_FULL - AXIS_DEAD), 0.0, 1.0)
-                move_axis = signf(dx_px) * a
+                                move_axis = 1.0 if dx_px > 0.0 else -1.0
 
 func _press(pos: Vector2, idx := 0) -> void:
                 var vp := get_viewport_rect().size
@@ -776,6 +780,22 @@ func _press(pos: Vector2, idx := 0) -> void:
                                 fire_idx = idx
 
 func _goga_tick(delta: float) -> void:
+                # THE PC LAW (v0.3.4-3): LEFT/RIGHT arrows steer, SPACE holds
+                # the fire. The keyboard owns its own latch - a release only
+                # clears `firing` when IT lit it (the touch fire finger and
+                # the probes keep full ownership of their own state).
+                var kb := Input.get_axis("ui_left", "ui_right")
+                if kb != 0.0:
+                                move_axis = signf(kb)
+                var space: bool = Input.is_action_pressed("ui_accept")
+                if space and not _kb_fire:
+                                _kb_fire = true
+                elif not space and _kb_fire:
+                                _kb_fire = false
+                                if fire_idx == -1:
+                                                firing = false
+                if space:
+                                firing = true
                 _ship_tick(delta)
                 _tail_tick(delta)
                 _weapon_tick(delta)

@@ -5,8 +5,8 @@ extends Node2D
 ## it calls finish_run(...) (or the player pauses out via the host chrome).
 ##
 ## Games get for free: HUD top bar (back, score, coins), pause sheet, run-end
-## flow (coins → save → rewarded double → interstitial pacing → menu),
-## TouchKit wiring, achievement helpers, sfx helpers.
+## flow (coins → save → menu), TouchKit wiring, achievement helpers, sfx
+## helpers.
 
 signal request_finish(score: int, coins_earned: int)
 signal request_quit
@@ -298,11 +298,9 @@ func set_hud_score_prefix(prefix: String) -> void:
         if _score_label != null:
                 _score_label.text = _score_prefix + str(score)
 
-## v0.2.6 THE SHARED BANNER STRIP: the 52dp Unity banner is a NATIVE view
-## in REAL px (the menu.gd math) - every game that wears one (registry
-## "banner": true) reserves this much LOGICAL space at its bottom so the
-## strip has a real place to appear. Snake carried its own copy; this is
-## the one-true-helper now.
+## v0.2.6 (RETIRED, the 0-ADS LAW): this computed the 52dp Unity banner
+## strip's logical height. No banner exists anymore, but the helper stays
+## because the menu bottom-margin math and a few row offsets still call it.
 func banner_safe_px() -> float:
         var dpi := DisplayServer.screen_get_dpi()
         var win := DisplayServer.window_get_size()
@@ -313,12 +311,12 @@ func banner_safe_px() -> float:
         var phys := 52.0 * dpi / 160.0 + 12.0
         return maxf(64.0, ceilf(phys / maxf(0.05, px_per_logical)))
 
-## convenience: the reserved bottom inset for THIS game (0 when it does
-## not wear a banner)
+## THE 0-ADS LAW (the owner's open-source round): there is no ad banner
+## anymore - the 52dp strip is reclaimed by every game's own layout (this
+## used to reserve space for the Unity banner view). The helper stays so
+## the 25+ layout call sites read ONE truth.
 func banner_bottom() -> float:
-        if not bool(GameReg.get_game(game_id).get("banner", false)):
-                return 0.0
-        return banner_safe_px()
+        return 0.0
 
 ## Games with shops call this during _goga_setup() to get a HUD button.
 ## BUTTON SAFETY SYSTEM v0.0.8: buttons join the top bar BETWEEN the back

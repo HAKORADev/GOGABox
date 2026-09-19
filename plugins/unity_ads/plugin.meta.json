@@ -1,7 +1,0 @@
-{
-        "addon_dir": "unity_ads",
-        "android_sdk": "com.unity3d.ads:unity-ads:4.20.0",
-        "gradle_deps": ["com.unity3d.ads:unity-ads:4.20.0"],
-        "godot_plugin_version": 1,
-        "description": "Unity Ads bridge plugin (v1 GodotPlugin) - interstitial, rewarded, banner with rotation + retry ladder. Test ads are controlled from the Unity dashboard (per-device test mode was removed in v0.0.8). Java source staged into <project>/android/build/src/main/java; gradle deps injected into build.gradle."
-}

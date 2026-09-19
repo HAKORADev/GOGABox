@@ -4,7 +4,6 @@
 #   1. the pinned Godot android_source.zip (export templates)
 #   2. the project's android-overlay/  (manifest, gradle tweaks, icons)
 #   3. shared plugins/ (java source staged into the gradle source set)
-#   4. per-project config (ads_config.json)
 # Deterministic: wipes android/build every run. Fast (<5s, cached downloads).
 # Usage: .ci/materialize-project.sh <project-key>
 # ============================================================================
@@ -123,11 +122,6 @@ for plugin in $(gda_project '.use_plugins[]' "$KEY" 2>/dev/null); do
       gda_log "materialize[$KEY]: injected gradle dep: $dep"
     fi
   done
-  # per-project ads config injected into the addon (runtime reads res://addons/<dir>/ads_config.json)
-  CFG_REL="$(gda_project '.ads_config' "$KEY")"
-  if [ -n "$CFG_REL" ] && [ -f "$PROJ/$CFG_REL" ]; then
-    cp "$PROJ/$CFG_REL" "$PROJ/addons/$ADDON_DIR/ads_config.json"
-  fi
 done
 
 # ---------------------------------------------------------------- 4. gradle plumbing

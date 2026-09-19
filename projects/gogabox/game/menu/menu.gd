@@ -95,6 +95,9 @@ var _filter_state := ""          # "" = all | "favorites" | "mystery" (single-se
 # v0.3.4-4 THE SEARCH LAW: a real text search (a piece of the name finds
 # the game) - the owner's wish, kept in the android-only state.
 var _filter_text := ""
+# THE PLATFORM LAW (v0.3.4-3, the windows return): the os tag filters the
+# search sheet - "" = all | "android" | "pc"
+var _filter_os := ""
 
 func _ready() -> void:
         banner_safe = _banner_safe_px()
@@ -179,9 +182,10 @@ func _local_day() -> String:
         var d := Time.get_date_dict_from_system()
         return "%04d-%02d-%02d" % [int(d["year"]), int(d["month"]), int(d["day"])]
 
-## Called by main.gd when the splash fully faded out.
+## Called by main.gd when the splash fully faded out. THE 0-ADS LAW: the
+## old banner reveal is gone - the splash just hands over to the box.
 func on_splash_done() -> void:
-        Ads.banner_show()
+        pass
 
 ## Android BACK (routed from main.gd): close the top-most layer, or ask to
 ## leave the box. Never kills the app without a confirm.
@@ -263,6 +267,14 @@ func _apply_base() -> void:
                         return
                 want = ScaleRule.want_for(ws)
         var win := get_window()
+        # THE VERTICAL SLICE LAW (v0.3.4-3, the windows return): the box on
+        # PC is a PORTRAIT slice down the middle of the window, the sides
+        # wear the box brown - never the engine's black, never a stretched
+        # menu. Landscape keeps EXPAND.
+        if ScaleRule.is_pc() and want == ScaleRule.DESIGN_PORTRAIT:
+                ScaleRule.apply_vertical_slice(win, want)
+        elif ScaleRule.is_pc():
+                ScaleRule.apply_expand(win)
         if win.content_scale_size != want:
                 win.content_scale_size = want
         # v0.1.3: the banner margin follows the REAL stretch scale of THIS
@@ -933,6 +945,9 @@ func _passes_filters(g: Dictionary) -> bool:
                 return false
         if _filter_sub != "" and not (_filter_sub in (geo.get("sub", []) as Array)):
                 return false
+        # THE PLATFORM LAW: the os tag filters (every game wears one now)
+        if _filter_os != "" and not (_filter_os in (g.get("os", ["android", "pc"]) as Array)):
+                return false
         # THE SEARCH LAW: the name search - lowercase, spaces stripped, a
         # SUBSTRING of title+id. "slash" finds FRUIT SLASHER; "inv" finds
         # SPACE INVADERS. Case never matters.
@@ -1363,6 +1378,8 @@ func _open_search() -> void:
         v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(v)
 
+        v.add_child(_chip_row(scroll, "PLATFORM", ["android", "pc"],
+                        func(id: String): _filter_os = "" if _filter_os == id else id, "os"))
         v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
         v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
@@ -1393,13 +1410,14 @@ func _open_search() -> void:
                 _filter_sub = ""
                 _filter_state = ""
                 _filter_text = ""
+                _filter_os = ""
                 _close_sheet()
                 _feed_scroll.scroll_vertical = 0
                 _refresh()))
 
 func _filters_dirty() -> bool:
         return _filter_genre != "" or _filter_sub != "" \
-                        or _filter_state != "" or _filter_text != ""
+                        or _filter_state != "" or _filter_text != "" or _filter_os != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -1419,10 +1437,12 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                 match kind:
                         "genre": active = _filter_genre == sid
                         "sub": active = _filter_sub == sid
+                        "os": active = _filter_os == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
                         "sub": lbl = Meta.sub_label(sid)
+                        "os": lbl = "PHONE" if sid == "android" else "PC"
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -1597,12 +1617,35 @@ func _open_guide(g: Dictionary) -> void:
         about.custom_minimum_size = Vector2(540, 0)
         v.add_child(about)
 
+        # THE PLATFORM LAW (v0.3.4-3, the windows return): the os badges live
+        # where players read
+        var os_arr: Array = g.get("os", ["android", "pc"])
+        if not os_arr.is_empty():
+                v.add_child(Arc.label("PLATFORMS", 24, Arc.HOT))
+                var prow := HFlowContainer.new()
+                prow.add_theme_constant_override("h_separation", 8)
+                prow.add_theme_constant_override("v_separation", 8)
+                for oid in os_arr:
+                        prow.add_child(Arc.meta_chip("os", String(oid)))
+                v.add_child(prow)
+
         v.add_child(Arc.label("HOW TO PLAY", 24, Arc.HOT))
         for line in g.get("controls", []):
                 var l := Arc.label("- " + String(line), 19, Arc.INK, false)
                 l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 l.custom_minimum_size = Vector2(540, 0)
                 v.add_child(l)
+
+        # THE PLATFORM LAW: the PC controls render as their OWN section
+        # (keyboard + mouse, the owner's per-game list)
+        var pc_controls: Array = g.get("controls_pc", [])
+        if not pc_controls.is_empty():
+                v.add_child(Arc.label("HOW TO PLAY - PC", 24, Arc.HOT))
+                for line in pc_controls:
+                        var l2 := Arc.label("- " + String(line), 19, Arc.INK, false)
+                        l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        l2.custom_minimum_size = Vector2(540, 0)
+                        v.add_child(l2)
 
         v.add_child(Arc.label("GOOD TO KNOW", 24, Arc.HOT))
         var facts := ""
@@ -2971,8 +3014,6 @@ func _play_seconds(id: String) -> float:
 
 ## Called by GameHost when a game session ends.
 func on_game_closed() -> void:
-        Ads.banner_show()   # back on the box: banner returns (fresh fill)
-        Ads.refresh()       # re-preload interstitial + rewarded for next runs
         Roadmap.tick()
         _restore_feed_state()
 

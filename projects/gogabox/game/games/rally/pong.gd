@@ -731,6 +731,24 @@ func _follow_finger(at: Vector2) -> void:
                                 clampf(at.y, field.position.y + half,
                                 field.end.y - half))
 
+## THE PC LAW (v0.3.4-3, the windows return): the keyboard paddle - FIXED
+## speed, never ramping. The keys drive the FOLLOW target; the glide eases
+## the pad to it (the v0.3.7-1 law unchanged).
+func _kb_move(dir: float, delta: float) -> void:
+        var p: Dictionary = pads_by_id.get("user", null)
+        if p == null:
+                return
+        var half := _pad_half_len(p)
+        var spd := 4200.0
+        if int(p["axis"]) == 0:
+                p["follow"] = Vector2(clampf((p["follow"] as Vector2).x + dir * spd * delta,
+                                field.position.x + half, field.end.x - half),
+                                (p["follow"] as Vector2).y)
+        else:
+                p["follow"] = Vector2((p["follow"] as Vector2).x,
+                                clampf((p["follow"] as Vector2).y + dir * spd * delta,
+                                field.position.y + half, field.end.y - half))
+
 # ================================================================ THE RUN
 
 func _goga_tick(delta: float) -> void:
@@ -753,6 +771,16 @@ func _goga_tick(delta: float) -> void:
                 ball_pos += ball_dir * spd * delta
                 _push_trail()
         _tick_walls_and_goals()
+        # THE PC LAW (v0.3.4-3, the windows return): the arrows drive the
+        # paddle's follow target at a fixed speed (left/right on a horizontal
+        # field, up/down on a vertical one)
+        var axis_i := 0
+        if pads_by_id.has("user"):
+                axis_i = int(pads_by_id["user"]["axis"])
+        var kb := Input.get_axis("ui_left", "ui_right") if axis_i == 0 \
+                        else Input.get_axis("ui_up", "ui_down")
+        if kb != 0.0:
+                _kb_move(signf(kb), delta)
         _tick_pads()
         # v0.3.7-1 THE GLIDE: the user pad moves toward its follow target -
         # speed = the gap x rate (distance-proportional, the owner's own

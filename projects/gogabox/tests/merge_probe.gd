@@ -46,7 +46,7 @@ func _run() -> void:
         _check(not mr.is_empty(), "merge is in the registry")
         _check(int(mr["coin_div"]) == 100, "2048 run bonus = score/100 (v0.3.8-7)")
         _check(bool(mr["shop"]), "2048 wears a shop (the themes)")
-        _check(bool(mr["banner"]), "2048 carries the ad banner")
+        _check(not mr.has("banner"), "2048 carries NO ad banner (the 0-ads law)")
         _check(int(mr["fee"]) == 15, "the round fee stays 15")
         # v0.3.8-7 THE SIZE SCALING: 50 fusions on the 4x4, x4/x12 beyond
         _check(int(M.COIN_EVERY) == 50 and int(M.COIN_EVERY_X4) == 200 \

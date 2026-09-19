@@ -29,7 +29,7 @@ func _run() -> void:
         _check(not xr.is_empty(), "xo is in the registry")
         _check(String(xr["title"]) == "XO", "the title is JUST XO (no ladder)")
         _check(int(xr["coin_div"]) == 2, "xo run bonus = score/2 (owner)")
-        _check(bool(xr["banner"]), "xo carries the ad banner")
+        _check(not xr.has("banner"), "xo carries NO ad banner (the 0-ads law)")
         _check(int(xr["fee"]) == 10, "the round fee stays 10")
 
         # ---- boot the real scene ----

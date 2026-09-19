@@ -38,7 +38,7 @@ func _ready() -> void:
         fails += _test("menu: the SOON ? law - tiles AND pages", await _t_soon_art())
         fails += _test("snake: peace END banks, bonus /0", await _t_peace_end())
         fails += _test("dev: switches, code arm, all_owned-only, sheet", await _t_dev_cheats())
-        fails += _test("isolation: own-world launch + reward tiers", await _t_isolation())
+        fails += _test("isolation: own-world launch (0-ads)", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
@@ -396,7 +396,7 @@ func _t_registry() -> int:
                 "the death-worm teaser ships as DEADLY WORM (the owner's rename law)")
         ok += _check(int(dw_reg["coin_div"]) == 500 and int(dw_reg["fee"]) == 8,
                 "deadly worm wears the owner's economy (bonus /500, fee 8)")
-        ok += _check(bool(dw_reg["shop"]) and bool(dw_reg["banner"]),
+        ok += _check(bool(dw_reg["shop"]) and not dw_reg.has("banner"),
                 "deadly worm wears the shop + the banner")
         ok += _check(dw_reg["ach"].size() == 18,
                 "deadly worm wears the tiered ladder (18)")
@@ -420,7 +420,7 @@ func _t_registry() -> int:
                 "the craze-caves-like ships as ROCK BREAKER (rename law)")
         ok += _check(int(rb_reg["coin_div"]) == 250 and int(rb_reg["fee"]) == 8,
                 "rock breaker wears the owner's economy (bonus /250, fee 8)")
-        ok += _check(bool(rb_reg["shop"]) and bool(rb_reg["banner"]),
+        ok += _check(bool(rb_reg["shop"]) and not rb_reg.has("banner"),
                 "rock breaker wears the shop + the banner")
         ok += _check(rb_reg["ach"].size() == 14,
                 "rock breaker wears the tiered ladder (14)")
@@ -461,7 +461,7 @@ func _t_registry() -> int:
                 "the gold-miner teaser ships as GOLD MINER (the owner's naming law)")
         ok += _check(int(gm_reg["coin_div"]) == 30 and int(gm_reg["fee"]) == 8,
                 "gold miner wears the owner's economy (bonus /30, fee 8)")
-        ok += _check(bool(gm_reg["shop"]) and bool(gm_reg["banner"]),
+        ok += _check(bool(gm_reg["shop"]) and not gm_reg.has("banner"),
                 "gold miner wears the shop + the banner")
         ok += _check(gm_reg["ach"].size() == 8,
                 "gold miner wears the tiered ladder (8)")
@@ -543,12 +543,12 @@ func _t_registry() -> int:
                 hop_floor = mini(hop_floor, int(HO.POWERUPS[pc_id]["price"]))
         ok += _check(hop_floor >= 250,
                 "the tower shop keeps a real price floor (cheapest = %d)" % hop_floor)
-        # v0.2.7: the banner law REVERSED by the owner - EVERY game wears
-        # the banner now, the tower included; MELTING stays
+        # THE 0-ADS LAW: no game wears a banner key anymore - the strip is
+        # reclaimed; MELTING stays
         var banner_ok := true
         for b_id in ["snake", "rally", "lanes", "slasher", "merge", "dario", "xo", "hopper", "invaders", "domino", "chess", "fourline", "bovo", "squares", "pacman"]:
-                banner_ok = banner_ok and bool(GameReg.get_game(b_id).get("banner", false))
-        ok += _check(banner_ok, "EVERY game carries the ad banner (v0.2.7 owner law)")
+                banner_ok = banner_ok and not GameReg.get_game(b_id).has("banner")
+        ok += _check(banner_ok, "NO game carries a banner key (the 0-ads law)")
         ok += _check(int(HO.MELT["price"]) >= 400 and float(HO.MELT_MAX) == 1.5,
                 "MELTING: a real price and the x1.5 growth cap")
         # v0.2.8: 2048's verdict round + XO's sketch remake in the registry
@@ -586,7 +586,7 @@ func _t_registry() -> int:
                 "domino is PLAYABLE now: BOTH tables - the position ask (v0.3.8-8)")
         ok += _check(int(dg["coin_div"]) == 2 and int(dg["fee"]) == 10,
                 "domino wears the owner's economy (bonus /2, fee 10)")
-        ok += _check(bool(dg["shop"]) and bool(dg["banner"]),
+        ok += _check(bool(dg["shop"]) and not dg.has("banner"),
                 "domino wears the shop + the banner")
         ok += _check(dg["ach"].size() == 10, "domino wears the tiered ladder (10)")
         var cg: Dictionary = GameReg.get_game("chess")
@@ -595,7 +595,7 @@ func _t_registry() -> int:
                 "chess is PLAYABLE now: BOTH tables - the position ask (v0.3.8-8)")
         ok += _check(int(cg["coin_div"]) == 1 and int(cg["fee"]) == 10,
                 "chess wears the owner's economy (bonus /1, fee 10)")
-        ok += _check(bool(cg["shop"]) and bool(cg["banner"]),
+        ok += _check(bool(cg["shop"]) and not cg.has("banner"),
                 "chess wears the shop + the banner")
         ok += _check(cg["ach"].size() == 11, "chess wears the tiered ladder (11)")
         # the maze v0.3.8 tight clock (the owner: "much stricter but not
@@ -611,7 +611,7 @@ func _t_registry() -> int:
                 "fourline is PLAYABLE now: portrait only (the xo law, v0.3.9)")
         ok += _check(int(fl["coin_div"]) == 3 and int(fl["fee"]) == 8,
                 "fourline wears the owner's economy (bonus /3, fee 8)")
-        ok += _check(bool(fl["shop"]) and bool(fl["banner"]),
+        ok += _check(bool(fl["shop"]) and not fl.has("banner"),
                 "fourline wears the shop + the banner")
         ok += _check(fl["ach"].size() == 11,
                 "fourline wears the tiered ladder (11)")
@@ -630,7 +630,7 @@ func _t_registry() -> int:
                 "the teaser FIVE LINES ships as FIVE IN ROW (rename law)")
         ok += _check(int(bv["coin_div"]) == 2 and int(bv["fee"]) == 8,
                 "bovo wears the owner's economy (bonus /2, fee 8)")
-        ok += _check(bool(bv["shop"]) and bool(bv["banner"]),
+        ok += _check(bool(bv["shop"]) and not bv.has("banner"),
                 "bovo wears the shop + the banner")
         ok += _check(bv["ach"].size() == 11,
                 "bovo wears the tiered ladder (11)")
@@ -653,7 +653,7 @@ func _t_registry() -> int:
                 "the teaser DOTS ships as SQUARES (rename law)")
         ok += _check(int(sg["coin_div"]) == 2 and int(sg["fee"]) == 8,
                 "squares wears the owner's economy (bonus /2, fee 8)")
-        ok += _check(bool(sg["shop"]) and bool(sg["banner"]),
+        ok += _check(bool(sg["shop"]) and not sg.has("banner"),
                 "squares wears the shop + the banner")
         ok += _check(sg["ach"].size() == 11,
                 "squares wears the tiered ladder (11)")
@@ -683,7 +683,7 @@ func _t_registry() -> int:
                 "board ludo is PLAYABLE now: portrait only (the square-board law)")
         ok += _check(int(lg_reg["coin_div"]) == 1 and int(lg_reg["fee"]) == 8,
                 "board ludo wears the owner's economy (bonus /1, fee 8)")
-        ok += _check(bool(lg_reg["shop"]) and bool(lg_reg["banner"]),
+        ok += _check(bool(lg_reg["shop"]) and not lg_reg.has("banner"),
                 "board ludo wears the shop + the banner")
         ok += _check(lg_reg["ach"].size() == 15,
                 "board ludo wears the tiered ladder (15)")
@@ -694,7 +694,7 @@ func _t_registry() -> int:
                 "snakes & ladders is PLAYABLE now: portrait (the tall-board law)")
         ok += _check(int(snl_reg["coin_div"]) == 1 and int(snl_reg["fee"]) == 8,
                 "snakes & ladders wears the owner's economy (bonus /1, fee 8)")
-        ok += _check(bool(snl_reg["shop"]) and bool(snl_reg["banner"]),
+        ok += _check(bool(snl_reg["shop"]) and not snl_reg.has("banner"),
                 "snakes & ladders wears the shop + the banner")
         ok += _check(snl_reg["ach"].size() == 15,
                 "snakes & ladders wears the tiered ladder (15)")
@@ -707,7 +707,7 @@ func _t_registry() -> int:
                 "the teaser DOT MUNCHER ships as DOT EATER (rename law)")
         ok += _check(int(pg["coin_div"]) == 3 and int(pg["fee"]) == 8,
                 "dot eater wears the owner's economy (bonus /3, fee 8)")
-        ok += _check(bool(pg["shop"]) and bool(pg["banner"]),
+        ok += _check(bool(pg["shop"]) and not pg.has("banner"),
                 "dot eater wears the shop + the banner")
         ok += _check(pg["ach"].size() == 12,
                 "dot eater wears the tiered ladder (12)")
@@ -774,7 +774,7 @@ func _t_registry() -> int:
                 "the teaser BRICK STORM ships as BRICK BREAKER (rename law)")
         ok += _check(int(bg_reg["coin_div"]) == 3 and int(bg_reg["fee"]) == 8,
                 "brick breaker wears the owner's economy (bonus /3, fee 8)")
-        ok += _check(bool(bg_reg["shop"]) and bool(bg_reg["banner"]),
+        ok += _check(bool(bg_reg["shop"]) and not bg_reg.has("banner"),
                 "brick breaker wears the shop + the banner")
         ok += _check(bg_reg["ach"].size() == 15,
                 "brick breaker wears the tiered ladder (15)")
@@ -869,7 +869,7 @@ func _t_registry() -> int:
                 "the teaser CUBE OVERFLOW ships as CONQUER DICE (rename law)")
         ok += _check(int(jg_reg["coin_div"]) == 2 and int(jg_reg["fee"]) == 8,
                 "conquer dice wears the owner's economy (bonus /2, fee 8)")
-        ok += _check(bool(jg_reg["shop"]) and bool(jg_reg["banner"]),
+        ok += _check(bool(jg_reg["shop"]) and not jg_reg.has("banner"),
                 "conquer dice wears the shop + the banner")
         ok += _check(jg_reg["ach"].size() == 15,
                 "conquer dice wears the tiered ladder (15)")
@@ -2609,16 +2609,12 @@ func _t_host_flow() -> int:
         ok += _check(Box.stat("snake", "plays") == 1, "plays 1")
         # breakdown theatre collapsed into the sum line + chip shows the total
         ok += _check(host.has_method("_score_to_coins"), "host keeps the coin math")
-        # ---- rewarded DOUBLE: sim pays instantly -> wallet + button state ----
+        # ---- THE 0-ADS LAW: the death menu carries NO ad theatre at all -
+        # no DOUBLE (watch ad) button, the wallet keeps the honest total ----
         var dbl := _find_button(host, "DOUBLE")
-        ok += _check(dbl != null, "double button on the game-over sheet")
-        if dbl != null:
-                dbl.pressed.emit()
-                await get_tree().create_timer(1.0).timeout
-                ok += _check(Box.coins() == 163 + 23,
-                                "double pays the REAL amount (186) -> %d" % Box.coins())
-                ok += _check(dbl.disabled and String(dbl.text).begins_with("REWARDED"),
-                                "button enters rewarded state (%s)" % dbl.text)
+        ok += _check(dbl == null, "no ad DOUBLE button on the game-over sheet")
+        ok += _check(Box.coins() == 150 - 10 + 23,
+                        "wallet stays the honest payout (163) -> %d" % Box.coins())
         # quit path
         host._quit_to_menu()
         await get_tree().process_frame
@@ -2872,20 +2868,12 @@ func _t_capacity_hold() -> int:
         return ok
 
 ## v0.0.5 core regression: a game is its OWN WORLD - the box hides (BOTH the
-## Node2D and its CanvasLayer) and stops processing, the host carries a real
-## full-screen background, and rewarded payouts follow the watch-time tiers.
+## Node2D and its CanvasLayer) and stops processing, and the host carries a
+## real full-screen background. (The old rewarded watch-time tier checks
+## died with THE 0-ADS LAW - there is no Ads autoload anymore.)
 func _t_isolation() -> int:
         Box.reset_all()
         var ok := 0
-
-        # ---- tier math (half/p75/full from ads_config) ----
-        ok += _check(Ads.reward_mult(5.0) == 0.0, "5s watch pays nothing")
-        ok += _check(Ads.reward_mult(14.9) == 0.0, "14.9s pays nothing")
-        ok += _check(Ads.reward_mult(15.0) == 0.5, "15s = half")
-        ok += _check(Ads.reward_mult(19.9) == 0.5, "19.9s = half")
-        ok += _check(Ads.reward_mult(20.0) == 0.75, "20s = 75%")
-        ok += _check(Ads.reward_mult(29.9) == 0.75, "29.9s = 75%")
-        ok += _check(Ads.reward_mult(30.0) == 1.0, "30s = full")
 
         # ---- REAL main.gd as the stage: launch through its menu (the exact
         # v0.0.4 bug shape) and prove the box fully vanishes ----
@@ -2964,8 +2952,6 @@ func _t_plugin_names() -> int:
         var plugins := [
                 {"gd": root + "notify/addon/notify.gd",
                  "java": root + "notify/android/org/godotengine/plugin/notify/NotifyPlugin.java"},
-                {"gd": root + "unity_ads/addon/ads.gd",
-                 "java": root + "unity_ads/android/org/godotengine/plugin/unityads/UnityAdsPlugin.java"},
         ]
         # built-in Object methods that are legal on the singleton but not Java
         var builtin := {"connect": true}

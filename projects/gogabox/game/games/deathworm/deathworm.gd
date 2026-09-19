@@ -2026,6 +2026,29 @@ func _draw() -> void:
 func _goga_input(event: InputEvent) -> void:
         if state != "play":
                 return
+        if event is InputEventKey:
+                # THE PC LAW (the windows return): the ARROW keys bend the
+                # heading (the hidden analog's keyboard twin), SPACE dashes
+                var k := event as InputEventKey
+                if k.pressed and not k.echo:
+                        if k.is_action("ui_accept"):
+                                _do_dash()
+                        elif k.is_action("ui_left"):
+                                move_vec = Vector2(-1, 0)
+                                steer_mag = 0.9
+                        elif k.is_action("ui_right"):
+                                move_vec = Vector2(1, 0)
+                                steer_mag = 0.9
+                        elif k.is_action("ui_up"):
+                                move_vec = Vector2(0, -1)
+                                steer_mag = 0.9
+                        elif k.is_action("ui_down"):
+                                move_vec = Vector2(0, 1)
+                                steer_mag = 0.9
+                else:
+                        move_vec = Vector2.ZERO
+                        steer_mag = 0.0
+                return
         var split_l := W * 0.32
         var split_r := W * 0.68
         if event is InputEventScreenTouch:

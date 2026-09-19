@@ -2,8 +2,8 @@ extends Node2D
 ## host_node - the live wrapper around one running game. Handles:
 ## the universal GOGABox loading screen, orientation switch in/out,
 ## entry-fee accounting, per-game play time + coin stats, run reporting
-## (best/last/plays + coins), rewarded DOUBLE, interstitial pacing, and the
-## game-over sheet. Built fully in code (arsenal style).
+## (best/last/plays + coins), and the game-over sheet. Built fully in
+## code (arsenal style). THE 0-ADS LAW: no ad theatre anywhere.
 
 var game_def := {}
 var router: Node
@@ -71,12 +71,6 @@ func _ready() -> void:
 
         # ---- universal GOGABox loading screen (loads the script + assets) ----
         var id := String(game_def["id"])
-        # games may opt INTO a banner in their own view (registry "banner": true);
-        # default is banner-free play
-        if bool(game_def.get("banner", false)):
-                Ads.banner_show()
-        else:
-                Ads.banner_hide()
         await Loader.load_game(self, game_def)
 
         if not _session_open:
@@ -162,6 +156,14 @@ func _apply_orientation(landscape: bool) -> void:
         # more canvas in design px on taller/wider phones (games read the
         # real viewport W/H, they absorb it naturally).
         var root := get_window()
+        # THE VERTICAL SLICE LAW (v0.3.4-3, the windows return): on PC a
+        # PORTRAIT game never fills a wide window - it renders a vertical
+        # slice down the middle and the sides wear the box brown. Landscape
+        # games keep EXPAND (the full window is the canvas).
+        if ScaleRule.is_pc() and not landscape:
+                ScaleRule.apply_vertical_slice(root, ScaleRule.DESIGN_PORTRAIT)
+                return
+        ScaleRule.apply_expand(root)
         root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE if landscape \
                         else ScaleRule.DESIGN_PORTRAIT
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE
@@ -176,7 +178,11 @@ func _restore() -> void:
         # governor keep watching from here: whenever the system actually
         # rotates the window, the design follows within one frame.
         _flush_time()
-        ScaleRule.apply(get_window())
+        if ScaleRule.is_pc():
+                # back to the box's vertical slice (the menu is portrait)
+                ScaleRule.apply_vertical_slice(get_window(), ScaleRule.DESIGN_PORTRAIT)
+        else:
+                ScaleRule.apply(get_window())
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:
@@ -244,8 +250,7 @@ func _on_finish(final_score: int, earned: int) -> void:
         # business) - the total builds up LIVE: pickups count up first, then
         # the score bonus ticks up one division at a time while the remaining
         # score counts down, then both lines collapse into one sum line and
-        # the chip pops to the full amount. A watched ad later shows its
-        # multiplier and rolls the chip up to the doubled total.
+        # the chip pops to the full amount.
         var div := _live_div()
         var earn_row := Arc.chip("+0 GOGACoins", "res://assets/ui/coin.png",
                         Color(0, 0, 0, 0.08), 30, Color("8a5a14"))
@@ -254,7 +259,6 @@ func _on_finish(final_score: int, earned: int) -> void:
         cc.add_child(earn_row)
         sheet.add_child(cc)
         var earn_lbl: Label = earn_row.get_child(0).get_child(earn_row.get_child(0).get_child_count() - 1)
-        var paid := [total]
 
         var pick_line := Arc.label("", 20, Color("c9a25a"), false)
         pick_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -314,70 +318,15 @@ func _on_finish(final_score: int, earned: int) -> void:
                 sheet.add_child(hype)
 
         if total > 0:
-                # TIERED rewarded: watch-time decides the payout (15s+ = half,
-                # 20s+ = 75%, full ad = full reward; config in ads_config.json)
-                var hint := Arc.label(Ads.reward_hint(), 16, Color("8a6a40"), false)
-                hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                sheet.add_child(hint)
                 # v0.0.9 owner rule ("i told you more than two times"): the
-                # honest math line above the ad button - pickups and the score
-                # bonus ratio, in ONE modular format (Arc.bonus_ratio_text).
+                # honest math line - pickups and the score bonus ratio, in
+                # ONE modular format (Arc.bonus_ratio_text). THE 0-ADS LAW:
+                # the old rewarded DOUBLE theatre around it is gone whole.
                 var ratio := Arc.label("pickups = %d   -   score bonus = %s" %
                                 [earned, Arc.bonus_ratio_text(final_score, div)],
                                 18, Color("8a6a40"), false)
                 ratio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 sheet.add_child(ratio)
-                var dbl := [null]   # holder: the lambda cannot capture dbl_btn
-                var reward_line := Arc.label("", 20, Arc.GOOD, false)
-                reward_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                reward_line.visible = false
-                # v0.0.9 REWORK (owner spec): a closed-early ad does NOT gray+
-                # clickable (that read as broken) - the button counts down
-                # "RETRY IN 10s" grayed AND dead, then comes back green as
-                # "RETRY NOW". One tap = one clean new ad attempt. The second-
-                # watch no-reward bug is fixed in Ads itself (show-start
-                # fallback stamp + load-aware watchdog there).
-                var dbl_btn := Arc.button("DOUBLE  (watch ad)", Vector2(480, 84), 26, Arc.GOOD, func():
-                                var btn: Button = dbl[0]
-                                if btn.disabled:
-                                        return
-                                btn.text = "LOADING AD..."
-                                btn.disabled = true
-                                Ads.show_rewarded(func(watched: bool, mult: float, _secs: float):
-                                                var b2: Button = dbl[0]
-                                                print("[rewarded] watched=%s mult=%.2f" % [watched, mult])
-                                                if not watched or mult <= 0.0:
-                                                        _reward_retry_countdown(b2)
-                                                        var why := "ad closed early - no bonus"
-                                                        if mult <= 0.0 and watched:
-                                                                why = "too short - watch %d+ seconds for the bonus" % Ads.tier_secs("half")
-                                                        Arc.toast(game._toast_ref(), why)
-                                                        return
-                                                var extra := int(round(float(total) * mult))
-                                                Box.earn(extra)
-                                                Box.add_earned(id, extra)
-                                                var before := int(paid[0])
-                                                paid[0] += extra
-                                                # reward = x_multiply, then the total rolls up live
-                                                reward_line.text = "reward  +%d%%  (=%d GOGACoins)" % [int(round(mult * 100.0)), extra]
-                                                reward_line.visible = true
-                                                var roll := create_tween()
-                                                roll.tween_method(func(v: float):
-                                                                earn_lbl.text = "+%d GOGACoins" % int(v),
-                                                                float(before), float(paid[0]), 0.45)
-                                                roll.tween_callback(func(): Jukebox.sfx("coin"))
-                                                # the button TELLS the story: rewarded state,
-                                                # grayed out, with the real amount on it
-                                                b2.text = "REWARDED!  +%d" % extra
-                                                b2.disabled = true
-                                                var msg := "FULL reward! +%d more GOGACoins!" % extra
-                                                if mult < 1.0:
-                                                        msg = "%d%% reward: +%d more GOGACoins" % [int(round(mult * 100.0)), extra]
-                                                Arc.toast(game._toast_ref(), msg))
-                                                )
-                dbl[0] = dbl_btn
-                sheet.add_child(reward_line)
-                sheet.add_child(dbl_btn)
 
         # ---- v0.1.4 RETRY ECONOMY (owner rule: "same for retry logic too"):
         # the charge is what the wallet can ACTUALLY pay - snake pours every
@@ -398,8 +347,8 @@ func _on_finish(final_score: int, earned: int) -> void:
                         if not again_free else Arc.button(again_txt, Vector2(520, 84), 28, Arc.ACCENT)
         again_btn.pressed.connect(func():
                         Jukebox.sfx("click", -4.0)
-                        # re-derive the truth at tap time - the wallet moved while
-                        # the sheet was open (rewarded DOUBLE may have paid out)
+                        # re-derive the truth at tap time - the wallet may have
+                        # moved while the sheet was open
                         var pay := Box.entry_cost(id, fee) if partial else fee
                         if not Box.daily_ok(id):
                                 Arc.toast(game._toast_ref(), "daily limit reached - get back tomorrow to play")
@@ -418,7 +367,6 @@ func _on_finish(final_score: int, earned: int) -> void:
                         if not Box.consume_round_batteries(id):
                                 Arc.toast(game._toast_ref(), "Batteries empty - they refill over time")
                                 return
-                        Ads.register_run()
                         _close_over_sheet()
                         _clear_game()
                         game = (load(String(game_def["script"])) as GDScript).new()
@@ -434,13 +382,7 @@ func _on_finish(final_score: int, earned: int) -> void:
         sheet.add_child(again_btn)
 
         sheet.add_child(Arc.button("BACK TO BOX", Vector2(480, 84), 28, Color(0.42, 0.30, 0.16), func():
-                        # pacing owned by the Box: every 3rd run-back shows one.
-                        # (v0.0.4 double-gated this through Ads' own counter too,
-                        # which is why per-turn ads almost never fired.)
-                        if Box.should_show_interstitial(3):
-                                        Ads.show_interstitial(func(_shown: bool): _quit_to_menu())
-                        else:
-                                        _quit_to_menu()))
+                        _quit_to_menu()))
 
         # BUTTON SAFETY SYSTEM: measure, wrap overflow into a scroll, clamp to
         # the screen edges (this sheet ran off the bottom in landscape).
@@ -457,34 +399,6 @@ func _clear_game() -> void:
         if game != null and is_instance_valid(game):
                 game.queue_free()
         game = null
-
-## v0.0.9 owner spec: closed-early rewarded -> the button turns gray AND dead
-## while it counts "RETRY IN 10s" -> 9 -> ... -> "RETRY NOW" (green, live).
-## The countdown also pre-loads a fresh rewarded ad so the retry rarely
-## starts from an empty slot. The timer dies with the sheet (child of it).
-func _reward_retry_countdown(b: Button) -> void:
-        if b == null or not is_instance_valid(b):
-                return
-        b.text = "RETRY IN 10s"
-        b.disabled = true
-        var left := [10]
-        var t := Timer.new()
-        t.wait_time = 1.0
-        t.autostart = true
-        b.add_child(t)
-        t.timeout.connect(func():
-                if not is_instance_valid(b):
-                        t.queue_free()
-                        return
-                left[0] -= 1
-                if left[0] <= 0:
-                        t.queue_free()
-                        b.text = "RETRY NOW"
-                        b.disabled = false
-                        Arc.repaint_button(b, Arc.GOOD)
-                        Ads.refresh()   # fresh rewarded ready for the retry
-                else:
-                        b.text = "RETRY IN %ds" % left[0])
 
 ## v0.2.8: the LIVE bonus divider - the registry coin_div by default, but
 ## a game with mode-dependent math (2048 board sizes) overrides it through

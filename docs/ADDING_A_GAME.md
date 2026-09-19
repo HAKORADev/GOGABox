@@ -13,6 +13,12 @@
    `tier` (1-4, colors the popup) and a `rule`
    (`{"k": "score"|"cnt"|"max"|"stat", "key", "v"}`) that the base
    evaluates - no per-id code anywhere.
+   THE PLATFORM LAW (the windows return): every entry wears
+   `"os": ["android", "pc"]` and a `"controls_pc": [...]` array (the
+   keyboard/mouse lines - the guide renders them as HOW TO PLAY - PC).
+   If the game's touch controls are zones/analog, give them a keyboard
+   twin in the script (the arrows + SPACE patterns - see heavywar or
+   rockbreaker).
 2. **Write the game script** — one file under
    `projects/gogabox/game/games/<id>/<id>.gd` extending `GogaGame`
    (see `docs/goga_docs/plans/BOX_CORE_DESIGN.md` for the contract:

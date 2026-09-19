@@ -1492,6 +1492,13 @@ func _goga_tick(delta: float) -> void:
 func _move_pad(delta: float) -> void:
         if _auto:
                 _auto_think(delta)
+        # THE PC LAW (the windows return): the LEFT/RIGHT arrows drive the
+        # paddle's follow target at a fixed speed (the drag still wins when
+        # a finger is down - last writer is the tick order below)
+        var kb := Input.get_axis("ui_left", "ui_right")
+        if kb != 0.0:
+                pad_target = clampf(pad_target + kb * 4200.0 * us * delta,
+                                arena.position.x, arena.end.x)
         var gap := absf(pad_target - pad_x)
         if gap > 0.5:
                 var step: float = clampf(gap * 14.0 * delta, 0.0,
@@ -2005,6 +2012,12 @@ func _tap_anywhere(_at: Vector2) -> void:
 ## - and on the serve, the release IS the launch (the launch law).
 func _goga_input(event: InputEvent) -> void:
         if over:
+                return
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                # THE PC LAW (the windows return): SPACE launches
+                if event.is_action_pressed("ui_accept"):
+                        _serve_release()
                 return
         if event is InputEventScreenTouch:
                 var t := event as InputEventScreenTouch

@@ -9,18 +9,16 @@
    "ci_auto": true,
    "apk_name": "GOGABox",
    "package": "hakora.dev.gogabox",
-   "version_name": "0.4.0-15",
-   "version_code_base": 31250,
+   "version_name": "0.4.0-16",
+   "version_code_base": 31260,
    "aab": false,
    "abi_presets": {
     "arm64-v8a": "Android arm64",
     "armeabi-v7a": "Android arm32"
    },
    "use_plugins": [
-    "unity_ads",
     "notify"
    ],
-   "ads_config": "config/ads_config.json",
    "keystore": {
     "path": "config/keystore/arsenal-release.jks",
     "user": "arsenal",
@@ -28,6 +26,6 @@
    }
   }
  },
- "version_name": "0.4.0-15",
- "version_code_base": 31250
+ "version_name": "0.4.0-16",
+ "version_code_base": 31260
 }

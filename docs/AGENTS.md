@@ -61,9 +61,6 @@ belongs in `docs/goga_docs/`.
    `assets.manifest.json`. Never hot-link at runtime.
 5. **Secrets discipline**: keystores, passwords and GitHub tokens never
    enter the repo (`.gitignore` guards `*.keystore` and `.ci/local.env`).
-   Ad IDs / App Keys are *not* secrets — they ship inside every APK and
-   mediation platforms gate misuse by package name — so they live in
-   `ads_config.json` and in §4 below.
    **Exception (owner-approved, v0.0.7):** `config/keystore/arsenal-release.jks`
    IS committed. An ephemeral per-run debug keystore made every update
    "conflict with the installed package" — a stable signature is what makes
@@ -78,7 +75,7 @@ belongs in `docs/goga_docs/`.
 
 | path | what |
 |---|---|
-| `config/environment.lock` | pinned toolchain: Godot 4.7.2, JDK 17, Android SDK 36 / build-tools 36.1.0, AGP 8.6.1, Gradle 8.11.1, Unity Ads 4.20.0 |
+| `config/environment.lock` | pinned toolchain: Godot 4.7.2, JDK 17, Android SDK 36 / build-tools 36.1.0, AGP 8.6.1, Gradle 8.11.1 |
 | `config/projects.json` | registry: package, version, ABIs, presets, `use_plugins`, `ci_auto` |
 | `.ci/materialize-project.sh` | builds a clean `android/build`: pinned template + `android-overlay/` + plugins + config injection |
 | `build.sh <g> [--abi ...] [--type ...] [--aab]` | materialize → patch presets → import → export → verify |
@@ -87,136 +84,49 @@ belongs in `docs/goga_docs/`.
 | `tools/ci.sh [watch]` | list / watch GitHub Actions runs from the terminal |
 | `tools/sync-assets.py` | re-vendor assets from `assets.manifest.json` |
 | `tools/study/` | the game-study pipeline: web-portal scrapers, APKPure downloader, APK decompiler line, Godot .pck extractor, Quaternius/ambientCG fetcher — see docs/DECOMPILATION.md (study copies stay OUT of the repo) |
-| `plugins/<name>/` | GOGABox android plugins (`unity_ads`, `notify`) |
+| `plugins/<name>/` | GOGABox android plugins (`notify`) |
 | `docs/` | guides + `docs/goga_docs/` planning home (GDDs · ideas · plans · brainstorms) |
 
-## 4. Ads integration playbook
+## 4. The platforms + THE 0-ADS LAW (the open-source round, 2026-09-19)
 
-### 4.0 Where ads live
+**THE 0-ADS LAW (owner):** GOGABox is MIT-licensed open source with ZERO
+ads. The whole monetization stack was removed whole: the Unity Ads plugin
+(`plugins/unity_ads/`), the `Ads` autoload, the death-menu DOUBLE (watch
+ad) theatre, the per-3-runs interstitial pacing, the banner strip (the
+registry `banner` keys and the 52dp reservation), `ads_config.json`,
+`docs/ADS.md`, and the ad gradle deps + manifest entries. The box holds NO
+INTERNET permission - it is fully offline. GOGACoins are the only currency.
+Do not resurrect any of it. (The old spec lives only as history:
+`docs/goga_docs/brainstorms/THE_APP_STORE_QUESTION.md`.)
 
-Nothing ad-related sits inside game scenes. Game code calls only:
+**THE TWO-PLATFORM LAW:** ONE build action (`.github/workflows/build.yml`)
+ships BOTH platforms on every push to main:
 
-```gdscript
-Ads.register_run()
-Ads.maybe_interstitial(func(shown): ...)
-Ads.show_rewarded(func(watched_to_end): ...)
-Ads.banner_show() / Ads.banner_hide()
-```
+- Android APKs: arm32 + arm64 (the matrix via `.ci/ci-matrix.sh`).
+- THE Windows exe: `GOGABox.exe`, x86_32, official Godot 4.7.2 templates
+  (SSE2 baseline - runs on pre-2014 CPUs with no SSE4.2; 32-bit natively,
+  64-bit through WOW64), embedded pck, verified by THE REAL-EXE LAW
+  (`file` must print a genuine `PE32 executable ... Intel (i386|80386)`,
+  size > 50MB so the pck is inside). No 64-bit exe, no template forging.
 
-The `Ads` autoload (pacing + **desktop simulation**) and the native bridge
-are staged in at build time from `plugins/<backend>/`, selected by
-`use_plugins` in `config/projects.json`. Per-project knobs and IDs live in
-`projects/<g>/config/ads_config.json`. Architecture details: docs/ADS.md.
+**The PC laws (do not break them when touching games):**
 
-### 4.1 The real IDs (as of Aug 2026)
+- THE VERTICAL SLICE LAW: on desktop, portrait designs render a KEEP-aspect
+  slice down the window's middle; the letterbox wears the box brown
+  (`ScaleRule.is_pc` + `apply_vertical_slice`; landscape keeps EXPAND).
+- THE CONTROLS: every game wears `controls_pc` in its registry entry
+  (keyboard/mouse lines rendered as HOW TO PLAY - PC in the guide); games
+  with analog/zone touch controls carry a keyboard twin (the arrows /
+  SPACE patterns - see dario/hopper/invaders/lanes/merge/pong/pacman/maze/
+  brickbreaker/geometry/goldminer/deathworm/rockbreaker/heavywar).
+- THE PLATFORM LAW: every registry entry wears `"os": ["android", "pc"]`;
+  the search sheet filters by PHONE/PC chips.
+- NOTIFICATIONS: the notify bridge stays a desktop no-op (its GDScript
+  guards `OS.has_feature("android")`).
+- `emulate_touch_from_mouse=true` in project.godot makes every tap game
+  mouse-playable with zero code - only zone/analog games need the keyboard
+  twin.
 
-**ACTIVE backend — Unity Ads direct** (`use_plugins: ["unity_ads"]`):
-
-| thing | gogabox |
-|---|---|
-| Unity Game ID (Android) | `5770940` (owner decision: GOGABox reuses the first ID created for the repo) |
-| test_mode | `false` (real ads; flip `projects/gogabox/config/ads_config.json` for local testing) |
-| interstitial placement | `Interstitial_Android` |
-| rewarded placement | `Rewarded_Android` |
-| banner placement | `Banner_Android` |
-| package name | `hakora.dev.gogabox` |
-| dashboard | Unity Publishing dashboard → Monetization → Projects. NOTE: per-package dashboard entries may be needed later if Unity restricts serving for unregistered packages — create them, then paste the new Game ID into `projects/gogabox/config/ads_config.json`. Placements and the plugin contract stay identical. |
-| config file | `projects/gogabox/config/ads_config.json` |
-
-**LevelPlay mediation — built, verified, then rolled back (see §4.3):**
-
-| thing | value |
-|---|---|
-| App Key | `27d84b1ed` |
-| interstitial ad unit | `6j6die13bsc4f0n3` |
-| rewarded ad unit | `s6iuno9k7m9nx0sz` |
-| banner ad unit | `l7t8jl7rzxpuq0im` |
-| native ad unit — **not wired** (no native format in any plugin yet) | `jsyz6rjnru2nd61x` |
-| dashboard | app.unity.com → Grow → LevelPlay (same platform as ironsrc.com; either URL works) |
-| recover from commits | `19d5369` (plugin) + `7257c24` (activation) |
-
-### 4.2 Wiring a backend into a project (any backend)
-
-1. Does the plugin exist? (`ls plugins/`) → set `use_plugins: ["<name>"]`
-   in `config/projects.json`. If not, write one (§4.5).
-2. Fill `projects/<g>/config/ads_config.json` with that backend's schema and
-   IDs (`unity_ads`: `game_id` + `placements`; `levelplay`: `app_key` +
-   `ad_units`). Keep `test_mode: true` while developing.
-3. Desktop must never crash: every plugin's `ads.gd` simulates ads when not
-   running on Android. Order matters — the desktop branch must come **before**
-   any native `available()` check (a past bug; `tools/test.sh` catches it).
-4. Verify: `./tools/test.sh <g>` → `./build.sh <g> --abi arm64-v8a` → confirm
-   the plugin meta-data and dex classes landed in the APK (`.ci/verify-apk.sh`,
-   or `aapt2 dump badging` + a dex grep).
-5. One-line override without editing config:
-   `GDA_FORCE_PLUGINS=<name> ./build.sh <g>`.
-
-### 4.3 GOGAds - REMOVED (v0.3.7-2)
-The in-house ad framework lived here; the owner nuked it whole
-("nuke GOGAds, that's done"). The spec is archived in
-`docs/goga_docs/brainstorms/THE_APP_STORE_QUESTION.md`. The Unity Ads
-plugin + the house banner below are UNTOUCHED - they are the older,
-shared system.
-
-### 4.4 Re-enabling LevelPlay (if ever asked)
-
-The full mediation backend (LevelPlay SDK 9.6.0 + Unity Ads adapter, plugin,
-config, docs) was built, CI-verified green, then rolled back at the user's
-request ("UnityAds only is good for me"). It is two revert commits deep in
-history:
-
-```bash
-git revert --no-edit 56f53d4 f74a0f1   # undo the reverts: plugin first, then activation
-```
-
-After reverting: re-check the IDs against §4.1 (they come back with the
-revert), keep `test_mode: true`, run tests + both-ABI build, push.
-Reporting shows up in the **LevelPlay console** (app.unity.com → Grow), not
-the classic Unity Ads monetization section. Future option, not a pending
-task: AppLovin MAX could be added as just another `plugins/<name>`.
-
-### 4.5 Writing a new ad backend plugin
-
-Contract — `plugins/unity_ads/` is canonical:
-
-```
-plugins/<name>/
-  plugin.meta.json     # addon_dir, gradle_deps[], manifest_meta{}, autoload{name,script}
-  addon/ads.gd         # autoload `Ads`: DEFAULTS + config merge + desktop sim + the standard GDScript API
-  android/...java      # GodotPlugin v1: configure / load / show / banner + signals
-```
-
-`.ci/materialize-project.sh` consumes `plugin.meta.json`: copies the addon,
-injects the gradle deps, injects the manifest meta-data, repoints the
-autoload. Before trusting any ad-SDK API from docs, download the AAR and
-**`javap` it** — docs lie, bytecode doesn't (this caught real API drift
-before). Details: `plugins/unity_ads/README.md`.
-
-### 4.6 SDK upgrades
-
-1. Bump the SDK version in `config/environment.lock` and the plugin's
-   `plugin.meta.json`.
-2. `rm -rf .cache/android-sdk && ./tools/bootstrap.sh`.
-3. `javap` the new AAR; re-verify every signature the plugin uses.
-4. `tools/test.sh` + full both-ABI build before pushing. CI cache keys hash
-   the lock file, so runners re-fetch exactly once.
-
-### 4.7 Studying other games (the decompilation pipeline)
-
-When the owner asks to study a shipped game (web or android), do NOT
-re-derive the scraping/decompiling from scratch — the pipeline exists and is
-tested: `tools/study/fetch_webgame.py` (GameSnacks/CrazyGames/Poki/generic),
-`tools/study/fetch_apkpure.py` (APK/XAPK via the AEGON app endpoint),
-`tools/study/decompile_apk.py` (apktool + jadx + Il2CppDumper + ilspycmd +
-UnityPy in one command), `tools/study/godot_pck.py`,
-`tools/study/fetch_asset.py`. Full site matrix, per-engine playbook, install
-commands and the proven-results table: **docs/DECOMPILATION.md**.
-
-THE LAW (owner directive): study copies live in `study_out/` OUTSIDE the repo
-and are never committed or shared. Assets crafted from studied games are
-modified/redesigned before they enter GOGABox, and decompiled logic is
-studied, then rewritten — provenance gets recorded in docs/ASSETS.md and the
-manifest, like the Pop Siege art pipeline did.
 
 ## 5. Developing & building
 
@@ -274,14 +184,14 @@ unaffordable items are GRAYED OUT (disabled, dead to taps) — a dry wallet
 must never "buy" something it cannot pay for (error-sfx-only buying is a
 bug, not a design).
 
-**Release** — bump version → push → CI green → Actions → **build-android →
+**Release** — bump version → push → CI green → Actions → **build →
 Run workflow** → pick project + `create_release: true` → tag `v<version_name>`
-gets both APKs. Re-running the same version clobbers the previous assets.
+gets the APKs + the Windows zip. Re-running the same version clobbers the
+previous assets.
 
-**Before any store submission** — `test_mode: false` in the project's
-`ads_config.json` · package name matches the ad dashboard entry · one real
-interstitial + rewarded tested on device · consent/GDPR guidance reviewed ·
-docs updated.
+**Before any store submission** — `keystore` credentials verified ·
+package name matches the installed one · docs updated. (THE 0-ADS LAW:
+there is nothing ad-related to test or disclose anymore.)
 
 ## 7. Sandbox survival (this machine)
 
@@ -323,7 +233,7 @@ subjects (`git log` is the real history).
 |---|---|
 | env setup, toolchain freeze, pitfalls | docs/SETUP.md |
 | add a new game | inside the box: one registry entry + one GogaGame script + one thumbnail — read `docs/goga_docs/plans/BOX_CORE_DESIGN.md` and docs/ADDING_A_GAME.md |
-| ads architecture and config | docs/ADS.md + plugins/unity_ads/README.md |
+| the platforms + the 0-ads law | docs/RELEASE_LAW.md + this file §4 |
 | assets policy, manifest, source catalogs, store trials | docs/ASSETS.md |
 | studying other games: portals, APKs, engines, the usage law | docs/DECOMPILATION.md |
 | CI, caching, releases, signing | docs/CI.md |

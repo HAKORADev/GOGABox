@@ -3,17 +3,25 @@
 **Owner law, set 2026-09-04 (v0.3.3 round):** GitHub Releases are NOT automatic
 anymore and NOT per-build by default.
 
-## THE ANDROID-ONLY LAW
+## THE TWO-PLATFORM LAW (the ANDROID-ONLY law is REPEALED)
 
-**Owner law, set 2026-09-06 (the v0.3.4-4 android-only revision):** GOGABox
-builds for ANDROID ONLY. No Windows / desktop builds, no forging, no exe
-presets, no PC-only code branches. The owner's words: "we should not do
-windows builds because no way to make money from them at all". The one
-exception that survives the windows era (the owner liked it): the menu's
-NAME SEARCH BAR - but with no example in it, it just asks for a name.
-If a future round is tempted to ship desktop builds again: THIS LAW is the
-answer, the whole rollback is recorded in
-`docs/goga_docs/plans/PLAN_v034p4_ANDROID_ONLY.md`.
+**Owner law, set 2026-09-19 (the open-source round):** GOGABox builds for
+ANDROID and WINDOWS again — the old "no way to make money from windows
+builds" reason is gone (the box is MIT + 0 ads now, money was never the
+point). ONE build action (`build.yml`) ships both: the APKs (arm32 + arm64)
+and THE one Windows exe — `GOGABox.exe`, x86_32, official templates (SSE2
+baseline: it runs on pre-2014 CPUs with no SSE4.2), single file with the
+embedded pck, verified by THE REAL-EXE LAW in CI. No 64-bit exe, no
+template forging.
+
+The PC-side laws ride along: THE VERTICAL SLICE LAW (portrait games render
+a KEEP-aspect slice with the box brown sides), per-game keyboard/mouse
+controls (`controls_pc` in the registry + the guide's HOW TO PLAY - PC),
+THE PLATFORM LAW (os tags + the PHONE/PC filter chips), and notifications
+stay a desktop no-op. The full original windows round is recorded in
+`docs/goga_docs/plans/PLAN_v034p3_AND_WINDOWS.md`; the 2026-09-06 rollback
+that buried it is recorded in
+`docs/goga_docs/plans/PLAN_v034p4_ANDROID_ONLY.md` (history, kept).
 
 ## The rule
 

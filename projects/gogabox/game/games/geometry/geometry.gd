@@ -653,6 +653,17 @@ func _seed_world() -> void:
 func _goga_input(event: InputEvent) -> void:
         if sheet_open_count() > 0:
                 return
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                # THE PC LAW (the windows return): SPACE / UP is the tap -
+                # one verb, per the live mechanic
+                if event.is_action_pressed("ui_accept") \
+                                or event.is_action_pressed("ui_up"):
+                        if phase == "ready":
+                                _ready_start()
+                                return
+                        _do_action()
+                return
         if event is InputEventScreenTouch and event.pressed:
                 if phase == "ready":
                         _ready_start()

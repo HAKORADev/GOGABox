@@ -32,13 +32,17 @@
    the real viewport (e.g. snake centers its board: `ORIGIN.y = (vp.y -
    board_h)/2`). If a future game truly needs a fixed stage, the HOST must
    offset the stage by `((W-base_w)/2, (H-base_h)/2)` — one place, central.
-5. **Banner safe area**: box UI reserves 78px at the bottom
-   (`menu.gd BANNER_SAFE`). Games hide the banner during play
-   (`Ads.banner_hide()` on launch, `banner_show()` back in the menu).
-6. **Test matrix**: before shipping, headless-run the flow test AND eyeball
+5. **Bottom inset (reclaimed)**: the old 52dp ad-banner reservation is
+   retired (THE 0-ADS LAW) — `banner_bottom()` reads 0.0 and every layout
+   reclaims the strip. The menu's own safe-area math stays for the OS
+   gesture bar.
+6. **THE VERTICAL SLICE LAW (desktop)**: on PC a portrait design renders
+   KEEP-aspect in the window's middle and the letterbox is painted the box
+   brown (`ScaleRule.apply_vertical_slice`); landscape keeps EXPAND.
+7. **Test matrix**: before shipping, headless-run the flow test AND eyeball
    the game on a 20:9 profile (emulator) — the editor window is 16:9 and
    will happily hide this class of bug.
-7. When in doubt: the viewport is a ROOM, not a PICTURE. Build for the room.
+8. When in doubt: the viewport is a ROOM, not a PICTURE. Build for the room.
 
 ## 3. Fixed instances (history)
 

@@ -45,7 +45,7 @@ func _run() -> void:
         var cr: Dictionary = GameReg.get_game("chess")
         _check(not cr.is_empty(), "chess is in the registry")
         _check(int(cr["coin_div"]) == 1, "chess run bonus = score/1 (owner)")
-        _check(bool(cr["banner"]), "chess carries the ad banner")
+        _check(not cr.has("banner"), "chess carries NO ad banner (the 0-ads law)")
         _check(int(cr["fee"]) == 10, "the round fee stays 10")
         _check(int(cr["price"]) == 700, "chess keeps its teaser price (700)")
 

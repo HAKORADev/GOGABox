@@ -140,6 +140,7 @@ var coin_kills := 0
 var move_ptr := -1
 var move_anchor := 0.0
 var move_force := 0.0
+var _kb_dir := 0   # THE PC LAW: the arrows' own steering lane (the windows return)
 var aim_ptr := -1
 var aim_pos := Vector2(960.0, 400.0)
 var mouse_aim := false
@@ -944,6 +945,19 @@ func _goga_input(event: InputEvent) -> void:
                                 -1.0, 1.0)
                 elif d.index == aim_ptr:
                         aim_pos = d.position
+        elif event is InputEventKey:
+                # THE PC LAW (the windows return): LEFT/RIGHT steer the tank
+                # (the mouse keeps the aim + the cannon fire)
+                var k := event as InputEventKey
+                if k.pressed and not k.echo:
+                        if k.is_action("ui_left"):
+                                _kb_dir = -1
+                        elif k.is_action("ui_right"):
+                                _kb_dir = 1
+                elif not k.pressed:
+                        if _kb_dir != 0 and (k.is_action("ui_left") \
+                                        or k.is_action("ui_right")):
+                                _kb_dir = 0
         elif event is InputEventMouseButton:
                 # THE CONTROLS LAW: a touch screen's emulated mouse is DEAD
                 # (it was the moving-also-aims bug: the first finger IS a
@@ -1780,17 +1794,18 @@ func _update_player(delta: float) -> void:
                 # the tank still rolls through the tunnel (the drive law)
                 if state == GS.TUNNEL:
                         var tspd := 240.0 * (1.0 + _shop_lvl("wheels") * 0.12)
-                        p_x = clampf(p_x + move_force * tspd * delta + 30.0 * delta,
+                        p_x = clampf(p_x + (move_force if _kb_dir == 0 else float(_kb_dir)) * tspd * delta + 30.0 * delta,
                                 220.0, W - 220.0)
                         p_wheel_spin += delta * 15.0
                 _tank_pose(delta)
                 return
-        # move: the analog force from the LEFT zone
+        # move: the analog force from the LEFT zone, or the keyboard lane
+        var kb_force := move_force if _kb_dir == 0 else float(_kb_dir)
         var spd := 240.0 * (1.0 + _shop_lvl("wheels") * 0.12) \
                 * (1.0 + float(buffs["speed"]))
-        p_x = clampf(p_x + move_force * spd * delta, 110.0, W - 110.0)
-        if absf(move_force) > 0.02:
-                p_wheel_spin += move_force * delta * 11.0
+        p_x = clampf(p_x + kb_force * spd * delta, 110.0, W - 110.0)
+        if absf(kb_force) > 0.02:
+                p_wheel_spin += kb_force * delta * 11.0
         # aim: the RIGHT zone finger, else dead ahead (the pivot rides the
         # tower top - SCALED with the tank since v040-8)
         var pivot := Vector2(p_x, GROUND_Y - 284.0 * TANK_S)

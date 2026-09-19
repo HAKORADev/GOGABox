@@ -1474,7 +1474,7 @@ func _run() -> void:
         ck(String(Jukebox._current_music).ends_with("matcher_game.mp3"),
                 "THE MUSIC LAW: the zip's own track is the default game music (not the box menu)")
         var reg := GameReg.get_game("matcher")
-        ck(bool(reg.get("banner", false)), "the registry wears the banner")
+        ck(not reg.has("banner"), "the registry wears NO banner key (the 0-ads law)")
         ck(int(reg.get("coin_div", 0)) == 300, "the registry coin_div is 300")
         var ach_ids := []
         for a in reg.get("ach", []):
@@ -1482,7 +1482,7 @@ func _run() -> void:
         ck(ach_ids.has("jelly_500") and ach_ids.has("icecrash_300") and ach_ids.has("items_100"),
                 "the three new-mode achievements wait in the registry")
         var banner_inset: float = G.banner_bottom()
-        ck(banner_inset > 0.0, "the game reserves the real banner strip (%dpx)" % int(banner_inset))
+        ck(banner_inset == 0.0, "the game reclaims the banner strip (0px, the 0-ads law)")
 
         # ================================================== the PATCH 5 laws
         # THE DONUT PURGE: five per-color pop frames live on the disk, the

@@ -76,7 +76,6 @@ func _defaults() -> Dictionary:
                 "coins": START_COINS,
                 "owned": ["snake"],           # snake is the free starter game
                 "settings": {"music": 0.8, "sfx": 0.9},
-                "runs_since_interstitial": 0,
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
                 "favorites": [],              # favorited game ids (heart in the pre-play menu)
@@ -861,11 +860,5 @@ func set_sfx_volume(v: float) -> void:
         data["settings"]["sfx"] = clampf(v, 0.0, 1.0)
         save()
 
-## Interstitial pacing owned by the Box: call after every run.
-func should_show_interstitial(every: int) -> bool:
-        data["runs_since_interstitial"] = int(data["runs_since_interstitial"]) + 1
-        var show := int(data["runs_since_interstitial"]) >= every
-        if show:
-                data["runs_since_interstitial"] = 0
-        save()
-        return show
+## THE 0-ADS LAW: the old interstitial pacing counter (every 3rd run-back
+## showed one) is gone whole - no field, no function, no ads.

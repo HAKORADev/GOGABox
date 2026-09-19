@@ -14,8 +14,7 @@ const TIPS := [
         "tip: GOGACoins are shared by every game in the box",
         "tip: high scores and achievements live here forever",
         "tip: mystery tiles hide orders - complete them for surprises",
-        "tip: entry fees keep the arcade honest. earn them back!",
-        "tip: watch an ad after a run to DOUBLE your coins",
+        "tip: entry fees keep the arcade honest. earn them back!"
 ]
 
 static func load_game(parent: Node, g: Dictionary) -> void:

@@ -25,8 +25,7 @@
   },
   "gradle": "8.11.1",
   "agp": "8.6.1",
-  "unity_ads_sdk": "4.20.0",
   "notes": {
-    "min_sdk": "24 (Android 7.0) covers ~97% of active devices and exceeds Unity Ads' minimum (API 21). Raising to 30+ would cut a large share of ad-monetizable devices for no technical benefit - all Godot 4.x + Unity Ads features work on 24. Change android/build.gradle.min_sdk in projects.json-driven overlay if you must."
+    "min_sdk": "24 (Android 7.0) covers ~97% of active devices and runs all Godot 4.x features. The box is offline + ad-free (THE 0-ADS LAW), so no SDK floor applies - 24 stays for device reach. Change android/build.gradle.min_sdk in projects.json-driven overlay if you must."
   }
 }

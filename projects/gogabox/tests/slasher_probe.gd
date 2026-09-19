@@ -30,7 +30,7 @@ func _run() -> void:
         _check(String(sr["orientation"]) == "auto",
                 "the POSITION ASK is on (orientation auto, like snake)")
         _check(bool(sr["shop"]), "slasher wears a shop (the vegetables)")
-        _check(bool(sr["banner"]), "slasher carries the ad banner")
+        _check(not sr.has("banner"), "slasher carries NO ad banner (the 0-ads law)")
 
         # ---- the MODES law: two positions, two different games ----
         _check(float(SL.MODES["vertical"]["gravity"]) \

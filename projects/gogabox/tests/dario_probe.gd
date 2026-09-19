@@ -37,7 +37,7 @@ func _run() -> void:
         _check(int(dr["fee"]) == 100, "the entry costs 100 coins (owner)")
         _check(int(dr["coin_div"]) == 10, "the run bonus = score/10 (owner)")
         _check(bool(dr["shop"]), "the shop sells the night sky + the powerups")
-        _check(bool(dr["banner"]), "dario carries the ad banner")
+        _check(not dr.has("banner"), "dario carries NO ad banner (the 0-ads law)")
         _check(dr["ach"].size() == 3, "three fresh achievements")
         _check(String(dr["controls"][6]).contains("-100"),
                         "the guide tells the -100 death law (not -200)")

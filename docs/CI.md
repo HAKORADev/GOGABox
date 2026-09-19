@@ -2,23 +2,40 @@
 
 ## Workflows
 
-### `build-android.yml` — the dispatcher
+### `build.yml` — THE ONE BUILD (both platforms)
 
 | trigger | behavior |
 |---|---|
-| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI in its `abi_presets` (release) |
-| **manual dispatch** | pick `project` + `abi` (`all`/`arm64-v8a`/`armeabi-v7a`) + `build_type` (`release`/`debug`), optional `create_release` |
+| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI in its `abi_presets` (release) + THE Windows exe |
+| **manual dispatch** | pick `project` + `abi` (`all`/`arm64-v8a`/`armeabi-v7a`) + `build_type` (`release`/`debug`), optional `create_release` (APKs + the Windows zip) |
 
 Job flow: `plan` (generates the matrix with `.ci/ci-matrix.sh` — the same
-script runs locally) → one `build` job per (project, abi) → optional `release`.
+script runs locally) → one `build` job per (project, abi) → the `windows`
+job → optional `release` (needs both).
 
-Each build job:
+Each APK job:
 1. restores caches (toolchain + gradle),
 2. `./tools/bootstrap.sh` (installs only what's missing),
 3. `./build.sh <project> --abi <abi> --type <type>` (identical to local),
 4. uploads `dist/<project>/*.apk` as an artifact
    named `<project>-<abi>-<build_type>`,
 5. appends a build summary (sizes, versions, ABI) to the run page.
+
+### The Windows exe job (THE REAL-EXE LAW)
+
+Minutes, not hours: no template forging. The job seats the **official
+Godot 4.7.2 Windows x86_32 export templates** (SSE2 baseline — the exe runs
+on pre-2014 CPUs with no SSE4.2; 32-bit natively, 64-bit through WOW64),
+stages the shared plugin addons (the gitignored GDScript autoloads), imports
+the project and exports the ONE preset `Windows x86_32` (embedded pck,
+single file, the .ico). Then it VERIFIES the binary:
+
+- `file` must print a genuine `PE32 executable` for `Intel (i386|80386)`,
+- size must exceed 50MB (the pck is inside),
+
+and zips `GOGABox.exe` + a README.txt into `GOGABox-windows-<version>.zip`.
+There is no 64-bit exe preset. The exe is exported with the project's
+committed `export_presets.cfg` — no per-run patching.
 
 ### `env-check.yml`
 
@@ -37,7 +54,7 @@ First uncached run ≈ 20–25 min per ABI; cached runs ≈ 8–12 min.
 
 ## Releases
 
-Manual dispatch with `create_release: true` attaches both ABIs to a GitHub
+Manual dispatch with `create_release: true` attaches both ABIs + the Windows zip to a GitHub
 release tagged `<project>-v<version_name>` — project-scoped, so two games
 can both be at v1.0.0 without colliding (older global `v<version>` tags like
 `v1.0.0` remain from before this scheme). Re-running with
@@ -49,7 +66,7 @@ the same version re-uploads (clobbers).
    - `RELEASE_KEYSTORE_B64` — base64 of your release keystore:
      `base64 -w0 release.keystore`
    - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEYSTORE_ALIAS`
-2. Add a decode step before the build step in `build-android.yml`:
+2. Add a decode step before the build step in `build.yml`:
 
 ```yaml
       - name: Decode release keystore

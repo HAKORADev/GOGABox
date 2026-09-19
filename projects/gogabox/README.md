@@ -3,7 +3,7 @@
 One Android app, many endless arcade mini-games, one shared engine. Ported
 from [Python_Game_Box_PGB](https://github.com/HAKORADev/Python_Game_Box_PGB)
 v1.3.8 and grown into a proper Godot 4.7 game box: GOGACoin economy, game
-unlocks, per-game progress/achievements, skins shop, Unity Ads (real ads).
+unlocks, per-game progress/achievements, skins shop. Open source under MIT, zero ads.
 
 **Read `Docs/plans/BOX_CORE_DESIGN.md` before touching anything** — it is the
 contract that makes "adding a game = blinking".

@@ -591,6 +591,17 @@ func _on_tap(_pos: Vector2) -> void:
 func _goga_input(event: InputEvent) -> void:
         if over:
                 return
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                # THE PC LAW (the windows return): SPACE works every tap -
+                # the intro go and the claw release
+                if event.is_action_pressed("ui_accept"):
+                        if phase == "intro":
+                                Jukebox.sfx("gm_start", -2.0)
+                                _intro_go()
+                        else:
+                                _on_tap(Vector2.ZERO)
+                return
         if phase == "intro" and event is InputEventScreenTouch \
                         and (event as InputEventScreenTouch).pressed:
                 Jukebox.sfx("gm_start", -2.0)

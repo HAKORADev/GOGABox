@@ -677,11 +677,11 @@ func _run() -> void:
         _check(is_instance_valid(g3.pick_layer), "the pickup PAINTER exists")
         _check(g3._coin_tex != null, "the REAL GOGACoin texture is loaded")
 
-        # ---- THE BANNER (the v0.2.6 law reversed by the owner) ----
-        _check(bool(GameReg.get_game("hopper").get("banner", false)),
-                "the tower wears the banner now (v0.2.7 owner law)")
+        # ---- THE BANNER (retired, THE 0-ADS LAW) ----
+        _check(not GameReg.get_game("hopper").has("banner"),
+                "the tower wears NO banner key (the 0-ads law)")
         var bb: float = g3.banner_bottom()
-        _check(bb > 0.0, "the tower reserves real banner space (%.0f logical px)" % bb)
+        _check(bb == 0.0, "the tower reclaims the banner strip (0 logical px)")
 
         # ---- THE POWERUP SPAWN LAW: 20-40 from the last SPAWNED ----
         Box.dev_set_cheat("all_owned", 1)

@@ -7,7 +7,7 @@ config_version=5
 [application]
 
 config/name="GOGABox"
-config/description="GOdot GAme Box - a whole arcade in your pocket. Endless mini-games, GOGACoin economy, unlockable games, skins and ads. Ported from Python_Game_Box_PGB."
+config/description="GOdot GAme Box - a whole arcade in your pocket. Endless mini-games, GOGACoin economy, unlockable games and skins. Ported from Python_Game_Box_PGB. Open source under MIT, zero ads."
 run/main_scene="res://main.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "GL Compatibility")
@@ -28,7 +28,6 @@ run/delta_smoothing=false
 Box="*res://game/core/store.gd"
 Jukebox="*res://game/core/audio.gd"
 Notify="*res://addons/notify/notify.gd"
-Ads="*res://addons/unity_ads/ads.gd"
 
 [display]
 
@@ -43,6 +42,12 @@ Ads="*res://addons/unity_ads/ads.gd"
 ; and OS safe insets (notch/gesture bars) are padded as design-px margins.
 window/size/viewport_width=1080
 window/size/viewport_height=1920
+; THE PC WINDOW (v0.3.4-3, the windows return): desktops open a 1280x720
+; window - portrait designs render as the vertical slice with the box
+; brown sides (ScaleRule.apply_vertical_slice), landscape designs fill it
+; (EXPAND).
+window/size/window_width_override=1280
+window/size/window_height_override=720
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"

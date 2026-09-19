@@ -493,6 +493,7 @@ var death_t := 0.0
 var move_ptr := -1
 var move_anchor := 0.0
 var move_force := 0.0
+var _kb_dir := 0   # THE PC LAW: the arrows' own steering lane (the windows return)
 var fire_ptr := -1
 var mouse_fire := false          # the desktop rig's mouse
 var touch_ui := false            # the heavywar controls law
@@ -736,6 +737,23 @@ func _goga_input(event: InputEvent) -> void:
                 if d.index == move_ptr:
                         move_force = clampf((d.position.x - move_anchor)
                                 / (170.0 * us), -1.0, 1.0)
+        elif event is InputEventKey:
+                # THE PC LAW (the windows return): LEFT/RIGHT roll the
+                # cannon, SPACE fires (the mouse keeps working too)
+                var k := event as InputEventKey
+                if k.pressed and not k.echo:
+                        if k.is_action("ui_left"):
+                                _kb_dir = -1
+                        elif k.is_action("ui_right"):
+                                _kb_dir = 1
+                        elif k.is_action("ui_accept"):
+                                mouse_fire = true
+                else:
+                        if _kb_dir != 0 and (k.is_action("ui_left") \
+                                        or k.is_action("ui_right")):
+                                _kb_dir = 0
+                        if not k.is_action("ui_accept"):
+                                mouse_fire = false
         elif event is InputEventMouseButton:
                 if touch_ui:
                         return
@@ -1574,6 +1592,8 @@ func _cannon_tick(delta: float) -> void:
                 return
         var speed := 520.0 * us
         var want := move_force
+        if _kb_dir != 0:
+                want = float(_kb_dir)
         if _auto:
                 want = _auto_move()
         var tv := want * speed

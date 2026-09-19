@@ -186,7 +186,7 @@ static func chip(txt: String, icon_path := "", bg := Color(0, 0, 0, 0.35),
         pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return pc
 
-## Chip fed from the Meta tables (genres / subs). Unknown ids degrade
+## Chip fed from the Meta tables (genres / subs / os). Unknown ids degrade
 ## to a text-only chip - modular by design.
 static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
                 font_size := 18, color := INK) -> PanelContainer:
@@ -194,6 +194,7 @@ static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
         match kind:
                 "genre": txt = Meta.genre_label(id)
                 "sub": txt = Meta.sub_label(id)
+                "os": txt = Meta.os_label(id)
         return chip(txt, Meta.icon_for(kind, id), bg, font_size, color)
 
 ## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so
@@ -435,9 +436,8 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1, preserve_key := "") -> 
                 sc.register_tappable(b, _tap_emitter(b))
         sc.reinstate()
 
-## Make an existing button LOOK disabled while staying clickable (owner rule
-## for the rewarded button: after an early close it turns gray and says what
-## happened, but a tap still retries the ad).
+## Make an existing button LOOK disabled while staying clickable (the owner
+## rule it was born for: turn gray, keep the tap alive for a retry).
 static func gray_out_button(b: Button) -> void:
         var sb := panel_style(Color(0.45, 0.42, 0.38), int(b.size.y / 2.6) if b.size.y > 0 else 24)
         sb.shadow_color = Color(0, 0, 0, 0.25)

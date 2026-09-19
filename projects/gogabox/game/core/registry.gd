@@ -9,10 +9,9 @@ extends RefCounted
 ##   controls how to play lines (guide sheet)
 ##   genres   {"main": [<=3], "sub": [<=3]}   (GameBox-compatible limits)
 ##   charges  {"per_round": n, "capacity": n, "regen_minutes": m}  GOGABatteries (omit = free play)
-##   banner   true -> this game's own view carries the ad banner (opt-in;
-##            v0.2.6 THE OWNER LAW: every game wears one except the snowy
-##            tower - its controls live at the bottom; games reserve the
-##            strip with the shared banner_safe_px helper)
+##   os       ["android", "pc"] - the platforms the game runs on (THE
+##            PLATFORM LAW; default both when omitted)
+##   controls_pc  PC keyboard/mouse control lines (guide sheet, CONTROLS - PC)
 ##   hours    {"from": h, "to": h}  playable only inside the window (local time)
 ##   blocked_hours {"from": h, "to": h}     NOT playable inside the window
 ##   reveal   {"kind": "chain"|"orders"|"inbox"|"real"|"direct", ...}
@@ -39,8 +38,8 @@ const GAMES := [
                 # v0.1.8: BOTH orientations - the mode is chosen once, when
                 # the game loads, from how the phone is held right then.
                 "orientation": "auto", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 2, "price": 0, "fee": 10, "shop": true,
-                "banner": true,
                 # v0.1.5 SHARED ENTRY POLICY (was the v0.1.4 snake-only
                 # hardcode): partial_pay = a thin wallet pays min(fee, ALL
                 # its coins) at entry AND retry, empty wallet plays free.
@@ -72,19 +71,21 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "The Resident", "desc": "Play 100 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 100}},
 ],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the head bends where the cursor moves"],
         },
         {
                 "id": "rally", "title": "PING-PONG", "tag": "goals win",
                 "script": "res://game/games/rally/pong.gd",
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "auto", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 4, "price": 150, "fee": 8, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
-                "banner": true,   # v0.2.6: the court insets above the banner
                 "daily_rounds": 6,   # v0.1.4: 6 rounds a day, resets 12AM 00:00
                 "desc": "Real pong now: goals pay points, every hit heats the ball x1.1 until it burns red, coins and powerups ride the court, and the extra walls hunt YOU. The pause menu's END banks the run.",
                 "controls": ["hold anywhere - your platform follows the finger along its axis", "a goal for you +1, a goal on you -1", "every hit heats the ball x1.1 until the next serve", "END in the pause menu banks the earnings"],
+                "controls_pc": ["LEFT / RIGHT arrow keys move the paddle (UP/DOWN on a vertical field)"],
                 "genres": {"main": ["arcade", "sports"], "sub": ["retro", "competitive", "singleplayer"]},
                 "ach": [
     {"id": "rally_t1", "title": "Warm-Up", "desc": "Return the ball 15 times in one run", "tier": 1, "rule": {"k": "max", "key": "max_rally", "v": 15}},
@@ -125,13 +126,13 @@ const GAMES := [
                 "script": "res://game/games/lanes/lanes.gd",
                 "thumb": "res://assets/thumbs/lanes.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 500, "price": 200, "fee": 20, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 0,
         "orders": [{"type": "plays", "game": "rally", "count": 3},
                 {"type": "beat_best", "game": "rally"}],
         "needs_games": 2},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
-                "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "blocked_hours": {"from": 1, "to": 8},
                 "daily_rounds": 6, "daily_minutes": 15,
                 "desc": "Five lanes, a sky FULL of enemy ships, four weapons. Kills are score, wrecks drop loot, and the war only gets harder the more you kill. Buy ships, weapons and spaces in the shop.",
@@ -159,6 +160,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "Sky Veteran", "desc": "Play 50 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 50}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys change lanes",
+                		"SPACE holds the fire",
+                ],
         },
         {
                 # v0.2.9 THE REWORK (the owner: "currently it's too bad"):
@@ -171,13 +176,13 @@ const GAMES := [
                 "script": "res://game/games/slasher/slasher.gd",
                 "thumb": "res://assets/thumbs/slasher.png",
                 "orientation": "auto", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 30, "price": 250, "fee": 15, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 1,
         "orders": [{"type": "spend_in", "game": "lanes", "amount": 120},
                 {"type": "plays", "game": "rally", "count": 5}],
         "needs_games": 3},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
-                "banner": true,   # v0.2.6: the bottom strip is dead space here
                 "daily_minutes": 20,   # v0.1.4: 20 play-minutes a day
                 "desc": "Fruit fly, your finger is the blade - for real: the fruit splits along YOUR cut and the halves tumble. Choose your position first - portrait tosses from below, landscape lobs across. Every fruit +1, every fall -2, three hearts, and a slashed bomb takes one. A GOGACoin rides by every 20 seconds. Now and then the sky opens: FRENZY - for ten seconds it rains produce with bombs riding along. The shop sells the vegetable basket and the dessert shelf.",
                 "controls": [
@@ -202,6 +207,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "Blade Regular", "desc": "Play 60 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 60}},
 ],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and swipe across the fruit"],
         },
         {
                 # v0.2.5 THE REDESIGN (owner GDD, whole contract - the PGB
@@ -232,11 +238,10 @@ const GAMES := [
                 "script": "res://game/games/hopper/hopper.gd",
                 "thumb": "res://assets/thumbs/hopper.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 10, "price": 300, "fee": 12, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
-                "banner": true,   # v0.2.7: the owner REVERSED the v0.2.6 law -
-                                  # the tower wears the banner like every game
                 "hours": {"from": 16, "to": 22},
                 "desc": "Climb an endless tower of icy platforms while real snow falls, lands and piles up. Eat the snow with MELTING to grow - or shrink away where it's bare. Seven platform kinds, two walls, a scroll that never waits, and jumps that widen the higher you get.",
                 "controls": [
@@ -267,6 +272,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "The Mountain's Own", "desc": "Play 60 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 60}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys run",
+                		"SPACE jumps",
+                ],
         },
         {
                 # v0.3.8-7 (owner: "the original ... score be /100"):
@@ -276,8 +285,8 @@ const GAMES := [
                 "script": "res://game/games/merge/merge2048.gd",
                 "thumb": "res://assets/thumbs/merge.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 100, "price": 400, "fee": 15, "shop": true,
-                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "orders", "appear_after": 2,
         "orders": [{"type": "earn_in", "game": "hopper", "amount": 120},
                 {"type": "spend_in", "game": "slasher", "amount": 150}],
@@ -303,6 +312,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "Doubler", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["the ARROW keys slide the board"],
         },
         {
                 # v0.3.1 CURSED DARIO - the rebuild with lore (dario.md):
@@ -311,12 +321,12 @@ const GAMES := [
                 "script": "res://game/games/dario/dario.gd",
                 "thumb": "res://assets/thumbs/dario.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 10, "price": 350, "fee": 100, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 3,
         "orders": [{"type": "plays", "game": "merge", "count": 4},
                 {"type": "ach_in", "game": "merge", "count": 2}],
         "needs_games": 6},
-                "banner": true,   # the ground rises above the strip
                 "desc": "Dario fell into this world through a Witcher's curse. Ten TALL levels of stomp, dodge and deja vu to the end line - where SHE waits. Crush the Witcher (20 stomps, dodge her curses) and escape... probably. A mario-like with ? crates (the GOGACoins live inside them), timed ghost platforms, hunting bats, a charging rhino, a shop (the night sky, three powerups), 3 lives and a story that remembers you.",
                 "controls": [
                         "hold the LEFT half of the screen and slide to walk left/right",
@@ -341,6 +351,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "Cursed Regular", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys run",
+                		"SPACE jumps",
+                ],
         },
         {
                 # v0.2.8 THE SKETCH REMAKE (the owner: "rename it to just XO
@@ -350,8 +364,8 @@ const GAMES := [
                 "script": "res://game/games/xo/xo.gd",
                 "thumb": "res://assets/thumbs/xo.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 2, "price": 450, "fee": 10, "shop": false,
-                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "inbox", "minutes": 45,
         "appear_after": 4, "needs_games": 7},
                 "desc": "Sketchbook tic-tac-toe: paper, ink and one adaptive opponent. It wears four profiles (The Wall, The Trickster, The Rusher, The Sage), remembers your last two rounds and stops falling for your patterns. Every win pays +1, every loss costs -1, a GOGACoin lands on the board after every 3 rounds - mark its cell first to take it.",
@@ -372,6 +386,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Doodler", "desc": "Play 15 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 15}},
     {"id": "plays_t2", "title": "The Page's Owner", "desc": "Play 60 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 60}},
 ],
+                "controls_pc": ["click a square with the mouse"],
         },
 
         {
@@ -384,8 +399,8 @@ const GAMES := [
                 "script": "res://game/games/matcher/matcher.gd",
                 "thumb": "res://assets/thumbs/matcher.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 300, "price": 400, "fee": 10, "shop": true,
-                "banner": true,   # the rail seats itself above the strip
                 "charge_unlock": 150,
                 "reveal": {"kind": "orders", "appear_after": 6,
         "orders": [{"type": "plays", "game": "invaders", "count": 5},
@@ -428,6 +443,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "Wall Regular", "desc": "Play 50 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 50}},
 ],
+                "controls_pc": ["click two tiles with the mouse to swap them"],
         },
 
         {
@@ -438,8 +454,8 @@ const GAMES := [
                 "script": "res://game/games/invaders/invaders.gd",
                 "thumb": "res://assets/thumbs/invaders.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 500, "price": 350, "fee": 100, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "orders", "appear_after": 5,
         "orders": [{"type": "spend_in", "game": "dario", "amount": 200},
                 {"type": "plays", "game": "xo", "count": 6}],
@@ -471,6 +487,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "Watch Commander", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys steer",
+                		"SPACE holds the fire",
+                ],
         },
 
         # ---- the workshop (not built yet, but ALREADY in the feed as teasers so
@@ -500,8 +520,8 @@ const GAMES := [
                 "script": "res://game/games/cosmic_spud/cosmic_spud.gd",
                 "thumb": "res://assets/thumbs/spud.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 200, "price": 500, "fee": 50, "shop": true,
-                "banner": true,
                 "charge_unlock": 400,
                 "reveal": {"kind": "direct", "appear_after": 10,
         "needs_games": 13},
@@ -532,6 +552,7 @@ const GAMES := [
     {"id": "runs_t1", "title": "Drop In", "desc": "Finish 10 runs", "tier": 1, "rule": {"k": "cnt", "key": "cs_runs", "v": 10}},
     {"id": "runs_t2", "title": "The Veteran Spud", "desc": "Finish 50 runs", "tier": 2, "rule": {"k": "cnt", "key": "cs_runs", "v": 50}},
 ],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the invisible stick follows the cursor; the guns aim and fire by themselves"],
         },
 
 
@@ -548,8 +569,8 @@ const GAMES := [
                 "script": "res://game/games/pop_siege/pop_siege.gd",
                 "thumb": "res://assets/thumbs/pop_siege.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 1000, "price": 400, "fee": 10, "shop": true,
-                "banner": true,   # the field ends above the strip
                 "charge_unlock": 250,
                 "reveal": {"kind": "direct", "appear_after": 7,
         "needs_games": 10},
@@ -580,6 +601,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Siege Regular", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": [
+                		"click a folk card, then click a green grass cell to place it (or drag it there)",
+                		"click a placed gadget to open its panel",
+                ],
         },
 
 
@@ -594,11 +619,11 @@ const GAMES := [
                 "script": "res://game/games/geometry/geometry.gd",
                 "thumb": "res://assets/thumbs/geometry.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 # v0.3.6-3 THE /50 TRUTH (the owner's patch-1 ask, finally
                 # landed): score bonus /50 = coin_div 50. The patch-1 round
                 # misread it as the in-game speed step - that is back to /10.
                 "coin_div": 50, "price": 350, "fee": 10, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "orders", "appear_after": 8,
         "orders": [{"type": "ach_in", "game": "pop_siege", "count": 2},
                 {"type": "spend_in", "game": "matcher", "amount": 200}],
@@ -628,16 +653,17 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Loop's Regular", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["SPACE / UP (or a click) is the one verb - jump or flip gravity, per the live mechanic"],
         },
         {"id": "maze", "title": "Maze Escaper", "tag": "the matrix escapee",
                 "script": "res://game/games/maze/maze.gd",
                 "thumb": "res://assets/thumbs/maze.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 # v0.3.7 THE OWNED LAW: the score bonus is /3 (the owner's
                 # number for the escaper). The old "Escape The Maze" SOON
                 # teaser graduated into the real thing (the ritual honored).
                 "coin_div": 3, "price": 350, "fee": 10, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "orders", "appear_after": 9,
         "orders": [{"type": "earn_in", "game": "geometry", "amount": 200},
                 {"type": "plays", "game": "pop_siege", "count": 4}],
@@ -661,6 +687,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Maze Walker", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": [
+                		"the ARROW keys walk - one press, one step",
+                		"SPACE starts the run",
+                ],
         },        {"id": "domino", "title": "DOMINO", "tag": "the tile classic",
                 "script": "res://game/games/domino/domino.gd",
                 "thumb": "res://assets/thumbs/domino.png",
@@ -669,13 +699,13 @@ const GAMES := [
                 # positions - the ask picks the table, vertical stays the
                 # certified layout, horizontal is the new wide table
                 "orientation": "auto", "dim": "2d",
+                "os": ["android", "pc"],
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0 (the xo shape), run bonus /2, a GOGACoin
                 # after each 3rd round on a legal end spot - whoever puts
                 # a domino there takes it, the CPU races you.
                 "coin_div": 2, "price": 500, "fee": 10, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 7, "price": 500,
                         "needs_games": 8},
                 "desc": "the tile classic, played straight: seven tiles each, the highest double opens, match the ends and empty your hand. Draw from the boneyard when the ends starve you; both stuck means the lighter hand wins. Tap a tile then a glowing end, or drag it there - the ends glow only where your tile truly fits. A GOGACoin lands on the table after every 3rd round and the next domino on its spot takes it, yours or the CPU's. Win +1, lose -1, a blocked tie draws.",
@@ -700,6 +730,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a tile, then click the glowing end (or drag the tile there)"],
         },
         {"id": "chess", "title": "CHECKMATE", "tag": "the old war",
                 "script": "res://game/games/chess/chess.gd",
@@ -709,12 +740,12 @@ const GAMES := [
                 # properly"): BOTH positions - the ask picks, vertical grows
                 # the board to nearly the full width, landscape stays as built
                 "orientation": "auto", "dim": "2d",
+                "os": ["android", "pc"],
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0, run bonus /1, a GOGACoin each 3 minutes on
                 # a reachable square - whoever lands on it takes it.
                 "coin_div": 1, "price": 700, "fee": 10, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 8, "price": 700,
                         "needs_games": 9},
                 "desc": "the old war, played by the book: every piece moves by the law, castling, en passant, promotion, check, checkmate, stalemate, the 50-move rule, repetition and bare kings are all real. The CPU wears SIX hidden personalities - each with its own opening book (the Jobava London lives here) and its own honest mistakes - and it adapts to your openings for two rounds. Highlights show every legal move, the last move and every check. Win +1, lose -1, a draw pays nothing.",
@@ -739,6 +770,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The War's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a piece, then click its square"],
         },
         {"id": "fourline", "title": "FOUR IN LINE", "tag": "drop and connect",
                 "script": "res://game/games/fourline/fourline.gd",
@@ -748,8 +780,8 @@ const GAMES := [
                 # each 4 rounds in a hole - the disc that lands there
                 # takes it. 8x7 mid-sized board. 5 disc skins + 5 themes.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 3, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 9, "needs_games": 10},
                 "desc": "drop the discs, make four: the toy classic on an 8x7 board - tap a column and your disc falls with a real bounce. Four in any direction wins the round. One opponent with four invisible moods remembers your openings for two rounds and stops falling for the same trick; every win pays +1, every loss costs -1, and a GOGACoin waits in a hole after every 4 rounds - the disc that lands there takes it.",
                 "controls": ["TAP ANYWHERE TO START - then tap a column to drop your disc (drag across the columns to aim first, the ghost shows the seat)",
@@ -772,6 +804,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Board's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a column to drop your disc"],
         },
         {"id": "bovo", "title": "FIVE IN ROW", "tag": "five in a row",
                 "script": "res://game/games/bovo/bovo.gd",
@@ -783,8 +816,8 @@ const GAMES := [
                 # takes it. Boards: 8x8 free, 10x10 + 12x12 bought first
                 # then applied (the 2048 mechanic). 5 stone skins + 5 themes.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 10, "needs_games": 11},
                 "desc": "stones on a warm wooden board - place one per turn, five in a row (any direction) wins. The CPU wears four invisible moods, remembers your openings for two rounds and stops falling for the same trick. Grow the battlefield: the 10x10 and 12x12 boards are bought in the shop and applied in options, exactly like 2048. Every win pays +1, every loss costs -1, and a GOGACoin lands on the board after every 3 rounds - place a stone on it first.",
                 "controls": ["TAP ANYWHERE TO START - tap an intersection to place your stone (the ghost previews the point, lift to confirm)",
@@ -808,6 +841,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Board's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a crossing to place your mark"],
         },
         {"id": "squares", "title": "SQUARES", "tag": "close the boxes",
                 "script": "res://game/games/squares/squares.gd",
@@ -824,8 +858,8 @@ const GAMES := [
                 # A GOGACoin rests inside a box after every 3 rounds -
                 # the box's claimer takes it.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 11,
                         "needs_games": 12},
                 "desc": "draw lines between the dots, close boxes, take the board - the dots-and-boxes classic (KDE KSquares energy). Close a box and you go AGAIN: the chains are the whole war. Your pen is RED, the CPU's is BLUE; the lines dry to ink, the boxes keep their color. One opponent with four invisible moods watches the chains - lose to a big one and its double-cross eye wakes for two rounds. Every board holds an ODD number of boxes (9 / 25 / 49) so a round can never end in a draw. Win +1, lose -1, and after every 3 rounds a GOGACoin rests inside a box.",
@@ -852,6 +886,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Page's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click between two dots to draw your line"],
         },
         # v0.3.9-3 THE NEXT FIVE (the owner: "take the next 5 games in
         # future_games.md and put them as 'soon' titles in GOGABox so me
@@ -872,8 +907,8 @@ const GAMES := [
                 "script": "res://game/games/pacman/pacman.gd",
                 "thumb": "res://assets/thumbs/pacman.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 3, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 12,
                         "needs_games": 13},
                 "desc": "Balldozer's own maze: ENDLESS, RANDOM, braided - "
@@ -929,6 +964,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Maze's Resident", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["the ARROW keys steer the mouth (or hold the LEFT MOUSE BUTTON and drag)"],
         },
         # v0.3.9-7: BRICK STORM graduated (the owner's rename law: "brick
         # breaker is a genre and not a trademark name") - the full game
@@ -940,10 +976,10 @@ const GAMES := [
                 # THE HORIZONTAL LAW (the owner: "the game is horizontal
                 # only for now (for extra space for more bricks)")
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 # THE SCORE LAW (the owner: "each level cleared gives 1
                 # score point, score bonus is /3") - the dot eater shape.
                 "coin_div": 3, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 13,
                         "needs_games": 14},
                 "desc": "The infinite paddle court: endless levels, every "
@@ -1023,6 +1059,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Court's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": [
+                		"the LEFT / RIGHT arrows slide the paddle (or drag with the mouse)",
+                		"SPACE launches the ball",
+                ],
         },
         {"id": "jumpcube", "title": "CONQUER DICE", "tag": "grow and spill",
                 "script": "res://game/games/jumpcube/jumpcube.gd",
@@ -1041,8 +1081,8 @@ const GAMES := [
                 # enemy black) + the 3 board sizes (the 2048 mechanic: bought
                 # in the shop, applied from the options).
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
-                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 14,
                         "needs_games": 15},
                 "desc": "the jumping-dice war: every die holds dots, tap a "
@@ -1095,6 +1135,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a cell with the mouse"],
         },
         {"id": "ludo", "title": "BOARD LUDO", "tag": "roll and run home",
                 "script": "res://game/games/ludo/ludo.gd",
@@ -1121,8 +1162,8 @@ const GAMES := [
                 # always takes too long anyway"). VERTICAL - the square
                 # board seats proper in portrait.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 1, "price": 450, "fee": 8, "shop": true,
-                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 15,
                         "needs_games": 16},
                 "desc": "the classic one-die ludo, redressed for the box: "
@@ -1185,6 +1226,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "The Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click a pawn, then click the highlighted move"],
         },
         {"id": "snl", "title": "SNAKES & LADDERS",
                 "tag": "climb and slide",
@@ -1214,8 +1256,8 @@ const GAMES := [
                 # it takes it. Win +1 / lose -1, run bonus /1, no draws,
                 # the loser opens the next round. VERTICAL.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 1, "price": 450, "fee": 8, "shop": true,
-                "banner": true,   # turn-based: banner is safe here
                 "reveal": {"kind": "direct", "appear_after": 16,
                         "needs_games": 17},
                 "desc": "the pure-RNG classic, redressed for the box: roll "
@@ -1276,6 +1318,7 @@ const GAMES := [
     {"id": "plays_t1", "title": "The Regular", "desc": "Play 8 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Table's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
+                "controls_pc": ["click the DICE, then click your checker when it can move"],
         },
         # v0.4.0 HEAVY WAR - graduated from the SOON shelf's first name (the
         # owner's GDD, docs/goga_docs/gogames_ideas/heavywar.md): the
@@ -1290,8 +1333,8 @@ const GAMES := [
                 "script": "res://game/games/heavywar/heavywar.gd",
                 "thumb": "res://assets/thumbs/heavywar.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 500, "price": 600, "fee": 20, "shop": true,
-                "banner": true,
                 "charge_unlock": 300,
                 # v040-8 THE TOP-UP DECLARATION: heavywar carries SCRAP -
                 # 1 GOGACoin = 5 scrap (the owner's rate law). GameCoin
@@ -1328,6 +1371,10 @@ const GAMES := [
     {"id": "score_t3", "title": "History Written", "desc": "Score 15000 in one run", "tier": 3, "rule": {"k": "max", "key": "hw_score", "v": 15000}},
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys steer the tank",
+                		"the mouse aims - HOLD the LEFT MOUSE BUTTON to fire the cannon",
+                ],
         },
         # v040-7: the CRAZE CAVES-LIKE note graduated as ROCK BREAKER (the
         # owner's rename law: "the name feels like brick breaker but
@@ -1339,11 +1386,11 @@ const GAMES := [
                 # THE VERTICAL LAW (the owner: "the game will be vertical
                 # only") - the Snowy Tower / Space Invaders shape.
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 # THE SCORE LAW (the owner: "rockPoints is the number of
                 # break-ed rocks in the round regardless of it's level,
                 # score bonus will be /250").
                 "coin_div": 250, "price": 500, "fee": 8, "shop": true,
-                "banner": true,
                 # v040-8 THE TOP-UP DECLARATION: rockbreaker carries
                 # ROCKCOINS - 1 GOGACoin = 5 rockCoins (the rate law).
                 "currency": {"name": "ROCKCOINS", "rate": 9.0,
@@ -1380,6 +1427,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Flood Watcher", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
+                "controls_pc": [
+                		"LEFT / RIGHT arrow keys roll the cannon",
+                		"SPACE or the LEFT MOUSE BUTTON fires (hold it)",
+                ],
         },
 
         # v0.4.0-1 THE FEED TRUTH FIX (the owner's v040 test report):
@@ -1404,8 +1455,8 @@ const GAMES := [
                 "script": "res://game/games/deathworm/deathworm.gd",
                 "thumb": "res://assets/thumbs/deathworm.png",
                 "orientation": "landscape", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 500, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 # THE TOP-UP DECLARATION: deadly worm carries WORMCOINS -
                 # 1 GOGACoin = 5 wormCoins (the rate law).
                 "currency": {"name": "WORMCOINS", "rate": 12.0,
@@ -1446,6 +1497,10 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
     {"id": "plays_t2", "title": "The Resident", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
+                "controls_pc": [
+                		"the ARROW keys bend the worm's heading",
+                		"SPACE dashes",
+                ],
         },
         # v040-13 THE GRADUATION: the zuma teaser seat renamed as MARBLE
         # POPPER (the owner's rename law, the rock breaker precedent)
@@ -1454,6 +1509,7 @@ const GAMES := [
                 "script": "res://game/games/marble/marble.gd",
                 "thumb": "res://assets/thumbs/marble.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 5, "price": 350, "fee": 5, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
@@ -1494,6 +1550,7 @@ const GAMES := [
         {"id": "mb_wave", "title": "Wave Rider", "desc": "Survive a full challenge", "tier": 3, "rule": {"k": "cnt", "key": "challenges_won", "v": 1}},
         {"id": "mb_all", "title": "The Box Is Clean", "desc": "Clear all 100 levels", "tier": 4, "rule": {"k": "max", "key": "levels_max", "v": 100}},
 ],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and drag to aim - release to shoot"],
         },
         # v040-15 THE GRADUATION: the gold miner teaser seat renamed as GOLD
         # MINER (the owner's GDD, worked into laws; the endless timing miner)
@@ -1502,8 +1559,8 @@ const GAMES := [
                 "script": "res://game/games/goldminer/goldminer.gd",
                 "thumb": "res://assets/thumbs/goldminer.png",
                 "orientation": "portrait", "dim": "2d",
+                "os": ["android", "pc"],
                 "coin_div": 30, "price": 450, "fee": 8, "shop": true,
-                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
                 "desc": "The claw never stops swinging - drop it at the "
@@ -1542,6 +1599,7 @@ const GAMES := [
         {"id": "gm_score_2", "title": "The Mother Lode", "desc": "Score 600 in one run", "tier": 3, "rule": {"k": "score", "v": 600}},
         {"id": "gm_deep", "title": "Deep Digger", "desc": "Reach ground 8 in one run", "tier": 3, "rule": {"k": "max", "key": "gm_level", "v": 8}},
 ],
+                "controls_pc": ["LEFT CLICK or SPACE releases the claw"],
         },
         # v040-15 THE SOON SHELF: the next five un-shipped names walking
         # FUTURE_GAMES.md top to bottom (the file order law) parked as

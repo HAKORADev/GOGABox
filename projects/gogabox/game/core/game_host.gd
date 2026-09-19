@@ -1,8 +1,8 @@
 class_name GameHost
 extends RefCounted
 ## Launches a game and owns everything around a run: orientation switch,
-## entry fee, run-end economy (coins, best/last, rewarded double, interstitial),
-## and the game-over sheet. The menu calls GameHost.launch(...).
+## entry fee, run-end economy (coins, best/last), and the game-over sheet.
+## The menu calls GameHost.launch(...).
 
 static var active_host: Node = null  # the live host node while a game runs
 
