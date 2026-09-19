@@ -49,8 +49,8 @@ forging it, so the exe can never weigh less than the engine; the zip is as
 small as the official build gets.
 
 **THE 0-WARNINGS LAW (v0.4.0-17):** both workflows run the Node 24 action
-majors (`checkout@v5`, `cache@v5`, `upload-artifact@v5`,
-`download-artifact@v5`) and pin `ubuntu-24.04` on every job — the Node 20
+majors (`checkout@v5`, `cache@v5`, `upload-artifact@v7`,
+`download-artifact@v8`) and pin `ubuntu-24.04` on every job — the Node 20
 deprecation and the ubuntu-latest→26 migration notes can no longer appear.
 
 ### `env-check.yml`
