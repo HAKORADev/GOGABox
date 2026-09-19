@@ -3,10 +3,11 @@
 > The `goldminer` coming-soon teaser seat graduates as **GOLD MINER**. id =
 > `goldminer`. Portrait (vertical for now — "it can be both, but for now
 > vertical"). 2D. Reference study (scraped completely locally, the owner's
-> order): `study_locker/gamesnacks/goldminertom/` — Gamesnacks' **Gold Miner
-> Tom** (Construct 2 build: c2runtime.js + data.js mirrored whole, 98 sprite
-> sheets + 18 sound pairs). Its assets are code-modified and used as ours
-> (the scrape law), integrated with proper changes.
+> order): Gamesnacks' **Gold Miner Tom** (Construct 2 build: c2runtime.js +
+> data.js mirrored whole, 98 sprite sheets + 18 sound pairs) — mirrored in
+> the local study locker, OUTSIDE the repo (the study law: study copies are
+> never committed). Its assets are code-modified and used as ours (the
+> scrape law), integrated with proper changes.
 
 ## 1. One line
 

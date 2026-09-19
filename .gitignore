@@ -47,3 +47,12 @@ Thumbs.db
 download/
 study_out/
 films/
+
+# ---- THE STUDY LAW: study copies never live in the repo ----
+# study_locker/ holds the scraped game mirrors (gamesnacks etc.) and belongs
+# OUTSIDE the repo (docs/DECOMPILATION.md step 7: "Never commit a study copy";
+# docs/AGENTS.md: "study copies live OUTSIDE the repo"). The v040-13 round
+# walked 115 scraped files past the law - removed in the break round, the
+# data lives in the local locker again. Pattern WITHOUT the trailing slash
+# on purpose (the .cache lesson): catches a file OR a dir named study_locker.
+study_locker

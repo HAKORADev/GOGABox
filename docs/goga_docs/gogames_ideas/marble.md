@@ -2,10 +2,11 @@
 
 > The `zuma` coming-soon teaser seat graduates as **MARBLE POPPER** (the owner's
 > rename law: "rename it to just marble popper"). id = `marble`. Portrait. 2D.
-> Reference studies (scraped, the owner's order): `study_locker/gamesnacks/totemia/`
-> (Totemia: Cursed Marbles - 90 levels extracted) and
-> `study_locker/gamesnacks/zumble_ocean/` (Zumble Ocean - 60 levels extracted).
-> Their assets are code-modified and used as ours (the owner's scrape law).
+> Reference studies (scraped, the owner's order — kept OUT of the repo per
+> the study law; they live in the local study locker, untracked):
+> Totemia: Cursed Marbles (90 levels extracted) and Zumble Ocean (60 levels
+> extracted). Their assets are code-modified and used as ours (the owner's
+> scrape law).
 
 ## 1. One line
 
