@@ -1495,15 +1495,102 @@ const GAMES := [
         {"id": "mb_all", "title": "The Box Is Clean", "desc": "Clear all 100 levels", "tier": 4, "rule": {"k": "max", "key": "levels_max", "v": 100}},
 ],
         },
+        # v040-15 THE GRADUATION: the gold miner teaser seat renamed as GOLD
+        # MINER (the owner's GDD, worked into laws; the endless timing miner)
         {"id": "goldminer", "title": "GOLD MINER",
                 "tag": "swing, drop, reel the gold",
-                "coming_soon": true, "orientation": "auto", "dim": "2d",
-                "price": 450, "fee": 8,
+                "script": "res://game/games/goldminer/goldminer.gd",
+                "thumb": "res://assets/thumbs/goldminer.png",
+                "orientation": "portrait", "dim": "2d",
+                "coin_div": 30, "price": 450, "fee": 8, "shop": true,
+                "banner": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
-                "desc": "the claw swings, grabs the good gold, leaves "
-                        + "the rocks behind - swing, drop, grab, reel, "
-                        + "spend the haul, the workshop version is baking"},
+                "desc": "The claw never stops swinging - drop it at the "
+                        + "right beat and it hauls up whatever it bites. "
+                        + "Endless grounds populated fresh every run by the "
+                        + "ground algorithm profiles - big golds ringed by small "
+                        + "rocks, deep veins, bomb minefields - cleared by "
+                        + "taking every gold, then the next one loads. Gold "
+                        + "pays 1/2/3 by size, rocks pay 2/4/6 but crawl "
+                        + "home heavy. Bombs are the lives: three touches "
+                        + "end the dig, and every touch blasts everything "
+                        + "around it. A glowing gold rides the grounds every "
+                        + "50 hauled things - grab it to bank a GOGACoin. "
+                        + "Skins for the miner rig and for the whole vein.",
+                "controls": [
+                        "Tap anywhere to start the dig.",
+                        "Tap to release the swinging claw along its angle.",
+                        "Whatever the claw bites gets reeled to the top - "
+                                + "heavy things crawl home slowly.",
+                        "Take every gold to clear the ground; rocks are "
+                                + "optional but pay more.",
+                        "Never touch a bomb: it costs a life and blasts the "
+                                + "things around it. Three bombs end the run.",
+                        "The glowing gold carries a GOGACoin - reel it in.",
+                        "END in the pause menu banks the run any time.",
+                ],
+                "genres": {"main": ["arcade", "action"],
+                        "sub": ["timing", "procedural", "singleplayer"]},
+                "ach": [
+        {"id": "gm_first", "title": "First Nugget", "desc": "Reel in your first gold", "tier": 1, "rule": {"k": "cnt", "key": "golds_taken", "v": 1}},
+        {"id": "gm_score_1", "title": "Claim Staked", "desc": "Score 150 in one run", "tier": 1, "rule": {"k": "score", "v": 150}},
+        {"id": "gm_plays", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
+        {"id": "gm_coins", "title": "Glow Snatcher", "desc": "Bank 10 glowing golds", "tier": 2, "rule": {"k": "cnt", "key": "coins_taken", "v": 10}},
+        {"id": "gm_gold_100", "title": "Gold Rush", "desc": "Reel in 100 golds (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "golds_taken", "v": 100}},
+        {"id": "gm_rock_50", "title": "Stone Broker", "desc": "Reel in 50 rocks (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "rocks_taken", "v": 50}},
+        {"id": "gm_score_2", "title": "The Mother Lode", "desc": "Score 600 in one run", "tier": 3, "rule": {"k": "score", "v": 600}},
+        {"id": "gm_deep", "title": "Deep Digger", "desc": "Reach ground 8 in one run", "tier": 3, "rule": {"k": "max", "key": "gm_level", "v": 8}},
+],
+        },
+        # v040-15 THE SOON SHELF: the next five un-shipped names walking
+        # FUTURE_GAMES.md top to bottom (the file order law) parked as
+        # workshop teasers - gold miner graduated, the shelf never rests
+        {"id": "knife", "title": "KNIFE CIRCLE",
+                "tag": "fill the circle, miss nothing",
+                "coming_soon": true, "orientation": "portrait", "dim": "2d",
+                "price": 300, "fee": 5,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "the knife-throwing circle: fill the spinning "
+                        + "target with knives, never hit a knife that "
+                        + "already sticks - the workshop version is baking"},
+        {"id": "maskrush", "title": "MASK RUSH",
+                "tag": "swipe the line, ride the maze",
+                "coming_soon": true, "orientation": "portrait", "dim": "2d",
+                "price": 300, "fee": 5,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "the line-riding maze: swipe a direction and the "
+                        + "rider takes the WHOLE line until a wall - the "
+                        + "workshop version is baking"},
+        {"id": "stickbridge", "title": "STICK BRIDGE",
+                "tag": "hold, grow, cross the gap",
+                "coming_soon": true, "orientation": "portrait", "dim": "2d",
+                "price": 300, "fee": 5,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "hold to grow the stick, release to drop the "
+                        + "bridge, walk the gap - the workshop version "
+                        + "is baking"},
+        {"id": "bubbleshot", "title": "BUBBLE SHOT",
+                "tag": "aim, bounce, pop the cluster",
+                "coming_soon": true, "orientation": "portrait", "dim": "2d",
+                "price": 300, "fee": 5,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "the bubble cluster shooter: aim the throw, pop "
+                        + "the matching clusters before the ceiling "
+                        + "closes - the workshop version is baking"},
+        {"id": "towertrim", "title": "TOWER TRIM",
+                "tag": "stack it tall, keep it inside",
+                "coming_soon": true, "orientation": "portrait", "dim": "2d",
+                "price": 300, "fee": 5,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "the clipped tower: stack the falling shapes "
+                        + "high, whatever hangs OUT of the tower gets "
+                        + "trimmed off - the workshop version is baking"},
 ]
 
 static func get_game(id: String) -> Dictionary:

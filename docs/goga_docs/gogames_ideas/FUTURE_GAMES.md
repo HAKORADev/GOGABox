@@ -243,13 +243,17 @@ stay.
   gogames_ideas/deadlyworm.md.
 - **zuma-like** - PopCap Zuma: the stone frog spits balls into the rolling
   chain, match 3 of a color, pop the run - never let the chain reach the
-  hole.
+  hole. **GRADUATED v040-13 as MARBLE POPPER** (100 levels / 10 places, the
+  chain engine, the idol) — gogames_ideas/marble.md.
 - **gold-miner-like** (owner, v0.3.9-6 round) — the Gold Miner CONCEPT:
   someone with a thing (the claw on a cable) that COLLECTS THE GOOD
   GOLD and lets the rocks fall behind - swing, drop, grab, reel, spend
   the haul. Timing-and-value arcade, same concept, GOGABox cut.
   (Dedup-checked: craze-caves-like digs with its own body through caves
   - this one never moves, the CLAW does all the work.)
+  **GRADUATED v040-15 as GOLD MINER** (the Gamesnacks Gold Miner Tom
+  scrape, the endless algorithmic grounds, bombs-as-lives, the every-50
+  glowing gold) — gogames_ideas/gold_miner.md.
 - **knife circle** — throw a knife at a moving/rotating circle without
   hitting another knife. ("yes that type")
 - **tomb-of-the-mask-old-maze-like** — the owner's "tomb of the mask: old
@@ -808,3 +812,37 @@ is an original).
   PARRIED by the sword on the way through (the parry is the
   counter-attack). Kill, take the arena's rewards, grow the orbit, go
   deeper - the rogue-like loop wrapped around one spinning blade.
+
+Twenty-first dump - the v040-15 round (2026-09-18, the owner's message
+alongside the gold miner build, +2: the brawl-stars-like arena brawler and
+FULL ORBIT, the owner's own concept, specced in full). Dedup-checked
+against the shelf: the brawl-stars-like is SIBLINGS-not-duplicates with
+cosmic_spud (the shipped top-down arena shooter ON FOOT - no hero roster,
+no supers) - THIS one is the hero-brawler energy (a roster, supers and
+gadgets, the 3v3 / battle-royale mode family). Full Orbit is
+SIBLINGS-not-duplicates with the racing shelf (line racer, traffic
+drifter, hill climb - none wears a planet-sized road or the
+wreck-economy siege); it also cross-references the vehicle-horde
+rogue-like (the surround-and-wreck energy, but on an open road around
+the earth, not a horde field). Both stay.
+
+- **brawl-stars-like** - the hero arena brawler: a roster of
+  characters with their own attacks + supers/gadgets, quick top-down
+  arena modes (the 3v3 gem-grab / brawl-ball energy, the showdown
+  battle-royale flavor), trophies climbing. (Owner: "Add a game like
+  brawl stars".)
+- **full orbit** (the owner's own concept) - a 3D game with a ROAD and
+  the controllable thing is a car on a road that is 40000KM (a full
+  spin around the earth): other cars damage you and you wreck them,
+  some cars shoot and you can shoot; WRECKS are the currency - upgrade
+  the car or change it with a better, stronger one with more things;
+  THE GOAL is a full earth spin without getting wrecked. The run can be
+  closed and RETURNED FROM WHERE IT STOPPED (the journey persists).
+
+THE SOON SHELF (v040-15 round): the first five un-shipped names walking
+this file top to bottom are parked in the box as the workshop teasers
+**KNIFE CIRCLE / MASK RUSH / STICK BRIDGE / BUBBLE SHOT / TOWER TRIM**
+(registry ids knife, maskrush, stickbridge, bubbleshot, towertrim -
+knife circle, tomb-of-the-mask line mover, stick hero, bubble shooter,
+tower stacking clipped) so the owner picks the next GDDs from a living
+shelf. GOLD MINER graduated the same round.

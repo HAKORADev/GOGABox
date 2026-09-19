@@ -312,22 +312,27 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 28,
-                "28 playable games (marble popper joined, v040-13)")
+        var ok := _check(GameReg.playable().size() == 29,
+                "29 playable games (gold miner joined, v040-15)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
         # feed sorts by this file's order; the newest game walks last)
-        ok += _check(GameReg.workshop().size() == 1,
-                "1 workshop teaser (gold miner - zuma graduated as MARBLE POPPER, v040-13)")
+        # v040-15: gold miner graduated; the NEXT FIVE teasers parked
+        ok += _check(GameReg.workshop().size() == 5,
+                "5 workshop teasers (gold miner graduated, v040-15: knife "
+                + "circle, mask rush, stick bridge, bubble shot, tower trim)")
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
-        ok += _check(ids[ids.size() - 1] == "goldminer"
-                        and ids.find("rockbreaker") == ids.size() - 4
-                        and ids.find("deathworm") == ids.size() - 3
-                        and ids.find("marble") == ids.size() - 2,
-                "marble popper walks last of the playable, the teaser after it")
+        ok += _check(ids.find("marble") == ids.size() - 7
+                        and ids.find("goldminer") == ids.size() - 6
+                        and ids[ids.size() - 5] == "knife"
+                        and ids[ids.size() - 4] == "maskrush"
+                        and ids[ids.size() - 3] == "stickbridge"
+                        and ids[ids.size() - 2] == "bubbleshot"
+                        and ids[ids.size() - 1] == "towertrim",
+                "gold miner walks last of the playable, five teasers after it (v040-15)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
@@ -342,7 +347,15 @@ func _t_registry() -> int:
                         and GameReg.get_game("zuma").is_empty()
                         and String(GameReg.get_game("marble")["title"]) == "MARBLE POPPER"
                         and String(GameReg.get_game("goldminer")["title"]) == "GOLD MINER",
-                "the SOON teasers wear their shelf names; zuma graduated as MARBLE POPPER (v040-13)")
+                "the SOON teasers wear their shelf names; gold miner graduated (v040-15)")
+        # v040-15: the next five teasers carry the FUTURE_GAMES order
+        ok += _check(String(GameReg.get_game("knife")["title"]) == "KNIFE CIRCLE"
+                        and String(GameReg.get_game("maskrush")["title"]) == "MASK RUSH"
+                        and String(GameReg.get_game("stickbridge")["title"]) == "STICK BRIDGE"
+                        and String(GameReg.get_game("bubbleshot")["title"]) == "BUBBLE SHOT"
+                        and String(GameReg.get_game("towertrim")["title"]) == "TOWER TRIM"
+                        and bool(GameReg.get_game("knife")["coming_soon"]),
+                "the next five FUTURE_GAMES names parked as teasers (v040-15)")
         ok += _check(GameReg.get_game("keys").is_empty(),
                 "Key Singer retired from the box")
         ok += _check(String(GameReg.get_game("maze")["title"]) == "Maze Escaper",
@@ -439,6 +452,31 @@ func _t_registry() -> int:
                 "FIVE PLACES each: every theme owns five views")
         ok += _check(RB.SKINS.size() == 5 and int(RB.SKINS["classic"]["price"]) == 0,
                 "5 cannon skins, the first free")
+        # v040-15: GOLD MINER graduates (the endless timing miner)
+        var gm_reg: Dictionary = GameReg.get_game("goldminer")
+        ok += _check(not bool(gm_reg.get("coming_soon", false)) \
+                        and String(gm_reg["orientation"]) == "portrait",
+                "gold miner is PLAYABLE now: portrait (the vertical law)")
+        ok += _check(String(gm_reg["title"]) == "GOLD MINER",
+                "the gold-miner teaser ships as GOLD MINER (the owner's naming law)")
+        ok += _check(int(gm_reg["coin_div"]) == 30 and int(gm_reg["fee"]) == 8,
+                "gold miner wears the owner's economy (bonus /30, fee 8)")
+        ok += _check(bool(gm_reg["shop"]) and bool(gm_reg["banner"]),
+                "gold miner wears the shop + the banner")
+        ok += _check(gm_reg["ach"].size() == 8,
+                "gold miner wears the tiered ladder (8)")
+        var GM: GDScript = load("res://game/games/goldminer/miner_data.gd")
+        ok += _check(int(GM.POINTS["gold_s"]) == 1 and int(GM.POINTS["gold_m"]) == 2
+                        and int(GM.POINTS["gold_l"]) == 3
+                        and int(GM.POINTS["rock_s"]) == 2
+                        and int(GM.POINTS["rock_m"]) == 4
+                        and int(GM.POINTS["rock_l"]) == 6,
+                "gold miner wears the point law (gold 1/2/3, rock 2/4/6)")
+        ok += _check(float(GM.REEL_SPEED["rock_l"]) < float(GM.REEL_SPEED["gold_l"]),
+                "gold miner wears the weight law (heavy value crawls home)")
+        ok += _check((GM.MINER_SKINS as Array).size() == 5
+                        and (GM.VEIN_SKINS as Array).size() == 5,
+                "gold miner wears the 5 + 5 skins (bombs are one)")
         ok += _check(RB.fmt(1000) == "1.00K" and RB.fmt(1254000) == "1.25M",
                 "the number law: 1.00K, 1.25M after 999")
         # v0.3.9-5: THE SPLIT SIGHT + THE HEAVY KICK (the owner's patch-5)
@@ -2372,10 +2410,11 @@ func _t_feed_order() -> int:
         ok += _check(Roadmap.state("squares") == "LOCKED",
                 "squares surfaces LOCKED at 12 owned (%s)" % Roadmap.state("squares"))
         # v0.4.0-1 THE SOON SHELF IS BACK: the four next names parked
-        # again (the owner's v040 report catch)
-        ok += _check(GameReg.workshop().size() == 1,
-                "the workshop wears the last soon teaser "
-                + "(zuma graduated as MARBLE POPPER v040-13)")
+        # again (the owner's v040 report catch) - v040-15: gold miner
+        # graduated, the NEXT FIVE ride the shelf
+        ok += _check(GameReg.workshop().size() == 5,
+                "the workshop wears the next five teasers "
+                + "(gold miner graduated v040-15)")
         rows = Roadmap.feed_rows()
         ids = []
         buckets = []
@@ -2384,10 +2423,10 @@ func _t_feed_order() -> int:
                 buckets.append(int(r["bucket"]))
         var soon_first_at := buckets.find(3)
         if soon_first_at >= 0:
-                # v040-13: goldminer leads the shelf (zuma graduated as
-                # MARBLE POPPER)
-                ok += _check(String(ids[soon_first_at]) == "goldminer",
-                        "the SOON block wears goldminer first (%s)" % [ids.slice(soon_first_at)])
+                # v040-15: knife leads the shelf (gold miner graduated as
+                # GOLD MINER)
+                ok += _check(String(ids[soon_first_at]) == "knife",
+                        "the SOON block wears knife first (%s)" % [ids.slice(soon_first_at)])
                 var soon_tail_ok := true
                 for k in range(soon_first_at, buckets.size()):
                         if int(buckets[k]) != 3:
