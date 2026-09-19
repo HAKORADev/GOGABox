@@ -2265,6 +2265,26 @@ func _open_settings() -> void:
                 Jukebox.apply_volumes()
                 Jukebox.sfx("coin", -2.0)))
 
+        # v0.4.0-17 THE PC SETTINGS TOGGLE (the owner: "make in windows build,
+        # the settings menu has toggles of full screen or windowed"): one
+        # honest button, PC builds only - phones never see it. The state is
+        # the real window mode, the label re-reads it, and the stay-open law
+        # (v040-14) rebuilds the sheet in place - the close button owns
+        # closing.
+        if ScaleRule.is_pc():
+                var fs_txt := "FULLSCREEN: ON" if ScaleRule.is_fullscreen() \
+                                else "FULLSCREEN: OFF"
+                vb.add_child(Arc.button(fs_txt, Vector2(480, 70), 24, Arc.ACCENT,
+                                func():
+                                        ScaleRule.toggle_fullscreen()
+                                        Jukebox.sfx("click", -4.0)
+                                        _close_sheet()
+                                        _open_settings()))
+                var fs_note := Arc.label("or press F11 / Alt+Enter anywhere",
+                                19, Color("8a6a40"), false)
+                fs_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                vb.add_child(fs_note)
+
         var reset := Arc.button("RESET ALL PROGRESS", Vector2(480, 70), 22, Arc.BAD,
                         func(): _confirm_reset_all())
         vb.add_child(reset)

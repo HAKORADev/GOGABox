@@ -9,6 +9,11 @@ var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
+        # v0.4.0-17 THE PC BOOT WINDOW LAW: on a desktop, honor the persisted
+        # fullscreen choice and shape the window to the menu (portrait)
+        # BEFORE the menu reads the pixels - the first frame is already the
+        # right shape. Phones: is_pc() is false, this is a no-op.
+        ScaleRule.boot_window()
         # v0.1.3 THE RESOLUTION & SCALE RULE (ScaleRule.gd = source of truth):
         # internal resolution FIXED at 1080x1920 portrait / 1920x1080
         # landscape; stretch canvas_items + aspect EXPAND fills ANY window
@@ -180,6 +185,17 @@ func _input(event: InputEvent) -> void:
         if _splash_alive and event is InputEventScreenTouch \
                         and (event as InputEventScreenTouch).pressed:
                 _end_splash()
+                return
+        # v0.4.0-17 THE PC HOTKEY LAW (the owner's order): F11 or Alt+Enter
+        # toggles fullscreen / windowed anywhere in the box. PC only, key
+        # press only (no echo), and the splash keeps its skip touch.
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo \
+                        and ScaleRule.is_pc():
+                var k := (event as InputEventKey).keycode
+                if k == KEY_F11 or ((k == KEY_ENTER or k == KEY_KP_ENTER) \
+                                and (event as InputEventKey).alt_pressed):
+                        ScaleRule.toggle_fullscreen()
 
 ## Android BACK button (config/quit_on_go_back=false routes it here):
 ## in-game -> pause | sheet open -> close it | menu -> "leave GOGABox?"

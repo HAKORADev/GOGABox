@@ -1231,7 +1231,7 @@ func _start_mode(id: String) -> void:
         if mode == "peace":
                 score_bonus_enabled = false
                 pause_end_run = true
-                Jukebox.music("res://assets/audio/music/matcher_peace.wav")
+                Jukebox.music("res://assets/audio/music/matcher_peace.ogg")
         else:
                 score_bonus_enabled = true
                 pause_end_run = false
@@ -5478,7 +5478,7 @@ func _rail_tap(pid: String) -> void:
 var _arm_snd: AudioStreamPlayer = null
 
 func _arm_sound_fade_in() -> void:
-        var path := "res://assets/audio/sfx/m_arm.wav"
+        var path := "res://assets/audio/sfx/m_arm.ogg"
         if not ResourceLoader.exists(path):
                 return
         if _arm_snd == null:

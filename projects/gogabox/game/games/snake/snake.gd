@@ -209,7 +209,7 @@ func _goga_setup() -> void:
         _build_chips()
         _speed_lbl = add_hud_chip("x1.00")
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/snake_theme.wav")
+        Jukebox.music("res://assets/audio/music/snake_theme.ogg")
         # THE LORE LAW (v0.3.9-13): the snake speaks first - once ever -
         # then the flow walks on (the ask, or the mode select on reload)
         var flow := func():

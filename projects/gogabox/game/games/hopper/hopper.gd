@@ -485,7 +485,7 @@ func _goga_setup() -> void:
         if _is_geo():
                 Jukebox.music("res://assets/audio/music/tower_geo_theme.ogg")
         else:
-                Jukebox.music("res://assets/audio/music/tower_theme.wav")
+                Jukebox.music("res://assets/audio/music/tower_theme.ogg")
         _show_ready_card()
 
 func _apply_place(mat: ShaderMaterial) -> void:
@@ -2376,7 +2376,7 @@ func _apply_geo_style() -> void:
         if _is_geo():
                 Jukebox.music("res://assets/audio/music/tower_geo_theme.ogg")
         else:
-                Jukebox.music("res://assets/audio/music/tower_theme.wav")
+                Jukebox.music("res://assets/audio/music/tower_theme.ogg")
 
 func _place_row(id: String) -> Control:
         var pl: Dictionary = PLACES[id]

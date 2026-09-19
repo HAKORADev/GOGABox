@@ -487,7 +487,7 @@ func _goga_setup() -> void:
         # be at the right side") - the flow seats in call order
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("OPTIONS", func(): _options_open())
-        Jukebox.music("res://assets/audio/music/bv_theme.wav")
+        Jukebox.music("res://assets/audio/music/bv_theme.ogg")
         _build_ready()
 
 func _new_board() -> void:

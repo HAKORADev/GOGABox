@@ -143,3 +143,99 @@ static func apply_expand(win: Window) -> bool:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
                 return true
         return false
+
+# ================================================== THE PC WINDOW LAWS
+## v0.4.0-17 (the owner's first Windows test round): the WINDOW follows the
+## CONTENT in windowed mode. The owner: "it should be internally 1:1 ...
+## 1280x720 or even 4K, all should work ... make pressing F11 or alt+enter
+## go full screen or return windowed ... make it in vertical games to
+## re-window itself to have no empty sides."
+##   - THE 1:1 LAW: stretch canvas_items renders at the REAL window
+##     resolution on every size (720p, FHD, 4K) - the design constants are
+##     a logical canvas, never an upscale target. Nothing extra to code:
+##     any window size works, and the laws below just pick a good shape.
+##   - THE RE-WINDOW LAW: windowed, the window RESHAPES itself to the
+##     content's aspect - portrait content (the box menu, portrait games)
+##     gets a 9:16 window, landscape games get a 16:9 window - so the
+##     vertical slice renders with NO empty sides. The vertical slice law
+##     above stays as the fallback for whatever aspect the user drags the
+##     window into (brown bars, never black, never stretched).
+##   - THE FULLSCREEN LAW: F11 / Alt+Enter anywhere, or the SETTINGS
+##     toggle (Windows build), flips WINDOW_MODE_FULLSCREEN <-> WINDOWED.
+##     Fullscreen is a monitor - it cannot reshape - so portrait content
+##     falls back to the vertical slice with the box brown sides. The
+##     choice persists in the Box settings (pc_fullscreen) and re-applies
+##     at boot.
+
+## The content kind currently driving the window shape:
+## "portrait" (menu + portrait games) or "landscape".
+static var pc_kind := "portrait"
+
+static func is_fullscreen() -> bool:
+        var m := DisplayServer.window_get_mode()
+        return m == DisplayServer.WINDOW_MODE_FULLSCREEN \
+                        or m == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+
+## Re-shape the window to `kind` ("portrait" | "landscape") in WINDOWED
+## mode, centered on the window's screen. Fullscreen: remember the kind and
+## leave the monitor alone. Headless/no-display: no-op (probes stay safe).
+static func re_window(kind: String) -> void:
+        if kind != "landscape" and kind != "portrait":
+                return
+        pc_kind = kind
+        if DisplayServer.get_name() == "headless":
+                return
+        if is_fullscreen():
+                return
+        var scr := _usable_rect()
+        var want: Vector2i
+        if kind == "portrait":
+                # 9:16 like the design, 90% of the screen height, sane caps
+                var h := clampi(int(float(scr.size.y) * 0.9), 480, 1440)
+                want = Vector2i(h * 9 / 16, h)
+        else:
+                # 16:9 like the design (the classic 1280x720 window), 80%
+                # of the screen width, sane caps
+                var w := clampi(int(float(scr.size.x) * 0.8), 640, 1600)
+                want = Vector2i(w, w * 9 / 16)
+        want.x = mini(want.x, scr.size.x)
+        want.y = mini(want.y, scr.size.y)
+        DisplayServer.window_set_size(want)
+        DisplayServer.window_set_position(
+                        scr.position + (scr.size - want) / 2)
+
+## THE FULLSCREEN LAW: flip, persist, and on the way back to windowed
+## re-window to the content kind so no empty sides return with it.
+static func toggle_fullscreen() -> void:
+        set_fullscreen(not is_fullscreen())
+
+static func set_fullscreen(on: bool) -> void:
+        if DisplayServer.get_name() == "headless":
+                return
+        if on == is_fullscreen():
+                return
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN
+                        if on else DisplayServer.WINDOW_MODE_WINDOWED)
+        if Box.has_method("set_pc_fullscreen"):
+                Box.set_pc_fullscreen(on)
+        if not on:
+                re_window(pc_kind)
+
+## The boot law (main._ready): honor the persisted choice once.
+static func boot_window() -> void:
+        if not is_pc() or DisplayServer.get_name() == "headless":
+                return
+        var want_fs: bool = Box.has_method("pc_fullscreen") \
+                        and Box.call("pc_fullscreen")
+        if want_fs:
+                DisplayServer.window_set_mode(
+                                DisplayServer.WINDOW_MODE_FULLSCREEN)
+        else:
+                re_window(pc_kind)
+
+static func _usable_rect() -> Rect2i:
+        var scr := DisplayServer.window_get_current_screen()
+        var r := DisplayServer.screen_get_usable_rect(scr)
+        if r.size.x <= 0 or r.size.y <= 0:
+                r = Rect2i(Vector2i.ZERO, Vector2i(1280, 720))
+        return r

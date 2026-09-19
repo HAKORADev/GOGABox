@@ -898,9 +898,9 @@ func _t_registry() -> int:
                 var vk := String(JC.THEMES[tk]["sfx"])
                 sfx_ok = sfx_ok \
                         and ResourceLoader.exists("res://assets/audio/sfx/cd_in_"
-                                        + vk + ".wav") \
+                                        + vk + ".ogg") \
                         and ResourceLoader.exists("res://assets/audio/sfx/cd_out_"
-                                        + vk + ".wav")
+                                        + vk + ".ogg")
         ok += _check(sfx_ok,
                 "every theme wears its own in/out SFX voice (the owner's ask)")
         var ok2 := true

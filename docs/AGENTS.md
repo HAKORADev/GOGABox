@@ -114,6 +114,12 @@ ships BOTH platforms on every push to main:
 - THE VERTICAL SLICE LAW: on desktop, portrait designs render a KEEP-aspect
   slice down the window's middle; the letterbox wears the box brown
   (`ScaleRule.is_pc` + `apply_vertical_slice`; landscape keeps EXPAND).
+  v0.4.0-17: the slice is the FALLBACK - in windowed mode THE RE-WINDOW LAW
+  reshapes the window to the content first (portrait -> 9:16, landscape ->
+  16:9, `ScaleRule.re_window`), so no empty sides show at all.
+- THE FULLSCREEN LAW: F11 / Alt+Enter anywhere (main._input) + the SETTINGS
+  toggle (PC builds only). The choice persists in Box settings
+  (`pc_fullscreen`) and re-applies at boot (`ScaleRule.boot_window`).
 - THE CONTROLS: every game wears `controls_pc` in its registry entry
   (keyboard/mouse lines rendered as HOW TO PLAY - PC in the guide); games
   with analog/zone touch controls carry a keyboard twin (the arrows /
@@ -126,6 +132,24 @@ ships BOTH platforms on every push to main:
 - `emulate_touch_from_mouse=true` in project.godot makes every tap game
   mouse-playable with zero code - only zone/analog games need the keyboard
   twin.
+
+**THE SLIM PACK LAWS (v0.4.0-17 - the owner's size round: "213 MBs ... x2.2
+the size of one apk ... there is something like compressing"):**
+
+- THE SLIM AUDIO LAW: `assets/audio` holds OGG sources only (libvorbis q6,
+  `tools/v0417_slim_audio.py` - 417 wav sources converted, duration-checked
+  to 150 ms, refs patched). A forge that emits wav must convert before
+  commit. The Jukebox already prefers .ogg and force-loops music at runtime.
+- THE 2D TEXTURE LAW: every 2D texture imports LOSSLESS
+  (`compress/mode=0`, no mipmaps - `tools/v0417_slim_textures.py`). The 38
+  VRAM-compressed stragglers (bgs, thumbs, chess woods, splash) weighed 3x
+  their source pixels and went blocky on gradients. VRAM compress is for
+  real 3D only - this box has none.
+- THE SMALL DELIVERY LAW: the Windows artifact ships THE ZIP ONLY (the exe
+  + README inside it); CI fails if the delivery passes 175 MB. The exe's
+  floor is the OFFICIAL 32-bit template (~116 MB, all renderers compiled
+  in) - no forging, no UPX, no 64-bit preset; the game data is the only
+  part that answers for its weight.
 
 
 ## 5. Developing & building

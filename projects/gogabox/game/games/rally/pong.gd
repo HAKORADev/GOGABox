@@ -153,7 +153,7 @@ func _goga_setup() -> void:
         set_hud_score_prefix("PONG")
         _heat_lbl = add_hud_chip("x1.00")
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/pong_theme.wav")
+        Jukebox.music("res://assets/audio/music/pong_theme.ogg")
         # THE LORE LAW (v0.3.9-13): the platform speaks first - once ever
         var flow := func():
                 if forced != "":

@@ -398,15 +398,15 @@ func _reset_run() -> void:
 func _music_track() -> String:
         match place_id:
                 "polar":
-                        return "res://assets/audio/sfx/dw_music_ice.wav"
+                        return "res://assets/audio/sfx/dw_music_ice.ogg"
                 "city":
-                        return "res://assets/audio/sfx/dw_music_city.wav"
+                        return "res://assets/audio/sfx/dw_music_city.ogg"
                 "jungle":
-                        return "res://assets/audio/sfx/dw_music_jungle.wav"
+                        return "res://assets/audio/sfx/dw_music_jungle.ogg"
                 "medieval":
-                        return "res://assets/audio/sfx/dw_music_kingdom.wav"
+                        return "res://assets/audio/sfx/dw_music_kingdom.ogg"
                 _:
-                        return "res://assets/audio/sfx/dw_music_desert.wav"
+                        return "res://assets/audio/sfx/dw_music_desert.ogg"
 
 func _goga_intro() -> void:
         state = "intro"

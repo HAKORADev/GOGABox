@@ -670,7 +670,7 @@ func _goga_setup() -> void:
         _layout(vp)
         _build_widgets(vp)
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/ludo_theme.wav")
+        Jukebox.music("res://assets/audio/music/ludo_theme.ogg")
         ## THE FLOW LAW: the optionals ask opens the game FIRST, the
         ## TAP ANYWHERE gate seats after the pick (the snakes board's
         ## own correction, the house keeps one flow)

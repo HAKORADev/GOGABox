@@ -444,7 +444,7 @@ func _goga_setup() -> void:
         _build_fade()
         _next_level(true)
         _intro_open()
-        Jukebox.music("res://assets/audio/music/pong_theme.wav")
+        Jukebox.music("res://assets/audio/music/pong_theme.ogg")
 
 func _build_shop_button() -> void:
         add_hud_button("SHOP", func(): _shop_open())

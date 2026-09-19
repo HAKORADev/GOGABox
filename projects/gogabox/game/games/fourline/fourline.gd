@@ -434,7 +434,7 @@ func _goga_setup() -> void:
         _build_widgets(vp)
         _load_meta()
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/fl_theme.wav")
+        Jukebox.music("res://assets/audio/music/fl_theme.ogg")
         _build_ready()
 
 func _skin() -> Dictionary:

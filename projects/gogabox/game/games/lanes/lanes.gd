@@ -272,7 +272,7 @@ func _goga_setup() -> void:
         _build_ship()
         _build_hud2()
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/dash_theme.wav")
+        Jukebox.music("res://assets/audio/music/dash_theme.ogg")
         _show_ready_card()
 
 func _add_mat() -> CanvasItemMaterial:

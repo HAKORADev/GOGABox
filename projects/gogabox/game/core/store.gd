@@ -75,7 +75,10 @@ func _defaults() -> Dictionary:
         return {
                 "coins": START_COINS,
                 "owned": ["snake"],           # snake is the free starter game
-                "settings": {"music": 0.8, "sfx": 0.9},
+                # v0.4.0-17: pc_fullscreen rides along (the PC FULLSCREEN
+                # LAW - Windows settings toggle + F11/Alt+Enter persist here;
+                # phones ignore it, the key just never applies there).
+                "settings": {"music": 0.8, "sfx": 0.9, "pc_fullscreen": false},
                 "games": {},                  # per-game: best/last/plays/counters/ach/progress
                 "meta": {},                   # box-wide: reveal bookkeeping, last_play, ...
                 "favorites": [],              # favorited game ids (heart in the pre-play menu)
@@ -858,6 +861,16 @@ func set_music_volume(v: float) -> void:
 
 func set_sfx_volume(v: float) -> void:
         data["settings"]["sfx"] = clampf(v, 0.0, 1.0)
+        save()
+
+## v0.4.0-17 THE PC WINDOW LAWS: the fullscreen choice (Windows settings
+## toggle / F11 / Alt+Enter) survives restarts. Saves from old builds lack
+## the key - get() keeps windowed as the default.
+func pc_fullscreen() -> bool:
+        return bool(data["settings"].get("pc_fullscreen", false))
+
+func set_pc_fullscreen(v: bool) -> void:
+        data["settings"]["pc_fullscreen"] = v
         save()
 
 ## THE 0-ADS LAW: the old interstitial pacing counter (every 3rd run-back

@@ -55,7 +55,7 @@ func _hit_count(g: GogaGame, marked: Array, before: Array) -> int:
 
 func _run() -> void:
         Box.reset_all()
-        _check(ResourceLoader.exists("res://assets/audio/music/dash_theme.wav"),
+        _check(ResourceLoader.exists("res://assets/audio/music/dash_theme.ogg"),
                         "the deep sky has its music")
         for t in ["ship_orange", "enemy_grunt", "laser_yellow",
                   "laser_thunder", "bomb", "shield_1", "fx_flare"]:

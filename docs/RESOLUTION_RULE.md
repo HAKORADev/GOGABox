@@ -231,3 +231,39 @@ Verification (tests/geometry_probe.gd, rewritten v0.1.3):
   regression back to KEEP), and no visible Control pokes outside.
 - LAYER 3 - rotation ping-pong: landscape -> portrait -> landscape ->
   portrait on one live scene (the owner's third screenshot regression).
+
+## THE PC WINDOW LAWS (v0.4.0-17 - the owner's first Windows test round)
+
+The owner's order: "it should be internally 1:1 internal horizontal/vertical
+resolutions, 1280x720 or even 4K, all should work, make pressing F11 or
+alt+enter go full screen or return windowed ... make it in vertical games to
+re-window itself to have no empty sides ... make in windows build, the
+settings menu has toggles of full screen or windowed."
+
+9. THE 1:1 LAW: stretch `canvas_items` renders at the REAL window
+   resolution on every size - 720p, FHD, 4K. The design constants are a
+   logical canvas, never an upscale target; the PC window laws just pick a
+   good window SHAPE. Any window size the user makes already renders 1:1.
+10. THE RE-WINDOW LAW (ScaleRule.re_window): in WINDOWED mode the window
+    reshapes itself to the content - portrait content (the box menu,
+    portrait games) gets a 9:16 window (~90% of the screen height), landscape
+    games a 16:9 window (~80% of the width), centered on the screen. The
+    vertical slice (rule 2's phone history) stays as the FALLBACK for any
+    off-aspect shape the user drags the window into: brown bars, never
+    black, never stretched. Hooked at: boot (main._ready, the persisted
+    choice), game launch (host_node._apply_orientation), back-to-menu
+    (host_node._restore). Fullscreen: the kind is remembered, the monitor
+    is left alone.
+11. THE FULLSCREEN LAW: F11 or Alt+Enter anywhere (main._input, PC only,
+    no echo), or the SETTINGS sheet toggle (Windows builds only - phones
+    never see the row; the stay-open law rebuilds the sheet in place).
+    Toggling persists through Box settings (`pc_fullscreen`) and re-applies
+    at boot. Fullscreen is a monitor - it cannot reshape - so portrait
+    content wears the vertical slice with the box brown sides there.
+
+Verification (tests/window_probe.gd - run under Xvfb, NOT --headless:
+headless has no window and every law no-ops by design): the REAL main.gd
+boots, the window must open portrait ~9:16; re_window landscape/portrait
+reshape + stay inside the screen + remember the kind; the fullscreen toggle
+flips the mode, persists in the Box settings, and returning to windowed
+re-windows to the content; the content scale stays glued to the design.

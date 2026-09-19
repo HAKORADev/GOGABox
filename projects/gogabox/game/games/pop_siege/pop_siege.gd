@@ -159,7 +159,7 @@ func _goga_setup() -> void:
         _build_night()
         _build_ready()
         _goga_tk_ready()
-        Jukebox.music("res://assets/audio/music/ps_theme.wav")
+        Jukebox.music("res://assets/audio/music/ps_theme.ogg")
         check_achievements()
 
 # ------------------------------------------------------------ the ready gate

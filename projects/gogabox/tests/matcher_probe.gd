@@ -447,7 +447,7 @@ func _run() -> void:
         G.coin_clock = 0.05
         await get_tree().create_timer(0.3).timeout
         ck(G.coin_cell.x < 0, "PEACE spawns no coins")
-        ck(String(Jukebox._current_music).ends_with("matcher_peace.wav"),
+        ck(String(Jukebox._current_music).ends_with("matcher_peace.ogg"),
                 "PEACE keeps its own calm theme")
 
         # ------------------------------------------------ the butterflies laws

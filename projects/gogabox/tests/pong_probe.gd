@@ -36,7 +36,7 @@ func _drag(g: GogaGame, at: Vector2, idx := 0) -> void:
 
 func _run() -> void:
         Box.reset_all()
-        _check(ResourceLoader.exists("res://assets/audio/music/pong_theme.wav"),
+        _check(ResourceLoader.exists("res://assets/audio/music/pong_theme.ogg"),
                         "the court has its music")
         var g: GogaGame = load("res://game/games/rally/pong.gd").new()
         g.game_id = "rally"

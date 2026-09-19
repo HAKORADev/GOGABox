@@ -554,7 +554,7 @@ func _goga_setup() -> void:
                                                 "thunder", "bomb"]:
                                 wpower[wid] = 1
                                 wpts[wid] = 0
-                Jukebox.music("res://assets/audio/music/inv_tour.wav")
+                Jukebox.music("res://assets/audio/music/inv_tour.ogg")
                 # THE FLOW LAW (v0.3.2 PATCH, the owner: "the game supposed to show
                 # optionals screen first then the tap to play"): the crew picker
                 # opens FIRST; closing it lands on the tap-anywhere card.
@@ -1517,7 +1517,7 @@ func _begin_stage(idx: int, first := false) -> void:
                 stage = idx
                 wave = 0
                 if idx == 9:
-                                Jukebox.music("res://assets/audio/music/inv_finale.wav")
+                                Jukebox.music("res://assets/audio/music/inv_finale.ogg")
                 if not first and themes_on:
                                 _apply_stage_sky(idx)
                 phase = "gap"

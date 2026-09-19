@@ -47,6 +47,9 @@ Thumbs.db
 download/
 study_out/
 films/
+# the local export scratch (the Windows preset's export_path; CI writes the
+# same dir and only ever uploads the zipped delivery)
+projects/build/
 
 # ---- THE STUDY LAW: study copies never live in the repo ----
 # study_locker/ holds the scraped game mirrors (gamesnacks etc.) and belongs

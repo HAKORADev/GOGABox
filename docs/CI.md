@@ -37,6 +37,22 @@ and zips `GOGABox.exe` + a README.txt into `GOGABox-windows-<version>.zip`.
 There is no 64-bit exe preset. The exe is exported with the project's
 committed `export_presets.cfg` — no per-run patching.
 
+**THE SMALL DELIVERY LAW (v0.4.0-17):** the artifact ships **THE ZIP ONLY** —
+the old run uploaded the raw exe AND the zip, so one download carried the
+game twice (~360 MB). The zip is what ships. The game data itself is kept
+lean by THE SLIM PACK LAWS (tools/v0417_slim_audio.py: every wav source is
+ogg; tools/v0417_slim_textures.py: every 2D texture imports lossless), and
+the job fails CI if the delivery ever re-fattens past 175 MB. Read the exe's
+weight honestly: ~116 MB of it is the OFFICIAL 32-bit template (the engine
+floor: D3D12 + ANGLE + Vulkan + GL all compiled in) — the laws forbid
+forging it, so the exe can never weigh less than the engine; the zip is as
+small as the official build gets.
+
+**THE 0-WARNINGS LAW (v0.4.0-17):** both workflows run the Node 24 action
+majors (`checkout@v5`, `cache@v5`, `upload-artifact@v5`,
+`download-artifact@v5`) and pin `ubuntu-24.04` on every job — the Node 20
+deprecation and the ubuntu-latest→26 migration notes can no longer appear.
+
 ### `env-check.yml`
 
 Fast toolchain-only sanity run (no build). Use it after touching

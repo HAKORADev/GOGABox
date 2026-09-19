@@ -720,7 +720,7 @@ func _goga_setup() -> void:
         # (the owner: "no optionals or options for now")
         add_hud_button("SHOP", func(): _shop_open())
         pause_end_run = true         # THE PONG LAW: the pause END banks
-        Jukebox.music("res://assets/audio/music/de_theme.wav")
+        Jukebox.music("res://assets/audio/music/de_theme.ogg")
         _new_maze(true)
         # THE LORE LAW: the first start wears its story (the invaders way)
         if Box.counter(game_id, "lore_start") == 0:

@@ -42,12 +42,14 @@ Notify="*res://addons/notify/notify.gd"
 ; and OS safe insets (notch/gesture bars) are padded as design-px margins.
 window/size/viewport_width=1080
 window/size/viewport_height=1920
-; THE PC WINDOW (v0.3.4-3, the windows return): desktops open a 1280x720
-; window - portrait designs render as the vertical slice with the box
-; brown sides (ScaleRule.apply_vertical_slice), landscape designs fill it
-; (EXPAND).
-window/size/window_width_override=1280
-window/size/window_height_override=720
+; THE PC WINDOW (v0.4.0-17): desktops open a PORTRAIT 720x1280 window -
+; the box menu is portrait content, and the RE-WINDOW LAW (ScaleRule)
+; reshapes the window to every content: portrait games stay 9:16, landscape
+; games re-window to 16:9 - no empty sides anywhere. F11 / Alt+Enter or the
+; settings toggle go fullscreen; the vertical slice (box brown sides) only
+; returns in fullscreen or when the user drags the window off-aspect.
+window/size/window_width_override=720
+window/size/window_height_override=1280
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"

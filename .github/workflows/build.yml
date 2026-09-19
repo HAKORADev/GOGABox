@@ -60,16 +60,21 @@ on:
       - "build.sh"
       - ".github/workflows/build.yml"
 
+# THE 0-WARNINGS LAW (v0.4.0-17, the owner's annotations report): the
+# actions ride the Node 24 majors (checkout@v5, cache@v5, upload-artifact@v5,
+# download-artifact@v5) and every job pins ubuntu-24.04 - ubuntu-latest would
+# silently migrate to Ubuntu 26 in Oct 2026, a pinned label cannot move.
+
 permissions:
   contents: read
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate build matrix
         id: gen
         run: |
@@ -84,7 +89,7 @@ jobs:
   # ============================================================ the APKs
   build:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       contents: write
@@ -92,10 +97,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Restore toolchain cache (JDK / Android SDK / Godot)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cache/jdk
@@ -104,7 +109,7 @@ jobs:
           key: toolchain-${{ runner.os }}-${{ hashFiles('config/environment.lock') }}
 
       - name: Restore gradle cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -120,7 +125,7 @@ jobs:
         run: ./build.sh "${{ matrix.project }}" --abi "${{ matrix.abi }}" --type "${{ matrix.build_type }}"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.project }}-${{ matrix.abi }}-${{ matrix.build_type }}
           path: dist/${{ matrix.project }}/*.apk
@@ -138,13 +143,13 @@ jobs:
     # THE ONE BUILD LAW: GOGABox.exe (32-bit), official templates, minutes
     # not hours. No forge, no 64-bit preset, no surprises.
     name: Windows exe (x86_32, the one build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Restore the Windows toolchain cache (editor + the 32-bit templates)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/godot-win
           key: win-toolchain-${{ runner.os }}-${{ hashFiles('config/environment.lock') }}
@@ -226,18 +231,37 @@ jobs:
           V="$(jq -r '.projects.gogabox.version_name' config/projects.json)"
           mkdir -p stage
           cp projects/build/GOGABox.exe stage/
-          printf "GOGABox %s for Windows\r\n\r\nGOGABox.exe - the ONE Windows build (32-bit).\r\nIt runs on EVERY Windows: 32-bit natively, 64-bit through WOW64.\r\nSingle file - everything is embedded. No installer needed.\r\n\r\nOpen source under the MIT license. Zero ads, fully offline.\r\n" "$V" > stage/README.txt
+          printf "GOGABox %s for Windows\r\n\r\nGOGABox.exe - the ONE Windows build (32-bit).\r\nIt runs on EVERY Windows: 32-bit natively, 64-bit through WOW64.\r\nSingle file - everything is embedded. No installer needed.\r\n\r\nF11 or Alt+Enter toggles fullscreen - windowed, the window\r\nfollows the game's shape (portrait games get a portrait window).\r\nThe settings menu wears a fullscreen toggle too.\r\n\r\nOpen source under the MIT license. Zero ads, fully offline.\r\n" "$V" > stage/README.txt
           cd stage && zip -9 "../GOGABox-windows-${V}.zip" GOGABox.exe README.txt
           cd .. && mv "GOGABox-windows-${V}.zip" stage/
           ls -la stage/
 
+      # THE SMALL DELIVERY LAW (v0.4.0-17, the owner: "213 MBs ... x2.2 the
+      # size of one apk ... there is something like compressing"): the
+      # slim-pack rounds did their part - every wav source is ogg, every 2D
+      # texture is lossless (tools/v0417_slim_*.py) - so the zip must stay
+      # lean. The artifact ships THE ZIP ONLY: the raw exe inside it is the
+      # engine (the official 32-bit template is ~116 MB of fixed
+      # D3D12/ANGLE/Vulkan floor) + the game, and shipping both twice made
+      # the old artifact ~360 MB. Guard: a re-fattened pack fails CI.
+      - name: THE SMALL DELIVERY LAW - the zip is what ships and it stays lean
+        run: |
+          F="projects/build/GOGABox.exe"
+          Z="$(ls stage/GOGABox-windows-*.zip | head -1)"
+          ZS="$(stat -c%s "$Z")"
+          ES="$(stat -c%s "$F")"
+          [ "$ZS" -lt 175000000 ] || { echo "::error::the delivery re-fattened ($ZS bytes) - the slim-pack laws are being violated"; exit 1; }
+          echo "THE DELIVERY: exe $ES bytes | zip $ZS bytes - the zip is what ships"
+          echo "| delivery | bytes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| GOGABox.exe (engine + game, embedded) | $ES |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| GOGABox-windows zip (what ships) | $ZS |" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload the Windows delivery
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: GOGABox-windows
           path: |
-            stage/GOGABox.exe
-            stage/README.txt
             stage/GOGABox-windows-*.zip
           if-no-files-found: error
           retention-days: 30
@@ -246,13 +270,13 @@ jobs:
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.create_release
     needs: [build, windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "*"
           merge-multiple: true

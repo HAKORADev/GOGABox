@@ -528,7 +528,7 @@ func _goga_setup() -> void:
         # the SHOP next to the back button, the OPTIONS at the right side
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("OPTIONS", func(): _options_open())
-        Jukebox.music("res://assets/audio/music/sq_theme.wav")
+        Jukebox.music("res://assets/audio/music/sq_theme.ogg")
         _build_ready()
 
 func _new_board() -> void:

@@ -317,7 +317,7 @@ func _goga_setup() -> void:
         _layout(vp)
         _build_widgets(vp)
         add_hud_button("SHOP", func(): _shop_open())
-        Jukebox.music("res://assets/audio/music/snl_theme.wav")
+        Jukebox.music("res://assets/audio/music/snl_theme.ogg")
         ## THE FLOW LAW (the owner: "it should be the opposite") - the
         ## optionals ask opens the game FIRST, the TAP ANYWHERE gate
         ## seats after the pick

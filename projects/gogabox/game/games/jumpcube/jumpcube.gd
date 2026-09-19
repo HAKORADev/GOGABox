@@ -712,7 +712,7 @@ func _goga_setup() -> void:
         # the SHOP next to the back button, the OPTIONS at the right side
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("OPTIONS", func(): _options_open())
-        Jukebox.music("res://assets/audio/music/jc_theme.wav")
+        Jukebox.music("res://assets/audio/music/jc_theme.ogg")
         # THE LORE LAW (v0.3.9-13): the die speaks first - once ever
         if Box.counter(game_id, "lore_start") == 0:
                 Box.bump_counter(game_id, "lore_start", 1)
