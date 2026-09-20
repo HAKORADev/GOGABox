@@ -5,11 +5,22 @@ extends RefCounted
 ## item list out) so the probe can assert fairness on hundreds of seeds
 ## without booting the scene (the marble levels-forge law: nothing ships
 ## blind - the validator runs at forge/probe time AND at play time).
+## v041 THE OWNER'S REPORT ROUND: rocks pay NEGATIVE (score_for - the
+## rock prices law), the rig seats EXACTLY on the measured surface line
+## (SURFACE_Y + the rig consts), and the grounds grew REAL traps - every
+## big gold's straight shot rides a guard on its aim lane.
 
 const POINTS := {
         "gold_s": 1, "gold_m": 2, "gold_l": 3,
         "rock_s": 2, "rock_m": 4, "rock_l": 6,
 }
+
+## THE ROCK PRICES LAW (v041, the owner's override of the old GDD): rocks
+## PAY NEGATIVE - small -2, medium -4, large -6; gold pays +1/+2/+3 by
+## size. POINTS keeps the magnitudes, score_for hands out the money.
+static func score_for(kind: String) -> int:
+        var pts := int(POINTS.get(kind, 0))
+        return -pts if kind.begins_with("rock") else pts
 
 ## the weight law: reel speed px/s per thing (heavy value crawls home)
 const REEL_SPEED := {
@@ -44,9 +55,22 @@ const VEIN_SKINS := [
 ## the generator's own geometry contract (goldminer.gd mirrors these)
 const FIELD := Rect2(70, 430, 940, 1260)     # x,y,w,h in design space
 const ROPE_MAX := 1580.0
-const ANCHOR_Y := 176.0
 const MARGIN := 30.0
 const GAP := 26.0
+
+## THE SURFACE LAW (v041): the land's crust top line, measured off
+## bg_surface.png (the light stone band starts at y=311 and runs FLAT
+## across the whole width - the wheels' contact line)
+const SURFACE_Y := 311.0
+## the rig's seat constants, in rig-texture pixels (rig_classic.png is
+## 360x300): the winch axle the rope hangs from, the wheels' contact row,
+## and the draw scale the game mirrors
+const RIG_SCALE := 0.8
+const RIG_HUB := Vector2(257.0, 46.0)
+const RIG_BASE_Y := 292.0
+## the hub Y seats the rig EXACTLY on the surface:
+## hub_y + (base - hub) * scale = SURFACE_Y
+const ANCHOR_Y := SURFACE_Y - (RIG_BASE_Y - RIG_HUB.y) * RIG_SCALE
 
 ## ------------------------------------------------------------- profiles
 ## classic     uniform scatter
@@ -55,6 +79,11 @@ const GAP := 26.0
 ## minefield   bombs parked beside the gold clusters
 ## twin_pockets two clusters at the side extremes
 ## cross_haul  big rocks ringing medium golds (the reel-risk test)
+## v041 THE TRAP LAW: every big gold's straight shot rides a guard (a
+## rock or a bomb ON the aim lane), and most loose rocks bias into gold
+## lanes - the clean shot is usually the expensive one. The fairness
+## validator stays: traps are fair (rocks are a tax, bombs keep their
+## dodge margin), never a wall.
 
 static func profile_for(level: int, rng: RandomNumberGenerator) -> String:
         var pool := ["classic", "classic", "fortress", "deep_vein"]
@@ -87,6 +116,85 @@ static func _rock_size(level: int, rng: RandomNumberGenerator) -> String:
         if roll < 0.5:
                 return "rock_s"
         return "rock_m" if roll < 0.92 else "rock_l"
+
+static func _rand_gold(items: Array, rng: RandomNumberGenerator) -> Dictionary:
+        var golds: Array = []
+        for it in items:
+                if String(it["kind"]).begins_with("gold"):
+                        golds.append(it)
+        if golds.is_empty():
+                return {}
+        return golds[rng.randi_range(0, golds.size() - 1)]
+
+## a lane seat for a hazard: ON the anchor->gold aim line (a small
+## perpendicular jitter keeps it inside the claw's grab path), never
+## hugging the gold itself (bombs keep the fair-dodge margin). Places the
+## item and returns true, or false when no fair seat turned up.
+static func _lane_place(items: Array, kind: String, r: float,
+                anchor: Vector2, gold: Dictionary,
+                rng: RandomNumberGenerator, tries := 22) -> bool:
+        var g: Vector2 = gold["pos"]
+        var to: Vector2 = g - anchor
+        var dist := to.length()
+        if dist < r + float(gold["r"]) + GAP + 40.0:
+                return false
+        var clear := 46.0 if kind == "bomb" else GAP
+        var t_hi := 1.0 - (r + float(gold["r"]) + clear) / dist
+        if t_hi <= 0.42:
+                return false
+        var perp := Vector2(-to.y, to.x) / dist
+        for t_i in tries:
+                var t := rng.randf_range(0.42, t_hi)
+                var p := anchor + to * t \
+                        + perp * (rng.randf_range(-0.5, 0.5) * (r + 10.0))
+                if _ok_placement(items, kind, r, p, anchor):
+                        items.append({"kind": kind, "pos": p, "r": r})
+                        return true
+        return false
+
+## the guard's size: a bomb when the lives law has one to spend (level
+## 2+), a rock otherwise; rocks may out-spend the budget - traps first
+static func _guard_kind(level: int, rng: RandomNumberGenerator,
+                budget: Dictionary) -> String:
+        if level >= 2 and int(budget["b"]) > 0 and rng.randf() < 0.4:
+                budget["b"] -= 1
+                return "bomb"
+        if int(budget["r"]) > 0:
+                budget["r"] -= 1
+        return _rock_size(level, rng)
+
+## THE TRAP LAW: a big gold's straight shot gets a hazard on its lane.
+## Returns false when no fair seat exists (the attempt voids and the
+## generator retries - nothing ships blind).
+static func _guard_lane(items: Array, anchor: Vector2, gold: Dictionary,
+                rng: RandomNumberGenerator, level: int,
+                budget: Dictionary) -> bool:
+        var kind := _guard_kind(level, rng, budget)
+        return _lane_place(items, kind, RADII[kind], anchor, gold, rng)
+
+## straight-line distance (the probe's trap check reads lane_guarded)
+static func seg_dist(a: Vector2, b: Vector2, p: Vector2) -> float:
+        var ab := b - a
+        var l2 := ab.length_squared()
+        if l2 < 0.0001:
+                return a.distance_to(p)
+        var t := clampf((p - a).dot(ab) / l2, 0.0, 1.0)
+        return (a + ab * t).distance_to(p)
+
+## THE TRAP CHECK: does the straight shot anchor->gold cross a hazard
+## (rock or bomb) inside the claw's grab pad (the game bites at r + 14)?
+static func lane_guarded(items: Array, anchor: Vector2, gold: Dictionary,
+                grab_pad := 14.0) -> bool:
+        for it in items:
+                if it == gold:
+                        continue
+                var k := String(it["kind"])
+                if not (k.begins_with("rock") or k == "bomb"):
+                        continue
+                if seg_dist(anchor, gold["pos"], it["pos"]) \
+                                <= float(it["r"]) + grab_pad:
+                        return true
+        return false
 
 static func _ok_placement(items: Array, kind: String, r: float,
                 pos: Vector2, anchor: Vector2) -> bool:
@@ -171,6 +279,11 @@ static func _attempt(level: int, rng: RandomNumberGenerator,
                                         items.append({"kind": "rock_s", "pos": p,
                                                 "r": RADII["rock_s"]})
                                         budget["r"] -= 1
+                        # the core's straight shot gets its own lane guard
+                        # too (the ring is wide, the lane is exact)
+                        if not _guard_lane(items, anchor, items[0], rng,
+                                        level, budget) and not safe:
+                                return []
 
         # ---- golds
         while budget["g"] > 0:
@@ -201,6 +314,14 @@ static func _attempt(level: int, rng: RandomNumberGenerator,
                         items.append({"kind": kind, "pos": pos, "r": r})
                         if kind != "gold_s":
                                 placed_gold_m = true
+                        # THE TRAP LAW: the big gold's straight shot gets a
+                        # guard ON its aim lane - a failed guard voids the
+                        # attempt (the generator retries); the safe fallback
+                        # tolerates a bare lane
+                        if kind == "gold_l" and not _guard_lane(items,
+                                        anchor, items[items.size() - 1],
+                                        rng, level, budget) and not safe:
+                                return []
                 budget["g"] -= 1
 
         # ---- rocks
@@ -211,23 +332,31 @@ static func _attempt(level: int, rng: RandomNumberGenerator,
                 var r: float = RADII[kind]
                 var pos := Vector2.ZERO
                 var ok := false
-                for t in 30:
-                        match profile:
-                                "cross_haul":
-                                        pos = _rand_pos(rng, r, 0.3)
-                                "deep_vein":
-                                        pos = _rand_pos(rng, r, 0.05)
-                                "twin_pockets":
-                                        pos = _rand_pos(rng, r, 0.0,
-                                                rng.randf_range(FIELD.position.x + MARGIN + r,
-                                                        FIELD.end.x - MARGIN - r))
-                                _:
-                                        pos = _rand_pos(rng, r)
-                        if _ok_placement(items, kind, r, pos, anchor):
-                                ok = true
-                                break
-                if ok:
-                        items.append({"kind": kind, "pos": pos, "r": r})
+                # THE TRAP LAW: most loose rocks aim at a gold's lane, not
+                # the void - the whole ground becomes a guarded-shot problem
+                if rng.randf() < 0.6:
+                        var gld := _rand_gold(items, rng)
+                        if not gld.is_empty():
+                                ok = _lane_place(items, kind, r, anchor, gld,
+                                        rng, 14)
+                if not ok:
+                        for t in 30:
+                                match profile:
+                                        "cross_haul":
+                                                pos = _rand_pos(rng, r, 0.3)
+                                        "deep_vein":
+                                                pos = _rand_pos(rng, r, 0.05)
+                                        "twin_pockets":
+                                                pos = _rand_pos(rng, r, 0.0,
+                                                        rng.randf_range(FIELD.position.x + MARGIN + r,
+                                                                FIELD.end.x - MARGIN - r))
+                                        _:
+                                                pos = _rand_pos(rng, r)
+                                if _ok_placement(items, kind, r, pos, anchor):
+                                        ok = true
+                                        break
+                        if ok:
+                                items.append({"kind": kind, "pos": pos, "r": r})
                 budget["r"] -= 1
 
         # ---- bombs (the lives)

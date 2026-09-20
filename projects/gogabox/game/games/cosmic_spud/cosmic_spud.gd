@@ -889,7 +889,18 @@ func _tick_player(delta: float) -> void:
                 p_walk += delta * 10.0
                 moving = true
         else:
-                p_walk = 0.0
+                # v0.4.1 THE FIXED STEERING LAW: on a desktop the arrows (and
+                # the box's WASD fallback) drive at ONE fixed speed - binary
+                # keys can never fake the stick's force read
+                var kb := Vector2(Input.get_axis("ui_left", "ui_right"),
+                                Input.get_axis("ui_up", "ui_down"))
+                if kb.length_squared() > 0.01:
+                        p_pos += kb.normalized() * PLAYER_SPD \
+                                        * float(stats["spd_m"]) * delta
+                        p_walk += delta * 10.0
+                        moving = true
+                else:
+                        p_walk = 0.0
         # solid props: slide out of the circles
         for pr in props:
                 var d: Vector2 = p_pos - pr["c"]

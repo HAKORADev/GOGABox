@@ -120,19 +120,44 @@ func _run() -> void:
                                 "d": -float(k) * MarbleData.CONTACT,
                                 "kind": "m", "life": -1.0, "pow": "",
                                 "spr": null, "glow": null, "bonded": true})
+        # v0.4.1 THE LIVING INSERT LAW: the rear part NEVER moves; the shot
+        # takes the struck marble's slot and the part toward the hole is
+        # pushed forward EXACTLY one spacing over INSERT_T.
         var rear_d_before: float = float(cp.marbles[0]["d"])
         var hit_d_before: float = float(cp.marbles[2]["d"])
+        var front_d_before: float = float(cp.marbles[3]["d"])
         var shot_nr := {"pos": cp.pos_at(hit_d_before - MarbleData.CONTACT),
                         "vel": Vector2.ZERO, "c": 6, "spr": null, "rainbow": false}
         game._insert_shot(cp, 2, shot_nr)
+        # at the insert instant the new marble sits IN the struck marble's
+        # slot (the sneak-in moment) and the push is still 0 - the struck
+        # marble + the whole front group now owe one CONTACT of push
+        var owed: float = 0.0
+        for i in range(2, cp.marbles.size()):
+                owed += float(cp.marbles[i].get("push", 0.0))
+        check("living insert: the front group owes exactly one spacing each",
+                cp.marbles.size() >= 5 and absf(owed - 2.0 * MarbleData.CONTACT) < 0.75)
+        # let the push settle (INSERT_T = 0.22s -> 24 frames covers it); the
+        # chain's own flow advances everything, so every law is read
+        # RELATIVE to the rearmost marble (the rear part never moves
+        # relative to the flow - the OLD law slid it back one spacing)
+        var rear_ref_pre: float = float(cp.marbles[0]["d"]) - rear_d_before
+        for i in 24:
+                game._goga_tick(1.0 / 60.0)
+                if OS.get_environment("MARBLE_DEBUG") != "" and i % 4 == 0:
+                        var dbg: Array = []
+                        for mm in cp.marbles:
+                                dbg.append("%.0f" % float(mm["d"]))
+                        print("  t%d ds=%s" % [i, ", ".join(dbg)])
+        var rear_ref_post: float = float(cp.marbles[0]["d"]) - rear_d_before
+        check("living insert: the rear part is never shoved backward",
+                (rear_ref_post - rear_ref_pre) > -1.2)
         var spacing_ok := true
         for i in range(1, cp.marbles.size()):
                 var gap: float = float(cp.marbles[i]["d"]) - float(cp.marbles[i - 1]["d"])
-                if absf(gap - MarbleData.CONTACT) > 0.6:
+                if absf(gap - MarbleData.CONTACT) > 0.75:
                         spacing_ok = false
-        check("push keeps perfect spacing", spacing_ok)
-        check("push slides the rear exactly one spacing",
-                absf(float(cp.marbles[0]["d"]) - (rear_d_before - MarbleData.CONTACT)) < 0.6)
+        check("living insert: perfect spacing after the settle", spacing_ok)
         var inserted_order_ok := true
         for i in range(1, cp.marbles.size()):
                 if float(cp.marbles[i]["d"]) < float(cp.marbles[i - 1]["d"]):

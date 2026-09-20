@@ -75,7 +75,8 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 10 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
     {"id": "plays_t2", "title": "The Resident", "desc": "Play 100 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 100}},
 ],
-                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the head bends where the cursor moves"],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the head bends where the cursor moves",
+                        "PC: the LEFT/RIGHT arrows (or A/D) bend the head at a fixed rate - the finger swipe keeps its force steering",],
         },
         {
                 "id": "rally", "title": "PING-PONG", "tag": "goals win",
@@ -502,7 +503,8 @@ const GAMES := [
                 "controls_pc": [
                 		"LEFT / RIGHT arrow keys steer",
                 		"SPACE holds the fire",
-                ],
+                
+                        "PC: the ship follows the CURSOR, the LEFT button holds the fire (arrows + SPACE still work)",],
         },
 
         # ---- the workshop (not built yet, but ALREADY in the feed as teasers so
@@ -564,7 +566,8 @@ const GAMES := [
     {"id": "runs_t1", "title": "Drop In", "desc": "Finish 10 runs", "tier": 1, "rule": {"k": "cnt", "key": "cs_runs", "v": 10}},
     {"id": "runs_t2", "title": "The Veteran Spud", "desc": "Finish 50 runs", "tier": 2, "rule": {"k": "cnt", "key": "cs_runs", "v": 50}},
 ],
-                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the invisible stick follows the cursor; the guns aim and fire by themselves"],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and move - the invisible stick follows the cursor; the guns aim and fire by themselves",
+                        "PC: the ARROWS (or WASD) drive the potato at a fixed speed",],
         },
 
 
@@ -1566,7 +1569,8 @@ const GAMES := [
         {"id": "mb_wave", "title": "Wave Rider", "desc": "Survive a full challenge", "tier": 3, "rule": {"k": "cnt", "key": "challenges_won", "v": 1}},
         {"id": "mb_all", "title": "The Box Is Clean", "desc": "Clear all 100 levels", "tier": 4, "rule": {"k": "max", "key": "levels_max", "v": 100}},
 ],
-                "controls_pc": ["hold the LEFT MOUSE BUTTON and drag to aim - release to shoot"],
+                "controls_pc": ["hold the LEFT MOUSE BUTTON and drag to aim - release to shoot",
+                        "PC: the idol aims where the CURSOR points (a slider totem rides it), LEFT click fires, RIGHT click swaps the loaded marble",],
         },
         # v040-15 THE GRADUATION: the gold miner teaser seat renamed as GOLD
         # MINER (the owner's GDD, worked into laws; the endless timing miner)

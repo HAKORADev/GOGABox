@@ -426,10 +426,22 @@ func _paint_splats() -> void:
                 var t: float = clampf(float(s["life"]) / float(s["max"]), 0.0, 1.0)
                 var col: Color = s["col"]
                 col.a = 0.55 * t
+                # v0.4.1 THE TOP-LEFT SPLAT FIX (the owner: "particles of a
+                # slash at the very top left appear when i slash something"):
+                # the splat record stores the fruit's absolute x/y, but the
+                # paint loop drew ONLY each blob's offset - every stain's
+                # cluster landed around the WORLD ORIGIN (0,0). The blobs
+                # now seat on their own splat's position.
+                var at := Vector2(float(s["x"]), float(s["y"]))
+                # the receiver stays DYNAMIC on purpose (the probes' splat
+                # spy records these exact calls headless - a statically
+                # typed Node2D receiver would bind the native draw and
+                # bypass any script recorder)
+                var painter = splat_painter
                 for blob in s["blobs"]:
                         var off: Vector2 = blob["off"]
                         var rr: float = float(blob["r"])
-                        splat_painter.draw_circle(off, rr, col)
+                        painter.draw_circle(at + off, rr, col)
         # the tiny sparkles (4, slow, subtle)
         var vp := get_viewport_rect().size
         for i in 4:

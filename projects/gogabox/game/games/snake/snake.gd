@@ -48,6 +48,23 @@ const BUG_SCORE_PENALTY := 5
 const MAGNET_RANGE := 330.0
 const POWER_BOARD_LIFE := 10.0  # the aura fruit expires (Snake3D rule)
 
+# ============ v0.4.1 THE SURVIVAL MODE (docs/todo/pending/pending.md -
+# the owner's snake.io-like third play mode, verbatim: "open walls or closed
+# normally... much bigger land with camera following snake... many fruits
+# in many places... only be toggled if +4 opponent snakes are selected...
+# will not work with bugs or obstacles... snake getting slower when it gets
+# bigger... growing very very very bigger than usual... score based on
+# eaten snake parts... bonus be /100... like the snake.io games but more
+# fun")
+const SURV_WORLD := 3.4         # THE LAND LAW: the field grows this much
+const SURV_FEAST_N := 14        # THE FEAST LAW: fruits live in many places
+const SURV_GROWTH := 3.5        # THE GROWTH LAW: a fruit pays x3.5 length
+const SURV_SLOW_FLOOR := 0.55   # THE SLOWDOWN LAW: the floor of the slow
+const SURV_SLOW_LEN := 5400.0   # ...the body that reaches the floor
+const SURV_RESPAWN_T := 3.4     # an eaten snake swims back (the io flow)
+const SURV_PART_PX := 70.0      # one "part" = one apple's worth of body
+const SURV_GATE := 5            # THE GATE LAW: needs MORE than 4 opponents
+
 # JUMPING FRUITS (owner v0.2.2): a random live window, a short void, a new
 # spot - catchable, never comfortable
 const JUMP_WINDOW_MIN := 4.0
@@ -101,6 +118,12 @@ var player: SnakeBody
 var enemies: Array = []         # [{body: SnakeBody, ai: SnakeAI, score, name, bite_cd}]
 var bugs: Array = []            # [{pos, dir, phase, munch, hit_cd}]
 var obstacles: Array = []       # Array[Rect2]
+# ---- v0.4.1 SURVIVAL state
+var survival := false           # THE SUBMODE LAW: a togglable option
+var extra_fruits: Array = []    # [{pos, id, pop, live, resp_t}]
+var _surv_respawn: Array = []   # respawn clocks for eaten snakes
+var _cam := Vector2.ZERO        # the camera's top-left in world space
+var _surv_enemies := 0          # the survival pack size (respawns to it)
 var _dying: Array = []          # SnakeBody mid-collapse (enemy deaths)
 
 var edible_id := "apple"
@@ -197,6 +220,10 @@ func _goga_setup() -> void:
         var forced := start_orientation
         orient = forced if forced != "" else _auto_orient()
         wrap_mode = bool(Box.get_progress(game_id, "mode_nowalls", false))
+        # v0.4.1 THE SUBMODE LAW: survival restores its seat (the gate is
+        # re-checked at the mode card AND at populate - the option can be
+        # saved while the pack count later dropped below 5)
+        survival = bool(Box.get_progress(game_id, "mode_survival", false))
         _build_field()
         player = SnakeBody.new()
         player.base_speed = START_SPEED
@@ -247,7 +274,34 @@ func _build_field() -> void:
         var w := maxf(100.0, vp.x - 16.0)
         var h := maxf(100.0, vp.y - top - bottom - 8.0)
         board = Rect2(Vector2((vp.x - w) / 2.0, top + 4.0), Vector2(w, h))
+        # v0.4.1 THE LAND LAW: survival's field is a BIG WORLD - the camera
+        # (the _cam follow in _goga_tick + the draw transform in _paint)
+        # rides the snake across it. The screen math above stays the seed
+        # so the same screen produces the same world shape.
+        if survival:
+                var c := board.get_center()
+                var sw := board.size * SURV_WORLD
+                board = Rect2(c - sw / 2.0, sw)
+                _cam = player_head_seed() - vp / 2.0
+                _cam = _clamp_cam(_cam, vp)
         _build_garden()
+
+## the camera's seed seat (the board center until a body exists)
+func player_head_seed() -> Vector2:
+        if player != null and is_instance_valid(player):
+                return player.head_pos
+        return board.get_center()
+
+func _clamp_cam(c: Vector2, vp: Vector2) -> Vector2:
+        # keep the view inside the world; a wrap field just stays clamped
+        # (the world edges still exist as the seam walls)
+        c.x = clampf(c.x, board.position.x, board.end.x - vp.x)
+        c.y = clampf(c.y, board.position.y, board.end.y - vp.y)
+        return c
+
+## THE LAND LAW's view helper - the live viewport size
+func _view_size() -> Vector2:
+        return get_viewport_rect().size
 
 ## The garden dressing: deco blobs (both places), stars + fireflies (night).
 func _build_garden() -> void:
@@ -336,6 +390,12 @@ func _reset_world() -> void:
 ## The war, assembled THE MOMENT the run starts (never before).
 func _populate_world() -> void:
         var war := not peace
+        # v0.4.1 THE GATE + EXCLUSIVITY LAWS: survival enforces its seat at
+        # spawn time - 5+ opponents guaranteed, bugs/obstacles can never
+        # ride along (the mode card holds the toggle-time gate)
+        if survival:
+                _set_opt("bugs", false)
+                _set_opt("obstacles", false)
         if war and _opt_on("obstacles") and Box.unlock_owned(game_id, "obstacles"):
                 _spawn_obstacles()
         if war and _opt_on("bugs") and Box.unlock_owned(game_id, "bugs"):
@@ -345,8 +405,20 @@ func _populate_world() -> void:
                 var n := 1
                 if Box.unlock_owned(game_id, "pack"):
                         n = clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
+                if survival:
+                        n = clampi(n, SURV_GATE, 10)   # the gate guarantees 5+
+                _surv_enemies = n if survival else 0
                 for i in n:
                         _add_enemy(i)
+        elif survival:
+                # the gate law: survival WITHOUT opponents is not survival -
+                # the pack spawns even if the enemy box was left off
+                _surv_enemies = SURV_GATE
+                for i in SURV_GATE:
+                        _add_enemy(i)
+        # v0.4.1 THE FEAST LAW: many fruits in many places
+        if survival:
+                _surv_spawn_feast()
         _spawn_fruit(true)
         if not peace:
                 _maybe_coin()
@@ -541,6 +613,9 @@ func _show_mode_select() -> void:
         vb.add_child(t)
         # PEACE - the style ABOVE the modes (runs with walls OR no-walls)
         vb.add_child(_peace_card())
+        # v0.4.1 THE SUBMODE SEAT: the SURVIVAL toggle rides under the
+        # peace style (its own law row) - the gate lives on the card
+        vb.add_child(_survival_card())
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 14)
         row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -630,6 +705,62 @@ func _peace_card() -> Button:
                         _show_mode_select())
         return b
 
+## v0.4.1 THE SURVIVAL CARD (the owner's third play mode as an OPTION):
+## "only be toggled if +4 opponent snakes are selected and can not be
+## toggled if there is less snakes and will not work with bugs or
+## obstacles". The gate reads the REAL optionals seat: the ENEMY pack
+## owned, enemies ON, and the count MORE THAN 4. The walls cards still
+## choose open/closed INSIDE survival (the walls law).
+func _surv_gate_ok() -> bool:
+        var pack := Box.unlock_owned(game_id, "pack")
+        var n := clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
+        return pack and _opt_on("enemies") and n > SURV_GATE - 1
+
+func _survival_card() -> Button:
+        var gate_ok := _surv_gate_ok()
+        var n := clampi(int(Box.get_progress(game_id, "enemy_count", 1)), 1, 10)
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(574, 86)
+        var sb := Arc.panel_style(Color("e8b25a") if survival else Arc.CARD, 20, 10)
+        if not survival:
+                sb.set_border_width_all(3)
+                sb.border_color = Color("e8b25a")
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var hb := HBoxContainer.new()
+        hb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        hb.alignment = BoxContainer.ALIGNMENT_CENTER
+        hb.add_theme_constant_override("separation", 14)
+        hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(hb)
+        var col := Arc.INK if survival else Color("8a6224")
+        var l := Arc.label("SURVIVAL", 30, col)
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        hb.add_child(l)
+        var st_txt := "ON - the big land feast" if survival \
+                        else ("OFF - needs 5+ snakes (you have %d)" % n) \
+                        if not gate_ok else "OFF - the snake.io feast"
+        var st := Arc.label(st_txt, 16, col if survival \
+                        else Color(0.55, 0.48, 0.38), false)
+        st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        hb.add_child(st)
+        b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        if not gate_ok:
+                                _toast_show("survival needs 5+ opponent " +
+                                        "snakes - cycle the ENEMY box count")
+                                return
+                        survival = not survival
+                        Box.set_progress(game_id, "mode_survival", survival)
+                        if survival:
+                                # THE EXCLUSIVITY LAW: no bugs/obstacles there
+                                _set_opt("bugs", false)
+                                _set_opt("obstacles", false)
+                        _show_mode_select())
+        return b
+
 func _show_ready_card() -> void:
         _phase = "ready"
         _clear_overlay_panel()
@@ -663,6 +794,8 @@ func _show_ready_card() -> void:
 func _ready_subline() -> String:
         var place_name: String = SnakeFruits.PLACES[place]["name"]
         var bits := [place_name, "NO-WALLS - wrap walls" if wrap_mode else "CLASSIC walls"]
+        if survival:
+                bits.append("SURVIVAL")
         if peace:
                 bits.append("PEACE")
         return "  ·  ".join(bits)
@@ -677,6 +810,10 @@ func _start() -> void:
         if _phase != "ready" or not player.alive:
                 return
         _phase = "run"
+        # v0.4.1 THE BONUS LAW: survival's score bonus is /100 (the same
+        # mechanic gold miner runs at /30) - the modular override, no game
+        # names in the economy.
+        bonus_div_override = 100 if survival else -1
         _populate_world()
         # JUMPING FRUITS live only when bought AND toggled (owner v0.2.2)
         jump_on = _opt_on("jump") and Box.unlock_owned(game_id, "jump")
@@ -750,6 +887,13 @@ func _goga_tick(delta: float) -> void:
         _tick_tongue(delta)
         if _phase == "run" and player.alive:
                 _steer(delta)
+                # v0.4.1 THE FIXED STEERING LAW (the owner: arrows "have no
+                # force detection, so the speed increasement of movement...
+                # mis-calculated" - the PC keyboard steers at ONE fixed turn
+                # rate, the finger keeps its force steering untouched)
+                var kb := Input.get_axis("ui_left", "ui_right")
+                if kb != 0.0:
+                        player.head_dir += signf(kb) * TURN_RATE * delta
                 var adv := player.advance(delta, board, wrap_mode)
                 player.tick_effects(delta)
                 _sync_speeds()
@@ -766,6 +910,17 @@ func _goga_tick(delta: float) -> void:
                         _tick_bugs(delta)
                         _check_player_collisions()
                         _tick_bites(delta)
+                        # v0.4.1 SURVIVAL: the feast lives + the pack comes back
+                        if survival:
+                                _tick_extra_fruits(delta)
+                                _tick_surv_respawn(delta)
+                # v0.4.1 THE LAND LAW: the camera rides the snake (smoothed)
+                if survival:
+                        var vp := _view_size()
+                        var want := player.head_pos - vp / 2.0
+                        _cam = _cam.lerp(_clamp_cam(want, vp),
+                                        minf(1.0, delta * 6.0))
+                _view.queue_redraw()
         elif _collapse_t >= 0.0:
                 _tick_collapse(delta)
                 # the field keeps living while the snake folds: enemies slither on
@@ -836,6 +991,22 @@ func _give_points_to(e: Dictionary) -> void:
                                 [String(e.get("name", "the enemy")), lost])
 
 func _sync_speeds() -> void:
+        if survival:
+                # v0.4.1 THE SLOWDOWN LAW (the owner: "snake getting slower
+                # when it gets bigger instead of getting much faster") - the
+                # inverse read of the score multiplier: the BODY decides,
+                # longer = slower, floored so the run stays playable
+                var f := clampf(1.0 - player.length_px / SURV_SLOW_LEN,
+                                SURV_SLOW_FLOOR, 1.0)
+                player.base_speed = START_SPEED * f
+                player.speed = player.base_speed
+                for e in enemies:
+                        var b: SnakeBody = e["body"]
+                        var ef := clampf(1.0 - b.length_px / SURV_SLOW_LEN,
+                                        SURV_SLOW_FLOOR, 1.0)
+                        b.base_speed = START_SPEED * ENEMY_SPEED_RATIO * ef
+                        b.speed = b.base_speed
+                return
         player.base_speed = clampf(START_SPEED * _score_speed_mult(score),
                         SPEED_HARD_MIN, SPEED_HARD_MAX)
         player.speed = player.base_speed
@@ -924,7 +1095,8 @@ func _eat_fruit(by: SnakeBody, is_player: bool) -> void:
                 Jukebox.sfx("power_bad", -4.0)
                 _burst(apple_pos, [Color("8ac44a"), Color("8a6a40")], 9)
         else:
-                by.len_target += SnakeBody.LEN_PER_APPLE
+                by.len_target += SnakeBody.LEN_PER_APPLE \
+                                * (SURV_GROWTH if survival else 1.0)   # v0.4.1 THE GROWTH LAW
                 var pts: float = 3.0 if golden else 1.0
                 if is_player:
                         _eaten += 1
@@ -1073,6 +1245,94 @@ func _in_obstacle(p: Vector2, pad: float) -> bool:
                 if (o as Rect2).grow(pad).has_point(p):
                         return true
         return false
+
+# ============================================ v0.4.1 SURVIVAL - THE FEAST
+
+## THE FEAST LAW: many fruits in many places - a swarm of extra edibles
+## across the big land (the main apple law keeps its own seat above).
+func _surv_spawn_feast() -> void:
+        extra_fruits.clear()
+        for i in SURV_FEAST_N:
+                extra_fruits.append(_surv_new_fruit(true))
+
+func _surv_new_fruit(first := false) -> Dictionary:
+        var owned := Box.items_owned(game_id, "fruit")
+        var mode := String(Box.get_progress(game_id, "fruit_mode", "apple"))
+        var m := apple_r + 20.0
+        var p := Vector2.ZERO
+        for t in 30:
+                p = Vector2(randf_range(board.position.x + m, board.end.x - m),
+                                randf_range(board.position.y + m, board.end.y - m))
+                if first and p.distance_to(player.head_pos) < 420.0:
+                        continue
+                if _near_any_body(p, 34.0):
+                        continue
+                break
+        return {"pos": p, "id": SnakeFruits.roll_edible(owned, mode),
+                "pop": 0.0, "live": true, "resp_t": 0.0}
+
+func _tick_extra_fruits(delta: float) -> void:
+        var hr := player.head_r()
+        for f in extra_fruits:
+                if not bool(f["live"]):
+                        f["resp_t"] = float(f["resp_t"]) - delta
+                        if float(f["resp_t"]) <= 0.0:
+                                var nf := _surv_new_fruit()
+                                f["pos"] = nf["pos"]
+                                f["id"] = nf["id"]
+                                f["live"] = true
+                                f["pop"] = 0.0
+                        else:
+                                continue
+                f["pop"] = minf(1.0, float(f["pop"]) + delta * 3.4)
+                var fr := apple_r * float(SnakeFruits.hit_meta(f["id"])["hr"])
+                var fp: Vector2 = (f["pos"] as Vector2) + Vector2(
+                                SnakeFruits.hit_meta(f["id"])["hit"]) * apple_r
+                # the player eats
+                if float(f["pop"]) > 0.5 and _portal_touch(player.head_pos,
+                                fp, hr + fr * 0.8):
+                        _surv_eat_extra(player, {}, f)
+                        continue
+                # the pack eats too (the io garden feels alive)
+                for e in enemies:
+                        var b: SnakeBody = e["body"]
+                        if b.alive and _portal_touch(b.head_pos, fp,
+                                        b.head_r() + fr * 0.8):
+                                _surv_eat_extra(b, e, f)
+                                break
+
+## the feast bite: THE GROWTH LAW pays x3.5, the eater scores (parts of
+## the garden are worth their fruit)
+func _surv_eat_extra(by: SnakeBody, e: Dictionary, f: Dictionary) -> void:
+        by.len_target += SnakeBody.LEN_PER_APPLE * SURV_GROWTH
+        var pts: float = 3.0 if by.has_power("golden") else 1.0
+        if e.is_empty():
+                _eaten += 1
+                _award_pts(pts, true)
+                achievement_count("apples", 1)
+        else:
+                _award_pts(pts, false, e)
+        Jukebox.sfx("snake_eat", -5.0, 1.0 + randf() * 0.2)
+        _burst(f["pos"], [SnakeFruits.fruit_body(String(f["id"])),
+                        SnakeFruits.FRUITS[String(f["id"])]["acc"],
+                        Color("fff3dc")], 9)
+        f["live"] = false
+        f["resp_t"] = randf_range(1.6, 3.2)
+
+## THE PACK FLOW: an eaten snake swims back in after a breath - the feast
+## never runs dry (the war's no-respawn law stays the war's own)
+func _tick_surv_respawn(delta: float) -> void:
+        var alive := 0
+        for e in enemies:
+                if (e["body"] as SnakeBody).alive:
+                        alive += 1
+        for i in range(_surv_respawn.size() - 1, -1, -1):
+                if float(_surv_respawn[i]) <= _time:
+                        _surv_respawn.remove_at(i)
+                        if alive < _surv_enemies:
+                                _add_enemy(randi() % 10)
+                                alive += 1
+                                _toast_show("a new snake swims in...")
 
 # ------------------------------------------------------------- powers
 
@@ -1261,7 +1521,19 @@ func _kill_enemy(e: Dictionary) -> void:
         Jukebox.sfx("snake_die", -4.0, 0.8)
         _burst(b.head_pos, [b.pal["pri"], FLASH_RED, Color("fff3dc")], 14)
         _ring(b.head_pos, b.pal["pri"])
-        # permanent for this round - no respawn (owner rule); the body COLLAPSES
+        # v0.4.1 THE PARTS LAW (survival): "score will be based on eaten
+        # snake parts (or full snake giving all it's parts as score)" - a
+        # kill banks the victim's WHOLE BODY as parts (its own run score
+        # already transferred at the kill sites)
+        if survival:
+                var parts := int(b.length_px / SURV_PART_PX)
+                if parts > 0:
+                        set_score(score + parts)
+                        _toast_show("+%d parts - %s is eaten" % [parts,
+                                        String(e.get("name", "the enemy"))])
+                _surv_respawn.append(_time + SURV_RESPAWN_T)
+        # permanent for the war round - no respawn (owner rule); the body
+        # COLLAPSES. Survival swims a new snake in instead (the io flow).
 
 ## dead enemies fold into themselves too, quickly, then VANISH (owner
 ## v0.2.1 bug 11: the corpse used to linger forever - the same stale
@@ -1572,6 +1844,9 @@ func _paint(v: Node2D) -> void:
                 _paint_moon(v, Vector2(86.0, 96.0))
         elif sky == "day":
                 _paint_sun(v, Vector2(vp.x - 88.0, 92.0))
+        # v0.4.1 THE LAND LAW: the world draws through the camera transform -
+        # screen-space dressing stays put, the WORLD rides under the snake
+        v.draw_set_transform(-_cam, 0.0, Vector2.ONE)
         # the field itself
         v.draw_rect(board, pl["field"])
         # drifting deco blobs (super subtle, alive) - also OUTSIDE the field
@@ -1613,11 +1888,17 @@ func _paint(v: Node2D) -> void:
                 v.draw_set_transform(coin_pos, coin_rot,
                                 Vector2(cs * cpop, cs / cpop * coin_pop))
                 v.draw_texture(_coin_tex, -_coin_tex.get_size() / 2.0)
-                v.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+                # back to the WORLD seat (the camera transform rides on)
+                v.draw_set_transform(-_cam, 0.0, Vector2.ONE)
         # the edible (pop + breathing - never an alpha fade)
         if apple_live and apple_pop > 0.0:
                 SnakeFruits.paint_fruit(v, edible_id, apple_pos,
                                 apple_r * apple_pop, _time, true)
+        # v0.4.1 THE FEAST: the swarm of extra fruits rides the world too
+        for f in extra_fruits:
+                if bool(f["live"]) and float(f["pop"]) > 0.0:
+                        SnakeFruits.paint_fruit(v, String(f["id"]), f["pos"],
+                                        apple_r * float(f["pop"]), _time, true)
         # the power fruit (the aura IS the type signal)
         if power_live and power_pop > 0.0:
                 var blink := 1.0
@@ -1645,6 +1926,8 @@ func _paint(v: Node2D) -> void:
                 var col: Color = m["c"]
                 col.a = a
                 v.draw_circle(m["p"], float(m["r"]) * (0.5 + 0.5 * a), col)
+        # v0.4.1: the world transform ends - back to the screen seat
+        v.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 ## soft ground shadow (day garden = the sun's; night = faint moon shade)
 func _ground_shadow(v: Node2D, at: Vector2, r: float, scale: float) -> void:

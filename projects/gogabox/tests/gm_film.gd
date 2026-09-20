@@ -7,6 +7,7 @@ extends Node
 ##   02 the ground (rig + swing + items)  06 the clear -> next ground
 ##   03 the launch (claw flying)          07 the shop (the 5 + 5 shelf)
 ##   04 the reel (the grab + the dust)    08 the pause sheet (the END row)
+##   09 the walls law (the sideways claw turns home at the room's edge)
 
 var g: GogaGame = null
 var shots := 0
@@ -35,6 +36,16 @@ func _tap(at: Vector2) -> void:
         await get_tree().process_frame
 
 func _ready() -> void:
+        # THE FILM WINDOW LAW (v041): the PC seat (v041) opens a 720x1280
+        # window - the film's finger coordinates live in the 1080x1920
+        # design space, so the rig re-windows itself to the design first
+        # (the stretch is EXPAND: 1080x1920 window = the design 1:1)
+        DisplayServer.window_set_size(Vector2i(1080, 1920))
+        DisplayServer.window_set_position(Vector2i(0, 0))
+        await get_tree().process_frame
+        await get_tree().process_frame
+        print("FILM: window %s viewport %s" % [DisplayServer.window_get_size(),
+                get_viewport().get_visible_rect().size])
         Box.reset_all()
         Box.bump_counter("goldminer", "lore_start", 1)
         var GM: GDScript = load("res://game/games/goldminer/goldminer.gd")
@@ -48,6 +59,8 @@ func _ready() -> void:
         # the start tap -> the run
         await _tap(Vector2(540, 1500))
         await get_tree().create_timer(0.8).timeout
+        print("FILM: after start tap phase=%s waiting=%s" % [g.phase,
+                g.tap_anywhere_waiting()])
         await _snap("02_ground")
         # a real mid-swing launch: tap the field, photograph the flight
         var thrown := false
@@ -94,6 +107,25 @@ func _ready() -> void:
         while g.phase != "swing" and guard < 400:
                 await get_tree().create_timer(0.05).timeout
                 guard += 1
+        # THE WALLS LAW (v041): a sideways claw turns home at the REAL
+        # room's edge - it can never fly out of resolution (the snap rides
+        # the flip itself - once "reel" starts, the claw is already crawling
+        # home and the wall beat is gone)
+        g.phase = "swing"
+        g.claw_dir = Vector2(-1, 0.06).normalized()
+        g.phase = "fly"
+        var wguard := 0
+        while g.phase == "fly" and wguard < 400:
+                await get_tree().create_timer(0.02).timeout
+                wguard += 1
+        var wall_rope: float = g.rope_len
+        await _snap("09_wall")
+        print("FILM: wall turn at rope %.0f, phase %s" % [wall_rope,
+                g.phase])
+        guard = 0
+        while g.phase != "swing" and guard < 400:
+                await get_tree().create_timer(0.05).timeout
+                guard += 1
         # THE BLAST: seat a bomb on the line and THROW INTO IT (deterministic
         # aim - the blast itself rides the real pipeline)
         var bomb := {"kind": "bomb", "pos": g.anchor + Vector2(0, 700),
@@ -107,7 +139,7 @@ func _ready() -> void:
         var lives0: int = g.lives
         g.claw_dir = (bomb["pos"] - g.anchor).normalized()
         g.phase = "fly"
-        await get_tree().create_timer(0.55).timeout
+        await get_tree().create_timer(0.95).timeout
         await _snap("05_blast")
         print("FILM: bomb lives %d -> %d" % [lives0, g.lives])
         guard = 0

@@ -208,6 +208,51 @@ func _run() -> void:
         g.chain.clear()
         g._relayout()
 
+        # ---- v0.4.1 THE CROSSWISE DOUBLE LAW (the owner: "if the tile is
+        # 0/0 it sits horizontal and not vertical which is wrong and weird,
+        # double tiles usually should sit the opposite position, if line is
+        # vertical they should be horizontal") - every DOUBLE stands across
+        # the row's flow (tall where the row lies), both tables, both flow
+        # directions ----
+        g.chain.clear()
+        for c in sim_chain:
+                g.chain.append({"a": c[0], "b": c[1], "fl": false,
+                        "who": 1, "landed": true})
+        g._relayout()
+        g._settle_glide()
+        var dbl_ok := true
+        var dbl_seen := 0
+        var dbl_idx := -1
+        for i in g.chain.size():
+                var t: Dictionary = g.chain[i]
+                if not t.has("pv"):
+                        dbl_ok = false
+                        continue
+                if int(t["a"]) == int(t["b"]):
+                        dbl_seen += 1
+                        if dbl_idx < 0 and i >= 2 and i < g.chain.size() - 2:
+                                dbl_idx = i   # a mid-band double for the geometry checks
+                        if not bool(t["pv"]):
+                                dbl_ok = false
+                        elif (g.chain_rects[i]["rect"] as Rect2).size.y \
+                                        <= (g.chain_rects[i]["rect"] as Rect2).size.x:
+                                dbl_ok = false   # a standing double is TALL
+        _check(dbl_ok and dbl_seen >= 5,
+                "THE CROSSWISE DOUBLE LAW: every double of the mixed chain stands across the flow (%d doubles)" % dbl_seen)
+        # the doubles sit in the SAME row band as their lying neighbours
+        # (perpendicular, not exiled) - a double's band neighbors are lying
+        # tiles on BOTH flow directions (left cursor and right cursor)
+        if dbl_idx >= 2 and dbl_idx < g.chain.size() - 2:
+                var dbl_r: Rect2 = g.chain_rects[dbl_idx]["rect"]
+                var prev_r: Rect2 = g.chain_rects[dbl_idx - 1]["rect"]
+                var next_r: Rect2 = g.chain_rects[dbl_idx + 1]["rect"]
+                _check(absf(dbl_r.get_center().y - prev_r.get_center().y) < 1.0 \
+                                and absf(dbl_r.get_center().y - next_r.get_center().y) < 1.0,
+                        "THE CROSSWISE DOUBLE LAW: the double shares its row band with its lying neighbours")
+                _check(absf(prev_r.end.x - dbl_r.position.x) < 1.0 \
+                                or absf(dbl_r.end.x - next_r.position.x) < 1.0,
+                        "THE CROSSWISE DOUBLE LAW: the standing double keeps the edge-to-edge contact")
+
         # ---- v0.3.8-4 THE ANCHOR LAW (the owner's headline: tiles never
         # move) - live placements through _place, then a LEFT placement:
         # every earlier screen rect must be BIT-IDENTICAL ----
@@ -423,6 +468,46 @@ func _run() -> void:
                 [{"a": 5, "b": 6, "fl": false, "who": 1}], {}, {}, 
                 RandomNumberGenerator.new())
         _check(stuck_pick == -1, "a starved hand returns -1 (the draw/pass door)")
+
+        # ---- v0.4.1 THE CROSSWISE DOUBLE on the WIDE TABLE (rows of ten,
+        # 1920x1080) - the perpendicular law is the table's, not one pose's
+        # luck. Also a LEFT-flowed double (the -x cursor) must stand. ----
+        g._apply_orientation("horizontal")
+        g.chain.clear()
+        for c in sim_chain:
+                g.chain.append({"a": c[0], "b": c[1], "fl": false,
+                        "who": 1, "landed": true})
+        g._relayout()
+        g._settle_glide()
+        var wide_ok := true
+        for i in g.chain.size():
+                var t: Dictionary = g.chain[i]
+                if t.has("pv") and int(t["a"]) == int(t["b"]) \
+                                and not bool(t["pv"]):
+                        wide_ok = false
+        _check(wide_ok,
+                "THE CROSSWISE DOUBLE LAW: the wide table (rows of ten) stands its doubles too")
+        # the LIVE left-flow placement: a double onto the LEFT open end
+        g.probe_reset(51)
+        g.chain = []
+        g.hand_p = [[6, 6], [4, 4]]
+        g.hand_c = []
+        g.deck = []
+        g.opening = false
+        g.state = "play"
+        g.turn = g.P
+        g._relayout()
+        g.sel = 0
+        g._place(g.P, 0, 2)          # the 6-6 opens (a double - stands)
+        g.sel = 0
+        g._place(g.P, 0, 1)          # the 4-4 onto the LEFT end (a double)
+        var left_ok: bool = bool(g.chain[1]["pv"]) \
+                        and bool(g.chain[0]["pv"])
+        _check(left_ok,
+                "THE CROSSWISE DOUBLE LAW: a LEFT-flowed double stands across the flow too")
+        g.chain.clear()
+        g._apply_orientation("vertical")
+        g._relayout()
 
         # ---- THE MEMORY LAW (the xo 2-round window) ----
         var mem: Array = []

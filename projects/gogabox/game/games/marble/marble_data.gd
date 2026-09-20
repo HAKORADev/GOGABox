@@ -93,7 +93,7 @@ const POWERS := [
         {"id": "speed", "name": "HIGH SPEED", "price": 260,
                 "desc": "shots fly much faster for a while"},
         {"id": "vapor", "name": "VAPOR", "price": 300,
-                "desc": "matches eat one extra marble each side"},
+                "desc": "the chain dissolves marble by marble; matches eat wider"},
         {"id": "rainbow", "name": "RAINBOW", "price": 340,
                 "desc": "your next 3 shots match any color"},
         {"id": "lightning", "name": "LIGHTNING", "price": 380,
@@ -117,6 +117,13 @@ const CATCH_UP := 2.3           # the back-group chase multiplier
 const SLOW_ZONE := 0.85         # last 15% of the path
 const SLOW_MULT := 0.55         # the owner's "slow down before the hole"
 const DANGER_ZONE := 0.88       # the idol's breath
+
+# ---------------------------------------------------------------- v041 tuning
+const INSERT_T := 0.22          # THE LIVING INSERT: push+settle duration
+const ROLLBACK_MULT := 2.6      # THE POP-BACK LAW: faster than chain speed
+const ROLLBACK_MIN := 190.0     #    (floor so early places still read fast)
+const VAPOR_BASE := 0.02        # THE VAPOR SWEEP: stagger base + per-px step
+const VAPOR_STEP := 0.0006      #    (marble after marble, quick but readable)
 
 static func levels() -> Array:
         return MarbleMapsData.DATA["levels"]

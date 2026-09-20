@@ -216,6 +216,23 @@ func _input(event: InputEvent) -> void:
                         and (event as InputEventScreenTouch).pressed:
                 _end_splash()
                 return
+        # v0.4.1 THE WASD FALLBACK LAW (the owner: "make controls fallbacks,
+        # like a game that has the arrow-keys defined only... making the WASD
+        # keys be used same way... if a game has different use for both
+        # arrows and WASD, then do nothing"): no game defines its own W/A/S/D
+        # (Heavy War aliases them to the SAME directions), so the box
+        # translates once, globally - every arrows-only game hears the keys.
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo:
+                var wk := (event as InputEventKey).keycode
+                var ak := KEY_NONE
+                match wk:
+                        KEY_W: ak = KEY_UP
+                        KEY_A: ak = KEY_LEFT
+                        KEY_S: ak = KEY_DOWN
+                        KEY_D: ak = KEY_RIGHT
+                if ak != KEY_NONE:
+                        _push_key(ak, true)
         # v0.4.1 THE GAMEPAD SEAT: d-pad = arrows, A/B/X/Y = the 1/2/3/4
         # keys, START = ESC (the back law). The translation lives in ONE
         # place - every game that already listens to those keys hears the

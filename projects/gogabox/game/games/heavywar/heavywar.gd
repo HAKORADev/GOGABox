@@ -143,7 +143,16 @@ var move_force := 0.0
 var _kb_dir := 0   # THE PC LAW: the arrows' own steering lane (the windows return)
 var aim_ptr := -1
 var aim_pos := Vector2(960.0, 400.0)
-var mouse_aim := false
+# v0.4.1 THE PC SEAT (the owner: "make the tank moves with arrows while
+# the whole mouse clicks be for shoot and aim"): the mouse is split -
+# the CURSOR aims (the cannon tracks it from the first motion, the
+# reticle IS the pointer in live play) and the LEFT BUTTON fires (hold
+# = keep firing, the auto-cadence law). Arrows drive; WASD rides along
+# as the alias. A touch screen never reads any of this (touch_ui).
+var mouse_fire := false          # the LMB is held - the guns speak
+var mouse_seen := false          # the mouse owns the aim from its first motion
+var _kb_left := false
+var _kb_right := false
 var touch_ui := false          # a real touch screen: the emulated mouse is dead
 
 # parallax scroll
@@ -946,18 +955,26 @@ func _goga_input(event: InputEvent) -> void:
                 elif d.index == aim_ptr:
                         aim_pos = d.position
         elif event is InputEventKey:
-                # THE PC LAW (the windows return): LEFT/RIGHT steer the tank
-                # (the mouse keeps the aim + the cannon fire)
+                # THE PC LAW (the windows return): LEFT/RIGHT (or A/D) drive
+                # the tank - the mouse keeps the aim + the cannon fire
                 var k := event as InputEventKey
-                if k.pressed and not k.echo:
-                        if k.is_action("ui_left"):
-                                _kb_dir = -1
-                        elif k.is_action("ui_right"):
-                                _kb_dir = 1
-                elif not k.pressed:
-                        if _kb_dir != 0 and (k.is_action("ui_left") \
-                                        or k.is_action("ui_right")):
-                                _kb_dir = 0
+                var kl: bool = k.is_action("ui_left") or k.keycode == KEY_A
+                var kr: bool = k.is_action("ui_right") or k.keycode == KEY_D
+                if kl or kr:
+                        if k.pressed:
+                                if kl:
+                                        _kb_left = true
+                                if kr:
+                                        _kb_right = true
+                        else:
+                                if kl:
+                                        _kb_left = false
+                                if kr:
+                                        _kb_right = false
+                        # the lane reads the HELD keys - pressing the other
+                        # arrow reverses instead of dead-sticking
+                        _kb_dir = (1 if _kb_right else 0) \
+                                        - (1 if _kb_left else 0)
         elif event is InputEventMouseButton:
                 # THE CONTROLS LAW: a touch screen's emulated mouse is DEAD
                 # (it was the moving-also-aims bug: the first finger IS a
@@ -965,7 +982,10 @@ func _goga_input(event: InputEvent) -> void:
                 if touch_ui:
                         return
                 var m := event as InputEventMouseButton
-                mouse_aim = m.pressed
+                # v0.4.1 THE PC SEAT: the LEFT button is FIRE (hold = keep
+                # firing); the aim itself rides the cursor, no button needed
+                if m.button_index == MOUSE_BUTTON_LEFT:
+                        mouse_fire = m.pressed
                 if m.pressed:
                         if state == GS.INTRO:
                                 _intro_tap()
@@ -973,13 +993,13 @@ func _goga_input(event: InputEvent) -> void:
                                 _menu_tap(m.position)
                         else:
                                 aim_pos = m.position
-                elif state == GS.PLACE or state == GS.BOSS:
-                        pass
         elif event is InputEventMouseMotion:
                 if touch_ui:
                         return
-                if mouse_aim:
-                        aim_pos = (event as InputEventMouseMotion).position
+                # THE AIM IS THE CURSOR: the cannon tracks the pointer from
+                # its first motion - no button held required anymore
+                mouse_seen = true
+                aim_pos = (event as InputEventMouseMotion).position
 
 func _touch_down(idx: int, pos: Vector2) -> void:
         if state == GS.INTRO:
@@ -1045,6 +1065,17 @@ func _start_place() -> void:
                 + ("  II" if place_i >= 10 else ""), 2.4)
 
 func _goga_tick(delta: float) -> void:
+        # THE PC POINTER LAW (v0.4.1): in live play the game OWNS the
+        # pointer - the OS cursor hides and the reticle IS the cursor
+        # (sheets + pause + menus force it back - the game_base pointer
+        # law). A touch screen never plays this game.
+        if not touch_ui:
+                var live := state == GS.PLACE or state == GS.BOSS
+                if live and not over:
+                        if Input.mouse_mode != Input.MOUSE_MODE_HIDDEN:
+                                Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+                elif Input.mouse_mode == Input.MOUSE_MODE_HIDDEN:
+                        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
         if paused or state == GS.OVER:
                 return
         # the top-bar scrap chip lives (the pop siege chip law)
@@ -1806,10 +1837,10 @@ func _update_player(delta: float) -> void:
         p_x = clampf(p_x + kb_force * spd * delta, 110.0, W - 110.0)
         if absf(kb_force) > 0.02:
                 p_wheel_spin += kb_force * delta * 11.0
-        # aim: the RIGHT zone finger, else dead ahead (the pivot rides the
-        # tower top - SCALED with the tank since v040-8)
+        # aim: the RIGHT zone finger, else the PC cursor (the pivot rides
+        # the tower top - SCALED with the tank since v040-8)
         var pivot := Vector2(p_x, GROUND_Y - 284.0 * TANK_S)
-        if aim_ptr != -1 or mouse_aim:
+        if aim_ptr != -1 or mouse_seen:
                 var a := (aim_pos - pivot).angle()
                 if a > -0.06 and a < PI / 2:
                         a = -0.06
@@ -1823,7 +1854,8 @@ func _update_player(delta: float) -> void:
         cd_main -= delta
         cd_mg -= delta
         cd_rk -= delta
-        var fire := aim_ptr != -1 or mouse_aim
+        # v0.4.1 THE PC SEAT: a finger on the aim half OR the held LMB fires
+        var fire := aim_ptr != -1 or mouse_fire
         if fire and cd_main <= 0.0:
                 _fire_main()
                 cd_main = maxf(0.09, 0.62 - (_shop_lvl("cannon") + 1) * 0.025) \
@@ -3861,8 +3893,9 @@ func _draw_hud() -> void:
                         Color(0.78, 0.24, 0.24, damage_flash * 0.35))
         if flash > 0.0:
                 hud_draw.draw_rect(Rect2(0, 0, W, H), Color(1, 1, 1, flash))
-        # ---------- THE AIM CURSOR ----------
-        if aim_ptr != -1 or mouse_aim:
+        # ---------- THE AIM CURSOR (the game-owned pointer - in live play
+        # the OS cursor hides and THIS is the cursor) ----------
+        if aim_ptr != -1 or mouse_seen:
                 _draw_crosshair(aim_pos)
 
 func _weapon_pips(name_txt: String, at: Vector2, n: int, maxn: int,
@@ -3997,6 +4030,9 @@ func _game_over() -> void:
         if state == GS.OVER:
                 return
         state = GS.OVER
+        # THE POINTER LAW: the death sheet needs a pointer - hand it back
+        if not touch_ui and Input.mouse_mode == Input.MOUSE_MODE_HIDDEN:
+                Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
         if not tunnel.is_empty():
                 tunnel = {}
                 if tunnel_node != null and is_instance_valid(tunnel_node):

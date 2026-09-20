@@ -386,6 +386,8 @@ var move_idx := -1                    # owns the analog move anchor
 var move_axis := 0.0                  # the tower law: the drag's analog -1..1
 var fire_idx := -1
 var _kb_fire := false   # THE PC LAW: the keyboard's own fire latch (v0.3.4-3)
+var _mouse_fire := false        # v0.4.1 THE CURSOR LAW: LMB's own fire latch
+var _mouse_x := -1.0            # the cursor's seat (-1 = the cursor never aimed)
 var firing := false
 var ship_v := Vector2.ZERO            # for the tail + bank
 var dodge_side := 0.0                 # THE DODGE LAW: the committed sidestep side
@@ -746,6 +748,19 @@ func _goga_input(event: InputEvent) -> void:
                                 elif t.index == move_idx:
                                                 move_idx = -1
                                                 move_axis = 0.0
+                # v0.4.1 THE CURSOR LAW (the owner: "in space invaders make
+                # ship follow cursor and LMB shoot, this will be cooler"): on
+                # a desktop the cursor IS the steering - the ship seeks its x,
+                # the LEFT button holds the fire. Touch stays byte-for-byte.
+                elif event is InputEventMouseMotion and ScaleRule.is_pc():
+                                _mouse_x = (event as InputEventMouseMotion).position.x
+                elif event is InputEventMouseButton and ScaleRule.is_pc():
+                                var mb := event as InputEventMouseButton
+                                if mb.button_index == MOUSE_BUTTON_LEFT:
+                                                if mb.pressed:
+                                                                firing = true
+                                                elif fire_idx == -1:
+                                                                firing = false
                 elif event is InputEventScreenDrag:
                                 var d := event as InputEventScreenDrag
                                 if d.index == move_idx:
@@ -784,6 +799,12 @@ func _goga_tick(delta: float) -> void:
                 # the fire. The keyboard owns its own latch - a release only
                 # clears `firing` when IT lit it (the touch fire finger and
                 # the probes keep full ownership of their own state).
+                # v0.4.1: the cursor aims first (a seek axis - the ship
+                # banks toward its x and settles under it); the keyboard
+                # latch below still wins while a key is held
+                if _mouse_x >= 0.0 and ScaleRule.is_pc():
+                                move_axis = clampf((_mouse_x - ship.position.x)
+                                                                / 130.0, -1.0, 1.0)
                 var kb := Input.get_axis("ui_left", "ui_right")
                 if kb != 0.0:
                                 move_axis = signf(kb)

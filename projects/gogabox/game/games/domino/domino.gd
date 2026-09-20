@@ -791,35 +791,38 @@ func _placed_rects() -> Array:
 ## row: the serpentine folds tall-narrow to match the field's aspect -
 ## seven packed the 20-tile chain 1710 wide (4:1) and the 0.45
 ## readability floor could not answer a 1.17:1 ground (the probe
-## measured the poke-through); five keeps every honest chain above the
-## floor. Tiles
+## measured the poke-through). Tiles
 ## TOUCH edge-to-edge exactly (the studied stick-together law) and a
-## double lies ACROSS the flow - the classic. Overlap is impossible by
+## double lies ACROSS the flow - the classic (v0.4.1: the owner's
+## "double tiles usually should sit the opposite position, if line is
+## vertical they should be horizontal" - the pack rode them IN-LINE for
+## two rounds, the look was wrong; they stand now, see THE CROSSWISE
+## DOUBLE below). Overlap is impossible by
 ## construction, and the fit zoom guarantees the whole box sits in the
 ## chain area - the 28-tile worst case is a closed-form rectangle.
 var ROW_MAX := 5
 
-## the row pitch: one long side + one short side - facing doubles clear
+## the row pitch: ONE LONG (v0.4.1 THE CROSSWISE-DOUBLE PITCH). Rows sit
+## a tile's long side apart - a standing double pokes long/2 out of its
+## row band each way, so two standing doubles in facing rows meet
+## EXACTLY edge-to-edge (95 + 95 = 190) and a double against a lying
+## neighbour keeps 47.5 of daylight. No overlap BY CONSTRUCTION, the
+## stick-together law included.
 func _row_pitch() -> float:
-                return _tile_long() + _tile_short()
+                return _tile_long()
 
-## the next slot a side's cursor would take (dbl is kept for the call
-## signature - under THE PACK LAW it no longer bends the pose). Pure
-## math off the cursor.
-## THE CORNER: at ROW_MAX the turn domino stands IN the row's own band -
-## its long edge flush against the last tile's short edge (the real
-## L-turn, full edge contact); the return row one half-pitch down plugs
-## its first tile UNDER the corner (the cursor paid the corner's width).
-## THE PACK (v0.3.8-5 round 3): every ROW TILE LIES along the flow -
-## doubles ride IN-LINE, the Mexican-Train pack. The probe proved the
-## alternative dead: on a half-pitch lattice ANY standing tile aligned
-## under a standing tile pierces it by half a short, and doubles land
-## on aligned columns too often to guard. Rows of lying tiles + standing
-## corners = zero overlap BY CONSTRUCTION, 47.5 daylight between rows,
-## and the corner stays the only vertical in the field (the opener
-## double stands alone at the center, where row 1's top edge meets its
-## bottom edge exactly).
-func _snake_candidate(cur: Dictionary, _dbl: bool) -> Dictionary:
+## the next slot a side's cursor would take. THE CORNER: at ROW_MAX one
+## vertical tile stands IN the row's own band - its long edge flush
+## against the last tile's short edge (the real L-turn, full edge
+## contact); the return row one pitch below keeps its distance.
+## v0.4.1 THE CROSSWISE DOUBLE (the owner's logical bug: "if the tile is
+## 0/0 it sits horizontal and not vertical which is wrong and weird,
+## double tiles usually should sit the opposite position, if line is
+## vertical they should be horizontal"): a DOUBLE STANDS ACROSS the
+## row's flow - tall where the row lies - and eats ONE SHORT of the row
+## (its own width), so the next tile still lands flush on its short
+## edge (the stick-together law, no daylight, no overlap).
+func _snake_candidate(cur: Dictionary, dbl: bool) -> Dictionary:
                 var dir: Vector2 = cur["dir"]
                 var x: float = cur["x"]
                 var y: float = cur["y"]
@@ -831,11 +834,13 @@ func _snake_candidate(cur: Dictionary, _dbl: bool) -> Dictionary:
                                 return {"center": cc, "dir": dir,
                                                 "rect": Rect2(cc - csz * 0.5, csz),
                                                 "vert": true}
-                var center := Vector2(x + dir.x * (_tile_long() * 0.5), y)
-                var rsz := Vector2(_tile_long(), _tile_short())
+                var stride := _tile_short() if dbl else _tile_long()
+                var center := Vector2(x + dir.x * (stride * 0.5), y)
+                var rsz := Vector2(_tile_short(), _tile_long()) if dbl \
+                                                else Vector2(_tile_long(), _tile_short())
                 return {"center": center, "dir": dir,
                                                 "rect": Rect2(center - rsz * 0.5, rsz),
-                                                "vert": false}
+                                                "vert": dbl}
 
 ## THE STEP: commit the next tile's pose into `entry` and advance the
 ## side's cursor. The corner turns the row: same edge, one pitch down,
@@ -851,15 +856,19 @@ func _snake_place(side: int, dbl: bool, entry: Dictionary) -> void:
                 var dir: Vector2 = cand["dir"]
                 if int(cur.get("run", 0)) >= ROW_MAX:
                                 # the turn: the cursor pays the corner's width,
-                                # drops half a pitch, and heads back (the return
-                                # row's first tile lands flush under the corner)
+                                # drops one row pitch, and heads back (the return
+                                # row starts a full long below - the crosswise
+                                # doubles of facing rows exactly clear)
                                 cur["x"] = float(cur["x"]) + dir.x * _tile_short()
-                                cur["y"] = float(cur["y"]) + _row_pitch() * 0.5
+                                cur["y"] = float(cur["y"]) + _row_pitch()
                                 cur["dir"] = Vector2(-dir.x, 0)
                                 cur["run"] = 0
                 else:
-                                # every row tile strides ONE LONG - the pack law
-                                cur["x"] = float(cur["x"]) + dir.x * _tile_long()
+                                # every row tile strides its OWN flow width - a
+                                # lying tile one long, a crosswise double its
+                                # one short (the pack law, still edge-to-edge)
+                                cur["x"] = float(cur["x"]) + dir.x \
+                                                * (_tile_short() if dbl else _tile_long())
                                 cur["run"] = int(cur.get("run", 0)) + 1
 
 ## the opener's pose: dead center of the chain area, the double stands
@@ -947,8 +956,14 @@ func _chain_bbox() -> Rect2:
                 # fit only saw placed tiles and walked a step AFTER every
                 # landing)
                 if not cur_l.is_empty() and not cur_r.is_empty():
+                                # BOTH poses ride the census (v0.4.1: a crosswise
+                                # double may land on the open end - its tall
+                                # rect pokes past the lying estimate, so the fit
+                                # reserves for both before anything lands)
                                 rs.append(_snake_candidate(cur_l, false)["rect"])
+                                rs.append(_snake_candidate(cur_l, true)["rect"])
                                 rs.append(_snake_candidate(cur_r, false)["rect"])
+                                rs.append(_snake_candidate(cur_r, true)["rect"])
                 var bb := Rect2()
                 var first := true
                 for r in rs:

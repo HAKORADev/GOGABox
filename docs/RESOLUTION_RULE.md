@@ -267,3 +267,49 @@ boots, the window must open portrait ~9:16; re_window landscape/portrait
 reshape + stay inside the screen + remember the kind; the fullscreen toggle
 flips the mode, persists in the Box settings, and returning to windowed
 re-windows to the content; the content scale stays glued to the design.
+
+## 9. THE DESIGN FOLLOWS THE CONTENT (v0.4.1 - the vertical-fullscreen kill)
+
+The owner's mixed report proved the v0.4.0-17 fullscreen seat broken: in
+fullscreen on a 16:9 monitor the portrait menu got the LANDSCAPE design
+(want_for read the monitor's landscape pixels), which painted the
+sideways-hybrid, mis-aimed every click, and left "black sides" that were
+really the EXPAND canvas reaching past the content WITH live clicks inside.
+
+The law now: **on a desktop the design is picked by WHAT IS SHOWING** - the
+menu's own position choice (`ScaleRule.pc_position`, F10 / the settings
+row) or the game's orientation - never by the window's aspect. The phone
+rule is unchanged (the window IS the screen; rotation is physical).
+
+## 10. THE PC STRETCH LAW: KEEP EVERYWHERE
+
+On a desktop EVERY design renders KEEP-aspect (`ScaleRule.apply_pc`):
+windowed, re_window reshapes the window to the design (no bars at all);
+fullscreen or any dragged shape, the bars wear the box brown. EXPAND is a
+phone law - a desktop canvas can never outgrow its content again, so bar
+clicks land outside the canvas and die (the owner's clickable-sides bug).
+
+## 11. THE EDGE VEIL (the Spotify-like theming, done honestly)
+
+When the brown bars exist, the app's own edge wears a soft inward shadow
+(main.gd `_build_edge_veil`, visible only when `ScaleRule.bars_visible`) -
+the box floats above the sides. NOT per-pixel dominant-color theming (the
+owner pre-rejected that read for this app).
+
+## 12. THE SHARPNESS LAW (the jagged/cloud kill)
+
+The PC windows render the 1080x1920 design downscaled (a 900px-tall
+monitor shows it at ~0.6-0.75); linear sampling without mips aliased the
+raster art into the jagged thumbnails and the cloud-ish wash (the same art
+is clean on the FHD+ phone because it samples 1:1). The law: project.godot
+canvas filter = Linear Mipmap + tools/v041_mipmaps.py generates mips on
+the 2D art (2089 textures). Vector UI/text are unaffected (always sharp).
+
+## 13. DYNAMIC SCALE (the FSR law)
+
+The owner asked for FSR4.1; the honest answer: FSR 4 is AMD RDNA4 ML tech
+that cannot ride a 2D GL app, and FSR 2/3 are temporal 3D passes. The
+FidelityFX piece that fits is the SPATIAL SHARPENING pass (game/core/
+rcas.gdshader, CAS math from the same family) - one shader over the whole
+final frame, every GPU (AMD/NVIDIA/Intel), no restart, OFF by default.
+Settings > Screen & Graphics > DYNAMIC SCALE.

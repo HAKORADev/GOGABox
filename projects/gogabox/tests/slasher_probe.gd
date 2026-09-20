@@ -96,6 +96,40 @@ func _run() -> void:
                 "the cut floats +1 next to the fruit")
         _check(g.splats.size() >= 1 and g.drops.size() >= 10,
                 "REAL juice: a splat on the wood + droplets in the air")
+        # v0.4.1 THE TOP-LEFT SPLAT FIX (the owner: "some particles of a
+        # slash at the very top left appear when i slash something"): the
+        # stain's blobs used to draw at their bare offsets - around the
+        # WORLD ORIGIN. A spy painter rides the REAL draw cycle and
+        # records the actual draw_circle calls, so the paint itself is
+        # judged, not the data.
+        var splat_at := Vector2(640, 900)
+        g.splats = []
+        g._add_splat(splat_at, Color(1, 0, 0))
+        var real_painter: Node2D = g.splat_painter
+        real_painter.draw.disconnect(g._paint_splats)
+        var spy := SplatSpy.new()
+        g.world.add_child(spy)
+        spy.draw.connect(g._paint_splats)
+        g.splat_painter = spy
+        spy.queue_redraw()
+        await get_tree().process_frame
+        await get_tree().process_frame
+        g.splat_painter = real_painter
+        spy.draw.disconnect(g._paint_splats)
+        real_painter.draw.connect(g._paint_splats)
+        spy.queue_free()
+        var origin_blob := false
+        var on_fruit := false
+        for c in spy.circles:
+                var pos: Vector2 = c["pos"]
+                if pos.length() < 60.0:
+                        origin_blob = true
+                if pos.distance_to(splat_at) <= 50.0:
+                        on_fruit = true
+        _check(spy.circles.size() >= 8 and not origin_blob,
+                "SPLAT FIX: no juice blob paints near the top-left (0,0) origin (%d circles)" % spy.circles.size())
+        _check(on_fruit,
+                "SPLAT FIX: the stain's blobs paint AROUND the cut fruit")
         var moved := false
         if g.halves.size() > 0:
                 var h0: Dictionary = g.halves[0]
@@ -490,6 +524,19 @@ func _make_live(g: GogaGame, kind: String, pos: Vector2) -> Dictionary:
         g.world.add_child(s)
         return {"node": s, "kind": kind, "v": Vector2.ZERO,
                 "spin": 0.0, "sliced": false, "scale": 0.5, "g": 1560.0}
+
+## v0.4.1 THE SPLAT SPY: a duck-typed painter the probe swaps in before
+## _paint_splats() so the REAL draw_circle calls are recorded and judged
+## (the top-left splat bug lived in the paint math, not the data). The
+## override mirrors the native signature exactly; the engine never calls
+## it - only the game's dynamic splat_painter.draw_circle(...) does.
+class SplatSpy extends Node2D:
+        var circles: Array = []
+        @warning_ignore("native_method_override")
+        func draw_circle(pos: Vector2, r: float, col: Color,
+                        antialiased := false, width := -1.0,
+                        width_as_texture := false) -> void:
+                circles.append({"pos": pos, "r": r, "col": col})
 
 func _make_item(g: GogaGame, kind: String) -> Dictionary:
         var s := Sprite2D.new()

@@ -1,11 +1,17 @@
 extends GogaGame
-## MARBLE POPPER (v040-13) - the zuma seat graduated (the owner's rename law).
+## MARBLE POPPER (v041) - the zuma seat graduated (the owner's rename law).
 ## A vertical marble shooter: chains roll carved paths toward a living idol;
 ## you fire marbles, match 3+, pop runs, ride cascades - 100 levels across
 ## 10 places, 5+5+5 skins, shop-spawned powerups, chain GOGACoins, the lives
 ## ladder and the challenge waves - the owner's GDD worked into laws.
 ## The chain engine is data + geometry (the owner: "this game is on
 ## algorithms, geometrics, level-designing").
+## v041 THE BIG PATCH: the universal tap-anywhere intro, the PC mouse seat
+## (cursor aims, LMB fires, RMB swaps), the sparkle path preview, the true
+## jaw/hole/head anatomy, the POP-BACK law, the true rolling read, the
+## LIVING INSERT (the front part is pushed one spacing over time), the
+## per-marble pop colors, match-popped powerup marbles, the vapor sweep
+## and the extinct-color oracle.
 
 const A := "res://assets/games/marble/"
 const DESIGN := Vector2(1080, 1920)          # the box portrait design space
@@ -61,6 +67,10 @@ var twin_fading := false
 var pads: Array = []               # the twin spot rings (the pad law)
 var slider := false
 var shots: Array = []              # {pos, vel, c, spr, rainbow}
+# THE PC SEAT (v0.4.1, brainstorm 2.3): a real desktop with no touch screen
+# reads the mouse - the cursor aims (the slider rides it), LMB fires, RMB
+# swaps. Phones and the headless test rigs keep the touch path untouched.
+var pc_ui := false
 
 # the totem art's seats, measured off the 502x502 texture (same layout on
 # every skin): the mouth hole center and the back-notch hole, in head-LOCAL px
@@ -82,12 +92,14 @@ var coin_pending := false
 
 # preview
 var preview_t := 0.0
-var preview_arrows: Array = []     # of Sprite2D
+var preview_arrows: Array = []     # of SparkleLine (the moving sparkle route)
 
 # hud
 var lives_lbl: Label
 var pop_lbl: Label                 # the in-level pop score (small, under the bar)
 var _tex_cache: Dictionary = {}
+# the last pop-fx records {pos, tint} - the probe's per-marble color seat
+var fx_log: Array = []
 
 var cleared_card: Control = null   # the cleared/lost overlay cards
 var ready_ui: Control = null
@@ -144,6 +156,12 @@ func _goga_setup() -> void:
         rng.randomize()
         meta = MBMeta.load_meta()
         pause_end_run = false
+        # THE PC SEAT (the heavywar controls law): a real desktop with no
+        # touch screen reads the mouse; phones and headless rigs never do -
+        # a touch screen's own emulated mouse events stay dead (they are the
+        # first finger, not a cursor)
+        pc_ui = ScaleRule.is_pc() \
+                and not DisplayServer.is_touchscreen_available()
         set_hud_score_prefix("LEVEL")   # the widget counts ONE level (the owner's accuracy law)
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("LEVELS", func(): _levels_open())
@@ -191,6 +209,7 @@ func _build_intro() -> void:
         var dim := ColorRect.new()
         dim.color = Color(0.04, 0.03, 0.07, 0.55)
         dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+        dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
         ready_ui.add_child(dim)
         var cc := CenterContainer.new()
         cc.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -214,6 +233,13 @@ func _build_intro() -> void:
         vb.add_child(tap)
         # THE NO-HELPER LAW (v040-14, the owner): no info line under the tap
         # prompt - the how-to lives in the guide (it already does), never here
+        # THE TAP-ANYWHERE LAW (v0.4.1, brainstorm 2.2): the START sits on the
+        # universal base overlay - EVERY pixel of the screen AND any keyboard
+        # key fires it, exactly once (the old own-tap path heard only a
+        # middle-bottom patch of the screen - the owner, both platforms).
+        # The intro card keeps its own "TAP ANYWHERE TO START" art, so the
+        # overlay rides mute (note "").
+        tap_anywhere_start(_intro_go, "")
         if not bool(meta.d["seen_story"]) and DisplayServer.get_name() != "headless":
                 meta.mark_story()
                 box_story_show("THE OLD IDOL",
@@ -237,6 +263,7 @@ func _intro_go() -> void:
 
 # ================================================================= level
 func _start_level(idx: int, as_challenge: bool, wave: int) -> void:
+        tap_anywhere_stop()   # the intro overlay is done the moment a level starts
         level_idx = idx
         challenge = as_challenge
         challenge_wave = wave
@@ -337,10 +364,55 @@ func _level_colors() -> Array:
         return MarbleData.place_colors(int(level["place"]))
 
 func _deal_colors() -> void:
-        var cols := _level_colors()
-        load_c = cols[rng.randi_range(0, cols.size() - 1)]
-        next_c = cols[rng.randi_range(0, cols.size() - 1)]
+        load_c = _roll_live()
+        next_c = _roll_live()
         _refresh_shooter_marbles()
+
+# ============================================ THE EXTINCT COLOR ORACLE (v041)
+func _is_marble(m: Dictionary) -> bool:
+        # a color-carrying chain marble: the normal kind AND the powerup
+        # carrier (v0.4.1: a fixed-color normal marble with an icon)
+        return m["kind"] == "m" or m["kind"] == "pow"
+
+func _live_colors() -> Array:
+        # THE EXTINCT COLOR LAW (v0.4.1, brainstorm 2.12): every color that
+        # can still appear in this level - the colors riding live marbles
+        # right now, plus every color a chain can still spawn (quota left)
+        var out: Array = []
+        for cp in chains:
+                for m in cp.marbles:
+                        if _is_marble(m) and int(m["c"]) >= 0 \
+                                        and not out.has(int(m["c"])):
+                                out.append(int(m["c"]))
+                if cp.spawned < cp.quota:
+                        for c in cp.colors:
+                                if not out.has(int(c)):
+                                        out.append(int(c))
+        return out
+
+func _roll_live() -> int:
+        # the shooter's load roll: never a dead color
+        var live := _live_colors()
+        if live.is_empty():
+                var cols := _level_colors()
+                return int(cols[rng.randi_range(0, cols.size() - 1)])
+        return int(live[rng.randi_range(0, live.size() - 1)])
+
+func _refresh_load_colors() -> void:
+        # a color died mid-flight -> the loaded AND the next marble re-roll
+        # into existing colors immediately (the shooter never loads extinct)
+        var live := _live_colors()
+        if live.is_empty():
+                return
+        var changed := false
+        if not live.has(load_c):
+                load_c = int(live[rng.randi_range(0, live.size() - 1)])
+                changed = true
+        if not live.has(next_c):
+                next_c = int(live[rng.randi_range(0, live.size() - 1)])
+                changed = true
+        if changed:
+                _refresh_shooter_marbles()
 
 # ------------------------------------------------------------------ hole
 func _build_hole(pi: int) -> void:
@@ -357,6 +429,13 @@ func _build_hole(pi: int) -> void:
         bot.texture = _t("hole_%s_bot.png" % skin)
         bot.name = "bot"
         bot.scale = Vector2(1.16, 1.0)   # the jaw fills the head's mouth arch
+        # THE JAW/HOLE LAYER LAW (v0.4.1, brainstorm 2.5, the owner: "hole is
+        # the opened mouth, jaw under the hole, head over the hole, when
+        # marbles move, they should be over the jaw, not under it"): the draw
+        # order matches the anatomy - the jaw (z 6-5 = 1) sits UNDER the
+        # marbles (marble_layer z 2), the head arch (z 6) renders OVER the
+        # hole opening; a marble rolling into the mouth reads as INSIDE it
+        bot.z_index = -5
         h.add_child(bot)
         world.add_child(h)
         holes.append(h)
@@ -466,8 +545,7 @@ func _shoot_at(world_pos: Vector2) -> void:
                 rainbow_n -= 1
                 c = -1
         load_c = next_c
-        var cols := _level_colors()
-        next_c = cols[rng.randi_range(0, cols.size() - 1)]
+        next_c = _roll_live()
         _refresh_shooter_marbles()
         var spr := Sprite2D.new()
         spr.texture = _marble_tex(c)
@@ -484,41 +562,22 @@ func _shoot_at(world_pos: Vector2) -> void:
 # ------------------------------------------------------------------ preview
 func _build_preview() -> void:
         # THE PATH PREVIEW LAW (v040-14, the owner: "show the user the exact
-        # marble path of the level"): a GHOST CHAIN of the level's own
-        # marbles rolls the whole route, entry to idol, looping until the
-        # tap - the exact path, the exact direction, unmissable
+        # marble path of the level") - REBUILT v0.4.1 (brainstorm 2.4): the
+        # route wears a MOVING SPARKLE LINE - small glowing dots streaming
+        # along the carved path, entry to idol, looping until the tap. Never
+        # marble sprites (the old ghost chain read as real marbles riding
+        # the route - confusing); the exact path, the exact direction.
         for a in preview_arrows:
                 if is_instance_valid(a):
                         a.queue_free()
         preview_arrows.clear()
         for ci in chains.size():
-                var cp: ChainPath = chains[ci]
-                var cols: Array = cp.colors
-                for k in 8:
-                        var s := Sprite2D.new()
-                        s.texture = _marble_tex(cols[k % cols.size()])
-                        s.scale = Vector2(0.9, 0.9)
-                        s.modulate.a = 0.85
-                        s.z_index = 3
-                        marble_layer.add_child(s)
-                        preview_arrows.append(s)
-        _preview_roll(0.0)
+                var sp := SparkleLine.new(chains[ci], self)
+                world.add_child(sp)
+                preview_arrows.append(sp)
 
-func _preview_roll(t: float) -> void:
-        # the ghost chain rides each path (loops the full length)
-        for ci in chains.size():
-                var cp: ChainPath = chains[ci]
-                for k in 8:
-                        var ai := ci * 8 + k
-                        if ai >= preview_arrows.size():
-                                continue
-                        var s: Sprite2D = preview_arrows[ai]
-                        var span := cp.length + MarbleData.CONTACT * 10.0
-                        var d := fmod(t * 560.0 + k * MarbleData.CONTACT * 1.15, span)
-                        s.visible = d <= cp.length
-                        if s.visible:
-                                s.position = cp.pos_at(d)
-                                s.rotation = d / (MarbleData.MARBLE_D * 0.5)
+func _tick_preview(delta: float) -> void:
+        preview_t += delta   # the sparkle lines animate themselves
 
 # ================================================================= HUD
 func _show_pop_score(reset: bool) -> void:
@@ -1007,10 +1066,14 @@ func _goga_tk_ready() -> void:
         tk.dragged.connect(func(from: Vector2, to: Vector2): _field_dragged(from, to))
 
 func _field_tapped(p: Vector2) -> void:
+        # THE PC SEAT: on a desktop the mouse's EMULATED touch is dead in
+        # play - the mouse path owns firing (one click = one shot, never a
+        # touch double-fire). The intro rides the universal tap overlay and
+        # the preview still takes the emulated tap (tap anywhere = anywhere).
+        if pc_ui and phase == "play":
+                return
         var wp := p - ORIGIN
         match phase:
-                "intro":
-                        _intro_go()
                 "preview":
                         _begin_play()
                 "play":
@@ -1019,10 +1082,47 @@ func _field_tapped(p: Vector2) -> void:
                         pass
 
 func _field_dragged(from: Vector2, to: Vector2) -> void:
+        if pc_ui:
+                return   # the cursor owns the slider on a desktop
         if phase != "play" or not slider:
                 return
         var dx := to.x - from.x
         shooter.position.x = clampf(shooter.position.x + dx, 150.0, DESIGN.x - 150.0)
+
+func _goga_input(event: InputEvent) -> void:
+        # THE PC SEAT (v0.4.1, brainstorm 2.3): the cursor aims the totem
+        # (the slider rides the cursor along its rail), the LEFT button
+        # fires, the RIGHT button swaps the loaded shot. Phones never enter
+        # here (pc_ui is false) - the touch path is byte-for-byte the old one.
+        if not pc_ui:
+                return
+        if event is InputEventMouseMotion:
+                _pc_aim((event as InputEventMouseMotion).position - ORIGIN)
+        elif event is InputEventMouseButton:
+                var m := event as InputEventMouseButton
+                if not m.pressed:
+                        return
+                match m.button_index:
+                        MOUSE_BUTTON_LEFT:
+                                if phase == "play":
+                                        _play_tap(m.position - ORIGIN)
+                        MOUSE_BUTTON_RIGHT:
+                                if phase == "play":
+                                        _swap_loaded()
+                        _:
+                                pass
+
+func _pc_aim(wp: Vector2) -> void:
+        # the totem follows the cursor: the head aims where the cursor is;
+        # a slider totem also rides the rail under it (brainstorm 2.3)
+        if phase != "play" and phase != "preview":
+                return
+        if slider:
+                shooter.position.x = clampf(wp.x, 150.0, DESIGN.x - 150.0)
+        var dir := wp - shooter.position
+        if dir.length() >= 24.0:
+                aim = dir.normalized()
+                shooter_head.rotation = aim.angle() + PI / 2
 
 func _play_tap(wp: Vector2) -> void:
         # the twin law: tap near the OTHER legal spot -> the launcher fades
@@ -1092,10 +1192,6 @@ func _begin_play() -> void:
         phase = "play"
         game_toast("GO!")
 
-func _tick_preview(delta: float) -> void:
-        preview_t += delta
-        _preview_roll(preview_t)          # the ghost chain loops until the tap
-
 ## the entry flavor of a path: an ON-SCREEN entry is a hole (marbles grow
 ## in); a path that starts off-screen is an edge (marbles roll in)
 func _entry_is_hole(pi: int) -> bool:
@@ -1125,7 +1221,11 @@ func _tick_play(delta: float) -> void:
         for cp in chains:
                 _tick_chain(cp, delta)
         _tick_shots(delta)
+        _tick_vapor(delta)   # v0.4.1: the vapor sweep dissolves marble by marble
         _tick_holes(delta)
+        # THE EXTINCT COLOR LAW: the oracle re-rolls the load the moment a
+        # color dies (the same frame the last marble of it leaves the chains)
+        _refresh_load_colors()
         if phase != "play":
                 return
         # THE CLEAR LAW: quota spent, every chain empty
@@ -1181,10 +1281,28 @@ func _tick_chain(cp: ChainPath, delta: float) -> void:
                         var spd := cp.speed * (group_mult if in_front else 1.0) \
                                 * (1.0 if in_front else MarbleData.CATCH_UP)
                         m["d"] += spd * delta
+                        # v0.4.1 THE LIVING INSERT: the push flows INTO d over
+                        # INSERT_T - the pushed group advances together, its
+                        # spacing untouched, and the shot's marble slides into
+                        # the gap (the push rate = one spacing per INSERT_T)
+                        var push_left := float(m.get("push", 0.0))
+                        if push_left > 0.0:
+                                var step: float = minf(push_left,
+                                                MarbleData.CONTACT \
+                                                / MarbleData.INSERT_T * delta)
+                                m["d"] += step
+                                m["push"] = push_left - step
                         if i < n - 1:
                                 var ahead: Dictionary = cp.marbles[i + 1]
                                 var target: float = ahead["d"] - MarbleData.CONTACT
-                                if m["d"] > target:
+                                # v0.4.1 THE LIVING INSERT: while the ahead
+                                # marble is still being PUSHED (the sneak-in
+                                # window) its gap is GROWING by design - the
+                                # smooth-contact pull must not fight the push
+                                # and drag the rear part backward (the owner:
+                                # "the shot should not move the things back")
+                                if m["d"] > target \
+                                                and float(ahead.get("push", 0.0)) <= 0.0:
                                         m["d"] = lerpf(m["d"], target, minf(1.0, delta * 20.0))
                                 # THE BOND LAW: a pair carries a bonded state with
                                 # hysteresis; the false->true transition IS the join
@@ -1207,6 +1325,23 @@ func _tick_chain(cp: ChainPath, delta: float) -> void:
                                         return
                         else:
                                 m["bonded"] = true
+        # ---- v0.4.1 THE POP-BACK LAW: the part toward the hole rolls BACK
+        # (faster than the chain) to meet the rear part after a pop - the
+        # rear part never surges forward anymore. The colors ride as-is.
+        if cp.rollback_i >= 0 and not cp.marbles.is_empty():
+                var fi := cp.rollback_i
+                if fi < cp.marbles.size():
+                        var gap: float = cp.marbles[fi]["d"] - cp.rollback_target
+                        if gap <= 0.5:
+                                # met: the bond machine hears the join next
+                                # tick (a matching junction cascades)
+                                cp.rollback_i = -1
+                        else:
+                                var back: float = minf(gap, delta * maxf(
+                                                cp.speed * MarbleData.ROLLBACK_MULT,
+                                                MarbleData.ROLLBACK_MIN))
+                                for k in range(fi, cp.marbles.size()):
+                                        cp.marbles[k]["d"] -= back
         # ---- the eat law
         if not cp.marbles.is_empty() and phase == "play":
                 var front: Dictionary = cp.marbles.back()
@@ -1227,17 +1362,17 @@ func _on_join(cp: ChainPath, i: int) -> void:
                 return
         var a: Dictionary = cp.marbles[i]
         var b: Dictionary = cp.marbles[i + 1]
-        if a["kind"] != "m" or b["kind"] != "m":
+        if not _is_marble(a) or not _is_marble(b):
                 return
         if a["c"] != b["c"]:
                 return
         var left := i
-        while left > 0 and cp.marbles[left - 1]["kind"] == "m" \
+        while left > 0 and _is_marble(cp.marbles[left - 1]) \
                         and cp.marbles[left - 1]["c"] == a["c"] \
                         and (cp.marbles[left]["d"] - cp.marbles[left - 1]["d"]) <= MarbleData.CONTACT * 1.1:
                 left -= 1
         var right := i + 1
-        while right < cp.marbles.size() - 1 and cp.marbles[right + 1]["kind"] == "m" \
+        while right < cp.marbles.size() - 1 and _is_marble(cp.marbles[right + 1]) \
                         and cp.marbles[right + 1]["c"] == a["c"] \
                         and (cp.marbles[right + 1]["d"] - cp.marbles[right]["d"]) <= MarbleData.CONTACT * 1.1:
                 right += 1
@@ -1279,21 +1414,26 @@ func _insert_shot(cp: ChainPath, hit_i: int, shot: Dictionary) -> void:
         var front_side: bool = shot["pos"].distance_to(front_pos) < shot["pos"].distance_to(rear_pos)
         var c: int = hit["c"] if int(shot["c"]) < 0 else int(shot["c"])
         var m := {"c": c, "d": 0.0, "kind": "m", "life": -1.0, "pow": "",
-                "spr": null, "glow": null, "bonded": true}
-        # THE PUSH LAW (v040-14): an insert slides the REAR part back one
-        # contact spacing, INSTANTLY - one solid push, no lerp wave, no
-        # marbles floating past the entry (the top-left ghost is dead).
-        # front-side: m takes hit's old slot (hit steps back); rear-side:
-        # m slots behind hit (the rearmost steps back). The rearmost may
-        # step behind the entry (d < 0 = inside the entrance) - it hides
-        # there and grows back in when the chain advances (the entry law)
+                "spr": null, "glow": null, "bonded": true, "push": 0.0}
+        # THE LIVING INSERT LAW (v041, the owner: "the shot should not move
+        # the things back or affect them, it should move the things that are
+        # toward it to move forward by a distance worth one marble - my
+        # marble moves, hits the marbles, then it sneaks into them while the
+        # forward ones move forward"). The REAR part never moves anymore:
+        # the shot's marble takes the slot of the marble it struck, and THAT
+        # marble plus everything TOWARD THE HOLE is pushed forward one
+        # contact spacing OVER TIME (the push flows through _tick_chain at
+        # INSERT_T) - the gap the shot slides into is the push's own making.
+        # rear-side: m takes hit's old slot (hit leads the pushed group);
+        # front-side: m takes the front neighbour's old slot (hit stays).
         var insert_i := hit_i + (1 if front_side else 0)
-        m["d"] = hit["d"] if front_side else hit["d"] - MarbleData.CONTACT
-        var rear_last := hit_i if front_side else hit_i - 1
-        for k in range(rear_last, -1, -1):
-                if cp.marbles[k]["kind"] == "m" or cp.marbles[k]["kind"] == "coin" \
-                                or cp.marbles[k]["kind"] == "pow":
-                        cp.marbles[k]["d"] -= MarbleData.CONTACT
+        m["d"] = hit["d"] + (MarbleData.CONTACT if front_side else 0.0)
+        for k in range(insert_i, cp.marbles.size()):
+                var mm: Dictionary = cp.marbles[k]
+                if mm["kind"] == "m" or mm["kind"] == "coin" \
+                                or mm["kind"] == "pow":
+                        mm["push"] = float(mm.get("push", 0.0)) \
+                                        + MarbleData.CONTACT
         cp.marbles.insert(insert_i, m)
         cp.ensure_sprite(m)
         Jukebox.sfx("mb_insert", -8.0, 1.2)
@@ -1303,19 +1443,21 @@ func _match_check(cp: ChainPath, i: int) -> void:
         if i < 0 or i >= cp.marbles.size():
                 return
         var m: Dictionary = cp.marbles[i]
-        if m["kind"] != "m":
+        if not _is_marble(m):
                 return
         # THE FULL RUN LAW (v040-14, the owner: "+3 matched, only 3 popped
         # is very wrong"): the walk compares each NEW edge against the
         # RUNNING edge of the run - never against the inserted marble -
-        # so the whole contiguous same-color run pops, whatever its size
+        # so the whole contiguous same-color run pops, whatever its size.
+        # v0.4.1: the powerup carrier counts as a color marble of its own
+        # fixed color (the icon marble law).
         var left := i
-        while left > 0 and cp.marbles[left - 1]["kind"] == "m" \
+        while left > 0 and _is_marble(cp.marbles[left - 1]) \
                         and cp.marbles[left - 1]["c"] == m["c"] \
                         and (cp.marbles[left]["d"] - cp.marbles[left - 1]["d"]) <= MarbleData.CONTACT * 1.12:
                 left -= 1
         var right := i
-        while right < cp.marbles.size() - 1 and cp.marbles[right + 1]["kind"] == "m" \
+        while right < cp.marbles.size() - 1 and _is_marble(cp.marbles[right + 1]) \
                         and cp.marbles[right + 1]["c"] == m["c"] \
                         and (cp.marbles[right + 1]["d"] - cp.marbles[right]["d"]) <= MarbleData.CONTACT * 1.12:
                 right += 1
@@ -1328,16 +1470,18 @@ func _match_check(cp: ChainPath, i: int) -> void:
 func _pop_run(cp: ChainPath, left: int, right: int) -> void:
         # the vapor law: a match eats one extra marble each side while active
         if vapor_t > 0.0:
-                if left > 0 and cp.marbles[left - 1]["kind"] == "m":
+                if left > 0 and _is_marble(cp.marbles[left - 1]):
                         left -= 1
-                if right < cp.marbles.size() - 1 and cp.marbles[right + 1]["kind"] == "m":
+                if right < cp.marbles.size() - 1 and _is_marble(cp.marbles[right + 1]):
                         right += 1
         var count := right - left + 1
         var pts := 10 * count + maxi(0, combo - 1) * 20
         _pop_score_add(pts)
         for i in range(left, right + 1):
                 var m: Dictionary = cp.marbles[i]
-                _spawn_pop_fx(cp.pos_at(m["d"]), MarbleData.COLOR_TINT.get(m["c"], Color.WHITE))
+                # THE POP VFX COLOR LAW (v041): each popped marble's own tint
+                _spawn_pop_fx(cp.pos_at(m["d"]),
+                                MarbleData.COLOR_TINT.get(int(m["c"]), Color.WHITE))
         var popped: Array = cp.marbles.slice(left, right + 1)
         cp.marbles = cp.marbles.slice(0, left) + cp.marbles.slice(right + 1)
         for m in popped:
@@ -1345,14 +1489,133 @@ func _pop_run(cp: ChainPath, left: int, right: int) -> void:
                         m["spr"].queue_free()
                 if m["glow"] != null and is_instance_valid(m["glow"]):
                         m["glow"].queue_free()
+        # v0.4.1: a popped powerup carrier FIRES its power (it was
+        # match-popped like a normal marble - the icon marble law)
+        for m in popped:
+                if String(m.get("kind", "")) == "pow":
+                        _trigger_pow(cp, m)
         if combo > 1:
                 Jukebox.sfx("mb_combo%d" % clampi(combo, 1, 10), -4.0)
         else:
                 Jukebox.sfx("mb_pop", -4.0, 1.0 + rng.randf() * 0.2)
         if count >= 5:
                 Jukebox.sfx("mb_bonus", -6.0)
-        # the removed run may have left matching ends that now touch:
-        # the join law catches them next ticks (no forced recursion)
+        # v0.4.1 THE POP-BACK LAW: a gap with a rear part behind it sends the
+        # FRONT part rolling BACK to meet it (faster than the chain); the
+        # rear part stays put and the marbles return AS-IS (colors never
+        # change). A matching junction cascades through the bond machine.
+        if left > 0 and left < cp.marbles.size():
+            cp.rollback_i = left
+            cp.rollback_target = float(cp.marbles[left - 1]["d"]) \
+                            + MarbleData.CONTACT
+            if float(cp.marbles[left]["d"]) <= cp.rollback_target:
+                    cp.rollback_i = -1   # already touching - the join law runs
+        else:
+                # a chain that emptied (or lost its rear part) has nothing to
+                # roll back TO - the state must never outlive its pop (a
+                # stale target would drag the freshly fed chain backward)
+                cp.rollback_i = -1
+
+## v0.4.1 THE POWERUP MARBLE LAW (brainstorm 2.9 + 2.11): the carrier is a
+## NORMAL fixed-color marble with the icon at its center - match-popped
+## like any marble, never collected by a stray shot - and VAPOR sweeps the
+## chain marble by marble (the "matcher" read), never an instant clear.
+func _trigger_pow(cp: ChainPath, m: Dictionary) -> void:
+        var kind := String(m["pow"])
+        var pname := ""
+        for p in MarbleData.POWERS:
+                if p["id"] == kind:
+                        pname = String(p["name"])
+        _pow_name_show(pname)
+        Jukebox.sfx("mb_powtake", -2.0)
+        _spawn_ring_fx(cp.pos_at(clampf(float(m["d"]), 0.0, cp.length)),
+                        MarbleData.POW_TINT.get(kind, Color.WHITE))
+        match kind:
+                "back":
+                        for c in chains:
+                                for mm in c.marbles:
+                                        mm["d"] -= 300.0
+                "bomb":
+                        var at: Vector2 = cp.pos_at(
+                                        clampf(float(m["d"]), 0.0, cp.length))
+                        var blast: Array = []
+                        for mm in cp.marbles:
+                                if cp.pos_at(mm["d"]).distance_to(at) <= 250.0:
+                                        blast.append(mm)
+                        for mm in blast:
+                                _spawn_pop_fx(cp.pos_at(mm["d"]), Color(1.0, 0.6, 0.3))
+                                _free_marble(cp, mm)
+                        Jukebox.sfx("mb_bomb", -2.0)
+                "speed":
+                        speed_t = 15.0
+                "vapor":
+                        _vapor_sweep(cp, cp.pos_at(
+                                        clampf(float(m["d"]), 0.0, cp.length)))
+                "rainbow":
+                        rainbow_n = 3
+                "lightning":
+                        var counts := {}
+                        for mm in cp.marbles:
+                                if _is_marble(mm):
+                                        counts[mm["c"]] = int(counts.get(mm["c"], 0)) + 1
+                        if not counts.is_empty():
+                                var best_c: int = counts.keys()[0]
+                                for k in counts:
+                                        if counts[k] > counts[best_c]:
+                                                best_c = k
+                                var zapped: Array = []
+                                for mm in cp.marbles:
+                                        if _is_marble(mm) and mm["c"] == best_c \
+                                                        and zapped.size() < 14:
+                                                zapped.append(mm)
+                                for mm in zapped:
+                                        _spawn_pop_fx(cp.pos_at(mm["d"]), Color(0.6, 0.9, 1.0))
+                                        _free_marble(cp, mm)
+                                Jukebox.sfx("mb_lightning", -2.0)
+
+## one honest teardown for a chain marble (the bomb/lightning paths used to
+## free the glow by hand - one door now)
+func _free_marble(cp: ChainPath, m: Dictionary) -> void:
+        cp.marbles.erase(m)
+        if m["spr"] != null and is_instance_valid(m["spr"]):
+                m["spr"].queue_free()
+        if m["glow"] != null and is_instance_valid(m["glow"]):
+                m["glow"].queue_free()
+
+var _vapor_queue: Array = []   # [{cp, m, t}] - the staggered dissolve
+
+## THE VAPOR SWEEP (the owner: "vapor should be a majestic marble that when
+## hit another, it removes all of them accurately and not instantly, like
+## game 'matcher'"): every marble in the chain dissolves one by one,
+## staggered by its distance from the carrier, each in its own color.
+func _vapor_sweep(cp: ChainPath, from_pos: Vector2) -> void:
+        Jukebox.sfx("mb_vapor" if ResourceLoader.exists(
+                        "res://assets/audio/sfx/mb_vapor.ogg") else "mb_pow", -2.0)
+        for mm in cp.marbles.duplicate():
+                var d: float = cp.pos_at(mm["d"]).distance_to(from_pos)
+                _vapor_queue.append({"cp": cp, "m": mm,
+                                "t": MarbleData.VAPOR_BASE
+                                + d * MarbleData.VAPOR_STEP})
+
+func _tick_vapor(delta: float) -> void:
+        if _vapor_queue.is_empty():
+                return
+        for i in range(_vapor_queue.size() - 1, -1, -1):
+                var v: Dictionary = _vapor_queue[i]
+                v["t"] = float(v["t"]) - delta
+                var cp: ChainPath = v["cp"]
+                var m: Dictionary = v["m"]
+                if float(v["t"]) > 0.0:
+                        continue
+                _vapor_queue.remove_at(i)
+                if not cp.marbles.has(m):
+                        continue   # a match beat the sweep to it
+                _pop_score_add(10)
+                _spawn_pop_fx(cp.pos_at(m["d"]),
+                                MarbleData.COLOR_TINT.get(int(m["c"]), Color.WHITE))
+                if String(m["kind"]) == "coin":
+                        coin_pending = true   # the missed-coin law
+                _free_marble(cp, m)
 
 # ------------------------------------------------------------------ shots
 func _tick_shots(delta: float) -> void:
@@ -1379,9 +1642,11 @@ func _tick_shots(delta: float) -> void:
                             if sd["pos"].distance_to(mp) <= MarbleData.MARBLE_D * 0.72:
                                     if m["kind"] == "coin":
                                             _collect_coin(cp, m)
-                                    elif m["kind"] == "pow":
-                                            _collect_pow(cp, m)
                                     else:
+                                            # v0.4.1 THE POWERUP MARBLE LAW: a
+                                            # carrier is a NORMAL marble - the
+                                            # shot INSERTS next to it (match-
+                                            # popped later), never auto-collects
                                             _insert_shot(cp, i, sd)
                                     hit_done = true
                                     break
@@ -1405,67 +1670,9 @@ func _collect_coin(cp: ChainPath, m: Dictionary) -> void:
                 m["glow"].queue_free()
         check_achievements()
 
-func _collect_pow(cp: ChainPath, m: Dictionary) -> void:
-        var kind := String(m["pow"])
-        var pname := ""
-        for p in MarbleData.POWERS:
-                if p["id"] == kind:
-                        pname = String(p["name"])
-        _pow_name_show(pname)
-        Jukebox.sfx("mb_powtake", -2.0)
-        _spawn_ring_fx(cp.pos_at(m["d"]), MarbleData.POW_TINT.get(kind, Color.WHITE))
-        cp.marbles.erase(m)
-        if m["spr"] != null and is_instance_valid(m["spr"]):
-                m["spr"].queue_free()
-        if m["glow"] != null and is_instance_valid(m["glow"]):
-                m["glow"].queue_free()
-        match kind:
-                "back":
-                        for c in chains:
-                                for mm in c.marbles:
-                                        mm["d"] -= 300.0
-                "bomb":
-                        var at := cp.pos_at(m["d"])
-                        var blast: Array = []
-                        for mm in cp.marbles:
-                                if cp.pos_at(mm["d"]).distance_to(at) <= 250.0:
-                                        blast.append(mm)
-                        for mm in blast:
-                                _spawn_pop_fx(cp.pos_at(mm["d"]), Color(1.0, 0.6, 0.3))
-                                cp.marbles.erase(mm)
-                                if mm["spr"] != null and is_instance_valid(mm["spr"]):
-                                        mm["spr"].queue_free()
-                                if mm["glow"] != null and is_instance_valid(mm["glow"]):
-                                        mm["glow"].queue_free()
-                        Jukebox.sfx("mb_bomb", -2.0)
-                "speed":
-                        speed_t = 15.0
-                "vapor":
-                        vapor_t = 15.0
-                "rainbow":
-                        rainbow_n = 3
-                "lightning":
-                        var counts := {}
-                        for mm in cp.marbles:
-                                if mm["kind"] == "m":
-                                        counts[mm["c"]] = int(counts.get(mm["c"], 0)) + 1
-                        if not counts.is_empty():
-                                var best_c: int = counts.keys()[0]
-                                for k in counts:
-                                        if counts[k] > counts[best_c]:
-                                                best_c = k
-                                var zapped: Array = []
-                                for mm in cp.marbles:
-                                        if mm["kind"] == "m" and mm["c"] == best_c and zapped.size() < 14:
-                                                zapped.append(mm)
-                                for mm in zapped:
-                                        _spawn_pop_fx(cp.pos_at(mm["d"]), Color(0.6, 0.9, 1.0))
-                                        cp.marbles.erase(mm)
-                                        if mm["spr"] != null and is_instance_valid(mm["spr"]):
-                                                mm["spr"].queue_free()
-                                        if mm["glow"] != null and is_instance_valid(mm["glow"]):
-                                                mm["glow"].queue_free()
-                                Jukebox.sfx("mb_lightning", -2.0)
+## v0.4.1: the old any-shot _collect_pow is GONE - the carrier is a normal
+## marble now; its effect fires through _pop_run -> _trigger_pow when a
+## MATCH pops it.
 
 func _pow_carrier_alive() -> bool:
         for cp in chains:
@@ -1485,7 +1692,15 @@ func _spawn_pow_carrier() -> void:
                 return
         var hit_i := rng.randi_range(1, best.marbles.size() - 1)
         var hit: Dictionary = best.marbles[hit_i]
-        var m := {"c": 0, "d": hit["d"] + MarbleData.CONTACT, "kind": "pow",
+        # v0.4.1 THE POWERUP MARBLE LAW: the carrier wears a NORMAL FIXED
+        # color (its neighbour's when possible) with only the icon at its
+        # center - no rainbow cycling, no any-shot magnet
+        var pc: int
+        if _is_marble(hit) and int(hit["c"]) >= 0:
+                pc = int(hit["c"])
+        else:
+                pc = int(best.colors[rng.randi_range(0, best.colors.size() - 1)])
+        var m := {"c": pc, "d": hit["d"] + MarbleData.CONTACT, "kind": "pow",
                 "pow": owned_pows[rng.randi_range(0, owned_pows.size() - 1)],
                 "life": MarbleData.POW_LIFE, "spr": null, "glow": null, "bonded": true}
         m["d"] = minf(m["d"], best.marbles.back()["d"] + MarbleData.CONTACT)
@@ -1642,6 +1857,8 @@ class ChainPath extends RefCounted:
         var danger_played := false
         var wave_spawn_i := 0        # marbles spawned in the current wave
         var coin_wave_ready := false # the GOGACoin embeds on the next spawn
+        var rollback_i := -1         # v0.4.1 THE POP-BACK: the front part's
+        var rollback_target := 0.0   #   roll-back seat + where it meets
         var game: Node
 
         func build(raw: Array, spd: float, q: int, wv: int, cols: Array, g: Node, i: int) -> void:
@@ -1748,7 +1965,10 @@ class ChainPath extends RefCounted:
                         spr.texture = load("res://assets/ui/coin.png")
                         spr.scale = Vector2(1.15, 1.15)
                 else:
-                        spr.texture = game._marble_tex(2)
+                        # v0.4.1 THE POWERUP MARBLE LAW: the carrier wears its
+                        # own fixed color like any marble - the power icon
+                        # rides at its CENTER (the icon-only law)
+                        spr.texture = game._marble_tex(int(m["c"]))
                 game.marble_layer.add_child(spr)
                 m["spr"] = spr
                 if m["kind"] == "pow":
@@ -1800,9 +2020,23 @@ class ChainPath extends RefCounted:
                                 elif m["kind"] == "m":
                                         spr.scale = Vector2.ONE
                         spr.position = game_path_pos(m)
-                        if m["kind"] == "m":
-                                spr.rotation = m["d"] / (MarbleData.MARBLE_D * 0.5)
-                        elif m["kind"] == "coin":
+                        if game._is_marble(m):
+                                # v0.4.1 THE ROLLING LAW (the owner: "the
+                                # marbles are rolling left-right while the
+                                # logical thing is to roll up-down... rolling
+                                # left-right is spinning on itself"): the
+                                # sprite turns with the HORIZONTAL travel -
+                                # a lane to the right tumbles the face
+                                # over-the-top, a lane to the left tumbles it
+                                # back, a vertical dive keeps the face (a
+                                # real ball's read, not a self-spin)
+                                var dx: float = spr.position.x \
+                                                - float(m.get("last_x", spr.position.x))
+                                m["last_x"] = spr.position.x
+                                m["rot"] = float(m.get("rot", 0.0)) \
+                                                + dx / (MarbleData.MARBLE_D * 0.5)
+                                spr.rotation = float(m["rot"])
+                        if m["kind"] == "coin":
                                 m["life"] -= delta
                                 var lf: float = m["life"]
                                 if lf <= 0.0:
@@ -1816,7 +2050,12 @@ class ChainPath extends RefCounted:
                                 if not (entry_hole and md < float(game.GROW_IN)):
                                         spr.scale = Vector2(1.15, 1.15) \
                                                 * (1.0 + sin(t * 7.0) * 0.07)
-                        else:
+                        elif m["kind"] == "pow":
+                                # v0.4.1: the carrier is a color marble now -
+                                # this expiry branch is EXPLICITLY the pow's
+                                # (the old bare else caught the kind-"m"
+                                # marbles after the rolling law joined the
+                                # chain and erased the whole feed every tick)
                                 m["life"] -= delta
                                 if m["life"] <= 0.0:
                                         gone.append(m)
@@ -1824,7 +2063,6 @@ class ChainPath extends RefCounted:
                                 # the unmatched powerup marble pulses, then vanishes
                                 if m["life"] < 1.0:
                                         spr.modulate.a = maxf(0.0, m["life"])
-                                spr.rotation = 0.0
                                 if m["glow"] != null and is_instance_valid(m["glow"]):
                                         m["glow"].rotation = t * 2.2
                                         m["glow"].scale = Vector2.ONE * (0.72 + sin(t * 6.0) * 0.07)
@@ -1918,3 +2156,39 @@ class TrackDraw extends Node2D:
                                 Color(glow, 0.65), 5.0)
                         # the idol seat
                         draw_circle(cp.end_pos(), MarbleData.MARBLE_D * 0.85, rim.darkened(0.3))
+
+# ============================================================ THE SPARKLE ROUTE
+class SparkleLine extends Node2D:
+        ## v0.4.1 THE PATH PREVIEW LAW (brainstorm 2.4, the owner: the ghost
+        ## chain "shows real marbles which is confusing, make it sparkle-like
+        ## line that moves"): a moving sparkle rides the carved route - small
+        ## glowing dots streaming entry to idol, looping until the tap. Never
+        ## a marble sprite.
+        var cp: ChainPath
+        var game: Node
+        var _t := 0.0
+
+        func _init(cp_: ChainPath, g: Node) -> void:
+                cp = cp_
+                game = g
+                z_index = 3
+
+        func _process(delta: float) -> void:
+                _t += delta
+                queue_redraw()
+
+        func _draw() -> void:
+                var span: float = cp.length + MarbleData.CONTACT * 4.0
+                var n := 16
+                var gap := span / float(n)
+                for k in n:
+                        var d := fmod(_t * 460.0 + float(k) * gap, span)
+                        if d > cp.length:
+                                continue
+                        var p := cp.pos_at(d)
+                        var fade := 1.0 - float(k) / float(n)
+                        var glow := Color(1.0, 0.88, 0.45, 0.55 * fade)
+                        var core := Color(1.0, 0.97, 0.8, 0.9 * fade)
+                        draw_circle(p, 9.0, Color(glow, glow.a * 0.4))
+                        draw_circle(p, 5.0, glow)
+                        draw_circle(p, 2.4, core)

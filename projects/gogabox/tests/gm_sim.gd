@@ -22,13 +22,15 @@ func _run() -> void:
         while sim_t < SIM and guard < 400000 and not game.over:
                 guard += 1
                 # THE BOT: launch when the swing lines up with the best gold
-                # - the tolerance is the CATCH WINDOW at that distance
+                # - the tolerance is the CATCH WINDOW at that distance.
+                # (v041: the glowing-gold carrier IS aimable - a human grabs
+                # it for the GOGACoin; the 50th bank can leave it as the
+                # only gold on the ground, the bot must not idle there)
                 if game.phase == "swing":
                         var best_tol := -1.0
                         var best_dir := Vector2.ZERO
                         for it in game.items:
-                                if String(it["kind"]).begins_with("gold") \
-                                                and not bool(it["coin"]):
+                                if String(it["kind"]).begins_with("gold"):
                                         var to: Vector2 = it["pos"] - game.anchor
                                         var dist := to.length()
                                         if dist < 40.0:

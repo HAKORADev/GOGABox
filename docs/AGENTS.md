@@ -836,3 +836,49 @@ low - a short flight beats the drift); a live bank (coins spendable
 mid-run) must flush to the save on a debounce, not per event; and a
 number-format law ("1.00K") belongs in ONE static function the probe
 reads without booting the scene.
+
+## THE v0.4.1 LAWS (the owner's mixed-report round - the PC seat + the games)
+
+33. THE DESIGN FOLLOWS THE CONTENT: on a desktop the design (portrait /
+    landscape) is picked by what is showing (the menu's position choice,
+    the game's orientation) - NEVER by the window's aspect. The fullscreen
+    corruption family dies here (RESOLUTION_RULE rules 9-13).
+34. THE PC STRETCH = KEEP: a desktop canvas never outgrows its content;
+    windowed re_window matches the design, off-aspect wears the box brown
+    + the edge veil. Bar clicks land outside the canvas (dead).
+35. THE SHARPNESS LAW: the design downscales on small monitors - the 2D
+    raster art ships mips (tools/v041_mipmaps.py) and canvas samples
+    trilinear (project.godot). New art keeps mipmaps/generate=true.
+36. DYNAMIC SCALE: the FidelityFX spatial sharpen pass over the final
+    frame (rcas.gdshader) - the honest FSR for a 2D GL app, all GPUs,
+    off by default, no restart. Never fake an FSR brand on it.
+37. THE PC SEAT: ESC = the back law (1:1), F10 = the menu position (main
+    menu only), arrows scroll the feed / the picks row, Tab+LR switches
+    the list, buttons NEVER take focus, WASD falls back to arrows (no
+    game may define its own WASD use), the gamepad speaks dpad=arrows /
+    ABXY=1-4 / START=back, and the GOGACursor is the box's pointer (games
+    with their own cursor own the pointer; box sheets always bring one
+    back).
+38. THE UNFOCUS PAUSE LAW: losing focus opens the back-button pause sheet
+    + mutes the master bus; returning keeps the pause up (prepare to
+    return). The Android freeze law (v0.3.8-5) stays underneath.
+39. THE TAP-ANYWHERE LAW: one universal full-screen overlay in game_base
+    (tap_anywhere_start) - every intro covers EVERY pixel and any key.
+    No game builds its own tap patch again.
+40. THE SPLASH VEIL LAW: the veil is opaque from frame zero (a direct
+    child of the splash layer); only the logo fades. The feed can never
+    flick through the splash again.
+41. THE DOOMSCROLL LAW: the feed runs to the last pixel (the banner
+    reserve is gone) and the bottom wears the dark-brown shade + side
+    wings (menu.gd _build_bottom_shade).
+42. THE SETTINGS SEAT: AAA-shaped (AUDIO / SCREEN & GRAPHICS / CONTROLS /
+    RESET over CLOSE). Every toggle persists, rebuilds in place, and the
+    platform-only rows never leak (phones never see Screen & Graphics or
+    Controls).
+43. THE TAGS: the pre-play header wears the platform chips AND the
+    control-scheme chips (touch / mouse+keys / gamepad, Meta.CTRL_TAGS +
+    Meta.ctrl_list). The guide reads HOW TO PLAY (universal) first, then
+    CONTROLS split by DEVICE - never platform-branded.
+44. THE THUMBNAIL CAPTURE LAW: a game's thumb may be a code-programmed
+    in-game capture (tests/v041_thumbs*.gd) - the owner prefers the real
+    render over painted art when the two disagree.

@@ -10,6 +10,15 @@ extends GogaGame
 ## single bombs, hearts + score + GOGACoins widgets, the END button in the
 ## pause sheet, the every-50 glowing-gold coin law with the next-level edge
 ## case, the darker-dust drag trails, the different SFX per thing.
+## v041 THE OWNER'S REPORT ROUND: the intro shows NO game pieces (the rig
+## ghost kill - the rig, rope and claw seat in only when the run starts,
+## the go rides the universal tap-anywhere overlay), the rig's wheels sit
+## EXACTLY on the measured surface line (MinerData.SURFACE_Y), the claw's
+## whole trip clamps to the REAL viewport room (the walls law - nothing
+## flies out of resolution), rocks pay NEGATIVE (-2/-4/-6, score_for) and
+## float their tax at the winch while gold floats its + (the float text
+## law - a negative total pays no coin bonus and never lowers the best),
+## and the grounds grew real traps (every big gold's aim lane is guarded).
 
 const A := "res://assets/games/goldminer/"
 const DESIGN := Vector2(1080, 1920)          # the box portrait design space
@@ -165,6 +174,10 @@ func _build_intro() -> void:
         tap.add_theme_constant_override("outline_size", 12)
         tap.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(tap)
+        # THE TAP-ANYWHERE LAW (v0.4.1): the universal full-screen overlay
+        # owns the go - any tap OR any key fires it, from any pixel. The
+        # game's own raw intro paths are gone (one door, everywhere).
+        tap_anywhere_start(_intro_start, "")
         # THE NO-HELPER LAW: no info line under the tap prompt - the how-to
         # lives in the guide (it already does), never here
         if not bool(Box.counter(game_id, "lore_start")) \
@@ -178,10 +191,16 @@ func _build_intro() -> void:
                         + "three of those and the dig is done.",
                         func(): pass, "DIG", Color(0.9, 0.7, 0.25))
 
+## the universal overlay's go (it owns the tap AND the keyboard paths)
+func _intro_start() -> void:
+        Jukebox.sfx("gm_start", -2.0)
+        _intro_go()
+
 func _intro_go() -> void:
         if ready_ui != null and is_instance_valid(ready_ui):
                 ready_ui.queue_free()
                 ready_ui = null
+        tap_anywhere_stop()
         tap_cooldown = 0.35     # the start tap's release must not fire a throw
         _new_run()
 
@@ -222,19 +241,35 @@ func _build_world() -> void:
         rig = Sprite2D.new()
         rig.texture = _rig_tex()
         rig.centered = false
-        rig.scale = Vector2(0.8, 0.8)
+        rig.scale = Vector2(MinerData.RIG_SCALE, MinerData.RIG_SCALE)
         world.add_child(rig)
         claw_spr = Sprite2D.new()
         claw_spr.texture = _t("claw_open.png")
         claw_spr.offset = Vector2(31.0 - 27.5, 24.0 - 16.0)   # hub seats the rope
         world.add_child(claw_spr)
+        # THE INTRO GHOST LAW (v041): the intro shows the dirt only - the
+        # rig, the rope and the claw seat IN when the run starts (the rig
+        # used to float at the default (0,0) through the whole intro - the
+        # owner's "mining ghost in the sky" catch)
+        rig.visible = false
+        rope_draw.visible = false
+        claw_spr.visible = false
 
 ## the rig rides its OWN random spot each RUN (the owner's "the character
 ## position should differ from game to game" law); the generator gets the
-## same anchor so every gold stays reachable
+## same anchor so every gold stays reachable. THE SURFACE LAW (v041): the
+## seat math lives in MinerData - the hub Y lands the wheels' contact row
+## (RIG_BASE_Y) exactly on the measured surface line (SURFACE_Y).
 func _seat_rig() -> void:
         anchor = Vector2(rng.randf_range(240.0, 840.0), MinerData.ANCHOR_Y)
-        rig.position = anchor - Vector2(257.0, 46.0) * 0.8
+        rig.position = anchor - MinerData.RIG_HUB * MinerData.RIG_SCALE
+        rig.visible = true
+        rope_draw.visible = true
+        claw_spr.visible = true
+
+## the wheels' world Y - the probe's surface check reads this
+func rig_base_y() -> float:
+        return rig.position.y + MinerData.RIG_BASE_Y * MinerData.RIG_SCALE
 
 func _new_run() -> void:
         level = 1
@@ -317,6 +352,33 @@ func _make_coin_carrier(it: Dictionary) -> void:
         tw.tween_property(glow, "modulate:a", 0.35, 0.5)
         it["glow"] = glow
 
+# ---------------------------------------------------------------- the room
+## THE RESOLUTION RULE: the room is REAL - the visible canvas rect
+## translated into world space (the world draws at ORIGIN inside it).
+## Never a hardcoded 1080x1920: the box stretches canvas_items EXPAND,
+## the room grows with the device.
+func _room() -> Rect2:
+        return Rect2(-ORIGIN, get_viewport_rect().size)
+
+## THE WALLS LAW (v041): the longest rope the claw may pay out along dir
+## so the whole trip stays inside the room - the claw can never exit the
+## screen or bite a ground that lives out of resolution. The margin covers
+## the claw sprite's own half (~31px) plus the heaviest load's grip
+## (r * 0.55 + 16 -> ~60px); the carried load's own body is clamped in
+## _seat_claw. dir must be normalized.
+func _wall_rope_len(dir: Vector2, room: Rect2) -> float:
+        var m := 94.0
+        var best := MinerData.ROPE_MAX
+        if dir.x < -0.0001:
+                best = minf(best, (room.position.x + m - anchor.x) / dir.x)
+        elif dir.x > 0.0001:
+                best = minf(best, (room.end.x - m - anchor.x) / dir.x)
+        if dir.y > 0.0001:
+                best = minf(best, (room.end.y - m - anchor.y) / dir.y)
+        elif dir.y < -0.0001:
+                best = minf(best, (room.position.y + m - anchor.y) / dir.y)
+        return maxf(0.0, best)
+
 # ================================================================ the loop
 func _goga_tick(delta: float) -> void:
         if tap_cooldown > 0.0:
@@ -339,10 +401,12 @@ func _goga_tick(delta: float) -> void:
                 "fly":
                         _tick_rope_sound(delta)
                         var prev := rope_len
-                        rope_len = minf(rope_len + ROPE_OUT * delta,
-                                MinerData.ROPE_MAX)
+                        var wall := _wall_rope_len(claw_dir, _room())
+                        rope_len = minf(rope_len + ROPE_OUT * delta, wall)
                         _seat_claw()
                         _fly_hit(prev)
+                        if phase == "fly" and rope_len >= wall - 0.01:
+                                phase = "reel"  # the wall: the claw turns home
                 "grab":
                         grab_t -= delta
                         if grab_t <= 0.0:
@@ -382,7 +446,14 @@ func _seat_claw() -> void:
                 var spr: Sprite2D = carried["spr"]
                 if spr != null and is_instance_valid(spr):
                         var grip: float = float(carried["r"]) * 0.55 + 16.0
-                        spr.position = tip + claw_dir * grip
+                        var p := tip + claw_dir * grip
+                        # THE WALLS LAW: the load rides inside too - its own
+                        # radius never crosses the room's edge
+                        var r := float(carried["r"])
+                        var room := _room()
+                        p.x = clampf(p.x, room.position.x + r, room.end.x - r)
+                        p.y = clampf(p.y, room.position.y + r, room.end.y - r)
+                        spr.position = p
                         spr.rotation = claw_spr.rotation
 
 func _fly_hit(prev_len: float) -> void:
@@ -398,8 +469,6 @@ func _fly_hit(prev_len: float) -> void:
                         if p.distance_to(it["pos"]) <= float(it["r"]) + 14.0:
                                 _grab(it)
                                 return
-        if rope_len >= MinerData.ROPE_MAX:
-                phase = "reel"          # empty claw, full speed home
 
 func _grab(it: Dictionary) -> void:
         carried = it
@@ -457,15 +526,19 @@ func _spawn_blast(pos: Vector2) -> void:
         blasts.append(anim)
         Jukebox.sfx("gm_blast", 0.0)
 
+## the blasts tick by wall time; a finished anim LEAVES the array (the old
+## -99 sentinel lingered forever and re-ticked inside manual tickers - the
+## sim drove two ticks into one frame and indexed frames[-1099])
 func _tick_blasts(delta: float) -> void:
-        for b in blasts:
+        for i in range(blasts.size() - 1, -1, -1):
+                var b: Dictionary = blasts[i]
                 b["t"] += delta
                 var idx := int(b["t"] / 0.09)
                 var spr: Sprite2D = b["spr"]
                 if idx >= 4:
                         if spr != null and is_instance_valid(spr):
                                 spr.queue_free()
-                        b["t"] = -99.0
+                        blasts.remove_at(i)
                         continue
                 if spr != null and is_instance_valid(spr):
                         spr.texture = b["frames"][idx]
@@ -500,6 +573,30 @@ func _tick_rope_sound(delta: float) -> void:
                 reel_snd_t = 0.42
                 Jukebox.sfx("gm_reel", -9.0)
 
+## THE FLOAT TEXT LAW (v041): every banked thing speaks its price at the
+## winch - gold floats its + in the gold ink, a rock floats its NEGATIVE
+## tax in the red ink (the rock prices law made visible; the score chip
+## carries the running total, negative included).
+func _float_pts(pts: int) -> void:
+        if pts == 0:
+                return
+        var lbl := Arc.label("%+d" % pts, 52,
+                Color(1, 0.85, 0.3) if pts > 0 else Color(1, 0.45, 0.35))
+        lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.06, 0))
+        lbl.add_theme_constant_override("outline_size", 12)
+        lbl.size = Vector2(240, 70)
+        lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        lbl.z_index = 30
+        lbl.position = anchor + Vector2(-120, 150)
+        fx_layer.add_child(lbl)
+        # the darker-dust law's lifecycle: the floater rises, fades and
+        # frees ITSELF (engine-driven - no manual cleanup to freeze)
+        var tw := lbl.create_tween().set_parallel(true)
+        tw.tween_property(lbl, "position:y", lbl.position.y - 120.0, 0.9) \
+                .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+        tw.tween_property(lbl, "modulate:a", 0.0, 0.55).set_delay(0.35)
+        tw.chain().tween_callback(lbl.queue_free)
+
 ## the bank: whatever the claw brought home pays here (score + counters +
 ## the thing's OWN voice - the different-SFX law)
 func _bank() -> void:
@@ -511,8 +608,9 @@ func _bank() -> void:
                 _check_cleared()    # the blast's last gold clears on the way home
                 return
         var kind := String(carried["kind"])
-        var pts: int = MinerData.POINTS[kind]
+        var pts: int = MinerData.score_for(kind)     # rocks pay NEGATIVE (v041)
         add_score(pts)
+        _float_pts(pts)
         achievement_count("golds_taken" if kind.begins_with("gold") else "rocks_taken", 1)
         if bool(carried["coin"]):
                 add_run_coins(1)
@@ -594,18 +692,11 @@ func _goga_input(event: InputEvent) -> void:
         if event is InputEventKey and (event as InputEventKey).pressed \
                         and not (event as InputEventKey).echo:
                 # THE PC LAW (the windows return): SPACE works every tap -
-                # the intro go and the claw release
+                # the claw release. The intro go rides the universal
+                # tap-anywhere overlay (any key fires it there).
                 if event.is_action_pressed("ui_accept"):
-                        if phase == "intro":
-                                Jukebox.sfx("gm_start", -2.0)
-                                _intro_go()
-                        else:
-                                _on_tap(Vector2.ZERO)
+                        _on_tap(Vector2.ZERO)
                 return
-        if phase == "intro" and event is InputEventScreenTouch \
-                        and (event as InputEventScreenTouch).pressed:
-                Jukebox.sfx("gm_start", -2.0)
-                _intro_go()
 
 # ---------------------------------------------------------------- the shop
 func _shop_open() -> void:
