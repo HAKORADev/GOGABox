@@ -156,21 +156,19 @@ func _apply_orientation(landscape: bool) -> void:
         # more canvas in design px on taller/wider phones (games read the
         # real viewport W/H, they absorb it naturally).
         var root := get_window()
-        # THE VERTICAL SLICE LAW (v0.3.4-3, the windows return): on PC a
-        # PORTRAIT game never fills a wide window - it renders a vertical
-        # slice down the middle and the sides wear the box brown. Landscape
-        # games keep EXPAND (the full window is the canvas).
-        # v0.4.0-17 THE RE-WINDOW LAW on top: windowed, the window RESHAPES
-        # itself to the content first (portrait -> 9:16 window, landscape ->
-        # 16:9), so the portrait slice runs with NO empty sides at all. The
-        # slice law stays as the fallback for any shape the user drags the
-        # window into afterwards (brown bars, never black, never stretched).
-        if ScaleRule.is_pc() and not landscape:
-                ScaleRule.apply_vertical_slice(root, ScaleRule.DESIGN_PORTRAIT)
-                ScaleRule.re_window("portrait")
-                return
+        # v0.4.1 THE DESIGN FOLLOWS THE CONTENT LAW: on a PC the game's OWN
+        # orientation picks the design - never the window's shape - and the
+        # stretch is KEEP (apply_pc): windowed the window reshapes itself to
+        # the game (re_window), fullscreen or off-aspect the brown bars come
+        # back instead of any stretch. Landscape games are NOT special
+        # anymore: the old EXPAND-on-PC path was the portrait-fullscreen
+        # corruption's twin.
         if ScaleRule.is_pc():
-                ScaleRule.re_window("landscape")
+                var kind := "landscape" if landscape else "portrait"
+                ScaleRule.apply_pc(root, ScaleRule.DESIGN_LANDSCAPE
+                                if landscape else ScaleRule.DESIGN_PORTRAIT)
+                ScaleRule.re_window(kind)
+                return
         ScaleRule.apply_expand(root)
         root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE if landscape \
                         else ScaleRule.DESIGN_PORTRAIT
@@ -187,11 +185,11 @@ func _restore() -> void:
         # rotates the window, the design follows within one frame.
         _flush_time()
         if ScaleRule.is_pc():
-                # back to the box's vertical slice (the menu is portrait)
-                # - and v0.4.0-17: the window follows, portrait again, so
-                # the menu fills its window with no empty sides.
-                ScaleRule.apply_vertical_slice(get_window(), ScaleRule.DESIGN_PORTRAIT)
-                ScaleRule.re_window("portrait")
+                # v0.4.1: back to the MENU'S OWN position (pc_position - a
+                # landscape game must not leave the menu sideways) - the
+                # window follows it, so the menu fills its window again.
+                ScaleRule.apply_pc(get_window(), ScaleRule.pc_menu_design())
+                ScaleRule.re_window(ScaleRule.pc_position)
         else:
                 ScaleRule.apply(get_window())
         DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
@@ -222,6 +220,12 @@ func _quit_to_menu() -> void:
 func request_pause() -> void:
         if game != null and is_instance_valid(game) and not game.over:
                 game._back_pressed()
+
+## v0.4.1 THE UNFOCUS PAUSE LAW: the box lost focus - the game sits on its
+## pause sheet (never toggles: if the pause is already open it STAYS).
+func ensure_pause_for_box() -> void:
+        if game != null and is_instance_valid(game):
+                game.ensure_pause_for_box()
 
 func _exit_tree() -> void:
         if _session_open:

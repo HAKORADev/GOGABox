@@ -96,23 +96,83 @@ func _ready() -> void:
         add_child(menu2)
         await get_tree().process_frame
         await get_tree().process_frame
+        # v0.4.1 the AAA rework: the main seat carries AUDIO / SCREEN &
+        # GRAPHICS / CONTROLS - the toggles live one click deeper.
         menu2.call("_open_settings")
         await get_tree().process_frame
         await get_tree().process_frame
-        ck(_has_fs_button(menu2),
-                        "settings: the PC sheet wears the FULLSCREEN toggle")
+        ck(_has_button(menu2, "SCREEN & GRAPHICS"),
+                        "settings: the main seat wears SCREEN & GRAPHICS")
+        ck(_has_button(menu2, "CONTROLS"),
+                        "settings: the main seat wears CONTROLS")
+        menu2.call("_close_sheet")
+        await get_tree().process_frame
+        menu2.call("_open_screen_graphics")
+        await get_tree().process_frame
+        await get_tree().process_frame
+        ck(_has_button_prefix(menu2, "DISPLAY: "),
+                        "settings: the Screen sheet wears the DISPLAY toggle")
+        ck(_has_button_prefix(menu2, "POSITION: "),
+                        "settings: the Screen sheet wears the POSITION toggle")
+        ck(_has_button_prefix(menu2, "DYNAMIC SCALE: "),
+                        "settings: the Graphics sheet wears DYNAMIC SCALE")
+        ck(_has_button_prefix(menu2, "GOGACURSOR: "),
+                        "settings: the Graphics sheet wears GOGACURSOR")
+
+        # ---- v0.4.1 THE DESIGN FOLLOWS THE CONTENT LAW: fullscreen NEVER
+        # re-picks the design. The old want_for(window px) fed the LANDSCAPE
+        # design to the portrait menu in fullscreen on a 16:9 monitor - the
+        # owner's "vertical fullscreen is currently horizontal but tries to
+        # look like vertical", the mis-aimed clicks, the clickable black
+        # sides. The design must stay PORTRAIT with the bars on. ----
+        ScaleRule.set_fullscreen(true)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        await get_tree().process_frame
+        ck(win.content_scale_size == ScaleRule.DESIGN_PORTRAIT,
+                        "content law: fullscreen keeps the PORTRAIT design")
+        ck(win.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP,
+                        "content law: fullscreen wears KEEP (no stretch)")
+        # the bars law is shape-honest (bare Xvfb has no WM - fullscreen
+        # may keep the window's 9:16 shape): bars EXACTLY when off-aspect
+        var wpx := DisplayServer.window_get_size()
+        var cs := win.content_scale_size
+        var off_aspect := absf(float(wpx.x) / float(wpx.y)
+                        - float(cs.x) / float(cs.y)) > 0.005
+        ck(ScaleRule.bars_visible(win) == off_aspect,
+                        "content law: the brown bars appear exactly when " +
+                        "the window is off-aspect")
+        menu2.call("apply_resolution")
+        ck(win.content_scale_size == ScaleRule.DESIGN_PORTRAIT,
+                        "content law: the governor never flips the design")
+        ScaleRule.set_fullscreen(false)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        ck(ScaleRule.bars_visible(win) == false,
+                        "content law: re-windowed, the bars are gone")
+        ck(win.content_scale_size == ScaleRule.DESIGN_PORTRAIT,
+                        "content law: windowed again, portrait design holds")
 
         print("WINDOW PROBE: %d checks, %d fails" % [checks, fails])
         Box.reset_all()
         get_tree().quit(1 if fails > 0 else 0)
 
-## depth-first: does any Button under `root` carry the FULLSCREEN label?
-func _has_fs_button(root: Node) -> bool:
+## depth-first: does any Button under `root` carry this exact label?
+func _has_button(root: Node, txt: String) -> bool:
+        for c in root.get_children():
+                if c is Button and String((c as Button).text) == txt:
+                        return true
+                if _has_button(c, txt):
+                        return true
+        return false
+
+## depth-first: does any Button under `root` begin with this prefix?
+func _has_button_prefix(root: Node, prefix: String) -> bool:
         for c in root.get_children():
                 if c is Button and String((c as Button).text) \
-                                .begins_with("FULLSCREEN: "):
+                                .begins_with(prefix):
                         return true
-                if _has_fs_button(c):
+                if _has_button_prefix(c, prefix):
                         return true
         return false
 

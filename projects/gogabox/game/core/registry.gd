@@ -39,6 +39,10 @@ const GAMES := [
                 # the game loads, from how the phone is held right then.
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
+                # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
+                "gamepad": true,
+
                 "coin_div": 2, "price": 0, "fee": 10, "shop": true,
                 # v0.1.5 SHARED ENTRY POLICY (was the v0.1.4 snake-only
                 # hardcode): partial_pay = a thin wallet pays min(fee, ALL
@@ -79,6 +83,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
+                # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
+                "gamepad": true,
+
                 "coin_div": 4, "price": 150, "fee": 8, "shop": true,
                 "reveal": {"kind": "chain"},
                 "charges": {"per_round": 2, "capacity": 10, "regen_minutes": 5},
@@ -455,6 +463,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/invaders.png",
                 "orientation": "landscape", "dim": "2d",
                 "os": ["android", "pc"],
+                # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
+                # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
+                "gamepad": true,
+
                 "coin_div": 500, "price": 350, "fee": 100, "shop": true,
                 "reveal": {"kind": "orders", "appear_after": 5,
         "orders": [{"type": "spend_in", "game": "dario", "amount": 200},
@@ -977,6 +989,10 @@ const GAMES := [
                 # only for now (for extra space for more bricks)")
                 "orientation": "landscape", "dim": "2d",
                 "os": ["android", "pc"],
+                # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
+                # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
+                "gamepad": true,
+
                 # THE SCORE LAW (the owner: "each level cleared gives 1
                 # score point, score bonus is /3") - the dot eater shape.
                 "coin_div": 3, "price": 450, "fee": 8, "shop": true,

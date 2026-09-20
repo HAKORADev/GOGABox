@@ -67,3 +67,11 @@ renderer/rendering_method="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.227451, 0.137255, 0.074510, 1)
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+; v0.4.1 THE SHARPNESS LAW: the PC windows render the 1080x1920 design
+; downscaled (a 1600x900 monitor shows it at ~0.75) - without mipmaps the
+; linear-filtered raster art aliased into the jagged thumbnails and the
+; cloud-ish wash the owner screenshotted (same art is clean on the phone
+; because the FHD+ panel samples it 1:1). Canvas items now sample with
+; trilinear where the texture ships mips (tools/v041_mipmaps.py generates
+; them on the 2D art); vector UI/text are unaffected.
+textures/canvas_textures/default_texture_filter=2

@@ -140,6 +140,10 @@ func quit_to_box() -> void:
 ## THIS sheet.
 func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxContainer:
         var root := _overlay_root_ref()
+        # v0.4.1 THE POINTER LAW: a box sheet (shop, pause, anything) must
+        # always have something to aim with - a game that hid or took the
+        # OS cursor hands it back while the sheet owns the screen.
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
         # v040-11: publish this sheet's id - the Arc.fit_sheet pass that wraps
         # the sheet's content hands it to the BoxScroll (the CONTINUITY LAW:
         # the list remembers its own offset across the buy-refresh cycle).
@@ -377,6 +381,9 @@ func _pause_open() -> void:
                 return
         paused = true
         get_tree().paused = true
+        # v0.4.1 THE POINTER LAW: the pause sheet must have something to
+        # aim with, even in a game that hid the cursor for its own play.
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
         var sheet := Arc.sheet(_overlay_root, 0.0)
         # v0.3.3-p2: ALWAYS rides the DIM (the sheet's true root) - the whole
         # branch processes while the tree is paused, and the dim itself can
@@ -416,6 +423,76 @@ func _pause_close() -> void:
 
 # --------------------------------------------------- unified input plumbing
 
+## v0.4.1 THE UNFOCUS PAUSE LAW: the box lost focus mid-run (the player
+## tabbed away / grabbed their phone) - main.gd asks the game to sit on
+## the SAME pause sheet the back button opens, so returning never means a
+## half-second freeze-then-jump; the player resumes when ready. Sheets and
+## story cards already own the screen stay as they are.
+func ensure_pause_for_box() -> void:
+        if over or paused or not _pause_pair.is_empty():
+                return
+        if not _sheet_stack.is_empty() or box_story_open():
+                return
+        _pause_open()
+
+# ============================================== v0.4.1 THE TAP-ANYWHERE LAW
+## ONE universal full-screen intro tap - the owner: "tap anywhere to start
+## actually is not really anywhere, i had to click in the middle of the
+## screen slightly toward the bottom... which also means tap anywhere
+## screen is not universal in the internal infra which is bad". The
+## overlay covers EVERY pixel, eats the press through the GUI stage (so
+## the raw path can never start a run behind a sheet), and takes itself
+## down the moment it fires. The note label is optional - games with
+## their own intro art pass "".
+
+var _tap_start: Dictionary = {}   # {node: Control, cb: Callable}
+
+func tap_anywhere_start(cb: Callable, note := "TAP ANYWHERE TO START") -> void:
+        tap_anywhere_stop()
+        var root := _overlay_root_ref()
+        var ov := Control.new()
+        ov.name = "TapAnywhere"
+        ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+        ov.mouse_filter = Control.MOUSE_FILTER_STOP
+        ov.gui_input.connect(func(ev: InputEvent):
+                if ev is InputEventScreenTouch and (ev as InputEventScreenTouch).pressed:
+                        _fire_tap_start()
+                elif ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
+                        _fire_tap_start())
+        if note != "":
+                var lbl := Arc.label(note, 32, Arc.ACCENT, true)
+                lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                lbl.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+                lbl.grow_horizontal = Control.GROW_DIRECTION_BOTH
+                lbl.grow_vertical = Control.GROW_DIRECTION_BEGIN
+                lbl.position.y -= 190.0
+                lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                ov.add_child(lbl)
+                var pl := lbl.create_tween().set_loops()
+                pl.tween_property(lbl, "modulate:a", 0.45, 0.7) \
+                                .set_trans(Tween.TRANS_SINE)
+                pl.tween_property(lbl, "modulate:a", 1.0, 0.7) \
+                                .set_trans(Tween.TRANS_SINE)
+        root.add_child(ov)
+        root.move_child(ov, root.get_child_count() - 1)
+        _tap_start = {"node": ov, "cb": cb}
+
+func tap_anywhere_stop() -> void:
+        if _tap_start.has("node") and is_instance_valid(_tap_start["node"]):
+                _tap_start["node"].queue_free()
+        _tap_start = {}
+
+func tap_anywhere_waiting() -> bool:
+        return not _tap_start.is_empty()
+
+func _fire_tap_start() -> void:
+        if _tap_start.is_empty():
+                return
+        var cb: Callable = _tap_start["cb"]
+        tap_anywhere_stop()
+        if cb.is_valid():
+                cb.call()
+
 func _unhandled_input(event: InputEvent) -> void:
         if over:
                 return
@@ -428,6 +505,12 @@ func _unhandled_input(event: InputEvent) -> void:
         # the story card) owns the screen, the game hears NOTHING raw.
         if not _sheet_stack.is_empty() or not _pause_pair.is_empty() \
                                 or box_story_open():
+                return
+        # v0.4.1: a keyboard press also fires the universal intro tap (a PC
+        # player's hands are on the keys - "tap anywhere" means ANYWHERE).
+        if not _tap_start.is_empty() and event is InputEventKey \
+                        and (event as InputEventKey).pressed:
+                _fire_tap_start()
                 return
         tk.feed(event)
         _goga_input(event)

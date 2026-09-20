@@ -5,10 +5,21 @@ extends Node2D
 
 var _splash_layer: CanvasLayer
 var _splash_root: Control
+var _splash_veil: ColorRect
 var _splash_alive := false
 var _menu: Node2D
 
 func _ready() -> void:
+        # v0.4.1 THE ICON LAW (the owner: "the app in windows has it's icon
+        # correct, but the one appears in taskbar, task manager, windowed
+        # window icon, all of them are not the same one as the icon"). The
+        # exe resource icon was already the right face - the RUNTIME window
+        # icon was a different rendering (the project svg). The window now
+        # wears the canonical face directly at boot, before the first frame.
+        if ScaleRule.is_pc():
+                var face: Texture2D = load("res://icons/main_512x512.png")
+                if face != null and face.get_image() != null:
+                        DisplayServer.window_set_icon(face.get_image())
         # v0.4.0-17 THE PC BOOT WINDOW LAW: on a desktop, honor the persisted
         # fullscreen choice and shape the window to the menu (portrait)
         # BEFORE the menu reads the pixels - the first frame is already the
@@ -44,6 +55,14 @@ func _ready() -> void:
         # half the refresh bill.
         Engine.max_fps = 30
 
+        # v0.4.1 THE PC SEAT: the FSR-style sharpening layer, the edge veil
+        # (the app floats above the brown bars), the GOGACursor, and the
+        # focus nuke (Tab/arrows can never walk between buttons).
+        _build_dyn_scale()
+        _build_edge_veil()
+        _apply_gogacursor()
+        get_tree().node_added.connect(_nuke_focus)
+
 var _was_paused := false
 var _resume_mute := false
 
@@ -75,20 +94,24 @@ func _lifecycle(what: int) -> void:
                                 _menu.call("apply_resolution")
 
 ## v0.1.3 THE GOVERNOR - the resolution system's safety net. Every frame
-## (menu in the box, splash included) re-decide the design from the REAL
-## window pixels. At steady state this is one Vector2i compare; when the
-## window changed (boot-in-landscape races, system-driven rotations the
-## size_changed hook missed, resume after a background kill) the design and
-## the whole layout self-correct within one frame. "Stuck in the wrong
-## design" - the v0.1.2 opened-as-landscape screenshot - is structurally
-## impossible now. During a GAME the host owns content_scale_size (its
-## orientation lock + design swap); the governor must not fight it.
+## (menu in the box, splash included) re-decide the design. At steady state
+## this is one Vector2i compare. On PHONES the design still follows the real
+## window px (the window IS the screen - rotation is physical). On a PC the
+## design follows the CONTENT (the menu's position choice, the game's
+## orientation) - the window shape never picks a design anymore (v0.4.1,
+## the vertical-fullscreen corruption's root kill). During a GAME the host
+## owns content_scale_size; the governor must not fight it.
 func _process(_delta: float) -> void:
         if GameHost.active_host != null:
                 return
         if _menu != null and is_instance_valid(_menu) \
                         and _menu.has_method("apply_resolution"):
                 _menu.call("apply_resolution")
+        # the edge veil breathes with the window: visible only when the
+        # brown bars exist (fullscreen portrait, or a dragged-off-aspect
+        # window) - one cheap compare per frame.
+        if _veil_root != null and is_instance_valid(_veil_root):
+                _veil_root.visible = ScaleRule.bars_visible(get_window())
 
 ## v0.1.3: the design resolution lives in ScaleRule (1080x1920 portrait /
 ## 1920x1080 landscape, aspect EXPAND); the governor above + the menu's
@@ -123,18 +146,24 @@ func _show_splash() -> void:
         _splash_layer.layer = 20
         add_child(_splash_layer)
 
+        # v0.4.1 THE SPLASH FLICKER KILL (the owner's v010-era report: the
+        # feed "made a little flick showing the feed then returns again to
+        # continue the splash screen"). The old veil lived INSIDE the fading
+        # splash root - the whole root (veil included) faded in over 0.3s,
+        # so the freshly built feed showed THROUGH the half-transparent
+        # veil for those frames. The veil is now a DIRECT child of the
+        # layer, opaque from frame zero, and only the logo fades in on top
+        # of it.
+        _splash_veil = ColorRect.new()
+        _splash_veil.color = Color(0.227451, 0.137255, 0.074510, 1.0)
+        _splash_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _splash_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _splash_layer.add_child(_splash_veil)
+
         _splash_root = Control.new()
         _splash_root.set_anchors_preset(Control.PRESET_FULL_RECT)
         _splash_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _splash_layer.add_child(_splash_root)
-
-        # opaque veil FIRST - without it the feed renders for a frame or two
-        # while the logo decodes (the "menu flashes before the splash" glitch)
-        var veil := ColorRect.new()
-        veil.color = Color(0.227451, 0.137255, 0.074510, 1.0)
-        veil.set_anchors_preset(Control.PRESET_FULL_RECT)
-        veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _splash_root.add_child(veil)
 
         # v0.1.1 OWNER RULE (brainstorm): the old splash.png poster (G icon +
         # striped background + subtitle) is gone - the splash is THE LOGO
@@ -168,10 +197,11 @@ func _end_splash() -> void:
         if not _splash_alive:
                 return
         _splash_alive = false
-        if not is_instance_valid(_splash_root):
-                return
         var out := create_tween()
-        out.tween_property(_splash_root, "modulate:a", 0.0, 0.4)
+        if is_instance_valid(_splash_root):
+                out.tween_property(_splash_root, "modulate:a", 0.0, 0.4)
+        if _splash_veil != null and is_instance_valid(_splash_veil):
+                out.parallel().tween_property(_splash_veil, "color:a", 0.0, 0.4)
         out.tween_callback(func():
                 if is_instance_valid(_splash_layer):
                         _splash_layer.queue_free()
@@ -186,26 +216,91 @@ func _input(event: InputEvent) -> void:
                         and (event as InputEventScreenTouch).pressed:
                 _end_splash()
                 return
+        # v0.4.1 THE GAMEPAD SEAT: d-pad = arrows, A/B/X/Y = the 1/2/3/4
+        # keys, START = ESC (the back law). The translation lives in ONE
+        # place - every game that already listens to those keys hears the
+        # pad with zero per-game code, and the box menu scrolls with it.
+        if event is InputEventJoypadButton:
+                var jb := event as InputEventJoypadButton
+                if jb.button_index == JOY_BUTTON_START:
+                        if jb.pressed:
+                                _go_back()
+                                get_viewport().set_input_as_handled()
+                        return
+                var pk := _pad_button_key(jb.button_index)
+                if pk != KEY_NONE:
+                        _push_key(pk, jb.pressed)
+                        get_viewport().set_input_as_handled()
+                        return
+        elif event is InputEventJoypadMotion:
+                _pad_axes(event as InputEventJoypadMotion)
+                return
         # v0.4.0-17 THE PC HOTKEY LAW (the owner's order): F11 or Alt+Enter
         # toggles fullscreen / windowed anywhere in the box. PC only, key
         # press only (no echo), and the splash keeps its skip touch.
         if event is InputEventKey and (event as InputEventKey).pressed \
-                        and not (event as InputEventKey).echo \
-                        and ScaleRule.is_pc():
+                        and not (event as InputEventKey).echo:
                 var k := (event as InputEventKey).keycode
-                if k == KEY_F11 or ((k == KEY_ENTER or k == KEY_KP_ENTER) \
-                                and (event as InputEventKey).alt_pressed):
-                        ScaleRule.toggle_fullscreen()
+                if ScaleRule.is_pc():
+                        if k == KEY_F11 or ((k == KEY_ENTER or k == KEY_KP_ENTER) \
+                                        and (event as InputEventKey).alt_pressed):
+                                ScaleRule.toggle_fullscreen()
+                                get_viewport().set_input_as_handled()
+                                return
+                        # v0.4.1 THE ESC LAW: ESC is the phone's back button,
+                        # 1:1 - pause game, close the top sheet, ask to leave.
+                        if k == KEY_ESCAPE:
+                                _go_back()
+                                get_viewport().set_input_as_handled()
+                                return
+                        # v0.4.1 THE F10 POSITION LAW: flip the menu's
+                        # position - main menu only, never under a sheet,
+                        # never in a game (the owner's guard).
+                        if k == KEY_F10 and GameHost.active_host == null \
+                                        and _menu != null \
+                                        and is_instance_valid(_menu) \
+                                        and _menu.has_method("toggle_menu_position") \
+                                        and not _menu.call("has_open_overlay"):
+                                _menu.call("toggle_menu_position")
+                                get_viewport().set_input_as_handled()
+                                return
+        if event is InputEventMouseButton \
+                        and (event as InputEventMouseButton).button_index \
+                        == MOUSE_BUTTON_LEFT and ScaleRule.is_pc() \
+                        and Box.pc_gogacursor() and _cur_norm != null:
+                var mb := event as InputEventMouseButton
+                Input.set_custom_mouse_cursor(
+                                _cur_press if mb.pressed else _cur_norm,
+                                Input.CURSOR_ARROW, Vector2(1, 1))
 
-## Android BACK button (config/quit_on_go_back=false routes it here):
+## Android BACK button (config/quit_on_go_back=false routes it here) - and
+## since v0.4.1 the PC's ESC and the gamepad's START ride the same road:
 ## in-game -> pause | sheet open -> close it | menu -> "leave GOGABox?"
 func _notification(what: int) -> void:
         # v0.3.8-5: the app lifecycle rides the same hook (THE SLEEP LAW)
         if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_RESUMED:
                 _lifecycle(what)
                 return
+        # v0.4.1 THE UNFOCUS PAUSE LAW (the owner: "make the app get paused
+        # when un-focused on both platforms, pause is just the back button
+        # pause menu... make it pause+mute"): losing focus opens the pause
+        # sheet and silences the box; coming back keeps the pause up - the
+        # player presses RESUME when ready (prepare to return, no
+        # freeze-then-jump).
+        if what == NOTIFICATION_APPLICATION_FOCUS_OUT \
+                        or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+                _box_focus_out()
+                return
+        if what == NOTIFICATION_APPLICATION_FOCUS_IN \
+                        or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+                _box_focus_in()
+                return
         if what != NOTIFICATION_WM_GO_BACK_REQUEST:
                 return
+        _go_back()
+
+## The one back road (Android back / PC ESC / gamepad START).
+func _go_back() -> void:
         if _splash_alive:
                 _end_splash()
                 return
@@ -214,3 +309,193 @@ func _notification(what: int) -> void:
                 return
         if _menu != null and is_instance_valid(_menu) and _menu.has_method("handle_back"):
                 _menu.call("handle_back")
+
+# ================================================ v0.4.1 THE PC SEAT
+
+var _dyn_layer: CanvasLayer
+var _veil_root: Control
+var _cur_norm: Texture2D
+var _cur_press: Texture2D
+var _pad_held := {}
+var _focus_muted := false
+var _pre_focus_mute := false
+
+## v0.4.1 THE FOCUS NUKE (the owner: "pressing keyboard arrows, arrows work
+## like moving from button to button... and tab button do the same... i do
+## not want tab or arrows to do that thing for buttons at all"). Every
+## button and slider that ever joins the tree is born focus-proof - the
+## GUI focus walk is dead, so Tab and the arrows are FREE for the feed and
+## the games (menu._input / game input keep them).
+func _nuke_focus(n: Node) -> void:
+        if n is BaseButton or n is HSlider or n is VSlider:
+                (n as Control).focus_mode = Control.FOCUS_NONE
+
+## v0.4.1 DYNAMIC SCALE - the FSR law. One full-frame FidelityFX
+## sharpening pass (the FSR family's spatial sharpener) over whatever the
+## box drew: big 4K windows keep the FHD-sharp look, jagged upscaled art
+## tightens up. Works on every GPU (AMD, NVIDIA, Intel - it is one shader,
+## no vendor lock), costs almost nothing, and the toggle needs NO restart.
+## OFF by default - the honest 1:1 rendering is the baseline.
+func _build_dyn_scale() -> void:
+        if not ScaleRule.is_pc():
+                return
+        var sh: Shader = load("res://game/core/rcas.gdshader")
+        if sh == null:
+                return
+        _dyn_layer = CanvasLayer.new()
+        _dyn_layer.layer = 120   # above everything - it sharpens the FRAME
+        add_child(_dyn_layer)
+        var rect := ColorRect.new()
+        rect.name = "DynScale"
+        rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+        rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var mat := ShaderMaterial.new()
+        mat.shader = sh
+        rect.material = mat
+        rect.visible = Box.pc_dynamic_scale()
+        _dyn_layer.add_child(rect)
+
+func set_dynamic_scale(on: bool) -> void:
+        if _dyn_layer != null and is_instance_valid(_dyn_layer) \
+                        and _dyn_layer.get_child_count() > 0:
+                (_dyn_layer.get_child(0) as CanvasItem).visible = on
+
+## v0.4.1 THE GOGACURSOR (the owner: "the default cursor be a golden
+## pixelated one with brown outlines and clicking makes it do the
+## click/hold effect"). The OS pointer wears the box's own face; a game
+## with its own cursor (Heavy War's reticle) hides/takes the OS cursor as
+## it always did, and every box sheet brings a pointer back
+## (game_base forces MOUSE_MODE_VISIBLE when a pause/shop opens).
+func _apply_gogacursor() -> void:
+        if not ScaleRule.is_pc():
+                return
+        if Box.pc_gogacursor():
+                if _cur_norm == null:
+                        _cur_norm = load("res://assets/ui/goga_cursor.png")
+                        _cur_press = load("res://assets/ui/goga_cursor_press.png")
+                if _cur_norm != null:
+                        Input.set_custom_mouse_cursor(_cur_norm,
+                                        Input.CURSOR_ARROW, Vector2(1, 1))
+        else:
+                Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+
+func set_gogacursor(on: bool) -> void:
+        if on:
+                _apply_gogacursor()
+        else:
+                Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+
+## v0.4.1 THE EDGE VEIL (the owner: "the screen sides should get themed
+## instead of being total black... it should feel like the sides are under
+## the app"). When the brown bars exist, the app's own edge wears a soft
+## inward shadow - the box floats above the sides. NOT per-pixel dominant
+## color theming (that reads wrong here) - one universal shadow language.
+func _build_edge_veil() -> void:
+        if not ScaleRule.is_pc():
+                return
+        var layer := CanvasLayer.new()
+        layer.layer = 95   # above game + sheets, under the sharpening pass
+        add_child(layer)
+        _veil_root = Control.new()
+        _veil_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _veil_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _veil_root.visible = false
+        layer.add_child(_veil_root)
+        var shadow := Color(0, 0, 0, 0.42)
+        var defs := [
+                [Control.PRESET_LEFT_WIDE, Vector2(0.0, 0.5), Vector2(1.0, 0.5), 54.0],
+                [Control.PRESET_RIGHT_WIDE, Vector2(1.0, 0.5), Vector2(0.0, 0.5), 54.0],
+                [Control.PRESET_TOP_WIDE, Vector2(0.5, 0.0), Vector2(0.5, 1.0), 30.0],
+                [Control.PRESET_BOTTOM_WIDE, Vector2(0.5, 1.0), Vector2(0.5, 0.0), 30.0],
+        ]
+        for d in defs:
+                var g := Gradient.new()
+                g.offsets = PackedFloat32Array([0.0, 1.0])
+                g.colors = PackedColorArray([Color(shadow, shadow.a),
+                                Color(shadow, 0.0)])
+                var t := GradientTexture2D.new()
+                t.gradient = g
+                t.fill_from = d[1]
+                t.fill_to = d[2]
+                t.width = 16
+                t.height = 16
+                var tr := TextureRect.new()
+                tr.texture = t
+                tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                tr.stretch_mode = TextureRect.STRETCH_SCALE
+                tr.set_anchors_preset(d[0])
+                tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                _veil_root.add_child(tr)
+                var px := float(d[3])
+                match d[0]:
+                        Control.PRESET_LEFT_WIDE:
+                                tr.offset_right = px
+                        Control.PRESET_RIGHT_WIDE:
+                                tr.offset_left = -px
+                        Control.PRESET_TOP_WIDE:
+                                tr.offset_bottom = px
+                        Control.PRESET_BOTTOM_WIDE:
+                                tr.offset_top = -px
+
+## v0.4.1 THE UNFOCUS PAUSE LAW helpers. Mute rides the MASTER bus and is
+## restored exactly as it was; the pause sheet stays up until the player
+## presses RESUME.
+func _box_focus_out() -> void:
+        if _focus_muted:
+                return
+        _focus_muted = true
+        _pre_focus_mute = AudioServer.is_bus_mute(0)
+        AudioServer.set_bus_mute(0, true)
+        if GameHost.active_host != null and is_instance_valid(GameHost.active_host):
+                GameHost.active_host.call("ensure_pause_for_box")
+
+func _box_focus_in() -> void:
+        if not _focus_muted:
+                return
+        _focus_muted = false
+        AudioServer.set_bus_mute(0, _pre_focus_mute)
+
+# ------------------------------------------------ the gamepad seat
+
+func _pad_button_key(btn: JoyButton) -> Key:
+        match btn:
+                JOY_BUTTON_DPAD_UP:
+                        return KEY_UP
+                JOY_BUTTON_DPAD_DOWN:
+                        return KEY_DOWN
+                JOY_BUTTON_DPAD_LEFT:
+                        return KEY_LEFT
+                JOY_BUTTON_DPAD_RIGHT:
+                        return KEY_RIGHT
+                JOY_BUTTON_A:
+                        return KEY_1
+                JOY_BUTTON_B:
+                        return KEY_2
+                JOY_BUTTON_X:
+                        return KEY_3
+                JOY_BUTTON_Y:
+                        return KEY_4
+        return KEY_NONE
+
+func _push_key(keycode: Key, pressed: bool) -> void:
+        var ev := InputEventKey.new()
+        ev.keycode = keycode
+        ev.physical_keycode = keycode
+        ev.pressed = pressed
+        Input.parse_input_event(ev)
+
+## The left stick speaks the d-pad's language (edge-triggered at 0.55).
+func _pad_axes(ev: InputEventJoypadMotion) -> void:
+        if ev.axis == JOY_AXIS_LEFT_X:
+                _pad_axis("left", ev.axis_value < -0.55, KEY_LEFT)
+                _pad_axis("right", ev.axis_value > 0.55, KEY_RIGHT)
+        elif ev.axis == JOY_AXIS_LEFT_Y:
+                _pad_axis("up", ev.axis_value < -0.55, KEY_UP)
+                _pad_axis("down", ev.axis_value > 0.55, KEY_DOWN)
+
+func _pad_axis(pname: String, on: bool, key: Key) -> void:
+        var was := bool(_pad_held.get(pname, false))
+        if on == was:
+                return
+        _pad_held[pname] = on
+        _push_key(key, on)

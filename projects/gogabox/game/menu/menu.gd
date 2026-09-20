@@ -100,6 +100,10 @@ var _filter_text := ""
 var _filter_os := ""
 
 func _ready() -> void:
+        # v0.4.1 THE POSITION SEAT: the PC menu restores its persisted
+        # position choice (F10 / the settings row) before the first layout.
+        if ScaleRule.is_pc():
+                ScaleRule.pc_position = Box.pc_position()
         banner_safe = _banner_safe_px()
         _layer = CanvasLayer.new()
         _layer.layer = -1          # menu lives UNDER games (fixes games invisible)
@@ -125,7 +129,11 @@ func _ready() -> void:
         _margin.add_theme_constant_override("margin_left", 16)
         _margin.add_theme_constant_override("margin_right", 16)
         _margin.add_theme_constant_override("margin_top", 22)
-        _margin.add_theme_constant_override("margin_bottom", int(banner_safe))
+        # v0.4.1 THE DOOMSCROLL LAW: the old 64-78px banner reserve is
+        # RECLAIMED - the feed runs to the last pixel and the dark shade
+        # (_build_bottom_shade) closes the bottom. Only the OS safe inset
+        # (the gesture bar) still pads the margin.
+        _margin.add_theme_constant_override("margin_bottom", 6)
         _margin.mouse_filter = Control.MOUSE_FILTER_PASS
         _root.add_child(_margin)
 
@@ -174,6 +182,118 @@ func _ready() -> void:
         add_child(t)
 
         _build_particles()
+        _build_bottom_shade()
+
+## v0.4.1 THE DOOMSCROLL LAW (the owner: the old banner strip made the
+## feed's bottom look empty and dead - "in apps like facebook, reddit,
+## X/twitter, posts at the end of the screen get high bottom-to-top
+## shading... a cool shadow and sides-fade that look brown but darker").
+## The shade lives INSIDE the menu root, painted over the feed and under
+## every sheet/toast (later siblings + the toast's layer-100 canvas).
+## Static, tasteful, no liquid glass - a dark-brown breath at the edges.
+func _build_bottom_shade() -> void:
+        var shade := Control.new()
+        shade.name = "DoomscrollShade"
+        shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+        shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _root.add_child(shade)
+        var dark := Color(0.055, 0.03, 0.012)
+        # bottom - the main act: tall, strong, feels like the feed dives in
+        var gt := Gradient.new()
+        gt.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+        gt.colors = PackedColorArray([Color(dark, 0.0),
+                        Color(dark, 0.34), Color(dark, 0.9)])
+        var bt := GradientTexture2D.new()
+        bt.gradient = gt
+        bt.fill_from = Vector2(0.5, 0.0)
+        bt.fill_to = Vector2(0.5, 1.0)
+        bt.width = 16
+        bt.height = 256
+        var bot := TextureRect.new()
+        bot.texture = bt
+        bot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        bot.stretch_mode = TextureRect.STRETCH_SCALE
+        bot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+        bot.offset_top = -170.0
+        bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        shade.add_child(bot)
+        # sides - the quiet wings (brown but darker, breathing-level subtle)
+        var sg := Gradient.new()
+        sg.offsets = PackedFloat32Array([0.0, 1.0])
+        sg.colors = PackedColorArray([Color(dark, 0.30), Color(dark, 0.0)])
+        var st := GradientTexture2D.new()
+        st.gradient = sg
+        st.fill_from = Vector2(0.0, 0.5)
+        st.fill_to = Vector2(1.0, 0.5)
+        st.width = 64
+        st.height = 16
+        for side in ["left", "right"]:
+                var wing := TextureRect.new()
+                wing.texture = st
+                wing.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                wing.stretch_mode = TextureRect.STRETCH_SCALE
+                wing.flip_h = side == "right"
+                wing.custom_minimum_size = Vector2(34, 0)
+                wing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                if side == "left":
+                        wing.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+                        wing.offset_left = 0.0
+                        wing.offset_right = 34.0
+                else:
+                        wing.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+                        wing.offset_left = -34.0
+                        wing.offset_right = 0.0
+                shade.add_child(wing)
+
+## v0.4.1 THE F10 POSITION LAW (the owner: "there is no toggle like the
+## android one... make F10 do this job, also make it in the settings") -
+## flip the MENU'S position between vertical and horizontal. Main menu
+## only (main.gd guards it: never while a game runs, never under a sheet);
+## the choice persists through the Box settings and the window reshapes
+## to the new design.
+func toggle_menu_position() -> void:
+        var want := "landscape" if ScaleRule.pc_position == "portrait" \
+                        else "portrait"
+        ScaleRule.pc_position = want
+        if Box.has_method("set_pc_position"):
+                Box.set_pc_position(want)
+        ScaleRule.re_window(want)
+        _apply_base()
+        _layout()
+        _bg_canvas_update()
+
+## v0.4.1 THE ARROW LAWS (PC): Up/Down scroll the feed; at the top of the
+## feed Left/Right scroll the picks row; Tab+Left/Right switch WHICH LIST
+## the row shows (TODAY'S PICKS -> LAST PLAYED -> ...). Focus navigation
+## is nuked in main.gd, so arrows can never walk buttons - and while a
+## game runs the game owns every arrow (this handler is menu-only).
+func _input(event: InputEvent) -> void:
+        if not visible or GameHost.active_host != null:
+                return
+        if not (event is InputEventKey):
+                return
+        var k := (event as InputEventKey)
+        if not k.pressed:
+                return
+        if _sheet_open or _trophies_open:
+                return
+        match k.keycode:
+                KEY_UP:
+                        _feed_scroll.scroll_vertical -= 150
+                        get_viewport().set_input_as_handled()
+                KEY_DOWN:
+                        _feed_scroll.scroll_vertical += 150
+                        get_viewport().set_input_as_handled()
+                KEY_LEFT, KEY_RIGHT:
+                        var dir := -1 if k.keycode == KEY_LEFT else 1
+                        if Input.is_key_pressed(KEY_TAB):
+                                # Tab+Left/Right: the next/previous LIST
+                                _list_move(dir)
+                                get_viewport().set_input_as_handled()
+                        elif _feed_scroll.scroll_vertical <= 0.5:
+                                # at the top: Left/Right live INSIDE the row
+                                _strip_scroll.scroll_horizontal += 190 * dir
+                                get_viewport().set_input_as_handled()
 
 ## The local day key (menu-side mirror of Box._today_key) - drives the
 ## midnight refresh so the 12AM daily reset is VISIBLE in the box.
@@ -261,19 +381,29 @@ func _apply_base() -> void:
                 want = ScaleRule.DESIGN_LANDSCAPE
         elif orientation_override == "portrait":
                 pass
+        elif ScaleRule.is_pc():
+                # v0.4.1 THE DESIGN FOLLOWS THE CONTENT LAW: on a PC the
+                # MENU'S OWN position choice (F10 / the settings row)
+                # picks the design - never the window's aspect. This is the
+                # root kill of the vertical-fullscreen corruption: the old
+                # want_for(window px) force-fed the LANDSCAPE design to the
+                # portrait menu in fullscreen on a 16:9 monitor (the
+                # sideways-hybrid, the mis-aimed clicks, the clickable
+                # black sides).
+                want = ScaleRule.pc_menu_design()
         else:
                 var ws := DisplayServer.window_get_size()
                 if ws.x <= 0 or ws.y <= 0:
                         return
                 want = ScaleRule.want_for(ws)
         var win := get_window()
-        # THE VERTICAL SLICE LAW (v0.3.4-3, the windows return): the box on
-        # PC is a PORTRAIT slice down the middle of the window, the sides
-        # wear the box brown - never the engine's black, never a stretched
-        # menu. Landscape keeps EXPAND.
-        if ScaleRule.is_pc() and want == ScaleRule.DESIGN_PORTRAIT:
-                ScaleRule.apply_vertical_slice(win, want)
-        elif ScaleRule.is_pc():
+        # v0.4.1 THE PC STRETCH LAW: a desktop ALWAYS renders KEEP - the
+        # window matches the design (windowed, after re_window) or the bars
+        # wear the box brown (fullscreen / any dragged shape). EXPAND is a
+        # phone law now; the canvas can never outgrow its content on a PC.
+        if ScaleRule.is_pc():
+                ScaleRule.apply_pc(win, want)
+        elif win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_EXPAND:
                 ScaleRule.apply_expand(win)
         if win.content_scale_size != want:
                 win.content_scale_size = want
@@ -304,7 +434,7 @@ func _apply_safe_margins() -> void:
         _margin.add_theme_constant_override("margin_top", maxi(22, int(ins.y)))
         _margin.add_theme_constant_override("margin_right", 16 + int(ins.z))
         _margin.add_theme_constant_override("margin_bottom",
-                        int(banner_safe) + int(ins.w))
+                        6 + int(ins.w))
 
 ## v0.1.3: the background shader draws in REAL design px (its "canvas"
 ## uniform = the live canvas size) - stripes stay 45 degrees at the exact
@@ -1593,7 +1723,13 @@ func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
                 _open_guide(g))
         return row
 
-## General guide: about, how to play, controls, then genres + age rating.
+## General guide (v0.4.1 THE GUIDE REWORK, the owner: "update the 'how to
+## play' section to be first universal, then another 'controls' section
+## that is not platform-specific, it should be 'touch' and 'gamepad' and
+## 'mouse+keyboard' because GOGABox is very modular... a phone can get a
+## gamepad"). So: THE GAME -> PLATFORMS -> HOW TO PLAY (universal, no
+## device in sight) -> CONTROLS split into TOUCH / MOUSE+KEYS / GAMEPAD
+## with the tag-icon language -> GOOD TO KNOW -> genres.
 func _open_guide(g: Dictionary) -> void:
         _close_sheet()
         var h := _sheet_height()
@@ -1617,8 +1753,7 @@ func _open_guide(g: Dictionary) -> void:
         about.custom_minimum_size = Vector2(540, 0)
         v.add_child(about)
 
-        # THE PLATFORM LAW (v0.3.4-3, the windows return): the os badges live
-        # where players read
+        # THE PLATFORM LAW: the os badges live where players read
         var os_arr: Array = g.get("os", ["android", "pc"])
         if not os_arr.is_empty():
                 v.add_child(Arc.label("PLATFORMS", 24, Arc.HOT))
@@ -1629,23 +1764,61 @@ func _open_guide(g: Dictionary) -> void:
                         prow.add_child(Arc.meta_chip("os", String(oid)))
                 v.add_child(prow)
 
-        v.add_child(Arc.label("HOW TO PLAY", 24, Arc.HOT))
-        for line in g.get("controls", []):
-                var l := Arc.label("- " + String(line), 19, Arc.INK, false)
-                l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                l.custom_minimum_size = Vector2(540, 0)
-                v.add_child(l)
+        # THE CONTROLS TAGS (v0.4.1): the control-scheme chips with their
+        # icons, right where the reading starts.
+        v.add_child(Arc.label("CONTROLS", 24, Arc.HOT))
+        var crow := HFlowContainer.new()
+        crow.add_theme_constant_override("h_separation", 8)
+        crow.add_theme_constant_override("v_separation", 8)
+        for c in Meta.ctrl_list(g):
+                crow.add_child(Arc.meta_chip("ctrl", String(c)))
+        v.add_child(crow)
 
-        # THE PLATFORM LAW: the PC controls render as their OWN section
-        # (keyboard + mouse, the owner's per-game list)
+        # HOW TO PLAY - universal wording, never device-branded.
+        v.add_child(Arc.label("HOW TO PLAY", 24, Arc.HOT))
+        var howto: Array = g.get("howto", [])
+        if howto.is_empty():
+                howto = [String(g.get("desc", ""))]
+        for line in howto:
+                var hl := Arc.label("- " + String(line), 19, Arc.INK, false)
+                hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                hl.custom_minimum_size = Vector2(540, 0)
+                v.add_child(hl)
+
+        # CONTROLS - one subsection per DEVICE (the same game may ride a
+        # phone, a PC, or a phone with a gamepad). Each subhead wears its
+        # device icon from the tag-icon language.
+        var touch_lines: Array = g.get("controls", [])
+        if not touch_lines.is_empty():
+                v.add_child(Arc.chip("TOUCH", Meta.icon_for("ctrl", "touch"),
+                                Color(1, 1, 1, 0.5), 20, Arc.HOT))
+                for line in touch_lines:
+                        var l := Arc.label("- " + String(line), 19, Arc.INK, false)
+                        l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        l.custom_minimum_size = Vector2(540, 0)
+                        v.add_child(l)
         var pc_controls: Array = g.get("controls_pc", [])
         if not pc_controls.is_empty():
-                v.add_child(Arc.label("HOW TO PLAY - PC", 24, Arc.HOT))
+                v.add_child(Arc.chip("MOUSE + KEYS",
+                                Meta.icon_for("ctrl", "mkb"),
+                                Color(1, 1, 1, 0.5), 20, Arc.HOT))
                 for line in pc_controls:
                         var l2 := Arc.label("- " + String(line), 19, Arc.INK, false)
                         l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                         l2.custom_minimum_size = Vector2(540, 0)
                         v.add_child(l2)
+        if bool(g.get("gamepad", false)):
+                v.add_child(Arc.chip("GAMEPAD", Meta.icon_for("ctrl", "pad"),
+                                Color(1, 1, 1, 0.5), 20, Arc.HOT))
+                var pad_lines: Array = g.get("controls_pad", [
+                                "d-pad (or the left stick) = the arrows",
+                                "A / B / X / Y = the 1 / 2 / 3 / 4 keys",
+                                "START = the back button (pause)"])
+                for line in pad_lines:
+                        var l3 := Arc.label("- " + String(line), 19, Arc.INK, false)
+                        l3.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        l3.custom_minimum_size = Vector2(540, 0)
+                        v.add_child(l3)
 
         v.add_child(Arc.label("GOOD TO KNOW", 24, Arc.HOT))
         var facts := ""
@@ -2248,6 +2421,17 @@ func _sheet_height(default_h := 880.0) -> float:
 
 # ------------------------------------------------------------ settings
 
+## v0.4.1 THE SETTINGS REWORK (the owner: "make it like the AAA games
+## settings menu... main settings menu have many buttons, we may add extra
+## tech later... making the sound options under button audio will be
+## better, even for android"). The main sheet is a SEAT of buttons:
+##   AUDIO              - music + sfx (every platform)
+##   SCREEN & GRAPHICS  - PC only: fullscreen + position (Screen) and
+##                        Dynamic Scale + GOGACursor (Graphics)
+##   CONTROLS           - PC only: every GOGABox key and its use
+##   RESET ALL PROGRESS - at the end, over CLOSE, exactly as before
+## The stay-open law keeps working: every toggle rebuilds its sheet in
+## place; the CLOSE button owns closing.
 func _open_settings() -> void:
         if _sheet_open:
                 return
@@ -2256,35 +2440,15 @@ func _open_settings() -> void:
         var title := Arc.label("SETTINGS", 42, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
-
-        vb.add_child(_volume_row("MUSIC", Box.music_volume(), func(v: float):
-                Box.set_music_volume(v)
-                Jukebox.apply_volumes()))
-        vb.add_child(_volume_row("SFX", Box.sfx_volume(), func(v: float):
-                Box.set_sfx_volume(v)
-                Jukebox.apply_volumes()
-                Jukebox.sfx("coin", -2.0)))
-
-        # v0.4.0-17 THE PC SETTINGS TOGGLE (the owner: "make in windows build,
-        # the settings menu has toggles of full screen or windowed"): one
-        # honest button, PC builds only - phones never see it. The state is
-        # the real window mode, the label re-reads it, and the stay-open law
-        # (v040-14) rebuilds the sheet in place - the close button owns
-        # closing.
+        vb.add_child(Arc.button("AUDIO", Vector2(480, 78), 30, Arc.ACCENT,
+                        func(): _close_sheet(); _open_audio_settings()))
         if ScaleRule.is_pc():
-                var fs_txt := "FULLSCREEN: ON" if ScaleRule.is_fullscreen() \
-                                else "FULLSCREEN: OFF"
-                vb.add_child(Arc.button(fs_txt, Vector2(480, 70), 24, Arc.ACCENT,
-                                func():
-                                        ScaleRule.toggle_fullscreen()
-                                        Jukebox.sfx("click", -4.0)
-                                        _close_sheet()
-                                        _open_settings()))
-                var fs_note := Arc.label("or press F11 / Alt+Enter anywhere",
-                                19, Color("8a6a40"), false)
-                fs_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-                vb.add_child(fs_note)
-
+                vb.add_child(Arc.button("SCREEN & GRAPHICS", Vector2(480, 78), 28,
+                                Color(0.16, 0.10, 0.05, 0.85),
+                                func(): _close_sheet(); _open_screen_graphics()))
+                vb.add_child(Arc.button("CONTROLS", Vector2(480, 78), 30,
+                                Color(0.16, 0.10, 0.05, 0.85),
+                                func(): _close_sheet(); _open_controls_list()))
         var reset := Arc.button("RESET ALL PROGRESS", Vector2(480, 70), 22, Arc.BAD,
                         func(): _confirm_reset_all())
         vb.add_child(reset)
@@ -2294,7 +2458,156 @@ func _open_settings() -> void:
         vb.add_child(note)
         vb.add_child(Arc.button("CLOSE", Vector2(480, 72), 26, Arc.ACCENT,
                         func(): _close_sheet()))
-        Arc.fit_sheet(vb)
+        Arc.fit_sheet(vb, 4)
+
+## The AUDIO sheet: the two volume sliders moved out of the main seat
+## (v0.4.1 - the AAA split; every platform gets this one).
+func _open_audio_settings() -> void:
+        var vb := _sheet_base()
+        var title := Arc.label("AUDIO", 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        vb.add_child(_volume_row("MUSIC", Box.music_volume(), func(v: float):
+                Box.set_music_volume(v)
+                Jukebox.apply_volumes()))
+        vb.add_child(_volume_row("SFX", Box.sfx_volume(), func(v: float):
+                Box.set_sfx_volume(v)
+                Jukebox.apply_volumes()
+                Jukebox.sfx("coin", -2.0)))
+        vb.add_child(Arc.button("BACK", Vector2(480, 70), 26,
+                        Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet(); _open_settings()))
+        Arc.fit_sheet(vb, 3)
+
+## The SCREEN & GRAPHICS sheet (PC builds only - phones never see it).
+## Screen: the windowed/fullscreen toggle + the position toggle.
+## Graphics: Dynamic Scale (the FSR-style sharpen, OFF by default) and the
+## GOGACursor (the golden pixelated pointer, ON by default).
+func _open_screen_graphics() -> void:
+        var vb := _sheet_base()
+        var title := Arc.label("SCREEN & GRAPHICS", 38, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var s_head := Arc.label("SCREEN", 24, Arc.HOT)
+        vb.add_child(s_head)
+        var fs_txt := "DISPLAY: FULLSCREEN" if ScaleRule.is_fullscreen() \
+                        else "DISPLAY: WINDOWED"
+        vb.add_child(Arc.button(fs_txt, Vector2(480, 70), 26, Arc.ACCENT,
+                        func():
+                                ScaleRule.toggle_fullscreen()
+                                Jukebox.sfx("click", -4.0)
+                                _close_sheet()
+                                _open_screen_graphics()))
+        var fs_note := Arc.label("or press F11 / Alt+Enter anywhere", 19,
+                        Color("8a6a40"), false)
+        fs_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(fs_note)
+        var pos_txt := "POSITION: HORIZONTAL" \
+                        if ScaleRule.pc_position == "landscape" \
+                        else "POSITION: VERTICAL"
+        vb.add_child(Arc.button(pos_txt, Vector2(480, 70), 26, Arc.ACCENT,
+                        func():
+                                toggle_menu_position()
+                                Jukebox.sfx("click", -4.0)
+                                _close_sheet()
+                                _open_screen_graphics()))
+        var pos_note := Arc.label("or press F10 in the main menu", 19,
+                        Color("8a6a40"), false)
+        pos_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(pos_note)
+        var g_head := Arc.label("GRAPHICS", 24, Arc.HOT)
+        vb.add_child(g_head)
+        var ds_txt := "DYNAMIC SCALE: ON" if Box.pc_dynamic_scale() \
+                        else "DYNAMIC SCALE: OFF"
+        vb.add_child(Arc.button(ds_txt, Vector2(480, 70), 26, Arc.ACCENT,
+                        func():
+                                var on := not Box.pc_dynamic_scale()
+                                Box.set_pc_dynamic_scale(on)
+                                if router != null and is_instance_valid(router) \
+                                                and router.has_method("set_dynamic_scale"):
+                                        router.call("set_dynamic_scale", on)
+                                Jukebox.sfx("click", -4.0)
+                                _close_sheet()
+                                _open_screen_graphics()))
+        var ds_note := Arc.label("FSR sharpening for big screens - NVIDIA, " +
+                        "AMD and Intel, no restart needed", 17,
+                        Color("8a6a40"), false)
+        ds_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        ds_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        ds_note.custom_minimum_size = Vector2(500, 0)
+        vb.add_child(ds_note)
+        var cur_txt := "GOGACURSOR: ON" if Box.pc_gogacursor() \
+                        else "GOGACURSOR: OFF"
+        vb.add_child(Arc.button(cur_txt, Vector2(480, 70), 26, Arc.ACCENT,
+                        func():
+                                var on := not Box.pc_gogacursor()
+                                Box.set_pc_gogacursor(on)
+                                if router != null and is_instance_valid(router) \
+                                                and router.has_method("set_gogacursor"):
+                                        router.call("set_gogacursor", on)
+                                Jukebox.sfx("click", -4.0)
+                                _close_sheet()
+                                _open_screen_graphics()))
+        var cur_note := Arc.label("the golden pixelated pointer - games with " +
+                        "their own cursor take over while they play", 17,
+                        Color("8a6a40"), false)
+        cur_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        cur_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        cur_note.custom_minimum_size = Vector2(500, 0)
+        vb.add_child(cur_note)
+        vb.add_child(Arc.button("BACK", Vector2(480, 70), 26,
+                        Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet(); _open_settings()))
+        Arc.fit_sheet(vb, 2)
+
+## The CONTROLS sheet (PC builds only): every GOGABox key and what it does.
+## Per-game controls live in each game's guide page - this is the BOX's own
+## seat (the owner: "by controls i only mean GOGABox ones").
+func _open_controls_list() -> void:
+        var vb := _sheet_base()
+        var title := Arc.label("CONTROLS", 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(title)
+        var scroll := BoxScroll.new()
+        scroll.custom_minimum_size = Vector2(0, _sheet_height() - 300)
+        scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        vb.add_child(scroll)
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 8)
+        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        scroll.add_child(v)
+        var rows := [
+                ["ESC", "the phone's back button - pauses the game, closes " +
+                        "sheets, asks before leaving the box"],
+                ["F11 / ALT+ENTER", "fullscreen <-> windowed, anywhere"],
+                ["F10", "flip the menu position (vertical / horizontal) - " +
+                        "main menu only"],
+                ["UP / DOWN", "scroll the feed"],
+                ["LEFT / RIGHT", "at the top of the feed, scroll the picks " +
+                        "row"],
+                ["TAB + LEFT / RIGHT", "switch the picks list (today's " +
+                        "picks, last played, ...)"],
+                ["MOUSE WHEEL", "scroll any list"],
+                ["GAMEPAD", "d-pad = arrows, A/B/X/Y = the 1/2/3/4 keys, " +
+                        "START = ESC - in the games that wear the gamepad " +
+                        "tag"],
+                ["", "each game's own controls live in its guide page"],
+        ]
+        for r in rows:
+                var row := HBoxContainer.new()
+                row.add_theme_constant_override("separation", 14)
+                var key := Arc.label(String(r[0]), 22, Arc.HOT, false)
+                key.custom_minimum_size = Vector2(300, 0)
+                row.add_child(key)
+                var use := Arc.label(String(r[1]), 20, Arc.INK, false)
+                use.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                use.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                row.add_child(use)
+                v.add_child(row)
+        vb.add_child(Arc.button("BACK", Vector2(480, 70), 26,
+                        Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet(); _open_settings()))
+        Arc.fit_sheet(vb, 2)
 
 func _confirm_reset_all() -> void:
         _close_sheet()
@@ -2362,6 +2675,19 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         hv.add_child(Arc.label(String(g["tag"]), 20, Color("8a6a40"), false))
         hv.add_child(Arc.label("best %d   last %d   plays %d" % [Box.stat(id, "best"),
                         Box.stat(id, "last"), Box.stat(id, "plays")], 20, Color("6a4a28"), false))
+        # v0.4.1 THE PLATFORM TAGS BACK + THE CONTROLS TAGS (the owner: the
+        # os tag "exist in search filters and in guide, but not in each game
+        # pre-play or the game metadata itself - earlier, it was exist there
+        # accurately"). The pre-play header wears the platform chips again,
+        # next to the control-scheme chips (touch / mouse+keys / gamepad).
+        var tag_row := HFlowContainer.new()
+        tag_row.add_theme_constant_override("h_separation", 8)
+        tag_row.add_theme_constant_override("v_separation", 6)
+        for os_id in (g.get("os", ["android", "pc"]) as Array):
+                tag_row.add_child(Arc.meta_chip("os", String(os_id)))
+        for c in Meta.ctrl_list(g):
+                tag_row.add_child(Arc.meta_chip("ctrl", String(c)))
+        hv.add_child(tag_row)
         if allow_fav:
                 var hb := _heart_button(id)
                 head.add_child(hb)

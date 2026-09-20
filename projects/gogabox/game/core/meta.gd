@@ -51,11 +51,43 @@ const SUBS := {
 
 # v0.3.4-3 THE PLATFORM LAW (the windows return): every game wears an os
 # tag (the badge on all games; platform exclusives become possible later).
-# No icons yet - the chip renders text-only.
+# v0.4.1: the tags wear ICONS (assets/meta/os_*.png) and return to every
+# pre-play header (they lived in search + guide only).
 const OS_TAGS := {
-        "android": {"label": "PHONE"},
-        "pc": {"label": "PC"},
+        "android": {"label": "PHONE", "icon": "res://assets/meta/os_android.png"},
+        "pc": {"label": "PC", "icon": "res://assets/meta/os_pc.png"},
 }
+
+# v0.4.1 THE CONTROLS TAGS (the owner: "add controls tags that reflect the
+# game controls with cool icons like hand finger for touch and keyboard and
+# mouse for mouse+keyboard and gamepad for gamepad"). A registry entry
+# carries "ctrl": a list of these ids; the honest fallback (no key) is
+# touch + mouse+keys when PC control lines exist + gamepad when the game
+# declares the seat ("gamepad": true). Same design language as the tags.
+const CTRL_TAGS := {
+        "touch": {"label": "TOUCH", "icon": "res://assets/meta/ctrl_touch.png"},
+        "mkb": {"label": "MOUSE + KEYS", "icon": "res://assets/meta/ctrl_mkb.png"},
+        "pad": {"label": "GAMEPAD", "icon": "res://assets/meta/ctrl_pad.png"},
+}
+
+## The control-scheme chips for one registry entry.
+static func ctrl_list(g: Dictionary) -> Array:
+        var out: Array = []
+        if g.has("ctrl"):
+                for c in g["ctrl"]:
+                        out.append(String(c))
+                return out
+        out.append("touch")
+        if not (g.get("controls_pc", []) as Array).is_empty():
+                out.append("mkb")
+        if bool(g.get("gamepad", false)):
+                out.append("pad")
+        return out
+
+static func ctrl_label(id: String) -> String:
+        if CTRL_TAGS.has(id):
+                return String(CTRL_TAGS[id]["label"])
+        return id.to_upper()
 
 static func genre_label(id: String) -> String:
         if GENRES.has(id):
@@ -73,12 +105,13 @@ static func os_label(id: String) -> String:
         return id.to_upper()
 
 static func icon_for(kind: String, id: String) -> String:
-        # kind: "genre" | "sub" | "os"
+        # kind: "genre" | "sub" | "os" | "ctrl"
         var table := {}
         match kind:
                 "genre": table = GENRES
                 "sub": table = SUBS
                 "os": table = OS_TAGS
+                "ctrl": table = CTRL_TAGS
         if table.has(id) and String(table[id].get("icon", "")) != "":
                 return String(table[id]["icon"])
         return ""

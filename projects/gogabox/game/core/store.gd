@@ -873,5 +873,32 @@ func set_pc_fullscreen(v: bool) -> void:
         data["settings"]["pc_fullscreen"] = v
         save()
 
+## v0.4.1 THE PC SEAT SETTINGS: the menu's position choice (F10 + the
+## Screen settings row), the Dynamic Scale toggle (the FSR-style sharpen,
+## OFF by default) and the GOGACursor (ON by default - it is the box's
+## face). All survive restarts; old saves fall back to the defaults.
+func pc_position() -> String:
+        var v := String(data["settings"].get("pc_position", "portrait"))
+        return "landscape" if v == "landscape" else "portrait"
+
+func set_pc_position(v: String) -> void:
+        data["settings"]["pc_position"] = \
+                        "landscape" if v == "landscape" else "portrait"
+        save()
+
+func pc_dynamic_scale() -> bool:
+        return bool(data["settings"].get("pc_dynamic_scale", false))
+
+func set_pc_dynamic_scale(v: bool) -> void:
+        data["settings"]["pc_dynamic_scale"] = v
+        save()
+
+func pc_gogacursor() -> bool:
+        return bool(data["settings"].get("pc_gogacursor", true))
+
+func set_pc_gogacursor(v: bool) -> void:
+        data["settings"]["pc_gogacursor"] = v
+        save()
+
 ## THE 0-ADS LAW: the old interstitial pacing counter (every 3rd run-back
 ## showed one) is gone whole - no field, no function, no ads.

@@ -99,13 +99,15 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## 64-bit + 32-bit, SSE2 baseline). The window laws that only matter on a
 ## desktop live here.
 ##
-## THE VERTICAL SLICE LAW (the owner: "vertical games should not run in
-## full screen, only horizontal ones will run in full window, vertical will
-## run like, taking a vertical slice and the sides be the gogabox
-## background"): on a desktop a PORTRAIT design renders KEEP-aspect in the
-## middle of the window and the letterbox is painted the BOX BROWN (never
-## the engine's black). Landscape designs keep the phone's EXPAND rule -
-## the full window is the canvas.
+## v0.4.1 THE DESIGN FOLLOWS THE CONTENT LAW (the owner's vertical-fullscreen
+## kill): the old want_for(window px) rule FORCED the LANDSCAPE design onto
+## the portrait menu in fullscreen on a 16:9 monitor - the menu painted
+## sideways-hybrid, clicks landed wrong, and the "black sides" were really
+## the EXPAND canvas reaching past the content with live clicks inside. The
+## law now: on a desktop the design is picked by WHAT IS SHOWING (the menu's
+## position choice, the game's orientation) - the window's aspect NEVER
+## picks a design again. The window either RESHAPES to the content (re_window)
+## or the content letterboxes inside it with the box brown (KEEP).
 
 ## The box brown (the splash veil's flat brown, main.gd) - the bars' paint.
 const PC_BAR_BROWN := Color(0.227451, 0.137255, 0.074510)
@@ -120,9 +122,25 @@ static func is_pc() -> bool:
         return OS.has_feature("windows") or OS.has_feature("linux") \
                         or OS.has_feature("macos")
 
-## The vertical slice: KEEP aspect at `design`, the bars wear the box brown.
+## THE MENU'S POSITION CHOICE (v0.4.1, F10 + the settings row): "portrait"
+## or "landscape". Separated from pc_kind on purpose - a landscape GAME
+## must not leave the menu living sideways after it closes. Persisted by
+## the menu through the Box settings (pc_position).
+static var pc_position := "portrait"
+
+## The design the MENU wants on a PC: from the position choice, never from
+## the window's shape.
+static func pc_menu_design() -> Vector2i:
+        return DESIGN_LANDSCAPE if pc_position == "landscape" \
+                        else DESIGN_PORTRAIT
+
+## THE PC STRETCH LAW (v0.4.1 - the vertical slice generalized): on a
+## desktop EVERY design renders KEEP-aspect - the window either matches the
+## design (windowed, after re_window: no bars at all) or the bars wear the
+## box brown (fullscreen, or any shape the user drags into). EXPAND is a
+## phone law - a desktop canvas must never grow past its content again.
 ## Returns true when the mode had to move (callers may reflow).
-static func apply_vertical_slice(win: Window, design: Vector2i) -> bool:
+static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win == null:
                 return false
         var changed := false
@@ -135,6 +153,10 @@ static func apply_vertical_slice(win: Window, design: Vector2i) -> bool:
                 changed = true
         return changed
 
+## The vertical slice (kept for compatibility - apply_pc is the law now).
+static func apply_vertical_slice(win: Window, design: Vector2i) -> bool:
+        return apply_pc(win, design)
+
 ## The phone rule again: EXPAND fills every window edge-to-edge.
 static func apply_expand(win: Window) -> bool:
         if win == null:
@@ -143,6 +165,21 @@ static func apply_expand(win: Window) -> bool:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
                 return true
         return false
+
+## Are the brown bars on screen right now? (the edge veil's switch - the
+## app floats above the sides only when the window is off-aspect).
+static func bars_visible(win: Window) -> bool:
+        if win == null:
+                return false
+        if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
+                return false
+        var wpx := DisplayServer.window_get_size()
+        var cs := win.content_scale_size
+        if wpx.x <= 0 or wpx.y <= 0 or cs.x <= 0 or cs.y <= 0:
+                return false
+        var sw := float(wpx.x) / float(cs.x)
+        var sh := float(wpx.y) / float(cs.y)
+        return absf(sw - sh) > 0.005
 
 # ================================================== THE PC WINDOW LAWS
 ## v0.4.0-17 (the owner's first Windows test round): the WINDOW follows the
@@ -168,7 +205,10 @@ static func apply_expand(win: Window) -> bool:
 ##     at boot.
 
 ## The content kind currently driving the window shape:
-## "portrait" (menu + portrait games) or "landscape".
+## "portrait" (the menu in its vertical position + portrait games) or
+## "landscape". NOT the menu's persisted position choice - that is
+## pc_position above; a landscape game re_windows the window and hands it
+## back to pc_position's shape on the way out.
 static var pc_kind := "portrait"
 
 static func is_fullscreen() -> bool:
@@ -205,7 +245,10 @@ static func re_window(kind: String) -> void:
                         scr.position + (scr.size - want) / 2)
 
 ## THE FULLSCREEN LAW: flip, persist, and on the way back to windowed
-## re-window to the content kind so no empty sides return with it.
+## re-window to the content kind so no empty sides return with it. The
+## design does NOT ride the window shape anymore (KEEP + the content's
+## design stay glued), so the stretched-window -> fullscreen -> restore
+## scale bug is structurally dead: the design never depended on the window.
 static func toggle_fullscreen() -> void:
         set_fullscreen(not is_fullscreen())
 
