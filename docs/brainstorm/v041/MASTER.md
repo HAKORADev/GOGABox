@@ -170,3 +170,8 @@
 - The heavywar/slasher/domino/marble work landed through parallel agents
   whose results timed out mid-flight; every diff was reviewed by hand, the
   unfinished marble laws were completed in-tree, and everything re-verified.
+
+## CI DELIVERY (run 35534228811, commit b8f7cbe - ALL GREEN)
+- Windows exe (x86_32): SUCCESS - the zip artifact 123.1 MB (the 175MB gate holds)
+- arm64-v8a: SUCCESS - 113.6 MB; armeabi-v7a: SUCCESS - 114.9 MB
+- 0 annotations on the run (the Node 24 majors + the ubuntu-24.04 pin hold)
