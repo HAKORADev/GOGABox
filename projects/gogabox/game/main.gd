@@ -55,13 +55,15 @@ func _ready() -> void:
         # half the refresh bill.
         Engine.max_fps = 30
 
-        # v0.4.1 THE PC SEAT: the edge veil (the app floats above the brown
-        # bars), the GOGACursor, and the focus nuke (Tab/arrows can never
-        # walk between buttons). v041-1: DYNAMIC SCALE IS NUKED (the owner:
-        # "the dynamic scale tech, remove it, it just made the app more
-        # blurry, your fixes worked more way better, nuke it") - the honest
-        # 1:1 rendering + the mipmap law are the whole sharpness story.
-        _build_edge_veil()
+        # v0.4.1 THE PC SEAT: the GOGACursor and the focus nuke (Tab/arrows
+        # can never walk between buttons). v041-1: DYNAMIC SCALE IS NUKED
+        # (the owner: "the dynamic scale tech, remove it, it just made the
+        # app more blurry, your fixes worked more way better, nuke it") -
+        # the honest 1:1 rendering + the mipmap law are the whole sharpness
+        # story. v041-1 r2: THE EDGE VEIL IS RETIRED with the brown - the
+        # sides are flat #0a0a0a and NOTHING paints above the app anymore
+        # (the owner: "it is rendered even on top of the app in-resolution
+        # area ... give the sides just a #0a0a0a color").
         _apply_gogacursor()
         get_tree().node_added.connect(_nuke_focus)
 
@@ -104,18 +106,17 @@ func _lifecycle(what: int) -> void:
 ## the vertical-fullscreen corruption's root kill). During a GAME the host
 ## owns content_scale_size; the governor must not fight it.
 func _process(_delta: float) -> void:
-        # v041-1: the cursor ownership flag rides the frame clock
-        _cursor_owner_tick()
+        # v041-1 r2: the software cursor rides SoftCursor's OWN
+        # PROCESS_MODE_ALWAYS frame clock - even a paused tree (a game's
+        # pause sheet) never freezes the pointer, which the _process here
+        # could not promise.
         if GameHost.active_host != null:
                 return
         if _menu != null and is_instance_valid(_menu) \
                         and _menu.has_method("apply_resolution"):
                 _menu.call("apply_resolution")
-        # the edge veil breathes with the window: visible only when the
-        # brown bars exist (fullscreen portrait, or a dragged-off-aspect
-        # window) - one cheap compare per frame.
-        if _veil_root != null and is_instance_valid(_veil_root):
-                _veil_root.visible = ScaleRule.bars_visible(get_window())
+        # v041-1 r2: the edge veil is retired - the governor's only frame
+        # duty left is the design re-decide above.
 
 ## v0.1.3: the design resolution lives in ScaleRule (1080x1920 portrait /
 ## 1920x1080 landscape, aspect EXPAND); the governor above + the menu's
@@ -288,34 +289,8 @@ func _input(event: InputEvent) -> void:
                                 _menu.call("toggle_menu_position")
                                 get_viewport().set_input_as_handled()
                                 return
-        if event is InputEventMouseButton \
-                        and (event as InputEventMouseButton).button_index \
-                        == MOUSE_BUTTON_LEFT and ScaleRule.is_pc() \
-                        and Box.pc_gogacursor() and _cur_norm != null:
-                # v041-1 THE OWNERSHIP LAW: the press frame paints ONLY while
-                # the box owns the cursor. A game that hid the mouse (its own
-                # aim cursor) is never overpainted - and the ownership flag
-                # tracks the mouse mode every frame below.
-                if _cursor_owner == "box":
-                        var mb := event as InputEventMouseButton
-                        Input.set_custom_mouse_cursor(
-                                        _cur_press if mb.pressed else _cur_norm,
-                                        Input.CURSOR_ARROW, Vector2(26, 26))
-
-## v041-1: the ownership flag follows the REAL mouse mode (a game hiding the
-## cursor takes ownership; anything showing it hands it back). One compare
-## per frame from _process.
-func _cursor_owner_tick() -> void:
-        if not ScaleRule.is_pc():
-                return
-        var hidden := Input.mouse_mode == Input.MOUSE_MODE_HIDDEN \
-                        or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-        var want := "game" if hidden else "box"
-        if want != _cursor_owner:
-                _cursor_owner = want
-                if want == "box" and Box.pc_gogacursor() and _cur_norm != null:
-                        Input.set_custom_mouse_cursor(_cur_norm,
-                                        Input.CURSOR_ARROW, Vector2(26, 26))
+## v041-1 r2: the press-frame cursor swap is RETIRED - the hold/click
+## effect is the software cursor's code darkening (SoftCursor's frame law).
 
 ## Android BACK button (config/quit_on_go_back=false routes it here) - and
 ## since v0.4.1 the PC's ESC and the gamepad's START ride the same road:
@@ -356,16 +331,13 @@ func _go_back() -> void:
 
 # ================================================ v0.4.1 THE PC SEAT
 
-var _veil_root: Control
-var _cur_norm: Texture2D
-var _cur_press: Texture2D
-## v041-1 THE CURSOR OWNERSHIP LAW: "box" = the box paints/press-paints the
-## golden cursor; "game" = a game hid the OS cursor and aims with its own
-## (Heavy War's reticle) - clicks must NEVER re-paint the box cursor over it
-## (the owner: "it does not override the GOGACursor when the game is
-## running"). A game claims ownership by hiding the mouse; showing it
-## (the pointer law on every pause/shop sheet) hands it back.
-var _cursor_owner := "box"
+## v041-1 r2 THE SOFTWARE GOGACURSOR (game/core/soft_cursor.gd): the
+## owner's own 32x32 arrow, the code shadow (real alpha), the code
+## hold/click darkening, the 1:1 real-pixel seat. The node carries the
+## whole ownership law itself.
+var _cur_node: SoftCursor
+var _cur_tex: Texture2D
+var _cur_none_tex: ImageTexture
 var _pad_held := {}
 var _focus_muted := false
 var _pre_focus_mute := false
@@ -387,83 +359,51 @@ func _nuke_focus(n: Node) -> void:
 func set_dynamic_scale(_on: bool) -> void:
         pass
 
-## v0.4.1 THE GOGACURSOR (the owner: "the default cursor be a golden
-## pixelated one with brown outlines and clicking makes it do the
-## click/hold effect"). The OS pointer wears the box's own face; a game
-## with its own cursor (Heavy War's reticle) hides/takes the OS cursor as
-## it always did, and every box sheet brings a pointer back
-## (game_base forces MOUSE_MODE_VISIBLE when a pause/shop opens).
+## v041-1 r2 THE GOGACURSOR SEAT (game/core/soft_cursor.gd holds the
+## laws): the OS pointer wears a 1x1 fully-transparent image - the
+## hardware cursor is silenced WITHOUT touching the mouse MODE, so a
+## game hiding/capturing the mode (Heavy War's reticle) still takes the
+## seat and every sheet restoring MOUSE_MODE_VISIBLE still hands it back.
 func _apply_gogacursor() -> void:
         if not ScaleRule.is_pc():
                 return
         if Box.pc_gogacursor():
-                if _cur_norm == null:
-                        _cur_norm = load("res://assets/ui/goga_cursor.png")
-                        _cur_press = load("res://assets/ui/goga_cursor_press.png")
-                if _cur_norm != null:
-                        _cursor_owner = "box"
-                        Input.set_custom_mouse_cursor(_cur_norm,
-                                        Input.CURSOR_ARROW, Vector2(26, 26))
+                if _cur_node == null:
+                        _cur_node = SoftCursor.new()
+                        add_child(_cur_node)
+                if _cur_tex == null:
+                        _cur_tex = load("res://assets/ui/goga_cursor.png")
+                _cur_node.build(_cur_tex)
+                Input.set_custom_mouse_cursor(_cursor_none_tex(),
+                                Input.CURSOR_ARROW, Vector2.ZERO)
         else:
+                if _cur_node != null:
+                        _cur_node.kill()
                 Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
 
 func set_gogacursor(on: bool) -> void:
         if on:
                 _apply_gogacursor()
         else:
-                Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+                if ScaleRule.is_pc():
+                        if _cur_node != null:
+                                _cur_node.kill()
+                        Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
 
-## v0.4.1 THE EDGE VEIL (the owner: "the screen sides should get themed
-## instead of being total black... it should feel like the sides are under
-## the app"). When the brown bars exist, the app's own edge wears a soft
-## inward shadow - the box floats above the sides. NOT per-pixel dominant
-## color theming (that reads wrong here) - one universal shadow language.
-func _build_edge_veil() -> void:
-        if not ScaleRule.is_pc():
-                return
-        var layer := CanvasLayer.new()
-        layer.layer = 95   # above game + sheets, under the sharpening pass
-        add_child(layer)
-        _veil_root = Control.new()
-        _veil_root.set_anchors_preset(Control.PRESET_FULL_RECT)
-        _veil_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _veil_root.visible = false
-        layer.add_child(_veil_root)
-        var shadow := Color(0, 0, 0, 0.42)
-        var defs := [
-                [Control.PRESET_LEFT_WIDE, Vector2(0.0, 0.5), Vector2(1.0, 0.5), 54.0],
-                [Control.PRESET_RIGHT_WIDE, Vector2(1.0, 0.5), Vector2(0.0, 0.5), 54.0],
-                [Control.PRESET_TOP_WIDE, Vector2(0.5, 0.0), Vector2(0.5, 1.0), 30.0],
-                [Control.PRESET_BOTTOM_WIDE, Vector2(0.5, 1.0), Vector2(0.5, 0.0), 30.0],
-        ]
-        for d in defs:
-                var g := Gradient.new()
-                g.offsets = PackedFloat32Array([0.0, 1.0])
-                g.colors = PackedColorArray([Color(shadow, shadow.a),
-                                Color(shadow, 0.0)])
-                var t := GradientTexture2D.new()
-                t.gradient = g
-                t.fill_from = d[1]
-                t.fill_to = d[2]
-                t.width = 16
-                t.height = 16
-                var tr := TextureRect.new()
-                tr.texture = t
-                tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                tr.stretch_mode = TextureRect.STRETCH_SCALE
-                tr.set_anchors_preset(d[0])
-                tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                _veil_root.add_child(tr)
-                var px := float(d[3])
-                match d[0]:
-                        Control.PRESET_LEFT_WIDE:
-                                tr.offset_right = px
-                        Control.PRESET_RIGHT_WIDE:
-                                tr.offset_left = -px
-                        Control.PRESET_TOP_WIDE:
-                                tr.offset_bottom = px
-                        Control.PRESET_BOTTOM_WIDE:
-                                tr.offset_top = -px
+## The silent hardware pointer: 1x1, fully transparent.
+func _cursor_none_tex() -> ImageTexture:
+        if _cur_none_tex == null:
+                var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+                img.set_pixel(0, 0, Color(0, 0, 0, 0))
+                _cur_none_tex = ImageTexture.create_from_image(img)
+        return _cur_none_tex
+
+## v041-1 r2: THE EDGE VEIL IS RETIRED (was _build_edge_veil, a 95-layer
+## shading the app's own edges from above). The owner saw it riding ON TOP
+## of the in-resolution area and ordered the sides flat: "give the sides
+## just a #0a0a0a color ... later we may find a way to populate the sides
+## more better". Nothing paints above the app anymore - the bars are the
+## clear color (ScaleRule.PC_BAR_INK), the app is the app.
 
 ## v0.4.1 THE UNFOCUS PAUSE LAW helpers. Mute rides the MASTER bus and is
 ## restored exactly as it was; the pause sheet stays up until the player

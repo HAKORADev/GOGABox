@@ -2312,14 +2312,13 @@ func _show_intro_sheet() -> void:
                 return
         state = "intro"
         var vb := sheet_push(0.0, "intro")
-        var dim: Control = _sheet_stack.back()["dim"]
-        dim.gui_input.connect(func(ev: InputEvent):
-                if ev is InputEventScreenTouch and ev.pressed:
-                        _start_run())
-        var cc: Control = _sheet_stack.back()["cc"]
-        cc.gui_input.connect(func(ev: InputEvent):
-                if ev is InputEventScreenTouch and ev.pressed:
-                        _start_run())
+        # v041-1 r2 THE ANYWHERE LAW (the owner: "tap anywhere screen is not
+        # actually anywhere"): the old per-control gui_input hooks were a
+        # dead-zone map - the game_base dim-close law consumed the dim taps
+        # first (sheet_pop over the intro), and taps landing on the content
+        # column hit no handler at all. The intro tap is now read at _input
+        # (below) BEFORE the GUI dispatch - ANYWHERE means anywhere, the
+        # sheet's own controls included.
         var sp := TextureRect.new()
         sp.texture = load(S + "worms/%s_head_open.png" % String(worm_d["id"]))
         sp.custom_minimum_size = Vector2(0, 220)
@@ -2348,6 +2347,28 @@ func _show_intro_sheet() -> void:
         # tap-to-start only - the controls and the coin law live in the
         # registry desc/controls (the guide), where they already were.
         _intro_pair = [_sheet_stack.back()["dim"], _sheet_stack.back()["cc"]]
+
+## v041-1 r2 THE ANYWHERE LAW - the intro's only door, read BEFORE the GUI
+## dispatch (Node._input): a pressed touch OR a pressed left mouse button
+## (the game's two seats) starts the run from any pixel on screen - the
+## dim, the content column, the worm art, the labels. The event is eaten
+## so the starting tap can never leak into the run as a dash. The state
+## guard + _start_run's own guard make the double-path (a tap the dim
+## still saw) impossible.
+func _input(event: InputEvent) -> void:
+        if state != "intro":
+                return
+        var hit := false
+        if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+                hit = true
+        elif event is InputEventMouseButton \
+                        and (event as InputEventMouseButton).pressed \
+                        and (event as InputEventMouseButton).button_index \
+                        == MOUSE_BUTTON_LEFT:
+                hit = true
+        if hit:
+                get_viewport().set_input_as_handled()
+                _start_run()
 
 func _start_run() -> void:
         if state != "intro":

@@ -107,10 +107,14 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## law now: on a desktop the design is picked by WHAT IS SHOWING (the menu's
 ## position choice, the game's orientation) - the window's aspect NEVER
 ## picks a design again. The window either RESHAPES to the content (re_window)
-## or the content letterboxes inside it with the box brown (KEEP).
+## or the content letterboxes inside it with the flat #0a0a0a ink (KEEP).
 
-## The box brown (the splash veil's flat brown, main.gd) - the bars' paint.
-const PC_BAR_BROWN := Color(0.227451, 0.137255, 0.074510)
+## v041-1 r2 THE FLAT SIDES LAW (the owner: "give the sides just a
+## #0a0a0a color, will be more focused on the game this way, later we may
+## find a way to populate the sides more better"): the bars wear FLAT
+## near-black ink - no brown, no edge veil on top of the app (the veil is
+## retired with the brown). One honest color, focus on the game.
+const PC_BAR_INK := Color(0.0392157, 0.0392157, 0.0392157)  # #0a0a0a
 
 ## A real desktop session: not a phone/tablet, not the headless test runs.
 ## The headless guard keeps every probe and CI run on the phone rules.
@@ -137,7 +141,7 @@ static func pc_menu_design() -> Vector2i:
 ## THE PC STRETCH LAW (v0.4.1 - the vertical slice generalized): on a
 ## desktop EVERY design renders KEEP-aspect - the window either matches the
 ## design (windowed, after re_window: no bars at all) or the bars wear the
-## box brown (fullscreen, or any shape the user drags into). EXPAND is a
+## flat #0a0a0a ink (fullscreen, or any shape the user drags into). EXPAND is a
 ## phone law - a desktop canvas must never grow past its content again.
 ## Returns true when the mode had to move (callers may reflow).
 static func apply_pc(win: Window, design: Vector2i) -> bool:
@@ -147,7 +151,7 @@ static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
                 changed = true
-        RenderingServer.set_default_clear_color(PC_BAR_BROWN)
+        RenderingServer.set_default_clear_color(PC_BAR_INK)
         if win.content_scale_size != design:
                 win.content_scale_size = design
                 changed = true
@@ -157,8 +161,8 @@ static func apply_pc(win: Window, design: Vector2i) -> bool:
         # rest of the window is never rendered and shows the raw window
         # background (black), no matter what the clear color says. The fix
         # is one attach: hand the viewport the WHOLE window again; the canvas
-        # transform still centers the design, and the margins now wear the
-        # box brown (the edge veil shades the app's edge on top of them).
+        # transform still centers the design, and the margins wear the flat
+        # #0a0a0a ink (v041-1 r2: the brown + the edge veil are retired).
         # Cheap RID call; re-asserted on every apply_pc (the governor runs
         # it every frame, so a window reshape can never leave it stale).
         RenderingServer.viewport_attach_to_screen(win.get_viewport_rid(),
@@ -178,8 +182,8 @@ static func apply_expand(win: Window) -> bool:
                 return true
         return false
 
-## Are the brown bars on screen right now? (the edge veil's switch - the
-## app floats above the sides only when the window is off-aspect).
+## Are the ink bars on screen right now? (one honest read - the round-2
+## sides wear flat #0a0a0a and nothing paints above the app anymore).
 static func bars_visible(win: Window) -> bool:
         if win == null:
                 return false
@@ -208,11 +212,11 @@ static func bars_visible(win: Window) -> bool:
 ##     gets a 9:16 window, landscape games get a 16:9 window - so the
 ##     vertical slice renders with NO empty sides. The vertical slice law
 ##     above stays as the fallback for whatever aspect the user drags the
-##     window into (brown bars, never black, never stretched).
+##     window into (ink bars, never stretched).
 ##   - THE FULLSCREEN LAW: F11 / Alt+Enter anywhere, or the SETTINGS
 ##     toggle (Windows build), flips WINDOW_MODE_FULLSCREEN <-> WINDOWED.
 ##     Fullscreen is a monitor - it cannot reshape - so portrait content
-##     falls back to the vertical slice with the box brown sides. The
+##     falls back to the vertical slice with the flat ink sides. The
 ##     choice persists in the Box settings (pc_fullscreen) and re-applies
 ##     at boot.
 

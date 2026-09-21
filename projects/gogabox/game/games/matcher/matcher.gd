@@ -1046,6 +1046,24 @@ func _goga_sheet_popped(id: String) -> void:
                         pick_open = false
                 "power":
                         wallet_chip = null
+                "shop":
+                        # v041-1 r2 THE ALWAYS-AFTER-EACH-CHANGE LAW (the
+                        # owner: "i will buy mode or skin while in the
+                        # optionals menu, the thing got bought, will need
+                        # game re-open to get updated ... make this check
+                        # always after each change"): the optionals sheet
+                        # sat BENEATH the shop and kept its build-time
+                        # owned/locked states - a purchase inside the shop
+                        # left stale locked cards behind. A REAL shop close
+                        # (CLOSE button, the dim, the back law) rebuilds the
+                        # optionals from the live Box state; the pop that
+                        # rides the shop's own rebuild cycle is gated off
+                        # (_shop_gate) so the refresh only fires once, on
+                        # the close the player actually sees.
+                        if _shop_gate:
+                                _shop_gate = false
+                        elif pick_open:
+                                _pick_rebuild()
 
 
 # ================================================================ the shop
@@ -1095,8 +1113,11 @@ func _shop_open() -> void:
 
 
 ## the stack-safe rebuild: the live shop pops, a fresh one pushes
+var _shop_gate := false
 func _shop_rebuild() -> void:
+        _shop_gate = true
         _shop_down()
+        _shop_gate = false
         _shop_open()
 
 
