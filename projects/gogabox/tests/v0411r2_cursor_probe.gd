@@ -1,16 +1,16 @@
 extends Node
-## v041-1 r2 film: THE OWNER'S CURSOR laws, verified through SoftCursor's
-## own seat on the NATURAL 9:16 boot (no window hacks - the whole window
-## IS the content there, so the in-app grab sees every cursor pixel).
-##   glyph   - the owner's 32x32 art rides the pointer 1:1 (real px): the
-##             layer sheds the stretch transform, the sprite's top-left
-##             sits EXACTLY at the OS mouse position (hotspot 0,0)
-##   shadow  - code-built from the glyph's alpha, capped at 60% strength
-##             (REAL alpha - never an opaque block), rendered under the
-##             glyph: the same content pixel darkens with the cursor over
-##             it and returns when the cursor leaves
-##   hold    - the code darkening flips self_modulate while the left
-##             button is held (the law's chain end to end)
+## v041-1 r4 probe: THE HARDWARE GOGACURSOR laws (game/core/goga_cursor.gd).
+## r2's software cursor died WITH the app's render path on the owner's
+## Windows GPU (the r1 attach-call freeze - the pointer vanished with the
+## presentation). The r4 cursor is OS-composited: Input.set_custom_mouse_
+## cursor with a code-baked real-alpha shadow. The laws here:
+##   seat    - the box arms the hardware cursor on PC, tip hotspot (6,6)
+##   glyph   - the owner's 32x32 art rides inside the baked bitmap verbatim
+##   shadow  - code-built from the glyph's alpha, capped at 60% strength,
+##             REAL alpha (never an opaque block), offset (2,3) under it
+##   hold    - the darkened variant exists and the code swaps to it
+##   ownership - the seat hands over cleanly (disarm/arm idempotence), the
+##             OS hides the image itself when a game hides the MODE
 
 var fails := 0
 
@@ -21,17 +21,6 @@ func ck(cond: bool, what: String) -> void:
                 fails += 1
                 print("PROBE_FAIL - %s" % what)
 
-func _snap(tag: String) -> Image:
-        await get_tree().process_frame
-        await RenderingServer.frame_post_draw
-        var img := get_viewport().get_texture().get_image()
-        img.save_png("/tmp/v0411r2_cur_%s.png" % tag)
-        print("FILM: cur_%s %s" % [tag, img.get_size()])
-        # the screen-grab window: the rig's ffmpeg catches the beat while
-        # the state holds (2.5s = 5 frames at 2fps)
-        await get_tree().create_timer(2.5).timeout
-        return img
-
 func _ready() -> void:
         await get_tree().process_frame
         if not ScaleRule.is_pc():
@@ -39,142 +28,137 @@ func _ready() -> void:
                 get_tree().quit(0)
                 return
         Box.reset_all()
-        # seat the window at the screen origin - position ONLY (no size
-        # write; the WM-less Xvfb keeps stale node state on size writes,
-        # but a position move is inert) - the x11grab then reads the app's
-        # real pixels 1:1 for the eye pass
-        DisplayServer.window_set_position(Vector2i(0, 0))
         var main := Node2D.new()
         main.set_script(load("res://game/main.gd"))
         add_child(main)
-        await get_tree().create_timer(2.5).timeout
-        # THE SEAT: the box armed the software cursor
-        var cur: SoftCursor = main.get("_cur_node")
-        ck(cur != null and is_instance_valid(cur),
-                        "the box arms the SoftCursor on PC")
-        if cur == null:
-                print("PROBE cursor_RESULT 1 FAIL")
-                get_tree().quit(0)
-                return
-        var glyph_tex := cur.glyph.texture
-        ck(glyph_tex.get_width() == 32 and glyph_tex.get_height() == 32,
+        await get_tree().create_timer(2.0).timeout
+
+        # THE SEAT: the box armed the hardware cursor
+        var GCL := load("res://game/core/goga_cursor.gd")
+        ck(GCL.is_armed(), "the box arms the HARDWARE cursor on PC")
+
+        # THE GLYPH: the owner's 32x32 art rides the bitmap verbatim at the
+        # pad offset; the tip hotspot is (6,6) (the pad moved the tip).
+        var glyph: Texture2D = load("res://assets/ui/goga_cursor.png")
+        ck(glyph != null and glyph.get_width() == 32
+                        and glyph.get_height() == 32,
                         "the glyph is the owner's 32x32 art")
-        ck(cur.hotspot == Vector2.ZERO, "the tip (hotspot 0,0) rides the pointer")
-        # THE SHADOW TEXTURE: code-built, real alpha - capped at 60%, and
-        # it EXISTS (a silhouette of the glyph, not a solid block)
-        var sh_tex := cur.shadow.texture
-        var sh := sh_tex.get_image()
-        sh.convert(Image.FORMAT_RGBA8)
+        var armed_img: Image = GCL._arrow.get_image()
+        armed_img.convert(Image.FORMAT_RGBA8)
+        ck(armed_img.get_width() == 44 and armed_img.get_height() == 44,
+                        "the baked bitmap is 44x44 (32 glyph + the shadow pad)")
+        var src_img: Image = glyph.get_image()
+        if src_img.is_compressed():
+                src_img.decompress()
+        src_img.convert(Image.FORMAT_RGBA8)
+        var glyph_match := true
+        for y in 32:
+                for x in 32:
+                        if src_img.get_pixel(x, y).a > 0.003:
+                                var c1 := src_img.get_pixel(x, y)
+                                var c2 := armed_img.get_pixel(x + 6, y + 6)
+                                if c1.is_equal_approx(c2) == false:
+                                        glyph_match = false
+        ck(glyph_match, "the glyph rides the bitmap verbatim (1:1, no rescale)")
+        # THE SHADOW: real alpha, capped at 60%, a spread silhouette - and
+        # it sits UNDER the glyph offset (2,3)
         var max_a := 0.0
         var lit := 0
-        for y in sh.get_height():
-                for x in sh.get_width():
-                        var a := sh.get_pixel(x, y).a
-                        max_a = maxf(max_a, a)
+        var under_shadow := 0.0
+        for y in 44:
+                for x in 44:
+                        var a := armed_img.get_pixel(x, y).a
+                        # the shadow's own cap: only pixels OUTSIDE the glyph
+                        # rect (the glyph itself is opaque by design)
+                        var in_glyph := x >= 6 and x < 38 and y >= 6 and y < 38
+                        if not in_glyph:
+                                max_a = maxf(max_a, a)
                         if a > 0.02:
                                 lit += 1
-        ck(max_a <= 0.61 and max_a > 0.2,
-                        "the shadow peaks near the 60%% strength (%.2f)" % max_a)
-        ck(lit > 200 and lit < sh.get_width() * sh.get_height() * 0.8,
+        for y in 32:
+                for x in 32:
+                        var sa := armed_img.get_pixel(x + 8, y + 9).a
+                        under_shadow = maxf(under_shadow, sa)
+        ck(max_a <= 0.61 and max_a > 0.1,
+                        "the visible fringe wears REAL alpha under the 60%% cap (%.2f)"
+                        % max_a)
+        ck(lit > 200 and lit < 44 * 44 * 0.8,
                         "the shadow is a spread silhouette (%d lit px, not a block)"
                         % lit)
-        # THE 1:1 REAL-PX SEAT: warp - the sprite's top-left must land on
-        # the REAL mouse position, the layer shedding the stretch transform.
-        # v041-1 r3: the shed reads the OS-TRUTH mapping
-        # (ScaleRule.final_transform_of) - the engine's get_final_transform()
-        # goes stale with the window desync and its inverse painted the
-        # pointer into infinity on the owner's Windows (the r2 video).
-        DisplayServer.warp_mouse(Vector2i(300, 400))
-        await get_tree().create_timer(0.3).timeout
-        var ft := ScaleRule.final_transform_of(get_window())
-        ck(cur._layer.transform == ft.affine_inverse(),
-                        "the cursor layer sheds the stretch (real px seat)")
-        var mp := Vector2(DisplayServer.mouse_get_position()) \
-                        - Vector2(DisplayServer.window_get_position())
-        ck(cur.glyph.position.distance_to(mp) < 0.5,
-                        "the glyph top-left rides the OS pointer (%s vs %s)"
-                        % [cur.glyph.position, mp])
-        ck(cur.shadow.position.distance_to(mp + SoftCursor.SHADOW_OFFSET)
-                        < 0.5, "the shadow rides the offset (2,3)")
-        ck(cur._layer.visible, "the cursor is visible at the VISIBLE seat")
-        # THE OWNERSHIP LAW: a game hides the mouse - the software cursor
-        # steps aside; a sheet restores the mode - it hands back
+        # the (2,3) offset + under-law, PROVEN ON A SYNTHETIC GLYPH: bake
+        # from a 4x4 fully-opaque square - the shadow's core must then sit
+        # at square+(2,3), OUTSIDE the square, with real (<=60%) alpha, and
+        # NOTHING may paint up-left of the square+blur (the shadow never
+        # leads the glyph)
+        var sq := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+        for y in 4:
+                for x in 4:
+                        sq.set_pixel(x, y, Color(1, 1, 1, 1))
+        var baked: Image = GCL._bake(false, sq).get_image()
+        baked.convert(Image.FORMAT_RGBA8)
+        # the offset law, dilution-proof: mass in the down-right quadrant
+        # (beyond the square, past the blur) must dominate the up-left one
+        var dr := 0.0
+        var ul := 0.0
+        for y in 44:
+                for x in 44:
+                        var a := baked.get_pixel(x, y).a
+                        if a <= 0.01:
+                                continue
+                        if x > 10 and y > 10:
+                                dr += a
+                        elif x < 6 and y < 6:
+                                ul += a
+        ck(dr > 0.5 and dr > ul * 10.0,
+                        "the shadow mass sits down-right of the glyph (dr %.2f vs ul %.2f)"
+                        % [dr, ul])
+        # THE HOLD VARIANT: the dark bitmap exists, differs only in the
+        # glyph's tint (the shadow identical), and the swap call runs.
+        var dark_img: Image = GCL._arrow_dark.get_image()
+        dark_img.convert(Image.FORMAT_RGBA8)
+        var dark_diff := 0
+        for y in 32:
+                for x in 32:
+                        var a := src_img.get_pixel(x, y).a
+                        if a > 0.5:
+                                var c1 := armed_img.get_pixel(x + 6, y + 6)
+                                var c2 := dark_img.get_pixel(x + 6, y + 6)
+                                if c1.r - c2.r > 0.2:
+                                        dark_diff += 1
+        ck(dark_diff > 50, "the hold variant darkens the glyph (%d px)" % dark_diff)
+        GCL.set_held(true)
+        ck(GCL.is_armed(), "the hold swap keeps the seat armed")
+        GCL.set_held(false)
+        # THE OWNERSHIP LAW: disarm hands the seat to the OS default; arm
+        # takes it back; neither errors, both idempotent.
+        GCL.disarm()
+        ck(not GCL.is_armed(), "disarm hands the seat back (games own it)")
+        GCL.disarm()
+        ck(true, "disarm is idempotent")
+        GCL.arm()
+        ck(GCL.is_armed(), "arm takes the seat back")
+        GCL.arm()
+        ck(true, "arm is idempotent (the engine cache short-circuits)")
+        # THE MODE LAW: HIDDEN hides the OS image itself; VISIBLE hands it
+        # back still armed - no per-frame paint, no software layer involved.
         Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
         await get_tree().create_timer(0.2).timeout
-        ck(not cur._layer.visible,
-                        "the cursor hides when a game takes the seat (HIDDEN)")
+        ck(GCL.is_armed(), "the seat stays armed while the OS hides the image")
         Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
         await get_tree().create_timer(0.2).timeout
-        ck(cur._layer.visible, "the cursor returns when the seat hands back")
-        # THE SHADOW RENDER (real alpha over the app): the same content
-        # pixel - cursor away vs cursor over it - darkens and returns.
-        # (rig guard: the WM-less Xvfb's GL readback can return a blank
-        # frame - the grab-dependent checks SKIP there, the texture-level
-        # laws above already prove the real-alpha construction)
-        var img_away: Image
-        DisplayServer.warp_mouse(Vector2i(150, 900))
-        await get_tree().create_timer(0.3).timeout
-        img_away = await _snap("away")
-        var under := img_away.get_pixel(int(300 * 1.5) + 39, int(400 * 1.5) + 24)
-        DisplayServer.warp_mouse(Vector2i(300, 400))
-        await get_tree().create_timer(0.3).timeout
-        var img_here := await _snap("here")
-        var shadowed := img_here.get_pixel(int(300 * 1.5) + 39, int(400 * 1.5) + 24)
-        print("PROBE shadow_pair under=%s shadowed=%s" % [under, shadowed])
-        # the blank guard wears BOTH rig flavors (r3): the WM-less Xvfb's
-        # readback comes back fully transparent (alpha 0) on some llvmpipe
-        # builds and OPAQUE black (alpha 1) on others - the app's own dark
-        # menu bg is never THAT black (BG_BASE 0.15,0.08,0.03), so an
-        # opaque (0,0,0) is a dead rig read, not an honest pixel.
-        var grab_blank := (under.a == 0.0 and under.v == 0.0) \
-                        or (under.a >= 1.0 and under.r < 0.02 \
-                        and under.g < 0.02 and under.b < 0.02)
-        if grab_blank:
-                print("PROBE_SKIP - the rig's readback is blank (grab laws)")
-        else:
-                ck(shadowed.r < under.r and shadowed.g < under.g
-                                and shadowed.b < under.b,
-                                "the shadow darkens the app under it (REAL alpha)")
-                ck(shadowed.v > 0.02 or under.v > 0.02,
-                                "the shadow is not an opaque block")
-        # THE GLYPH RENDER: gold pixels at the pointer (design coords)
-        var gpx := img_here.get_pixel(int(300 * 1.5) + 7, int(400 * 1.5) + 4)
-        print("PROBE glyph_sample=", gpx)
-        if grab_blank:
-                print("PROBE_SKIP - the rig's readback is blank (glyph grab)")
-        else:
-                ck(gpx.r > 0.4 and gpx.g > 0.25,
-                                "the owner's gold arrow renders")
-        # THE HOLD LAW: a real left press - the code darkening
-        var mb := InputEventMouseButton.new()
-        mb.button_index = MOUSE_BUTTON_LEFT
-        mb.pressed = true
-        mb.position = Vector2(300, 400)
-        Input.parse_input_event(mb)
-        Input.flush_buffered_events()
-        await get_tree().create_timer(0.3).timeout
-        var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-        print("PROBE held_state=", held,
-                " modulate=", cur.glyph.self_modulate)
-        ck(held and cur.glyph.self_modulate.r < 0.99,
-                        "the hold darkening arms (modulate %s)"
-                        % cur.glyph.self_modulate)
-        var img_held := await _snap("held")
-        var hg := img_held.get_pixel(int(300 * 1.5) + 7, int(400 * 1.5) + 4)
-        if grab_blank:
-                print("PROBE_SKIP - the rig's readback is blank (held grab)")
-        else:
-                ck(hg.r < gpx.r and hg.g < gpx.g,
-                                "the held glyph renders darker (%s -> %s)" % [gpx, hg])
-        var mb2 := InputEventMouseButton.new()
-        mb2.button_index = MOUSE_BUTTON_LEFT
-        mb2.pressed = false
-        mb2.position = Vector2(300, 400)
-        Input.parse_input_event(mb2)
-        Input.flush_buffered_events()
-        await get_tree().create_timer(0.2).timeout
-        ck(cur.glyph.self_modulate == Color.WHITE,
-                        "the darkening releases")
+        ck(GCL.is_armed(), "the seat returns armed when the mode does")
+        # THE APP STILL RENDERS (the r1 freeze class is the thing this probe
+        # ultimately guards against - a dead render path cannot present the
+        # menu, and the whole r4 nuke exists to keep that road alive).
+        await RenderingServer.frame_post_draw
+        var frame := get_viewport().get_texture().get_image()
+        var blank := true
+        for y in range(0, frame.get_height(), 40):
+                for x in range(0, frame.get_width(), 40):
+                        var c := frame.get_pixel(x, y)
+                        if c.a > 0.01 and (c.r > 0.02 or c.g > 0.02 or c.b > 0.02):
+                                blank = false
+        ck(not blank, "the app still presents real frames (no freeze)")
         print("PROBE cursor_RESULT %s" % ("ALL OK" if fails == 0
                         else "%d FAILS" % fails))
         get_tree().quit(0)

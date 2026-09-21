@@ -1,11 +1,14 @@
 extends Node
 ## v041-1 r2 probe: THE FLAT SIDES LAW (the owner: "it is rendered even on
 ## top of the app in-resolution area ... give the sides just a #0a0a0a
-## color"). The bars ARE the clear color (the v041-1 root-cause work: with
-## KEEP the engine never renders outside the design rect - the re-attach
-## to the whole window exposes the clear color there), so the honest
-## verification is the clear color itself + NOTHING painting above the
-## app anymore (the veil is retired with the brown).
+## color"). r4 UPDATE: the bars ARE the near-black ink via the engine's own
+## letterbox path (windowed re_window = no bars at all; fullscreen
+## off-aspect = the GLES3 blit's near-black letterbox clear) - the r1
+## empty-rect re-attach hack that promised "the clear color shows on the
+## bars" froze the owner's Windows present path instead and is GONE (see
+## scale_rule.apply_pc, THE PRESENT-PATH NUKE). The honest verification:
+## the ink constant, the clear color, and NO attach call in the present
+## path + nothing painting above the app anymore (the veil is retired).
 
 var fails := 0
 
@@ -29,12 +32,19 @@ func _ready() -> void:
                         .is_equal_approx(Color("0a0a0a")),
                         "apply_pc paints the bars #0a0a0a (clear color %s)"
                         % RenderingServer.get_default_clear_color())
-        # THE RE-ATTACH LAW (round 1, kept): the viewport owns the WHOLE
-        # window - the clear color actually SHOWS on the bars
-        var win := get_window()
-        win.size = Vector2i(1280, 720)
-        ScaleRule.apply_pc(win, ScaleRule.DESIGN_PORTRAIT)
-        ck(true, "apply_pc re-asserted on an off-aspect window without error")
+        # THE PRESENT PATH IS CLEAN (r4): no viewport_attach_to_screen call
+        # rides the apply_pc present road anymore - the r1 empty-rect hack
+        # froze the owner's real Windows GL present. Source-level guard:
+        # the viewport is left to the engine's own attach law.
+        var sr := FileAccess.open("res://game/core/scale_rule.gd", FileAccess.READ)
+        var src_code := sr.get_as_text() if sr != null else ""
+        var exec_calls := 0
+        for line in src_code.split("\n"):
+                var t := line.strip_edges()
+                if t.begins_with("RenderingServer.viewport_attach_to_screen("):
+                        exec_calls += 1
+        ck(exec_calls == 0,
+                        "apply_pc carries no viewport_attach_to_screen call (r4)")
         # THE VEIL IS RETIRED: boot the real box and walk its tree - no
         # veil layer (layer 95), no veil control, nothing above the app
         var main := Node2D.new()

@@ -116,21 +116,15 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## retired with the brown). One honest color, focus on the game.
 const PC_BAR_INK := Color(0.0392157, 0.0392157, 0.0392157)  # #0a0a0a
 
-## v041-1 r3 THE WINDOW TRUTH LAW (the owner's r2 video: the app booting
-## into a full-brown window, the menu clipped into a corner strip, the
-## phantom empty screens, no cursor). RIG-REPRODUCED ROOT CAUSE: the root
-## Window's internal `size` only updates through the WM-resize event or
-## the Window PROPERTY path - a raw DisplayServer.window_set_size
-## (re_window, the mode flips, a WM restore race) can leave Window.size
-## STALE FOREVER: the stretch final-transform keeps mapping the design
-## onto the BOOT rect while the real window moved (rig probe: ds_px=(1256,
-## 705) with win.size=(720,1280) and the final transform frozen at the
-## boot scale - everything the owner saw follows from that one desync).
-## The watchdog re-seats OS truth through the property path -
-## Window.set_size ALWAYS re-runs _update_viewport_size(), so the
-## transform heals THE SAME FRAME, no WM event needed. No feedback loop:
-## OS truth is read, never written back. Transient (0,0) reports during
-## mode flips are skipped, headless probes are skipped.
+## v041-1 r3 THE WINDOW TRUTH LAW (kept in r4): re-seat the OS truth
+## through the Window PROPERTY path whenever it disagrees with
+## DisplayServer - Window.set_size ALWAYS re-runs the engine's own
+## _update_viewport_size(), so a WM-less session (the rig), a boot-time
+## raw re_window, or a swallowed mode-flip event heals THE SAME FRAME.
+## No feedback loop: OS truth is read, never written back. Transient
+## (0,0) reports during mode flips are skipped, headless probes skip.
+## (On a real Windows desktop the WM echo keeps Window.size honest
+## anyway - this is the safety net, not the render path.)
 static func sync_window(win: Window) -> bool:
         if win == null:
                 return false
@@ -217,18 +211,31 @@ static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win.content_scale_size != design:
                 win.content_scale_size = design
                 changed = true
-        # v041-1 THE BAR PAINT LAW (the owner: "for the sides, they are
-        # showing black"). Root cause, rig-verified: with aspect KEEP the
-        # engine ATTACHES the root viewport to the design rect only - the
-        # rest of the window is never rendered and shows the raw window
-        # background (black), no matter what the clear color says. The fix
-        # is one attach: hand the viewport the WHOLE window again; the canvas
-        # transform still centers the design, and the margins wear the flat
-        # #0a0a0a ink (v041-1 r2: the brown + the edge veil are retired).
-        # Cheap RID call; re-asserted on every apply_pc (the governor runs
-        # it every frame, so a window reshape can never leave it stale).
-        RenderingServer.viewport_attach_to_screen(win.get_viewport_rid(),
-                        Rect2i(), 0)
+        # v041-1 r4 THE PRESENT-PATH NUKE (the owner: "track the code step
+        # by step until you find and ensure this is the bug and nuke it").
+        # r1's BAR PAINT LAW called RenderingServer.viewport_attach_to_screen
+        # with an EMPTY rect here EVERY FRAME. The engine source (4.7
+        # renderer_viewport.cpp) proves what that does: once the root
+        # viewport is attached to a screen, the engine blits its render
+        # target straight to the window, and with an empty rect the blit
+        # destination is (0,0) + the viewport's INTERNAL size - the engine's
+        # own letterbox mapping (attach_to_screen_rect = Rect2(margin,
+        # screen_size), re-seated by Window::_update_viewport_size on every
+        # WM resize) is overwritten every frame, the content loses its
+        # centering margin, and because dst == rt->size the GLES3 blit's
+        # clear-to-black branch never runs either - the window surface
+        # outside the blit keeps STALE bytes. The rig (llvmpipe, WM-less)
+        # still painted through it; the owner's real Windows GL driver
+        # stopped presenting after the splash entirely (his film: the flat
+        # splash-brown freeze, the menu never painting, the sticky black on
+        # Maximize when the swapchain reallocated, the software cursor gone
+        # with the dead render path). THE CALL IS GONE - the present path
+        # is the engine's own again, the exact road every build through
+        # v041 shipped on. The bars: windowed re_window shapes the window
+        # to the design (no bars at all); fullscreen off-aspect letterboxes
+        # through the engine (the GLES3 blit clears the bars near-black -
+        # visually the #0a0a0a ink; the clear color above paints the render
+        # target's own clear).
         return changed
 
 ## The vertical slice (kept for compatibility - apply_pc is the law now).

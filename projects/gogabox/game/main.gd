@@ -106,10 +106,8 @@ func _lifecycle(what: int) -> void:
 ## the vertical-fullscreen corruption's root kill). During a GAME the host
 ## owns content_scale_size; the governor must not fight it.
 func _process(_delta: float) -> void:
-        # v041-1 r2: the software cursor rides SoftCursor's OWN
-        # PROCESS_MODE_ALWAYS frame clock - even a paused tree (a game's
-        # pause sheet) never freezes the pointer, which the _process here
-        # could not promise.
+        # v041-1 r4: the cursor is OS-composited hardware now (GogaCursor) -
+        # no per-frame pointer work is needed anywhere in the box.
         if GameHost.active_host != null:
                 return
         if _menu != null and is_instance_valid(_menu) \
@@ -145,6 +143,10 @@ func on_game_closed() -> void:
                         _menu.call("on_game_closed")
                 # box theme back - it NEVER plays inside a game scene
                 Jukebox.play_music_menu()
+        # v041-1 r4: the box cursor re-arms when the box takes the pointer
+        # back (a game may have replaced the image with its own; the engine
+        # cache short-circuits the call when nothing moved).
+        _apply_gogacursor()
 
 func _show_splash() -> void:
         _splash_layer = CanvasLayer.new()
@@ -263,6 +265,17 @@ func _input(event: InputEvent) -> void:
         # v0.4.0-17 THE PC HOTKEY LAW (the owner's order): F11 or Alt+Enter
         # toggles fullscreen / windowed anywhere in the box. PC only, key
         # press only (no echo), and the splash keeps its skip touch.
+        # v041-1 r4 THE HOLD LAW: the left button darkens the box cursor
+        # (the hardware image swaps) - menu only, never over a game's seat.
+        if event is InputEventMouseButton \
+                        and (event as InputEventMouseButton).button_index \
+                        == MOUSE_BUTTON_LEFT and ScaleRule.is_pc() \
+                        and Box.pc_gogacursor() \
+                        and GameHost.active_host == null:
+                var pressed_now: bool = (event as InputEventMouseButton).pressed
+                if pressed_now != _cur_held:
+                        _cur_held = pressed_now
+                        GogaCursorLib.set_held(_cur_held)
         if event is InputEventKey and (event as InputEventKey).pressed \
                         and not (event as InputEventKey).echo:
                 var k := (event as InputEventKey).keycode
@@ -289,8 +302,10 @@ func _input(event: InputEvent) -> void:
                                 _menu.call("toggle_menu_position")
                                 get_viewport().set_input_as_handled()
                                 return
-## v041-1 r2: the press-frame cursor swap is RETIRED - the hold/click
-## effect is the software cursor's code darkening (SoftCursor's frame law).
+## v041-1 r4 THE HOLD LAW: the code darkening rides the HARDWARE cursor -
+## a second bitmap (the glyph modulated 0.55, same code shadow) swaps in
+## while the left button is held. Menu only: a click never re-paints the
+## box cursor over a game's own seat (the ownership law).
 
 ## Android BACK button (config/quit_on_go_back=false routes it here) - and
 ## since v0.4.1 the PC's ESC and the gamepad's START ride the same road:
@@ -331,13 +346,12 @@ func _go_back() -> void:
 
 # ================================================ v0.4.1 THE PC SEAT
 
-## v041-1 r2 THE SOFTWARE GOGACURSOR (game/core/soft_cursor.gd): the
-## owner's own 32x32 arrow, the code shadow (real alpha), the code
-## hold/click darkening, the 1:1 real-pixel seat. The node carries the
-## whole ownership law itself.
-var _cur_node: SoftCursor
-var _cur_tex: Texture2D
-var _cur_none_tex: ImageTexture
+## v041-1 r4 THE HARDWARE GOGACURSOR (game/core/goga_cursor.gd): the
+## owner's own 32x32 arrow as an OS-composited cursor, the code shadow
+## baked real-alpha, the code hold/click darkening, 1:1 with the OS
+## pointer by definition. The OS carries the whole seat now.
+const GogaCursorLib := preload("res://game/core/goga_cursor.gd")
+var _cur_held := false
 var _pad_held := {}
 var _focus_muted := false
 var _pre_focus_mute := false
@@ -359,44 +373,31 @@ func _nuke_focus(n: Node) -> void:
 func set_dynamic_scale(_on: bool) -> void:
         pass
 
-## v041-1 r2 THE GOGACURSOR SEAT (game/core/soft_cursor.gd holds the
-## laws): the OS pointer wears a 1x1 fully-transparent image - the
-## hardware cursor is silenced WITHOUT touching the mouse MODE, so a
-## game hiding/capturing the mode (Heavy War's reticle) still takes the
-## seat and every sheet restoring MOUSE_MODE_VISIBLE still hands it back.
+## v041-1 r4 THE HARDWARE GOGACURSOR SEAT (game/core/goga_cursor.gd
+## holds the laws): the owner's arrow is an OS-COMPOSITED cursor now -
+## Input.set_custom_mouse_cursor with the code-baked real-alpha shadow.
+## r2's software cursor died with the r1 render freeze (the pointer
+## vanished WITH the app's presentation on his Windows GPU); a hardware
+## cursor is drawn by the OS itself - it cannot vanish, cannot lag, and
+## is 1:1 with the OS pointer by definition. No 1x1 silencing anymore:
+## the image IS the seat. A game that hides the mouse (Heavy War) hides
+## it for the OS too; a game that sets its own image replaces ours;
+## on_game_closed re-arms (the engine cache short-circuits the call).
 func _apply_gogacursor() -> void:
         if not ScaleRule.is_pc():
                 return
+        _cur_held = false
         if Box.pc_gogacursor():
-                if _cur_node == null:
-                        _cur_node = SoftCursor.new()
-                        add_child(_cur_node)
-                if _cur_tex == null:
-                        _cur_tex = load("res://assets/ui/goga_cursor.png")
-                _cur_node.build(_cur_tex)
-                Input.set_custom_mouse_cursor(_cursor_none_tex(),
-                                Input.CURSOR_ARROW, Vector2.ZERO)
+                GogaCursorLib.arm()
         else:
-                if _cur_node != null:
-                        _cur_node.kill()
-                Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+                GogaCursorLib.disarm()
 
 func set_gogacursor(on: bool) -> void:
         if on:
                 _apply_gogacursor()
         else:
                 if ScaleRule.is_pc():
-                        if _cur_node != null:
-                                _cur_node.kill()
-                        Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
-
-## The silent hardware pointer: 1x1, fully transparent.
-func _cursor_none_tex() -> ImageTexture:
-        if _cur_none_tex == null:
-                var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
-                img.set_pixel(0, 0, Color(0, 0, 0, 0))
-                _cur_none_tex = ImageTexture.create_from_image(img)
-        return _cur_none_tex
+                        GogaCursorLib.disarm()
 
 ## v041-1 r2: THE EDGE VEIL IS RETIRED (was _build_edge_veil, a 95-layer
 ## shading the app's own edges from above). The owner saw it riding ON TOP
