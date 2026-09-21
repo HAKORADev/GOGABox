@@ -85,8 +85,15 @@ func _process(_delta: float) -> void:
         var show: bool = not hidden_by_seat
         var win := get_window()
         if show and win != null:
-                # THE 1:1 LAW: invert the stretch - the layer draws in real px.
-                _layer.transform = win.get_final_transform().affine_inverse()
+                # THE 1:1 LAW: invert the stretch - the layer draws in real
+                # px. v041-1 r3: the mapping is rebuilt from DISPLAYSERVER
+                # TRUTH (ScaleRule.final_transform_of) - the engine's
+                # get_final_transform() goes stale with the window desync
+                # (and transiently singular during mode flips), and a
+                # singular inverse paints the pointer into infinity: the
+                # owner's r2 "no visible cursor".
+                _layer.transform = ScaleRule.final_transform_of(win) \
+                                .affine_inverse()
                 var mp := Vector2(DisplayServer.mouse_get_position()) \
                                 - Vector2(DisplayServer.window_get_position())
                 var ws := Vector2(DisplayServer.window_get_size())

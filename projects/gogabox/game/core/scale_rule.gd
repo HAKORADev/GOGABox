@@ -116,6 +116,64 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## retired with the brown). One honest color, focus on the game.
 const PC_BAR_INK := Color(0.0392157, 0.0392157, 0.0392157)  # #0a0a0a
 
+## v041-1 r3 THE WINDOW TRUTH LAW (the owner's r2 video: the app booting
+## into a full-brown window, the menu clipped into a corner strip, the
+## phantom empty screens, no cursor). RIG-REPRODUCED ROOT CAUSE: the root
+## Window's internal `size` only updates through the WM-resize event or
+## the Window PROPERTY path - a raw DisplayServer.window_set_size
+## (re_window, the mode flips, a WM restore race) can leave Window.size
+## STALE FOREVER: the stretch final-transform keeps mapping the design
+## onto the BOOT rect while the real window moved (rig probe: ds_px=(1256,
+## 705) with win.size=(720,1280) and the final transform frozen at the
+## boot scale - everything the owner saw follows from that one desync).
+## The watchdog re-seats OS truth through the property path -
+## Window.set_size ALWAYS re-runs _update_viewport_size(), so the
+## transform heals THE SAME FRAME, no WM event needed. No feedback loop:
+## OS truth is read, never written back. Transient (0,0) reports during
+## mode flips are skipped, headless probes are skipped.
+static func sync_window(win: Window) -> bool:
+        if win == null:
+                return false
+        if DisplayServer.get_name() == "headless":
+                return false
+        var real := DisplayServer.window_get_size()
+        if real.x <= 0 or real.y <= 0:
+                return false
+        if win.size == real:
+                return false
+        win.size = real
+        return true
+
+## The root Window (static helpers have no `get_window`).
+static func root_window() -> Window:
+        var tree := Engine.get_main_loop() as SceneTree
+        return tree.root if tree != null else null
+
+## The engine's stretch mapping (design px -> real window px) rebuilt
+## from DISPLAYSERVER TRUTH - singular-proof (v041-1 r3). The engine's
+## get_final_transform() answers from Window.size, which the desync above
+## can leave stale (or transiently 0x0 during mode flips - a singular
+## matrix whose affine_inverse() poisoned the software cursor into
+## invisibility on the owner's Windows). The box's PC stretch law is KEEP
+## (apply_pc) - that branch is computed exactly from OS truth; anything
+## else (phone EXPAND, headless fakes) falls back to the engine's own
+## answer. Determinant is always > 0: real px and the design are nonzero.
+static func final_transform_of(win: Window) -> Transform2D:
+        if win == null:
+                return Transform2D()
+        if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
+                return win.get_final_transform()
+        var wpx := DisplayServer.window_get_size()
+        var cs := win.content_scale_size
+        if wpx.x <= 0 or wpx.y <= 0 or cs.x <= 0 or cs.y <= 0:
+                return win.get_final_transform()
+        var f := win.content_scale_factor
+        if f <= 0.0:
+                f = 1.0
+        var s := minf(float(wpx.x) / float(cs.x), float(wpx.y) / float(cs.y)) * f
+        var margin := (Vector2(wpx) - Vector2(cs) * s) * 0.5
+        return Transform2D(Vector2(s, 0.0), Vector2(0.0, s), margin)
+
 ## A real desktop session: not a phone/tablet, not the headless test runs.
 ## The headless guard keeps every probe and CI run on the phone rules.
 static func is_pc() -> bool:
@@ -147,6 +205,10 @@ static func pc_menu_design() -> Vector2i:
 static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win == null:
                 return false
+        # v041-1 r3 THE WINDOW TRUTH LAW: heal any OS-vs-Window desync
+        # FIRST (the governor runs this every frame - the freeze class is
+        # structurally dead; see sync_window).
+        sync_window(win)
         var changed := false
         if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
@@ -273,6 +335,10 @@ static func re_window(kind: String) -> void:
         DisplayServer.window_set_position(
                         scr.position + (scr.size - want) / 2)
         apply_window_lock()
+        # v041-1 r3: the WM event may never come (boot-time resizes, WM-less
+        # sessions, the Windows restore race) - re-seat the truth NOW so the
+        # stretch transform is correct from the very first frame.
+        sync_window(root_window())
 
 ## THE FULLSCREEN LAW: flip, persist, and on the way back to windowed
 ## re-window to the content kind so no empty sides return with it. The
@@ -297,6 +363,7 @@ static func set_fullscreen(on: bool) -> void:
         # restore-animation race structurally dead (the owner's "fullscreen
         # in-game prevents me to go windowed until i exit the game").
         apply_window_lock()
+        sync_window(root_window())
         if not on:
                 re_window(pc_kind)
                 _rewindow_deferred()
@@ -324,6 +391,7 @@ static func boot_window() -> void:
         else:
                 re_window(pc_kind)
         apply_window_lock()
+        sync_window(root_window())
 
 static func _usable_rect() -> Rect2i:
         var scr := DisplayServer.window_get_current_screen()

@@ -155,6 +155,11 @@ func _process(delta: float) -> void:
 func _reassert_window_law() -> void:
         if DisplayServer.get_name() == "headless":
                 return
+        # v041-1 r3 THE WINDOW TRUTH LAW: in-game nobody else watches the
+        # window - heal any OS-vs-Window desync every frame (the freeze
+        # class: the canvas keeps mapping the boot rect while the real
+        # window moved; see ScaleRule.sync_window).
+        ScaleRule.sync_window(get_window())
         var landscape := _orient_now == "horizontal"
         var want_design := ScaleRule.DESIGN_LANDSCAPE if landscape \
                         else ScaleRule.DESIGN_PORTRAIT

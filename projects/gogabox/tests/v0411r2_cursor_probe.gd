@@ -79,10 +79,14 @@ func _ready() -> void:
                         "the shadow is a spread silhouette (%d lit px, not a block)"
                         % lit)
         # THE 1:1 REAL-PX SEAT: warp - the sprite's top-left must land on
-        # the REAL mouse position, the layer shedding the stretch transform
+        # the REAL mouse position, the layer shedding the stretch transform.
+        # v041-1 r3: the shed reads the OS-TRUTH mapping
+        # (ScaleRule.final_transform_of) - the engine's get_final_transform()
+        # goes stale with the window desync and its inverse painted the
+        # pointer into infinity on the owner's Windows (the r2 video).
         DisplayServer.warp_mouse(Vector2i(300, 400))
         await get_tree().create_timer(0.3).timeout
-        var ft := get_window().get_final_transform()
+        var ft := ScaleRule.final_transform_of(get_window())
         ck(cur._layer.transform == ft.affine_inverse(),
                         "the cursor layer sheds the stretch (real px seat)")
         var mp := Vector2(DisplayServer.mouse_get_position()) \
@@ -117,7 +121,14 @@ func _ready() -> void:
         var img_here := await _snap("here")
         var shadowed := img_here.get_pixel(int(300 * 1.5) + 39, int(400 * 1.5) + 24)
         print("PROBE shadow_pair under=%s shadowed=%s" % [under, shadowed])
-        var grab_blank := under.a == 0.0 and under.v == 0.0
+        # the blank guard wears BOTH rig flavors (r3): the WM-less Xvfb's
+        # readback comes back fully transparent (alpha 0) on some llvmpipe
+        # builds and OPAQUE black (alpha 1) on others - the app's own dark
+        # menu bg is never THAT black (BG_BASE 0.15,0.08,0.03), so an
+        # opaque (0,0,0) is a dead rig read, not an honest pixel.
+        var grab_blank := (under.a == 0.0 and under.v == 0.0) \
+                        or (under.a >= 1.0 and under.r < 0.02 \
+                        and under.g < 0.02 and under.b < 0.02)
         if grab_blank:
                 print("PROBE_SKIP - the rig's readback is blank (grab laws)")
         else:
