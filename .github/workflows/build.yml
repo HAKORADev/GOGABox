@@ -231,8 +231,12 @@ jobs:
           V="$(jq -r '.projects.gogabox.version_name' config/projects.json)"
           mkdir -p stage
           cp projects/build/GOGABox.exe stage/
-          printf "GOGABox %s for Windows\r\n\r\nGOGABox.exe - the ONE Windows build (32-bit).\r\nIt runs on EVERY Windows: 32-bit natively, 64-bit through WOW64.\r\nSingle file - everything is embedded. No installer needed.\r\n\r\nKEYS:\r\n  F11 or Alt+Enter - fullscreen / windowed\r\n  F10 - flip the menu position (vertical / horizontal)\r\n  ESC - the back button (pauses the game, closes sheets)\r\n  Up/Down - scroll the feed; Left/Right at the top scroll the\r\n    picks row; Tab+Left/Right switch the picks list\r\n  In games: the arrows play (WASD works too), and some games\r\n    use the mouse - check each game's guide page.\r\n\r\nThe settings menu wears AUDIO, SCREEN & GRAPHICS (fullscreen,\r\nposition, Dynamic Scale, GOGACursor) and CONTROLS.\r\n\r\nOpen source under the MIT license. Zero ads, fully offline.\r\n" "$V" > stage/README.txt
-          cd stage && zip -9 "../GOGABox-windows-${V}.zip" GOGABox.exe README.txt
+          # v041-1 THE CLEAN ARTIFACT LAW (the owner: "in the github windows
+          # binary packaging, do not include readmes, not wanted for an
+          # artifact i mean"): the zip ships THE EXE ONLY - the guide lives
+          # in the box itself (every game's guide page + the settings'
+          # CONTROLS sheet), the README died with the ad-era paperwork.
+          cd stage && zip -9 "../GOGABox-windows-${V}.zip" GOGABox.exe
           cd .. && mv "GOGABox-windows-${V}.zip" stage/
           ls -la stage/
 

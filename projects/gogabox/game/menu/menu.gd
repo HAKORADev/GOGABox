@@ -98,6 +98,10 @@ var _filter_text := ""
 # THE PLATFORM LAW (v0.3.4-3, the windows return): the os tag filters the
 # search sheet - "" = all | "android" | "pc"
 var _filter_os := ""
+# v041-1 THE CONTROLS FILTER LAW (the owner: "they should exist in the
+# search menu filters (i see platforms but no controls)"): the control-
+# scheme tag filters the search sheet - "" = all | "touch" | "mkb" | "pad".
+var _filter_ctrl := ""
 
 func _ready() -> void:
         # v0.4.1 THE POSITION SEAT: the PC menu restores its persisted
@@ -147,12 +151,21 @@ func _ready() -> void:
         _build_grid()
 
         _toast = Arc.toast_overlay(_root)
-        Box.coins_changed.connect(func(_t: int): _wallet_label.text = Box.coins_display())
+        # v041-1: the wallet chip prints the COMPACT law (nnnK/M/B, whole
+        # units - see Box.coins_compact)
+        Box.coins_changed.connect(func(_t: int): _wallet_label.text = Box.coins_compact())
         Box.game_unlocked.connect(func(_id: String): _after_roadmap_change())
         Box.reveal_changed.connect(func(_id: String): _after_roadmap_change())
         Box.batteries_changed.connect(_update_battery_chip)
 
         Jukebox.play_music_menu()
+        # v041-1 THE PC BREATH LAW: the 30-frame menu breath is a PHONE
+        # comfort law. On a desktop the shader drift + the smooth arrow
+        # scrolling read stuttery at 30 (the owner: "the main menu
+        # background that scrolls... it moves in non-smooth movement... any
+        # eye can feel the stutter-like movements") - a PC pays 60 gladly.
+        if ScaleRule.is_pc():
+                Engine.max_fps = 60
         # v0.0.7: NO auto permission ask at boot. The single system dialog is
         # far better spent the moment the player taps ALLOW REMINDERS (the
         # mystery page) - a boot-time popup gets reflex-denied and burns the
@@ -198,11 +211,13 @@ func _build_bottom_shade() -> void:
         shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _root.add_child(shade)
         var dark := Color(0.055, 0.03, 0.012)
-        # bottom - the main act: tall, strong, feels like the feed dives in
+        # bottom - the main act: LIGHT for most of the ride, then HEAVY at
+        # the very bottom (the owner: "it should be heavy at bottom and
+        # gets lite-er at the top")
         var gt := Gradient.new()
-        gt.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
-        gt.colors = PackedColorArray([Color(dark, 0.0),
-                        Color(dark, 0.34), Color(dark, 0.9)])
+        gt.offsets = PackedFloat32Array([0.0, 0.62, 0.82, 1.0])
+        gt.colors = PackedColorArray([Color(dark, 0.0), Color(dark, 0.10),
+                        Color(dark, 0.42), Color(dark, 0.94)])
         var bt := GradientTexture2D.new()
         bt.gradient = gt
         bt.fill_from = Vector2(0.5, 0.0)
@@ -279,10 +294,10 @@ func _input(event: InputEvent) -> void:
                 return
         match k.keycode:
                 KEY_UP:
-                        _feed_scroll.scroll_vertical -= 150
+                        _nudge_feed(-300)
                         get_viewport().set_input_as_handled()
                 KEY_DOWN:
-                        _feed_scroll.scroll_vertical += 150
+                        _nudge_feed(300)
                         get_viewport().set_input_as_handled()
                 KEY_LEFT, KEY_RIGHT:
                         var dir := -1 if k.keycode == KEY_LEFT else 1
@@ -292,7 +307,7 @@ func _input(event: InputEvent) -> void:
                                 get_viewport().set_input_as_handled()
                         elif _feed_scroll.scroll_vertical <= 0.5:
                                 # at the top: Left/Right live INSIDE the row
-                                _strip_scroll.scroll_horizontal += 190 * dir
+                                _nudge_strip(280.0 * dir)
                                 get_viewport().set_input_as_handled()
 
 ## The local day key (menu-side mirror of Box._today_key) - drives the
@@ -518,7 +533,7 @@ func _build_top_bar() -> void:
         coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
         wh.add_child(coin)
-        _wallet_label = Arc.label(Box.coins_display(), 30, Arc.COIN, false)
+        _wallet_label = Arc.label(Box.coins_compact(), 30, Arc.COIN, false)
         wh.add_child(_wallet_label)
         # v040-8 THE WALLET TAP LAW: the wallet chip is TAPPABLE - it opens
         # the top-up menu (the owner: "tapping gogacoins in the GOGABox main
@@ -532,11 +547,11 @@ func _build_top_bar() -> void:
         # v040-10 THE FIXED SEAT LAW (the owner: "the gogacoin icon in main
         # menu when have 3 numbers, it overlaps with the search button"):
         # the chip's width is seeded from the COMPACTED wallet - with the
-        # compaction law the text never grows past "999"/"1.00K", and the
-        # seat is fixed ONCE at build time so the balance digits can never
-        # push the coin icon into the search button. A small right margin
-        # keeps honest air before the search icon.
-        var seat_probe := Arc.label(Box.coins_display(), 30, Arc.COIN, false)
+        # v041-1 compact law (whole units, no decimals) the text never grows
+        # past "999"/"12K"/"2M", and the seat is fixed ONCE at build time so
+        # the balance digits can never push the coin icon into the search
+        # button. A small right margin keeps honest air before the search icon.
+        var seat_probe := Arc.label(Box.coins_compact(), 30, Arc.COIN, false)
         var seat_w := maxf(150.0, ceilf(seat_probe.get_minimum_size().x)
                 + 62.0 + 10.0)
         seat_probe.queue_free()
@@ -784,6 +799,16 @@ func _build_feed() -> void:
         _feed_vb.add_theme_constant_override("separation", 8)
         _feed_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         _feed_scroll.add_child(_feed_vb)
+        # v041-1 THE CLEAR-OF-THE-SHADE LAW (the owner: "the bottom area
+        # still not used for the feed, feed literally under it"): the
+        # doomscroll shade paints ~170px over the feed's bottom; without a
+        # tail spacer the LAST tile could never scroll above the shade line
+        # - the feed's final row sat dead under the gradient forever. The
+        # spacer lets the feed's last pixel ride UP into the light.
+        var tail := Control.new()
+        tail.custom_minimum_size = Vector2(0, 150)
+        tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _feed_vb.add_child(tail)
 
 ## v0.0.9 CAROUSEL (owner redesign): title + dots = WHICH list is shown;
 ## arrows switch the list; the cards themselves swipe left/right by touch.
@@ -801,6 +826,14 @@ func _build_carousel() -> void:
         row.add_theme_constant_override("separation", 10)
         _feed_vb.add_child(row)
         _pick_prev = _arrow_btn("<", func(): _list_move(-1))
+        # v041-1 THE ARROW Z LAW (the owner: "the picks line's arrows, the
+        # left one when an underlaying game moves under it, it somehow eats
+        # the button visually while the right one is accurate"): the strip
+        # scroll sits BETWEEN the arrows in the row (child order = paint
+        # order), so the cards painted OVER the left arrow. Both arrows ride
+        # z_index 1 - they always paint above the strip, like the right one
+        # always did.
+        _pick_prev.z_index = 1
         row.add_child(_pick_prev)
         # horizontal touch-scroll strip: finger drags the cards, BoxScroll adds
         # inertia and owns taps (cards are registered tappables)
@@ -815,6 +848,7 @@ func _build_carousel() -> void:
         _strip_row.add_theme_constant_override("separation", 12)
         _strip_scroll.add_child(_strip_row)
         _pick_next = _arrow_btn(">", func(): _list_move(1))
+        _pick_next.z_index = 1
         row.add_child(_pick_next)
 
 func _arrow_btn(txt: String, cb: Callable) -> Button:
@@ -1059,7 +1093,7 @@ func _refresh() -> void:
                 empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 empty.custom_minimum_size = Vector2(0, 120)
                 _grid.add_child(empty)
-        _wallet_label.text = Box.coins_display()
+        _wallet_label.text = Box.coins_compact()
         _update_battery_chip()
         # v040-11: the feed lands EXACTLY where the owner left it - the same
         # frame, no top-jump, no flicker (verified: tests/scroll_law_probe.gd)
@@ -1077,6 +1111,9 @@ func _passes_filters(g: Dictionary) -> bool:
                 return false
         # THE PLATFORM LAW: the os tag filters (every game wears one now)
         if _filter_os != "" and not (_filter_os in (g.get("os", ["android", "pc"]) as Array)):
+                return false
+        # v041-1 THE CONTROLS FILTER LAW: the scheme tag filters too
+        if _filter_ctrl != "" and not (_filter_ctrl in Meta.ctrl_list(g)):
                 return false
         # THE SEARCH LAW: the name search - lowercase, spaces stripped, a
         # SUBSTRING of title+id. "slash" finds FRUIT SLASHER; "inv" finds
@@ -1236,10 +1273,15 @@ func _tile(g: Dictionary, st: String) -> Control:
         match st:
                 "OWNED":
                         # v0.1.4 OWNER RULE: a reached daily limit fades the
-                        # thumbnail and wears "get back tomorrow to play" - the
-                        # tile must never look alive while the PLAY button would
-                        # refuse (the v0.1.1 mismatch disease, daily edition)
-                        var daily_dead := not Box.daily_ok(id)
+                        # thumbnail and wears "get back tomorrow" - the
+                        # tile must never look alive while the PLAY button
+                        # would refuse. v041-1 THE UNIVERSAL GATE READ: the
+                        # tile grays for the TIME WINDOW too (snowy tower
+                        # used to stay lit while pong grayed - the tile read
+                        # the daily cap only), and the chip text is the
+                        # owner's shortened wording.
+                        var daily_dead := not Box.daily_ok(id) \
+                                        or not Roadmap.window_ok(id)
                         var th := _add_thumb(b, g, 70, daily_dead)
                         if daily_dead:
                                 th.modulate = Color(1, 1, 1, 0.32)
@@ -1248,7 +1290,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
                         b.add_child(name_l)
                         if daily_dead:
-                                var dchip := Arc.chip("get back tomorrow to play", "",
+                                var dchip := Arc.chip("get back tomorrow", "",
                                                 Color(0, 0, 0, 0.4), 16, Color(1, 1, 1, 0.85))
                                 dchip.position = Vector2(14, 272)
                                 b.add_child(dchip)
@@ -1423,7 +1465,43 @@ func _build_particles() -> void:
                         "phase": randf() * TAU,
                 })
 
+## v041-1 THE SMOOTH RIDE LAW (the owner: "the main menu scrolling with
+## arrows currently is not smooth, it feels like a grid that moves square
+## to square, bad feel i guess, it has to be smooth as same as finger-
+## scrolling"): the arrow keys no longer jump the offsets - they nudge a
+## TARGET and the menu's _process glides the scrolls toward it every frame
+## (the same easing feel as BoxScroll's finger inertia).
+var _feed_target := -1.0
+var _strip_target := -1.0
+const SCROLL_RIDE := 3400.0   # design px/s glide speed
+
+func _nudge_feed(amount: float) -> void:
+        if _feed_target < 0.0:
+                _feed_target = float(_feed_scroll.scroll_vertical)
+        _feed_target = clampf(_feed_target + amount, 0.0, 1000000.0)
+
+func _nudge_strip(amount: float) -> void:
+        if _strip_target < 0.0:
+                _strip_target = float(_strip_scroll.scroll_horizontal)
+        _strip_target = clampf(_strip_target + amount, 0.0, 1000000.0)
+
+func _scroll_ride(delta: float) -> void:
+        if _feed_target >= 0.0 and is_instance_valid(_feed_scroll):
+                var cur := float(_feed_scroll.scroll_vertical)
+                var nxt := move_toward(cur, _feed_target, SCROLL_RIDE * delta)
+                _feed_scroll.scroll_vertical = int(nxt)
+                if absf(nxt - _feed_target) < 1.0:
+                        _feed_target = -1.0
+        if _strip_target >= 0.0 and is_instance_valid(_strip_scroll):
+                var cur2 := float(_strip_scroll.scroll_horizontal)
+                var nxt2 := move_toward(cur2, _strip_target, SCROLL_RIDE * delta)
+                _strip_scroll.scroll_horizontal = int(nxt2)
+                if absf(nxt2 - _strip_target) < 1.0:
+                        _strip_target = -1.0
+
 func _process(delta: float) -> void:
+        # v041-1: the arrow-key glide (the smooth ride law)
+        _scroll_ride(delta)
         if _fx == null or not is_instance_valid(_fx):
                 return
         var vr := _root.size
@@ -1510,6 +1588,9 @@ func _open_search() -> void:
 
         v.add_child(_chip_row(scroll, "PLATFORM", ["android", "pc"],
                         func(id: String): _filter_os = "" if _filter_os == id else id, "os"))
+        # v041-1: the CONTROLS row - touch / mouse+keys / gamepad chips
+        v.add_child(_chip_row(scroll, "CONTROLS", ["touch", "mkb", "pad"],
+                        func(id: String): _filter_ctrl = "" if _filter_ctrl == id else id, "ctrl"))
         v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
         v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
@@ -1541,13 +1622,15 @@ func _open_search() -> void:
                 _filter_state = ""
                 _filter_text = ""
                 _filter_os = ""
+                _filter_ctrl = ""
                 _close_sheet()
                 _feed_scroll.scroll_vertical = 0
                 _refresh()))
 
 func _filters_dirty() -> bool:
         return _filter_genre != "" or _filter_sub != "" \
-                        or _filter_state != "" or _filter_text != "" or _filter_os != ""
+                        or _filter_state != "" or _filter_text != "" or _filter_os != "" \
+                        or _filter_ctrl != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -1568,11 +1651,13 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "genre": active = _filter_genre == sid
                         "sub": active = _filter_sub == sid
                         "os": active = _filter_os == sid
+                        "ctrl": active = _filter_ctrl == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
                         "sub": lbl = Meta.sub_label(sid)
                         "os": lbl = "PHONE" if sid == "android" else "PC"
+                        "ctrl": lbl = Meta.ctrl_label(sid)
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -2207,7 +2292,7 @@ func _topup_settle(gid: String, n: int, out: int) -> void:
                 return
         GameCoin.add(gid, out)
         Jukebox.sfx("coin", -2.0)
-        _wallet_label.text = Box.coins_display()
+        _wallet_label.text = Box.coins_compact()
         _close_sheet()
         _open_topup_game(gid)
 
@@ -2344,20 +2429,22 @@ func _open_dev_sheet() -> void:
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         note.custom_minimum_size = Vector2(560, 0)
         v.add_child(note)
-        # the pinned actions: DONE applies + closes, RESTART BOX reboots all
+        # the pinned actions: DONE applies + closes, GIVE EVERYTHING grants
+        # the whole box for real (v041-1 - the RESTART BOX button is RETIRED:
+        # the owner's dev flow must never reboot the app, "it restarts the
+        # app which is bad and prevents me from doing too much work")
         var acts := HBoxContainer.new()
         acts.add_theme_constant_override("separation", 10)
         acts.alignment = BoxContainer.ALIGNMENT_CENTER
         vb.add_child(acts)
         acts.add_child(Arc.button("DONE", Vector2(270, 74), 24, Arc.GOOD,
                         func(): _close_sheet()))
-        acts.add_child(Arc.button("RESTART BOX", Vector2(270, 74), 22, Arc.BAD,
+        acts.add_child(Arc.button("GIVE EVERYTHING", Vector2(270, 74), 20,
+                        Color("3f7fb0"),
                         func():
-                                Jukebox.sfx("confirm", -4.0)
-                                Box.save()
-                                _close_sheet()
-                                get_tree().call_deferred(
-                                                "reload_current_scene")))
+                                Box.dev_grant_everything()
+                                Jukebox.sfx("unlock", -2.0)
+                                Arc.toast(_toast, "the whole box is yours - every game, coins, pools, extras")))
 
 func _sheet_base(h := 0.0, id := "") -> VBoxContainer:
         # v040-11 THE ONE-SHEET LAW: a live pair is NEVER orphaned. The top-up
@@ -2374,7 +2461,19 @@ func _sheet_base(h := 0.0, id := "") -> VBoxContainer:
         _set_feed_lock(true)
         var vb := Arc.sheet(_root, h)
         var kids := _root.get_children()
-        _sheet_pair = [kids[kids.size() - 2], kids[kids.size() - 1]]
+        var dim: Control = kids[kids.size() - 2]
+        _sheet_pair = [dim, kids[kids.size() - 1]]
+        # v041-1 THE DIM-CLOSE LAW (the owner: "the pre-play close button
+        # when tapped/clicked, it does not close, but pressing ESC closes
+        # it"): the dim used to EAT every click that missed a button in
+        # silence. AAA standard now: a click on the dim closes the sheet -
+        # a near-miss can never feel like a dead button again.
+        dim.gui_input.connect(func(ev: InputEvent):
+                if ev is InputEventMouseButton \
+                                and (ev as InputEventMouseButton).pressed \
+                                and (ev as InputEventMouseButton).button_index \
+                                == MOUSE_BUTTON_LEFT:
+                        _close_sheet())
         return vb
 
 ## v040-4: the trophies sheet's OWN close - frees ITS pair (the generic
@@ -2440,7 +2539,8 @@ func _open_settings() -> void:
         var title := Arc.label("SETTINGS", 42, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(title)
-        vb.add_child(Arc.button("AUDIO", Vector2(480, 78), 30, Arc.ACCENT,
+        vb.add_child(Arc.button("AUDIO", Vector2(480, 78), 30,
+                        Color(0.16, 0.10, 0.05, 0.85),
                         func(): _close_sheet(); _open_audio_settings()))
         if ScaleRule.is_pc():
                 vb.add_child(Arc.button("SCREEN & GRAPHICS", Vector2(480, 78), 28,
@@ -2517,25 +2617,9 @@ func _open_screen_graphics() -> void:
         vb.add_child(pos_note)
         var g_head := Arc.label("GRAPHICS", 24, Arc.HOT)
         vb.add_child(g_head)
-        var ds_txt := "DYNAMIC SCALE: ON" if Box.pc_dynamic_scale() \
-                        else "DYNAMIC SCALE: OFF"
-        vb.add_child(Arc.button(ds_txt, Vector2(480, 70), 26, Arc.ACCENT,
-                        func():
-                                var on := not Box.pc_dynamic_scale()
-                                Box.set_pc_dynamic_scale(on)
-                                if router != null and is_instance_valid(router) \
-                                                and router.has_method("set_dynamic_scale"):
-                                        router.call("set_dynamic_scale", on)
-                                Jukebox.sfx("click", -4.0)
-                                _close_sheet()
-                                _open_screen_graphics()))
-        var ds_note := Arc.label("FSR sharpening for big screens - NVIDIA, " +
-                        "AMD and Intel, no restart needed", 17,
-                        Color("8a6a40"), false)
-        ds_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        ds_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        ds_note.custom_minimum_size = Vector2(500, 0)
-        vb.add_child(ds_note)
+        # v041-1: DYNAMIC SCALE IS GONE (the owner: "the dynamic scale tech,
+        # remove it, it just made the app more blurry, your fixes worked more
+        # way better, nuke it"). GRAPHICS keeps only the GOGACURSOR seat.
         var cur_txt := "GOGACURSOR: ON" if Box.pc_gogacursor() \
                         else "GOGACURSOR: OFF"
         vb.add_child(Arc.button(cur_txt, Vector2(480, 70), 26, Arc.ACCENT,
@@ -2588,12 +2672,21 @@ func _open_controls_list() -> void:
                 ["TAB + LEFT / RIGHT", "switch the picks list (today's " +
                         "picks, last played, ...)"],
                 ["MOUSE WHEEL", "scroll any list"],
-                ["GAMEPAD", "d-pad = arrows, A/B/X/Y = the 1/2/3/4 keys, " +
-                        "START = ESC - in the games that wear the gamepad " +
-                        "tag"],
+                ["GAMEPAD", "d-pad (or the left stick) = the arrows, " +
+                        "SQUARE / TRIANGLE / CIRCLE / CROSS (the Xbox pad's " +
+                        "X / Y / B / A) = the 1 / 2 / 3 / 4 keys, START = " +
+                        "ESC - in the games that wear the gamepad tag"],
                 ["", "each game's own controls live in its guide page"],
         ]
         for r in rows:
+                # v041-1 THE LINES LAW (the owner: "give it lines at the top
+                # and bottom of each one so reading them be direct, because
+                # now i was literally looking to where to read, just simple
+                # lines will work"): every row wears a hairline above and
+                # below - one glance, one row.
+                var cell := VBoxContainer.new()
+                cell.add_theme_constant_override("separation", 6)
+                cell.add_child(_hairline())
                 var row := HBoxContainer.new()
                 row.add_theme_constant_override("separation", 14)
                 var key := Arc.label(String(r[0]), 22, Arc.HOT, false)
@@ -2603,7 +2696,9 @@ func _open_controls_list() -> void:
                 use.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
                 use.size_flags_horizontal = Control.SIZE_EXPAND_FILL
                 row.add_child(use)
-                v.add_child(row)
+                cell.add_child(row)
+                cell.add_child(_hairline())
+                v.add_child(cell)
         vb.add_child(Arc.button("BACK", Vector2(480, 70), 26,
                         Color(0.42, 0.30, 0.16),
                         func(): _close_sheet(); _open_settings()))
@@ -2630,6 +2725,16 @@ func _confirm_reset_all() -> void:
         vb.add_child(Arc.button("KEEP IT", Vector2(480, 80), 26, Arc.ACCENT,
                         func(): _close_sheet()))
         Arc.fit_sheet(vb, 2)
+
+## v041-1 THE LINES LAW helper: one 2px hairline, the width of its parent -
+## the reading rails of the CONTROLS sheet (and anything else that wants
+## the same directness).
+func _hairline() -> Control:
+        var ln := ColorRect.new()
+        ln.color = Color(0.35, 0.24, 0.12, 0.45)
+        ln.custom_minimum_size = Vector2(0, 2)
+        ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        return ln
 
 func _volume_row(name_: String, value: float, on_change: Callable) -> Control:
         var row := VBoxContainer.new()
@@ -2675,19 +2780,12 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         hv.add_child(Arc.label(String(g["tag"]), 20, Color("8a6a40"), false))
         hv.add_child(Arc.label("best %d   last %d   plays %d" % [Box.stat(id, "best"),
                         Box.stat(id, "last"), Box.stat(id, "plays")], 20, Color("6a4a28"), false))
-        # v0.4.1 THE PLATFORM TAGS BACK + THE CONTROLS TAGS (the owner: the
-        # os tag "exist in search filters and in guide, but not in each game
-        # pre-play or the game metadata itself - earlier, it was exist there
-        # accurately"). The pre-play header wears the platform chips again,
-        # next to the control-scheme chips (touch / mouse+keys / gamepad).
-        var tag_row := HFlowContainer.new()
-        tag_row.add_theme_constant_override("h_separation", 8)
-        tag_row.add_theme_constant_override("v_separation", 6)
-        for os_id in (g.get("os", ["android", "pc"]) as Array):
-                tag_row.add_child(Arc.meta_chip("os", String(os_id)))
-        for c in Meta.ctrl_list(g):
-                tag_row.add_child(Arc.meta_chip("ctrl", String(c)))
-        hv.add_child(tag_row)
+        # v041-1 THE TAGS-IN-THEIR-SEAT LAW (the owner: "your platform/
+        # controls tags are mis-designed in the pre-play, they should be in
+        # top of the genres list, right there i mean accurately"): the os +
+        # control-scheme chips LEFT the cramped header - they now live
+        # EXACTLY on top of the GENRES section of the pre-play page (see
+        # _open_game_page), where the tag reading starts.
         if allow_fav:
                 var hb := _heart_button(id)
                 head.add_child(hb)
@@ -2926,6 +3024,17 @@ func _open_game_page(g: Dictionary) -> void:
 
         # GENRES / MORE TAGS live in the (previously empty) space between
         # RESET and CLOSE - each group in its own labeled spot.
+        # v041-1: the PLATFORM + CONTROLS chips seat EXACTLY here - on top
+        # of the genres list, in the owner's words "in top of the genres
+        # list, right there".
+        var tag_seat := HFlowContainer.new()
+        tag_seat.add_theme_constant_override("h_separation", 8)
+        tag_seat.add_theme_constant_override("v_separation", 6)
+        for os_id in (g.get("os", ["android", "pc"]) as Array):
+                tag_seat.add_child(Arc.meta_chip("os", String(os_id)))
+        for c in Meta.ctrl_list(g):
+                tag_seat.add_child(Arc.meta_chip("ctrl", String(c)))
+        content.add_child(tag_seat)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 content.add_child(Arc.label("GENRES", 20, Arc.HOT))
@@ -3376,6 +3485,8 @@ func _save_feed_state() -> void:
                 "sub": _filter_sub,
                 "state": _filter_state,
                 "text": _filter_text,
+                "os": _filter_os,
+                "ctrl": _filter_ctrl,
         }
         _launch_tile_idx = -1
         _launch_tile_off = 0.0
@@ -3408,6 +3519,8 @@ func _restore_feed_state() -> void:
                 _filter_sub = String(_saved_feed.get("sub", ""))
                 _filter_state = String(_saved_feed.get("state", ""))
                 _filter_text = String(_saved_feed.get("text", ""))
+                _filter_os = String(_saved_feed.get("os", ""))
+                _filter_ctrl = String(_saved_feed.get("ctrl", ""))
                 _list_idx = int(_saved_feed.get("list", 0))
         _refresh()
         if _saved_feed.is_empty():

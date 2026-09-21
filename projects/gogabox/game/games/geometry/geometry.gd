@@ -996,6 +996,20 @@ func _pusher_push(dt: float) -> bool:
                                     if feet2 <= bot2 and feet2 >= bot2 - 48.0 * us:
                                             _land_at(bot2, p["y"])
                                             return false
+                            # v041-1 THE JUMP SLIDE LAW (the owner: "square
+                            # jumped on obstacle, there is obstacle over that
+                            # obstacle but a little forward, i try to jump,
+                            # it gets stuck... it should be able to jump and
+                            # slide normally, it supposed to be left behind
+                            # only if user has not jumped"): a RISING airborne
+                            # square is never shoved sideways - the jump arcs
+                            # past the lip. The climb snap and both bonks
+                            # above already settled the honest landings; the
+                            # side face belongs to the jump now. A grounded
+                            # run into a wall still shoves (left behind).
+                            if not bool(p["ground"]) \
+                                            and p["vy"] * float(p["g"]) < 0.0:
+                                    continue
                             p["x"] -= (speed + PUSH_EXTRA) * us * dt
                             _spin_settle_pause()
                             return true

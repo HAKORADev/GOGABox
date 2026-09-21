@@ -175,7 +175,7 @@ static func _fruit_shadow(v: CanvasItem, id: String, pos: Vector2, r: float) -> 
                         var a := TAU * float(i) / 16.0
                         pts.append(at + Vector2(cos(a) * r * float(sh[2]) * 0.55,
                                         sin(a) * r * float(sh[3]) * 0.62))
-                v.draw_colored_polygon(pts, Color(0.08, 0.16, 0.04, 0.10))
+                Arc.safe_poly(v, pts, Color(0.08, 0.16, 0.04, 0.10))
 
 
 static func _ellipse(v: CanvasItem, c: Vector2, rx: float, ry: float,
@@ -184,7 +184,7 @@ static func _ellipse(v: CanvasItem, c: Vector2, rx: float, ry: float,
         for i in 20:
                 var a := TAU * float(i) / 20.0
                 pts.append(c + Vector2(cos(a) * rx, sin(a) * ry).rotated(rot))
-        v.draw_colored_polygon(pts, col)
+        Arc.safe_poly(v, pts, col)
 
 
 ## A sphere with rim shading + a soft top-left highlight (the craft base).
@@ -221,7 +221,7 @@ static func _leaf(v: CanvasItem, at: Vector2, r: float, ang := -0.7,
                 var dir := Vector2.from_angle(ang)
                 var side := dir.orthogonal()
                 pts.append(at + dir * L * s - side * wid)
-        v.draw_colored_polygon(pts, col.darkened(0.15))
+        Arc.safe_poly(v, pts, col.darkened(0.15))
         v.draw_line(at, at + Vector2.from_angle(ang) * L, col.darkened(0.4),
                         maxf(1.6, r * 0.06))
 
@@ -234,12 +234,12 @@ static func _apple(v: CanvasItem, pos: Vector2, r: float) -> void:
                 var a := TAU * float(i) / 26.0 - PI * 0.5
                 var rr := r * (1.0 + 0.07 * cos(2.0 * a))
                 pts.append(pos + Vector2(cos(a) * rr * 1.02, sin(a) * rr * 0.98))
-        v.draw_colored_polygon(pts, body.darkened(0.28))
+        Arc.safe_poly(v, pts, body.darkened(0.28))
         for i in 26:
                 var a := TAU * float(i) / 26.0 - PI * 0.5
                 var rr := r * (0.94 + 0.06 * cos(2.0 * a))
                 pts[i] = pos + Vector2(cos(a) * rr * 0.98, sin(a) * rr * 0.94)
-        v.draw_colored_polygon(pts, body)
+        Arc.safe_poly(v, pts, body)
         # top dimple + stem + leaf
         v.draw_circle(pos + Vector2(0, -r * 0.86), r * 0.2, body.darkened(0.32))
         _stem(v, pos + Vector2(0, -r * 0.82), r)
@@ -276,11 +276,11 @@ static func _banana(v: CanvasItem, pos: Vector2, r: float) -> void:
         var poly := left
         for i in range(right.size() - 1, -1, -1):
                 poly.append(right[i])
-        v.draw_colored_polygon(poly, rim)
+        Arc.safe_poly(v, poly, rim)
         var poly2 := PackedVector2Array()
         for p in poly:
                 poly2.append(c + (p - c) * 0.9)
-        v.draw_colored_polygon(poly2, body)
+        Arc.safe_poly(v, poly2, body)
         # the spine ridge + a belly shade band (both follow the curve now)
         v.draw_polyline(spine, body.darkened(0.16), maxf(2.0, r * 0.08), true)
         var band := PackedVector2Array()
@@ -356,11 +356,11 @@ static func _strawberry(v: CanvasItem, pos: Vector2, r: float) -> void:
                 var rr := r * (0.62 + 0.42 * pow(maxf(0.0, cos(a)), 0.7)
                                 + 0.18 * maxf(0.0, -sy))
                 pts.append(pos + Vector2(cos(a) * rr * 0.92, sy * rr * 1.08))
-        v.draw_colored_polygon(pts, body.darkened(0.3))
+        Arc.safe_poly(v, pts, body.darkened(0.3))
         var pts2 := PackedVector2Array()
         for p in pts:
                 pts2.append(pos + (p - pos) * 0.9)
-        v.draw_colored_polygon(pts2, body)
+        Arc.safe_poly(v, pts2, body)
         # the seeds sit IN the flesh (dark pit + pale core)
         for i in 7:
                 var a := -0.9 + float(i) * 0.42
@@ -388,11 +388,11 @@ static func _pear(v: CanvasItem, pos: Vector2, r: float) -> void:
                 # small head on top, fat belly at the bottom
                 var rr := r * (0.56 + 0.46 * pow(clampf(0.5 + sy * 0.9, 0.0, 1.0), 0.8))
                 pts.append(pos + Vector2(cos(a) * rr * 0.94, sy * rr * 1.12))
-        v.draw_colored_polygon(pts, body.darkened(0.3))
+        Arc.safe_poly(v, pts, body.darkened(0.3))
         var pts2 := PackedVector2Array()
         for p in pts:
                 pts2.append(pos + (p - pos) * 0.9)
-        v.draw_colored_polygon(pts2, body)
+        Arc.safe_poly(v, pts2, body)
         # warm blush on the sun side
         v.draw_circle(pos + Vector2(r * 0.22, r * 0.3), r * 0.42,
                         Color("e8a86a").lerp(body, 0.35))
@@ -410,11 +410,11 @@ static func _lemon(v: CanvasItem, pos: Vector2, r: float) -> void:
                 var nub := 1.0 + 0.14 * pow(absf(cos(a)), 8.0)
                 pts.append(pos + Vector2(cos(a) * r * 1.18 * nub,
                                 sin(a) * r * 0.86 * nub))
-        v.draw_colored_polygon(pts, body.darkened(0.3))
+        Arc.safe_poly(v, pts, body.darkened(0.3))
         var pts2 := PackedVector2Array()
         for p in pts:
                 pts2.append(pos + (p - pos) * 0.9)
-        v.draw_colored_polygon(pts2, body)
+        Arc.safe_poly(v, pts2, body)
         # peel texture hint + highlight
         for i in 6:
                 var a := TAU * float(i) / 6.0 + 0.5
@@ -461,7 +461,7 @@ static func _watermelon(v: CanvasItem, pos: Vector2, r: float) -> void:
                         var a := PI * float(i) / 14.0
                         pts.append(pos + Vector2(cos(a) * rr, -sin(a) * rr * 0.92))
                 pts.append(pos + Vector2(0, r * 0.06))
-                v.draw_colored_polygon(pts, ainfo["col"])
+                Arc.safe_poly(v, pts, ainfo["col"])
         # seeds
         for row in 2:
                 for k in 3:
@@ -480,11 +480,11 @@ static func _pineapple(v: CanvasItem, pos: Vector2, r: float) -> void:
         for i in 22:
                 var a := TAU * float(i) / 22.0
                 pts.append(pos + Vector2(cos(a) * r * 0.88, sin(a) * r * 1.06))
-        v.draw_colored_polygon(pts, body.darkened(0.32))
+        Arc.safe_poly(v, pts, body.darkened(0.32))
         var pts2 := PackedVector2Array()
         for p in pts:
                 pts2.append(pos + (p - pos) * 0.92)
-        v.draw_colored_polygon(pts2, body)
+        Arc.safe_poly(v, pts2, body)
         # diamond lattice: two diagonal hatch sets + a dot in every diamond
         for i in 4:
                 var yy := -r * 0.66 + float(i) * r * 0.44

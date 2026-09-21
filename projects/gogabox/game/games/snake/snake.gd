@@ -56,6 +56,7 @@ const POWER_BOARD_LIFE := 10.0  # the aura fruit expires (Snake3D rule)
 # bigger... growing very very very bigger than usual... score based on
 # eaten snake parts... bonus be /100... like the snake.io games but more
 # fun")
+const FRUIT_BASE_R := 24.0      # v041-1: the fruit sizes x1/x2/x3 base radius
 const SURV_WORLD := 3.4         # THE LAND LAW: the field grows this much
 const SURV_FEAST_N := 14        # THE FEAST LAW: fruits live in many places
 const SURV_GROWTH := 3.5        # THE GROWTH LAW: a fruit pays x3.5 length
@@ -123,12 +124,15 @@ var survival := false           # THE SUBMODE LAW: a togglable option
 var extra_fruits: Array = []    # [{pos, id, pop, live, resp_t}]
 var _surv_respawn: Array = []   # respawn clocks for eaten snakes
 var _cam := Vector2.ZERO        # the camera's top-left in world space
-var _surv_enemies := 0          # the survival pack size (respawns to it)
+var _surv_enemies := 0          # the survival pack size
+var _surv_dead := 0             # v041-1: kills banked (the pack never returns)
+var _surv_won := false          # v041-1: the last-one-standing victory fired
 var _dying: Array = []          # SnakeBody mid-collapse (enemy deaths)
 
 var edible_id := "apple"
 var apple_pos := Vector2.ZERO
 var apple_r := 26.0
+var fruit_size := 1             # v041-1: the live fruit's size (1/2/3)
 var apple_pop := 0.0
 var apple_live := false
 var _apple_tween: Tween
@@ -383,6 +387,9 @@ func _reset_world() -> void:
         power_live = false
         power_cd.clear()
         _collapse_t = -1.0
+        _surv_dead = 0
+        _surv_won = false
+        fruit_size = 1
         player.setup(board.get_center(), 0.0, _pal["pri"], _pal["milk"])
         player.base_speed = START_SPEED
         player.speed = START_SPEED
@@ -748,9 +755,14 @@ func _survival_card() -> Button:
         hb.add_child(st)
         b.pressed.connect(func():
                         Jukebox.sfx("click", -4.0)
-                        if not gate_ok:
+                        # v041-1: the gate is judged AT TAP TIME - never from
+                        # the build-time capture (the count may have changed)
+                        if not _surv_gate_ok():
                                 _toast_show("survival needs 5+ opponent " +
                                         "snakes - cycle the ENEMY box count")
+                                survival = false
+                                Box.set_progress(game_id, "mode_survival", false)
+                                _show_mode_select()
                                 return
                         survival = not survival
                         Box.set_progress(game_id, "mode_survival", survival)
@@ -814,6 +826,13 @@ func _start() -> void:
         # mechanic gold miner runs at /30) - the modular override, no game
         # names in the economy.
         bonus_div_override = 100 if survival else -1
+        # v041-1 THE OVERRIDE LAW (the owner: "it should override them, not
+        # listen to them... i managed to play survival in the normal wall-less
+        # scene and wall-ed scene, no big land i mean"): survival IGNORES the
+        # wall cards completely - its world is ALWAYS the big land with hard
+        # edges (the preference itself is untouched for classic play).
+        if survival:
+                wrap_mode = false
         _populate_world()
         # JUMPING FRUITS live only when bought AND toggled (owner v0.2.2)
         jump_on = _opt_on("jump") and Box.unlock_owned(game_id, "jump")
@@ -910,10 +929,11 @@ func _goga_tick(delta: float) -> void:
                         _tick_bugs(delta)
                         _check_player_collisions()
                         _tick_bites(delta)
-                        # v0.4.1 SURVIVAL: the feast lives + the pack comes back
+                        # v0.4.1 SURVIVAL: the feast lives. v041-1: the pack
+                        # never respawns - the run watches for THE LAST ONE.
                         if survival:
                                 _tick_extra_fruits(delta)
-                                _tick_surv_respawn(delta)
+                                _tick_surv_win()
                 # v0.4.1 THE LAND LAW: the camera rides the snake (smoothed)
                 if survival:
                         var vp := _view_size()
@@ -1096,8 +1116,9 @@ func _eat_fruit(by: SnakeBody, is_player: bool) -> void:
                 _burst(apple_pos, [Color("8ac44a"), Color("8a6a40")], 9)
         else:
                 by.len_target += SnakeBody.LEN_PER_APPLE \
+                                * float(fruit_size) \
                                 * (SURV_GROWTH if survival else 1.0)   # v0.4.1 THE GROWTH LAW
-                var pts: float = 3.0 if golden else 1.0
+                var pts: float = (3.0 if golden else 1.0) * float(fruit_size)
                 if is_player:
                         _eaten += 1
                         _award_pts(pts, true)
@@ -1202,7 +1223,14 @@ func _spawn_fruit(first := false) -> void:
                 # tiny boards fallback: anywhere honest
                 apple_pos = board.get_center() + Vector2(randf_range(-60.0, 60.0),
                                 randf_range(-60.0, 60.0))
-        apple_r = clampf(player.width * 0.85, 22.0, 42.0)
+        # v041-1 THE FRUIT SIZES LAW (the owner: "fruits should be 3
+        # different sizes, 1 is the normal one, 2 is bigger gives double as 1
+        # and 3 gives x3 as one and 3 times bigger; size here should not
+        # dynamically scale with the snake itself"): every spawn rolls its
+        # size - the radius is FIXED per size (never snake-scaled again).
+        var roll := randf()
+        fruit_size = 1 if roll < 0.55 else (2 if roll < 0.85 else 3)
+        apple_r = FRUIT_BASE_R * [1.0, 1.7, 3.0][fruit_size - 1]
         apple_live = true
         apple_pop = 0.0
         jump_t = randf_range(JUMP_WINDOW_MIN, JUMP_WINDOW_MAX)
@@ -1320,6 +1348,27 @@ func _surv_eat_extra(by: SnakeBody, e: Dictionary, f: Dictionary) -> void:
         f["resp_t"] = randf_range(1.6, 3.2)
 
 ## THE PACK FLOW: an eaten snake swims back in after a breath - the feast
+## v041-1 THE LAST-ONE LAW: every enemy dead = the player IS the last one
+## standing - the run banks its score with a victory note (no respawn, no
+## waiting around an empty world).
+func _tick_surv_win() -> void:
+        if _surv_won or over:
+                return
+        if survival and player.alive and not enemies.is_empty():
+                var any_alive := false
+                for e in enemies:
+                        var b: SnakeBody = e["body"]
+                        if b.alive:
+                                any_alive = true
+                                break
+                if not any_alive:
+                        _surv_won = true
+                        _toast_show("THE LAST ONE STANDING - the pack is yours!")
+                        Jukebox.sfx("jingle_win", -2.0)
+                        achievement_max("max_score", score)
+                        check_achievements()
+                        finish_run(score)
+
 ## never runs dry (the war's no-respawn law stays the war's own)
 func _tick_surv_respawn(delta: float) -> void:
         var alive := 0
@@ -1531,9 +1580,13 @@ func _kill_enemy(e: Dictionary) -> void:
                         set_score(score + parts)
                         _toast_show("+%d parts - %s is eaten" % [parts,
                                         String(e.get("name", "the enemy"))])
-                _surv_respawn.append(_time + SURV_RESPAWN_T)
+                # v041-1 THE LAST-ONE LAW (the owner: "died snakes should not
+                # re-spawn and game should end when you are the last one"):
+                # the pack NEVER comes back - every kill is permanent, and
+                # eating the whole pack ends the run in glory.
+                _surv_dead += 1
         # permanent for the war round - no respawn (owner rule); the body
-        # COLLAPSES. Survival swims a new snake in instead (the io flow).
+        # COLLAPSES.
 
 ## dead enemies fold into themselves too, quickly, then VANISH (owner
 ## v0.2.1 bug 11: the corpse used to linger forever - the same stale
@@ -2103,7 +2156,7 @@ func _paint_bug(v: Node2D, b: Dictionary) -> void:
         for i in 16:
                 var a := TAU * float(i) / 16.0
                 pts.append(p + fwd * cos(a) * 14.0 + side * sin(a) * 11.0)
-        v.draw_colored_polygon(pts, BUG_BODY)
+        Arc.safe_poly(v, pts, BUG_BODY)
         var mid := PackedVector2Array([p - fwd * 14.0, p + fwd * 14.0])
         v.draw_polyline(mid, BUG_SHELL, 2.5, true)
         # eyes on the head
@@ -2199,10 +2252,10 @@ func _paint_chips(c: Control) -> void:
 func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
         match id:
                 "slower":   # hourglass
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(-6, -7), at + Vector2(6, -7),
                                         at + Vector2(0, 0)]), col)
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(-6, 7), at + Vector2(6, 7),
                                         at + Vector2(0, 0)]), col)
                 "faster":   # double chevron
@@ -2225,7 +2278,7 @@ func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
                         c.draw_line(at + Vector2(-6, 2), at + Vector2(-6, -4), col, 3.2)
                         c.draw_line(at + Vector2(6, 2), at + Vector2(6, -4), col, 3.2)
                 "golden":   # 4-point star
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(0, -8), at + Vector2(2.4, -2.4),
                                         at + Vector2(8, 0), at + Vector2(2.4, 2.4),
                                         at + Vector2(0, 8), at + Vector2(-2.4, 2.4),
@@ -2237,7 +2290,7 @@ func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
                                         at + Vector2(-3, 5), at + Vector2(0, 8),
                                         at + Vector2(3, 5)]), col, 2.2, true)
                 "sprint":   # lightning bolt
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(2, -8), at + Vector2(-4, 1),
                                         at + Vector2(0, 1), at + Vector2(-2, 8),
                                         at + Vector2(4, -1), at + Vector2(0, -1)]), col)
@@ -2245,10 +2298,10 @@ func _paint_glyph(c: Control, id: String, at: Vector2, col: Color) -> void:
                         c.draw_line(at + Vector2(0, -7), at + Vector2(0, 2), col, 2.4)
                         c.draw_circle(at + Vector2(0, 4), 3.6, col)
                 "eater":    # two fangs
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(-6, -7), at + Vector2(-1, -7),
                                         at + Vector2(-3.5, 4)]), col)
-                        c.draw_colored_polygon(PackedVector2Array([
+                        Arc.safe_poly(c, PackedVector2Array([
                                         at + Vector2(1, -7), at + Vector2(6, -7),
                                         at + Vector2(3.5, 4)]), col)
 
@@ -2641,18 +2694,30 @@ func _build_optionals_strip() -> Control:
         row.add_child(_optional_box("opt_enemy.png", "ENEMY",
                         func(): return _enemy_state_txt(pack), true, 0,
                         func():
-                                var on := not _opt_on("enemies")
-                                if on:
-                                        _set_opt("enemies", true)
-                                elif pack:
-                                        # OFF -> tap again cycles the count
+                                # v041-1 THE FULL CYCLE LAW (the owner: "i can
+                                # set enemies to 1-10 but the off option is
+                                # gone"): one tap walks OFF -> 1 -> 2 -> ... ->
+                                # 10 -> OFF again. No pack = a plain ON/OFF
+                                # (the single snake).
+                                if not pack:
+                                        _set_opt("enemies", not _opt_on("enemies"))
+                                elif _opt_on("enemies"):
                                         var n := clampi(int(Box.get_progress(
                                                         game_id, "enemy_count", 1)), 1, 10)
-                                        n = n % 10 + 1
-                                        Box.set_progress(game_id, "enemy_count", n)
-                                        _set_opt("enemies", true)
+                                        if n >= 10:
+                                                _set_opt("enemies", false)
+                                        else:
+                                                Box.set_progress(game_id, "enemy_count", n + 1)
                                 else:
-                                        _set_opt("enemies", false),
+                                        Box.set_progress(game_id, "enemy_count", 1)
+                                        _set_opt("enemies", true)
+                                # v041-1 THE LIVE GATE LAW: the SURVIVAL card
+                                # re-reads the count NOW (the old card kept the
+                                # build-time gate_ok lambda capture - the
+                                # owner's "recognition relies on the first
+                                # number, it does not re-check after each
+                                # change")
+                                _show_mode_select(),
                         war_locked))
         # POWER-UPS
         var pu_unlocked := Box.unlock_owned(game_id, "powerups")

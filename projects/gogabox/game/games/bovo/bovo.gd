@@ -714,10 +714,20 @@ func _layout(vp: Vector2) -> void:
                         (vp.y - top - bot) / float(grid_n + 0.84))
         cell = minf(cell, 112.0)
         cell = maxf(cell, 34.0)
+        # v041-1 THE PIXEL-GRID LAW (the owner: "the PC version of five in
+        # row still has its bug... its board squares are mis-sized and some
+        # lines have invisible squares... the game is fine in android"):
+        # fractional cell sizes land the grid lines between pixels once the
+        # desktop's KEEP scale (0.42 on a 1600x900 seat) downsamples them -
+        # half of every line alpha-fades into the wood ("invisible squares").
+        # The whole board geometry snaps to INTEGER design px: every cell
+        # boundary is a whole pixel at source, the downscale keeps them
+        # even, and the Android 1:1 seat loses nothing.
+        cell = floorf(cell)
         var side := float(grid_n) * cell
         var spare := vp.y - top - bot - side
-        board_origin = Vector2((vp.x - side) * 0.5,
-                        top + maxf(0.0, spare * 0.40))
+        board_origin = Vector2(roundf((vp.x - side) * 0.5),
+                        roundf(top + maxf(0.0, spare * 0.40)))
         _place_texts(vp)
         bg_l.queue_redraw()
         board_l.queue_redraw()

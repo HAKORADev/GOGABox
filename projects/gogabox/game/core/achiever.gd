@@ -105,8 +105,18 @@ func _paint_achievement(item: Dictionary) -> void:
         v.add_child(head)
         var name_l := Arc.label("%s  -  %s" % [String(g.get("title", "")), String(ach.get("title", ""))],
                         30, Arc.CARD)
+        # v041-1 THE OVERFLOW LAW (the owner: "if text was too much, the
+        # widget literally goes out-of-resolution... just use extra lines,
+        # since it's not an always-on widget"): long names/descs WRAP into
+        # extra lines now - the panel keeps its 640 width and grows
+        # downward; the text never shrinks below readable and never leaves
+        # the screen again.
+        name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(name_l)
         var desc := Arc.label(String(ach.get("desc", "")), 19, Color(1, 1, 1, 0.75), false)
+        desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(desc)
 
         # v0.0.9 owner rule: trophies get their OWN longer, slower fanfare
@@ -151,6 +161,10 @@ func _paint_battery(item: Dictionary) -> void:
         var body_txt := "your GOGABattery bank is completely full!" if title == "" \
                         else "%s batteries are fully charged - back to it!" % title
         var body := Arc.label(body_txt, 26, Arc.CARD)
+        # v041-1 THE OVERFLOW LAW (same as the achievement popup): wrap,
+        # never overflow
+        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(body)
 
         _animate_popup(root, panel, func(): Jukebox.sfx("unlock", -6.0))

@@ -114,8 +114,10 @@ func _ready() -> void:
                         "settings: the Screen sheet wears the DISPLAY toggle")
         ck(_has_button_prefix(menu2, "POSITION: "),
                         "settings: the Screen sheet wears the POSITION toggle")
-        ck(_has_button_prefix(menu2, "DYNAMIC SCALE: "),
-                        "settings: the Graphics sheet wears DYNAMIC SCALE")
+        # v041-1: DYNAMIC SCALE IS NUKED - the Graphics sheet wears only
+        # the GOGACURSOR seat now
+        ck(not _has_button_prefix(menu2, "DYNAMIC SCALE: "),
+                        "settings: DYNAMIC SCALE is gone (the nuke law)")
         ck(_has_button_prefix(menu2, "GOGACURSOR: "),
                         "settings: the Graphics sheet wears GOGACURSOR")
 

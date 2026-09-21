@@ -24,8 +24,14 @@ static func launch(router: Node, id: String) -> bool:
                         stage_c = router          # tests / headless: plain node
                 var host_c: Node = load("res://game/core/host_node.gd").new()
                 host_c.configure(g, stage_c, 0, false)
-                stage_c.add_child(host_c)
+                # v041-1 THE SEAT-FIRST LAW: active_host is set BEFORE the
+                # host enters the tree. host._ready re-windows and flips the
+                # design; the menu's size_changed governor used to see
+                # active_host == null in that exact frame and force the MENU's
+                # design back - the owner's "the game will remain internally
+                # vertical but the window will get somehow horizontal-like".
                 active_host = host_c
+                stage_c.add_child(host_c)
                 if stage_c.has_method("on_game_entered"):
                         stage_c.call("on_game_entered")
                 return true
@@ -64,8 +70,11 @@ static func launch(router: Node, id: String) -> bool:
         # shadowing would leave the box hidden forever after a run).
         # v0.1.4: `partial` tells the retry button to charge min(fee, wallet).
         host.configure(g, stage, fee, partial)
-        stage.add_child(host)
+        # v041-1 THE SEAT-FIRST LAW (see the cheat path above): the host is
+        # seated BEFORE it enters the tree - the orientation re-window inside
+        # _ready can never race the menu's size_changed governor again.
         active_host = host
+        stage.add_child(host)
         if stage.has_method("on_game_entered"):
                 stage.call("on_game_entered")
         return true

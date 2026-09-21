@@ -46,7 +46,7 @@ const PU_MIN_T := 8.0
 const PU_MAX_T := 18.0
 const PU_R := 22.0
 const SCORE_PER_COIN := 3        # every 3 points = one bonus coin
-const AI_SPEED := 430.0          # the main rival
+const AI_SPEED := 470.0          # the main rival (v041-1: quicker feet)
 # v0.2.3 patch (owner: "the more enemies platforms are slower while they
 # have the widest walls, make them faster and more smarter"): the extra
 # walls now hunt FASTER than the main rival. Their guard is small, so
@@ -555,6 +555,16 @@ func _add_pad(id: String, is_user: bool, edge: String, axis: int,
                 # faster and steadier (the owner's "more smarter")
                 "think": 0.10 if extra else AI_THINK,
                 "err_k": 0.18 if extra else 0.30,
+                # v041-1 THE HUMAN PACE LAW: the owner - "the enemy is slow
+                # as hell... play human-like: when the ball is slow, it moves
+                # slow; when the ball is fast, usually a human will slide and
+                # make the ball often-ish slide from him like as over-slide".
+                # Each NEW approach re-rolls a lazy/urgent gear and an
+                # over-slide commit (the mis-judged lunge that lets a fast
+                # ball squeak past - sometimes).
+                "gear": 1.0,          # the chase urgency this approach
+                "over": 0.0,          # the over-slide mis-target (px)
+                "seen_dir": 0.0,      # the incoming flag the commit rode
         }
         pads.append(p)
         pads_by_id[id] = p
@@ -1040,6 +1050,24 @@ func _tick_ai(p: Dictionary, delta: float) -> void:
                 p["ai_t"] = float(p["think"])
                 p["err"] = randf_range(-1.0, 1.0) * float(p["len"]) \
                                 * float(p["err_k"])
+        # v041-1 THE APPROACH COMMIT: the moment a ball turns TOWARD this
+        # pad, the brain re-rolls its gear and its over-slide - a slow ball
+        # is read lazily, a fast one urges the feet and tempts the lunge.
+        var axis_c := _axis_of(p)
+        var out_n_c := _edge_inward(String(p["edge"]))
+        var incoming_c := ball_dir.dot(out_n_c) < -0.05 and serve_t <= 0.0
+        var bdn_c := ball_dir.y if axis_c == 0 else ball_dir.x
+        if incoming_c and float(p.get("seen_dir", 0.0)) * bdn_c <= 0.0:
+                var sp := _ball_speed()
+                # the gear: slow ball = lazy (0.55), burning ball = urgent
+                p["gear"] = clampf(0.55 + sp / 1400.0, 0.55, 1.45)
+                # the over-slide: the faster the arrival, the bigger the
+                # chance the human-ish brain mis-judges the slide
+                var over_k := clampf((sp - 620.0) / 1400.0, 0.0, 1.0)
+                p["over"] = (randf_range(-1.0, 1.0) * float(p["len"]) * 0.62 \
+                                * over_k) if randf() < 0.10 + 0.30 * over_k \
+                                else 0.0
+        p["seen_dir"] = bdn_c
         var axis := _axis_of(p)
         var out_n := _edge_inward(String(p["edge"]))
         var toward := ball_dir.dot(out_n) < -0.05 and serve_t <= 0.0
@@ -1072,7 +1100,8 @@ func _tick_ai(p: Dictionary, delta: float) -> void:
                                 var fmax := field.end.x - 8.0 if axis == 0 \
                                                 else field.end.y - 8.0
                                 target = _fold_axis(pred, fmin, fmax) \
-                                                + float(p["err"])
+                                                + float(p["err"]) \
+                                                + float(p.get("over", 0.0))
                         else:
                                 target = cur_axis
                 else:
@@ -1081,7 +1110,11 @@ func _tick_ai(p: Dictionary, delta: float) -> void:
                 var mid := field.get_center().x if axis == 0 \
                                 else field.get_center().y
                 target = lerpf(cur_axis, mid, 0.5)
-        var na := move_toward(cur_axis, target, float(p["ai_speed"]) * delta)
+        # v041-1 THE HUMAN FEET: the pace rides the ball (lazy on slow,
+        # urgent on fast) - the old fixed 430 read as "slow as hell" on
+        # every rally and 0 difficulty across the board
+        var feet: float = float(p["ai_speed"]) * float(p.get("gear", 1.0))
+        var na := move_toward(cur_axis, target, feet * delta)
         p["c"] = Vector2(na, c.y) if axis == 0 else Vector2(c.x, na)
 
 func _fold_axis(v: float, lo: float, hi: float) -> float:

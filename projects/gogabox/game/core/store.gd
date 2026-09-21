@@ -507,6 +507,63 @@ func coins_display() -> String:
                 return "0"
         return Arc.short_num(int(data["coins"]))
 
+## v041-1 THE COMPACT WALLET LAW (the owner: "i recommend you to make coins
+## in main menu be nnnK/M/B without the nnn.nn because currently it overlaps
+## with the search button... i mean only here, opening top-up shows the
+## rest"). The MAIN MENU chip prints whole units only - 999, 12K, 2M, 3B -
+## the seat can never grow decimal tails again; the top-up and the shops
+## keep the exact coins_display.
+func coins_compact() -> String:
+        if dev_cheat("gogacoins") == 1:
+                return "0"
+        var n := int(data["coins"])
+        var v := float(absi(n))
+        var s := ""
+        if v < 1000.0:
+                s = str(n)
+        elif v < 1000000.0:
+                s = "%dK" % int(roundi(v / 1000.0))
+        elif v < 1000000000.0:
+                s = "%dM" % int(roundi(v / 1000000.0))
+        else:
+                s = "%dB" % int(roundi(v / 1000000000.0))
+        return ("-" + s) if n < 0 else s
+
+## v041-1 THE GIVE-EVERYTHING LAW (the owner, after hand-editing the save
+## gave him "some stuff and not all"): one button in the dev sheet that
+## grants THE WHOLE BOX for real - every game owned (in catalog order, the
+## save's owned[] array), a fat REAL wallet (the cheat flags stay honest),
+## every battery pool full, every charge meter full, every extra ON (the
+## parent included). No restart, no reload - the feed just refreshes.
+func dev_grant_everything() -> void:
+        for g in GameReg.GAMES:
+                var id := String(g["id"])
+                if not (data["owned"] as Array).has(id):
+                        (data["owned"] as Array).append(id)
+                # every extra of every game ON (the parent gate included)
+                for ex in g.get("extras", []):
+                        set_progress("__dev__", "cheat_x_%s_%s" % [id,
+                                        String((ex as Dictionary)["id"])], 1)
+                set_progress("__dev__", "cheat_extras", 1)
+                # every charge meter full (a charging tile resolves at once)
+                var cu := int(g.get("charge_unlock", 0))
+                if cu > 0:
+                        _slot(id)["charges_in"] = cu
+                # every game pool full (a drained pool tops up)
+                if g.has("charges"):
+                        var cap := int(g["charges"].get("capacity", 10))
+                        data["game_batteries"][id] = {
+                                "count": cap,
+                                "ts": int(Time.get_unix_time_from_system())}
+        # the box bank full + a fat REAL wallet
+        data["box_batteries"]["count"] = BOX_BATTERY_CAP
+        data["coins"] = maxi(int(data["coins"]), 999999)
+        save()
+        coins_changed.emit(coins())
+        batteries_changed.emit()
+        for g in GameReg.GAMES:
+                game_unlocked.emit(String(g["id"]))
+
 func earn(amount: int) -> void:
         if dev_cheat("gogacoins") == 1:
                 return   # the real wallet stays untouched under the cheat
@@ -886,15 +943,11 @@ func set_pc_position(v: String) -> void:
                         "landscape" if v == "landscape" else "portrait"
         save()
 
-func pc_dynamic_scale() -> bool:
-        return bool(data["settings"].get("pc_dynamic_scale", false))
-
-func set_pc_dynamic_scale(v: bool) -> void:
-        data["settings"]["pc_dynamic_scale"] = v
-        save()
-
 func pc_gogacursor() -> bool:
         return bool(data["settings"].get("pc_gogacursor", true))
+
+## v041-1: DYNAMIC SCALE IS NUKED - pc_dynamic_scale + set_pc_dynamic_scale
+## are retired with it (the stale settings key dies on its own).
 
 func set_pc_gogacursor(v: bool) -> void:
         data["settings"]["pc_gogacursor"] = v

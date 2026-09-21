@@ -3158,7 +3158,7 @@ func _t_dev_cheats() -> int:
         await get_tree().process_frame
         ok += _check(menu._sheet_open, "the dev sheet builds")
         for wanted in ["ALL_OWNED  =  0", "GOGACOINS  =  0", "BATTERY  =  0",
-                        "CODE  =  1", "DONE", "RESTART BOX"]:
+                        "CODE  =  1", "DONE", "GIVE EVERYTHING"]:
                 ok += _check(_find_button(menu, wanted) != null,
                                 "dev sheet rendered: %s" % wanted)
         ok += _check(_find_button(menu, "SNAKE - ") == null

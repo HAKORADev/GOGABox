@@ -56,6 +56,20 @@ var blasts: Array = []           # the running explosion anims
 
 # the rope math (design space)
 var anchor := Vector2(540, MinerData.ANCHOR_Y)
+# v041-1 THE TIMED GROUND LAW (the owner: "make the game timed... use the
+# gold, the rocks, distance and sorting and the time of the thing thrown
+# takes from top to bottom to calculate everything so you make the time to
+# calculate as collecting all golds with 60% of gold... the rocks sorting
+# is actually tricky so it will be more fun"): every ground computes its
+# own clock from the REAL field - each gold's round trip (the swing's
+# payout speed down, its own reel weight back) is priced in seconds, the
+# golds are sorted by value-per-second, and the clock is the time of
+# collecting the cheapest 60% of the total gold value. The rocks and the
+# distances make the honest budget tight - the long-term win feels like
+# gambling, exactly as ordered.
+var ground_time := 0.0
+var ground_clock := 0.0
+var time_lbl: Label
 var swing_phase := 0.0
 var rope_len := ROPE_IDLE
 var claw_dir := Vector2(0, 1)
@@ -121,6 +135,8 @@ func _goga_setup() -> void:
         rng.randomize()
         pause_end_run = true      # THE END LAW: the pause sheet banks the run
         lives_lbl = add_hud_chip("x3", "res://assets/ui/heart.png")
+        # v041-1 THE TIMED GROUND: the live clock rides the HUD
+        time_lbl = add_hud_chip("0:00")
         add_hud_button("SHOP", func(): _shop_open())
         _layout()
         _goga_tk_ready()
@@ -324,9 +340,48 @@ func _populate() -> void:
         for it in items:
                 if String(it["kind"]).begins_with("gold"):
                         golds_left += 1
+        _price_ground_clock()
 
-## the coin law's edge case: the 50th thing banked the level - the glowing
-## gold rides the NEXT ground (it IS one of its golds, glowing now)
+## v041-1: the clock builder - see THE TIMED GROUND LAW at ground_time.
+func _price_ground_clock() -> void:
+        var priced: Array = []
+        var total_value := 0
+        for it in items:
+                var kind := String(it["kind"])
+                if not kind.begins_with("gold"):
+                        continue
+                var val := int(MinerData.POINTS.get(kind, 0))
+                if val <= 0:
+                        continue
+                total_value += val
+                var dist: float = anchor.distance_to(it["pos"])
+                # the honest round trip: payout at ROPE_OUT, the reel home at
+                # the thing's OWN weight speed (the heavy gold crawls), plus
+                # the claw's closing beat
+                var trip: float = dist / ROPE_OUT \
+                                + dist / float(MinerData.REEL_SPEED.get(kind, 900.0)) \
+                                + GRAB_TIME
+                priced.append({"v": val, "t": trip})
+        var target := float(total_value) * 0.6
+        # the greedy fill: the cheapest-to-take golds first
+        priced.sort_custom(func(a, b): return float(a["v"]) / float(a["t"]) \
+                        > float(b["v"]) / float(b["t"]))
+        var acc := 0.0
+        var got := 0.0
+        for p in priced:
+                got += float(p["v"])
+                acc += float(p["t"])
+                if got >= target:
+                        break
+        # the swing/aim overhead rides on top; a floor keeps tiny fields sane
+        ground_time = maxf(20.0, ceilf(acc + 8.0))
+        ground_clock = ground_time
+        if time_lbl != null:
+                time_lbl.text = _clock_text(ground_clock)
+
+func _clock_text(t: float) -> String:
+        var s := int(maxf(0.0, ceilf(t)))
+        return "%d:%02d" % [s / 60, s % 60]
 func _seed_coin() -> void:
         var golds: Array = []
         for it in items:
@@ -391,6 +446,18 @@ func _goga_tick(delta: float) -> void:
                 if shake_t <= 0.0:
                         world.position = ORIGIN
         _tick_blasts(delta)
+        # v041-1 THE TIMED GROUND: the clock burns during play; 0 = the run
+        # is over (the gambling push - no endless thinking)
+        if phase == "swing" or phase == "fly" or phase == "grab" \
+                        or phase == "reel":
+                ground_clock -= delta
+                if time_lbl != null:
+                        time_lbl.text = _clock_text(ground_clock)
+                if ground_clock <= 0.0:
+                        ground_clock = 0.0
+                        if time_lbl != null:
+                                time_lbl.text = "0:00"
+                        _run_over()
         match phase:
                 "swing":
                         swing_phase += delta * TAU / SWING_PERIOD
@@ -609,7 +676,11 @@ func _bank() -> void:
                 return
         var kind := String(carried["kind"])
         var pts: int = MinerData.score_for(kind)     # rocks pay NEGATIVE (v041)
-        add_score(pts)
+        # v041-1 THE SCORE FLOOR LAW (the owner: "make score be only 0 as
+        # minimum, so decreasing should always be 0 as minimum because -2 or
+        # -24 has no meaning"): the tax still floats red, the total never
+        # reads below zero.
+        set_score(maxi(score + pts, 0))
         _float_pts(pts)
         achievement_count("golds_taken" if kind.begins_with("gold") else "rocks_taken", 1)
         if bool(carried["coin"]):

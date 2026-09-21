@@ -55,10 +55,12 @@ func _ready() -> void:
         # half the refresh bill.
         Engine.max_fps = 30
 
-        # v0.4.1 THE PC SEAT: the FSR-style sharpening layer, the edge veil
-        # (the app floats above the brown bars), the GOGACursor, and the
-        # focus nuke (Tab/arrows can never walk between buttons).
-        _build_dyn_scale()
+        # v0.4.1 THE PC SEAT: the edge veil (the app floats above the brown
+        # bars), the GOGACursor, and the focus nuke (Tab/arrows can never
+        # walk between buttons). v041-1: DYNAMIC SCALE IS NUKED (the owner:
+        # "the dynamic scale tech, remove it, it just made the app more
+        # blurry, your fixes worked more way better, nuke it") - the honest
+        # 1:1 rendering + the mipmap law are the whole sharpness story.
         _build_edge_veil()
         _apply_gogacursor()
         get_tree().node_added.connect(_nuke_focus)
@@ -102,6 +104,8 @@ func _lifecycle(what: int) -> void:
 ## the vertical-fullscreen corruption's root kill). During a GAME the host
 ## owns content_scale_size; the governor must not fight it.
 func _process(_delta: float) -> void:
+        # v041-1: the cursor ownership flag rides the frame clock
+        _cursor_owner_tick()
         if GameHost.active_host != null:
                 return
         if _menu != null and is_instance_valid(_menu) \
@@ -222,8 +226,11 @@ func _input(event: InputEvent) -> void:
         # arrows and WASD, then do nothing"): no game defines its own W/A/S/D
         # (Heavy War aliases them to the SAME directions), so the box
         # translates once, globally - every arrows-only game hears the keys.
-        if event is InputEventKey and (event as InputEventKey).pressed \
-                        and not (event as InputEventKey).echo:
+        # v041-1 THE RELEASE LAW (the owner's cosmic spud report: "when
+        # luckily move it, it keeps moving without stopping until i tap
+        # another button"): only the PRESSES were ever forwarded - the
+        # action system saw ui_up held FOREVER. The release rides now.
+        if event is InputEventKey and not (event as InputEventKey).echo:
                 var wk := (event as InputEventKey).keycode
                 var ak := KEY_NONE
                 match wk:
@@ -232,7 +239,7 @@ func _input(event: InputEvent) -> void:
                         KEY_S: ak = KEY_DOWN
                         KEY_D: ak = KEY_RIGHT
                 if ak != KEY_NONE:
-                        _push_key(ak, true)
+                        _push_key(ak, (event as InputEventKey).pressed)
         # v0.4.1 THE GAMEPAD SEAT: d-pad = arrows, A/B/X/Y = the 1/2/3/4
         # keys, START = ESC (the back law). The translation lives in ONE
         # place - every game that already listens to those keys hears the
@@ -285,10 +292,30 @@ func _input(event: InputEvent) -> void:
                         and (event as InputEventMouseButton).button_index \
                         == MOUSE_BUTTON_LEFT and ScaleRule.is_pc() \
                         and Box.pc_gogacursor() and _cur_norm != null:
-                var mb := event as InputEventMouseButton
-                Input.set_custom_mouse_cursor(
-                                _cur_press if mb.pressed else _cur_norm,
-                                Input.CURSOR_ARROW, Vector2(1, 1))
+                # v041-1 THE OWNERSHIP LAW: the press frame paints ONLY while
+                # the box owns the cursor. A game that hid the mouse (its own
+                # aim cursor) is never overpainted - and the ownership flag
+                # tracks the mouse mode every frame below.
+                if _cursor_owner == "box":
+                        var mb := event as InputEventMouseButton
+                        Input.set_custom_mouse_cursor(
+                                        _cur_press if mb.pressed else _cur_norm,
+                                        Input.CURSOR_ARROW, Vector2(26, 26))
+
+## v041-1: the ownership flag follows the REAL mouse mode (a game hiding the
+## cursor takes ownership; anything showing it hands it back). One compare
+## per frame from _process.
+func _cursor_owner_tick() -> void:
+        if not ScaleRule.is_pc():
+                return
+        var hidden := Input.mouse_mode == Input.MOUSE_MODE_HIDDEN \
+                        or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+        var want := "game" if hidden else "box"
+        if want != _cursor_owner:
+                _cursor_owner = want
+                if want == "box" and Box.pc_gogacursor() and _cur_norm != null:
+                        Input.set_custom_mouse_cursor(_cur_norm,
+                                        Input.CURSOR_ARROW, Vector2(26, 26))
 
 ## Android BACK button (config/quit_on_go_back=false routes it here) - and
 ## since v0.4.1 the PC's ESC and the gamepad's START ride the same road:
@@ -329,10 +356,16 @@ func _go_back() -> void:
 
 # ================================================ v0.4.1 THE PC SEAT
 
-var _dyn_layer: CanvasLayer
 var _veil_root: Control
 var _cur_norm: Texture2D
 var _cur_press: Texture2D
+## v041-1 THE CURSOR OWNERSHIP LAW: "box" = the box paints/press-paints the
+## golden cursor; "game" = a game hid the OS cursor and aims with its own
+## (Heavy War's reticle) - clicks must NEVER re-paint the box cursor over it
+## (the owner: "it does not override the GOGACursor when the game is
+## running"). A game claims ownership by hiding the mouse; showing it
+## (the pointer law on every pause/shop sheet) hands it back.
+var _cursor_owner := "box"
 var _pad_held := {}
 var _focus_muted := false
 var _pre_focus_mute := false
@@ -347,35 +380,12 @@ func _nuke_focus(n: Node) -> void:
         if n is BaseButton or n is HSlider or n is VSlider:
                 (n as Control).focus_mode = Control.FOCUS_NONE
 
-## v0.4.1 DYNAMIC SCALE - the FSR law. One full-frame FidelityFX
-## sharpening pass (the FSR family's spatial sharpener) over whatever the
-## box drew: big 4K windows keep the FHD-sharp look, jagged upscaled art
-## tightens up. Works on every GPU (AMD, NVIDIA, Intel - it is one shader,
-## no vendor lock), costs almost nothing, and the toggle needs NO restart.
-## OFF by default - the honest 1:1 rendering is the baseline.
-func _build_dyn_scale() -> void:
-        if not ScaleRule.is_pc():
-                return
-        var sh: Shader = load("res://game/core/rcas.gdshader")
-        if sh == null:
-                return
-        _dyn_layer = CanvasLayer.new()
-        _dyn_layer.layer = 120   # above everything - it sharpens the FRAME
-        add_child(_dyn_layer)
-        var rect := ColorRect.new()
-        rect.name = "DynScale"
-        rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-        rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var mat := ShaderMaterial.new()
-        mat.shader = sh
-        rect.material = mat
-        rect.visible = Box.pc_dynamic_scale()
-        _dyn_layer.add_child(rect)
-
-func set_dynamic_scale(on: bool) -> void:
-        if _dyn_layer != null and is_instance_valid(_dyn_layer) \
-                        and _dyn_layer.get_child_count() > 0:
-                (_dyn_layer.get_child(0) as CanvasItem).visible = on
+## v0.4.1 DYNAMIC SCALE - RETIRED v041-1 (the owner: "remove it, it just
+## made the app more blurry... nuke it"). The RCAS sharpen pass, its shader,
+## its settings row and its Box flag are gone; set_dynamic_scale stays as a
+## harmless no-op so any stale settings call cannot error.
+func set_dynamic_scale(_on: bool) -> void:
+        pass
 
 ## v0.4.1 THE GOGACURSOR (the owner: "the default cursor be a golden
 ## pixelated one with brown outlines and clicking makes it do the
@@ -391,8 +401,9 @@ func _apply_gogacursor() -> void:
                         _cur_norm = load("res://assets/ui/goga_cursor.png")
                         _cur_press = load("res://assets/ui/goga_cursor_press.png")
                 if _cur_norm != null:
+                        _cursor_owner = "box"
                         Input.set_custom_mouse_cursor(_cur_norm,
-                                        Input.CURSOR_ARROW, Vector2(1, 1))
+                                        Input.CURSOR_ARROW, Vector2(26, 26))
         else:
                 Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
 
@@ -484,13 +495,18 @@ func _pad_button_key(btn: JoyButton) -> Key:
                         return KEY_LEFT
                 JOY_BUTTON_DPAD_RIGHT:
                         return KEY_RIGHT
-                JOY_BUTTON_A:
-                        return KEY_1
-                JOY_BUTTON_B:
-                        return KEY_2
+                # v041-1 THE FACE-BUTTON LAW (the owner: "1,2,3,4 i meant the
+                # square, triangle, circle, cross, also ABXY in Xbox"): the
+                # count rides the PlayStation pad's shape order - square,
+                # triangle, circle, cross - which is the Xbox pad's X, Y, B, A
+                # (Godot: X=left, Y=top, B=right, A=bottom).
                 JOY_BUTTON_X:
-                        return KEY_3
+                        return KEY_1
                 JOY_BUTTON_Y:
+                        return KEY_2
+                JOY_BUTTON_B:
+                        return KEY_3
+                JOY_BUTTON_A:
                         return KEY_4
         return KEY_NONE
 

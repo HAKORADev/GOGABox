@@ -154,6 +154,15 @@ func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxConta
         var cc: Control = kids[kids.size() - 1]
         dim.process_mode = Node.PROCESS_MODE_ALWAYS
         cc.process_mode = Node.PROCESS_MODE_ALWAYS
+        # v041-1 THE DIM-CLOSE LAW (the menu seat wears the same): a click
+        # on the dim closes the TOP sheet - a near-miss on a shop or an
+        # options sheet can never feel like a dead button again.
+        dim.gui_input.connect(func(ev: InputEvent):
+                if ev is InputEventMouseButton \
+                                and (ev as InputEventMouseButton).pressed \
+                                and (ev as InputEventMouseButton).button_index \
+                                == MOUSE_BUTTON_LEFT:
+                        sheet_pop())
         _sheet_stack.append({"dim": dim, "cc": cc, "id": id})
         return vb
 
@@ -394,6 +403,14 @@ func _pause_open() -> void:
         dim.process_mode = Node.PROCESS_MODE_ALWAYS
         cc.process_mode = Node.PROCESS_MODE_ALWAYS
         _pause_pair = [dim, cc]
+        # v041-1 THE DIM-CLOSE LAW: a click on the pause dim = RESUME (the
+        # universal outside-click, same as the menu sheets)
+        dim.gui_input.connect(func(ev: InputEvent):
+                if ev is InputEventMouseButton \
+                                and (ev as InputEventMouseButton).pressed \
+                                and (ev as InputEventMouseButton).button_index \
+                                == MOUSE_BUTTON_LEFT:
+                        _pause_close())
         var g := GameReg.get_game(game_id)
         var title := Arc.label(String(g.get("title", game_id)), 44, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

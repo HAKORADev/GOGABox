@@ -137,12 +137,44 @@ func _on_orientation_reload(o: String) -> void:
         # play count stays: one session = one play (the fee was never re-taken)
 
 func _process(delta: float) -> void:
+        # v041-1 THE WINDOW-LAW REASSERT (PC only): while a game runs nobody
+        # else watches the window (the menu governor is parked). The owner's
+        # "fullscreen in-game prevents me to go windowed until i exit the
+        # game" dies here: whatever the WM did, the host re-decides mode,
+        # design and shape from the SAME laws every frame - one cheap
+        # compare at steady state.
+        if ScaleRule.is_pc():
+                _reassert_window_law()
         # play-time accounting for the global stats screen
         if game == null or not is_instance_valid(game) or game.over or game.paused:
                 return
         _accum += delta
         if _accum >= 5.0:
                 _flush_time()
+
+func _reassert_window_law() -> void:
+        if DisplayServer.get_name() == "headless":
+                return
+        var landscape := _orient_now == "horizontal"
+        var want_design := ScaleRule.DESIGN_LANDSCAPE if landscape \
+                        else ScaleRule.DESIGN_PORTRAIT
+        var root := get_window()
+        if root.content_scale_size != want_design \
+                        or root.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
+                ScaleRule.apply_pc(root, want_design)
+        # the persisted fullscreen setting is THE truth for the mode - if the
+        # window drifted (a swallowed F11, a WM hiccup), re-apply it
+        var want_fs: bool = Box.has_method("pc_fullscreen") \
+                        and Box.call("pc_fullscreen")
+        if want_fs != ScaleRule.is_fullscreen():
+                DisplayServer.window_set_mode(
+                                DisplayServer.WINDOW_MODE_FULLSCREEN
+                                if want_fs else DisplayServer.WINDOW_MODE_WINDOWED)
+                ScaleRule.apply_window_lock()
+                if not want_fs:
+                        ScaleRule.re_window("landscape"
+                                        if _orient_now == "horizontal"
+                                        else "portrait")
 
 func _flush_time() -> void:
         if _accum > 0.0:
@@ -172,8 +204,13 @@ func _apply_orientation(landscape: bool) -> void:
         ScaleRule.apply_expand(root)
         root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE if landscape \
                         else ScaleRule.DESIGN_PORTRAIT
-        DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE
-                        if landscape else DisplayServer.SCREEN_SENSOR_PORTRAIT)
+        # v041-1: the sensor rotation is a PHONE law - a desktop display
+        # server answers with "Orientation not supported" (the owner's log
+        # spam) and the design/window laws above already own the PC seat.
+        if not ScaleRule.is_pc():
+                DisplayServer.screen_set_orientation(
+                                DisplayServer.SCREEN_SENSOR_LANDSCAPE
+                                if landscape else DisplayServer.SCREEN_SENSOR_PORTRAIT)
 
 func _restore() -> void:
         # v0.3.8-5 THE COMFORT LAW: hand the 60 frames back to the box
@@ -192,7 +229,9 @@ func _restore() -> void:
                 ScaleRule.re_window(ScaleRule.pc_position)
         else:
                 ScaleRule.apply(get_window())
-        DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
+        # v041-1: the sensor release is a PHONE law (see _apply_orientation)
+        if not ScaleRule.is_pc():
+                DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 
 func _quit_to_menu() -> void:
         _session_open = false
@@ -246,6 +285,17 @@ func _on_finish(final_score: int, earned: int) -> void:
         game.check_achievements()
 
         await get_tree().create_timer(0.55).timeout
+        # v041-1 THE FREED-SEAT GUARD (the owner's log spam: "Required object
+        # 'rp_target' is null" + "Lambda capture at index N was freed" +
+        # "Tween started with no Tweeners"): the 0.55s theatre delay can
+        # outlive the session - a quit-to-box (or a pause-opened exit) frees
+        # the game while this coroutine slept. The theatre must never build
+        # its sheet over a freed overlay or tween freed labels again.
+        if not _session_open:
+                return
+        if game == null or not is_instance_valid(game) \
+                        or not is_instance_valid(game._overlay_root_ref()):
+                return
 
         # ---- game over sheet ----
         var sheet := Arc.sheet(game._overlay_root_ref(), 0.0)

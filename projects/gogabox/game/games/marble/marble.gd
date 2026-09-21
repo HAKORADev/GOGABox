@@ -160,8 +160,7 @@ func _goga_setup() -> void:
         # touch screen reads the mouse; phones and headless rigs never do -
         # a touch screen's own emulated mouse events stay dead (they are the
         # first finger, not a cursor)
-        pc_ui = ScaleRule.is_pc() \
-                and not DisplayServer.is_touchscreen_available()
+        pc_ui = ScaleRule.is_pc()
         set_hud_score_prefix("LEVEL")   # the widget counts ONE level (the owner's accuracy law)
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("LEVELS", func(): _levels_open())
@@ -991,6 +990,10 @@ func _show_cleared() -> void:
         cleared_card = card[0]
         var vb: VBoxContainer = card[1]
         var t := Arc.label("LEVEL %d CLEARED!" % (level_idx + 1), 44, Arc.GOOD)
+        # v041-1 THE OUTLINE LAW (the owner: "win menu should has its text
+        # outlined like fruit slasher as example")
+        t.add_theme_constant_override("outline_size", 8)
+        t.add_theme_color_override("font_outline_color", Color(0.10, 0.05, 0.02, 0.95))
         t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(t)
         vb.add_child(Arc.label("SCORE %d   BEST %d" % [run_level_score, meta.best_for(level_idx + 1)],
@@ -1030,9 +1033,16 @@ func _show_cleared() -> void:
         row.add_child(Arc.button("REPLAY", Vector2(230, 64), 22, Arc.ACCENT, func():
                 _close_card()
                 _start_level(level_idx, false, 1)))
-        row.add_child(Arc.button("LEVELS", Vector2(230, 64), 22, Arc.CARD, func():
-                _close_card()
-                _levels_open()))
+        # v041-1 THE LEVELS-SEAT LAW (the owner: "in win menu, there is
+        # button levels, make it only appear here when the game is
+        # completed, also it has a bug, if i opened and closed it, i am
+        # stuck forever"): the LEVELS button lives on the win card ONLY
+        # when every level is done (the final card), and it opens OVER the
+        # card - the card stays underneath, so closing the sheet returns
+        # to a live win card (the stuck-forever state is dead).
+        if next_lv > MarbleData.LEVELS_TOTAL:
+                row.add_child(Arc.button("LEVELS", Vector2(230, 64), 22,
+                                Arc.CARD, func(): _levels_open()))
 
 func _stars_earned() -> int:
         var s := 1
@@ -1244,7 +1254,12 @@ func _tick_holes(delta: float) -> void:
                 var h: Node2D = holes[ci]
                 var front_d: float = cp.marbles.back()["d"] if not cp.marbles.is_empty() else -1.0
                 var near := clampf(1.0 - (cp.length - maxf(front_d, 0.0)) / 320.0, 0.0, 1.0)
-                var pulse := 1.0 + sin(t * 6.0) * 0.05
+                # v041-1 THE HUNGER LAW (the owner: "make the hole idol only
+                # do the zoom-in/out when things get close and do it faster
+                # when much closer, currently it do the zoom-in/out always"):
+                # the idle hole is STILL (amplitude 0); the zoom breathes in
+                # with `near`, and inside the danger zone it pants fast.
+                var pulse := 1.0 + sin(t * 6.0) * 0.05 * near
                 if front_d >= cp.length * MarbleData.DANGER_ZONE and not cp.danger_played:
                         cp.danger_played = true
                         Jukebox.sfx("mb_danger", -2.0)
@@ -1294,6 +1309,22 @@ func _tick_chain(cp: ChainPath, delta: float) -> void:
                                 m["push"] = push_left - step
                         if i < n - 1:
                                 var ahead: Dictionary = cp.marbles[i + 1]
+                                # v041-1 THE NO-CRAWL LAW (the owner: "even
+                                # when two unmatchable marbles, the one at the
+                                # back runs toward the one at the front to
+                                # connect with it, there is no single zuma-like
+                                # game made this shit"): the rear marble stops
+                                # one honest lip-gap behind an UNMATCHING front
+                                # - it never presses, never bonds. Matching
+                                # pairs still close and cascade.
+                                if not bool(ahead.get("bonded", true)) \
+                                                and int(ahead["c"]) != int(m["c"]) \
+                                                and _is_marble(ahead) and _is_marble(m) \
+                                                and float(ahead.get("push", 0.0)) <= 0.0:
+                                        var lip: float = ahead["d"] \
+                                                        - MarbleData.CONTACT * 1.22
+                                        if m["d"] < lip:
+                                                m["d"] = minf(m["d"] + spd * delta, lip)
                                 var target: float = ahead["d"] - MarbleData.CONTACT
                                 # v0.4.1 THE LIVING INSERT: while the ahead
                                 # marble is still being PUSHED (the sneak-in
@@ -1428,8 +1459,20 @@ func _insert_shot(cp: ChainPath, hit_i: int, shot: Dictionary) -> void:
         # front-side: m takes the front neighbour's old slot (hit stays).
         var insert_i := hit_i + (1 if front_side else 0)
         m["d"] = hit["d"] + (MarbleData.CONTACT if front_side else 0.0)
+        # v041-1 THE LOCAL PUSH LAW (the owner: "the living insert pushes
+        # things forward blindly, like if chain is not connected in many
+        # areas and i shot at the top of the middle dis-connected chain,
+        # logically the other first marbles that are far away should not
+        # move forward"): the push walks the chain FROM the hit and STOPS
+        # at the first disconnected gap - only the physically connected
+        # segment between gaps rides forward.
         for k in range(insert_i, cp.marbles.size()):
                 var mm: Dictionary = cp.marbles[k]
+                if k > insert_i:
+                        var prev_m: Dictionary = cp.marbles[k - 1]
+                        if float(mm["d"]) - float(prev_m["d"]) \
+                                        > MarbleData.CONTACT * 1.3:
+                                break   # a real gap - the far side stays put
                 if mm["kind"] == "m" or mm["kind"] == "coin" \
                                 or mm["kind"] == "pow":
                         mm["push"] = float(mm.get("push", 0.0)) \
@@ -1505,11 +1548,21 @@ func _pop_run(cp: ChainPath, left: int, right: int) -> void:
         # rear part stays put and the marbles return AS-IS (colors never
         # change). A matching junction cascades through the bond machine.
         if left > 0 and left < cp.marbles.size():
-            cp.rollback_i = left
-            cp.rollback_target = float(cp.marbles[left - 1]["d"]) \
-                            + MarbleData.CONTACT
-            if float(cp.marbles[left]["d"]) <= cp.rollback_target:
-                    cp.rollback_i = -1   # already touching - the join law runs
+            # v041-1 THE MATCHABLE ROLLBACK LAW (the owner: "when i said
+            # pop-back, i mean when colors are matchable or same, the thing
+            # in the front returns back... you made it when they get
+            # connected, the whole chain rolls back, this is stupid"): the
+            # front part rolls back ONLY when the junction colors MATCH -
+            # a re-join is possible. Unmatchable junctions keep their gap.
+            if _is_marble(cp.marbles[left - 1]) and _is_marble(cp.marbles[left]) \
+                            and int(cp.marbles[left - 1]["c"]) == int(cp.marbles[left]["c"]):
+                    cp.rollback_i = left
+                    cp.rollback_target = float(cp.marbles[left - 1]["d"]) \
+                                    + MarbleData.CONTACT
+                    if float(cp.marbles[left]["d"]) <= cp.rollback_target:
+                            cp.rollback_i = -1   # already touching - the join law runs
+            else:
+                    cp.rollback_i = -1
         else:
                 # a chain that emptied (or lost its rear part) has nothing to
                 # roll back TO - the state must never outlive its pop (a
@@ -1542,6 +1595,21 @@ func _trigger_pow(cp: ChainPath, m: Dictionary) -> void:
                         for mm in cp.marbles:
                                 if cp.pos_at(mm["d"]).distance_to(at) <= 250.0:
                                         blast.append(mm)
+                        # v041-1 (the owner: "when power-up is vanish, it
+                        # should not take the marble with it, it just should
+                        # remove itself with its effect"): the blast spares
+                        # the junction marble the carrier was touching - the
+                        # bomb removes ITSELF and the crowd around, not the
+                        # marble it landed against.
+                        var nearest: Dictionary = {}
+                        var nd := INF
+                        for mm in blast:
+                                var dd: float = cp.pos_at(mm["d"]).distance_to(at)
+                                if dd > 0.5 and dd < nd:
+                                        nd = dd
+                                        nearest = mm
+                        if not nearest.is_empty():
+                                blast.erase(nearest)
                         for mm in blast:
                                 _spawn_pop_fx(cp.pos_at(mm["d"]), Color(1.0, 0.6, 0.3))
                                 _free_marble(cp, mm)
@@ -1552,7 +1620,14 @@ func _trigger_pow(cp: ChainPath, m: Dictionary) -> void:
                         _vapor_sweep(cp, cp.pos_at(
                                         clampf(float(m["d"]), 0.0, cp.length)))
                 "rainbow":
-                        rainbow_n = 3
+                        # v041-1 (the owner: "it should rainbow-fy the total
+                        # rainbow marbles i should throw, like if total 5,
+                        # then my main and secondary marbles then the other
+                        # ones"): the counter grows AND the seats re-dress -
+                        # the loaded + next marbles visibly turn rainbow
+                        # right now, the rest of the allowance rides behind.
+                        rainbow_n += 3
+                        _refresh_shooter_marbles()
                 "lightning":
                         var counts := {}
                         for mm in cp.marbles:

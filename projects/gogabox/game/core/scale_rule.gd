@@ -151,6 +151,18 @@ static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win.content_scale_size != design:
                 win.content_scale_size = design
                 changed = true
+        # v041-1 THE BAR PAINT LAW (the owner: "for the sides, they are
+        # showing black"). Root cause, rig-verified: with aspect KEEP the
+        # engine ATTACHES the root viewport to the design rect only - the
+        # rest of the window is never rendered and shows the raw window
+        # background (black), no matter what the clear color says. The fix
+        # is one attach: hand the viewport the WHOLE window again; the canvas
+        # transform still centers the design, and the margins now wear the
+        # box brown (the edge veil shades the app's edge on top of them).
+        # Cheap RID call; re-asserted on every apply_pc (the governor runs
+        # it every frame, so a window reshape can never leave it stale).
+        RenderingServer.viewport_attach_to_screen(win.get_viewport_rid(),
+                        Rect2i(), 0)
         return changed
 
 ## The vertical slice (kept for compatibility - apply_pc is the law now).
@@ -216,6 +228,19 @@ static func is_fullscreen() -> bool:
         return m == DisplayServer.WINDOW_MODE_FULLSCREEN \
                         or m == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 
+## v041-1 THE WINDOWED LOCK LAW (the owner: "i want you to lock the windowed
+## window from getting stretched at all, this will be better"). The windowed
+## window is NOT user-resizable anymore: its shape is ALWAYS exactly the
+## content's shape (re_window) - nothing can drag it off-aspect, so the
+## whole stretch/mis-scale/resize-flicker family is structurally dead.
+## Fullscreen ignores the flag (the monitor owns the shape there).
+static func apply_window_lock() -> void:
+        if DisplayServer.get_name() == "headless":
+                return
+        DisplayServer.window_set_flag(
+                        DisplayServer.WINDOW_FLAG_RESIZE_DISABLED,
+                        not is_fullscreen())
+
 ## Re-shape the window to `kind` ("portrait" | "landscape") in WINDOWED
 ## mode, centered on the window's screen. Fullscreen: remember the kind and
 ## leave the monitor alone. Headless/no-display: no-op (probes stay safe).
@@ -243,6 +268,7 @@ static func re_window(kind: String) -> void:
         DisplayServer.window_set_size(want)
         DisplayServer.window_set_position(
                         scr.position + (scr.size - want) / 2)
+        apply_window_lock()
 
 ## THE FULLSCREEN LAW: flip, persist, and on the way back to windowed
 ## re-window to the content kind so no empty sides return with it. The
@@ -261,8 +287,26 @@ static func set_fullscreen(on: bool) -> void:
                         if on else DisplayServer.WINDOW_MODE_WINDOWED)
         if Box.has_method("set_pc_fullscreen"):
                 Box.set_pc_fullscreen(on)
+        # v041-1: the lock flips with the mode (fullscreen unlocks the flag,
+        # windowed locks the shape) and the window re-shapes to the content
+        # kind AFTER the mode settled - the deferred pass makes the Windows
+        # restore-animation race structurally dead (the owner's "fullscreen
+        # in-game prevents me to go windowed until i exit the game").
+        apply_window_lock()
         if not on:
                 re_window(pc_kind)
+                _rewindow_deferred()
+
+## One-frame-later re-assert of the windowed shape (static helper piggy-
+## backing a fresh frame: DisplayServer calls land after the WM settled).
+static func _rewindow_deferred() -> void:
+        var tree: SceneTree = Engine.get_main_loop() as SceneTree
+        if tree == null:
+                return
+        tree.create_timer(0.05).timeout.connect(func():
+                if not is_fullscreen():
+                        re_window(pc_kind)
+                        apply_window_lock())
 
 ## The boot law (main._ready): honor the persisted choice once.
 static func boot_window() -> void:
@@ -275,6 +319,7 @@ static func boot_window() -> void:
                                 DisplayServer.WINDOW_MODE_FULLSCREEN)
         else:
                 re_window(pc_kind)
+        apply_window_lock()
 
 static func _usable_rect() -> Rect2i:
         var scr := DisplayServer.window_get_current_screen()

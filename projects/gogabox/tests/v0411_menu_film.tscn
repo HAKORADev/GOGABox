@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://v0411menuflm"]
+
+[ext_resource type="Script" path="res://tests/v0411_menu_film.gd" id="1"]
+
+[node name="V0411MenuFilm" type="Node"]
+script = ExtResource("1")

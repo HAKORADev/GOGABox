@@ -27,10 +27,47 @@ var _orbit_t := 0.0
 var _panic := 0.0               # hard-avoid grace after an all-die rollout
 var _wobble_ph := 0.0           # per-enemy lane wobble (snakes are not rails)
 
+# v041-1 THE MULTI-PROFILE LAW (the owner: "the AI is stupid as fuck, it
+# prioritizes a fruit over its soul... i want it to follow the overall
+# GOGABox AI's multi-profile where it has many different powerful
+# difficulties with programmed failures"). Every enemy wears ONE of four
+# brains - the pack reads as a real mixed crowd, and every brain FAILS in
+# its own honest way (never insane, never perfect):
+#   greedy    - food-blind: fruit weight x2.2, short sight (3 steps), a
+#               loose clearance gate -> it wins races and dies in gaps.
+#   cautious  - long sight (6 steps), double clearance weight, keeps its
+#               belly away from the player's head -> it survives but loses
+#               every race and never cuts anyone off.
+#   hunter    - the noose brain: tight encircle threshold, cut-offs, but a
+#               programmed OVERCOMMIT (it gambles a risky cut 12% of the
+#               time) -> dangerous, occasionally suicidal.
+#   drifter   - the filler: big wobble, lazy turn, slow reactions -> it
+#               swims around, grabs what is close, mostly stays alive.
+const PROFILES := {
+        "greedy": {"roll": 3, "clear_w": 0.006, "react": 0.05,
+                "wobble": 0.03, "apple_w": 2.2, "hunt_food": true,
+                "risk": 0.0, "hard_gate": 0.9},
+        "cautious": {"roll": 6, "clear_w": 0.010, "react": 0.05,
+                "wobble": 0.02, "apple_w": 0.75, "hunt_food": false,
+                "risk": 0.0, "hard_gate": 1.9},
+        "hunter": {"roll": 5, "clear_w": 0.008, "react": 0.04,
+                "wobble": 0.025, "apple_w": 1.0, "hunt_food": true,
+                "risk": 0.12, "hard_gate": 1.15},
+        "drifter": {"roll": 4, "clear_w": 0.0075, "react": 0.12,
+                "wobble": 0.06, "apple_w": 0.9, "hunt_food": false,
+                "risk": 0.0, "hard_gate": 1.1},
+}
+const PROFILE_ORDER := ["greedy", "cautious", "hunter", "drifter"]
+var profile_name := "drifter"
+var pf: Dictionary = PROFILES["drifter"]
+var _react_t := 0.0             # the programmed reaction delay (seconds)
+
 func _init(b: SnakeBody, i: int) -> void:
         body = b
         idx = i
         _wobble_ph = randf() * TAU
+        profile_name = PROFILE_ORDER[i % PROFILE_ORDER.size()]
+        pf = PROFILES[profile_name]
 
 
 ## The world interface the game exposes (snake.gd):
@@ -40,6 +77,13 @@ func _init(b: SnakeBody, i: int) -> void:
 func think(delta: float, g: Node) -> void:
         if body == null or not body.alive:
                 return
+        # v041-1 THE REACTION LAW: a human does not re-decide every frame -
+        # the profile's delay makes the pack feel alive instead of glued
+        # (the drifter is the slowest reader of the screen).
+        _react_t -= delta
+        if _react_t > 0.0:
+                return
+        _react_t = float(pf["react"])
         var player: SnakeBody = g.player_body()
         var beh := _behavior(player)
         var target := _choose_target(g, player, beh)
@@ -76,7 +120,7 @@ func _behavior(player: SnakeBody) -> Dictionary:
                 "hunt": false,
                 "farm": false,
                 "coin_weight": 1.0,
-                "apple_weight": 0.5,
+                "apple_weight": 0.5 * float(pf["apple_w"]),
                 "encircle": false,
         }
         if player == null or not player.alive:
@@ -107,7 +151,12 @@ func _behavior(player: SnakeBody) -> Dictionary:
                 beh["farm"] = true
                 beh["hunt"] = false
         var my_len: float = body.length_px + 60.0 * float(body.effects.get("eater", 0.0))
-        beh["encircle"] = my_len >= beh["encircle_threshold"] * player.length_px
+        # v041-1: the hunter's programmed overcommit - sometimes it tightens
+        # the noose early and takes the risk (and sometimes pays for it)
+        var th: float = beh["encircle_threshold"]
+        if profile_name == "hunter" and randf() < float(pf["risk"]):
+                th *= 0.62
+        beh["encircle"] = my_len >= th * player.length_px
         return beh
 
 
@@ -221,6 +270,11 @@ func _angle_to(p: Vector2, g: Node) -> float:
 ## survivors the one closest to `desired` wins; lane wobble keeps snakes
 ## from stacking into a rail. All die -> the one that dies LAST + panic.
 func _survivor_angle(g: Node, desired: float) -> float:
+        # v041-1: the rollout DEPTH is the profile's sight (the greedy sees
+        # 3 steps, the cautious sees 6 - a real spread of power and failure)
+        var roll_steps: int = int(pf["roll"])
+        var clear_w: float = float(pf["clear_w"])
+        var hard_gate: float = float(pf["hard_gate"])
         var step_px: float = body.speed * body.speed_mult() * ROLLOT_T
         var hr := body.width * 0.5
         # prebuilt body sample arrays (cached per frame by each SnakeBody)
@@ -243,7 +297,7 @@ func _survivor_angle(g: Node, desired: float) -> float:
                 var p := body.head_pos
                 var dead_at := -1
                 var min_clear := 9999.0
-                for st in ROLLOT_STEPS:
+                for st in roll_steps:
                         p = p + dir * step_px
                         if g.wrap_mode:
                                 # portals are FREE real estate: fold the probe, no edge cost
@@ -274,13 +328,23 @@ func _survivor_angle(g: Node, desired: float) -> float:
                                 break
                         min_clear = minf(min_clear, clear)
                 var want := absf(off)
-                var wobble := 0.035 * sin(_wobble_ph + float(k))
+                var wobble := float(pf["wobble"]) * sin(_wobble_ph + float(k))
                 if dead_at < 0:
-                        var cost := -want + wobble + minf(min_clear, 260.0) * 0.004
-                        if cost > best_survivor_cost:
-                                best_survivor_cost = cost
-                                best_survivor = ang
-                elif dead_at > best_dead_steps:
+                        # v041-1 THE SOUL GATE: skimming a body under the
+                        # profile's own gate counts as a death - the fruit on
+                        # the far side of my corpse is NOT worth my soul. A
+                        # risky gate (greedy 0.9, cautious 1.9) IS the
+                        # programmed failure spread.
+                        if min_clear < hr * hard_gate + 4.0:
+                                dead_at = roll_steps   # demoted to the dead pool
+                                min_clear = 9999.0
+                        else:
+                                var cost := -want + wobble \
+                                                + minf(min_clear, 260.0) * clear_w
+                                if cost > best_survivor_cost:
+                                        best_survivor_cost = cost
+                                        best_survivor = ang
+                if dead_at >= 0 and dead_at > best_dead_steps:
                         best_dead_steps = dead_at
                         best_dead = ang
         if best_survivor_cost < -90000.0:

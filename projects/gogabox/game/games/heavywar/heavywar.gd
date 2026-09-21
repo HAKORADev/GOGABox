@@ -177,8 +177,11 @@ func _goga_setup() -> void:
         # mouse events for the first finger - the v040-5 bug where MOVING
         # (a left-half finger) also steered the aim came from exactly that.
         # A touch screen never reads the mouse again; desktop rigs keep it.
-        touch_ui = DisplayServer.is_touchscreen_available() \
-                or OS.has_feature("mobile") or OS.has_feature("android")
+        # v041-1 THE PC-SEAT DETECTION LAW: emulate_touch_from_mouse makes
+        # the display server REPORT a touchscreen on every desktop - the
+        # mouse seat never armed (the owner: "tank aim is not following
+        # cursor"). A desktop is a mouse seat, a phone is a touch seat.
+        touch_ui = OS.has_feature("mobile") or OS.has_feature("android")
         set_score(0)
         _run_reset()
         _build_world()
@@ -940,6 +943,15 @@ func _main_cannon(pivot: Vector2, aim: float, sk: Dictionary) -> void:
 # =================================================================
 func _goga_input(event: InputEvent) -> void:
         if state == GS.OVER or paused:
+                return
+        # v041-1 THE MOUSE-IS-NOT-A-FINGER LAW (the owner: "if i clicked on
+        # the left side i will still control the tank... the controls are
+        # not really smart enough to know when to use what"): on a desktop
+        # the mouse's EMULATED touches are DEAD - the touch zones never arm
+        # from a click. The mouse path owns everything (motion aims, LMB
+        # fires, menus answer clicks), the touch path is phone-only.
+        if not touch_ui and (event is InputEventScreenTouch \
+                        or event is InputEventScreenDrag):
                 return
         if event is InputEventScreenTouch:
                 var e := event as InputEventScreenTouch

@@ -605,7 +605,9 @@ func _refresh_chips() -> void:
                         var upb: Button = menu_box.get_meta("up_btn")
                         if upb != null and is_instance_valid(upb):
                                 asig += "1" if coins >= int(menu_box.get_meta("up_cost", 0)) else "0"
-                if menu_box.has_meta("gear_btn"):
+                if menu_box.has_meta("gear_btn") \
+                                and menu_box.get_meta("gear_btn") != null \
+                                and is_instance_valid(menu_box.get_meta("gear_btn")):
                         var gb: Button = menu_box.get_meta("gear_btn")
                         if gb != null and is_instance_valid(gb):
                                 asig += "1" if coins >= int(menu_box.get_meta("gear_cost", 0)) else "0"
@@ -748,10 +750,18 @@ func _ensure_ghost(fid: String) -> void:
                 ghost_head.name = "head"
                 ghost.add_child(ghost_head)
                 field.add_child(ghost)
-        (ghost.get_node("base") as Sprite2D).texture = _t("folk/%s_base.png" % fid)
+        var base := ghost.get_node("base") as Sprite2D
+        base.texture = _t("folk/%s_base.png" % fid)
         ghost_head.texture = _t("folk/%s_head_g1.png" % fid)
         var sc := CELL / 62.0
         ghost.scale = Vector2(sc, sc)
+        # v041-1 THE GHOST ANATOMY LAW (the owner: "characters/weapons
+        # on-drag before dropping, their heads are mis-centered... so it is
+        # the mis-centered head issue"): the ghost's head now rides the SAME
+        # mount the placed folk uses (the -36% body mount + the head's own
+        # static offset) - the drag preview is anatomy-true, and the body
+        # keeps the alpha-transparent look it already had.
+        _mount_head(ghost_head, base, fid)
         ghost.visible = false
         ghost.modulate = Color(1, 1, 1, 0.75)
 

@@ -321,9 +321,10 @@ func _loop_battery() -> void:
         game.carried = {"kind": "rock_m", "pos": Vector2.ZERO, "r": 58.0,
                 "spr": null, "coin": false, "dying": false, "v": ""}
         game._bank()
-        _check("rock prices: banking a rock pays NEGATIVE (%d -> %d)"
+        # v041-1 THE SCORE FLOOR LAW: the total never reads below zero
+        _check("rock prices: banking a rock pays NEGATIVE, floored at 0 (%d -> %d)"
                         % [rock_score0, game.score],
-                game.score == rock_score0 - 4)
+                game.score == maxi(rock_score0 - 4, 0))
         # THE FLOAT TEXT LAW (v041): the bank speaks its price at the winch
         # - the NEWEST fx child is the floater, the rock wears the NEGATIVE
         # red ink

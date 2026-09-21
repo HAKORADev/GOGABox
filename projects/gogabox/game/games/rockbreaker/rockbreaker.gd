@@ -613,8 +613,11 @@ func _goga_setup() -> void:
         ground_y = H - GROUND_H * us
         # THE CONTROLS LAW: a touch screen's emulated mouse is DEAD (the
         # heavywar law) - the left finger must never become a mouse press.
-        touch_ui = DisplayServer.is_touchscreen_available() \
-                or OS.has_feature("mobile") or OS.has_feature("android")
+        # v041-1 THE PC-SEAT DETECTION LAW: emulate_touch_from_mouse makes
+        # the display server REPORT a touchscreen on every desktop - the
+        # mouse seat never armed (the owner: "tank aim is not following
+        # cursor"). A desktop is a mouse seat, a phone is a touch seat.
+        touch_ui = OS.has_feature("mobile") or OS.has_feature("android")
         md = Box.get_progress(GAME, "rb", {})
         _meta_heal()
         set_score(0)
@@ -766,9 +769,16 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         mouse_fire = false
         elif event is InputEventMouseMotion:
+                # v041-1 THE CURSOR STEER LAW (the owner: "make it follow the
+                # cursor too, but via LMB + cursor movement, more better
+                # controlling"): while the LEFT button is down the cannon
+                # rides the cursor's x - touch keeps its own half-screen law.
                 if touch_ui:
                         return
-                pass
+                if mouse_fire:
+                        move_force = clampf((event.position.x - cannon_x)
+                                / (170.0 * us), -1.0, 1.0)
+                        move_anchor = event.position.x
 
 func _touch_down(idx: int, pos: Vector2) -> void:
         var px := pos.x
@@ -1168,13 +1178,22 @@ func _rock_physics(delta: float) -> void:
                 # clamped to a beatable band, never a dead settle
                 if y + r > floor_y:
                         y = floor_y - r
-                        var raw: float
+                        # v041-1 THE SCENE-HEIGHT BOUNCE LAW (the owner):
+                        # the kick no longer rides the impact speed - every
+                        # ground bounce aims at a TARGET HEIGHT fraction of
+                        # the LIVE scene: 50-80% of the arena, one bounce in
+                        # five a power bounce at 80-95%. v = sqrt(2 g h)
+                        # puts the rock's apex exactly there - no more soft
+                        # hops that wait too much and die low.
+                        var scene_h: float = maxf(1.0, floor_y - arena_top * us)
+                        var frac: float
                         if rng.randf() < CHAOS_POWER_CHANCE:
-                                raw = absf(vy) * rng.randf_range(CHAOS_POWER_LO,
-                                        CHAOS_POWER_HI)
+                                frac = rng.randf_range(CHAOS_POWER_LO / 1.58,
+                                        CHAOS_POWER_HI / 1.66)
                         else:
-                                raw = absf(vy) * rng.randf_range(CHAOS_LO, CHAOS_HI)
-                        var kick := clampf(raw, GROUND_MIN_KICK * us,
+                                frac = rng.randf_range(0.50, 0.80)
+                        var kick: float = sqrt(2.0 * GRAVITY * scene_h * frac)
+                        kick = clampf(kick, GROUND_MIN_KICK * us,
                                 KICK_MAX * us)
                         vy = -kick
                         vx = clampf(vx * rng.randf_range(0.85, 1.25)

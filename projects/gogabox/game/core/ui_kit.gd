@@ -100,6 +100,30 @@ static func text_width(txt: String, size: int, use_display := false) -> float:
         var f := font_big() if use_display else font_ui()
         return f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 
+
+## v041-1 THE SAFE POLYGON LAW (the owner's log spam: "Invalid polygon data,
+## triangulation failed" x1000s): the engine's triangulator refuses degenerate
+## polygons (<3 UNIQUE points, or zero signed area - collinear/duplicated
+## points) and prints an ERROR for every attempt. Every per-frame code-draw
+## that can degenerate (ribbons, stars, swipe ghosts) rides THIS gate: a
+## degenerate polygon is skipped silently instead of spamming the log.
+static func safe_poly(c: CanvasItem, pts: PackedVector2Array, col: Color) -> void:
+        if c == null or pts.size() < 3:
+                return
+        var uniq := {}
+        for p in pts:
+                uniq[p] = true
+        if uniq.size() < 3:
+                return
+        var area2 := 0.0
+        for i in pts.size():
+                var p1 := pts[i]
+                var p2 := pts[(i + 1) % pts.size()]
+                area2 += p1.x * p2.y - p2.x * p1.y
+        if absf(area2) < 0.01:
+                return
+        c.draw_colored_polygon(pts, col)
+
 static func panel_style(bg: Color, radius := 22, margin := 0) -> StyleBoxFlat:
         var sb := StyleBoxFlat.new()
         sb.bg_color = bg
