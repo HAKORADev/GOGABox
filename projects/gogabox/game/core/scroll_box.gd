@@ -14,6 +14,11 @@ extends ScrollContainer
 ## A tap = touch down/up within TAP_PX and TAP_MS that never became a drag.
 
 signal tapped(pos: Vector2)
+## v041-1 r7 THE GRAB LAW: announced the moment a finger captures this
+## scroll. The menu's arrow-key ride listens - a pending keyboard target
+## must NEVER keep gliding while a finger is dragging the same list (the
+## two motions used to fight; the finger always wins now).
+signal grabbed
 
 const TAP_PX := 16.0
 const TAP_MS := 400
@@ -344,6 +349,7 @@ func _touch(t: InputEventScreenTouch) -> void:
                         _last_t = Time.get_ticks_msec()
                         _vel = Vector2.ZERO
                         _dragging = false
+                        grabbed.emit()
                 return
         if t.index != _idx:
                 return

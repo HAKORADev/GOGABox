@@ -155,6 +155,56 @@ var _kb_left := false
 var _kb_right := false
 var touch_ui := false          # a real touch screen: the emulated mouse is dead
 
+# v041-1 r7 THE HARDWARE RETICLE (the game cursor seat): the OS carries
+# this game's own crosshair ABOVE every Control - the SHOP/back buttons
+# can never paint over the cursor again (the owner: "when hovered on the
+# shop/back buttons, the cursor do not be over it, movements tracked but
+# with no visual cursor") - and the LMB hold wears a DIFFERENT image, the
+# fire cursor (the owner: "a game can make different one for clicking,
+# i mean as same as it can do one for the GOGABox-related menus").
+const CUR_SIZE := 56
+const CUR_C := 28.0
+const CUR_FIRE_COL := Color("ff6a4a")
+var _cur_norm: ImageTexture = null
+var _cur_fire: ImageTexture = null
+
+## Bake the reticle as a bitmap: the drawn crosshair's own language
+## (ring + ticks + center dot, the HTML crosshair) with a black
+## silhouette outline so it reads on any background.
+func _bake_reticle(fire: bool) -> ImageTexture:
+        var img := Image.create(CUR_SIZE, CUR_SIZE, false, Image.FORMAT_RGBA8)
+        var ring_r := 12.0 if fire else 15.0
+        var tick_in := ring_r + 4.0
+        # ticks end INSIDE the bitmap so their silhouette never clips
+        var tick_out := ring_r + 10.0
+        var col: Color = CUR_FIRE_COL if fire else THEME["accent_hi"]
+        var dot_r := 3.4 if fire else 2.2
+        for y in CUR_SIZE:
+                for x in CUR_SIZE:
+                        var d := Vector2(float(x) + 0.5 - CUR_C,
+                                        float(y) + 0.5 - CUR_C).length()
+                        var ax := absf(float(x) + 0.5 - CUR_C)
+                        var ay := absf(float(y) + 0.5 - CUR_C)
+                        var core := absf(d - ring_r) <= 1.2 \
+                                        or (ax >= tick_in and ax <= tick_out \
+                                        and ay <= 1.2) \
+                                        or (ay >= tick_in and ay <= tick_out \
+                                        and ax <= 1.2) \
+                                        or d <= dot_r
+                        var shade := absf(d - ring_r) <= 2.6 \
+                                        or (ax >= tick_in - 1.3 \
+                                        and ax <= tick_out + 1.3 \
+                                        and ay <= 2.5) \
+                                        or (ay >= tick_in - 1.3 \
+                                        and ay <= tick_out + 1.3 \
+                                        and ax <= 2.5) \
+                                        or d <= dot_r + 1.6
+                        if core:
+                                img.set_pixel(x, y, col)
+                        elif shade:
+                                img.set_pixel(x, y, Color(0, 0, 0, 0.85))
+        return ImageTexture.create_from_image(img)
+
 # parallax scroll
 var scroll_x := 0.0
 
@@ -197,6 +247,17 @@ func _goga_setup() -> void:
         # THE SCORE ICON LAW: the warbird rides INSIDE the box score chip
         # (the pop siege icon law) - the separate kills panel is dead.
         _score_icon_in_chip()
+        # v041-1 r7 THE HARDWARE RETICLE: the OS carries this game's
+        # crosshair above EVERY Control (the game cursor seat) - the
+        # SHOP/back buttons and every sheet keep the cursor visible, and
+        # the LMB hold wears the fire variant. The old HIDDEN-mouse law is
+        # dead: hiding the OS pointer and drawing the reticle through
+        # hud_draw left the reticle UNDER the top-bar buttons - movements
+        # tracked, cursor gone (the owner's exact report).
+        if not touch_ui:
+                _cur_norm = _bake_reticle(false)
+                _cur_fire = _bake_reticle(true)
+                game_cursor_arm(_cur_norm, _cur_fire, Vector2(CUR_C, CUR_C))
         _enter_intro()
 
 # =================================================================
@@ -1077,17 +1138,11 @@ func _start_place() -> void:
                 + ("  II" if place_i >= 10 else ""), 2.4)
 
 func _goga_tick(delta: float) -> void:
-        # THE PC POINTER LAW (v0.4.1): in live play the game OWNS the
-        # pointer - the OS cursor hides and the reticle IS the cursor
-        # (sheets + pause + menus force it back - the game_base pointer
-        # law). A touch screen never plays this game.
-        if not touch_ui:
-                var live := state == GS.PLACE or state == GS.BOSS
-                if live and not over:
-                        if Input.mouse_mode != Input.MOUSE_MODE_HIDDEN:
-                                Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
-                elif Input.mouse_mode == Input.MOUSE_MODE_HIDDEN:
-                        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+        # v041-1 r7: the old PC POINTER LAW (hide the OS cursor in live
+        # play, draw the reticle through hud_draw) is RETIRED - the game
+        # cursor seat (armed at _goga_setup) IS the pointer now, hardware
+        # and above everything. Touch seats never had a pointer to begin
+        # with; their drawn aim rides below.
         if paused or state == GS.OVER:
                 return
         # the top-bar scrap chip lives (the pop siege chip law)
@@ -3905,9 +3960,11 @@ func _draw_hud() -> void:
                         Color(0.78, 0.24, 0.24, damage_flash * 0.35))
         if flash > 0.0:
                 hud_draw.draw_rect(Rect2(0, 0, W, H), Color(1, 1, 1, flash))
-        # ---------- THE AIM CURSOR (the game-owned pointer - in live play
-        # the OS cursor hides and THIS is the cursor) ----------
-        if aim_ptr != -1 or mouse_seen:
+        # ---------- THE AIM CURSOR (the touch seat only - a finger has no
+        # OS cursor, so the drawn reticle rides the world for it; on a PC
+        # the hardware reticle IS the cursor and a second drawn one would
+        # double-paint under the HUD) ----------
+        if (aim_ptr != -1 or mouse_seen) and not _game_cur_armed:
                 _draw_crosshair(aim_pos)
 
 func _weapon_pips(name_txt: String, at: Vector2, n: int, maxn: int,

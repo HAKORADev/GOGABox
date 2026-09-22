@@ -105,23 +105,13 @@ func _paint_achievement(item: Dictionary) -> void:
         v.add_child(head)
         var name_l := Arc.label("%s  -  %s" % [String(g.get("title", "")), String(ach.get("title", ""))],
                         30, Arc.CARD)
-        # v041-1 THE OVERFLOW LAW (the owner: "if text was too much, the
-        # widget literally goes out-of-resolution... just use extra lines,
-        # since it's not an always-on widget"): long names/descs WRAP into
-        # extra lines now - the panel keeps its 640 width and grows
-        # downward; the text never shrinks below readable and never leaves
-        # the screen again.
-        name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(name_l)
         var desc := Arc.label(String(ach.get("desc", "")), 19, Color(1, 1, 1, 0.75), false)
-        desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(desc)
 
         # v0.0.9 owner rule: trophies get their OWN longer, slower fanfare
         # (was star + win - the exact same sounds as unlocks/death).
-        _animate_popup(root, panel, func():
+        _fit_and_animate(root, panel, name_l, desc, 30, 19, func():
                         Jukebox.sfx("achievement", -2.0)
                         Arc.confetti(root, Vector2(panel.size.x / 2.0, 90), 18))
 
@@ -161,21 +151,106 @@ func _paint_battery(item: Dictionary) -> void:
         var body_txt := "your GOGABattery bank is completely full!" if title == "" \
                         else "%s batteries are fully charged - back to it!" % title
         var body := Arc.label(body_txt, 26, Arc.CARD)
-        # v041-1 THE OVERFLOW LAW (same as the achievement popup): wrap,
-        # never overflow
-        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         v.add_child(body)
 
-        _animate_popup(root, panel, func(): Jukebox.sfx("unlock", -6.0))
+        _fit_and_animate(root, panel, body, null, 26, 19,
+                        func(): Jukebox.sfx("unlock", -6.0))
 
-## The shared slide language: park offscreen until sized, bounce in from
-## above, hold, slide away. flourish_cb fires right after the bounce-in
-## starts (kinds add their own sound/confetti there).
-func _animate_popup(root: Control, panel: PanelContainer, flourish_cb: Callable) -> void:
-        panel.custom_minimum_size = Vector2(640, 0)
-        panel.position = Vector2(-10000, -10000)  # park offscreen until sized
+# ========================================== v041-1 r7 THE COLLISION LAW
+## THE OWNER'S ORDER: the popups "are making new lines blindly, there
+## should be a collision detector to process and decide if extra text
+## will be out-of-resolution or not, because currently i guess the logic
+## is stupid letters-limiting only and it is not that smart". He was
+## right, twice over - the v041-1 fix wrapped EVERY long label at a
+## FIXED 640px panel, and inside that panel the text column collapsed to
+## the VBox's minimum width (an autowrapping Label's min width is its
+## longest WORD - without EXPAND_FILL on the VBox the HBox starves it),
+## so lines broke at ~350px even when the screen had 900px of room: the
+## blind new lines. And nothing ever checked the panel's HEIGHT against
+## the resolution at all. The real detector, in order:
+##   1. MEASURE the text against the LIVE viewport (root.size), not a
+##      const: a line that fits the available width stays ONE line.
+##   2. WRAP only when the measurement says the line cannot fit - at the
+##      FULL available width, with the column EXPANDED to it (fewest
+##      honest lines).
+##   3. COLLISION-CHECK the panel's REAL parked height against the screen
+##      (a panel taller than 55% of the viewport would ride off the
+##      bottom) and step the font ladder down until it fits - measured,
+##      not estimated; bounded, never below readable.
+func _fit_and_animate(root: Control, panel: PanelContainer,
+                main_l: Label, second_l: Label, main_size: int,
+                second_size: int, flourish_cb: Callable) -> void:
+        var main_txt := main_l.text
+        var second_txt := "" if second_l == null else second_l.text
+        var ladder := [[main_size, second_size], [26, 17], [22, 15]]
+        var step := 0
+        var f_main: FontFile = Arc.font_big() if main_l.get_theme_font(
+                        "font") == Arc.font_big() else Arc.font_ui()
+        var f_second: FontFile = Arc.font_ui()
+        var max_panel_w := minf(root.size.x - 48.0, 940.0)
+        var text_w := maxf(200.0, max_panel_w - 116.0)
+        var fits := false
+        while true:
+                var ms: int = ladder[step][0]
+                var ss: int = ladder[step][1]
+                main_l.add_theme_font_size_override("font_size", ms)
+                if second_l != null:
+                        second_l.add_theme_font_size_override("font_size", ss)
+                # (1)+(2): the width verdict against the live viewport.
+                # The text column = panel max - the icon, the HBox and
+                # style paddings (icon 72 + separation 14 + margins ~30).
+                var w_main: float = f_main.get_string_size(main_txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, ms).x
+                var w_second := 0.0
+                if second_l != null:
+                        w_second = f_second.get_string_size(second_txt,
+                                        HORIZONTAL_ALIGNMENT_LEFT, -1, ss).x
+                fits = w_main <= text_w and w_second <= text_w
+                main_l.autowrap_mode = TextServer.AUTOWRAP_OFF if fits \
+                                else TextServer.AUTOWRAP_WORD_SMART
+                if second_l != null:
+                        second_l.autowrap_mode = TextServer.AUTOWRAP_OFF \
+                                        if fits else TextServer.AUTOWRAP_WORD_SMART
+                        second_l.size_flags_horizontal = \
+                                        Control.SIZE_EXPAND_FILL
+                main_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                # THE NARROW-COLUMN KILL: the labels' VBox must EXPAND into
+                # the wrapped panel's width, or the HBox starves it down to
+                # its longest word and the lines break blindly again
+                var v := main_l.get_parent() as Control
+                if v != null and v != panel:
+                        v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                if fits:
+                        panel.custom_minimum_size = Vector2(0, 0)
+                else:
+                        # wrap at the FULL width (fewest honest lines)
+                        panel.custom_minimum_size = Vector2(max_panel_w, 0)
+                # the quick ESTIMATE gates the ladder before the park (the
+                # REAL verdict lands below, on the parked panel's own size)
+                var lines_main := 1 if fits else int(ceil(w_main / text_w))
+                var lines_second := 0
+                if second_l != null:
+                        lines_second = 0 if fits else int(ceil(
+                                        w_second / text_w))
+                var est_h := 30.0 + float(lines_main) * (ms + 10.0) \
+                                + float(lines_second) * (ss + 8.0) + 60.0
+                if est_h <= root.size.y * 0.55 or step >= ladder.size() - 1:
+                        break
+                step += 1
+        # ---- park offscreen, then the REAL collision verdict ----
+        panel.position = Vector2(-10000, -10000)
         await get_tree().process_frame
+        var limit := root.size.y * 0.55
+        while panel.size.y > limit and step < ladder.size() - 1:
+                step += 1
+                main_l.add_theme_font_size_override("font_size",
+                                int(ladder[step][0]))
+                if second_l != null:
+                        second_l.add_theme_font_size_override("font_size",
+                                        int(ladder[step][1]))
+                await get_tree().process_frame
+        # ---- the shared slide language: bounce in from above, hold,
+        # slide away. flourish_cb fires right after the bounce-in starts.
         var pw: float = panel.size.x
         var cx: float = maxf(0.0, (root.size.x - pw) / 2.0)
         panel.position = Vector2(cx, -panel.size.y - 20.0)

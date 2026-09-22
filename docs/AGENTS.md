@@ -882,3 +882,45 @@ reads without booting the scene.
 44. THE THUMBNAIL CAPTURE LAW: a game's thumb may be a code-programmed
     in-game capture (tests/v041_thumbs*.gd) - the owner prefers the real
     render over painted art when the two disagree.
+45. THE ROTATION OVERRIDE PARITY (v041-1 r7): a game CAN override the
+    play position on EVERY platform (the host's rotation reload), the
+    USER still cannot during play (F10 stays menu-only, the sensor is
+    locked on phones). The reload's mid-flight guard (host_node
+    _orient_now = "") is claimed BEFORE the design moves on EVERY path -
+    the design governor never fights an in-flight rotation. A refused
+    ask re-windows the window back to the settled kind: a rotated window
+    around un-rotated content can never outlive the refuse.
+46. THE GAME CURSOR SEAT (v041-1 r7): a game arms its OWN hardware
+    cursor (GogaCursorLib.game_arm: normal + CLICK image, the box's held
+    state, game-side) - the OS composites it above every Control, so HUD
+    buttons and sheets can never paint over it (the Heavy War lesson:
+    a drawn reticle under the top bar vanishes over SHOP/back). Touch
+    seats keep the drawn aim; the box cursor returns on game close.
+47. THE POPUP COLLISION LAW (v041-1 r7): the achievement/battery popups
+    MEASURE against the live viewport - a line that fits stays ONE line
+    (the panel hugs its content), a line that cannot fit wraps at the
+    FULL available width (the text column MUST carry EXPAND_FILL - an
+    autowrapping Label's min width is its longest word, the HBox will
+    starve it blind), and the parked panel's REAL height collides against
+    55% of the viewport with a bounded font ladder (30/19 -> 26/17 ->
+    22/15). Measured, never estimated, never letter-counted.
+48. THE CODE FRAME LAW (v041-1 r7): the loader's golden frame is drawn
+    in CODE (draw_rect, straight edges) and the thumbnail sits FLUSH
+    against it (inset = the stroke width). A StyleBoxFlat radius next to
+    a straight child lets the art float over the curved corners.
+49. THE DOOMSCROLL ENGINE (v041-1 r7): arrow scrolling is a real engine
+    - echoes are DEAD (an OS key-repeat is not a fresh nudge), the held
+    keys drive ONE continuous accelerating glide, release glides out
+    honestly, every target clamps to the REAL scrollable max
+    (bar.max_value - bar.page; the 1,000,000 phantom made the bottom of
+    the feed stick), a refresh kills pending targets, and a finger grab
+    (BoxScroll.grabbed) always wins over a pending arrow glide. The feed
+    AND the picks line ride it, 1:1.
+50. THE WINDOWS TOAST SEAT (v041-1 r7): Notify.schedule on Windows is a
+    REAL toast - a per-user AppUserModelId registration (HKCU, identity
+    + icon + ShowInSettings) and a Scheduled Task per notification that
+    fires WinRT toast XML (title, body, appLogoOverride icon, per-kind
+    ms-winsoundevent sound). Same entries as Android (schedule/cancel/
+    cancel_all), same controllables, survives app close AND reboot.
+    Windows scripts live under user://notify; custom wav audio is a
+    packaged-app feature - kinds map to distinct system toast sounds.

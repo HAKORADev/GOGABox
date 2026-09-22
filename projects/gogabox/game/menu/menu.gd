@@ -299,22 +299,42 @@ func toggle_menu_position() -> void:
 ## the row shows (TODAY'S PICKS -> LAST PLAYED -> ...). Focus navigation
 ## is nuked in main.gd, so arrows can never walk buttons - and while a
 ## game runs the game owns every arrow (this handler is menu-only).
+## v041-1 r7 THE DOOMSCROLL INPUT: echoes are DEAD (an OS key-repeat was
+## every "specific milliseconds" fresh nudge - the mis-sync), releases
+## book the held flags BEFORE any guard (a key held across a game launch
+## or a sheet can never stick), and every press/replay runs through the
+## ride engine below. The synthesized WASD/gamepad keys (main.gd) ride
+## the same road - one truth for every direction source.
 func _input(event: InputEvent) -> void:
-        if not visible or GameHost.active_host != null:
-                return
         if not (event is InputEventKey):
                 return
         var k := (event as InputEventKey)
+        if k.echo:
+                return
+        var dir_key := ""
+        match k.keycode:
+                KEY_UP:
+                        dir_key = "up"
+                KEY_DOWN:
+                        dir_key = "down"
+                KEY_LEFT:
+                        dir_key = "left"
+                KEY_RIGHT:
+                        dir_key = "right"
+        if dir_key != "":
+                _scroll_held[dir_key] = k.pressed
         if not k.pressed:
+                return
+        if not visible or GameHost.active_host != null:
                 return
         if _sheet_open or _trophies_open:
                 return
         match k.keycode:
                 KEY_UP:
-                        _nudge_feed(-300)
+                        _nudge_feed(-SCROLL_STEP)
                         get_viewport().set_input_as_handled()
                 KEY_DOWN:
-                        _nudge_feed(300)
+                        _nudge_feed(SCROLL_STEP)
                         get_viewport().set_input_as_handled()
                 KEY_LEFT, KEY_RIGHT:
                         var dir := -1 if k.keycode == KEY_LEFT else 1
@@ -324,7 +344,7 @@ func _input(event: InputEvent) -> void:
                                 get_viewport().set_input_as_handled()
                         elif _feed_scroll.scroll_vertical <= 0.5:
                                 # at the top: Left/Right live INSIDE the row
-                                _nudge_strip(280.0 * dir)
+                                _nudge_strip(float(dir) * STRIP_STEP)
                                 get_viewport().set_input_as_handled()
 
 ## The local day key (menu-side mirror of Box._today_key) - drives the
@@ -810,6 +830,11 @@ func _icon_button(icon_path: String, cb: Callable) -> Button:
 ## game-over sheet's fit_sheet wrap).
 func _build_feed() -> void:
         _feed_scroll = BoxScroll.new()
+        # v041-1 r7 THE GRAB LAW: the finger cancels any pending arrow glide
+        # the moment it touches the list (the two motions never fight)
+        _feed_scroll.grabbed.connect(func():
+                _feed_target = -1.0
+                _feed_vel = 0.0)
         _feed_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
         _vb.add_child(_feed_scroll)
         _feed_vb = VBoxContainer.new()
@@ -855,6 +880,10 @@ func _build_carousel() -> void:
         # horizontal touch-scroll strip: finger drags the cards, BoxScroll adds
         # inertia and owns taps (cards are registered tappables)
         _strip_scroll = BoxScroll.new()
+        # v041-1 r7: the strip obeys the same grab law, 1:1 with the feed
+        _strip_scroll.grabbed.connect(func():
+                _strip_target = -1.0
+                _strip_vel = 0.0)
         _strip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
         _strip_scroll.custom_minimum_size = Vector2(0, 186)
         _strip_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -982,6 +1011,10 @@ func _refresh() -> void:
         # down and rebuilt, the OFFSET is re-applied the same frame.
         var keep_feed := _feed_scroll.scroll_vertical
         var keep_strip := _strip_scroll.scroll_horizontal
+        # v041-1 r7: a rebuild re-prices the content - any pending arrow target
+        # is stale the moment the old tiles die (the phantom-target lesson)
+        _feed_target = -1.0
+        _strip_target = -1.0
         _layout()
         for c in _grid.get_children():
                 _grid.remove_child(c)
@@ -1488,33 +1521,131 @@ func _build_particles() -> void:
 ## scrolling"): the arrow keys no longer jump the offsets - they nudge a
 ## TARGET and the menu's _process glides the scrolls toward it every frame
 ## (the same easing feel as BoxScroll's finger inertia).
+## v041-1 r7 THE DOOMSCROLL ENGINE (the owner: "when i scroll to the
+## bottom of the feed, it get stuck ... every specific milliseconds pass,
+## it makes the hold as many movement, leading to slow mis-synced
+## scrolling ... no real 'doomscrolling' experience work this way, same
+## exact issues exist in the picks line, 1:1"). Three diseases died:
+##   1. THE ECHO TAX (input side): every OS key-repeat was a fresh nudge.
+##   2. THE PHANTOM TARGET: the target clamped at 1,000,000 design px -
+##      NOT the scroll's real max - so at the bottom the target sat far
+##      past the real end and UP presses crawled instead of climbing.
+##      The target clamps to the REAL scrollable max every frame now.
+##   3. THE FINGER FIGHT: a pending target kept gliding under a finger
+##      drag - BoxScroll.grabbed clears it (the finger always wins).
+## THE FEEL: hold = one continuous accelerating glide (real doomscroll,
+## no per-repeat hops), release = a short honest glide-out in the last
+## direction, single tap = one smooth SCROLL_STEP ride.
 var _feed_target := -1.0
 var _strip_target := -1.0
-const SCROLL_RIDE := 3400.0   # design px/s glide speed
+var _feed_vel := 0.0
+var _strip_vel := 0.0
+var _scroll_held := {"up": false, "down": false, "left": false, "right": false}
+const SCROLL_RIDE := 3400.0   # design px/s glide speed (tap + glide-out)
+const SCROLL_STEP := 420.0    # one press = one smooth ride
+const STRIP_STEP := 340.0
+const HOLD_VEL_MAX := 5200.0  # the hold's terminal glide speed
+const HOLD_ACCEL := 7600.0    # reached in ~0.7s of holding
+const STRIP_VEL_MAX := 4400.0
+const RELEASE_GLIDE := 0.2    # the glide-out fraction of the held speed
+
+## The REAL scrollable max (bar range minus the visible page) - the only
+## honest clamp for a scroll target. The old 1,000,000 phantom is dead.
+func _scroll_max_v() -> float:
+        if not is_instance_valid(_feed_scroll):
+                return 0.0
+        var b := _feed_scroll.get_v_scroll_bar()
+        return maxf(0.0, b.max_value - b.page)
+
+func _scroll_max_h() -> float:
+        if not is_instance_valid(_strip_scroll):
+                return 0.0
+        var b := _strip_scroll.get_h_scroll_bar()
+        return maxf(0.0, b.max_value - b.page)
 
 func _nudge_feed(amount: float) -> void:
+        if not is_instance_valid(_feed_scroll):
+                return
         if _feed_target < 0.0:
                 _feed_target = float(_feed_scroll.scroll_vertical)
-        _feed_target = clampf(_feed_target + amount, 0.0, 1000000.0)
+        _feed_target = clampf(_feed_target + amount, 0.0, _scroll_max_v())
 
 func _nudge_strip(amount: float) -> void:
+        if not is_instance_valid(_strip_scroll):
+                return
         if _strip_target < 0.0:
                 _strip_target = float(_strip_scroll.scroll_horizontal)
-        _strip_target = clampf(_strip_target + amount, 0.0, 1000000.0)
+        _strip_target = clampf(_strip_target + amount, 0.0, _scroll_max_h())
 
 func _scroll_ride(delta: float) -> void:
-        if _feed_target >= 0.0 and is_instance_valid(_feed_scroll):
-                var cur := float(_feed_scroll.scroll_vertical)
-                var nxt := move_toward(cur, _feed_target, SCROLL_RIDE * delta)
-                _feed_scroll.scroll_vertical = int(nxt)
-                if absf(nxt - _feed_target) < 1.0:
-                        _feed_target = -1.0
-        if _strip_target >= 0.0 and is_instance_valid(_strip_scroll):
-                var cur2 := float(_strip_scroll.scroll_horizontal)
-                var nxt2 := move_toward(cur2, _strip_target, SCROLL_RIDE * delta)
-                _strip_scroll.scroll_horizontal = int(nxt2)
-                if absf(nxt2 - _strip_target) < 1.0:
-                        _strip_target = -1.0
+        # the ride only exists while the menu is the live screen - anything
+        # else (a game, a sheet, hidden) drops the held keys so nothing can
+        # scroll from behind, and the next real press re-seats them
+        var active := visible and GameHost.active_host == null \
+                        and not _sheet_open and not _trophies_open \
+                        and is_instance_valid(_feed_scroll) \
+                        and is_instance_valid(_strip_scroll)
+        if not active:
+                for hk in _scroll_held:
+                        _scroll_held[hk] = false
+                _feed_vel = 0.0
+                _strip_vel = 0.0
+                return
+        # ---- the FEED: up/down held = one continuous accelerating glide
+        var dir := 0.0
+        if _scroll_held["up"]:
+                dir -= 1.0
+        if _scroll_held["down"]:
+                dir += 1.0
+        if dir != 0.0:
+                _feed_vel = clampf(_feed_vel + dir * HOLD_ACCEL * delta,
+                                -HOLD_VEL_MAX, HOLD_VEL_MAX)
+                _feed_target = -1.0   # the hold owns the motion, targets wait
+                _feed_scroll.scroll_vertical = int(clampf(
+                                float(_feed_scroll.scroll_vertical) + _feed_vel * delta,
+                                0.0, _scroll_max_v()))
+        else:
+                if _feed_vel != 0.0:
+                        # RELEASE: one honest glide-out in the last direction,
+                        # clamped to the real max (the bottom is the bottom)
+                        _feed_target = clampf(float(_feed_scroll.scroll_vertical)
+                                        + clampf(_feed_vel * RELEASE_GLIDE, -900.0, 900.0),
+                                        0.0, _scroll_max_v())
+                        _feed_vel = 0.0
+                if _feed_target >= 0.0:
+                        _feed_target = clampf(_feed_target, 0.0, _scroll_max_v())
+                        var cur := float(_feed_scroll.scroll_vertical)
+                        var nxt := move_toward(cur, _feed_target, SCROLL_RIDE * delta)
+                        _feed_scroll.scroll_vertical = int(nxt)
+                        if absf(nxt - _feed_target) < 1.0:
+                                _feed_target = -1.0
+        # ---- the STRIP (the picks line): the exact same engine, 1:1
+        var sdir := 0.0
+        if _scroll_held["left"]:
+                sdir -= 1.0
+        if _scroll_held["right"]:
+                sdir += 1.0
+        if sdir != 0.0:
+                _strip_vel = clampf(_strip_vel + sdir * HOLD_ACCEL * delta,
+                                -STRIP_VEL_MAX, STRIP_VEL_MAX)
+                _strip_target = -1.0
+                _strip_scroll.scroll_horizontal = int(clampf(
+                                float(_strip_scroll.scroll_horizontal) + _strip_vel * delta,
+                                0.0, _scroll_max_h()))
+        else:
+                if _strip_vel != 0.0:
+                        _strip_target = clampf(float(
+                                        _strip_scroll.scroll_horizontal)
+                                        + clampf(_strip_vel * RELEASE_GLIDE, -800.0, 800.0),
+                                        0.0, _scroll_max_h())
+                        _strip_vel = 0.0
+                if _strip_target >= 0.0:
+                        _strip_target = clampf(_strip_target, 0.0, _scroll_max_h())
+                        var cur2 := float(_strip_scroll.scroll_horizontal)
+                        var nxt2 := move_toward(cur2, _strip_target, SCROLL_RIDE * delta)
+                        _strip_scroll.scroll_horizontal = int(nxt2)
+                        if absf(nxt2 - _strip_target) < 1.0:
+                                _strip_target = -1.0
 
 func _process(delta: float) -> void:
         # v041-1: the arrow-key glide (the smooth ride law)

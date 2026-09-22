@@ -103,7 +103,25 @@ func _on_orientation_reload(o: String) -> void:
         if o == _orient_now:
                 if (vps.x > vps.y) == (o == "horizontal"):
                         return   # the window truly sits there: do nothing
-                _orient_now = ""   # bookkeeping desynced - force the switch
+        # v041-1 r7 THE MID-FLIGHT GUARD OWNS EVERY PATH (the owner: "in
+        # android build, the thing handled more accurately where the game
+        # can override the rotations while the user can not, currently even
+        # the game can not ... the window really rotate itself, but the
+        # rotation is not even recognized as position rotation in the app,
+        # likely because that lock"). The guard (the "" that silences the
+        # r6 design governor while a rotation is in flight) used to be
+        # claimed ONLY on the desynced path - a GENUINE change left
+        # _orient_now holding the OLD orientation, so _assert_design_law
+        # re-asserted the stale design EVERY FRAME of the wait loop below.
+        # On a phone the EXPAND aspect masks it (the viewport shape still
+        # follows the physically rotating window, the check passes, the
+        # reload lands - Android's "the game can override"). On a PC the
+        # KEEP aspect pins the viewport shape to the DESIGN, so the check
+        # read the stale orientation forever: the ask was REFUSED after 30
+        # frames while re_window had already reshaped the real window - the
+        # window rotated itself, the app never recognized the rotation.
+        # The "" is claimed BEFORE the design moves, on every path.
+        _orient_now = ""
         _apply_orientation(o == "horizontal")
         # wait until the window actually reflects the new design (a rotation on
         # device is async; desktop/headless flips immediately) - capped wait
@@ -121,6 +139,16 @@ func _on_orientation_reload(o: String) -> void:
                 # window and let the live game settle its ask in THIS shape
                 var vps3 := get_viewport_rect().size
                 _orient_now = "horizontal" if vps3.x > vps3.y else "vertical"
+                # v041-1 r7: a refused ask leaves the WINDOW honest too -
+                # re_window back to the settled kind so the exact stranded
+                # state from the owner's report (a rotated window around
+                # un-rotated content) can never outlive the refuse. Phone:
+                # no-op by the phone branch's own absence (re_window is a
+                # PC seat); fullscreen/headless: re_window no-ops itself.
+                if ScaleRule.is_pc():
+                        ScaleRule.re_window("landscape" \
+                                        if _orient_now == "horizontal"
+                                        else "portrait")
                 if game != null and is_instance_valid(game):
                         game.orientation_settled()
                 return

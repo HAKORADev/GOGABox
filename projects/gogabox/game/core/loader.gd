@@ -61,26 +61,39 @@ func _run(g: Dictionary) -> void:
         # COVERED stretch - every 3:2 thumbnail rendered as a clipped box.
         # The frame now wears the thumbnail's real aspect: the WHOLE art
         # shows, complete, exactly like everywhere else in the box.
-        var frame := Panel.new()
-        var sb := Arc.panel_style(Color(0, 0, 0, 0.35), 26)
-        sb.border_color = Arc.ACCENT
-        sb.set_border_width_all(3)
-        frame.add_theme_stylebox_override("panel", sb)
+        # v041-1 r7 THE CODE FRAME LAW (the owner: "there is a golden
+        # outline rectangle, the sides are curved, making the thumbnail
+        # literally floating over the golden frame, a fix can be make the
+        # frame code-based so it wraps itself accurately, and make it not
+        # curved"): the old StyleBoxFlat wore corner RADIUS 26 while the
+        # thumbnail inside is a straight rect - at every corner the art's
+        # square shoulder rode PAST the curved golden line (art floating
+        # over the frame). The frame is CODE-DRAWN now: a straight-edged
+        # golden rectangle via draw_rect, and the thumbnail sits FLUSH
+        # against its inner edge (inset = the stroke width) - the golden
+        # line wraps the art exactly, no radius, no gap, no float.
+        var frame := Control.new()
+        frame.custom_minimum_size = Vector2(minf(380.0, W * 0.66),
+                        minf(380.0, W * 0.66) / 1.5)
+        frame.size_flags_horizontal = BoxContainer.SIZE_SHRINK_CENTER
+        frame.draw.connect(func():
+                var r := Rect2(Vector2.ZERO, frame.size)
+                # the dark seat under the art + the straight golden line
+                frame.draw_rect(r, Color(0, 0, 0, 0.35))
+                frame.draw_rect(r, Arc.ACCENT, false, 4.0))
         var fw := minf(380.0, W * 0.66)
         var fh := fw / 1.5          # the thumbs are 960x640 - keep them so
-        frame.custom_minimum_size = Vector2(fw, fh)
-        frame.clip_contents = true
-        frame.size_flags_horizontal = BoxContainer.SIZE_SHRINK_CENTER
         v.add_child(frame)
 
         var thumb := TextureRect.new()
         var tpath := String(g.get("thumb", ""))
         thumb.texture = load(tpath) if ResourceLoader.exists(tpath) else null
         thumb.set_anchors_preset(Control.PRESET_FULL_RECT)
-        thumb.offset_left = 6
-        thumb.offset_top = 6
-        thumb.offset_right = -6
-        thumb.offset_bottom = -6
+        var inset := 4.0            # flush against the golden line
+        thumb.offset_left = inset
+        thumb.offset_top = inset
+        thumb.offset_right = -inset
+        thumb.offset_bottom = -inset
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
         thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE

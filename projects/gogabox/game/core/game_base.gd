@@ -103,6 +103,48 @@ func _goga_tick(_delta: float) -> void:
 func _goga_input(_event: InputEvent) -> void:
         pass  # raw events AFTER tk.feed() has seen them
 
+# ------------------------------------- v041-1 r7 THE GAME CURSOR SEAT
+## THE OWNER'S ORDER: a game's custom cursor must live over its own HUD
+## buttons and sheets too ("the cursor can be used here too, i mean the
+## custom in-game one"), and a game can make a DIFFERENT one for clicking
+## - "as same as it can do one for the GOGABox-related menus" (the box
+## cursor's held state, game-side). The images ride the OS-composited
+## hardware cursor (GogaCursorLib's game seat): it cannot be covered by
+## any Control, cannot lag, cannot vanish with the render path. Phones:
+## no pointer, the seat is a no-op (games keep drawing their touch aim).
+const GogaCursorLib := preload("res://game/core/goga_cursor.gd")
+var _game_cur_armed := false
+
+## Arm this game's own cursor. `normal` is the everyday image, `click`
+## (optional) swaps in while the LEFT button is held. Hotspot is the
+## pixel inside the image that IS the pointer (a reticle: its center).
+func game_cursor_arm(normal: Texture2D, click: Texture2D = null,
+                hotspot := Vector2.ZERO) -> void:
+        if not ScaleRule.is_pc() or normal == null:
+                return
+        _game_cur_armed = GogaCursorLib.game_arm(normal, click, hotspot)
+
+## Hand the pointer back (the box cursor returns on the game-closed road;
+## a game may also call this itself when it wants the OS arrow back).
+func game_cursor_disarm() -> void:
+        if not _game_cur_armed:
+                return
+        _game_cur_armed = false
+        GogaCursorLib.game_disarm()
+
+## THE CLICK SWAP: an `_input` observer, NOT _unhandled_input - a press
+## that lands on a HUD Button dies at the GUI stage and never reaches the
+## unhandled lane, and THAT press is exactly the one the click cursor must
+## wear. This never consumes: it only mirrors the LMB state into the seat.
+func _input(event: InputEvent) -> void:
+        if not _game_cur_armed:
+                return
+        if event is InputEventMouseButton \
+                        and (event as InputEventMouseButton).button_index \
+                        == MOUSE_BUTTON_LEFT and ScaleRule.is_pc():
+                GogaCursorLib.set_held((event as InputEventMouseButton).pressed)
+
+
 # --------------------------------------------------- host-provided services
 
 func set_score(v: int) -> void:

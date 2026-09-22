@@ -135,6 +135,19 @@ static func arm() -> bool:
         return true
 
 static func set_held(held: bool) -> void:
+        # v041-1 r7: the GAME seat owns the swap while it is armed - a
+        # game's click cursor replaces the box darkening for the same
+        # reason a game's own image replaces the box glyph (the ownership
+        # law). The box seat behaves exactly as before when no game seat
+        # is live.
+        if _game_armed:
+                if _game_click == null:
+                        return
+                var gtex := _game_click if held else _game_norm
+                if gtex != null:
+                        Input.set_custom_mouse_cursor(gtex,
+                                        Input.CURSOR_ARROW, _game_hot)
+                return
         if not _armed or _arrow == null:
                 return
         var tex := _arrow_dark if held else _arrow
@@ -150,3 +163,62 @@ static func disarm() -> void:
 
 static func is_armed() -> bool:
         return _armed
+
+# ============================================ v041-1 r7 THE GAME SEAT
+## THE OWNER'S ORDER (the Heavy War report): "when hovered on the shop/
+## back buttons, the cursor do not be over it, movements tracked but with
+## no visual cursor ... the cursor can be used here too, i mean the custom
+## in-game one, also a game can make different one for clicking, i mean as
+## same as it can do one for the GOGABox-related menus". Two laws fall out
+## of that:
+##   1. A GAME'S OWN CURSOR SEAT - a game arms its own cursor image (the
+##      aim reticle) and a second CLICK image (same capability the box
+##      menus have with their held darkening). The images ride the same
+##      HARDWARE road as the box cursor (r4's lesson): the OS composites
+##      the cursor ABOVE EVERYTHING - HUD buttons, sheets, the whole GUI.
+##      An in-world drawn sprite can be painted over by any Control; a
+##      hardware cursor cannot be covered by construction. THE VISIBILITY
+##      BUG'S ROOT: Heavy War drew its reticle through hud_draw, which
+##      joins the overlay root BEFORE the top bar - the SHOP/back buttons
+##      painted over it, movements tracked, visual gone.
+##   2. THE OWNERSHIP LAW EXTENDED - while a game seat is armed, the box
+##      cursor machinery (arm/set_held/disarm) never touches the ARROW
+##      shape; on_game_closed re-arms the box cursor (main.gd already
+##      calls _apply_gogacursor on the way out).
+static var _game_norm: Texture2D = null
+static var _game_click: Texture2D = null
+static var _game_hot := Vector2.ZERO
+static var _game_armed := false
+
+## Arm the game seat: `normal` is the everyday cursor, `click` (optional)
+## swaps in while the LEFT button is held. Hotspot is inside the image.
+## Idempotent - re-arming with the same images short-circuits in the
+## engine cache. Headless (probes/CI): a no-op, reports false.
+static func game_arm(normal: Texture2D, click: Texture2D = null,
+                hotspot := Vector2.ZERO) -> bool:
+        if normal == null or DisplayServer.get_name() == "headless":
+                return false
+        _game_norm = normal
+        _game_click = click
+        _game_hot = hotspot
+        _game_armed = true
+        Input.set_custom_mouse_cursor(normal, Input.CURSOR_ARROW, hotspot)
+        return true
+
+## The game seat leaves the pointer (the game closed, or it wants the box
+## arrow back for a sheet). Resets BOTH seats' images so the next box
+## arm() re-applies cleanly.
+static func game_disarm() -> void:
+        if not _game_armed:
+                return
+        _game_armed = false
+        _game_norm = null
+        _game_click = null
+        Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+        # the box cursor re-arms through main._apply_gogacursor on the
+        # game-closed road; if the box seat believes it is still armed the
+        # cached texture pair is stale - force a fresh apply next arm().
+        _armed = false
+
+static func is_game_armed() -> bool:
+        return _game_armed
