@@ -746,32 +746,48 @@ func _survival_card() -> Button:
         var l := Arc.label("SURVIVAL", 30, col)
         l.mouse_filter = Control.MOUSE_FILTER_IGNORE
         hb.add_child(l)
-        var st_txt := "ON - the big land feast" if survival \
+        # v041-1 r6 THE HONEST SEAT LAW (the owner: "the survival mode has
+        # stupid text when it is playable, it is the 'snake.io feast' -
+        # remove it"): the OFF state reads OFF, plain. No borrowed names.
+        var st_txt := "ON - the big land" if survival \
                         else ("OFF - needs 5+ snakes (you have %d)" % n) \
-                        if not gate_ok else "OFF - the snake.io feast"
+                        if not gate_ok else "OFF"
         var st := Arc.label(st_txt, 16, col if survival \
                         else Color(0.55, 0.48, 0.38), false)
         st.mouse_filter = Control.MOUSE_FILTER_IGNORE
         hb.add_child(st)
-        b.pressed.connect(func():
-                        Jukebox.sfx("click", -4.0)
-                        # v041-1: the gate is judged AT TAP TIME - never from
-                        # the build-time capture (the count may have changed)
-                        if not _surv_gate_ok():
-                                _toast_show("survival needs 5+ opponent " +
-                                        "snakes - cycle the ENEMY box count")
-                                survival = false
-                                Box.set_progress(game_id, "mode_survival", false)
-                                _show_mode_select()
-                                return
-                        survival = not survival
-                        Box.set_progress(game_id, "mode_survival", survival)
-                        if survival:
-                                # THE EXCLUSIVITY LAW: no bugs/obstacles there
-                                _set_opt("bugs", false)
-                                _set_opt("obstacles", false)
-                        _show_mode_select())
+        b.pressed.connect(_toggle_survival)
         return b
+
+## v041-1 r6: the survival toggle is a NAMED door now (the card's lambda
+## was a 20-line closure no probe could reach). The gate is judged AT TAP
+## TIME (the count may have changed since the sheet was built).
+func _toggle_survival() -> void:
+        Jukebox.sfx("click", -4.0)
+        if not _surv_gate_ok():
+                _toast_show("survival needs 5+ opponent " +
+                        "snakes - cycle the ENEMY box count")
+                survival = false
+                Box.set_progress(game_id, "mode_survival", false)
+                _show_mode_select()
+                return
+        survival = not survival
+        Box.set_progress(game_id, "mode_survival", survival)
+        if survival:
+                # THE EXCLUSIVITY LAW: no bugs/obstacles there
+                _set_opt("bugs", false)
+                _set_opt("obstacles", false)
+        # v041-1 r6 THE LAND FOLLOWS THE FLAG (the owner: "if the survival
+        # was off and i made it on, it still does not open the correct big
+        # map scene, the checker likely puts survival later or something"):
+        # _build_field() read the flag ONCE at _ready - a toggle AFTER that
+        # never rebuilt the world, so the big land never formed. The flag
+        # flips -> the land rebuilds, the player re-seats at the new
+        # board's center, and the mode select shows over the REAL world
+        # (survival ON = the big land, OFF = the screen field).
+        _build_field()
+        _reset_world()
+        _show_mode_select()
 
 func _show_ready_card() -> void:
         _phase = "ready"
@@ -826,13 +842,14 @@ func _start() -> void:
         # mechanic gold miner runs at /30) - the modular override, no game
         # names in the economy.
         bonus_div_override = 100 if survival else -1
-        # v041-1 THE OVERRIDE LAW (the owner: "it should override them, not
-        # listen to them... i managed to play survival in the normal wall-less
-        # scene and wall-ed scene, no big land i mean"): survival IGNORES the
-        # wall cards completely - its world is ALWAYS the big land with hard
-        # edges (the preference itself is untouched for classic play).
-        if survival:
-                wrap_mode = false
+        # v041-1 r6 THE WALLS CARD STANDS (the owner: "the second biggest L
+        # is even in wall-less, survival still has walls, so you have not
+        # really fixed it"): the r1 override (survival always hard walls)
+        # is DEAD. Survival chooses the BIG LAND; the wall card the player
+        # picked chooses the EDGES - CLASSIC walls end the run, NO-WALLS
+        # wraps edge to edge across the whole big land, exactly like the
+        # ready card's own subline promises. (The r1 OVERRIDE LAW note is
+        # retired with the override itself.)
         _populate_world()
         # JUMPING FRUITS live only when bought AND toggled (owner v0.2.2)
         jump_on = _opt_on("jump") and Box.unlock_owned(game_id, "jump")
@@ -1223,14 +1240,16 @@ func _spawn_fruit(first := false) -> void:
                 # tiny boards fallback: anywhere honest
                 apple_pos = board.get_center() + Vector2(randf_range(-60.0, 60.0),
                                 randf_range(-60.0, 60.0))
-        # v041-1 THE FRUIT SIZES LAW (the owner: "fruits should be 3
-        # different sizes, 1 is the normal one, 2 is bigger gives double as 1
-        # and 3 gives x3 as one and 3 times bigger; size here should not
-        # dynamically scale with the snake itself"): every spawn rolls its
-        # size - the radius is FIXED per size (never snake-scaled again).
+        # v041-1 r6 THE HONEST x3 LAW (the owner: "fruit sizes are not x3,
+        # they are too huge"): the r1 ladder multiplied the RADIUS by 3.0 -
+        # the size-3 fruit painted 9x the food (radius cubed reads as a
+        # boulder). "3 times bigger" is the FRUIT: the AREA doubles then
+        # triples (radius x sqrt), size 2 = 2x the food, size 3 = 3x the
+        # food - exactly what their value pays (the eat law below). The
+        # radius is FIXED per size (never snake-scaled - the r1 law stands).
         var roll := randf()
         fruit_size = 1 if roll < 0.55 else (2 if roll < 0.85 else 3)
-        apple_r = FRUIT_BASE_R * [1.0, 1.7, 3.0][fruit_size - 1]
+        apple_r = FRUIT_BASE_R * [1.0, 1.41, 1.73][fruit_size - 1]
         apple_live = true
         apple_pop = 0.0
         jump_t = randf_range(JUMP_WINDOW_MIN, JUMP_WINDOW_MAX)
@@ -1296,8 +1315,17 @@ func _surv_new_fruit(first := false) -> Dictionary:
                 if _near_any_body(p, 34.0):
                         continue
                 break
+        # v041-1 r6 THE OWN SIZE LAW (the owner: "some change size instead
+        # of spawn different one"): the feast fruits rode the MAIN apple's
+        # radius - every main re-roll resized the whole garden in place.
+        # Each fruit now carries its OWN size (the same x1/x2/x3 roll as
+        # the main apple) - a respawn is a NEW fruit with a NEW size,
+        # and the neighbors never move a pixel.
+        var roll := randf()
+        var sz := 1 if roll < 0.55 else (2 if roll < 0.85 else 3)
         return {"pos": p, "id": SnakeFruits.roll_edible(owned, mode),
-                "pop": 0.0, "live": true, "resp_t": 0.0}
+                "pop": 0.0, "live": true, "resp_t": 0.0, "sz": sz,
+                "r": FRUIT_BASE_R * [1.0, 1.41, 1.73][sz - 1]}
 
 func _tick_extra_fruits(delta: float) -> void:
         var hr := player.head_r()
@@ -1310,12 +1338,15 @@ func _tick_extra_fruits(delta: float) -> void:
                                 f["id"] = nf["id"]
                                 f["live"] = true
                                 f["pop"] = 0.0
+                                f["sz"] = nf["sz"]
+                                f["r"] = nf["r"]
                         else:
                                 continue
                 f["pop"] = minf(1.0, float(f["pop"]) + delta * 3.4)
-                var fr := apple_r * float(SnakeFruits.hit_meta(f["id"])["hr"])
+                # v041-1 r6: the fruit's OWN radius (never the main apple's)
+                var fr := float(f["r"]) * float(SnakeFruits.hit_meta(f["id"])["hr"])
                 var fp: Vector2 = (f["pos"] as Vector2) + Vector2(
-                                SnakeFruits.hit_meta(f["id"])["hit"]) * apple_r
+                                SnakeFruits.hit_meta(f["id"])["hit"]) * float(f["r"])
                 # the player eats
                 if float(f["pop"]) > 0.5 and _portal_touch(player.head_pos,
                                 fp, hr + fr * 0.8):
@@ -1330,10 +1361,13 @@ func _tick_extra_fruits(delta: float) -> void:
                                 break
 
 ## the feast bite: THE GROWTH LAW pays x3.5, the eater scores (parts of
-## the garden are worth their fruit)
+## the garden are worth their fruit) - v041-1 r6: the fruit's OWN size
+## pays (x1/x2/x3, the main apple's value ladder - a size-3 feast fruit
+## feeds like a size-3 apple, everywhere in the garden).
 func _surv_eat_extra(by: SnakeBody, e: Dictionary, f: Dictionary) -> void:
-        by.len_target += SnakeBody.LEN_PER_APPLE * SURV_GROWTH
-        var pts: float = 3.0 if by.has_power("golden") else 1.0
+        var sz := int(f.get("sz", 1))
+        by.len_target += SnakeBody.LEN_PER_APPLE * SURV_GROWTH * float(sz)
+        var pts: float = (3.0 if by.has_power("golden") else 1.0) * float(sz)
         if e.is_empty():
                 _eaten += 1
                 _award_pts(pts, true)
@@ -1948,10 +1982,13 @@ func _paint(v: Node2D) -> void:
                 SnakeFruits.paint_fruit(v, edible_id, apple_pos,
                                 apple_r * apple_pop, _time, true)
         # v0.4.1 THE FEAST: the swarm of extra fruits rides the world too
+        # (v041-1 r6: each fruit paints at its OWN radius - the garden's
+        # sizes belong to the fruits, not to the main apple)
         for f in extra_fruits:
                 if bool(f["live"]) and float(f["pop"]) > 0.0:
                         SnakeFruits.paint_fruit(v, String(f["id"]), f["pos"],
-                                        apple_r * float(f["pop"]), _time, true)
+                                        float(f.get("r", apple_r)) * float(f["pop"]),
+                                        _time, true)
         # the power fruit (the aura IS the type signal)
         if power_live and power_pop > 0.0:
                 var blink := 1.0

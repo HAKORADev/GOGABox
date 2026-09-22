@@ -446,8 +446,12 @@ func _goga_tick(delta: float) -> void:
                 if shake_t <= 0.0:
                         world.position = ORIGIN
         _tick_blasts(delta)
-        # v041-1 THE TIMED GROUND: the clock burns during play; 0 = the run
-        # is over (the gambling push - no endless thinking)
+        # v041-1 THE TIMED GROUND: the clock burns during play. v041-1 r6
+        # THE TIME-UP LAW (the owner: "when time ends, make it just loads
+        # the next ground, not end the game, game ends only when lives are
+        # 0"): 0 = the ground is OVER, not the run - the next ground loads
+        # (the clear flow verbatim), the clock re-prices there, and the
+        # run only dies at 0 lives (the bomb law, untouched).
         if phase == "swing" or phase == "fly" or phase == "grab" \
                         or phase == "reel":
                 ground_clock -= delta
@@ -457,7 +461,7 @@ func _goga_tick(delta: float) -> void:
                         ground_clock = 0.0
                         if time_lbl != null:
                                 time_lbl.text = "0:00"
-                        _run_over()
+                        _time_up_next_ground()
         match phase:
                 "swing":
                         swing_phase += delta * TAU / SWING_PERIOD
@@ -743,6 +747,26 @@ func _run_over() -> void:
         Jukebox.sfx("gm_over", 0.0)
         achievement_max("gm_level", level)
         finish_run(score)
+
+## v041-1 r6 THE TIME-UP LAW: the clock hit zero - the ground ends the
+## way a cleared ground does (the next one loads, the run lives on). The
+## claw drops whatever it holds (nothing banks from a dead ground - the
+## honest hand, the score floor law unaffected) and the clear flow's own
+## transition takes over from here (level += 1 -> _populate -> the clock
+## re-prices).
+func _time_up_next_ground() -> void:
+        if not carried.is_empty():
+                var spr: Sprite2D = carried["spr"]
+                if spr != null and is_instance_valid(spr):
+                        spr.queue_free()
+                items.erase(carried)
+                carried = {}
+        claw_spr.texture = _t("claw_open.png")
+        claw_spr.offset = Vector2(31.0 - 27.5, 24.0 - 16.0)
+        phase = "clear"
+        clear_t = CLEAR_TIME
+        Jukebox.sfx("gm_clear", -2.0)
+        game_toast("TIME'S UP - NEXT GROUND")
 
 # ---------------------------------------------------------------- input
 func _on_tap(_pos: Vector2) -> void:

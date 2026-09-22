@@ -108,6 +108,13 @@ func _ready() -> void:
         # position choice (F10 / the settings row) before the first layout.
         if ScaleRule.is_pc():
                 ScaleRule.pc_position = Box.pc_position()
+                # v041-1 r6 THE BOOT SHAPE LAW: boot_window() ran BEFORE the
+                # menu existed (pc_kind's static default = portrait) - a
+                # persisted LANDSCAPE choice left the window 9:16 with the
+                # landscape menu letterboxed inside (the boot mis-scale).
+                # The window follows the restored choice right now; a no-op
+                # in fullscreen and when the shapes already agree.
+                ScaleRule.re_window(ScaleRule.pc_position)
         banner_safe = _banner_safe_px()
         _layer = CanvasLayer.new()
         _layer.layer = -1          # menu lives UNDER games (fixes games invisible)
@@ -272,10 +279,20 @@ func toggle_menu_position() -> void:
         ScaleRule.pc_position = want
         if Box.has_method("set_pc_position"):
                 Box.set_pc_position(want)
-        ScaleRule.re_window(want)
+        # v041-1 r6 THE DESIGN-FIRST LAW (the owner: "pressing F10 resize
+        # the window but the app inside does not rotate itself, it gets
+        # mis-scaled inside"): the DESIGN lands before the window moves -
+        # the canvas mapping is correct for ANY window shape from this
+        # instant, so a denied/delayed/echo-late window resize can never
+        # strand a mis-scaled app inside a resized window. The menu
+        # governor (main._process) keeps asserting the design every frame;
+        # the window echo (WM_WINDOWPOSCHANGED -> _rect_changed_callback ->
+        # _update_viewport_size, synchronous in the engine source) lands
+        # the final mapping the moment the real size settles.
         _apply_base()
         _layout()
         _bg_canvas_update()
+        ScaleRule.re_window(want)
 
 ## v0.4.1 THE ARROW LAWS (PC): Up/Down scroll the feed; at the top of the
 ## feed Left/Right scroll the picks row; Tab+Left/Right switch WHICH LIST

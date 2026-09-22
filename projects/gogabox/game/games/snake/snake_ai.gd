@@ -169,6 +169,21 @@ func _choose_target(g: Node, player: SnakeBody, beh: Dictionary) -> Dictionary:
         var cands: Array = []
         if g.apple_live:
                 cands.append({"p": g.apple_pos, "v": beh["apple_weight"]})
+        # v041-1 r6 THE GARDEN SENSE (the owner: "enemies are stupid, they
+        # aim to eat specific fruit and leaving all nearby ones, no real
+        # logic work this way"): the survival feast was INVISIBLE to the
+        # brain - the candidates list held the ONE main apple, the coin and
+        # the power, so every enemy beelined across the whole big land at
+        # that single fruit while ignoring fifteen fruits on the way. Every
+        # live feast fruit is a candidate now (its own size weighs the
+        # value), and the value-over-distance chooser does what a real
+        # snake.io rival does: the CLOSEST food usually wins, the far main
+        # apple only wins when nothing better sits on the road.
+        for f in g.extra_fruits:
+                if bool(f.get("live", false)) and float(f.get("pop", 0.0)) > 0.5:
+                        cands.append({"p": f["pos"],
+                                        "v": beh["apple_weight"] \
+                                                        * float(f.get("sz", 1))})
         if g.coin_live:
                 cands.append({"p": g.coin_pos, "v": beh["coin_weight"]})
         if g.power_live:

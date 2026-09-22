@@ -150,12 +150,49 @@ func _process(delta: float) -> void:
         # ONLY on real state changes (launch/orientation re_window, the F11
         # dance in ScaleRule.set_fullscreen - main.gd's handler works
         # in-game too), exactly like every build through v041.
+        # v041-1 r6 THE DESIGN GOVERNOR (the owner: "in full screen if i
+        # opened a game that is another position than the current one, the
+        # app will somehow be stuck in mis-scale because the window itself
+        # got resized but the app internally not" + "the debugging work here
+        # must go harder"): r5 deleted the per-frame WRITER but left a
+        # per-frame READER hole - during a game NOTHING re-asserted the
+        # design law, so any missed WM echo / WM fight / foreign window
+        # state stranded the canvas mapping forever (STUCK, the exact word).
+        # The menu always had its governor (main._process -> menu
+        # .apply_resolution); the games have one now: read-compare the real
+        # truth, write ONLY on drift (apply_pc/content_scale_size are
+        # no-op compares at steady state - zero churn, zero flicker fuel).
+        # The poison-shape watchdog rides the same beat (read-only, heals
+        # the screen-covering "windowed" window once if it ever appears).
+        ScaleRule.heal_poison_shape()
+        _assert_design_law()
         # play-time accounting for the global stats screen
         if game == null or not is_instance_valid(game) or game.over or game.paused:
                 return
         _accum += delta
         if _accum >= 5.0:
                 _flush_time()
+
+## v041-1 r6 THE DESIGN GOVERNOR - the game-side half of the resolution
+## law. The game's OWN orientation (_orient_now) is the content's truth;
+## the canvas mapping must always agree with it. Writes only on drift.
+func _assert_design_law() -> void:
+        if _orient_now == "":
+                return   # a rotation reload is mid-flight - its own path owns the canvas
+        var root := get_window()
+        var want := ScaleRule.DESIGN_LANDSCAPE \
+                        if _orient_now == "horizontal" \
+                        else ScaleRule.DESIGN_PORTRAIT
+        if ScaleRule.is_pc():
+                ScaleRule.apply_pc(root, want)
+        else:
+                # phones: EXPAND fills the window edge-to-edge (the design
+                # law rides _orient_now - the sensor is LOCKED during play)
+                if root.content_scale_aspect \
+                                != Window.CONTENT_SCALE_ASPECT_EXPAND:
+                        ScaleRule.apply_expand(root)
+                if root.content_scale_size != want:
+                        root.content_scale_size = want
 
 func _flush_time() -> void:
         if _accum > 0.0:

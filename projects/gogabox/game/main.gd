@@ -110,6 +110,10 @@ func _process(_delta: float) -> void:
         # no per-frame pointer work is needed anywhere in the box.
         if GameHost.active_host != null:
                 return
+        # v041-1 r6 THE POISON-SHAPE WATCHDOG (menu seat): a windowed window
+        # that exactly covers the screen is the maximize-trap's leftover -
+        # the taskbar-glitch maker. Read-only at steady state; heals once.
+        ScaleRule.heal_poison_shape()
         if _menu != null and is_instance_valid(_menu) \
                         and _menu.has_method("apply_resolution"):
                 _menu.call("apply_resolution")

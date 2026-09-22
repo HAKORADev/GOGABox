@@ -392,6 +392,11 @@ static func profile_next(i: int) -> Array:
 # ============================================================ state
 var board: Array = []
 var grid_n := 8                 # THE BOARD SIZE (the equipped SIZES key)
+
+# v041-1 r6 THE SURVIVOR WIDTH LAW - the grid strokes (design px), sized
+# to survive the desktop's sub-scale rendering (see _draw_board).
+const GRID_LINE_W := 4.0
+const GRID_LINE_W_BORDER := 6.0
 var size_id := "8"              # the equipped size key (SIZES)
 var turn := 1
 var state := "ready"            # ready | play | wait | round_over
@@ -553,12 +558,23 @@ func _draw_board() -> void:
                                         Color(th["board_dark"], 0.28))
                 yy += cell * 0.86
                 band += 1
-        # the grid: ink lines, the border a touch heavier
+        # the grid: ink lines, the border a touch heavier.
+        # v041-1 r6 THE SURVIVOR WIDTH LAW (the owner: "game board squares
+        # lines some of them still invisible in the windows build"): r1
+        # snapped the geometry to integer DESIGN px - but the desktop seat
+        # renders the 1080-wide design at ~0.36-0.75 DEVICE scale, so a
+        # 2.0px design line lands 0.7-1.5 device px wide: a sub-pixel
+        # antialiased quad whose coverage dies at fractional positions -
+        # SOME lines vanish, some survive (position-dependent, the exact
+        # report). The r5 menu-hairline law (the same disease, the same
+        # cure) doubles the stroke: 4.0 design px = 1.4-2.7 device px on
+        # every seat - always visible, still a crisp ink grid at Android's
+        # 1:1 (a go board's lines read exactly this weight).
         for k in grid_n:
                 var t := float(k) * cell + cell * 0.5
-                var w := 2.0
+                var w := GRID_LINE_W
                 if k == 0 or k == grid_n - 1:
-                        w = 3.5
+                        w = GRID_LINE_W_BORDER
                 board_l.draw_line(
                         Vector2(g.position.x + cell * 0.5, g.position.y + t),
                         Vector2(g.end.x - cell * 0.5, g.position.y + t),

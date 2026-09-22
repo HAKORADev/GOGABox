@@ -122,6 +122,19 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## retired with the brown). One honest color, focus on the game.
 const PC_BAR_INK := Color(0.0392157, 0.0392157, 0.0392157)  # #0a0a0a
 
+## v041-1 r6 THE TRUE FULLSCREEN LAW (the owner: "i believe that fullscreen
+## is windowed borderless, i feel it is ... so just make sure that we use
+## true full screen"): he was RIGHT - WINDOW_MODE_FULLSCREEN on Windows is
+## a borderless WS_POPUP covering the screen (the engine source calls it
+## the multiwindow_fs path - it even carries the multi-monitor expand
+## offset, a WINDOW feature through and through). The box now sits in
+## WINDOW_MODE_EXCLUSIVE_FULLSCREEN: the engine's exclusive seat (no
+## expand offset, the mode read says EXCLUSIVE honestly, and the DWM
+## taskbar-glitch family - "my windows taskbar shows the content of the
+## app like it is floating under it" - never had an exclusive window to
+## decorate). is_fullscreen() accepts both modes, so every read stays
+## honest through the flip.
+
 ## v041-1 r5 THE ONE-WRITER NUKE (the owner: "try to nuke every single
 ## stupid and wrong windowing thing ... the same way you did with the
 ## brown-overlay bug"): the r1-r4 machinery is GONE - sync_window (a
@@ -183,8 +196,12 @@ static func apply_pc(win: Window, design: Vector2i) -> bool:
         var changed := false
         if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+                # the bar ink rides the flip (KEEP is the only mode that
+                # shows bars; re-writing the clear color every call would
+                # make the design governor a per-frame renderer write -
+                # the exact churn the r5 one-writer law bans)
+                RenderingServer.set_default_clear_color(PC_BAR_INK)
                 changed = true
-        RenderingServer.set_default_clear_color(PC_BAR_INK)
         if win.content_scale_size != design:
                 win.content_scale_size = design
                 changed = true
@@ -352,21 +369,64 @@ static func re_window(kind: String) -> void:
 static func toggle_fullscreen() -> void:
         set_fullscreen(not is_fullscreen())
 
-## THE FULLSCREEN LAW (v041-1 r5 THE MODE-TRUTH DANCE): every transition
-## normalizes the engine's bookkeeping FIRST, flips ONCE, settles the
-## shape after. THE MAXIMIZE TRAP (the engine source): entering
-## fullscreen from a MAXIMIZED window saves the screen-covering rect as
-## pre_fs_rect, and exiting restores it - a "windowed" window that
-## covers the screen (the owner's corrupted fullscreen: "the app still
-## say it is windowed while it is full screen", F11 dead, F10 the only
-## escape). The dance: (1) entering - if the bookkeeping says MAXIMIZED,
-## drop to WINDOWED first (the engine restores the pre-maximize rect),
-## then fullscreen; (2) exiting - after WINDOWED, if the bookkeeping
-## landed MAXIMIZED (was_maximized_pre_fs), force WINDOWED again (SW_NORMAL)
-## before re_window shapes the real windowed size. One deferred settle
-## (a single frame - never a timer, never a second re_window) finishes
-## the job after the WM echo pumped. The design does NOT ride the window
-## shape (KEEP + the content's design stay glued).
+## v041-1 r6 THE POISON-SHAPE WATCHDOG (the owner's taskbar glitch + the
+## corrupted fullscreen family - "the debugging work here must go harder
+## because there is no previous state that was good to copy from it"):
+## the engine source proves the bookkeeping is RE-DERIVED FROM THE REAL
+## WINDOW on every WM_WINDOWPOSCHANGED - a windowed-bookkeeping window
+## whose real rect EXACTLY covers the screen can only be the poison state
+## (a maximized/screen-covering "windowed" window - the maximize trap's
+## leftover, the DWM taskbar-glitch maker). The windowed lock (RESIZE+
+## MAXIMIZE disabled) makes that shape un-buildable through the UI, so
+## any instance of it is FOREIGN - OS restores, driver events, whatever.
+## The watchdog heals it once: force the SW_NORMAL bookkeeping, re-window
+## to the content kind. Read-only at steady state (2 rect compares, zero
+## writes) - the r5 flicker lesson holds. Returns true when it healed.
+static func heal_poison_shape() -> bool:
+        if not is_pc() or DisplayServer.get_name() == "headless":
+                return false
+        if is_fullscreen():
+                return false
+        if DisplayServer.window_get_mode() \
+                        == DisplayServer.WINDOW_MODE_MAXIMIZED:
+                # the maximize button is dead in windowed - a maximized
+                # bookkeeping is foreign too; normalize before it poisons
+                DisplayServer.window_set_mode(
+                                DisplayServer.WINDOW_MODE_WINDOWED)
+                re_window(pc_kind)
+                return true
+        var scr_id := DisplayServer.window_get_current_screen()
+        var spos := DisplayServer.screen_get_position(scr_id)
+        var ssz := DisplayServer.screen_get_size(scr_id)
+        if DisplayServer.window_get_position() != spos \
+                        or DisplayServer.window_get_size() != ssz:
+                return false
+        # a WINDOWED window exactly covering the screen = the poison state
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+        re_window(pc_kind)
+        return true
+
+## THE FULLSCREEN LAW (v041-1 r5 THE MODE-TRUTH DANCE / r6 THE TRUE
+## FULLSCREEN): every transition normalizes the engine's bookkeeping
+## FIRST, flips ONCE, settles the shape after. THE MAXIMIZE TRAP (the
+## engine source): entering fullscreen from a MAXIMIZED window saves the
+## screen-covering rect as pre_fs_rect, and exiting restores it - a
+## "windowed" window that covers the screen (the owner's corrupted
+## fullscreen: "the app still say it is windowed while it is full
+## screen", F11 dead, F10 the only escape). The dance: (1) entering - if
+## the bookkeeping says MAXIMIZED, drop to WINDOWED first (the engine
+## restores the pre-maximize rect), then EXCLUSIVE fullscreen (the r6
+## true-fullscreen law); (2) exiting - after WINDOWED, if the bookkeeping
+## landed MAXIMIZED (was_maximized_pre_fs), force WINDOWED again
+## (SW_NORMAL) before re_window shapes the real windowed size. One
+## deferred settle (a single frame - never a timer, never a second
+## re_window) finishes the job after the WM echo pumped. The design does
+## NOT ride the window shape (KEEP + the content's design stay glued).
+## THE 2-STATE LAW: with the maximize trap dead, the lock alive and the
+## poison-shape watchdog healing any foreign state within a frame, F11
+## walks exactly two honest states - WINDOWED <-> FULLSCREEN. The four
+## look-alike bounce is structurally impossible: there are no other
+## states left to land in.
 static func set_fullscreen(on: bool) -> void:
         if DisplayServer.get_name() == "headless":
                 return
@@ -377,8 +437,9 @@ static func set_fullscreen(on: bool) -> void:
                         == DisplayServer.WINDOW_MODE_MAXIMIZED:
                 DisplayServer.window_set_mode(
                                 DisplayServer.WINDOW_MODE_WINDOWED)
-        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN
-                        if on else DisplayServer.WINDOW_MODE_WINDOWED)
+        DisplayServer.window_set_mode(
+                        DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN if on
+                        else DisplayServer.WINDOW_MODE_WINDOWED)
         if Box.has_method("set_pc_fullscreen"):
                 Box.set_pc_fullscreen(on)
         # (2) exiting: the engine may restore the pre-fs MAXIMIZED state
@@ -417,13 +478,13 @@ static func boot_window() -> void:
         if want_fs:
                 # a MAXIMIZED bookkeeping at boot would poison pre_fs_rect
                 # (the maximize trap) - normalize first, exactly like the
-                # runtime dance.
+                # runtime dance. r6: the TRUE fullscreen (exclusive).
                 if DisplayServer.window_get_mode() \
                                 == DisplayServer.WINDOW_MODE_MAXIMIZED:
                         DisplayServer.window_set_mode(
                                         DisplayServer.WINDOW_MODE_WINDOWED)
                 DisplayServer.window_set_mode(
-                                DisplayServer.WINDOW_MODE_FULLSCREEN)
+                                DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
         else:
                 re_window(pc_kind)
         apply_window_lock()

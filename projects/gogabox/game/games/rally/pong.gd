@@ -741,9 +741,18 @@ func _follow_finger(at: Vector2) -> void:
                                 clampf(at.y, field.position.y + half,
                                 field.end.y - half))
 
-## THE PC LAW (v0.3.4-3, the windows return): the keyboard paddle - FIXED
-## speed, never ramping. The keys drive the FOLLOW target; the glide eases
-## the pad to it (the v0.3.7-1 law unchanged).
+## THE PC LAW (v0.3.4-3, the windows return) / v041-1 r6 THE SPACE-INVADERS
+## LAW (the owner: "arrow controls are sliding and not accurately moving,
+## make it like as example space invaders, currently it is slide like grid
+## to grid which is not too much accurate"): the keys drive the paddle's
+## POSITION DIRECTLY - hold = a constant fixed speed, release = it STOPS
+## on the same frame. The old road wrote the FOLLOW target ahead and let
+## the glide chase it: the pad lagged its own target by ~300px at steady
+## state and kept gliding after the key died (the sliding, the never-
+## quite-where-you-put-it feel). No target, no glide, no slide - the pad
+## is where the keys put it, exactly like the old arcade cabinets. The
+## follow target stays synced to the paddle so the touch glide (the
+## finger's own law, untouched) never fights a keyboard seat.
 func _kb_move(dir: float, delta: float) -> void:
         var p: Dictionary = pads_by_id.get("user", null)
         if p == null:
@@ -751,13 +760,15 @@ func _kb_move(dir: float, delta: float) -> void:
         var half := _pad_half_len(p)
         var spd := 4200.0
         if int(p["axis"]) == 0:
-                p["follow"] = Vector2(clampf((p["follow"] as Vector2).x + dir * spd * delta,
-                                field.position.x + half, field.end.x - half),
-                                (p["follow"] as Vector2).y)
+                var nx := clampf((p["c"] as Vector2).x + dir * spd * delta,
+                                field.position.x + half, field.end.x - half)
+                p["c"] = Vector2(nx, (p["c"] as Vector2).y)
+                p["follow"] = p["c"]
         else:
-                p["follow"] = Vector2((p["follow"] as Vector2).x,
-                                clampf((p["follow"] as Vector2).y + dir * spd * delta,
-                                field.position.y + half, field.end.y - half))
+                var ny := clampf((p["c"] as Vector2).y + dir * spd * delta,
+                                field.position.y + half, field.end.y - half)
+                p["c"] = Vector2((p["c"] as Vector2).x, ny)
+                p["follow"] = p["c"]
 
 # ================================================================ THE RUN
 
