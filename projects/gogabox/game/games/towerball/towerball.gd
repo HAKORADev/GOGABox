@@ -1,26 +1,28 @@
 extends GogaGame3D
-## TOWER BALL (v041-2) - the box's first 3D game, and the helix-jump-like
-## graduation the owner parked in FUTURE_GAMES.md ("THE STACK BALL NOTE"):
-## ONE tower law, TWO modes -
-##   BALL     the classic stack-ball smash: hold to dive, shatter the disc
-##            under you, never touch black (fire forgives), reach the
-##            victory disc through 150..900 rows.
-##   PLATFORM the neon-tower take, round-shaped: ride the bouncing ball on
-##            a platform you steer, break the tower row by row, never let
-##            the ball fall.
-## The owner's contract (verbatim laws in the brainstorm sheet):
-## rounds with ends (150-300-450-600-750-900 ladder), lives 3 (a crash
-## costs one, the round continues; no lives ends the run), each win +1
-## score, score bonus /5, a GOGACoin after every 6 rounds in a legal area
-## that CAN be missed, skins for the ball and the breakables (5 + 5,
-## first default), the fire ball after a long streak, touch + mouse/keys,
-## vertical AND horizontal, "tap anywhere to start" through the universal
-## overlay, the mode selection AS the optionals menu. The ball is
-## BALLDOZER (the eyes ride every world); the game is geometrics - no
-## words inside the world, no lore card.
-## The 3D seat: world units = 10 design px; one DirectionalLight3D with
-## soft shadows + a gentle sky; the tower draws ~1 mesh per row (vertex
-## colored, one shared material) so a 900-row round is cheap.
+## TOWER BALL (v041-2 r2) - the box's first 3D game. ONE tower law, TWO modes:
+##   BALL     the Stack Ball smash (the owner's source: Stack Bounce, the
+##            PlayCanvas decompile): the tower spins, hold to dive, shatter
+##            the disc under you, never touch black (fire forgives), reach
+##            the victory disc through the 150..900 ladder. THE FIRE is the
+##            EXACT original boost: +0.03 a break, a 1.6s slow-mo charge at
+##            full, a 0.6/s burn, a 0.15/s idle decay, a -0.5 floor cooldown.
+##   PLATFORM the REAL Neon Tower (the owner's source, the famobi decompile):
+##            the ball ORBITS the pole at a fixed radius and bounces on its
+##            own; YOU ROTATE THE TOWER (swipe / arrows / gamepad) to steer
+##            the gaps under it. Falls build the combo (their combo law:
+##            score = combo+1, threshold 4 charges the SMASH-THROUGH); red
+##            sectors and walls kill; rotating into a wall's side kills.
+## r2 owner verdicts honored: NO lives (one crash = the run over), the empty
+## widget is dead (the FIRE GAUGE lives left of the score, circular like the
+## original), the ball EXISTS from the first frame (it bounces through the
+## intro + the optionals as the living scenery), skins are DESIGNS (glass /
+## rock / wood / water + ice / metal / rubber / gold - own materials, own
+## break VFX, own SFX; black always black), the world LIVES (the sky follows
+## the device's local day time: morning / noon / evening / night, sun and
+## moon, drifting clouds, stars), gamepad (X + left/right), no lore -
+## the character is BALLDOZER and the game is geometrics.
+## The 3D seat: world units = 10 design px; one DirectionalLight3D with soft
+## shadows; the tower draws ~1 mesh per alive row (vertex colored ArrayMesh).
 
 const TB := preload("res://game/games/towerball/towerball_data.gd")
 const Coin3DL := preload("res://game/core/game_coin3d.gd")
@@ -38,37 +40,56 @@ const SMASH_V := -46.0
 const FIRE_SMASH_MULT := 1.35
 const MAX_FALL := -60.0
 const WINDOW := 26             # alive discs ahead of the top
+const BALL_Z := 8.0            # THE BALL'S FRONT SEAT: the ball bounces on
+                               # the disc's front area (world angle 0, the
+                               # camera's side) - NOT the center axis where
+                               # the pole hid it (the owner: "the ball is
+                               # not even a ball, not even exist")
 const CAM_FOV := 46.0
 const CAM_TILT := 35.0         # degrees above the horizon
 
 # ------------------------------------------------- platform mode geometry
-const BH := 3.0                # block height
-const BPITCH := 3.35           # row pitch
-const GAPX := 0.55             # gap between blocks
-const PBALL_R := 1.8
-const PADDLE_H := 1.8
-const WIN_ROWS := 30           # alive rows above the bottom
-const COIN_WINDOW := 8         # the coin's row window (then it pops)
+# THE NEON TOWER SCALE (the decompiled config, verbatim ratios)
+const PBALL_R := TB.NT_BALL_R               # 0.8
+const P_OFFSET := TB.NT_BALL_OFFSET         # 4.55 - the ball's orbit radius
+const P_RING_R := TB.NT_RING_R              # 6.3
+const P_RING_H := TB.NT_RING_H              # 1.2
+const P_PITCH := TB.NT_INTER_RING           # 8.7 - the ring spacing
+const P_POLE_R := TB.NT_POLE_R              # 2.8
+const P_GRAV := TB.NT_GRAVITY               # -60
+const P_DRAG := TB.NT_DRAG                  # 0.02 quadratic
+const P_BOUNCE := TB.NT_BOUNCE_V            # 23
+const P_APEX := TB.NT_APEX                  # 6
+const P_WALL_DEG := TB.NT_WALL_DEG
+const P_CAM_D := 15.5
+const P_CAM_FOV := 46.0
+const P_WINDOW := 22            # alive rings ahead of the ball
+const COMBO_THRESHOLD := TB.NT_COMBO_THRESHOLD
 
 # ------------------------------------------------- state
 var mode := "ball"             # "ball" | "platform"
 var phase := "boot"            # boot|intro|optionals|transition|run|serve|won|over
 var round_idx := 1
 var round_len := 150
-var lives := TB.LIVES
 var rng := RandomNumberGenerator.new()
 
 # world
 var world: Node3D
 var cam: Camera3D
 var sun: DirectionalLight3D
+var sun_mesh: MeshInstance3D
+var moon_mesh: MeshInstance3D
 var env: WorldEnvironment
 var pole: MeshInstance3D
 var ball_mesh: MeshInstance3D
 var ball_face: Node3D
 var fire_p: CPUParticles3D
+var trail_p: CPUParticles3D
 var ball_mat: StandardMaterial3D
 var frag_layer: Node3D
+var sky_layer: Node3D          # clouds + stars
+var _clouds: Array = []
+var _stars: Node3D
 
 # ball mode live
 var top_row := 0
@@ -78,63 +99,52 @@ var by := 0.0                  # ball y
 var bvy := 0.0
 var holding := false
 var key_hold := false
+var pad_hold := false
 var cam_y := 0.0
 var shake_t := 0.0
 var victory_y := 0.0
 
-# fire
-var streak := 0
-var fire_t := 0.0
-var stun_t := 0.0             # the crash grace: no smash while it runs
+# THE BOOST (the exact Stack Bounce law)
+var boost_v := TB.BOOST_START
+var boost_charge_t := 0.0      # the 1.6s slow-mo charge countdown
+var boosting := false
+var streak := 0.0              # the ORIGINAL is a float streak (pitch + score)
+var stun_t := 0.0              # the crash grace: no smash while it runs
 
 # coin
 var coin_row_idx := -1
 var coin_seg := -1
 var coin_node: Coin3D = null
-var coin_window := 0           # platform mode: rows cleared when it must die
+var coin_ring_idx := -1
 
 # platform mode live
-var rows := {}                 # row -> row state
-var bottom_row := 0
-var tower_off := 0.0
-var tower_slide := 0.0
-var px := 0.0                  # paddle x
-var ptx := 0.0                 # paddle target x
-var pvx := 0.0                 # paddle velocity (for english)
-var bvx := 0.0
-var bvy2 := 0.0
-var bx := 0.0
-var bby := 0.0                 # platform ball y
-var ball_speed := 50.0
-var serve_t := 0.0
-var fw := 80.0
-var fh := 120.0
-var cols := 8
-var reach_y := 0.0
-var paddle_y := 0.0
-var kill_y := 0.0
-var pad_w := 14.0
-var cam_d := 60.0
-var wpp := 0.1                 # world units per design px (input mapping)
-var keys := {}                 # held arrows
-var cleared_this_round := 0
+var rings := {}                 # row -> ring state {data, node, rot}
+var p_top := 0                  # the next ring the ball can meet
+var p_y := 0.0                 # ball y
+var p_vy := 0.0
+var p_combo := 0               # consecutive falls (the charge)
+var p_pending := 0             # banked falls, applied on the next solid land
+var p_cam_y := 0.0
+var p_started := false
+var ball_base_scale := 1.0     # the same Balldozer mesh, per-mode size
+var keys := {}                 # held arrows / the pad's left-right
 
 # hud
-var lives_lbl: Label
-var streak_lbl: Label
+var gauge: Control             # THE FIRE GAUGE (the circular widget)
 var banner: Label
 
 # fragments (shared pool)
 var _frags: Array = []
 var _frag_cache := {}
+var _waves: Array = []         # the break shockwaves
 
 # ----------------------------------------------------------------- setup
 
 func _goga_setup() -> void:
         rng.randomize()
         pause_end_run = true     # THE END LAW: the pause sheet banks the run
-        lives_lbl = add_hud_chip("x3", "res://assets/ui/heart.png")
-        streak_lbl = add_hud_chip("")
+        gauge = _build_gauge()
+        add_hud_widget(gauge)
         add_hud_button("SHOP", func(): _shop_open())
         _goga_tk_ready()
         mode = String(Box.get_progress(game_id, "mode", "ball"))
@@ -143,13 +153,12 @@ func _goga_setup() -> void:
         _build_world()
         _build_round()           # the tower IS the intro scenery
         Jukebox.music("res://assets/audio/music/tb_theme.wav")
-        # THE UNIVERSAL RELOAD: the host told us the picked position - the
-        # flow skips the intro and the optionals and plays.
-        if start_orientation != "":
-                _start_run()
-        else:
-                _build_intro()
-                tap_anywhere_start(_intro_start, "")
+        # r2 THE OPTIONALS LAW: the mode + position cards are the game's own
+        # menu and ALWAYS show first - the run starts from PLAY. (r1 skipped
+        # them on the reload path and the one-tap disease skipped them on the
+        # fresh path; the owner saw neither. Both are dead.)
+        _build_intro()
+        tap_anywhere_start(_intro_start, "")
         check_achievements()
 
 func _goga_tk_ready() -> void:
@@ -160,6 +169,104 @@ func _goga_tk_ready() -> void:
 
 func _goga_pause_end_ok() -> bool:
         return phase == "run" or phase == "serve"
+
+# --------------------------------------------------------- the fire gauge
+## THE CIRCULAR WIDGET (the owner: "make it show the charge and heat of the
+## fireball and the consumption time of it in a circular design like the
+## original game"). One ring, three truths:
+##   charging (boost_v 0..1): the amber arc grows clockwise; at full it
+##            flashes into the charge-up white.
+##   burning (boosting):     the ring burns fire-orange and DRAINS - the
+##            remaining arc IS the remaining active time.
+##   cooling (boost_v < 0):  a dim slate arc refills from the floor - the
+##            cooldown before the charge can build again.
+
+func _build_gauge() -> Control:
+        var c := Control.new()
+        c.custom_minimum_size = Vector2(78, 64)
+        c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        c.draw.connect(func(): _paint_gauge(c))
+        return c
+
+func _paint_gauge(c: Control) -> void:
+        var mid := Vector2(39, 34)
+        var r_out := 24.0
+        var r_in := 16.0
+        # the seat ring (the widget's body)
+        _gauge_arc(c, mid, r_out + 3.0, 0.0, TAU,
+                        Color(0.16, 0.10, 0.05, 0.55))
+        var v := boost_v
+        if boosting:
+                # THE BURN: the arc IS the remaining active time
+                var frac: float = clampf(v, 0.0, 1.0)
+                var col := Color(1.0, 0.42, 0.08) if frac > 0.35 \
+                                else Color(1.0, 0.24, 0.05)
+                _gauge_arc(c, mid, r_out, -PI / 2.0,
+                                -PI / 2.0 + TAU * frac, col)
+                _gauge_arc(c, mid, r_in, -PI / 2.0,
+                                -PI / 2.0 + TAU * frac,
+                                Color(1.0, 0.85, 0.3, 0.85))
+                c.draw_circle(mid, (r_in + r_out) * 0.5 - 1.0,
+                                Color(0.32, 0.08, 0.02, 0.75))
+                _gauge_flame(c, mid, 1.0)
+        elif boost_charge_t > 0.0:
+                # THE CHARGE-UP: the white flash ring fills over 1.6s
+                var frac: float = 1.0 - boost_charge_t / TB.BOOST_CHARGE_TIME
+                _gauge_arc(c, mid, r_out, -PI / 2.0,
+                                -PI / 2.0 + TAU * frac, Color(1, 1, 1, 0.95))
+                c.draw_circle(mid, (r_in + r_out) * 0.5 - 1.0,
+                                Color(1.0, 0.55, 0.1, 0.5))
+                _gauge_flame(c, mid, frac)
+        elif v >= TB.BOOST_SHOW:
+                # THE CHARGE: amber fills 0..1 (the heat grows with it)
+                var frac: float = clampf(v, 0.0, 1.0)
+                var col := Color(1.0, 0.55 - 0.25 * frac, 0.1 + 0.1 * frac)
+                _gauge_arc(c, mid, r_out, -PI / 2.0,
+                                -PI / 2.0 + TAU * frac, col)
+                c.draw_circle(mid, (r_in + r_out) * 0.5 - 1.0,
+                                Color(0.16, 0.10, 0.05, 0.72))
+                _gauge_flame(c, mid, frac * 0.8)
+        elif v < 0.0:
+                # THE COOLDOWN: dim slate refills from the floor
+                var frac: float = clampf((v - TB.BOOST_FLOOR)
+                                / (0.0 - TB.BOOST_FLOOR), 0.0, 1.0)
+                _gauge_arc(c, mid, r_out, -PI / 2.0,
+                                -PI / 2.0 + TAU * frac,
+                                Color(0.55, 0.58, 0.62, 0.5))
+                c.draw_circle(mid, (r_in + r_out) * 0.5 - 1.0,
+                                Color(0.16, 0.10, 0.05, 0.6))
+        else:
+                c.draw_circle(mid, (r_in + r_out) * 0.5 - 1.0,
+                                Color(0.16, 0.10, 0.05, 0.45))
+                _gauge_flame(c, mid, 0.25)
+
+## one filled arc (a pie from the center - the classic gauge read)
+func _gauge_arc(c: Control, mid: Vector2, radius: float, a0: float,
+                a1: float, col: Color) -> void:
+        if a1 <= a0:
+                return
+        var pts := PackedVector2Array()
+        pts.append(mid)
+        var steps := maxi(4, int(absf(a1 - a0) / 0.14))
+        for i in steps + 1:
+                var a: float = lerpf(a0, a1, float(i) / float(steps))
+                pts.append(mid + Vector2(cos(a), sin(a)) * radius)
+        c.draw_colored_polygon(pts, col)
+
+## the little flame glyph in the gauge's eye (code-drawn: no icon asset)
+func _gauge_flame(c: Control, mid: Vector2, heat: float) -> void:
+        var col := Color(1.0, 0.62 + 0.3 * heat, 0.18, 0.55 + 0.4 * heat)
+        var s := 8.0 + 3.0 * heat
+        var pts := PackedVector2Array([
+                mid + Vector2(0, -s * 1.5),
+                mid + Vector2(s * 0.8, -s * 0.2),
+                mid + Vector2(s * 0.5, s),
+                mid + Vector2(-s * 0.5, s),
+                mid + Vector2(-s * 0.8, -s * 0.2),
+        ])
+        c.draw_colored_polygon(pts, col)
+        c.draw_circle(mid + Vector2(0, s * 0.35), s * 0.32,
+                        Color(1.0, 0.95, 0.7, 0.5 + 0.4 * heat))
 
 # ----------------------------------------------------------------- world
 
@@ -176,38 +283,203 @@ func _build_world() -> void:
         e.background_mode = Environment.BG_SKY
         var sky := Sky.new()
         var sm := ProceduralSkyMaterial.new()
-        sm.sky_top_color = Color(String(skin["sky_top"]))
-        sm.sky_horizon_color = Color(String(skin["sky_bot"]))
-        sm.ground_bottom_color = Color(String(skin["sky_bot"]))
-        sm.ground_horizon_color = Color(String(skin["sky_bot"]))
-        sm.sun_angle_max = 20.0
         sky.sky_material = sm
         e.sky = sky
         e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-        e.ambient_light_sky_contribution = 0.55
-        e.ambient_light_energy = 1.0
+        e.ambient_light_sky_contribution = 0.7
+        e.ambient_light_energy = 1.15
+        e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
         env.environment = e
         world.add_child(env)
         sun = DirectionalLight3D.new()
-        sun.rotation_degrees = Vector3(-52, -28, 0)
-        sun.light_energy = 1.15
+        # THE CAMERA-SIDE LIGHT: pitch -55, azimuth -28 -> the light travels
+        # AWAY from the camera (it shines from the camera's front-left-top):
+        # the ball's face, the discs' tops and the tower's front all read warm
+        sun.rotation_degrees = Vector3(-55, -28, 0)
+        sun.light_energy = 1.3
         sun.light_color = Color(1.0, 0.96, 0.88)
         sun.shadow_enabled = true
         sun.directional_shadow_max_distance = 220.0
         sun.shadow_blur = 1.4
         world.add_child(sun)
+        # THE LIVING WORLD SEAT: the sun disc, the moon, the stars, the clouds
+        sun_mesh = MeshInstance3D.new()
+        var smesh := SphereMesh.new()
+        smesh.radius = 6.0
+        smesh.height = 12.0
+        sun_mesh.mesh = smesh
+        var smat := StandardMaterial3D.new()
+        smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        smat.albedo_color = Color(1.0, 0.93, 0.72)
+        smat.emission_enabled = true
+        smat.emission = Color(1.0, 0.9, 0.6)
+        smat.emission_energy_multiplier = 2.2
+        sun_mesh.material_override = smat
+        world.add_child(sun_mesh)
+        moon_mesh = MeshInstance3D.new()
+        var mmesh := SphereMesh.new()
+        mmesh.radius = 4.4
+        mmesh.height = 8.8
+        moon_mesh.mesh = mmesh
+        var mmat := StandardMaterial3D.new()
+        mmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        mmat.albedo_color = Color(0.92, 0.94, 1.0)
+        mmat.emission_enabled = true
+        mmat.emission = Color(0.8, 0.85, 1.0)
+        mmat.emission_energy_multiplier = 1.1
+        moon_mesh.material_override = mmat
+        world.add_child(moon_mesh)
+        sky_layer = Node3D.new()
+        world.add_child(sky_layer)
+        _stars = Node3D.new()
+        sky_layer.add_child(_stars)
+        for i in 90:
+                var st := MeshInstance3D.new()
+                var q := SphereMesh.new()
+                q.radius = 0.22 + rng.randf() * 0.3
+                q.height = q.radius * 2.0
+                st.mesh = q
+                var stm := StandardMaterial3D.new()
+                stm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+                stm.albedo_color = Color(1, 1, 1)
+                stm.emission_enabled = true
+                stm.emission = Color(1, 1, 1)
+                stm.emission_energy_multiplier = 1.6
+                st.material_override = stm
+                var ang := rng.randf_range(0.0, TAU)
+                var el := rng.randf_range(0.05, 1.2)
+                var dd := 240.0
+                st.position = Vector3(cos(ang) * dd * cos(el),
+                                sin(el) * dd, sin(ang) * dd * cos(el))
+                _stars.add_child(st)
+        for i in 7:
+                var cl := MeshInstance3D.new()
+                var cq := QuadMesh.new()
+                cq.size = Vector2(70 + rng.randf() * 60.0,
+                                26 + rng.randf() * 16.0)
+                cl.mesh = cq
+                var cm := StandardMaterial3D.new()
+                cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+                cm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+                cm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+                cm.albedo_color = Color(1, 1, 1, 0.5)
+                cm.albedo_texture = _cloud_tex()
+                cm.no_depth_test = false
+                cl.material_override = cm
+                cl.position = Vector3(rng.randf_range(-160, 160),
+                                rng.randf_range(30, 130),
+                                rng.randf_range(-140, -60))
+                sky_layer.add_child(cl)
+                _clouds.append({"n": cl, "spd": rng.randf_range(1.2, 3.0),
+                                "base_a": 0.35 + rng.randf() * 0.25})
         frag_layer = Node3D.new()
         world.add_child(frag_layer)
         _build_ball()
+        _apply_day_phase()
         _apply_sky(skin)
 
-func _apply_sky(skin: Dictionary) -> void:
+## one soft radial-gradient cloud texture, code-built once
+var _cloud_tex_cache: GradientTexture2D = null
+
+func _cloud_tex() -> Texture2D:
+        if _cloud_tex_cache != null:
+                return _cloud_tex_cache
+        var g := Gradient.new()
+        g.set_color(0, Color(1, 1, 1, 0.0))
+        g.set_color(1, Color(1, 1, 1, 0.9))
+        g.add_point(0.45, Color(1, 1, 1, 0.85))
+        var t := GradientTexture2D.new()
+        t.gradient = g
+        t.fill = GradientTexture2D.FILL_RADIAL
+        t.fill_from = Vector2(0.5, 0.5)
+        t.fill_to = Vector2(0.5, 0.0)
+        t.width = 128
+        t.height = 64
+        _cloud_tex_cache = t
+        return t
+
+## THE DAY PHASE LAW: the sky follows the DEVICE's local time - morning /
+## noon / evening / night, each with its own light, its own sky, its own
+## stars (night), its own sun/moon seat.
+func _apply_day_phase() -> void:
+        var t := Time.get_time_dict_from_system()
+        var hour := float(t["hour"]) + float(t["minute"]) / 60.0
+        var top: Color
+        var hor: Color
+        var sun_col: Color
+        var energy := 1.15
+        var amb := 1.0
+        var stars_a := 0.0
+        var night := false
+        if hour >= 5.0 and hour < 8.0:          # MORNING
+                top = Color("7fb8e8")
+                hor = Color("ffd9a0")
+                sun_col = Color(1.0, 0.86, 0.66)
+                energy = 1.0
+                amb = 0.95
+        elif hour >= 8.0 and hour < 16.5:       # DAY
+                top = Color("4f9fe8")
+                hor = Color("cfeaff")
+                sun_col = Color(1.0, 0.97, 0.9)
+        elif hour >= 16.5 and hour < 20.0:      # EVENING
+                top = Color("3d5a9e")
+                hor = Color("ffb37a")
+                sun_col = Color(1.0, 0.72, 0.45)
+                energy = 1.1
+                amb = 1.0
+        else:                                    # NIGHT
+                top = Color("0a1230")
+                hor = Color("1c2a52")
+                sun_col = Color(0.55, 0.62, 0.9)
+                energy = 0.7
+                amb = 0.8
+                stars_a = 1.0
+                night = true
         var sm: ProceduralSkyMaterial = (env.environment.sky.sky_material
                         as ProceduralSkyMaterial)
-        sm.sky_top_color = Color(String(skin["sky_top"]))
-        sm.sky_horizon_color = Color(String(skin["sky_bot"]))
-        sm.ground_bottom_color = Color(String(skin["sky_bot"]))
-        sm.ground_horizon_color = Color(String(skin["sky_bot"]))
+        sm.sky_top_color = top
+        sm.sky_horizon_color = hor
+        sm.ground_bottom_color = hor
+        sm.ground_horizon_color = hor
+        sun.light_color = sun_col
+        sun.light_energy = energy
+        env.environment.ambient_light_energy = amb
+        # the sun/moon seats: the light's direction, pushed far out
+        var sd := -sun.global_transform.basis.z
+        sun_mesh.position = sd * 200.0
+        sun_mesh.visible = not night
+        moon_mesh.position = -sd * 200.0 + Vector3(0, 40, 0)
+        moon_mesh.visible = night
+        for st in _stars.get_children():
+                (st as MeshInstance3D).material_override.emission_energy_multiplier \
+                                = 1.6 * stars_a
+                st.visible = stars_a > 0.05
+        for cld in _clouds:
+                var m: StandardMaterial3D = cld["n"].material_override
+                m.albedo_color = Color(1, 1, 1, cld["base_a"]
+                                * (0.25 if night else 1.0))
+
+## the thumbnail's pose: the GOLDEN HOUR forced (the living world's best
+## light for the capture rig)
+func _force_golden_hour() -> void:
+        var sm: ProceduralSkyMaterial = (env.environment.sky.sky_material
+                        as ProceduralSkyMaterial)
+        sm.sky_top_color = Color("4f86c8")
+        sm.sky_horizon_color = Color("ffcf94")
+        sm.ground_bottom_color = Color("ffcf94")
+        sm.ground_horizon_color = Color("ffcf94")
+        sun.light_color = Color(1.0, 0.84, 0.62)
+        sun.light_energy = 1.45
+        env.environment.ambient_light_energy = 1.1
+        var sd := -sun.global_transform.basis.z
+        sun_mesh.position = sd * 200.0
+        sun_mesh.visible = true
+
+func _apply_sky(skin: Dictionary) -> void:
+        # the skin keeps its say on the sky ONLY as a gentle tint of the
+        # horizon - the day phase owns the light (the one-theme law with
+        # the living world on top)
+        pass
 
 ## BALLDOZER: the sphere + the eyes (every world, no mouth)
 func _build_ball() -> void:
@@ -219,9 +491,12 @@ func _build_ball() -> void:
         sph.rings = 16
         ball_mesh.mesh = sph
         ball_mat = StandardMaterial3D.new()
-        ball_mat.albedo_color = TB.ball_color()
-        ball_mat.roughness = 0.42
-        ball_mat.metallic = 0.12
+        ball_mat.albedo_color = TB.ball_skin()["color"]
+        ball_mat.roughness = TB.ball_skin()["rough"]
+        ball_mat.metallic = TB.ball_skin()["metal"]
+        if float(TB.ball_skin()["alpha"]) < 1.0:
+                ball_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+                ball_mat.albedo_color.a = TB.ball_skin()["alpha"]
         ball_mesh.material_override = ball_mat
         world.add_child(ball_mesh)
         ball_face = Node3D.new()
@@ -239,20 +514,21 @@ func _build_ball() -> void:
                                 BALL_R * 0.3, BALL_R * 0.82)
                 eye.material_override = eye_mat
                 ball_face.add_child(eye)
+        # THE FIRE CROWN (the boost visuals ride the ball)
         fire_p = CPUParticles3D.new()
         fire_p.emitting = false
-        fire_p.amount = 26
-        fire_p.lifetime = 0.5
+        fire_p.amount = 46
+        fire_p.lifetime = 0.6
         fire_p.mesh = SphereMesh.new()
-        (fire_p.mesh as SphereMesh).radius = BALL_R * 0.22
-        (fire_p.mesh as SphereMesh).height = BALL_R * 0.44
+        (fire_p.mesh as SphereMesh).radius = BALL_R * 0.3
+        (fire_p.mesh as SphereMesh).height = BALL_R * 0.6
         fire_p.direction = Vector3(0, 1, 0)
-        fire_p.spread = 60.0
-        fire_p.gravity = Vector3(0, 10, 0)
-        fire_p.initial_velocity_min = 3.0
-        fire_p.initial_velocity_max = 7.0
+        fire_p.spread = 180.0
+        fire_p.gravity = Vector3(0, 6, 0)
+        fire_p.initial_velocity_min = 2.0
+        fire_p.initial_velocity_max = 6.0
         fire_p.scale_amount_min = 0.6
-        fire_p.scale_amount_max = 1.2
+        fire_p.scale_amount_max = 1.3
         var fr := Gradient.new()
         fr.set_color(0, Color(1.0, 0.85, 0.25, 0.9))
         fr.set_color(1, Color(0.95, 0.25, 0.05, 0.0))
@@ -264,9 +540,36 @@ func _build_ball() -> void:
         fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
         fire_p.material_override = fm
         ball_mesh.add_child(fire_p)
+        # THE TRAIL (the skin's character + the fire's white)
+        trail_p = CPUParticles3D.new()
+        trail_p.emitting = false
+        trail_p.amount = 26
+        trail_p.lifetime = 0.45
+        trail_p.mesh = SphereMesh.new()
+        (trail_p.mesh as SphereMesh).radius = BALL_R * 0.3
+        (trail_p.mesh as SphereMesh).height = BALL_R * 0.6
+        trail_p.gravity = Vector3.ZERO
+        trail_p.initial_velocity_min = 0.0
+        trail_p.initial_velocity_max = 0.0
+        trail_p.scale_amount_min = 0.4
+        trail_p.scale_amount_max = 0.9
+        var tr := Gradient.new()
+        tr.set_color(0, Color(1, 1, 1, 0.5))
+        tr.set_color(1, Color(1, 1, 1, 0.0))
+        trail_p.color_ramp = tr
+        trail_p.material_override = fm.duplicate()
+        ball_mesh.add_child(trail_p)
 
 func _apply_ball_skin() -> void:
-        ball_mat.albedo_color = TB.ball_color()
+        var s := TB.ball_skin()
+        ball_mat.albedo_color = s["color"]
+        ball_mat.roughness = s["rough"]
+        ball_mat.metallic = s["metal"]
+        if float(s["alpha"]) < 1.0:
+                ball_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+                ball_mat.albedo_color.a = float(s["alpha"])
+        else:
+                ball_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 
 # ----------------------------------------------------------------- intro
 
@@ -278,14 +581,19 @@ func _build_intro() -> void:
         _intro_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
         _intro_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _overlay_root_ref().add_child(_intro_ui)
-        var cc := CenterContainer.new()
-        cc.set_anchors_preset(Control.PRESET_FULL_RECT)
-        cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _intro_ui.add_child(cc)
         var vb := VBoxContainer.new()
         vb.add_theme_constant_override("separation", 22)
         vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        cc.add_child(vb)
+        _intro_ui.add_child(vb)
+        # the logo rides HIGH - the bouncing ball owns the screen's center
+        # (the r1 logo covered it: the owner never saw the ball)
+        vb.anchor_left = 0.5
+        vb.anchor_right = 0.5
+        vb.anchor_top = 0.0
+        vb.anchor_bottom = 0.0
+        vb.offset_left = -310.0
+        vb.offset_right = 310.0
+        vb.offset_top = 150.0
         var logo := TextureRect.new()
         logo.texture = load("res://assets/games/towerball/logo.png")
         logo.custom_minimum_size = Vector2(620, 620.0 * 420.0 / 620.0)
@@ -299,6 +607,10 @@ func _build_intro() -> void:
         tap.add_theme_constant_override("outline_size", 12)
         tap.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(tap)
+        # the ball bounces on the top disc THROUGH the intro - the game is
+        # alive from the first frame (the owner: "the ball is not even a
+        # ball, not even exist" - never hidden again)
+        ball_mesh.visible = true
 
 func _intro_start() -> void:
         Jukebox.sfx("tb_click", -6.0)
@@ -310,6 +622,8 @@ func _intro_start() -> void:
 # ------------------------------------------------------------ optionals
 # THE OWNER: "make the mode selection as the optionals menu" - the mode
 # cards + the position cards (the snake ask design) + PLAY live here.
+# r2: the menu ALWAYS shows (fresh boot AND the position reload) - the
+# game never starts itself.
 
 func _optionals_open() -> void:
         phase = "optionals"
@@ -360,35 +674,31 @@ func _play_pressed() -> void:
         _start_run()
 
 func _start_run() -> void:
-        lives = TB.LIVES
         round_idx = 1
         set_score(0)
-        _lives_hud()
+        run_coins = 0
+        if _coins_label != null:
+                _coins_label.text = "0"
         _build_round()
         _transition()
-
-func _lives_hud() -> void:
-        if lives_lbl != null:
-                lives_lbl.text = "x%d" % lives
 
 # ----------------------------------------------------------------- rounds
 
 func _build_round() -> void:
         round_len = TB.round_length(round_idx)
-        if mode == "platform":
-                _frame_field()          # cols must exist before the row data
         rows_data.clear()
         for i in round_len:
                 if mode == "ball":
                         rows_data.append(TB.gen_row(i, round_len, rng,
                                         round_idx))
                 else:
-                        rows_data.append(TB.gen_blocks(i, cols, rng,
-                                        round_idx, round_len))
+                        rows_data.append(TB.gen_ring(i, round_len, rng,
+                                        round_idx))
         # the coin: the round AFTER every 6 wins carries one (the field
         # builds FIRST so the platform seat has its geometry)
         coin_row_idx = -1
         coin_seg = -1
+        coin_ring_idx = -1
         if coin_node != null and is_instance_valid(coin_node):
                 coin_node.queue_free()
         coin_node = null
@@ -400,12 +710,11 @@ func _build_round() -> void:
                                 coin_seg = TB.pick_coin_seg(rows_data[cr], rng)
                 _build_ball_tower()
         else:
-                _build_platform_field()
+                # the coin's seat rides a ring's GAP - decided BEFORE the
+                # build (the ring nodes carry their coin at birth)
                 if TB.coin_due(score):
-                        _spawn_air_coin()
-
-func cols_placeholder() -> int:
-        return cols
+                        coin_ring_idx = TB.coin_ring(round_len, rng)
+                _build_platform_tower()
 
 ## the slide-in banner (wordless except the round number - UI, not lore)
 func _transition() -> void:
@@ -435,12 +744,16 @@ func _transition() -> void:
                         phase = "run"
                         ball_mesh.visible = true
                         if mode == "platform":
-                                _serve_ball())
+                                p_started = true)
 
 func _round_won() -> void:
         phase = "won"
-        streak = 0
-        fire_t = 0.0
+        streak = 0.0
+        boost_v = TB.BOOST_START
+        boosting = false
+        boost_charge_t = 0.0
+        fire_p.emitting = false
+        trail_p.emitting = false
         add_score(1)
         achievement_count("rounds_won", 1)
         achievement_max("round_max", round_idx)
@@ -465,6 +778,7 @@ func _run_over() -> void:
         tw.tween_callback(func(): finish_run(score, run_coins))
 
 # ================================================================ BALL MODE
+# THE STACK BALL SMASH - the tower spins, the ball dives, the discs shatter.
 
 func _build_ball_tower() -> void:
         for k in discs:
@@ -480,14 +794,23 @@ func _build_ball_tower() -> void:
         by = THICK * 0.5 + BALL_R
         bvy = 0.0
         cam_y = by
-        streak = 0
-        fire_t = 0.0
+        streak = 0.0
+        boost_v = TB.BOOST_START
+        boosting = false
+        boost_charge_t = 0.0
+        fire_p.emitting = false
+        trail_p.emitting = false
         stun_t = 0.0
         victory_y = -float(round_len) * PITCH - 6.0
         _build_pole()
         _make_victory_disc()
         _ensure_discs()
-        ball_mesh.visible = false     # the seat happens at the transition
+        ball_mesh.visible = true
+        ball_base_scale = 1.0
+        ball_mesh.scale = Vector3.ONE
+        ball_mesh.position = Vector3(0, by, BALL_Z)
+        _apply_ball_skin()
+        _apply_tower_skin()
         _cam_follow(0.016)            # seat the camera for the intro too
 
 ## the victory disc: gold, safe, the round's end - the ball lands, the
@@ -582,6 +905,8 @@ func _disc_mesh(data: Dictionary, color: Color) -> ArrayMesh:
         var seg := TAU / float(count)
         var gap := 0.014
         var h := THICK * 0.5
+        var skin := TB.break_skin()
+        var alpha := float(skin["alpha"])
         for i in count:
                 var c: Color = TB.BLACK if bool(black[i]) else color
                 var a0 := float(i) * seg + gap * 0.5
@@ -668,57 +993,96 @@ func _shatter_top(quiet := false) -> void:
                         Jukebox.sfx("tb_miss", -8.0)
                 coin_row_idx = -1
                 coin_seg = -1
-        # fragments: the ring pops outward, each piece in its segment color
-        var base := TB.ramp_color(TB.break_skin(), top_row)
-        var skin := TB.break_skin()
-        for i in 10:
-                var ang := rng.randf_range(0.0, TAU)
-                var seg_i := int(floor(fposmod(ang, TAU) / (TAU / float(count)))) % count
-                var fc: Color = TB.BLACK if bool(black[seg_i]) \
-                                else TB.ramp_color(skin, top_row)
-                var rr := rng.randf_range(R_IN + 1.0, R_OUT - 1.0)
-                _frag(fc, Vector3(sin(ang) * rr,
-                                node.position.y + rng.randf_range(-0.6, 0.6),
-                                cos(ang) * rr),
-                        Vector3(sin(ang) * rng.randf_range(6.0, 15.0),
-                                rng.randf_range(3.0, 11.0),
-                                cos(ang) * rng.randf_range(6.0, 15.0)))
+        # THE BREAK VFX: the disc dies as its own SEGMENTS (wedge fragments
+        # in the segments' own colors) + the ring shockwave + the dust
+        _break_vfx_disc(node.position.y, data, float(d["rot"]))
         node.queue_free()
         discs.erase(top_row)
         # the disc gave way on EVERY path (the crash's quiet tear included)
-        # - only the STREAK and the sfx wait for an honest smash
+        # - only the STREAK and the boost wait for an honest smash
         top_row += 1
         if not quiet:
-                Jukebox.sfx("tb_break", -4.0, rng.randf_range(0.92, 1.1))
-                streak += 1
-                if fire_t <= 0.0 and streak >= TB.FIRE_AT:
-                        _ignite_fire()
+                var skin := TB.break_skin()
+                Jukebox.sfx(String(skin["sfx"]), -4.0,
+                                rng.randf_range(0.92, 1.1)
+                                + minf(streak, 30.0) * 0.004)
+                # THE EXACT BOOST LAW: +0.03 a break (Stack Bounce verbatim)
+                if not boosting and boost_charge_t <= 0.0:
+                        streak = streak + 1.0
+                        boost_v = TB.boost_after_break(boost_v)
+                        if TB.boost_ready(boost_v):
+                                # the slow-mo charge: the world breathes,
+                                # the ball heats up, then it BURNS
+                                boost_charge_t = TB.BOOST_CHARGE_TIME
+                                Jukebox.sfx("tb_charge", -3.0)
+                else:
+                        streak = streak + 1.0
         _ensure_discs()
 
+## THE IGNITION (Stack Bounce boost() verbatim): the ball IS the fireball
 func _ignite_fire() -> void:
-        fire_t = TB.FIRE_TIME
-        streak = 0
+        boosting = true
         fire_p.emitting = true
+        trail_p.emitting = true
+        ball_mat.emission_enabled = true
+        ball_mat.emission = Color(1.0, 0.35, 0.05)
+        ball_mat.emission_energy_multiplier = 1.6
         Jukebox.sfx("tb_fire", -2.0)
+        Jukebox.loop("tb_fire_loop", -10.0)
         achievement_count("fires", 1)
 
+## the burn-out (stopBoosting verbatim): the fire dies, the cooldown floor
+func _extinguish_fire() -> void:
+        boosting = false
+        boost_v = TB.BOOST_FLOOR
+        fire_p.emitting = false
+        trail_p.emitting = false
+        ball_mat.emission_enabled = false
+        Jukebox.stop_loop("tb_fire_loop")
+
 func _ball_tick(delta: float) -> void:
+        # THE BOOST CLOCK (updateBoosting verbatim): the charge slow-mo,
+        # the burn drain, the idle decay, the floor
+        if boost_charge_t > 0.0:
+                boost_charge_t -= delta
+                if boost_charge_t <= 0.0:
+                        boost_charge_t = 0.0
+                        _ignite_fire()
+        if boosting:
+                boost_v = TB.boost_tick(boost_v, delta, true)
+                if boost_v <= 0.0:
+                        _extinguish_fire()
+        elif boost_charge_t <= 0.0 and boost_v > TB.BOOST_FLOOR:
+                boost_v = TB.boost_tick(boost_v, delta, false)
+                if boost_v < TB.BOOST_FLOOR:
+                        boost_v = TB.BOOST_FLOOR
         if phase != "run":
+                if phase != "over" and phase != "won":
+                        # the intro/optionals scenery bounce
+                        _ball_idle(delta)
+                if gauge != null:
+                        gauge.queue_redraw()
                 return
         stun_t = maxf(0.0, stun_t - delta)
-        var want_hold: bool = (holding or key_hold) and stun_t <= 0.0
+        var want_hold: bool = (holding or key_hold or pad_hold) \
+                        and stun_t <= 0.0
         var smashing := want_hold
+        # the dive speed: the fireball dives deeper (m_fireSpeed's seat)
+        var dive := SMASH_V * (FIRE_SMASH_MULT if boosting else 1.0)
+        # the charge slow-mo: the TOWER breathes while the charge winds up
+        var slomo := TB.BOOST_SLOMO if boost_charge_t > 0.0 else 1.0
         if smashing:
-                bvy = SMASH_V * (FIRE_SMASH_MULT if fire_t > 0.0 else 1.0)
+                bvy = dive
         else:
                 bvy += GRAV * delta
                 if bvy < MAX_FALL:
                         bvy = MAX_FALL
         by += bvy * delta
-        # discs spin
+        # discs spin (the charge slow-mo rides their spin)
         for r in discs:
                 var d: Dictionary = discs[r]
-                d["rot"] = float(d["rot"]) + float(d["data"]["rot"]) * delta
+                d["rot"] = float(d["rot"]) + float(d["data"]["rot"]) * delta \
+                                * slomo
                 if d["node"] != null and is_instance_valid(d["node"]):
                         (d["node"] as Node3D).rotation.y = float(d["rot"])
         # contact with the top disc (only while a tower remains - once the
@@ -728,23 +1092,21 @@ func _ball_tick(delta: float) -> void:
         var top_surface := -float(top_row) * PITCH + THICK * 0.5
         if top_row < round_len and bvy < 0.0 and by - BALL_R <= top_surface:
                 by = top_surface + BALL_R
-                var d: Dictionary = discs.get(top_row, {})
+                var d2: Dictionary = discs.get(top_row, {})
                 var black_seg := false
-                if not d.is_empty():
-                        var data: Dictionary = d["data"]
+                if not d2.is_empty():
+                        var data: Dictionary = d2["data"]
                         var seg := TB.seg_under_ball(int(data["count"]),
-                                        float(d["rot"]))
+                                        float(d2["rot"]))
                         black_seg = bool(data["black"][seg])
                 if smashing:
-                        if black_seg and fire_t <= 0.0:
+                        if black_seg and not boosting:
                                 _crash(top_surface)
                         else:
                                 _shatter_top()
                 else:
-                        # the bounce: the streak breaks, the ball floats up
+                        # the bounce: the ball floats up
                         bvy = BOUNCE_V
-                        if streak > 0:
-                                streak = 0
                         Jukebox.sfx("tb_bounce", -6.0,
                                         rng.randf_range(0.9, 1.12))
         # the victory disc
@@ -752,42 +1114,81 @@ func _ball_tick(delta: float) -> void:
                 by = victory_y + THICK * 0.5 + BALL_R
                 bvy = BOUNCE_V
                 _round_won()
-        # the ball's world seat: the mesh rides the physics every tick
-        ball_mesh.position = Vector3(0, by, 0)
-        # fire clock
-        if fire_t > 0.0:
-                fire_t -= delta
-                if fire_t <= 0.0:
-                        fire_p.emitting = false
-        _hud_tick()
+        # the ball's world seat: the mesh rides the physics every tick -
+        # ON the disc's front area (the contact law's world angle 0)
+        ball_mesh.position = Vector3(0, by, BALL_Z)
+        _ball_wobble(delta, smashing)
+        trail_p.emitting = boosting or smashing
+        if gauge != null:
+                gauge.queue_redraw()
         _cam_follow(delta)
 
+## the intro/optionals scenery: the ball bounces on the top disc
+func _ball_idle(delta: float) -> void:
+        var top_surface := THICK * 0.5 + BALL_R
+        bvy += GRAV * delta
+        by += bvy * delta
+        if by <= top_surface and bvy < 0.0:
+                by = top_surface
+                bvy = BOUNCE_V * 0.75
+                Jukebox.sfx("tb_bounce", -16.0, rng.randf_range(0.9, 1.1))
+        ball_mesh.position = Vector3(0, by, BALL_Z)
+        for r in discs:
+                var d: Dictionary = discs[r]
+                d["rot"] = float(d["rot"]) + float(d["data"]["rot"]) * delta
+                if d["node"] != null and is_instance_valid(d["node"]):
+                        (d["node"] as Node3D).rotation.y = float(d["rot"])
+        _cam_follow(delta)
+
+## the ball's squash-stretch + the roll spin (the ball is ALIVE)
+var _sq := 1.0
+
+func _ball_wobble(delta: float, smashing: bool) -> void:
+        var target := 0.86 if smashing else 1.0
+        _sq = lerpf(_sq, target, 1.0 - exp(-9.0 * delta))
+        var w := 1.0 / maxf(0.5, _sq)
+        ball_mesh.scale = Vector3(ball_base_scale * w,
+                        ball_base_scale * _sq, ball_base_scale * w)
+        ball_face.rotation.y += delta * 2.2
+
+## THE CRASH (r2: NO LIVES - the owner's law. One crash = the run over.)
 func _crash(surface_y: float) -> void:
-        lives -= 1
-        _lives_hud()
-        streak = 0
-        shake_t = 0.5
+        streak = 0.0
+        shake_t = 0.6
         Jukebox.sfx("tb_crash", -2.0)
+        _red_flash()
         _frag(TB.BLACK, Vector3(0, surface_y + 1.0, 0),
                 Vector3(0, 9.0, 0))
-        for i in 8:
+        for i in 10:
                 var ang := rng.randf_range(0.0, TAU)
                 _frag(TB.BLACK, Vector3(sin(ang) * 4.0, surface_y + 1.2,
                                 cos(ang) * 4.0),
                         Vector3(sin(ang) * rng.randf_range(5.0, 11.0),
                                 rng.randf_range(4.0, 9.0),
                                 cos(ang) * rng.randf_range(5.0, 11.0)))
-        if lives <= 0:
-                fire_p.emitting = false
-                _run_over()
-                return
-        # THE GRACE: the black segment gave way under the crash - the ball
-        # drifts through the broken disc, stunned (no smash) for a beat.
-        # Without it a held dive would chain-crash all three lives in a
-        # second with no chance to react.
+        _extinguish_fire()
         _shatter_top(true)
         bvy = SMASH_V * 0.35
-        stun_t = 0.65
+        stun_t = 0.5
+        _run_over()
+
+## the red crash flash (a full-rect blush that dies fast)
+var _flash: ColorRect = null
+
+func _red_flash() -> void:
+        if _flash != null and is_instance_valid(_flash):
+                _flash.queue_free()
+        _flash = ColorRect.new()
+        _flash.color = Color(0.9, 0.1, 0.05, 0.32)
+        _flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _overlay_root_ref().add_child(_flash)
+        var tw := _flash.create_tween()
+        tw.tween_property(_flash, "color:a", 0.0, 0.4)
+        tw.tween_callback(func():
+                if _flash != null and is_instance_valid(_flash):
+                        _flash.queue_free()
+                _flash = null)
 
 func _cam_follow(delta: float) -> void:
         cam_y = lerpf(cam_y, by, 1.0 - exp(-7.0 * delta))
@@ -802,6 +1203,9 @@ func _cam_follow(delta: float) -> void:
                                 rng.randf_range(-s, s), 0)
         cam.position = target
         cam.look_at(focus, Vector3.UP)
+        # the living sky rides with the camera (the clouds/stars never parallax
+        # away into nothing)
+        sky_layer.position.y = cam_y
 
 func _cam_dist() -> float:
         var vp := get_viewport().get_visible_rect().size
@@ -810,522 +1214,577 @@ func _cam_dist() -> float:
         var tanh_ := tanv * aspect
         var d := R_OUT / maxf(0.02, tanh_ * 0.66)
         # the floor keeps the STACK visible on wide windows (a close camera
-        # hides the discs under the top one)
-        return clampf(d, 54.0, 120.0)
-
-func _hud_tick() -> void:
-        if streak_lbl == null:
-                return
-        if fire_t > 0.0:
-                streak_lbl.text = "FIRE"
-        elif streak > 1:
-                streak_lbl.text = "x%d" % streak
-        else:
-                streak_lbl.text = ""
+        # hides the discs under the top one); portrait needs the FARTHER seat
+        var floor_d := 54.0 if aspect > 1.2 else 66.0
+        return clampf(d, floor_d, 130.0)
 
 # ============================================================ PLATFORM MODE
-# the neon-tower take, round-shaped: the platform is yours, the ball
-# bounces forever, the tower breaks row by row, the rows never stop.
+# THE REAL NEON TOWER (the famobi decompile, round-shaped on the ladder):
+# the ball ORBITS the pole at a fixed radius and bounces vertically on its
+# own; the PLAYER rotates the TOWER of ring-platforms; falls through gaps
+# build the combo (fall score = combo+1, the pending banks land on the next
+# solid); the combo charge (4 falls) SMASHES the next solid platform; red
+# sectors + walls kill; rotating a wall's side through the ball kills.
 
-func _frame_field() -> void:
-        var vp := get_viewport().get_visible_rect().size
-        var aspect := vp.x / maxf(1.0, vp.y)
-        fh = clampf((vp.y - 300.0) / 10.0, 60.0, 170.0)
-        fw = clampf(fh * aspect * 0.92, 55.0, 200.0)
-        cols = clampi(int((fw - 4.0) / 12.0), 6, 14)
-        reach_y = -fh * 0.04
-        paddle_y = -fh * 0.42
-        kill_y = paddle_y - 5.0
-        cam_d = (fh * 0.56) / tan(deg_to_rad(24.0))
-        wpp = (fh * 1.14) / vp.y
-        ball_speed = maxf(46.0, fh * 0.40)
-        pad_w = clampf(fw * 0.19, 12.0, 26.0)
-
-func _build_platform_field() -> void:
-        for k in rows:
-                var d: Dictionary = rows[k]
+func _build_platform_tower() -> void:
+        for k in rings:
+                var d: Dictionary = rings[k]
                 if d["node"] != null and is_instance_valid(d["node"]):
                         d["node"].queue_free()
-        rows.clear()
+        rings.clear()
         _clear_frags()
-        bottom_row = 0
-        tower_off = 0.0
-        tower_slide = 0.0
-        cleared_this_round = 0
-        streak = 0
-        fire_t = 0.0
-        px = 0.0
-        ptx = 0.0
-        # platform mode: no pole - the tower is the field's own geometry
-        # the walls: two slim rails framing the field
-        for side in [-1.0, 1.0]:
-                var wall := MeshInstance3D.new()
-                var bm := BoxMesh.new()
-                bm.size = Vector3(1.8, fh, 2.6)
-                wall.mesh = bm
-                wall.position = Vector3(side * (fw * 0.5 + 0.9),
-                                paddle_y + fh * 0.5, 0)
-                var wm := StandardMaterial3D.new()
-                wm.albedo_color = Color(String(TB.break_skin()["pole"]))
-                wm.albedo_color = wm.albedo_color.darkened(0.25)
-                wm.roughness = 0.6
-                wall.material_override = wm
-                world.add_child(wall)
-        _build_paddle()
-        _ensure_rows()
-        ball_mesh.visible = false
+        p_top = 0
+        p_y = P_APEX
+        p_vy = 0.0
+        p_combo = 0
+        p_pending = 0
+        p_cam_y = p_y
+        p_started = false
+        ball_base_scale = PBALL_R / BALL_R
+        ball_mesh.scale = Vector3.ONE * ball_base_scale
+        _ensure_rings()
+        _build_pole_p()
+        ball_mesh.visible = true
+        ball_mesh.position = _p_ball_pos()
+        _apply_ball_skin()
+        _apply_tower_skin()
+        _platform_cam(0.016)
 
-var paddle: MeshInstance3D = null
-
-func _build_paddle() -> void:
-        if paddle != null and is_instance_valid(paddle):
-                paddle.queue_free()
-        paddle = MeshInstance3D.new()
-        var bm := BoxMesh.new()
-        bm.size = Vector3(pad_w, PADDLE_H, 4.2)
-        paddle.mesh = bm
+func _build_pole_p() -> void:
+        if pole != null and is_instance_valid(pole):
+                pole.queue_free()
+        pole = MeshInstance3D.new()
+        var cyl := CylinderMesh.new()
+        cyl.top_radius = P_POLE_R
+        cyl.bottom_radius = P_POLE_R
+        cyl.height = float(round_len) * P_PITCH + 80.0
+        cyl.radial_segments = 20
+        pole.mesh = cyl
         var pm := StandardMaterial3D.new()
-        pm.albedo_color = TB.ramp_color(TB.break_skin(), 0).darkened(0.18)
-        pm.roughness = 0.45
-        paddle.material_override = pm
-        paddle.position = Vector3(0, paddle_y, 0)
-        world.add_child(paddle)
+        pm.albedo_color = Color(String(TB.break_skin()["pole"]))
+        pm.roughness = 0.6
+        pole.material_override = pm
+        pole.position.y = -cyl.height * 0.5 + 24.0
+        world.add_child(pole)
 
-## the alive window rides the BOTTOM (cleared rows die, new rows bloom
-## at the window's top - the tower never runs out)
-func _ensure_rows() -> void:
-        for r in range(bottom_row, mini(round_len, bottom_row + WIN_ROWS)):
-                if not rows.has(r):
-                        rows[r] = _make_block_row(r)
+func _ring_y(row: int) -> float:
+        return -float(row) * P_PITCH
+
+## the alive window rides the ball's descent
+func _ensure_rings() -> void:
+        while p_top < round_len \
+                        and _ring_y(p_top) > p_y - P_WINDOW * P_PITCH:
+                if not rings.has(p_top):
+                        rings[p_top] = _make_ring(p_top)
+                p_top += 1
         var dead: Array = []
-        for r in rows:
-                if int(r) < bottom_row:
+        for r in rings:
+                if int(r) < p_top - P_WINDOW - 6:
                         dead.append(r)
         for r in dead:
-                var d: Dictionary = rows[r]
+                var d: Dictionary = rings[r]
                 if d["node"] != null and is_instance_valid(d["node"]):
                         d["node"].queue_free()
-                rows.erase(r)
+                rings.erase(r)
 
-func _make_block_row(row: int) -> Dictionary:
-        # THE PRESENCE LAW: breaks[i] = the block STANDS (all born standing,
-        # hard ones included); rows_data[row] (the birth data) says whether
-        # a standing block is breakable (true) or HARD (false).
-        var breaks: Array = []
-        for i in cols:
-                breaks.append(true)
+func _make_ring(row: int) -> Dictionary:
+        var data: Dictionary = rows_data[row]
         var node := MeshInstance3D.new()
-        node.mesh = _row_mesh(breaks, rows_data[row], row)
+        node.mesh = _ring_mesh(data, row)
         node.material_override = _tower_material()
-        node.position.y = _row_y(row) + tower_off
+        node.position.y = _ring_y(row)
         world.add_child(node)
-        return {"row": row, "breaks": breaks, "node": node}
+        # the walls: small boxes standing on the rim, movers carry a speed
+        var wall_nodes: Array = []
+        for w in data["walls"]:
+                var wm := MeshInstance3D.new()
+                var bm := BoxMesh.new()
+                var wd := deg_to_rad(P_WALL_DEG)
+                var arc := P_RING_R * wd
+                bm.size = Vector3(maxf(0.5, arc), float(w["h"]), 0.9)
+                wm.mesh = bm
+                var wmat := StandardMaterial3D.new()
+                wmat.albedo_color = TB.BLACK
+                wmat.roughness = 0.7
+                wm.material_override = wmat
+                var wr := Node3D.new()
+                wr.rotation.y = float(w["a"])
+                var rr := P_RING_R - 0.45
+                wr.position = Vector3(0, P_RING_H * 0.5 + float(w["h"]) * 0.5,
+                                0)
+                wm.position = Vector3(0, 0, rr)
+                wr.add_child(wm)
+                node.add_child(wr)
+                wall_nodes.append({"a": float(w["a"]), "h": float(w["h"]),
+                        "spd": float(w["spd"]), "n": wr})
+        var st := {"row": row, "data": data, "node": node,
+                        "rot": 0.0, "walls": wall_nodes, "coin": null}
+        if row == coin_ring_idx:
+                var coin: Coin3D = Coin3DL.new()
+                # the coin rides the guaranteed GAP's middle (the legal area:
+                # fall through this ring's gap to collect it)
+                var mid: float = float(data["gap0"]) + float(data["gap"]) * 0.5
+                coin.position = Vector3(sin(mid) * P_RING_R * 0.55,
+                                P_RING_H + 1.2, cos(mid) * P_RING_R * 0.55)
+                node.add_child(coin)
+                coin.set_diameter(Coin3DL.world_diameter(TB.COIN_DESIGN_PX,
+                                cam, P_CAM_D))
+                st["coin"] = coin
+                coin_node = coin
+        return st
 
-func _row_y(row: int) -> float:
-        return reach_y + BH * 0.5 + float(row) * BPITCH
-
-## one row = ONE ArrayMesh (the same draw-call law as the discs).
-## breaks[i] TRUE = the block stands; data[i] (the row's birth data)
-## says whether it is breakable (true) or HARD (false).
-func _row_mesh(breaks: Array, data: Array, row: int) -> ArrayMesh:
+## one ring = ONE ArrayMesh: the solid sectors in the row's color, the RED
+## sectors in the danger ink (always red-black, every skin), the gaps open.
+func _ring_mesh(data: Dictionary, row: int) -> ArrayMesh:
         var st := SurfaceTool.new()
         st.begin(Mesh.PRIMITIVE_TRIANGLES)
         var color := TB.ramp_color(TB.break_skin(), row)
-        var usable := fw - 4.0
-        var bw := (usable - float(cols - 1) * GAPX) / float(cols)
-        var x0 := -usable * 0.5
-        for i in cols:
-                if not bool(breaks[i]):
-                        continue
-                var c: Color = color if bool(data[i]) else TB.BLACK
-                var cx := x0 + float(i) * (bw + GAPX) + bw * 0.5
-                _box(st, Vector3(cx, 0, 0), Vector3(bw, BH, 4.2), c)
+        var h := P_RING_H * 0.5
+        var r := P_RING_R
+        var r_in := P_POLE_R + 0.4
+        var gap0: float = float(data["gap0"])
+        var gap: float = float(data["gap"])
+        # the solids
+        for s in data["solid"]:
+                _ring_sector(st, float(s[0]), float(s[1]), r, r_in, h, color)
+        # the reds
+        for rd in data["red"]:
+                _ring_sector(st, float(rd[0]), float(rd[1]), r, r_in, h,
+                                Color("c62828"))
         return st.commit()
 
-## an axis-aligned box into the surface (6 faces, 24 verts)
-func _box(st: SurfaceTool, c: Vector3, s: Vector3, col: Color) -> void:
-        var hx := s.x * 0.5
-        var hy := s.y * 0.5
-        var hz := s.z * 0.5
-        var faces := [
-                [Vector3(-hx, hy, -hz), Vector3(hx, hy, -hz), Vector3(hx, hy, hz), Vector3(-hx, hy, hz), Vector3.UP],
-                [Vector3(-hx, -hy, -hz), Vector3(-hx, -hy, hz), Vector3(hx, -hy, hz), Vector3(hx, -hy, -hz), Vector3.DOWN],
-                [Vector3(-hx, -hy, hz), Vector3(-hx, hy, hz), Vector3(hx, hy, hz), Vector3(hx, -hy, hz), Vector3(0, 0, 1)],
-                [Vector3(hx, -hy, -hz), Vector3(hx, hy, -hz), Vector3(-hx, hy, -hz), Vector3(-hx, -hy, -hz), Vector3(0, 0, -1)],
-                [Vector3(hx, -hy, hz), Vector3(hx, hy, hz), Vector3(hx, hy, -hz), Vector3(hx, -hy, -hz), Vector3(1, 0, 0)],
-                [Vector3(-hx, -hy, -hz), Vector3(-hx, hy, -hz), Vector3(-hx, hy, hz), Vector3(-hx, -hy, hz), Vector3(-1, 0, 0)],
-        ]
-        for f in faces:
-                var n: Vector3 = f[4]
-                _quad(st, c + f[0], c + f[1], c + f[2], c + f[3], n, col)
-
-func _serve_ball() -> void:
-        phase = "serve"
-        serve_t = 1.0
-        bx = px
-        bby = paddle_y + PADDLE_H * 0.5 + PBALL_R
-        bvx = 0.0
-        bvy2 = 0.0
-        streak = 0
-        ball_mesh.visible = true
-
-func _launch_ball() -> void:
-        var ang := TB.serve_angle(rng)
-        bvx = sin(ang) * ball_speed
-        bvy2 = cos(ang) * ball_speed
-        phase = "run"
-        Jukebox.sfx("tb_serve", -6.0)
-
-func _platform_tick(delta: float) -> void:
-        # the paddle: keys ride the target, the drag rides the target,
-        # the mouse rides the target - the paddle eases toward it
-        var pvx_now := 0.0
-        if keys.has("left"):
-                ptx -= fw * 1.7 * delta
-                pvx_now = -fw * 1.7
-        if keys.has("right"):
-                ptx += fw * 1.7 * delta
-                pvx_now = fw * 1.7
-        ptx = clampf(ptx, -fw * 0.5 + pad_w * 0.5 + 1.0,
-                        fw * 0.5 - pad_w * 0.5 - 1.0)
-        var old_px := px
-        px = lerpf(px, ptx, 1.0 - exp(-16.0 * delta))
-        pvx = (px - old_px) / maxf(0.0001, delta) * 0.25 + pvx_now * 0.1
-        if paddle != null:
-                paddle.position.x = px
-        if phase == "serve":
-                serve_t -= delta
-                bx = px
-                bby = paddle_y + PADDLE_H * 0.5 + PBALL_R
-                if serve_t <= 0.0:
-                        _launch_ball()
-        elif phase == "run":
-                _ball_physics(delta)
-        _platform_ball_visual()
-        if tower_slide > 0.0:
-                tower_slide = maxf(0.0, tower_slide - delta)
-                var k := tower_slide / 0.12
-                tower_off = BPITCH * k
-                for r in rows:
-                        var d: Dictionary = rows[r]
-                        if d["node"] != null and is_instance_valid(d["node"]):
-                                (d["node"] as Node3D).position.y = \
-                                                _row_y(int(r)) + tower_off
-        if fire_t > 0.0:
-                fire_t -= delta
-                if fire_t <= 0.0:
-                        fire_p.emitting = false
-        _coin_air_tick(delta)
-        _hud_tick()
-        _platform_cam(delta)
-
-func _platform_ball_visual() -> void:
-        ball_mesh.position = Vector3(bx, bby, 0)
-        ball_face.rotation.y = 0.0
-        var sm: SphereMesh = ball_mesh.mesh
-        sm.radius = PBALL_R
-        sm.height = PBALL_R * 2.0
-
-func _ball_physics(delta: float) -> void:
-        # substep the flight so a fast ball never tunnels a block
-        var travel := Vector2(bvx, bvy2) * delta
-        var steps := maxi(1, int(ceil(travel.length() / 0.9)))
-        for i in steps:
-                var dt := delta / float(steps)
-                bx += bvx * dt
-                bby += bvy2 * dt
-                _ball_step(dt)
-                if phase != "run":
-                        return
-
-func _ball_step(dt: float) -> void:
-        # walls
-        if bx > fw * 0.5 - PBALL_R and bvx > 0.0:
-                bx = fw * 0.5 - PBALL_R
-                bvx = -bvx
-                Jukebox.sfx("tb_bounce", -14.0, 1.3)
-        elif bx < -fw * 0.5 + PBALL_R and bvx < 0.0:
-                bx = -fw * 0.5 + PBALL_R
-                bvx = -bvx
-                Jukebox.sfx("tb_bounce", -14.0, 1.3)
-        # a soft ceiling high above the window (never reached in play)
-        var ceil_y := reach_y + float(WIN_ROWS) * BPITCH + 8.0
-        if bby > ceil_y and bvy2 > 0.0:
-                bvy2 = -bvy2
-        # blocks (the bottom row's band, then any row the ball is inside)
-        _ball_vs_rows()
-        if phase != "run":
+## one angular sector: top, bottom, outer wall - FANNED into sub-arcs
+## (a [0, TAU] full-circle sector is four collinear points as ONE quad:
+## the mesh collapses to a sliver - the r2 missing-rings root)
+func _ring_sector(st: SurfaceTool, a0: float, a1: float, r: float,
+                r_in: float, h: float, c: Color) -> void:
+        if a1 - a0 < 0.004:
                 return
-        # the paddle
-        var pad_top := paddle_y + PADDLE_H * 0.5
-        if bvy2 < 0.0 and bby - PBALL_R <= pad_top \
-                        and bby - PBALL_R >= pad_top - 2.2 \
-                        and absf(bx - px) <= pad_w * 0.5 + PBALL_R * 0.7:
-                var off := (bx - px) / (pad_w * 0.5)
-                var ang := TB.bounce_angle(off)
-                bvx = sin(ang) * ball_speed + pvx * 0.22
-                bvy2 = cos(ang) * ball_speed
-                # renormalize + keep the ball climbing honestly
-                var v := Vector2(bvx, bvy2)
-                if v.length() < ball_speed * 0.6:
-                        v = v.normalized() * ball_speed
-                bvx = v.x
-                bvy2 = maxf(v.y, ball_speed * 0.38)
-                bby = pad_top + PBALL_R
-                if streak > 0:
-                        streak = 0
-                Jukebox.sfx("tb_bounce", -6.0, rng.randf_range(0.9, 1.12))
-        # the fall
-        if bby - PBALL_R < kill_y:
+        var steps := maxi(1, int(ceilf((a1 - a0) / 0.35)))
+        for i in steps:
+                var s0: float = lerpf(a0, a1, float(i) / float(steps))
+                var s1: float = lerpf(a0, a1, float(i + 1) / float(steps))
+                var mid := (s0 + s1) * 0.5
+                var out := Vector3(sin(mid), 0, cos(mid))
+                _quad(st,
+                        Vector3(sin(s0) * r_in, h, cos(s0) * r_in),
+                        Vector3(sin(s1) * r_in, h, cos(s1) * r_in),
+                        Vector3(sin(s1) * r, h, cos(s1) * r),
+                        Vector3(sin(s0) * r, h, cos(s0) * r),
+                        Vector3.UP, c)
+                _quad(st,
+                        Vector3(sin(s0) * r_in, -h, cos(s0) * r_in),
+                        Vector3(sin(s0) * r, -h, cos(s0) * r),
+                        Vector3(sin(s1) * r, -h, cos(s1) * r),
+                        Vector3(sin(s1) * r_in, -h, cos(s1) * r_in),
+                        Vector3.DOWN, c)
+                _quad(st,
+                        Vector3(sin(s0) * r, -h, cos(s0) * r),
+                        Vector3(sin(s0) * r, h, cos(s0) * r),
+                        Vector3(sin(s1) * r, h, cos(s1) * r),
+                        Vector3(sin(s1) * r, -h, cos(s1) * r),
+                        out, c)
+
+func _p_ball_pos() -> Vector3:
+        # the ball rides the WORLD angle 0 (the camera's side), at its orbit
+        # radius: the mesh's seat every tick
+        return Vector3(0.0, p_y, P_OFFSET)
+
+## the tower rotation: EVERY ring rotates together (the original's pole)
+func _rotate_tower(amt: float) -> void:
+        if absf(amt) < 0.000001:
+                return
+        # THE ORIGINAL'S getAvailableRotation: when the ball's center sits
+        # inside a ring's vertical band, a sector edge sweeping through the
+        # ball kills (isRotational). Compute the safe rotation across every
+        # ring band the ball overlaps.
+        var safe := amt
+        var deadly := false
+        for r in rings:
+                var d: Dictionary = rings[r]
+                var ry := _ring_y(int(r))
+                # THE SLAB BAND: the ball's CENTER inside the ring's own
+                # height (not resting on top - resting rotates free, the
+                # original's verticalStart law)
+                var band_top := ry + P_RING_H * 0.5
+                var band_bot := ry - P_RING_H * 0.5
+                if p_y > band_top or p_y < band_bot:
+                        continue
+                var sr := TB.ring_safe_rot(d["data"], float(d["rot"]), amt)
+                if absf(sr) < absf(safe):
+                        safe = sr
+                        if absf(sr) < absf(amt) - 0.0005:
+                                deadly = true
+        # walls sweep too: a wall box crossing the ball's angle at its band
+        for r in rings:
+                var d: Dictionary = rings[r]
+                var ry := _ring_y(int(r))
+                if d.has("walls"):
+                        for wn in d["walls"]:
+                                var wh: float = float(wn["h"])
+                                var wall_top := ry + P_RING_H * 0.5 + wh
+                                var wall_bot := ry + P_RING_H * 0.5
+                                if p_y > wall_top + PBALL_R \
+                                                or p_y < wall_bot - PBALL_R:
+                                        continue
+                                var wa: float = float(wn["a"]) \
+                                                + float(d["rot"])
+                                var wd := deg_to_rad(P_WALL_DEG) * 0.5
+                                var rel := fposmod(TB.NT_BALL_ANG - wa + PI,
+                                                TAU) - PI
+                                var half := PBALL_R / P_OFFSET
+                                var dist := absf(rel) - wd - half
+                                if dist < absf(safe):
+                                        safe = signf(amt) * maxf(0.0, dist)
+                                        if dist <= 0.0:
+                                                deadly = true
+        # apply: the tower turns, the rings carry their walls
+        for r in rings:
+                var d: Dictionary = rings[r]
+                d["rot"] = float(d["rot"]) + safe
+                if d["node"] != null and is_instance_valid(d["node"]):
+                        (d["node"] as Node3D).rotation.y = float(d["rot"])
+        if deadly:
                 _p_crash()
 
-func _ball_vs_rows() -> void:
-        for r in rows:
-                var d: Dictionary = rows[r]
-                var breaks: Array = d["breaks"]
-                var row_y: float = (d["node"] as Node3D).position.y
-                var half_w := (fw - 4.0 - float(cols - 1) * GAPX) / float(cols)
-                var usable := fw - 4.0
-                var x0 := -usable * 0.5
-                for i in cols:
-                        if not bool(breaks[i]):
-                                continue   # already broken - no block there
-                        var bx0 := x0 + float(i) * (half_w + GAPX)
-                        var cx := clampf(bx, bx0, bx0 + half_w)
-                        var cy := clampf(bby, row_y - BH * 0.5,
-                                        row_y + BH * 0.5)
-                        var dx := bx - cx
-                        var dy := bby - cy
-                        var d2 := dx * dx + dy * dy
-                        if d2 > PBALL_R * PBALL_R:
-                                continue
-                        _hit_block(int(r), i, d, dx, dy)
-                        return
-
-func _hit_block(row: int, i: int, d: Dictionary, dx: float, dy: float) -> void:
-        var breaks: Array = d["breaks"]
-        var node: Node3D = d["node"]
-        var hard := false
-        var data: Array = rows_data[row]
-        if not bool(data[i]):
-                hard = true
-        if hard and fire_t <= 0.0:
-                # the bounce: reflect on the shallower axis, nothing breaks
-                if absf(dx) > absf(dy):
-                        bvx = absf(bvx) * (1.0 if dx > 0.0 else -1.0)
-                else:
-                        bvy2 = absf(bvy2) * (1.0 if dy > 0.0 else -1.0)
-                Jukebox.sfx("tb_bounce", -10.0, 0.8)
+func _platform_tick(delta: float) -> void:
+        if not p_started:
+                # the optionals/idle ride: the ball bounces on the top ring
+                _p_idle(delta)
                 return
-        breaks[i] = false
-        _rebuild_row(row, d)
-        streak += 1
-        if fire_t <= 0.0 and streak >= TB.FIRE_AT:
-                _ignite_fire()
-        var color: Color = TB.BLACK if hard \
-                        else TB.ramp_color(TB.break_skin(), row)
-        var usable := fw - 4.0
-        var bw := (usable - float(cols - 1) * GAPX) / float(cols)
-        var x0 := -usable * 0.5
-        var bcx := x0 + float(i) * (bw + GAPX) + bw * 0.5
-        for k in 4:
-                _frag(color, Vector3(bcx + rng.randf_range(-bw * 0.3, bw * 0.3),
-                                node.position.y + rng.randf_range(-1.0, 1.0), 0),
-                        Vector3(rng.randf_range(-6.0, 6.0),
-                                rng.randf_range(2.0, 8.0),
-                                rng.randf_range(-3.0, 3.0)))
-        Jukebox.sfx("tb_block", -4.0, rng.randf_range(0.92, 1.1))
-        # the reflect: the ball leaves the block on the shallower axis
-        if absf(dx) > absf(dy):
-                bvx = absf(bvx) * (1.0 if dx > 0.0 else -1.0)
-        else:
-                bvy2 = absf(bvy2) * (1.0 if dy > 0.0 else -1.0)
-        # the collapse: every BREAKABLE gone -> the row crumbles, the
-        # tower slides down one row (the next row enters reach); the
-        # hard blocks are the row's nails - they give way with it
-        var left := 0
-        for j in cols:
-                if bool(breaks[j]) and bool(data[j]):
-                        left += 1
-        if left == 0:
-                _collapse_row(row, d)
-
-func _rebuild_row(row: int, d: Dictionary) -> void:
-        var node: MeshInstance3D = d["node"]
-        node.mesh = _row_mesh(d["breaks"], rows_data[row], row)
-
-func _collapse_row(row: int, d: Dictionary) -> void:
-        # the hard blocks (still present) crumble away as debris
-        var breaks: Array = d["breaks"]
-        var data: Array = rows_data[row]
-        var node: Node3D = d["node"]
-        var usable := fw - 4.0
-        var bw := (usable - float(cols - 1) * GAPX) / float(cols)
-        var x0 := -usable * 0.5
-        for i in cols:
-                if not bool(breaks[i]) or bool(data[i]):
-                        continue   # gone already, or a breakable (paid for)
-                var bcx := x0 + float(i) * (bw + GAPX) + bw * 0.5
-                for k in 3:
-                        _frag(TB.BLACK, Vector3(bcx, node.position.y, 0),
-                                Vector3(rng.randf_range(-4.0, 4.0),
-                                        rng.randf_range(1.0, 5.0),
-                                        rng.randf_range(-2.0, 2.0)))
-        node.queue_free()
-        rows.erase(row)
-        bottom_row = maxi(bottom_row, row + 1)
-        cleared_this_round += 1
-        tower_slide = 0.12
-        Jukebox.sfx("tb_collapse", -8.0)
-        # the coin's window: rows cleared past its grace -> missed
-        if coin_node != null and is_instance_valid(coin_node) \
-                        and cleared_this_round > coin_window:
-                Jukebox.sfx("tb_miss", -8.0)
-                coin_node.queue_free()
-                coin_node = null
-        _ensure_rows()
-        if bottom_row >= round_len:
+        # THE GAUGE MIRROR: the platform's fire is the COMBO charge - the
+        # same circular widget reads it (the charge fills with falls, the
+        # burn state = the smash is armed)
+        boost_v = clampf(float(p_combo) / float(COMBO_THRESHOLD), 0.0, 1.0)
+        boosting = p_combo >= COMBO_THRESHOLD
+        boost_charge_t = 0.0
+        # THE ROTATION INPUT: keys/stick hold, the drag deltas already rode
+        # the rings through _rotate_tower directly (the finger is an event,
+        # not a state); the keys are a state
+        var ki := 0.0
+        if keys.has("left"):
+                ki -= 1.0
+        if keys.has("right"):
+                ki += 1.0
+        if ki != 0.0:
+                _rotate_tower(ki * TB.NT_KEYBOARD_ROT * delta)
+        # the ball's vertical physics (the original verbatim: the quadratic
+        # drag a = g - sign(v)*v*v*drag)
+        var a := P_GRAV - signf(p_vy) * p_vy * p_vy * P_DRAG
+        p_vy += a * delta
+        var prev_y := p_y
+        p_y += p_vy * delta
+        _ensure_rings()   # the alive window rides the descent
+        # the rings: the movers tick, the contacts resolve
+        for r in rings:
+                var d: Dictionary = rings[r]
+                var ry := _ring_y(int(r))
+                # the movers
+                for wn in d["walls"]:
+                        if float(wn["spd"]) != 0.0:
+                                wn["a"] = fposmod(float(wn["a"])
+                                                + float(wn["spd"]) * delta,
+                                                TAU)
+                # the contact: falling onto this ring's band
+                var band_top := ry + P_RING_H * 0.5
+                if p_vy < 0.0 and prev_y - PBALL_R >= band_top \
+                                and p_y - PBALL_R < band_top:
+                        var what := TB.ring_at(d["data"], TB.NT_BALL_ANG,
+                                        float(d["rot"]))
+                        if what == "gap":
+                                # through: the combo grows, keep falling
+                                _p_fall_through(d)
+                                continue
+                        p_y = band_top + PBALL_R
+                        if what == "red":
+                                _p_crash()
+                                return
+                        _p_land(d)
+                        break
+        # the finish: below the last ring = the round is won
+        if p_top >= round_len and p_y < _ring_y(round_len - 1) - P_PITCH:
                 _round_won()
+                return
+        ball_mesh.position = _p_ball_pos()
+        trail_p.emitting = p_vy < -18.0
+        # the coin's air window: the ring coin dies when the ball passes it
+        if coin_node != null and is_instance_valid(coin_node) \
+                        and coin_ring_idx >= 0:
+                var ry2 := _ring_y(coin_ring_idx)
+                if p_y < ry2 - P_PITCH * 1.5:
+                        Jukebox.sfx("tb_miss", -8.0)
+                        coin_node.queue_free()
+                        coin_node = null
+                        coin_ring_idx = -1
+        if gauge != null:
+                gauge.queue_redraw()
+        _platform_cam(delta)
 
+## the optionals/idle ride: the ball bounces on the top ring (ring 0 is
+## born fully solid - the original's "start" chunk)
+func _p_idle(delta: float) -> void:
+        var rest := P_RING_H * 0.5 + PBALL_R
+        var a := P_GRAV - signf(p_vy) * p_vy * p_vy * P_DRAG
+        p_vy += a * delta
+        p_y += p_vy * delta
+        if p_y <= rest and p_vy < 0.0:
+                p_y = rest
+                p_vy = P_BOUNCE * 0.55
+        ball_mesh.position = _p_ball_pos()
+        _platform_cam(delta)
+
+## a solid landing: the combo resets UNLESS the charge SMASHES through
+## (the original verbatim: the landing platform destroys itself and the
+## ball keeps falling - the charge is consumed)
+func _p_land(d: Dictionary) -> void:
+        if p_combo >= COMBO_THRESHOLD:
+                # THE SMASH-THROUGH (their combo law: threshold 4)
+                Jukebox.sfx("tb_smash", -2.0)
+                p_combo = 0
+                p_pending = 0
+                _break_vfx_ring(d)
+                rings.erase(d["row"])
+                (d["node"] as Node3D).queue_free()
+                Jukebox.sfx(String(TB.break_skin()["sfx"]), -5.0)
+                achievement_count("smashes", 1)
+                return
+        # the honest bounce: the pending banks, the combo dies
+        p_vy = P_BOUNCE
+        p_pending = 0
+        p_combo = 0
+        Jukebox.sfx("tb_bounce", -6.0, rng.randf_range(0.9, 1.12))
+
+## a gap fall: the combo grows (the original: score = comboCounter+1)
+func _p_fall_through(d: Dictionary) -> void:
+        p_combo += 1
+        p_pending += p_combo + 1
+        Jukebox.sfx("tb_fall", -8.0,
+                        1.0 + minf(float(p_combo), 9.0) * 0.06)
+        # the coin: collect if THIS ring's gap carried it
+        if int(d["row"]) == coin_ring_idx and d["coin"] != null \
+                        and is_instance_valid(d["coin"]):
+                add_run_coins(1)
+                achievement_count("coins_taken", 1)
+                Jukebox.sfx("coin", -2.0)
+                (d["coin"] as Coin3D).collect()
+                coin_ring_idx = -1
+                coin_node = null
+
+func _frag(c: Color, pos: Vector3, vel: Vector3) -> void:
+        _break_piece(String(TB.break_skin()["vfx"]), c, pos, vel)
+
+## THE CRASH (platform): red sector, a wall's side, no lives - the run over
 func _p_crash() -> void:
-        lives -= 1
-        _lives_hud()
-        streak = 0
-        shake_t = 0.5
+        shake_t = 0.6
         Jukebox.sfx("tb_crash", -2.0)
-        for k in 10:
+        _red_flash()
+        for i in 10:
                 var ang := rng.randf_range(0.0, TAU)
-                _frag(TB.ball_color(), Vector3(bx, bby, 0),
-                        Vector3(sin(ang) * rng.randf_range(4.0, 10.0),
-                                rng.randf_range(2.0, 8.0),
-                                rng.randf_range(-2.0, 2.0)))
-        if lives <= 0:
-                fire_p.emitting = false
-                ball_mesh.visible = false
-                _run_over()
-        else:
-                _serve_ball()
+                _frag(TB.BLACK, _p_ball_pos() + Vector3(sin(ang) * 1.5, 0.5,
+                                cos(ang) * 1.5),
+                        Vector3(sin(ang) * rng.randf_range(3.0, 7.0),
+                                rng.randf_range(3.0, 7.0),
+                                cos(ang) * rng.randf_range(3.0, 7.0)))
+        _run_over()
 
 func _platform_cam(delta: float) -> void:
+        p_cam_y = lerpf(p_cam_y, p_y, 1.0 - exp(-6.5 * delta))
         shake_t = maxf(0.0, shake_t - delta)
-        var target := Vector3(0, 0, cam_d)
+        # THE AIM-DOWN FRAMING: the player aims at the rings UNDER the ball,
+        # so the camera rides ~24 deg above the ball and pulls back far
+        # enough that the whole ring fits the NARROW screen axis (portrait
+        # needs the farther seat)
+        var vp := get_viewport().get_visible_rect().size
+        var aspect := vp.x / maxf(1.0, vp.y)
+        var tanv := tan(deg_to_rad(P_CAM_FOV) * 0.5)
+        var d: float = clampf(8.4 / maxf(0.02, tanv * aspect), 15.0, 34.0)
+        var focus := Vector3(0, p_cam_y - 1.0, P_OFFSET)
+        var target := focus + Vector3(0, 0.45 * d, d)
         if shake_t > 0.0:
-                var s := shake_t * shake_t * 1.2
+                var s := shake_t * shake_t * 1.4
                 target += Vector3(rng.randf_range(-s, s),
                                 rng.randf_range(-s, s), 0)
         cam.position = target
-        # the subtle tilt: the blocks' top faces catch the sun - the 3D
-        # reads without ever hiding the play line
-        cam.rotation = Vector3(-0.09, 0, 0)
-        cam.fov = 48.0
+        cam.look_at(focus, Vector3.UP)
+        sky_layer.position.y = p_cam_y
 
-## THE COIN (platform): floats in the open air between the paddle zone
-## and the tower bottom - a legal X, one window, then it pops
-func _spawn_air_coin() -> void:
-        coin_node = Coin3DL.new()
-        var x := rng.randf_range(-fw * 0.5 + 14.0, fw * 0.5 - 14.0)
-        var y := rng.randf_range(paddle_y + fh * 0.24, reach_y - 6.0)
-        coin_node.position = Vector3(x, y, 0)
-        world.add_child(coin_node)
-        coin_node.set_diameter(Coin3DL.world_diameter(TB.COIN_DESIGN_PX,
-                        cam, cam_d))
-        coin_window = cleared_this_round + COIN_WINDOW
+## the coin seat helper (platform): the ring already carries the coin at
+## build time; nothing else to place - kept for the caller symmetry
+func _seat_ring_coin() -> void:
+        pass
 
-func _coin_air_tick(_delta: float) -> void:
-        if coin_node == null or not is_instance_valid(coin_node):
-                return
-        if phase == "run" or phase == "serve":
-                var dx := bx - coin_node.position.x
-                var dy := bby - coin_node.position.y
-                var rr := PBALL_R + 3.0
-                if dx * dx + dy * dy <= rr * rr:
-                        add_run_coins(1)
-                        achievement_count("coins_taken", 1)
-                        Jukebox.sfx("coin", -2.0)
-                        coin_node.collect()
-                        coin_node = null
-                        return
-        if cleared_this_round > coin_window:
-                Jukebox.sfx("tb_miss", -8.0)
-                coin_node.queue_free()
-                coin_node = null
+# ================================================================ THE VFX
+# THE r2 BREAK SPECTACLE: the disc/ring dies as its own SEGMENTS (wedge
+# fragments in the segments' own colors) + the ring shockwave + the dust.
+# The skin's vfx style picks the debris character:
+#   shard (glass/classic): flat sharp wedges, fast, glassy
+#   rubble (rock):         chunky slow pieces + dust puffs
+#   splinter (wood):       long thin planks, spinny
+#   splash (water):        droplet spheres, arcing, then a mist puff
 
-# ================================================================ shared VFX
+func _break_vfx_disc(pos_y: float, data: Dictionary, rot: float) -> void:
+        var skin := TB.break_skin()
+        var count := int(data["count"])
+        var black: Array = data["black"]
+        var seg := TAU / float(count)
+        for i in count:
+                var c: Color = TB.BLACK if bool(black[i]) \
+                                else TB.ramp_color(skin, top_row)
+                var a := float(i) * seg + seg * 0.5 + rot
+                var rr := (R_IN + R_OUT) * 0.5
+                _break_piece(skin["vfx"], c,
+                        Vector3(sin(a) * rr, pos_y, cos(a) * rr),
+                        Vector3(sin(a) * rng.randf_range(7.0, 16.0),
+                                rng.randf_range(3.0, 12.0),
+                                cos(a) * rng.randf_range(7.0, 16.0)))
+        _shockwave(pos_y)
 
-func _frag(color: Color, pos: Vector3, vel: Vector3) -> void:
-        var m: MeshInstance3D = null
-        for f in _frags:
-                if not f["alive"]:
-                        m = f["node"]
-                        f["alive"] = true
-                        f["vel"] = vel
-                        f["life"] = 0.85
-                        f["spin"] = Vector3(rng.randf_range(-6, 6),
-                                        rng.randf_range(-6, 6),
-                                        rng.randf_range(-6, 6))
-                        m.position = pos
-                        m.visible = true
-                        var mat: StandardMaterial3D = _frag_mat(color)
-                        m.material_override = mat
-                        f["mat"] = mat
-                        m.scale = Vector3.ONE * rng.randf_range(0.6, 1.3)
-                        return
-        # the pool is dry: grow it
-        m = MeshInstance3D.new()
+func _break_vfx_ring(d: Dictionary) -> void:
+        var pos_y: float = (d["node"] as Node3D).position.y
+        var skin := TB.break_skin()
+        _break_piece(skin["vfx"], TB.ramp_color(skin, int(d["row"])),
+                Vector3(0, pos_y, P_OFFSET),
+                Vector3(0, 6.0, 2.0))
+        for i in 8:
+                var ang := rng.randf_range(0.0, TAU)
+                _break_piece(skin["vfx"],
+                        TB.ramp_color(skin, int(d["row"])),
+                        Vector3(sin(ang) * P_RING_R * 0.6, pos_y,
+                                        cos(ang) * P_RING_R * 0.6),
+                        Vector3(sin(ang) * rng.randf_range(4.0, 9.0),
+                                rng.randf_range(3.0, 8.0),
+                                cos(ang) * rng.randf_range(4.0, 9.0)))
+        _shockwave(pos_y)
+
+func _break_piece(style: String, c: Color, pos: Vector3, vel: Vector3) -> void:
+        var m := _frag_mesh(style, c)
+        var n := MeshInstance3D.new()
+        n.mesh = m
+        n.position = pos
+        n.material_override = _frag_mat(c, style)
+        frag_layer.add_child(n)
+        var spin := Vector3(rng.randf_range(-9, 9), rng.randf_range(-9, 9),
+                rng.randf_range(-9, 9))
+        if style == "rubble":
+                vel = vel * 0.6 + Vector3(0, 3.0, 0)
+                spin = spin * 0.4
+        elif style == "splash":
+                vel = vel * 0.8 + Vector3(0, 5.0, 0)
+        elif style == "splinter":
+                spin = Vector3(rng.randf_range(-14, 14),
+                        rng.randf_range(-3, 3), rng.randf_range(-14, 14))
+        _frags.append({"n": n, "vel": vel, "spin": spin, "t": 0.0,
+                "life": 1.1 if style != "splash" else 0.85})
+
+func _frag_mesh(style: String, c: Color) -> Mesh:
+        var key := style
         var bm := BoxMesh.new()
-        bm.size = Vector3(1.3, 1.3, 1.3)
-        m.mesh = bm
-        m.position = pos
-        m.visible = true
-        frag_layer.add_child(m)
-        var mat := _frag_mat(color)
-        m.material_override = mat
-        _frags.append({"node": m, "alive": true, "vel": vel, "life": 0.85,
-                "mat": mat, "spin": Vector3(rng.randf_range(-6, 6),
-                        rng.randf_range(-6, 6), rng.randf_range(-6, 6))})
+        match style:
+                "shard":
+                        bm.size = Vector3(rng.randf_range(1.2, 2.4), 0.28,
+                                rng.randf_range(1.2, 2.4))
+                "rubble":
+                        bm.size = Vector3(rng.randf_range(1.0, 2.2),
+                                rng.randf_range(0.8, 1.6),
+                                rng.randf_range(1.0, 2.2))
+                "splinter":
+                        bm.size = Vector3(rng.randf_range(0.5, 0.9),
+                                0.34, rng.randf_range(2.6, 4.4))
+                _:
+                        # splash droplets + the classic wedge
+                        bm.size = Vector3(rng.randf_range(0.5, 1.1),
+                                rng.randf_range(0.5, 1.1),
+                                rng.randf_range(0.5, 1.1))
+        return bm
 
-func _frag_mat(color: Color) -> StandardMaterial3D:
-        var key := color.to_html()
-        if _frag_cache.has(key):
-                var shared: StandardMaterial3D = _frag_cache[key]
-                var inst := shared.duplicate() as StandardMaterial3D
-                inst.albedo_color = color
-                inst.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-                return inst
+func _shockwave(pos_y: float) -> void:
+        var n := MeshInstance3D.new()
+        var tor := TorusMesh.new()
+        tor.inner_radius = R_OUT * 0.55
+        tor.outer_radius = R_OUT * 0.62
+        n.mesh = tor
+        n.position = Vector3(0, pos_y, 0)
         var m := StandardMaterial3D.new()
-        m.albedo_color = color
-        m.roughness = 0.55
+        m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
         m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        m.albedo_color = Color(1, 1, 1, 0.65)
+        n.material_override = m
+        frag_layer.add_child(n)
+        _waves.append({"n": n, "t": 0.0})
+
+func _frag_mat(c: Color, style: String) -> StandardMaterial3D:
+        var key := style + str(c)
+        if _frag_cache.has(key):
+                return _frag_cache[key]
+        var m := StandardMaterial3D.new()
+        m.albedo_color = c
+        m.roughness = float(TB.break_skin()["rough"])
+        m.metallic = float(TB.break_skin()["metal"])
+        if float(TB.break_skin()["alpha"]) < 1.0:
+                m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+                m.albedo_color.a = float(TB.break_skin()["alpha"])
         _frag_cache[key] = m
         return m
 
 func _frags_tick(delta: float) -> void:
         for f in _frags:
-                if not bool(f["alive"]):
+                if not is_instance_valid(f["n"]):
                         continue
-                var n: MeshInstance3D = f["node"]
-                var v: Vector3 = f["vel"]
-                v.y += GRAV * 0.6 * delta
-                f["vel"] = v
-                n.position += v * delta
-                n.rotation += (f["spin"] as Vector3) * delta
-                f["life"] = float(f["life"]) - delta
-                var mat: StandardMaterial3D = f["mat"]
-                mat.albedo_color.a = clampf(float(f["life"]) / 0.85, 0.0, 1.0)
-                if float(f["life"]) <= 0.0:
-                        f["alive"] = false
-                        n.visible = false
+                f["t"] += delta
+                var n: MeshInstance3D = f["n"]
+                f["vel"] += Vector3(0, -30.0, 0) * delta
+                n.position += f["vel"] * delta
+                n.rotation += f["spin"] * delta
+                var k: float = 1.0 - f["t"] / float(f["life"])
+                n.scale = Vector3.ONE * clampf(k, 0.05, 1.0)
+                if f["t"] >= float(f["life"]):
+                        n.queue_free()
+        _frags = _frags.filter(func(f): return is_instance_valid(f["n"]) \
+                        and f["t"] < float(f["life"]))
+        for w in _waves:
+                if not is_instance_valid(w["n"]):
+                        continue
+                w["t"] += delta
+                var n: MeshInstance3D = w["n"]
+                var k: float = w["t"] / 0.45
+                n.scale = Vector3(1.0 + k * 2.6, 1.0 + k * 0.4,
+                                1.0 + k * 2.6)
+                (n.material_override as StandardMaterial3D) \
+                                .albedo_color.a = 0.65 * (1.0 - k)
+                if k >= 1.0:
+                        n.queue_free()
+        _waves = _waves.filter(func(w): return is_instance_valid(w["n"]) \
+                        and w["t"] < 0.45)
+        # the clouds drift (the living world, both modes)
+        for cld in _clouds:
+                var n2: Node3D = cld["n"]
+                n2.position.x += float(cld["spd"]) * delta
+                if n2.position.x > 180.0:
+                        n2.position.x = -180.0
 
 func _clear_frags() -> void:
         for f in _frags:
-                f["alive"] = false
-                (f["node"] as MeshInstance3D).visible = false
+                if is_instance_valid(f["n"]):
+                        f["n"].queue_free()
+        _frags.clear()
+        for w in _waves:
+                if is_instance_valid(w["n"]):
+                        w["n"].queue_free()
+        _waves.clear()
 
-# ================================================================ skins/shop
+# ================================================================ the skins
 
 func _apply_tower_skin() -> void:
         var skin := TB.break_skin()
-        _apply_sky(skin)
+        if _tower_mat != null:
+                _tower_mat.roughness = float(skin["rough"])
+                _tower_mat.metallic = float(skin["metal"])
+                if float(skin["alpha"]) < 1.0:
+                        _tower_mat.transparency = \
+                                        BaseMaterial3D.TRANSPARENCY_ALPHA
+                else:
+                        _tower_mat.transparency = \
+                                        BaseMaterial3D.TRANSPARENCY_DISABLED
         if pole != null and is_instance_valid(pole):
                 var pm: StandardMaterial3D = pole.material_override
                 pm.albedo_color = Color(String(skin["pole"]))
@@ -1338,15 +1797,14 @@ func _apply_tower_skin() -> void:
                                         _disc_mesh(d["data"],
                                         TB.ramp_color(skin, int(r)))
         else:
-                if paddle != null and is_instance_valid(paddle):
-                        var pm2: StandardMaterial3D = paddle.material_override
-                        pm2.albedo_color = TB.ramp_color(skin, 0).darkened(0.18)
-                for r in rows:
-                        var d: Dictionary = rows[r]
-                        if d["node"] != null and is_instance_valid(d["node"]):
-                                (d["node"] as MeshInstance3D).mesh = \
-                                        _row_mesh(d["breaks"], rows_data[int(r)],
-                                        int(r))
+                for r in rings:
+                        var d2: Dictionary = rings[r]
+                        if d2["node"] != null \
+                                        and is_instance_valid(d2["node"]):
+                                (d2["node"] as MeshInstance3D).mesh = \
+                                        _ring_mesh(d2["data"], int(r))
+
+# ================================================================ the shop
 
 func _shop_open() -> void:
         if over:
@@ -1376,7 +1834,9 @@ func _shop_open() -> void:
         box.add_child(Arc.fit_label("BREAKABLE SKINS", 24, Arc.HOT, 560))
         for s in TB.BREAK_SKINS:
                 box.add_child(_skin_row("skin_break", s,
-                        func(): _apply_tower_skin()))
+                        func():
+                                _apply_tower_skin()
+                                _rebuild_world_look()))
         var back := Arc.button("CLOSE", Vector2(560, 72), 26, Arc.GOOD,
                 func(): sheet_pop())
         sheet.add_child(back)
@@ -1385,6 +1845,29 @@ func _shop_open() -> void:
                         continue
                 b.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 sc.register_tappable(b, Arc._tap_emitter(b))
+
+## the skin's own MATERIAL laws: the tower material's roughness/metallic/
+## alpha ARE the design (glass IS glass, metal IS metal)
+func _rebuild_world_look() -> void:
+        if mode == "ball":
+                _build_pole()
+                _make_victory_disc()
+                for r in discs:
+                        var d: Dictionary = discs[r]
+                        if d["node"] != null \
+                                        and is_instance_valid(d["node"]):
+                                (d["node"] as MeshInstance3D).mesh = \
+                                        _disc_mesh(d["data"],
+                                        TB.ramp_color(TB.break_skin(),
+                                        int(r)))
+        else:
+                _build_pole_p()
+                for r in rings:
+                        var d2: Dictionary = rings[r]
+                        if d2["node"] != null \
+                                        and is_instance_valid(d2["node"]):
+                                (d2["node"] as MeshInstance3D).mesh = \
+                                        _ring_mesh(d2["data"], int(r))
 
 ## THE SHELF LAWS (the goldminer shape): the ON row, buys refresh in
 ## place, the shop SELLS and the game APPLIES live.
@@ -1451,17 +1934,15 @@ func _mode_card(kind: String, selected: bool) -> Button:
                                         0.35, PI - 0.35, 24,
                                         Color(0.3, 0.2, 0.1, 0.8), 6.0)
                         glyph.draw_circle(Vector2(48, 10), 11.0,
-                                        TB.ball_color())
+                                TB.ball_skin()["color"])
                 else:
-                        # the tower rows + the paddle under
+                        # the tower rings + the orbiting ball
                         for i in 3:
                                 var y := 8.0 + float(i) * 16.0
-                                glyph.draw_rect(Rect2(18, y, 60, 9),
+                                glyph.draw_rect(Rect2(14, y, 68, 9),
                                         Color(0.3, 0.2, 0.1, 0.55))
-                        glyph.draw_rect(Rect2(30, 62, 36, 8),
-                                TB.ramp_color(TB.break_skin(), 0))
-                        glyph.draw_circle(Vector2(48, 52), 6.0,
-                                        TB.ball_color()))
+                        glyph.draw_circle(Vector2(48, 52), 7.0,
+                                TB.ball_skin()["color"]))
         glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
         vb.add_child(glyph)
         var lbl := Arc.label("BALL" if kind == "ball" else "PLATFORM", 26,
@@ -1508,7 +1989,8 @@ func _pos_card(kind: String, selected: bool) -> Button:
 # ================================================================ input
 # THE OWNER'S LAW: controls in 3D are not different than 2D on the box
 # side - TouchKit + the box key translation feed this game exactly like
-# a 2D one. The game maps the events into its own world.
+# a 2D one. r2 adds THE GAMEPAD: X dives/launches, the stick/d-pad's
+# left-right rotates the platform tower.
 
 func _goga_input(event: InputEvent) -> void:
         if event is InputEventKey:
@@ -1523,23 +2005,49 @@ func _goga_input(event: InputEvent) -> void:
                         KEY_RIGHT:
                                 if p: keys["right"] = true
                                 else: keys.erase("right")
+        elif event is InputEventJoypadButton:
+                var jb := (event as InputEventJoypadButton).button_index
+                var jp := (event as InputEventJoypadButton).pressed
+                if jb == JOY_BUTTON_A:
+                        pad_hold = jp
+                        if jp and mode == "platform" and phase == "serve":
+                                _p_launch()
+                elif jb == JOY_BUTTON_X:
+                        pad_hold = jp
+        elif event is InputEventJoypadMotion:
+                var axis := (event as InputEventJoypadMotion).axis
+                var val := (event as InputEventJoypadMotion).axis_value
+                if axis == JOY_AXIS_LEFT_X:
+                        var dead := 0.25
+                        if val < -dead:
+                                keys["left"] = true
+                                keys.erase("right")
+                        elif val > dead:
+                                keys["right"] = true
+                                keys.erase("left")
+                        else:
+                                keys.erase("left")
+                                keys.erase("right")
         elif event is InputEventMouseButton \
                         and (event as InputEventMouseButton).button_index \
                         == MOUSE_BUTTON_LEFT:
                 holding = (event as InputEventMouseButton).pressed
-        elif event is InputEventMouseMotion and ScaleRule.is_pc() \
-                        and mode == "platform" and phase != "boot" \
-                        and phase != "intro" and phase != "optionals":
-                # the PC seat: the platform follows the mouse X (the neon
-                # tower's native feel) - no button needed
-                var vp := get_viewport().get_visible_rect().size
-                ptx = ((event as InputEventMouseMotion).position.x \
-                                - vp.x * 0.5) * wpp
-        elif event is InputEventScreenDrag and mode == "platform":
-                # the finger: delta steering (no teleport when the finger
-                # lands far from the paddle)
+        elif event is InputEventScreenDrag and mode == "platform" \
+                        and phase == "run":
+                # THE FINGER: the horizontal drag delta ROTATES THE TOWER
+                # (the original's pointerRotationSensitivity: rad per px,
+                # design px here)
                 var dx: float = (event as InputEventScreenDrag).relative.x
-                ptx += dx * wpp
+                _rotate_tower(-dx * TB.NT_POINTER_ROT
+                                * _design_px_per_screen_px())
+
+func _design_px_per_screen_px() -> float:
+        # the drag arrives in screen px; the sensitivity is design px
+        var vp := get_viewport().get_visible_rect().size
+        var win := DisplayServer.window_get_size()
+        if win.x <= 0:
+                return 1.0
+        return vp.x / float(win.x)
 
 func _goga_tick(delta: float) -> void:
         _frags_tick(delta)
@@ -1549,10 +2057,19 @@ func _goga_tick(delta: float) -> void:
                 _platform_tick(delta)
 
 func _on_press(_pos: Vector2) -> void:
-        if mode == "platform" and phase == "serve":
-                _launch_ball()
+        if mode == "platform":
+                if phase == "serve":
+                        _p_launch()
                 return
         holding = true
 
 func _on_release(_pos: Vector2) -> void:
         holding = false
+
+## the platform run opens with the ball already bouncing - no serve phase
+## in r2 (the original starts you falling immediately); kept for the
+## gamepad X's launch call site
+func _p_launch() -> void:
+        pass
+
+

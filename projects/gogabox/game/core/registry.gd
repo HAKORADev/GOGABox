@@ -1624,11 +1624,13 @@ const GAMES := [
         # v041-2 THE 3D GRADUATION: the stack ball note (parked under the
         # helix-jump-like in FUTURE_GAMES.md since the v0.3.9-5 round)
         # graduates as TOWER BALL - the box's first 3D game, TWO modes
-        # (the classic smash + the platform ride), the round ladder
-        # 150..900, lives 3, the /5 bonus, the every-6 coin, the fire
-        # ball. dim "3d" is REAL now: the host reads it (the 3D seat).
+        # (the classic smash + the REAL Neon Tower platform ride), the
+        # round ladder 150..900, the /5 bonus, the every-6 coin, the EXACT
+        # original fire gauge. r2: NO lives (one crash = the run over),
+        # the skins are designs, the gamepad rides, the sky lives.
+        # dim "3d" is REAL: the host reads it (the 3D seat).
         {"id": "towerball", "title": "TOWER BALL",
-                "tag": "smash the tower, ride the bounce",
+                "tag": "smash the tower, steer the rings",
                 "script": "res://game/games/towerball/towerball.gd",
                 "thumb": "res://assets/thumbs/towerball.png",
                 "orientation": "auto", "dim": "3d",
@@ -1636,35 +1638,43 @@ const GAMES := [
                 "coin_div": 5, "price": 400, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
-                "desc": "The box's first 3D game - one tower law, two "
-                        + "ways to ride it. BALL: the helix spins under "
-                        + "Balldozer, hold to smash through the discs and "
-                        + "never land on black - unless the long streak "
-                        + "ignites the fire ball, then nothing stops you. "
-                        + "PLATFORM: the ball never stops bouncing and the "
-                        + "tower never stops coming - steer the platform, "
-                        + "break the rows, never let the ball fall. Every "
-                        + "round ends at a real finish line and grows from "
-                        + "150 rows up to 900; a crash costs one of your "
-                        + "three lives and no lives ends the run; every "
-                        + "round you clear pays a score point. A GOGACoin "
-                        + "waits on the tower after every 6 rounds won - "
-                        + "miss its seat and it is gone. Skins for the "
-                        + "ball and for everything that breaks.",
+                "desc": "The box's first 3D game, living under a sky that "
+                        + "follows your own day - morning, noon, evening "
+                        + "and night over one tower law and two ways to "
+                        + "ride it. BALL: the tower spins under Balldozer, "
+                        + "hold to smash through the discs and never land "
+                        + "on black. Breaks fill the fire gauge; when it "
+                        + "fills, the world slows, the ball ignites, and "
+                        + "for a blazing moment black shatters too - then "
+                        + "it cools and must fill again. PLATFORM: the "
+                        + "real Neon Tower ride - the ball bounces on its "
+                        + "own and YOU rotate the tower of rings; fall "
+                        + "through gaps to build the combo, and a charged "
+                        + "combo smashes straight through the next "
+                        + "platform; red sectors and walls end the ride. "
+                        + "No lives anywhere: one crash ends the run. "
+                        + "Every round ends at a real finish and grows "
+                        + "from 150 rings up to 900; every round you "
+                        + "clear pays a score point. A GOGACoin waits "
+                        + "after every 6 rounds won - take it in its "
+                        + "window or lose it. Skins are designs, not "
+                        + "colors: glass, rock, wood and water towers "
+                        + "that shatter their own way, and ice, metal, "
+                        + "rubber and gold balls.",
                 "controls": [
-                        "Tap anywhere to start.",
-                        "Pick the mode and the position in the OPTIONALS "
-                                + "menu, then PLAY.",
-                        "BALL: hold anywhere to smash down, release to "
-                                + "bounce. Time the spin - black ends a "
-                                + "life (fire forgives).",
-                        "PLATFORM: drag anywhere and the platform follows "
-                                + "your finger; catch the ball, break the "
-                                + "tower row by row.",
-                        "The fire ball wakes after a long unbroken streak "
-                                + "- while it burns, black shatters too.",
-                        "A GOGACoin rides the round after every 6 wins - "
-                                + "take it in its window or lose it.",
+                        "Tap anywhere to start, pick the MODE and the "
+                                + "POSITION in the optionals menu, PLAY.",
+                        "BALL: hold anywhere to dive and smash; release "
+                                + "to bounce. Black ends the run - fire "
+                                + "forgives.",
+                        "PLATFORM: swipe left and right to rotate the "
+                                + "tower; the ball falls through the gaps "
+                                + "you steer under it.",
+                        "The fire gauge next to the score fills as you "
+                                + "smash (or chain falls); the burning "
+                                + "ring is the fire's remaining time.",
+                        "A GOGACoin rides the round after every 6 wins "
+                                + "- take it in its window or lose it.",
                 ],
                 "genres": {"main": ["arcade", "action", "casual"],
                         "sub": ["singleplayer", "procedural"]},
@@ -1674,16 +1684,18 @@ const GAMES := [
         {"id": "tb_fire", "title": "On Fire", "desc": "Ignite the fire ball", "tier": 1, "rule": {"k": "cnt", "key": "fires", "v": 1}},
         {"id": "tb_fire5", "title": "Firestarter", "desc": "Ignite the fire ball 5 times (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "fires", "v": 5}},
         {"id": "tb_coin", "title": "Coin Snatcher", "desc": "Take 10 tower GOGACoins (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "coins_taken", "v": 10}},
-        {"id": "tb_deep", "title": "The Long Way", "desc": "Reach round 4 in one run", "tier": 2, "rule": {"k": "max", "key": "round_max", "v": 4}},
+        {"id": "tb_smash", "title": "Breaker", "desc": "Smash through 10 charged platforms (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "smashes", "v": 10}},
         {"id": "tb_900", "title": "The 900", "desc": "Reach round 6 in one run", "tier": 3, "rule": {"k": "max", "key": "round_max", "v": 6}},
         {"id": "tb_score", "title": "High Tower", "desc": "Score 12 in one run", "tier": 3, "rule": {"k": "score", "v": 12}},
 ],
                 "controls_pc": [
-                        "BALL: hold LEFT MOUSE / SPACE / DOWN to smash; "
-                                + "release to bounce.",
-                        "PLATFORM: the platform follows the mouse; or hold "
-                                + "LEFT/RIGHT arrows (WASD rides the same "
-                                + "road); click or wait for the serve.",
+                        "BALL: hold LEFT MOUSE / SPACE / DOWN to dive and "
+                                + "smash; release to bounce.",
+                        "PLATFORM: swipe (or drag the mouse) to rotate "
+                                + "the tower; hold LEFT/RIGHT arrows to "
+                                + "turn it; the ball never stops bouncing.",
+                        "GAMEPAD: X (or A) dives; the left stick / "
+                                + "d-pad's left-right rotates the tower.",
                 ],
         },
         # v040-15 THE SOON SHELF: the next five un-shipped names walking

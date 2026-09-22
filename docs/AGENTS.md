@@ -940,3 +940,30 @@ reads without booting the scene.
     through the same TouchKit + key translation as 2D (the box never
     learns 3D); MSAA 2x arms while a 3D game lives and restores on
     exit.
+52. THE REAL-WINDOW GATE + THE SEAT DEATH + THE BIRTH GRACE (v041-2 r2,
+    the owner's three dead roots):
+    a) THE REAL-WINDOW GATE: a rotation is ASYNC on real desktops (the
+    WM_SIZE echo pumps late); get_viewport_rect() is the DESIGN on a PC
+    (aspect KEEP pins it) and can never verify a rotation. The host's
+    boot AND the orientation reload now hold until the PHYSICAL window
+    px (DisplayServer.window_get_size) agree with the content kind
+    (headless + PC-fullscreen exempt), and the design governor's window
+    half re-windows ONCE after 45 frames of physical drift (the lost
+    WM-echo heal). No game ever boots wearing a stale-shape layout.
+    b) THE SEAT DEATH: the game cursor seat (goga_cursor.gd's game_arm)
+    is STATIC - it outlived the game that armed it, so the menu's own
+    LMB mirror re-swapped the dead game's images back on every click.
+    Law: the seat dies WITH the game node (both twins' _exit_tree call
+    game_disarm); no click anywhere can resurrect a dead game's cursor.
+    c) THE BIRTH GRACE + THE TAP LAW: with emulate_touch_from_mouse one
+    physical click is a mouse event AND an emulated touch; a sheet born
+    inside a press handler received the emulated press + the physical
+    release and its buttons self-pressed (Tower Ball skipped its own
+    optionals). Law: tap_anywhere fires on the RELEASE (a tap is press +
+    release), and every new sheet wears a one-frame full-rect input
+    shield that dies right after birth.
+53. THE SOURCE LAW (v041-2 r2, the owner: "my mistake was not giving you
+    the actual sources"): when a port/clone's FEEL is questioned, study
+    the owner-named originals FIRST (decompile/configs), quote the exact
+    constants in the game data file, and log them in the manifest
+    provenance (mechanics study only - assets stay derived in-repo).

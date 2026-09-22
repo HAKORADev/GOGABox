@@ -63,10 +63,15 @@ func _t_towerball() -> int:
         # the coin law
         ok += _check(TB.coin_due(6) and TB.coin_due(12) and not TB.coin_due(5)
                 and not TB.coin_due(7), "coin every 6 wins")
-        # fire laws
-        ok += _check(int(TB.FIRE_AT) == 12 and absf(float(TB.FIRE_TIME) - 5.0)
-                < 0.001, "fire = 12 streak / 5s")
-        ok += _check(int(TB.LIVES) == 3, "3 lives")
+        # fire laws (r2: THE EXACT BOOST - Stack Bounce verbatim) + NO LIVES
+        ok += _check(absf(float(TB.BOOST_PER_BREAK) - 0.03) < 0.001
+                and absf(float(TB.BOOST_BURN) - 0.6) < 0.001
+                and absf(float(TB.BOOST_FLOOR) + 0.5) < 0.001
+                and absf(float(TB.BOOST_CHARGE_TIME) - 1.6) < 0.001,
+                "the exact boost law (0.03/break, 0.6/s burn, -0.5 floor, "
+                + "1.6s charge)")
+        ok += _check(TB.get("LIVES") == null,
+                "NO LIVES (r2: one crash ends the run)")
         # the registry seat
         var g := GameReg.get_game("towerball")
         ok += _check(String(g.get("dim", "")) == "3d",
@@ -75,21 +80,22 @@ func _t_towerball() -> int:
                 "orientation auto (both positions)")
         ok += _check(int(g.get("coin_div", 0)) == 5, "score bonus /5")
         ok += _check(bool(g.get("shop", false)), "the shop seat")
-        # the skins ride the shared shelf laws
+        # the skins ride the shared shelf laws (r2: DESIGNS, not colors)
         Box.reset_all()
         Box.earn(10000)
-        ok += _check(Box.buy_item("towerball", "skin_ball", "gold", 250),
+        ok += _check(Box.buy_item("towerball", "skin_ball", "ice", 250),
                 "ball skin buys")
-        ok += _check(Box.item_on("towerball", "skin_ball") == "gold",
+        ok += _check(Box.item_on("towerball", "skin_ball") == "ice",
                 "ball skin equips")
-        ok += _check(Box.buy_item("towerball", "skin_break", "ocean", 250),
+        ok += _check(Box.buy_item("towerball", "skin_break", "glass", 250),
                 "break skin buys")
-        ok += _check(Box.item_on("towerball", "skin_break") == "ocean",
+        ok += _check(Box.item_on("towerball", "skin_break") == "glass",
                 "break skin equips")
-        ok += _check(TB.ball_color() == Color("e8b830"),
+        ok += _check(TB.ball_skin()["color"] == Color("bfe8ff"),
                 "the game reads the equipped ball skin")
-        ok += _check(String(TB.break_skin()["id"]) == "ocean",
-                "the game reads the equipped break skin")
+        ok += _check(String(TB.break_skin()["id"]) == "glass"
+                and String(TB.break_skin()["sfx"]) == "tb_break_glass",
+                "the game reads the equipped break skin + its voice")
         Box.reset_all()
         return ok
 

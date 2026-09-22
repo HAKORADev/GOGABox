@@ -65,6 +65,58 @@ func stop_music() -> void:
         _current_music = ""
         _music.stop()
 
+## v041-2 r2 THE LOOP SEAT: a game can hold a looping sound under its own
+## key (Tower Ball's fireball burn). One player per key, looped at the
+## stream level, freed on stop. Additive - nothing else changes.
+var _loops := {}
+
+func loop(name_: String, volume_db := 0.0) -> void:
+        if _loops.has(name_):
+                return
+        var path := _resolve(name_)
+        if path == "":
+                return
+        var stream: AudioStream = load(path)
+        if stream == null:
+                return
+        if stream is AudioStreamWAV:
+                var w := stream as AudioStreamWAV
+                w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+                w.loop_begin = 0
+                # loop_end is in FRAMES: 16-bit = 2 bytes per sample,
+                # stereo doubles it (the generated SFX are 16-bit)
+                var bytes_per_sample := 2
+                if w.format == AudioStreamWAV.FORMAT_8_BITS:
+                        bytes_per_sample = 1
+                elif w.format == AudioStreamWAV.FORMAT_16_BITS:
+                        bytes_per_sample = 2
+                var chans := 2 if w.stereo else 1
+                w.loop_end = int(w.data.size()
+                                / (bytes_per_sample * chans))
+        elif stream is AudioStreamOggVorbis:
+                (stream as AudioStreamOggVorbis).loop = true
+        elif stream is AudioStreamMP3:
+                (stream as AudioStreamMP3).loop = true
+        var p := AudioStreamPlayer.new()
+        p.stream = stream
+        p.volume_db = volume_db
+        p.bus = "SFX"
+        add_child(p)
+        p.play()
+        _loops[name_] = p
+
+func stop_loop(name_: String) -> void:
+        if not _loops.has(name_):
+                return
+        var p: AudioStreamPlayer = _loops[name_]
+        _loops.erase(name_)
+        if is_instance_valid(p):
+                p.queue_free()
+
+func stop_loops() -> void:
+        for k in _loops.keys():
+                stop_loop(k)
+
 ## v0.3.8-3 THE SAME-FRAME GATE: a magnet hoovering 40 gems in one tick
 ## used to thrash the 8-voice pool 40 times in one frame (the same sound
 ## 40 times over itself = the Android mixer choke). One voice per sound

@@ -21,6 +21,57 @@ var _session_open := true
 var _accum := 0.0        # play seconds accumulated since last flush
 var _over_sheet_pair: Array = []   # [center, dim] of the live game-over sheet
 var _orient_now := ""    # v0.2.0: the orientation the game is CURRENTLY in
+# v041-2 r2 THE REAL-WINDOW GATE state: the gate is open while a boot/reload
+# waits for the physical window (the design governor's window-half heal stays
+# quiet so the gate owns the wait), and the drift counter rides the governor.
+var _gate_open := false
+var _window_drift := 0
+
+## v041-2 r2 helper - THE PHYSICAL TRUTH: the window's REAL px shape.
+## get_viewport_rect() is the DESIGN on a PC (aspect KEEP pins it) - it can
+## never verify a rotation there. The DisplayServer px are what the owner's
+## eyes actually see.
+func _window_kind_matches(kind: String) -> bool:
+        var ws := DisplayServer.window_get_size()
+        if ws.x <= 0 or ws.y <= 0:
+                return true   # headless/no-display: nothing physical to disagree with
+        return (ws.x > ws.y) == (kind == "horizontal")
+
+## The gate: hold until the REAL window agrees with _orient_now (capped ~1.5s
+## at 60fps). PC fullscreen: no gate - KEEP letterboxes correctly the instant
+## the design flips and the monitor never follows a content kind. Headless
+## (probes/CI): the two-frame await exactly as before. On timeout the ask
+## settles HONESTLY from the real window (the stranded-ask law).
+func _gate_real_window() -> void:
+        if DisplayServer.get_name() == "headless":
+                await get_tree().process_frame
+                await get_tree().process_frame
+                return
+        if ScaleRule.is_pc() and ScaleRule.is_fullscreen():
+                await get_tree().process_frame
+                await get_tree().process_frame
+                return
+        for i in 90:
+                if _window_kind_matches(_orient_now):
+                        # one extra breath for the engine's own viewport recompute
+                        await get_tree().process_frame
+                        return
+                await get_tree().process_frame
+        # REFUSED: resync from the physical truth and re-window to it
+        var ws := DisplayServer.window_get_size()
+        if ws.x > 0 and ws.y > 0:
+                _orient_now = "horizontal" if ws.x > ws.y else "vertical"
+        if ScaleRule.is_pc():
+                ScaleRule.apply_pc(get_window(), ScaleRule.DESIGN_LANDSCAPE
+                                if _orient_now == "horizontal"
+                                else ScaleRule.DESIGN_PORTRAIT)
+                ScaleRule.re_window("landscape" if _orient_now == "horizontal"
+                                else "portrait")
+        else:
+                ScaleRule.apply_expand(get_window())
+                get_window().content_scale_size = ScaleRule.DESIGN_LANDSCAPE \
+                                if _orient_now == "horizontal" \
+                                else ScaleRule.DESIGN_PORTRAIT
 
 func _close_over_sheet() -> void:
         for n in _over_sheet_pair:
@@ -53,8 +104,20 @@ func _ready() -> void:
                 landscape = orient == "landscape"
         _orient_now = "horizontal" if landscape else "vertical"
         _apply_orientation(landscape)
-        await get_tree().process_frame
-        await get_tree().process_frame
+        # v041-2 r2 THE REAL-WINDOW BOOT GATE (the owner: "the rotation fix
+        # has not really fixed it ... the game itself scale a vertical image
+        # in the horizontal view ... it is only one thing, internal content
+        # mis-scales ... deeply in the roots"). The window rotation is ASYNC
+        # on real Windows (the WM_SIZE echo pumps late) - the two-frame await
+        # let the LOADER + the game boot while the physical window still wore
+        # the OLD shape, and the game's first (and only) layout pass baked the
+        # stale shape forever. The gate holds the boot until the REAL window
+        # px agree with the content kind (or honestly settles the ask).
+        _gate_open = true
+        await _gate_real_window()
+        _gate_open = false
+        if not _session_open:
+                return
         W = get_viewport_rect().size.x
         H = get_viewport_rect().size.y
 
@@ -132,13 +195,17 @@ func _on_orientation_reload(o: String) -> void:
         _apply_orientation(o == "horizontal")
         # wait until the window actually reflects the new design (a rotation on
         # device is async; desktop/headless flips immediately) - capped wait
+        # v041-2 r2: the check is the PHYSICAL window now (get_viewport_rect
+        # is the design on a PC - it passed instantly there and verified
+        # NOTHING; the game reboots only after the real rotation lands).
+        _gate_open = true
         var rotated := false
-        for i in 30:
+        for i in 90:
                 await get_tree().process_frame
-                var vps2 := get_viewport_rect().size
-                if (vps2.x > vps2.y) == (o == "horizontal"):
+                if _window_kind_matches(o):
                         rotated = true
                         break
+        _gate_open = false
         if not _session_open:
                 return
         if not rotated:
@@ -220,6 +287,28 @@ func _assert_design_law() -> void:
                         else ScaleRule.DESIGN_PORTRAIT
         if ScaleRule.is_pc():
                 ScaleRule.apply_pc(root, want)
+                # v041-2 r2 THE GOVERNOR'S WINDOW HALF: the design half
+                # above can heal a stale content_scale_size instantly, but a
+                # LOST WM_SIZE echo (the real-Windows disease the r6 report
+                # called "stuck in mis-scale") left the PHYSICAL window
+                # old-shaped forever while the design was right - the KEEP
+                # letterbox then wears the wrong-shaped content strip
+                # endlessly. The gate owns its own wait; steady state only:
+                # 45 consecutive mismatched frames (a slow WM's echo never
+                # takes that long) -> re_window ONCE. Zero writes otherwise.
+                if _gate_open or ScaleRule.is_fullscreen() \
+                                or DisplayServer.get_name() == "headless":
+                        _window_drift = 0
+                        return
+                if _window_kind_matches(_orient_now):
+                        _window_drift = 0
+                else:
+                        _window_drift += 1
+                        if _window_drift >= 45:
+                                _window_drift = 0
+                                ScaleRule.re_window("landscape" \
+                                                if _orient_now == "horizontal" \
+                                                else "portrait")
         else:
                 # phones: EXPAND fills the window edge-to-edge (the design
                 # law rides _orient_now - the sensor is LOCKED during play)

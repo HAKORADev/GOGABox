@@ -1548,6 +1548,15 @@ const HOLD_VEL_MAX := 5200.0  # the hold's terminal glide speed
 const HOLD_ACCEL := 7600.0    # reached in ~0.7s of holding
 const STRIP_VEL_MAX := 4400.0
 const RELEASE_GLIDE := 0.2    # the glide-out fraction of the held speed
+# v041-2 r2 THE SLIDE LAW (the owner: "when the press of an arrow is removed,
+# it completely stops, it should slow-down then stop, like slide and the slide
+# is slowing down like it is losing force as same as normal touching"). The
+# r7 glide-out was ONE capped hop at constant speed - it read as a dead stop.
+# The release now keeps the live velocity and decays it by exponential
+# friction (the same physical feel as BoxScroll's finger inertia): distance
+# = v/friction, ~1s of visible slide from full speed, never a sudden halt.
+const RELEASE_FRICTION := 4.2
+const RELEASE_VEL_FLOOR := 40.0
 
 ## The REAL scrollable max (bar range minus the visible page) - the only
 ## honest clamp for a scroll target. The old 1,000,000 phantom is dead.
@@ -1606,12 +1615,17 @@ func _scroll_ride(delta: float) -> void:
                                 0.0, _scroll_max_v()))
         else:
                 if _feed_vel != 0.0:
-                        # RELEASE: one honest glide-out in the last direction,
-                        # clamped to the real max (the bottom is the bottom)
-                        _feed_target = clampf(float(_feed_scroll.scroll_vertical)
-                                        + clampf(_feed_vel * RELEASE_GLIDE, -900.0, 900.0),
-                                        0.0, _scroll_max_v())
-                        _feed_vel = 0.0
+                        # RELEASE: the slide loses force like a finger lift -
+                        # the live velocity decays by friction, clamped to the
+                        # real max (the bottom is the bottom)
+                        _feed_target = -1.0   # the slide owns the motion now
+                        _feed_scroll.scroll_vertical = int(clampf(
+                                        float(_feed_scroll.scroll_vertical)
+                                        + _feed_vel * delta,
+                                        0.0, _scroll_max_v()))
+                        var decayed := _feed_vel * exp(-RELEASE_FRICTION * delta)
+                        _feed_vel = 0.0 if absf(decayed) < RELEASE_VEL_FLOOR \
+                                        else decayed
                 if _feed_target >= 0.0:
                         _feed_target = clampf(_feed_target, 0.0, _scroll_max_v())
                         var cur := float(_feed_scroll.scroll_vertical)
@@ -1634,11 +1648,15 @@ func _scroll_ride(delta: float) -> void:
                                 0.0, _scroll_max_h()))
         else:
                 if _strip_vel != 0.0:
-                        _strip_target = clampf(float(
-                                        _strip_scroll.scroll_horizontal)
-                                        + clampf(_strip_vel * RELEASE_GLIDE, -800.0, 800.0),
-                                        0.0, _scroll_max_h())
-                        _strip_vel = 0.0
+                        # RELEASE: the same friction slide, 1:1 with the feed
+                        _strip_target = -1.0
+                        _strip_scroll.scroll_horizontal = int(clampf(
+                                        float(_strip_scroll.scroll_horizontal)
+                                        + _strip_vel * delta,
+                                        0.0, _scroll_max_h()))
+                        var sdecayed := _strip_vel * exp(-RELEASE_FRICTION * delta)
+                        _strip_vel = 0.0 if absf(sdecayed) < RELEASE_VEL_FLOOR \
+                                        else sdecayed
                 if _strip_target >= 0.0:
                         _strip_target = clampf(_strip_target, 0.0, _scroll_max_h())
                         var cur2 := float(_strip_scroll.scroll_horizontal)

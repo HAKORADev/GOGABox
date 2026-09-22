@@ -259,6 +259,102 @@ def theme() -> list:
     return [s * 0.82 / peak for s in out]
 
 
+# ------------------------------------------------------- the r2 voices
+
+def sfx_break_glass() -> list:
+    """GLASS: bright brittle shards - two high cracks + a sparkle tail"""
+    out = mix(
+        gain(noise(0.07, 0.5, lp=0.95, seed=41), 1.0),
+        gain(tone(1240, 0.10, 0.30, slide=0.55), 0.9),
+        gain(tone(1870, 0.07, 0.22, slide=0.8), 0.8),
+    )
+    for i, f in enumerate((2400, 3100, 3900)):
+        s = gain(tone(f, 0.30, 0.10, slide=0.98), 0.5)
+        out = mix(out, s)
+    return out
+
+
+def sfx_break_rock() -> list:
+    """ROCK: a deep dry crumble - low crack + gravel rain"""
+    return mix(
+        gain(noise(0.06, 0.55, lp=0.30, seed=47), 1.0),
+        gain(tone(110, 0.12, 0.5, slide=0.7), 0.9),
+        gain(noise(0.42, 0.30, a=0.05, lp=0.14, seed=53), 1.0),
+    )
+
+
+def sfx_break_wood() -> list:
+    """WOOD: a hollow snap + splinter clatter"""
+    return mix(
+        gain(tone(190, 0.07, 0.55, slide=0.45), 1.0),
+        gain(noise(0.05, 0.35, lp=0.6, seed=59), 0.9),
+        gain(tone(340, 0.16, 0.28, slide=0.6), 0.7),
+        gain(noise(0.22, 0.22, a=0.03, lp=0.35, seed=61), 0.8),
+    )
+
+
+def sfx_break_water() -> list:
+    """WATER: a plunky splash - a downward plop + bubbly spray"""
+    out = mix(
+        gain(tone(420, 0.14, 0.5, slide=0.35), 1.0),
+        gain(noise(0.30, 0.30, a=0.02, lp=0.5, seed=67), 0.9),
+    )
+    for i, f in enumerate((820, 640, 990)):
+        s = gain(tone(f, 0.12, 0.14, slide=0.5), 0.6)
+        out = mix(out, s)
+    return out
+
+
+def sfx_charge() -> list:
+    """the boost charge: the 1.6s slow-mo riser (the world inhales)"""
+    dur = 1.5
+    out = []
+    for i in range(int(SR * dur)):
+        t = i / SR
+        f = 180.0 * (2.0 ** (t / dur * 2.2))
+        v = 0.30 * min(1.0, t * 6.0) * (1.0 - t / dur * 0.4)
+        out.append(math.sin(2 * math.pi * f * t) * v
+                   + math.sin(2 * math.pi * f * 1.5 * t) * v * 0.4)
+    return out
+
+
+def sfx_fall() -> list:
+    """the gap fall: a soft descending whoosh (the combo's own voice -
+    the pitch ladder rides the caller's pitch multiplier)"""
+    return mix(
+        gain(noise(0.22, 0.30, a=0.02, lp=0.45, seed=71), 0.9),
+        gain(tone(660, 0.18, 0.22, slide=0.45), 0.8),
+    )
+
+
+def sfx_fire_loop() -> list:
+    """the fireball burn: a 3s SEAMLESS loop (low roar + crackle)"""
+    dur = 3.0
+    n = int(SR * dur)
+    out = [0.0] * n
+    # the roar: two detuned low saws-ish (sine + soft harmonics)
+    for i in range(n):
+        t = i / SR
+        v = (math.sin(2 * math.pi * 62 * t)
+             + 0.5 * math.sin(2 * math.pi * 93 * t)
+             + 0.3 * math.sin(2 * math.pi * 47 * t))
+        out[i] = v * 0.16
+    # the crackle: seeded pops, wrapped so the loop seam never pops
+    state = 97
+    for i in range(n):
+        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+        if (state & 0xFFFF) < 90:
+            ln = SR // 90
+            amp = 0.10 + (state % 100) / 1000.0
+            for k in range(ln):
+                j = (i + k) % n
+                out[j] += amp * math.exp(-k / (ln * 0.3)) \
+                        * (((state >> (k % 7)) & 1) * 2 - 1)
+    peak = max(1e-6, max(abs(s) for s in out))
+    return [s * 0.8 / peak for s in out]
+
+
+
 # ------------------------------------------------------------- the drop
 
 SFX = {
@@ -273,6 +369,15 @@ SFX = {
     "tb_serve.wav": sfx_serve,
     "tb_click.wav": sfx_click,
     "tb_miss.wav": sfx_miss,
+    # ---- v041-2 r2: THE MATERIAL VOICES (the skins are DESIGNS - each
+    # breakable material speaks its own language) + the boost's own words
+    "tb_break_glass.wav": sfx_break_glass,
+    "tb_break_rock.wav": sfx_break_rock,
+    "tb_break_wood.wav": sfx_break_wood,
+    "tb_break_water.wav": sfx_break_water,
+    "tb_charge.wav": sfx_charge,
+    "tb_fall.wav": sfx_fall,
+    "tb_fire_loop.wav": sfx_fire_loop,
 }
 
 

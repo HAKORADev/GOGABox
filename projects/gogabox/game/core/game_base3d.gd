@@ -71,6 +71,14 @@ func _exit_tree() -> void:
         var vp := get_viewport()
         if vp != null:
                 vp.msaa_3d = _prev_msaa
+        # v041-2 r2 THE SEAT DEATH LAW (the twin mirror of game_base's fix):
+        # the static game cursor seat dies WITH the game node - a game that
+        # armed the OS pointer must never outlive its own node, or the next
+        # set_held anywhere (the menu's LMB mirror, the next game) swaps the
+        # dead game's images back in (the owner's war-cursor leak).
+        if _game_cur_armed:
+                _game_cur_armed = false
+                GogaCursorLib.game_disarm()
 
 func game_toast(msg: String) -> void:
         Arc.toast(_toast, msg)
@@ -155,6 +163,22 @@ func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxConta
                                 == MOUSE_BUTTON_LEFT:
                         sheet_pop())
         _sheet_stack.append({"dim": dim, "cc": cc, "id": id})
+        # v041-2 r2 THE BIRTH GRACE (the twin mirror): one full-rect shield
+        # eats every pointer event on the sheet's birth frame, then dies -
+        # a sheet opened from inside a press handler can never have a button
+        # under the pointer born already pressed.
+        var shield := Control.new()
+        shield.name = "SheetBirthShield"
+        shield.set_anchors_preset(Control.PRESET_FULL_RECT)
+        shield.mouse_filter = Control.MOUSE_FILTER_STOP
+        root.add_child(shield)
+        root.move_child(shield, root.get_child_count() - 1)
+        shield.ready.connect(func():
+                var tw := shield.create_tween()
+                tw.tween_interval(0.05)
+                tw.tween_callback(func():
+                        if shield != null and is_instance_valid(shield):
+                                shield.queue_free()))
         return vb
 
 func sheet_pop() -> void:
@@ -296,6 +320,15 @@ func add_hud_chip(txt: String, icon_path := "") -> Label:
         _hud_row.move_child(chip, _hud_row.get_child_count() - 2)
         return chip.get_child(0).get_child(chip.get_child(0).get_child_count() - 1)
 
+## v041-2 r2: a CUSTOM control in the top bar, just left of the score chip
+## (the owner: "make a widget next score from the left"). The widget keeps
+## its own minimum size - the row flows around it like any chip.
+func add_hud_widget(c: Control) -> void:
+        if _hud_row == null or not is_instance_valid(_hud_row):
+                return
+        _hud_row.add_child(c)
+        _hud_row.move_child(c, _hud_row.get_child_count() - 2)
+
 func _score_label_ref() -> Label:
         return _score_label
 
@@ -382,9 +415,16 @@ func tap_anywhere_start(cb: Callable, note := "TAP ANYWHERE TO START") -> void:
         ov.set_anchors_preset(Control.PRESET_FULL_RECT)
         ov.mouse_filter = Control.MOUSE_FILTER_STOP
         ov.gui_input.connect(func(ev: InputEvent):
-                if ev is InputEventScreenTouch and (ev as InputEventScreenTouch).pressed:
+                # v041-2 r2 THE TAP LAW (the twin mirror of game_base's fix):
+                # fire on the RELEASE - a tap is press + release, and firing on
+                # the press let the same click's emulated touch + release
+                # self-press whatever UI the callback built (the optionals
+                # skipped themselves).
+                if ev is InputEventScreenTouch \
+                                and not (ev as InputEventScreenTouch).pressed:
                         _fire_tap_start()
-                elif ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
+                elif ev is InputEventMouseButton \
+                                and not (ev as InputEventMouseButton).pressed:
                         _fire_tap_start())
         if note != "":
                 var lbl := Arc.label(note, 32, Arc.ACCENT, true)

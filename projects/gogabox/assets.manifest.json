@@ -4,6 +4,13 @@
  "_doc": "Every visual/audio asset the MATCHER and COSMIC SPUD games wear, where it came from, its license, and how to re-fetch or re-derive it. Re-derive: python3 tools/v033p3_art.py + python3 tools/v033p3_sfx.py (patch 3 re-derives the p1/p2 set too). All sources CC0 or the owner's own upload. COSMIC SPUD (v0.3.4) re-derive: python3 tools/v034_cs_art.py + python3 tools/v034_cs_audio.py (the raw hunt cache lives outside the repo; the manifest lines below carry the sources).",
  "sources": [
   {
+   "id": "towerball-algorithm-sources",
+   "name": "TOWER BALL r2 mechanics studied from the owner's given originals",
+   "url": "https://gamesnacks.com/games/stackbounce ; https://gamesnacks.com/games/2mk3ok3s7jl88 ; Stack Ball 1.2.38 (com.azurgames.stackball)",
+   "license": "Mechanics/constants study only - NO art, audio or code copied; every shipped asset is derived in-repo",
+   "used_for": "the exact boost law (0.03/break, 1.6s charge, 0.6/s burn, 0.15/s decay, -0.5 floor) + the streak law from the Stack Bounce decompile; the platform mode's ring/orbit/combo config (gravity -60, bounce 23, drag 0.02, orbit 4.55, ring 6.3, spacing 8.7, combo threshold 4) from the Neon Tower decompile; the fireball field names (m_killsToStart/m_fillSpeed/m_unfillSpeed/m_fireSpeed) from the Stack Ball metadata"
+  },
+  {
    "id": "towerball-derived",
    "name": "TOWER BALL v041-2 - all assets derived in-repo (no external sources)",
    "url": "",

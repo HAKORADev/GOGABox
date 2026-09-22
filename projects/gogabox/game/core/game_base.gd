@@ -132,6 +132,20 @@ func game_cursor_disarm() -> void:
         _game_cur_armed = false
         GogaCursorLib.game_disarm()
 
+## v041-2 r2 THE SEAT DEATH LAW (the owner's leak report: the Heavy War
+## cursor "appears now in GOGABox in all other games and even GOGABox main
+## menu when i click them"). The game seat is a STATIC in GogaCursorLib -
+## it outlived the game node that armed it: quitting re-armed the box
+## arrow, but _game_armed stayed TRUE with the war images, so the next
+## set_held (the menu's own LMB mirror, the next game's click swap) put
+## the war cursor back on every press. The seat is the GAME'S shadow: it
+## dies the frame the game node leaves the tree - quit, finish, the
+## orientation reload's _clear_game, every path frees the node.
+func _exit_tree() -> void:
+        if _game_cur_armed:
+                _game_cur_armed = false
+                GogaCursorLib.game_disarm()
+
 ## THE CLICK SWAP: an `_input` observer, NOT _unhandled_input - a press
 ## that lands on a HUD Button dies at the GUI stage and never reaches the
 ## unhandled lane, and THAT press is exactly the one the click cursor must
@@ -206,6 +220,25 @@ func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxConta
                                 == MOUSE_BUTTON_LEFT:
                         sheet_pop())
         _sheet_stack.append({"dim": dim, "cc": cc, "id": id})
+        # v041-2 r2 THE BIRTH GRACE: a sheet opened from inside a press handler
+        # (a HUD button, a TouchKit tap, anything) shares that physical click
+        # with the same-frame emulated touch - a button under the pointer can
+        # be born already pressed and activate on the release (Tower Ball's
+        # optionals skipped themselves; the owner: "immediately starts"). One
+        # full-rect shield eats every pointer event on the sheet's birth frame,
+        # then dies. No UI underneath can self-press; nothing else changes.
+        var shield := Control.new()
+        shield.name = "SheetBirthShield"
+        shield.set_anchors_preset(Control.PRESET_FULL_RECT)
+        shield.mouse_filter = Control.MOUSE_FILTER_STOP
+        root.add_child(shield)
+        root.move_child(shield, root.get_child_count() - 1)
+        shield.ready.connect(func():
+                var tw := shield.create_tween()
+                tw.tween_interval(0.05)
+                tw.tween_callback(func():
+                        if shield != null and is_instance_valid(shield):
+                                shield.queue_free()))
         return vb
 
 ## Close the top sheet - its EXACT pair dies (never a neighbor, never a
@@ -400,6 +433,14 @@ func add_hud_chip(txt: String, icon_path := "") -> Label:
         _hud_row.move_child(chip, _hud_row.get_child_count() - 2)
         return chip.get_child(0).get_child(chip.get_child(0).get_child_count() - 1)
 
+## v041-2 r2 THE TWIN MIRROR: a custom control in the top bar, left of the
+## score chip (see game_base3d's law).
+func add_hud_widget(c: Control) -> void:
+        if _hud_row == null or not is_instance_valid(_hud_row):
+                return
+        _hud_row.add_child(c)
+        _hud_row.move_child(c, _hud_row.get_child_count() - 2)
+
 func _score_label_ref() -> Label:
         return _score_label
 
@@ -513,10 +554,21 @@ func tap_anywhere_start(cb: Callable, note := "TAP ANYWHERE TO START") -> void:
         ov.name = "TapAnywhere"
         ov.set_anchors_preset(Control.PRESET_FULL_RECT)
         ov.mouse_filter = Control.MOUSE_FILTER_STOP
+        # v041-2 r2 THE TAP LAW (the owner: "make sure that you will make the
+        # 'tap anywhere to start' accurately"). The overlay fired on the PRESS
+        # before - with emulate_touch_from_mouse the SAME physical click also
+        # delivers an emulated ScreenTouch, and whatever UI the callback built
+        # (a sheet, a menu) received that emulated press + the physical release
+        # in the same breath: Tower Ball's PLAY button activated itself and the
+        # owner "immediately started" with no mode/position selection. A TAP is
+        # press + RELEASE - the callback fires on the release now, when every
+        # press of this gesture is already dead.
         ov.gui_input.connect(func(ev: InputEvent):
-                if ev is InputEventScreenTouch and (ev as InputEventScreenTouch).pressed:
+                if ev is InputEventScreenTouch \
+                                and not (ev as InputEventScreenTouch).pressed:
                         _fire_tap_start()
-                elif ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
+                elif ev is InputEventMouseButton \
+                                and not (ev as InputEventMouseButton).pressed:
                         _fire_tap_start())
         if note != "":
                 var lbl := Arc.label(note, 32, Arc.ACCENT, true)

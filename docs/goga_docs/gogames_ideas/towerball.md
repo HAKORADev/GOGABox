@@ -122,3 +122,61 @@ gold miner and brick breaker, with real ends.
   (the write-once seat bug), the hard blocks born "absent" (the presence
   law), the landscape camera hiding the stack under the top disc, and
   the platform field reading flat (the subtle tilt).
+
+---
+
+# r2 (v041-2 r2) - THE REBUILD AFTER THE OWNER'S TEST
+
+The owner's verdict on r1: 99.99% broken. The r2 rebuild, from his given
+sources (the decompiled originals):
+
+- THE SOURCES: Stack Bounce (gamesnacks, PlayCanvas - readable bundle),
+  Neon Tower (gamesnacks, famobi/THREE - the full config JSON in the
+  bundle), Stack Ball 1.2.38 XAPK (Unity il2cpp - the fireball field
+  names m_killsToStart/m_fillSpeed/m_unfillSpeed/m_fireSpeed + the look).
+- BALL mode: the EXACT Stack Bounce boost law - boostValue -0.25 start,
+  +0.03 a break, >=1 -> slomo 0.1 + a 1.6s slow-mo charge -> the FIREBALL
+  (fire material + the flame halo + the burn loop), burn -0.6/s, idle
+  decay -0.15/s, floor -0.5 (the ~50-break cooldown). The r1 fixed-count
+  streak (12/5s) is dead.
+- PLATFORM mode: THE REAL NEON TOWER - the ball orbits the pole at 4.55
+  and bounces on its own (gravity -60, quadratic drag 0.02, bounce 23);
+  the PLAYER rotates the whole tower (swipe/arrows/stick); falls through
+  gaps build the combo (threshold 4 charges the SMASH-THROUGH); red
+  sectors + walls kill; rotating a wall through the ball kills; the
+  original's getAvailableRotation law honored (resting on top rotates
+  free, inside the slab it constrains/kills). The r1 breakout-paddle
+  invention is dead.
+- NO LIVES anywhere (the owner: "i meant with no lives for real") - one
+  crash ends the run. The lives chip is gone.
+- THE HUD: [score] [THE FIRE GAUGE - a circular widget left of the score:
+  the charge arc, the burn ring (the remaining active time), the cooldown
+  refill] [coins]. The empty widget is gone.
+- THE FLOW: the intro (the ball bounces the tower as living scenery) ->
+  the optionals (mode + position + PLAY) -> the run. THE ONE-TAP DISEASE
+  (the emulated touch self-pressed PLAY the frame the sheet opened) is
+  dead: tap-anywhere fires on release + every sheet wears a one-frame
+  birth shield. The r1 "the game starts with no mode selection" report.
+- THE BALL'S FRONT SEAT: the ball rides the disc's FRONT (world angle 0,
+  z=8), not the center axis where the pole hid it - the r1 "the ball is
+  not even a ball, not even exist" report.
+- SKINS ARE DESIGNS: breakables CLASSIC/GLASS/ROCK/WOOD/WATER (own
+  roughness/metal/alpha, own debris styles shard/rubble/splinter/splash,
+  own SFX voices); balls CLASSIC/ICE/METAL/RUBBER/GOLD; black always
+  black. The r1 "another color" mistake.
+- THE LIVING WORLD: the sky follows the DEVICE's local day time (morning/
+  noon/evening/night palettes, the sun disc + the moon + 90 stars + 7
+  drifting cloud billboards, the sky-driven reflections); the thumbnail
+  forces the golden hour.
+- GAMEPAD: X/A dives, the stick/d-pad's left-right rotates the tower.
+- THE BOX FIXES that rode this round: the real-window boot gate + the
+  governor's window half (the rotation mis-scale root), the cursor seat
+  death (the war-cursor leak), the doomscroll release slide (friction
+  decay instead of the dead stop), and the thumbnails' right-edge bg
+  sliver (pop_siege's capture artifact) resmeared away.
+- TESTS: towerball_probe 19,951 checks 0 fails; flow_test ALL PASSED;
+  r5/r6/r7 window + scroll + continuity probes ALL GREEN under Xvfb;
+  the film rig re-shot (intro/opts/ball_v/ball_h/plat_v/plat_h/fire_h/
+  shop_v) and EYEBALLED - caught the ball's hidden axis seat, the
+  platform camera hugging the pole, the missing ring regen, and the
+  degenerate full-circle sector quad (the rings were slivers).
