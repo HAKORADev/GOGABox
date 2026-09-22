@@ -436,18 +436,20 @@ func _pad_button_key(btn: JoyButton) -> Key:
                         return KEY_LEFT
                 JOY_BUTTON_DPAD_RIGHT:
                         return KEY_RIGHT
-                # v041-1 THE FACE-BUTTON LAW (the owner: "1,2,3,4 i meant the
-                # square, triangle, circle, cross, also ABXY in Xbox"): the
-                # count rides the PlayStation pad's shape order - square,
-                # triangle, circle, cross - which is the Xbox pad's X, Y, B, A
-                # (Godot: X=left, Y=top, B=right, A=bottom).
-                JOY_BUTTON_X:
-                        return KEY_1
+                # v041-1 THE FACE-BUTTON LAW, r5 EDITION (the owner:
+                # "by gamepad 1234 mapping, 1 is triangle, 2 is circle,
+                # 3 is cross" - the PlayStation SHAPE order, clockwise
+                # from the top; 4 is the remaining shape, the square -
+                # the owner typed cross twice, cross is already 3). That
+                # is the Xbox pad's Y / B / A / X (Godot: Y=top,
+                # B=right, A=bottom, X=left).
                 JOY_BUTTON_Y:
-                        return KEY_2
+                        return KEY_1
                 JOY_BUTTON_B:
-                        return KEY_3
+                        return KEY_2
                 JOY_BUTTON_A:
+                        return KEY_3
+                JOY_BUTTON_X:
                         return KEY_4
         return KEY_NONE
 

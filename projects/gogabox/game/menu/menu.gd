@@ -2673,20 +2673,28 @@ func _open_controls_list() -> void:
                         "picks, last played, ...)"],
                 ["MOUSE WHEEL", "scroll any list"],
                 ["GAMEPAD", "d-pad (or the left stick) = the arrows, " +
-                        "SQUARE / TRIANGLE / CIRCLE / CROSS (the Xbox pad's " +
-                        "X / Y / B / A) = the 1 / 2 / 3 / 4 keys, START = " +
+                        "TRIANGLE / CIRCLE / CROSS / SQUARE (the Xbox pad's " +
+                        "Y / B / A / X) = the 1 / 2 / 3 / 4 keys, START = " +
                         "ESC - in the games that wear the gamepad tag"],
                 ["", "each game's own controls live in its guide page"],
         ]
         for r in rows:
-                # v041-1 THE LINES LAW (the owner: "give it lines at the top
-                # and bottom of each one so reading them be direct, because
-                # now i was literally looking to where to read, just simple
-                # lines will work"): every row wears a hairline above and
-                # below - one glance, one row.
+                # v041-1 r5 THE ONE-LINE LAW (the owner: "the lines are
+                # weird and flickering, when i move, sometime they be one
+                # or two, make them only one at the end of each one, will
+                # be more clear, and fix the flickering because when i
+                # scroll, sometimes they even vanish somehow"): TWO roots.
+                # (1) the r1 top+bottom pair DOUBLED between neighbors
+                # (row N's bottom + row N+1's top read as one-or-two
+                # lines depending on position) - now ONE line at the END
+                # of each row only. (2) the FLICKER was sub-pixel death:
+                # a 2 design-px line at the PC downscale (~0.47 on his
+                # 1600x900) renders at ~0.94 device px - it lands on a
+                # different device pixel every scroll step and blinks in
+                # and out. 4 design px = ~1.9 device px = a solid,
+                # always-present rail.
                 var cell := VBoxContainer.new()
                 cell.add_theme_constant_override("separation", 6)
-                cell.add_child(_hairline())
                 var row := HBoxContainer.new()
                 row.add_theme_constant_override("separation", 14)
                 var key := Arc.label(String(r[0]), 22, Arc.HOT, false)
@@ -2726,13 +2734,14 @@ func _confirm_reset_all() -> void:
                         func(): _close_sheet()))
         Arc.fit_sheet(vb, 2)
 
-## v041-1 THE LINES LAW helper: one 2px hairline, the width of its parent -
-## the reading rails of the CONTROLS sheet (and anything else that wants
-## the same directness).
+## v041-1 r5 THE ONE-LINE LAW helper: a 4 design-px rail, the width of
+## its parent - sub-pixel-proof at the PC downscale (a 2px line at ~0.47
+## scale is 0.94 device px: it blinks and vanishes on scroll; 4px is a
+## solid ~1.9 device px at his monitor and scales cleanly everywhere).
 func _hairline() -> Control:
         var ln := ColorRect.new()
         ln.color = Color(0.35, 0.24, 0.12, 0.45)
-        ln.custom_minimum_size = Vector2(0, 2)
+        ln.custom_minimum_size = Vector2(0, 4)
         ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
         return ln
 
@@ -3027,14 +3036,31 @@ func _open_game_page(g: Dictionary) -> void:
         # v041-1: the PLATFORM + CONTROLS chips seat EXACTLY here - on top
         # of the genres list, in the owner's words "in top of the genres
         # list, right there".
-        var tag_seat := HFlowContainer.new()
-        tag_seat.add_theme_constant_override("h_separation", 8)
-        tag_seat.add_theme_constant_override("v_separation", 6)
-        for os_id in (g.get("os", ["android", "pc"]) as Array):
-                tag_seat.add_child(Arc.meta_chip("os", String(os_id)))
-        for c in Meta.ctrl_list(g):
-                tag_seat.add_child(Arc.meta_chip("ctrl", String(c)))
-        content.add_child(tag_seat)
+        # v041-1 r5 THE TWO-SEAT LAW (the owner: "pre-play menu has
+        # controls and platform mixed, make them two different titled
+        # things the same way as genre/more, they are correct in the
+        # search menu filters btw"): the single mixed flow is GONE - the
+        # os chips and the control-scheme chips each wear their OWN
+        # labeled section, exactly the GENRES / MORE TAGS pattern (the
+        # titles match the search sheet's PLATFORM / CONTROLS rows).
+        var os_list: Array = g.get("os", ["android", "pc"]) as Array
+        if not os_list.is_empty():
+                content.add_child(Arc.label("PLATFORM", 20, Arc.HOT))
+                var prow := HFlowContainer.new()
+                prow.add_theme_constant_override("h_separation", 8)
+                prow.add_theme_constant_override("v_separation", 8)
+                for os_id in os_list:
+                        prow.add_child(Arc.meta_chip("os", String(os_id)))
+                content.add_child(prow)
+        var ctrl_list: Array = Meta.ctrl_list(g)
+        if not ctrl_list.is_empty():
+                content.add_child(Arc.label("CONTROLS", 20, Arc.HOT))
+                var crow := HFlowContainer.new()
+                crow.add_theme_constant_override("h_separation", 8)
+                crow.add_theme_constant_override("v_separation", 8)
+                for c in ctrl_list:
+                        crow.add_child(Arc.meta_chip("ctrl", String(c)))
+                content.add_child(crow)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 content.add_child(Arc.label("GENRES", 20, Arc.HOT))

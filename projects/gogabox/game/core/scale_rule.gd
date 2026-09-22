@@ -69,11 +69,17 @@ static func scale_of(win: Window) -> float:
                 return 1.0
         return minf(float(wpx.x) / float(cs.x), float(wpx.y) / float(cs.y))
 
-## The OS safe area (display cutout / status bar / gesture navigation) as
-## per-side insets converted to DESIGN px: Vector4(left, top, right, bottom).
-## Everything outside the safe area is reachable-but-covered screen edge,
-## which the menu pads into its page margins.
+## v041-1 r5 THE PHONE-ONLY LAW (the owner's fullscreen bottom band):
+## desktops answer ZERO - the engine's Windows get_display_safe_area()
+## is screen_get_usable_rect() = THE WORK AREA (monitor minus taskbar),
+## so in fullscreen the taskbar height leaked in as a bogus bottom inset
+## and the feed was padded up off the screen's bottom edge (the brown
+## band with the lone page dot - "in windowed, it is ok, but fullscreen
+## ... not too accurate"). A desktop window never overlaps a system bar
+## the phone way: no notch, no gesture bar - the padding is a PHONE law.
 static func safe_insets_design(win: Window) -> Vector4:
+        if is_pc():
+                return Vector4.ZERO
         var wpx := DisplayServer.window_get_size()
         if wpx.x <= 0 or wpx.y <= 0:
                 return Vector4.ZERO
@@ -116,57 +122,32 @@ static func safe_insets_design(win: Window) -> Vector4:
 ## retired with the brown). One honest color, focus on the game.
 const PC_BAR_INK := Color(0.0392157, 0.0392157, 0.0392157)  # #0a0a0a
 
-## v041-1 r3 THE WINDOW TRUTH LAW (kept in r4): re-seat the OS truth
-## through the Window PROPERTY path whenever it disagrees with
-## DisplayServer - Window.set_size ALWAYS re-runs the engine's own
-## _update_viewport_size(), so a WM-less session (the rig), a boot-time
-## raw re_window, or a swallowed mode-flip event heals THE SAME FRAME.
-## No feedback loop: OS truth is read, never written back. Transient
-## (0,0) reports during mode flips are skipped, headless probes skip.
-## (On a real Windows desktop the WM echo keeps Window.size honest
-## anyway - this is the safety net, not the render path.)
-static func sync_window(win: Window) -> bool:
-        if win == null:
-                return false
-        if DisplayServer.get_name() == "headless":
-                return false
-        var real := DisplayServer.window_get_size()
-        if real.x <= 0 or real.y <= 0:
-                return false
-        if win.size == real:
-                return false
-        win.size = real
-        return true
-
+## v041-1 r5 THE ONE-WRITER NUKE (the owner: "try to nuke every single
+## stupid and wrong windowing thing ... the same way you did with the
+## brown-overlay bug"): the r1-r4 machinery is GONE - sync_window (a
+## per-frame Window.size property write that fought the OS during every
+## mode flip; the engine's own WM_SIZE echo is the only honest road on a
+## real desktop, and every build through v041 shipped on it),
+## final_transform_of (the r3 software-cursor relic - the cursor is
+## OS-composited hardware since r4), _rewindow_deferred (the 0.05s timer
+## that re-shaped the window twice) and the per-frame lock writes. The
+## window now has ONE writer (ScaleRule, on state changes only) and the
+## engine owns the present path. THE ENGINE PROOFS (4.7
+## display_server_windows.cpp): window_set_size AND window_set_position
+## silently RETURN when wd.fullscreen || wd.maximized, and
+## window_set_position internally MOVES THE WINDOW AT wd.width/height
+## (the bookkeeping size) - so a size-then-position pair can resize the
+## window BACK to the stale bookkeeping size when the WM_SIZE echo has
+## not been pumped yet (the owner's "mis-size windowed window, but not
+## always"). re_window below therefore sets the POSITION FIRST and the
+## SIZE LAST (window_set_size preserves the current rect position), and
+## set_fullscreen normalizes the MAXIMIZED bookkeeping before/after the
+## mode flips (the maximized pre_fs_rect is what made F11 bounce between
+## two screen-covering look-alikes - the "corrupted fullscreen").
 ## The root Window (static helpers have no `get_window`).
 static func root_window() -> Window:
         var tree := Engine.get_main_loop() as SceneTree
         return tree.root if tree != null else null
-
-## The engine's stretch mapping (design px -> real window px) rebuilt
-## from DISPLAYSERVER TRUTH - singular-proof (v041-1 r3). The engine's
-## get_final_transform() answers from Window.size, which the desync above
-## can leave stale (or transiently 0x0 during mode flips - a singular
-## matrix whose affine_inverse() poisoned the software cursor into
-## invisibility on the owner's Windows). The box's PC stretch law is KEEP
-## (apply_pc) - that branch is computed exactly from OS truth; anything
-## else (phone EXPAND, headless fakes) falls back to the engine's own
-## answer. Determinant is always > 0: real px and the design are nonzero.
-static func final_transform_of(win: Window) -> Transform2D:
-        if win == null:
-                return Transform2D()
-        if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
-                return win.get_final_transform()
-        var wpx := DisplayServer.window_get_size()
-        var cs := win.content_scale_size
-        if wpx.x <= 0 or wpx.y <= 0 or cs.x <= 0 or cs.y <= 0:
-                return win.get_final_transform()
-        var f := win.content_scale_factor
-        if f <= 0.0:
-                f = 1.0
-        var s := minf(float(wpx.x) / float(cs.x), float(wpx.y) / float(cs.y)) * f
-        var margin := (Vector2(wpx) - Vector2(cs) * s) * 0.5
-        return Transform2D(Vector2(s, 0.0), Vector2(0.0, s), margin)
 
 ## A real desktop session: not a phone/tablet, not the headless test runs.
 ## The headless guard keeps every probe and CI run on the phone rules.
@@ -199,10 +180,6 @@ static func pc_menu_design() -> Vector2i:
 static func apply_pc(win: Window, design: Vector2i) -> bool:
         if win == null:
                 return false
-        # v041-1 r3 THE WINDOW TRUTH LAW: heal any OS-vs-Window desync
-        # FIRST (the governor runs this every frame - the freeze class is
-        # structurally dead; see sync_window).
-        sync_window(win)
         var changed := false
         if win.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
                 win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
@@ -301,22 +278,46 @@ static func is_fullscreen() -> bool:
         return m == DisplayServer.WINDOW_MODE_FULLSCREEN \
                         or m == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 
-## v041-1 THE WINDOWED LOCK LAW (the owner: "i want you to lock the windowed
-## window from getting stretched at all, this will be better"). The windowed
-## window is NOT user-resizable anymore: its shape is ALWAYS exactly the
-## content's shape (re_window) - nothing can drag it off-aspect, so the
-## whole stretch/mis-scale/resize-flicker family is structurally dead.
-## Fullscreen ignores the flag (the monitor owns the shape there).
+## v041-1 r5 THE TRUE WINDOWED LOCK (the owner: "lock the windowed window
+## from getting stretched at all"). The r1 lock set ONLY RESIZE_DISABLED -
+## and the engine's own style table (display_server_windows.cpp
+## _get_window_style) proves that a locked window STILL wears
+## WS_MAXIMIZEBOX: the maximize button stayed alive, a maximized window
+## poisoned the engine's pre_fs_rect with a screen-covering rect, and the
+## next fullscreen exit restored that rect as a "windowed" window that
+## COVERS THE SCREEN - the owner's corrupted fullscreen ("it still say it
+## is windowed while it is full screen", F11 bouncing between two
+## look-alikes, F10 the only escape). The lock now kills BOTH flags in
+## windowed (the style table strips WS_MAXIMIZEBOX when no_max_btn is
+## set - the maximize button truly dies, the poisoned state can never
+## form), clears both in fullscreen, and is IDEMPOTENT: the last applied
+## value is cached - a repeated call with the same state writes NOTHING
+## (each real write rebuilds the window style on Windows; a per-frame or
+## mid-flip write was the flicker fuel).
+static var _lock_applied := -1
+
 static func apply_window_lock() -> void:
         if DisplayServer.get_name() == "headless":
                 return
+        var want := 0 if is_fullscreen() else 1
+        if _lock_applied == want:
+                return
+        _lock_applied = want
         DisplayServer.window_set_flag(
-                        DisplayServer.WINDOW_FLAG_RESIZE_DISABLED,
-                        not is_fullscreen())
+                        DisplayServer.WINDOW_FLAG_RESIZE_DISABLED, want == 1)
+        DisplayServer.window_set_flag(
+                        DisplayServer.WINDOW_FLAG_MAXIMIZE_DISABLED, want == 1)
 
 ## Re-shape the window to `kind` ("portrait" | "landscape") in WINDOWED
 ## mode, centered on the window's screen. Fullscreen: remember the kind and
 ## leave the monitor alone. Headless/no-display: no-op (probes stay safe).
+## v041-1 r5 THE POSITION-FIRST ORDER: window_set_position MOVES the
+## window at the engine's bookkeeping size (wd.width/height), so sizing
+## first and positioning second could silently shrink the window back to
+## the STALE size (the WM_SIZE echo had not pumped yet - the owner's
+## "mis-size ... but not always"). Position first (a pure move at the
+## current size), size last (window_set_size keeps the current rect
+## position) - the end rect is exact in every pump timing.
 static func re_window(kind: String) -> void:
         if kind != "landscape" and kind != "portrait":
                 return
@@ -338,14 +339,10 @@ static func re_window(kind: String) -> void:
                 want = Vector2i(w, w * 9 / 16)
         want.x = mini(want.x, scr.size.x)
         want.y = mini(want.y, scr.size.y)
-        DisplayServer.window_set_size(want)
         DisplayServer.window_set_position(
                         scr.position + (scr.size - want) / 2)
+        DisplayServer.window_set_size(want)
         apply_window_lock()
-        # v041-1 r3: the WM event may never come (boot-time resizes, WM-less
-        # sessions, the Windows restore race) - re-seat the truth NOW so the
-        # stretch transform is correct from the very first frame.
-        sync_window(root_window())
 
 ## THE FULLSCREEN LAW: flip, persist, and on the way back to windowed
 ## re-window to the content kind so no empty sides return with it. The
@@ -355,36 +352,61 @@ static func re_window(kind: String) -> void:
 static func toggle_fullscreen() -> void:
         set_fullscreen(not is_fullscreen())
 
+## THE FULLSCREEN LAW (v041-1 r5 THE MODE-TRUTH DANCE): every transition
+## normalizes the engine's bookkeeping FIRST, flips ONCE, settles the
+## shape after. THE MAXIMIZE TRAP (the engine source): entering
+## fullscreen from a MAXIMIZED window saves the screen-covering rect as
+## pre_fs_rect, and exiting restores it - a "windowed" window that
+## covers the screen (the owner's corrupted fullscreen: "the app still
+## say it is windowed while it is full screen", F11 dead, F10 the only
+## escape). The dance: (1) entering - if the bookkeeping says MAXIMIZED,
+## drop to WINDOWED first (the engine restores the pre-maximize rect),
+## then fullscreen; (2) exiting - after WINDOWED, if the bookkeeping
+## landed MAXIMIZED (was_maximized_pre_fs), force WINDOWED again (SW_NORMAL)
+## before re_window shapes the real windowed size. One deferred settle
+## (a single frame - never a timer, never a second re_window) finishes
+## the job after the WM echo pumped. The design does NOT ride the window
+## shape (KEEP + the content's design stay glued).
 static func set_fullscreen(on: bool) -> void:
         if DisplayServer.get_name() == "headless":
                 return
         if on == is_fullscreen():
                 return
+        # (1) entering: a MAXIMIZED start poisons pre_fs_rect - normalize.
+        if on and DisplayServer.window_get_mode() \
+                        == DisplayServer.WINDOW_MODE_MAXIMIZED:
+                DisplayServer.window_set_mode(
+                                DisplayServer.WINDOW_MODE_WINDOWED)
         DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN
                         if on else DisplayServer.WINDOW_MODE_WINDOWED)
         if Box.has_method("set_pc_fullscreen"):
                 Box.set_pc_fullscreen(on)
-        # v041-1: the lock flips with the mode (fullscreen unlocks the flag,
-        # windowed locks the shape) and the window re-shapes to the content
-        # kind AFTER the mode settled - the deferred pass makes the Windows
-        # restore-animation race structurally dead (the owner's "fullscreen
-        # in-game prevents me to go windowed until i exit the game").
+        # (2) exiting: the engine may restore the pre-fs MAXIMIZED state
+        # (was_maximized_pre_fs) - a covering "windowed" window. Force the
+        # honest SW_NORMAL bookkeeping, then shape the window for real.
+        if not on and DisplayServer.window_get_mode() \
+                        == DisplayServer.WINDOW_MODE_MAXIMIZED:
+                DisplayServer.window_set_mode(
+                                DisplayServer.WINDOW_MODE_WINDOWED)
         apply_window_lock()
-        sync_window(root_window())
         if not on:
                 re_window(pc_kind)
-                _rewindow_deferred()
+                _settle_deferred()
 
-## One-frame-later re-assert of the windowed shape (static helper piggy-
-## backing a fresh frame: DisplayServer calls land after the WM settled).
-static func _rewindow_deferred() -> void:
+## One-frame-later settle: the lock flips only after the mode echo pumped
+## (a mid-flip style rebuild was flicker fuel), and the windowed shape is
+## asserted once more - one call, no timers, idempotent by construction.
+static func _settle_deferred() -> void:
         var tree: SceneTree = Engine.get_main_loop() as SceneTree
         if tree == null:
                 return
-        tree.create_timer(0.05).timeout.connect(func():
-                if not is_fullscreen():
-                        re_window(pc_kind)
-                        apply_window_lock())
+        tree.process_frame.connect(_settle_now, CONNECT_ONE_SHOT)
+
+static func _settle_now() -> void:
+        if is_fullscreen():
+                return
+        re_window(pc_kind)
+        apply_window_lock()
 
 ## The boot law (main._ready): honor the persisted choice once.
 static func boot_window() -> void:
@@ -393,12 +415,18 @@ static func boot_window() -> void:
         var want_fs: bool = Box.has_method("pc_fullscreen") \
                         and Box.call("pc_fullscreen")
         if want_fs:
+                # a MAXIMIZED bookkeeping at boot would poison pre_fs_rect
+                # (the maximize trap) - normalize first, exactly like the
+                # runtime dance.
+                if DisplayServer.window_get_mode() \
+                                == DisplayServer.WINDOW_MODE_MAXIMIZED:
+                        DisplayServer.window_set_mode(
+                                        DisplayServer.WINDOW_MODE_WINDOWED)
                 DisplayServer.window_set_mode(
                                 DisplayServer.WINDOW_MODE_FULLSCREEN)
         else:
                 re_window(pc_kind)
         apply_window_lock()
-        sync_window(root_window())
 
 static func _usable_rect() -> Rect2i:
         var scr := DisplayServer.window_get_current_screen()
