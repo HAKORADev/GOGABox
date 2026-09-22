@@ -170,8 +170,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "Sky Veteran", "desc": "Play 50 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 50}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys change lanes",
-                		"SPACE holds the fire",
+                                "LEFT / RIGHT arrow keys change lanes",
+                                "SPACE holds the fire",
                 ],
         },
         {
@@ -282,8 +282,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Mountain's Own", "desc": "Play 60 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 60}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys run",
-                		"SPACE jumps",
+                                "LEFT / RIGHT arrow keys run",
+                                "SPACE jumps",
                 ],
         },
         {
@@ -361,8 +361,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "Cursed Regular", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys run",
-                		"SPACE jumps",
+                                "LEFT / RIGHT arrow keys run",
+                                "SPACE jumps",
                 ],
         },
         {
@@ -501,8 +501,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "Watch Commander", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys steer",
-                		"SPACE holds the fire",
+                                "LEFT / RIGHT arrow keys steer",
+                                "SPACE holds the fire",
                 
                         "PC: the ship follows the CURSOR, the LEFT button holds the fire (arrows + SPACE still work)",],
         },
@@ -617,8 +617,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Siege Regular", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
                 "controls_pc": [
-                		"click a folk card, then click a green grass cell to place it (or drag it there)",
-                		"click a placed gadget to open its panel",
+                                "click a folk card, then click a green grass cell to place it (or drag it there)",
+                                "click a placed gadget to open its panel",
                 ],
         },
 
@@ -703,8 +703,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Maze Walker", "desc": "Play 40 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
                 "controls_pc": [
-                		"the ARROW keys walk - one press, one step",
-                		"SPACE starts the run",
+                                "the ARROW keys walk - one press, one step",
+                                "SPACE starts the run",
                 ],
         },        {"id": "domino", "title": "DOMINO", "tag": "the tile classic",
                 "script": "res://game/games/domino/domino.gd",
@@ -1079,8 +1079,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Court's Resident", "desc": "Play 40 runs", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 40}},
 ],
                 "controls_pc": [
-                		"the LEFT / RIGHT arrows slide the paddle (or drag with the mouse)",
-                		"SPACE launches the ball",
+                                "the LEFT / RIGHT arrows slide the paddle (or drag with the mouse)",
+                                "SPACE launches the ball",
                 ],
         },
         {"id": "jumpcube", "title": "CONQUER DICE", "tag": "grow and spill",
@@ -1391,8 +1391,8 @@ const GAMES := [
     {"id": "plays_t1", "title": "Regular", "desc": "Play 8 rounds", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 8}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys steer the tank",
-                		"the mouse aims - HOLD the LEFT MOUSE BUTTON to fire the cannon",
+                                "LEFT / RIGHT arrow keys steer the tank",
+                                "the mouse aims - HOLD the LEFT MOUSE BUTTON to fire the cannon",
                 ],
         },
         # v040-7: the CRAZE CAVES-LIKE note graduated as ROCK BREAKER (the
@@ -1447,8 +1447,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Flood Watcher", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
                 "controls_pc": [
-                		"LEFT / RIGHT arrow keys roll the cannon",
-                		"SPACE or the LEFT MOUSE BUTTON fires (hold it)",
+                                "LEFT / RIGHT arrow keys roll the cannon",
+                                "SPACE or the LEFT MOUSE BUTTON fires (hold it)",
                 ],
         },
 
@@ -1517,8 +1517,8 @@ const GAMES := [
     {"id": "plays_t2", "title": "The Resident", "desc": "Play 30 rounds", "tier": 2, "rule": {"k": "stat", "key": "plays", "v": 30}},
 ],
                 "controls_pc": [
-                		"the ARROW keys bend the worm's heading",
-                		"SPACE dashes",
+                                "the ARROW keys bend the worm's heading",
+                                "SPACE dashes",
                 ],
         },
         # v040-13 THE GRADUATION: the zuma teaser seat renamed as MARBLE
@@ -1620,6 +1620,71 @@ const GAMES := [
         {"id": "gm_deep", "title": "Deep Digger", "desc": "Reach ground 8 in one run", "tier": 3, "rule": {"k": "max", "key": "gm_level", "v": 8}},
 ],
                 "controls_pc": ["LEFT CLICK or SPACE releases the claw"],
+        },
+        # v041-2 THE 3D GRADUATION: the stack ball note (parked under the
+        # helix-jump-like in FUTURE_GAMES.md since the v0.3.9-5 round)
+        # graduates as TOWER BALL - the box's first 3D game, TWO modes
+        # (the classic smash + the platform ride), the round ladder
+        # 150..900, lives 3, the /5 bonus, the every-6 coin, the fire
+        # ball. dim "3d" is REAL now: the host reads it (the 3D seat).
+        {"id": "towerball", "title": "TOWER BALL",
+                "tag": "smash the tower, ride the bounce",
+                "script": "res://game/games/towerball/towerball.gd",
+                "thumb": "res://assets/thumbs/towerball.png",
+                "orientation": "auto", "dim": "3d",
+                "os": ["android", "pc"],
+                "coin_div": 5, "price": 400, "fee": 8, "shop": true,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "The box's first 3D game - one tower law, two "
+                        + "ways to ride it. BALL: the helix spins under "
+                        + "Balldozer, hold to smash through the discs and "
+                        + "never land on black - unless the long streak "
+                        + "ignites the fire ball, then nothing stops you. "
+                        + "PLATFORM: the ball never stops bouncing and the "
+                        + "tower never stops coming - steer the platform, "
+                        + "break the rows, never let the ball fall. Every "
+                        + "round ends at a real finish line and grows from "
+                        + "150 rows up to 900; a crash costs one of your "
+                        + "three lives and no lives ends the run; every "
+                        + "round you clear pays a score point. A GOGACoin "
+                        + "waits on the tower after every 6 rounds won - "
+                        + "miss its seat and it is gone. Skins for the "
+                        + "ball and for everything that breaks.",
+                "controls": [
+                        "Tap anywhere to start.",
+                        "Pick the mode and the position in the OPTIONALS "
+                                + "menu, then PLAY.",
+                        "BALL: hold anywhere to smash down, release to "
+                                + "bounce. Time the spin - black ends a "
+                                + "life (fire forgives).",
+                        "PLATFORM: drag anywhere and the platform follows "
+                                + "your finger; catch the ball, break the "
+                                + "tower row by row.",
+                        "The fire ball wakes after a long unbroken streak "
+                                + "- while it burns, black shatters too.",
+                        "A GOGACoin rides the round after every 6 wins - "
+                                + "take it in its window or lose it.",
+                ],
+                "genres": {"main": ["arcade", "action", "casual"],
+                        "sub": ["singleplayer", "procedural"]},
+                "ach": [
+        {"id": "tb_first", "title": "First Smash", "desc": "Win your first round", "tier": 1, "rule": {"k": "cnt", "key": "rounds_won", "v": 1}},
+        {"id": "tb_r10", "title": "Tower Rookie", "desc": "Win 10 rounds (lifetime)", "tier": 1, "rule": {"k": "cnt", "key": "rounds_won", "v": 10}},
+        {"id": "tb_fire", "title": "On Fire", "desc": "Ignite the fire ball", "tier": 1, "rule": {"k": "cnt", "key": "fires", "v": 1}},
+        {"id": "tb_fire5", "title": "Firestarter", "desc": "Ignite the fire ball 5 times (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "fires", "v": 5}},
+        {"id": "tb_coin", "title": "Coin Snatcher", "desc": "Take 10 tower GOGACoins (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "coins_taken", "v": 10}},
+        {"id": "tb_deep", "title": "The Long Way", "desc": "Reach round 4 in one run", "tier": 2, "rule": {"k": "max", "key": "round_max", "v": 4}},
+        {"id": "tb_900", "title": "The 900", "desc": "Reach round 6 in one run", "tier": 3, "rule": {"k": "max", "key": "round_max", "v": 6}},
+        {"id": "tb_score", "title": "High Tower", "desc": "Score 12 in one run", "tier": 3, "rule": {"k": "score", "v": 12}},
+],
+                "controls_pc": [
+                        "BALL: hold LEFT MOUSE / SPACE / DOWN to smash; "
+                                + "release to bounce.",
+                        "PLATFORM: the platform follows the mouse; or hold "
+                                + "LEFT/RIGHT arrows (WASD rides the same "
+                                + "road); click or wait for the serve.",
+                ],
         },
         # v040-15 THE SOON SHELF: the next five un-shipped names walking
         # FUTURE_GAMES.md top to bottom (the file order law) parked as

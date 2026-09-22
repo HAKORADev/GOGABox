@@ -9,7 +9,10 @@ var game_def := {}
 var router: Node
 var fee := 0
 var partial := false   # v0.1.4: snake partial-pay - retry charges min(fee, wallet)
-var game: GogaGame
+# v041-2 THE 3D SEAT: the game node is EITHER twin (GogaGame the Node2D or
+# GogaGame3D the Node3D) - both carry the same contract, so the type here
+# is the honest Node and every touch stays a duck call.
+var game: Node
 
 var W := 720.0
 var H := 1280.0
@@ -60,14 +63,18 @@ func _ready() -> void:
         # headless): the v0.0.3/0.0.4 bg collapsed to 0x0, so the live box menu
         # stayed visible around the board ("game in a small window"). This
         # layer is opaque, covers the REAL viewport, and dies with the host.
-        var bg_layer := CanvasLayer.new()
-        bg_layer.layer = -1     # below the game world (0), above the hidden box
-        add_child(bg_layer)
-        var bg := ColorRect.new()
-        bg.color = Color("241407")
-        bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-        bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        bg_layer.add_child(bg)
+        # v041-2 THE 3D SEAT: a "dim": "3d" game SKIPS the bg - 2D canvas
+        # layers render ABOVE the 3D world, so a brown rect would cover the
+        # whole game; the 3D world brings its own environment/sky instead.
+        if String(game_def.get("dim", "2d")) != "3d":
+                var bg_layer := CanvasLayer.new()
+                bg_layer.layer = -1     # below the game world (0), above the hidden box
+                add_child(bg_layer)
+                var bg := ColorRect.new()
+                bg.color = Color("241407")
+                bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+                bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                bg_layer.add_child(bg)
 
         # ---- universal GOGABox loading screen (loads the script + assets) ----
         var id := String(game_def["id"])

@@ -924,3 +924,19 @@ reads without booting the scene.
     cancel_all), same controllables, survives app close AND reboot.
     Windows scripts live under user://notify; custom wav audio is a
     packaged-app feature - kinds map to distinct system toast sounds.
+51. THE 3D SEAT (v041-2): the box hosts 3D games natively. A game wears
+    "dim": "3d" in the registry and extends GogaGame3D
+    (game/core/game_base3d.gd, a Node3D); the host stays Node2D and the
+    game joins as a Node3D child - 2D canvas layers render ABOVE the 3D
+    world, so the loader, the HUD, every sheet/popup/toast and the
+    cursor seat work over 3D for free, and the host skips its brown bg
+    for 3d (the world brings its own environment). THE TWIN LAW:
+    game_base3d.gd mirrors game_base.gd contract-for-contract - an infra
+    change to one twin MUST be mirrored to the other (GDScript has no
+    multiple inheritance; a shared base would re-seat 25 shipped games).
+    The 3D GOGACoin default is Coin3D (game/core/game_coin3d.gd) with
+    the scale law Coin3D.world_diameter(design_px, cam, distance) - the
+    coin reads the same size the 2D coin.png reads. Input arrives
+    through the same TouchKit + key translation as 2D (the box never
+    learns 3D); MSAA 2x arms while a 3D game lives and restores on
+    exit.

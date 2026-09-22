@@ -4,6 +4,13 @@
  "_doc": "Every visual/audio asset the MATCHER and COSMIC SPUD games wear, where it came from, its license, and how to re-fetch or re-derive it. Re-derive: python3 tools/v033p3_art.py + python3 tools/v033p3_sfx.py (patch 3 re-derives the p1/p2 set too). All sources CC0 or the owner's own upload. COSMIC SPUD (v0.3.4) re-derive: python3 tools/v034_cs_art.py + python3 tools/v034_cs_audio.py (the raw hunt cache lives outside the repo; the manifest lines below carry the sources).",
  "sources": [
   {
+   "id": "towerball-derived",
+   "name": "TOWER BALL v041-2 - all assets derived in-repo (no external sources)",
+   "url": "",
+   "license": "Same as the project",
+   "used_for": "assets/audio/sfx/tb_*.wav + assets/audio/music/tb_theme.wav (pure math: python3 tools/v0412_sfx.py), assets/games/towerball/logo.png (PIL: python3 tools/v0412_logo.py), assets/thumbs/towerball.png (the real 3D render capture law: tests/tb_thumb.gd + python3 tools/v0412_thumb.py)"
+  },
+  {
    "id": "kenney-fonts",
    "name": "Kenney - Kenney Fonts pack",
    "url": "https://kenney.nl/assets/kenney-fonts",

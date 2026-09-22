@@ -639,6 +639,11 @@ stay.
     the shape of the run itself is undecided in the owner's head on
     purpose: ENDLESS (no end at all) or WITH ends whose lengths and
     colors stay DYNAMIC. Both live here until the GDD picks.
+    **GRADUATED v041-2 as TOWER BALL** — the box's FIRST 3D game: the two
+    modes shipped (BALL + PLATFORM), the open question answered ROUNDS
+    (the 150..900 ladder), lives 3, the every-6 missable coin, the fire
+    ball, and the 3D seat became real box infra —
+    gogames_ideas/towerball.md.
 - **stress-ball-3d-like** — stabilize the wobbly 3D ball, keep it steady.
 - **crowd runner** — that walking low-poly blue character that gets
   multiplied and divided through gates (count-masters-like).

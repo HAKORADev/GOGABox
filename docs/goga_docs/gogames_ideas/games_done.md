@@ -34,6 +34,10 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
 28. MARBLE POPPER — done (the zuma-like graduated, v040-13)
 29. GOLD MINER — done (the gold-miner-like graduated, v040-15; the last
     five graduations marked by the owner's order that round)
+30. TOWER BALL — done (the stack-ball note graduated, v041-2; the box's
+    FIRST 3D game: two modes - ball + platform - the 150..900 round
+    ladder, lives 3, the every-6 coin, the fire ball; the 3D seat is
+    real box infra now)
 
 ## SOON — the next five (the file's order law, the thirteenth dump's rule:
 ## the first five un-shipped names walking `FUTURE_GAMES.md` top to bottom;

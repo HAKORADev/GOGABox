@@ -41,12 +41,57 @@ func _ready() -> void:
         fails += _test("isolation: own-world launch (0-ads)", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
+        fails += _test("towerball: the 3D seat + tower laws", await _t_towerball())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)
 
 func _test(name_: String, fn_result: int) -> int:
         print("  %s: %s" % ["PASS" if fn_result == 0 else "FAIL", name_])
         return fn_result
+
+## v041-2 THE 3D SEAT LAWS (the shared registry + the game's own economy)
+func _t_towerball() -> int:
+        var ok := 0
+        var TB: GDScript = load("res://game/games/towerball/towerball_data.gd")
+        # the owner's ladder, exact
+        var ladder := [150, 300, 450, 600, 750, 900]
+        for i in ladder.size():
+                ok += _check(int(TB.round_length(i + 1)) == ladder[i],
+                        "ladder stop %d" % (i + 1))
+        ok += _check(int(TB.round_length(7)) == 900, "the ladder holds 900")
+        ok += _check(int(TB.round_length(40)) == 900, "900 is the cap")
+        # the coin law
+        ok += _check(TB.coin_due(6) and TB.coin_due(12) and not TB.coin_due(5)
+                and not TB.coin_due(7), "coin every 6 wins")
+        # fire laws
+        ok += _check(int(TB.FIRE_AT) == 12 and absf(float(TB.FIRE_TIME) - 5.0)
+                < 0.001, "fire = 12 streak / 5s")
+        ok += _check(int(TB.LIVES) == 3, "3 lives")
+        # the registry seat
+        var g := GameReg.get_game("towerball")
+        ok += _check(String(g.get("dim", "")) == "3d",
+                "dim 3d (the host reads it)")
+        ok += _check(String(g.get("orientation", "")) == "auto",
+                "orientation auto (both positions)")
+        ok += _check(int(g.get("coin_div", 0)) == 5, "score bonus /5")
+        ok += _check(bool(g.get("shop", false)), "the shop seat")
+        # the skins ride the shared shelf laws
+        Box.reset_all()
+        Box.earn(10000)
+        ok += _check(Box.buy_item("towerball", "skin_ball", "gold", 250),
+                "ball skin buys")
+        ok += _check(Box.item_on("towerball", "skin_ball") == "gold",
+                "ball skin equips")
+        ok += _check(Box.buy_item("towerball", "skin_break", "ocean", 250),
+                "break skin buys")
+        ok += _check(Box.item_on("towerball", "skin_break") == "ocean",
+                "break skin equips")
+        ok += _check(TB.ball_color() == Color("e8b830"),
+                "the game reads the equipped ball skin")
+        ok += _check(String(TB.break_skin()["id"]) == "ocean",
+                "the game reads the equipped break skin")
+        Box.reset_all()
+        return ok
 
 func _check(cond: bool, why := "") -> int:
         if not cond:
@@ -312,8 +357,9 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        var ok := _check(GameReg.playable().size() == 29,
-                "29 playable games (gold miner joined, v040-15)")
+        # v041-2: TOWER BALL graduated (the box's first 3D game) - 30 playable
+        var ok := _check(GameReg.playable().size() == 30,
+                "30 playable games (tower ball joined, v041-2)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
@@ -325,14 +371,15 @@ func _t_registry() -> int:
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
-        ok += _check(ids.find("marble") == ids.size() - 7
-                        and ids.find("goldminer") == ids.size() - 6
+        ok += _check(ids.find("marble") == ids.size() - 8
+                        and ids.find("goldminer") == ids.size() - 7
+                        and ids.find("towerball") == ids.size() - 6
                         and ids[ids.size() - 5] == "knife"
                         and ids[ids.size() - 4] == "maskrush"
                         and ids[ids.size() - 3] == "stickbridge"
                         and ids[ids.size() - 2] == "bubbleshot"
                         and ids[ids.size() - 1] == "towertrim",
-                "gold miner walks last of the playable, five teasers after it (v040-15)")
+                "tower ball walks last of the playable, five teasers after it (v041-2)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")
