@@ -1,4 +1,4 @@
-# LAN MULTIPLAYER — the box-level system (owner spec, v040-7 round)
+# LAN MULTIPLAYER — the box-level system (owner spec, v040-7 round; cross-platform update, the v041-3-era reveal)
 
 > The owner's own spec, verbatim-shaped into laws. This is the dedicated
 > home of the LOCAL NETWORK multiplayer system — it grew out of the
@@ -114,6 +114,30 @@ carries everything shared.
 7. The match starts with the committed seats, CPU eliminated, all real.
 8. One wins; the others lose. The box economy charges/pays per device as
    it always does.
+
+## THE CROSS-PLATFORM UPDATE (the hidden plans, the v041-3-era reveal — document only)
+
+The owner's reveal of 2026-09-24 (see THE_PLATFORM_ANSWER.md, the sequel to
+THE_APP_STORE_QUESTION.md) carries LAN forward on three points. Nothing else
+in this spec changes — the host/join flow, the hold screen, the ten-seconds
+law, the real-only law all stand as written above.
+
+- **THE CROSS-PLATFORM LAW**: LAN will be cross-platform — phones and the
+  PC build in ONE session on the same network. The box itself became a
+  two-platform ship again in v0.4.0-16's Windows return, and the LAN system
+  follows it: a phone holder and a PC holder meet in the same hold screen.
+- **THE LAN TAG LAWS**: LAN support becomes TAGGED data on each game:
+  - a **platform tag** — which platform(s) a game's LAN supports, so a
+    cross-platform session only pairs seats the game actually supports;
+  - a **player-count tag** — how many players the game supports. GOGABox
+    caps one session at 4 players anyway (the PLAYERS badge 1..4, below);
+    the tag carries the game's own supported count inside that ceiling.
+- **LAN GETS ITS OWN TAGS**: LAN is its own tag family in
+  discovery/search — not squeezed into the genre badges — the same spirit
+  as THE PLAYERS BADGE LAW making players its own badge AREA. The tags ride
+  the registry entry next to the "players" field (THE OPEN TECH NOTES
+  below), so the feed, the store page, the search and the LAN system all
+  read the same numbers.
 
 ## THE OPEN TECH NOTES (for the plan that builds this)
 

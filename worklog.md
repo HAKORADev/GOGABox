@@ -17,3 +17,20 @@ Work Log:
 
 Stage Summary:
 - v041-2 r3: the input death (the immortal shield), the cursor seat corruption (the deferred corpse), and the rotation roots (the menu stomp + the boot parity + the both-truths gate) all killed at the root with probe-proof; Tower Ball rebuilt around the universal three-screen flow with the owner's design laws. The owner-experience rig (real clicks) is now the ship gate for every sheet/UI fix.
+
+---
+Task ID: v041-3 docs (the reveal)
+Agent: Super Z (main)
+Task: the owner revealed the hidden plans (GOGABox as a store/platform) - document them verbatim-first next to the LAN + appstore docs, carry the LAN cross-platform/tagging update into the LAN file, DOCUMENT ONLY (zero code), then return a full opinion
+
+Work Log:
+- Sandbox verified (d0819b41 = v041-3 r2, clean) - confirmed to the owner that r2 WAS shipped (the summary had gone stale)
+- Archaeology run (the owner's pointer): THE_APP_STORE_QUESTION.md re-read (v0.2.8 spark + the v0.3.7 age/GOGAds archive); git history dug - 70335dcf (rework + asset-store trials), 81351aca/0dbc1289 (windows forge + v0.3.4-3), 805b041a (THE GREAT UN-WINDOWING: "no windows builds, no way to make money from them"), 16db01d7 (THE OPEN-SOURCE ROUND: MIT + 0 ads + THE WINDOWS RETURN, "whose only reason is dead today"), 883ba438/f85ecbc1 (first windows test + v041 CI green)
+- NEW docs/goga_docs/ideas/THE_PLATFORM_ANSWER.md - the reveal file: the owner's FULL message preserved verbatim at the top (his order), then THE ARC (the store idea's three returns + the runway-cleared reading), THE LAWS (trust / local simulation / no-api-limit raw trick / SDK dlls / packaging draft / formal look + overrides / LAN cross-platform / returning age laws / the fluidity disclaimer), THE SHAPE OF A GAME draft tree (game + dlls + index + gogabox + discover subfolders), THE DEVELOPER LOOP (local paths -> the binary validates -> the full GitHub-side pipeline simulated -> later pointed at real repos), THE OPEN QUESTIONS (true packaging, the token push, the age return, the discover shape, the SDK Android twin), THE WORKING AGREEMENT (talk step by step, no refactor-over-refactor)
+- LAN_MULTIPLAYER.md: THE CROSS-PLATFORM UPDATE section added (phones + PC in ONE session; LAN support tagged with platform + player count inside the 4-player session cap; LAN gets its own tag family riding the registry) - header updated, nothing else touched
+- ideas/README.md: the system docs table indexed THE_PLATFORM_ANSWER.md + the LAN row notes the update
+- Both files read back and verified after writing (the owner's order)
+- DOCUMENT ONLY kept: zero game/infra code touched, no version bump, no config change
+
+Stage Summary:
+- The hidden plans now live in the repo as documentation: the platform answer file (verbatim-first, dense, house-style) + the LAN cross-platform update. The talk agenda is explicit (5 open questions), the working agreement is recorded, and the runway story (spark -> pulled attempt -> MIT/0-ads/two-platform clean room -> reveal) is preserved with commit hashes so the "everything connects" reading survives.
