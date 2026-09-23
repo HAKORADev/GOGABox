@@ -68,7 +68,7 @@ const COMBO_THRESHOLD := TB.NT_COMBO_THRESHOLD
 
 # ------------------------------------------------- state
 var mode := "ball"             # "ball" | "platform"
-var phase := "boot"            # boot|intro|optionals|transition|run|serve|won|over
+var phase := "boot"            # boot|orient|mode|ready|transition|run|serve|won|over
 var round_idx := 1
 var round_len := 150
 var rng := RandomNumberGenerator.new()
@@ -151,14 +151,22 @@ func _goga_setup() -> void:
         if mode != "ball" and mode != "platform":
                 mode = "ball"
         _build_world()
-        _build_round()           # the tower IS the intro scenery
+        _build_round()           # the tower IS the menu scenery - the ball
+                                 # bounces on it from the FIRST frame
         Jukebox.music("res://assets/audio/music/tb_theme.wav")
-        # r2 THE OPTIONALS LAW: the mode + position cards are the game's own
-        # menu and ALWAYS show first - the run starts from PLAY. (r1 skipped
-        # them on the reload path and the one-tap disease skipped them on the
-        # fresh path; the owner saw neither. Both are dead.)
-        _build_intro()
-        tap_anywhere_start(_intro_start, "")
+        # v041-2 r3 THE UNIVERSAL FLOW LAW (the owner: "position selection is
+        # first, mode/optionals second, tap anywhere is last to get ready" +
+        # "see all other games and follow them"): THE SNAKE ASK DESIGN, screen
+        # by screen - the phone-asset position cards, the mode cards, the
+        # ready card. The r2 one-sheet optionals (mode + position + PLAY
+        # stacked) and the r2 intro screen above it are DEAD - the flow is
+        # the box's own, the same shape every game speaks.
+        # Reload path: the host TELLS us the picked position (start_orientation)
+        # - the position ask is answered, the mode screen opens directly.
+        if start_orientation != "":
+                _show_mode_select()
+        else:
+                _show_orient_select()
         check_achievements()
 
 func _goga_tk_ready() -> void:
@@ -169,6 +177,18 @@ func _goga_tk_ready() -> void:
 
 func _goga_pause_end_ok() -> bool:
         return phase == "run" or phase == "serve"
+
+## v041-2 r3 THE OWNER'S BACK LAW: "the optionals menu in tower ball is
+## close-able by pressing back while in all other games pressing back is
+## on-top of it and nothing can close it, closing it makes you stuck
+## forever". The ask screens ARE the game's menu - back can never close
+## them (they are the root; there is nothing behind them to get stuck out
+## of). A sheet the game opened ABOVE the ask (the shop) still closes -
+## the exact shape every other game wears.
+func _back_pressed() -> void:
+        if phase in ["orient", "mode", "ready"] and _sheet_stack.is_empty():
+                return
+        super._back_pressed()
 
 # --------------------------------------------------------- the fire gauge
 ## THE CIRCULAR WIDGET (the owner: "make it show the charge and heat of the
@@ -287,7 +307,10 @@ func _build_world() -> void:
         e.sky = sky
         e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
         e.ambient_light_sky_contribution = 0.7
-        e.ambient_light_energy = 1.15
+        # v041-2 r3 THE BRIGHT WORLD LAW (the owner: the design looks
+        # "depressed and shitty"): the r2 ambient read dim on a phone -
+        # the sky fills the world with MORE honest light now.
+        e.ambient_light_energy = 1.3
         e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
         env.environment = e
         world.add_child(env)
@@ -347,7 +370,10 @@ func _build_world() -> void:
                 stm.emission_energy_multiplier = 1.6
                 st.material_override = stm
                 var ang := rng.randf_range(0.0, TAU)
-                var el := rng.randf_range(0.05, 1.2)
+                # the elevation walks BELOW the horizon too - the player
+                # looks DOWN at the tower, and the night sky must carry its
+                # stars into that view (the r2 night read flat)
+                var el := rng.randf_range(-1.1, 1.2)
                 var dd := 240.0
                 st.position = Vector3(cos(ang) * dd * cos(el),
                                 sin(el) * dd, sin(ang) * dd * cos(el))
@@ -428,11 +454,11 @@ func _apply_day_phase() -> void:
                 energy = 1.1
                 amb = 1.0
         else:                                    # NIGHT
-                top = Color("0a1230")
-                hor = Color("1c2a52")
-                sun_col = Color(0.55, 0.62, 0.9)
-                energy = 0.7
-                amb = 0.8
+                top = Color("101a3e")
+                hor = Color("243562")
+                sun_col = Color(0.58, 0.65, 0.92)
+                energy = 0.85
+                amb = 0.9
                 stars_a = 1.0
                 night = true
         var sm: ProceduralSkyMaterial = (env.environment.sky.sky_material
@@ -571,106 +597,254 @@ func _apply_ball_skin() -> void:
         else:
                 ball_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 
-# ----------------------------------------------------------------- intro
+# ----------------------------------------------------------------- the flow
+# v041-2 r3 THE UNIVERSAL FLOW (the snake ask design, verbatim shape):
+#   Screen 1  HOW DO YOU HOLD IT  - the phone-asset position cards
+#   Screen 2  CHOOSE MODE         - BALL / PLATFORM cards (the optionals)
+#   Screen 3  TAP ANYWHERE        - the ready card (the universal tap law)
+# The world lives behind every screen: the tower spins and the ball bounces
+# on it from the first frame - the menus never freeze the game.
 
-var _intro_ui: Control = null
+var _phase_ui: Control = null     # the live ask screen (dim or ready card)
+var _ready_card: Control = null
 
-func _build_intro() -> void:
-        phase = "intro"
-        _intro_ui = Control.new()
-        _intro_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
-        _intro_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _overlay_root_ref().add_child(_intro_ui)
-        var vb := VBoxContainer.new()
-        vb.add_theme_constant_override("separation", 22)
-        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        _intro_ui.add_child(vb)
-        # the logo rides HIGH - the bouncing ball owns the screen's center
-        # (the r1 logo covered it: the owner never saw the ball)
-        vb.anchor_left = 0.5
-        vb.anchor_right = 0.5
-        vb.anchor_top = 0.0
-        vb.anchor_bottom = 0.0
-        vb.offset_left = -310.0
-        vb.offset_right = 310.0
-        vb.offset_top = 150.0
-        var logo := TextureRect.new()
-        logo.texture = load("res://assets/games/towerball/logo.png")
-        logo.custom_minimum_size = Vector2(620, 620.0 * 420.0 / 620.0)
-        logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(logo)
-        var tap := Arc.label("TAP ANYWHERE TO START", 44, Color(1, 1, 1))
-        tap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        tap.add_theme_color_override("font_outline_color", Color(0.2, 0.1, 0.02))
-        tap.add_theme_constant_override("outline_size", 12)
-        tap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(tap)
-        # the ball bounces on the top disc THROUGH the intro - the game is
-        # alive from the first frame (the owner: "the ball is not even a
-        # ball, not even exist" - never hidden again)
-        ball_mesh.visible = true
-
-func _intro_start() -> void:
-        Jukebox.sfx("tb_click", -6.0)
-        if _intro_ui != null and is_instance_valid(_intro_ui):
-                _intro_ui.queue_free()
-                _intro_ui = null
-        _optionals_open()
-
-# ------------------------------------------------------------ optionals
-# THE OWNER: "make the mode selection as the optionals menu" - the mode
-# cards + the position cards (the snake ask design) + PLAY live here.
-# r2: the menu ALWAYS shows (fresh boot AND the position reload) - the
-# game never starts itself.
-
-func _optionals_open() -> void:
-        phase = "optionals"
-        var sheet := sheet_push(0.0, "optionals")
-        var t := Arc.label("TOWER BALL", 42, Arc.INK)
-        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        sheet.add_child(t)
-        sheet.add_child(Arc.fit_label("MODE", 24, Arc.HOT, 560))
-        var mrow := HBoxContainer.new()
-        mrow.add_theme_constant_override("separation", 14)
-        mrow.alignment = BoxContainer.ALIGNMENT_CENTER
-        sheet.add_child(mrow)
-        for m in ["ball", "platform"]:
-                var card := _mode_card(m, mode == m)
-                card.pressed.connect(func():
-                        mode = m
-                        Box.set_progress(game_id, "mode", m)
-                        Jukebox.sfx("tb_click", -6.0)
-                        _shop_reopen("optionals"))
-                mrow.add_child(card)
-        sheet.add_child(Arc.fit_label("POSITION", 24, Arc.HOT, 560))
-        var prow := HBoxContainer.new()
-        prow.add_theme_constant_override("separation", 14)
-        prow.alignment = BoxContainer.ALIGNMENT_CENTER
-        sheet.add_child(prow)
-        var live := _live_orient()
-        for choice in ["vertical", "horizontal"]:
-                var card := _pos_card(choice, live == choice)
-                card.pressed.connect(func():
-                        Jukebox.sfx("tb_click", -6.0)
-                        Box.set_progress(game_id, "orient_pref", choice))
-                prow.add_child(card)
-        var play := Arc.button("PLAY", Vector2(560, 86), 32, Arc.GOOD,
-                func(): _play_pressed())
-        sheet.add_child(play)
-        Arc.fit_sheet(sheet, 2)
-
-func _live_orient() -> String:
+func _auto_orient() -> String:
         var vp := get_viewport().get_visible_rect().size
         return "horizontal" if vp.x > vp.y else "vertical"
 
-func _play_pressed() -> void:
-        var picked := String(Box.get_progress(game_id, "orient_pref", ""))
-        if picked == "vertical" or picked == "horizontal":
-                if picked != _live_orient():
-                        request_orientation_reload.emit(picked)
-                        return
+func _clear_phase_ui() -> void:
+        if _phase_ui != null and is_instance_valid(_phase_ui):
+                _phase_ui.queue_free()
+        _phase_ui = null
+
+## THE ASK PANEL: the snake's exact panel shape (white 0.94, radius 26,
+## margin 24) on the shared warm dim. One helper so all screens agree.
+func _ask_panel() -> VBoxContainer:
+        _clear_phase_ui()
+        var dim := ColorRect.new()
+        dim.color = Color(0.09, 0.05, 0.02, 0.55)
+        dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+        dim.mouse_filter = Control.MOUSE_FILTER_STOP
+        _overlay_root_ref().add_child(dim)
+        var cc := CenterContainer.new()
+        cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+        cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        dim.add_child(cc)
+        var panel := PanelContainer.new()
+        panel.add_theme_stylebox_override("panel",
+                        Arc.panel_style(Color(1, 1, 1, 0.94), 26, 24))
+        cc.add_child(panel)
+        var vb := VBoxContainer.new()
+        vb.add_theme_constant_override("separation", 16)
+        panel.add_child(vb)
+        _phase_ui = dim
+        return vb
+
+## Screen 1: HOW DO YOU HOLD IT - the position ask. The phone cards are THE
+## UNIVERSAL ASSETS (the owner: "you re-created the design of
+## vertical/horizontal positions selection assets" - never again: the same
+## phone_vertical/phone_horizontal art every game asks with), preselected
+## from the LIVE window shape. A different position reloads through the
+## host (the universal law - same paid session, no second fee).
+func _show_orient_select() -> void:
+        phase = "orient"
+        var vb := _ask_panel()
+        var logo := TextureRect.new()
+        logo.texture = load("res://assets/games/towerball/logo.png")
+        logo.custom_minimum_size = Vector2(380, 380.0 * 420.0 / 620.0)
+        logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        vb.add_child(logo)
+        var t := Arc.label("HOW DO YOU HOLD IT?", 40, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var sub := Arc.label("your tower will be built this way", 20,
+                        Color("8a6a40"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(sub)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 18)
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_child(row)
+        var live := _auto_orient()
+        for choice in ["vertical", "horizontal"]:
+                var on: bool = live == choice
+                var card := _phone_card(choice, on)
+                card.pressed.connect(func(): _orient_choice(choice))
+                row.add_child(card)
+        var hint := Arc.label("you can change it here any time", 16,
+                        Color("8a6a40"), false)
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint)
+
+## THE TAP LAW (the snake law verbatim): a pick is judged against the LIVE
+## window, read fresh at tap time. Same shape = the mode screen; a
+## different shape = the host reloads the game in it. The pref is
+## remembered but decides nothing - the ask can never hang on a mismatch.
+func _orient_choice(choice: String) -> void:
+        Jukebox.sfx("tb_click", -6.0)
+        Box.set_progress(game_id, "orient_pref", choice)
+        if choice == _auto_orient():
+                _show_mode_select()
+        else:
+                request_orientation_reload.emit(choice)
+
+## The host could NOT rotate the window: the ask settles into the position
+## the window actually KEPT (the snake law) - the mode screen opens in the
+## settled shape, never a reload into a lie.
+func orientation_settled() -> void:
+        if phase in ["orient", "mode", "ready"]:
+                _show_mode_select()
+
+## the universal phone card (snake verbatim): 250x300, the asset art, the
+## ACCENT fill when selected, the hairline border when not
+func _phone_card(kind: String, selected: bool) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(250, 300)
+        var sb := Arc.panel_style(Arc.ACCENT if selected else Arc.CARD, 22, 12)
+        if not selected:
+                sb.set_border_width_all(3)
+                sb.border_color = Color(0, 0, 0, 0.12)
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var vb := VBoxContainer.new()
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_theme_constant_override("separation", 10)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(vb)
+        var ic := TextureRect.new()
+        ic.texture = load("res://assets/ui/phone_%s.png" % kind)
+        ic.custom_minimum_size = Vector2(190, 190)
+        ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(ic)
+        var l := Arc.label(kind.to_upper(), 26, Arc.INK if not selected \
+                        else Color(0.16, 0.10, 0.05))
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(l)
+        return b
+
+## Screen 2: CHOOSE MODE - BALL / PLATFORM (the optionals seat). A pick
+## saves the pref and walks to the ready card - the snake shape (the mode
+## cards START the run path; nothing closes these screens: the back law).
+func _show_mode_select() -> void:
+        phase = "mode"
+        var vb := _ask_panel()
+        var t := Arc.label("CHOOSE MODE", 38, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 14)
+        row.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_child(row)
+        row.add_child(_mode_card("BALL", "the spinning smash", mode == "ball",
+                        func():
+                                mode = "ball"
+                                Box.set_progress(game_id, "mode", mode)
+                                Jukebox.sfx("tb_click", -6.0)
+                                _show_ready_card()))
+        row.add_child(_mode_card("PLATFORM", "steer the rings",
+                        mode == "platform",
+                        func():
+                                mode = "platform"
+                                Box.set_progress(game_id, "mode", mode)
+                                Jukebox.sfx("tb_click", -6.0)
+                                _show_ready_card()))
+        var hint := Arc.label("the shop and the skins wait in the top bar",
+                        16, Color("8a6a40"), false)
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint)
+
+## the snake mode card shape: 280x110, GOOD when selected, title + sub
+func _mode_card(txt: String, sub: String, selected: bool, cb: Callable) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(280, 110)
+        var sb := Arc.panel_style(Arc.GOOD if selected else Arc.CARD, 20, 10)
+        if not selected:
+                sb.set_border_width_all(3)
+                sb.border_color = Color(0, 0, 0, 0.12)
+        b.add_theme_stylebox_override("normal", sb)
+        var sbp := sb.duplicate() as StyleBoxFlat
+        sbp.bg_color = sbp.bg_color.darkened(0.06)
+        b.add_theme_stylebox_override("pressed", sbp)
+        var vb := VBoxContainer.new()
+        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+        vb.alignment = BoxContainer.ALIGNMENT_CENTER
+        vb.add_theme_constant_override("separation", 2)
+        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        b.add_child(vb)
+        var l := Arc.label(txt, 30, Arc.INK if not selected \
+                        else Color(0.16, 0.10, 0.05), true)
+        l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(l)
+        var s := Arc.label(sub, 17, Color("6a4a28"), false)
+        s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        vb.add_child(s)
+        b.pressed.connect(cb)
+        return b
+
+## Screen 3: THE READY CARD - "TAP ANYWHERE TO START" + the run's subline,
+## the snake's exact soft card (white 0.82, scale-in). The tap itself rides
+## the universal tap-anywhere overlay (fires on RELEASE - the one-tap
+## disease stays dead); the card is pure visual, every filter IGNORE.
+func _show_ready_card() -> void:
+        phase = "ready"
+        _clear_phase_ui()
+        var cc := CenterContainer.new()
+        cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+        cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var panel := PanelContainer.new()
+        panel.add_theme_stylebox_override("panel",
+                        Arc.panel_style(Color(1, 1, 1, 0.82), 20))
+        var lbl := Arc.label("TAP ANYWHERE TO START", 40, Arc.INK)
+        lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var sub := Arc.label(_ready_subline(), 18, Color("6a4a28"), false)
+        sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
+        v.add_child(lbl)
+        v.add_child(sub)
+        panel.add_child(v)
+        cc.add_child(panel)
+        panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        cc.modulate.a = 0.0
+        _overlay_root_ref().add_child(cc)
+        _phase_ui = cc
+        _ready_card = cc
+        var tw := cc.create_tween()
+        tw.tween_property(cc, "modulate:a", 1.0, 0.18)
+        tw.parallel().tween_method(_card_step.bind(cc), 0.7, 1.0, 0.26) \
+                        .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        # the universal tap seat: release fires the run
+        tap_anywhere_start(_ready_go, "")
+
+func _ready_subline() -> String:
+        var rings := TB.round_length(1)
+        return "%s  ·  ROUND 1  ·  %d RINGS" % \
+                ["BALL" if mode == "ball" else "PLATFORM", rings]
+
+func _card_step(s: float, cc: Control) -> void:
+        if not is_instance_valid(cc):
+                return
+        cc.pivot_offset = cc.size / 2.0
+        cc.scale = Vector2(s, s)
+
+func _ready_go() -> void:
+        Jukebox.sfx("tb_click", -6.0)
+        if _ready_card != null and is_instance_valid(_ready_card):
+                _ready_card.queue_free()
+        _ready_card = null
         _start_run()
 
 func _start_run() -> void:
@@ -911,6 +1085,14 @@ func _disc_mesh(data: Dictionary, color: Color) -> ArrayMesh:
                 var c: Color = TB.BLACK if bool(black[i]) else color
                 var a0 := float(i) * seg + gap * 0.5
                 var a1 := float(i + 1) * seg - gap * 0.5
+                # v041-2 r3 THE TWO-TONE LAW (the owner: the design looks
+                # "very depressed and shitty"): one flat color per disc read
+                # as a dead blob - the faces wear their own honest light:
+                # the top is the color, the sides deepen, the bottom is the
+                # shade. Baked vertex color - zero extra draw calls.
+                var side := c.darkened(0.18)
+                var under := c.darkened(0.38)
+                var cap := c.darkened(0.10)
                 _quad(st,
                         Vector3(sin(a0) * R_IN, h, cos(a0) * R_IN),
                         Vector3(sin(a1) * R_IN, h, cos(a1) * R_IN),
@@ -922,31 +1104,31 @@ func _disc_mesh(data: Dictionary, color: Color) -> ArrayMesh:
                         Vector3(sin(a0) * R_OUT, -h, cos(a0) * R_OUT),
                         Vector3(sin(a1) * R_OUT, -h, cos(a1) * R_OUT),
                         Vector3(sin(a1) * R_IN, -h, cos(a1) * R_IN),
-                        Vector3.DOWN, c)
+                        Vector3.DOWN, under)
                 _quad(st,
                         Vector3(sin(a0) * R_OUT, -h, cos(a0) * R_OUT),
                         Vector3(sin(a0) * R_OUT, h, cos(a0) * R_OUT),
                         Vector3(sin(a1) * R_OUT, h, cos(a1) * R_OUT),
                         Vector3(sin(a1) * R_OUT, -h, cos(a1) * R_OUT),
-                        _outward(a0, a1), c)
+                        _outward(a0, a1), side)
                 _quad(st,
                         Vector3(sin(a0) * R_IN, -h, cos(a0) * R_IN),
                         Vector3(sin(a1) * R_IN, -h, cos(a1) * R_IN),
                         Vector3(sin(a1) * R_IN, h, cos(a1) * R_IN),
                         Vector3(sin(a0) * R_IN, h, cos(a0) * R_IN),
-                        Vector3(0, 0, 0), c)   # inner wall (normal set below)
+                        Vector3(0, 0, 0), side)   # inner wall
                 _quad(st,
                         Vector3(sin(a0) * R_OUT, -h, cos(a0) * R_OUT),
                         Vector3(sin(a0) * R_IN, -h, cos(a0) * R_IN),
                         Vector3(sin(a0) * R_IN, h, cos(a0) * R_IN),
                         Vector3(sin(a0) * R_OUT, h, cos(a0) * R_OUT),
-                        _side_normal(a0), c)
+                        _side_normal(a0), cap)
                 _quad(st,
                         Vector3(sin(a1) * R_IN, -h, cos(a1) * R_IN),
                         Vector3(sin(a1) * R_OUT, -h, cos(a1) * R_OUT),
                         Vector3(sin(a1) * R_OUT, h, cos(a1) * R_OUT),
                         Vector3(sin(a1) * R_IN, h, cos(a1) * R_IN),
-                        _side_normal(a1) * -1.0, c)
+                        _side_normal(a1) * -1.0, cap)
         return st.commit()
 
 func _outward(a0: float, a1: float) -> Vector3:
@@ -1366,6 +1548,8 @@ func _ring_sector(st: SurfaceTool, a0: float, a1: float, r: float,
                 var s1: float = lerpf(a0, a1, float(i + 1) / float(steps))
                 var mid := (s0 + s1) * 0.5
                 var out := Vector3(sin(mid), 0, cos(mid))
+                # v041-2 r3 THE TWO-TONE LAW (the ring faces carry their own
+                # light - see the disc law above)
                 _quad(st,
                         Vector3(sin(s0) * r_in, h, cos(s0) * r_in),
                         Vector3(sin(s1) * r_in, h, cos(s1) * r_in),
@@ -1377,13 +1561,13 @@ func _ring_sector(st: SurfaceTool, a0: float, a1: float, r: float,
                         Vector3(sin(s0) * r, -h, cos(s0) * r),
                         Vector3(sin(s1) * r, -h, cos(s1) * r),
                         Vector3(sin(s1) * r_in, -h, cos(s1) * r_in),
-                        Vector3.DOWN, c)
+                        Vector3.DOWN, c.darkened(0.38))
                 _quad(st,
                         Vector3(sin(s0) * r, -h, cos(s0) * r),
                         Vector3(sin(s0) * r, h, cos(s0) * r),
                         Vector3(sin(s1) * r, h, cos(s1) * r),
                         Vector3(sin(s1) * r, -h, cos(s1) * r),
-                        out, c)
+                        out, c.darkened(0.18))
 
 func _p_ball_pos() -> Vector3:
         # the ball rides the WORLD angle 0 (the camera's side), at its orbit
@@ -1597,7 +1781,10 @@ func _platform_cam(delta: float) -> void:
         var vp := get_viewport().get_visible_rect().size
         var aspect := vp.x / maxf(1.0, vp.y)
         var tanv := tan(deg_to_rad(P_CAM_FOV) * 0.5)
-        var d: float = clampf(8.4 / maxf(0.02, tanv * aspect), 15.0, 34.0)
+        # r3: the wide seat pulls back a little more - at the narrow floor
+        # the pole filled the landscape frame (the eye pass)
+        var floor_d := 18.0 if aspect > 1.2 else 15.0
+        var d: float = clampf(8.4 / maxf(0.02, tanv * aspect), floor_d, 34.0)
         var focus := Vector3(0, p_cam_y - 1.0, P_OFFSET)
         var target := focus + Vector3(0, 0.45 * d, d)
         if shake_t > 0.0:
@@ -1902,89 +2089,7 @@ func _shop_reopen(which: String) -> void:
         if which == "shop":
                 _shop_open()
         else:
-                _optionals_open()
-
-# ================================================================ the cards
-
-func _mode_card(kind: String, selected: bool) -> Button:
-        var b := Button.new()
-        b.custom_minimum_size = Vector2(240, 190)
-        var sb := Arc.panel_style(Arc.ACCENT if selected else Arc.CARD, 20, 10)
-        if not selected:
-                sb.set_border_width_all(3)
-                sb.border_color = Color(0, 0, 0, 0.12)
-        b.add_theme_stylebox_override("normal", sb)
-        var sbp := sb.duplicate() as StyleBoxFlat
-        sbp.bg_color = sbp.bg_color.darkened(0.06)
-        b.add_theme_stylebox_override("pressed", sbp)
-        var vb := VBoxContainer.new()
-        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
-        vb.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_theme_constant_override("separation", 10)
-        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        b.add_child(vb)
-        var glyph := Control.new()
-        glyph.custom_minimum_size = Vector2(96, 74)
-        glyph.draw.connect(func():
-                if kind == "ball":
-                        # the helix: three arcs + the ball above
-                        for i in 3:
-                                var y := 56.0 - float(i) * 20.0
-                                glyph.draw_arc(Vector2(48, y), 30.0,
-                                        0.35, PI - 0.35, 24,
-                                        Color(0.3, 0.2, 0.1, 0.8), 6.0)
-                        glyph.draw_circle(Vector2(48, 10), 11.0,
-                                TB.ball_skin()["color"])
-                else:
-                        # the tower rings + the orbiting ball
-                        for i in 3:
-                                var y := 8.0 + float(i) * 16.0
-                                glyph.draw_rect(Rect2(14, y, 68, 9),
-                                        Color(0.3, 0.2, 0.1, 0.55))
-                        glyph.draw_circle(Vector2(48, 52), 7.0,
-                                TB.ball_skin()["color"]))
-        glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(glyph)
-        var lbl := Arc.label("BALL" if kind == "ball" else "PLATFORM", 26,
-                Arc.INK, true)
-        lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(lbl)
-        return b
-
-func _pos_card(kind: String, selected: bool) -> Button:
-        var b := Button.new()
-        b.custom_minimum_size = Vector2(190, 190)
-        var sb := Arc.panel_style(Arc.ACCENT if selected else Arc.CARD, 20, 10)
-        if not selected:
-                sb.set_border_width_all(3)
-                sb.border_color = Color(0, 0, 0, 0.12)
-        b.add_theme_stylebox_override("normal", sb)
-        var sbp := sb.duplicate() as StyleBoxFlat
-        sbp.bg_color = sbp.bg_color.darkened(0.06)
-        b.add_theme_stylebox_override("pressed", sbp)
-        var vb := VBoxContainer.new()
-        vb.set_anchors_preset(Control.PRESET_FULL_RECT)
-        vb.alignment = BoxContainer.ALIGNMENT_CENTER
-        vb.add_theme_constant_override("separation", 10)
-        vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        b.add_child(vb)
-        var glyph := Control.new()
-        glyph.custom_minimum_size = Vector2(96, 74)
-        glyph.draw.connect(func():
-                var phone := Color(0.25, 0.16, 0.08, 0.85)
-                if kind == "vertical":
-                        glyph.draw_rect(Rect2(30, 4, 36, 66), phone, false, 5.0)
-                else:
-                        glyph.draw_rect(Rect2(8, 24, 80, 30), phone, false, 5.0))
-        glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(glyph)
-        var lbl := Arc.label("VERTICAL" if kind == "vertical" \
-                else "HORIZONTAL", 20, Arc.INK, true)
-        lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        vb.add_child(lbl)
-        return b
+                _show_mode_select()
 
 # ================================================================ input
 # THE OWNER'S LAW: controls in 3D are not different than 2D on the box

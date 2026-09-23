@@ -37,24 +37,71 @@ func _window_kind_matches(kind: String) -> bool:
                 return true   # headless/no-display: nothing physical to disagree with
         return (ws.x > ws.y) == (kind == "horizontal")
 
-## The gate: hold until the REAL window agrees with _orient_now (capped ~1.5s
-## at 60fps). PC fullscreen: no gate - KEEP letterboxes correctly the instant
-## the design flips and the monitor never follows a content kind. Headless
-## (probes/CI): the two-frame await exactly as before. On timeout the ask
-## settles HONESTLY from the real window (the stranded-ask law).
+## v041-2 r3 helper - THE CANVAS TRUTH: the content_scale_size IS the
+## design the canvas is mapped to. The gate used to verify the REAL window
+## only - a foreign design write in the wait (the menu's unguarded
+## size_changed stomp, r2's mis-scale engine) left a RIGHT-shaped window
+## around a WRONG-shaped canvas, and the gate let the game boot into it.
+## The boot now holds until BOTH truths agree.
+func _design_kind_matches(kind: String) -> bool:
+        var want := ScaleRule.DESIGN_LANDSCAPE if kind == "horizontal" \
+                        else ScaleRule.DESIGN_PORTRAIT
+        return get_window().content_scale_size == want
+
+## One honest re-assert of THIS game's design on the canvas mapping.
+## `kind` defaults to _orient_now - and a caller that still holds the
+## mid-flight "" MUST pass the ask's kind explicitly (the reload path
+## closes its gate BEFORE _orient_now is claimed: an implicit read there
+## would assert the PORTRAIT default and stomp the very flight it closes
+## - the probe caught it, MIDFLIGHT sample 0).
+## Idempotent at steady state; heals any foreign stomp that landed while a
+## gate waited. THE F10 ORDER (the owner: "see why it works accurately with
+## manual switches, then make the automatic switches be the same"): the
+## content decides the design, the design lands FIRST, the window follows.
+func _assert_own_design(kind := "") -> void:
+        var k := kind if kind != "" else _orient_now
+        if k == "":
+                return   # no truth to assert yet - never a default guess
+        var root := get_window()
+        if ScaleRule.is_pc():
+                ScaleRule.apply_pc(root, ScaleRule.DESIGN_LANDSCAPE
+                                if k == "horizontal"
+                                else ScaleRule.DESIGN_PORTRAIT)
+        else:
+                ScaleRule.apply_expand(root)
+                root.content_scale_size = ScaleRule.DESIGN_LANDSCAPE \
+                                if k == "horizontal" \
+                                else ScaleRule.DESIGN_PORTRAIT
+
+## The gate: hold until the REAL window AND the canvas design agree with
+## _orient_now (capped ~1.5s at 60fps). PC fullscreen: the monitor never
+## follows a content kind - the window half is exempt, the CANVAS half is
+## still verified. Headless (probes/CI): the two-frame await exactly as
+## before. On timeout the ask settles HONESTLY from the real window (the
+## stranded-ask law).
 func _gate_real_window() -> void:
         if DisplayServer.get_name() == "headless":
                 await get_tree().process_frame
                 await get_tree().process_frame
                 return
         if ScaleRule.is_pc() and ScaleRule.is_fullscreen():
+                # v041-2 r3: the fullscreen exemption keeps the WINDOW wait
+                # off, but the canvas is still verified - the design write
+                # is synchronous, so this passes instantly unless something
+                # stomped it (and then it is healed below).
                 await get_tree().process_frame
                 await get_tree().process_frame
+                if not _design_kind_matches(_orient_now):
+                        _assert_own_design()
                 return
         for i in 90:
-                if _window_kind_matches(_orient_now):
+                if _window_kind_matches(_orient_now) \
+                                and _design_kind_matches(_orient_now):
                         # one extra breath for the engine's own viewport recompute
                         await get_tree().process_frame
+                        # v041-2 r3: the last breath can be a stomp - close
+                        # the gate on the game's OWN design, always.
+                        _assert_own_design()
                         return
                 await get_tree().process_frame
         # REFUSED: resync from the physical truth and re-window to it
@@ -202,12 +249,17 @@ func _on_orientation_reload(o: String) -> void:
         var rotated := false
         for i in 90:
                 await get_tree().process_frame
-                if _window_kind_matches(o):
+                # v041-2 r3: BOTH truths - the real window AND the canvas
+                # design (the menu's stomp used to pass the window check
+                # while the canvas wore the wrong design)
+                if _window_kind_matches(o) and _design_kind_matches(o):
                         rotated = true
                         break
         _gate_open = false
         if not _session_open:
                 return
+        if rotated:
+                _assert_own_design(o)
         if not rotated:
                 # the window REFUSED the position: resync from the real
                 # window and let the live game settle its ask in THIS shape

@@ -33,38 +33,39 @@ func _ready() -> void:
         await _settle(3)
         Box.set_progress("towerball", "mode", mode)
         GH.launch(router, "towerball")
-        await _wait(2.4)
-        var host: Node = GH.active_host
-        var game: Node = host.game
-        # r2 THE FLOW: intro first - the ball bounces the tower as scenery
-        if base == "intro":
-                await _snap("alive")
-                await _wait(0.6)
-                await _snap("alive2")
-                get_tree().quit(0)
-                return
-        if base == "opts":
-                game.call("_intro_start")
+        var host: Node = null
+        var game: Node = null
+        for i in 120:
+                await _wait(0.1)
+                host = GH.active_host
+                if host != null and is_instance_valid(host) \
+                                and host.game != null:
+                        game = host.game
+                        break
+        # r3 THE FLOW: the position ask first (the ball bounces behind it)
+        if base == "ask":
+                await _snap("orient")
+                await _wait(0.4)
+                await _snap("orient2")
+                game.call("_show_mode_select")
                 await _wait(0.5)
-                await _snap("opts")
+                await _snap("mode")
+                game.call("_show_ready_card")
+                await _wait(0.5)
+                await _snap("ready")
                 get_tree().quit(0)
                 return
+        # walk to the ready card, then start the run (the r3 flow)
+        game.call("_show_ready_card")
+        await _wait(0.4)
+        game.call("_ready_go")
+        await _wait(2.6)
         if base == "shop":
-                game.call("_intro_start")
-                await _wait(0.3)
-                game.call("sheet_pop")
-                await _wait(0.2)
                 game.call("_shop_open")
                 await _wait(0.5)
                 await _snap("shop")
                 get_tree().quit(0)
                 return
-        game.call("_intro_start")
-        await _wait(0.3)
-        game.call("sheet_pop")
-        await _wait(0.2)
-        game.call("_start_run")
-        await _wait(1.6)
         if base == "ball":
                 # the play: hold smashes, release bounces - three beats
                 game.set("holding", true)

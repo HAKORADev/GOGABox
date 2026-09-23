@@ -72,13 +72,14 @@ func _exit_tree() -> void:
         if vp != null:
                 vp.msaa_3d = _prev_msaa
         # v041-2 r2 THE SEAT DEATH LAW (the twin mirror of game_base's fix):
-        # the static game cursor seat dies WITH the game node - a game that
-        # armed the OS pointer must never outlive its own node, or the next
-        # set_held anywhere (the menu's LMB mirror, the next game) swaps the
-        # dead game's images back in (the owner's war-cursor leak).
+        # the static game cursor seat dies WITH the game node.
+        # v041-2 r3 THE TOKEN AMENDMENT: the corpse's disarm is tokened -
+        # a stale token (the next seat already armed by the replay/reload)
+        # can never touch the live seat.
         if _game_cur_armed:
                 _game_cur_armed = false
-                GogaCursorLib.game_disarm()
+                GogaCursorLib.game_disarm(_game_seat_token)
+                _game_seat_token = -1
 
 func game_toast(msg: String) -> void:
         Arc.toast(_toast, msg)
@@ -98,18 +99,25 @@ func _goga_input(_event: InputEvent) -> void:
 
 const GogaCursorLib := preload("res://game/core/goga_cursor.gd")
 var _game_cur_armed := false
+# v041-2 r3 THE SEAT TOKEN LAW (the twin mirror of game_base's fix): the
+# token returned by game_arm is the ONLY key that disarms - a queued-free
+# game's stale token is a no-op, so the replayed game's seat and the box
+# arrow survive the deferred corpse.
+var _game_seat_token := -1
 
 func game_cursor_arm(normal: Texture2D, click: Texture2D = null,
                 hotspot := Vector2.ZERO) -> void:
         if not ScaleRule.is_pc() or normal == null:
                 return
-        _game_cur_armed = GogaCursorLib.game_arm(normal, click, hotspot)
+        _game_seat_token = GogaCursorLib.game_arm(normal, click, hotspot)
+        _game_cur_armed = _game_seat_token >= 0
 
 func game_cursor_disarm() -> void:
         if not _game_cur_armed:
                 return
         _game_cur_armed = false
-        GogaCursorLib.game_disarm()
+        GogaCursorLib.game_disarm(_game_seat_token)
+        _game_seat_token = -1
 
 func _input(event: InputEvent) -> void:
         if not _game_cur_armed:
@@ -167,18 +175,28 @@ func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxConta
         # eats every pointer event on the sheet's birth frame, then dies -
         # a sheet opened from inside a press handler can never have a button
         # under the pointer born already pressed.
+        # v041-2 r3 THE SHIELD DEATH LAWS (the twin mirror of game_base's
+        # fix; the owner: "the game itself even the shop in it and
+        # everything, does not listen to any inputs at all"): ready is
+        # connected BEFORE the add (ready fires synchronously INSIDE
+        # add_child - a connect after it is dead code and the shield lived
+        # forever over every sheet since r2), the shield is
+        # PROCESS_MODE_ALWAYS and the tween is TWEEN_PAUSE_PROCESS (a sheet
+        # opened under a paused tree must still lose its shield).
         var shield := Control.new()
         shield.name = "SheetBirthShield"
         shield.set_anchors_preset(Control.PRESET_FULL_RECT)
         shield.mouse_filter = Control.MOUSE_FILTER_STOP
-        root.add_child(shield)
-        root.move_child(shield, root.get_child_count() - 1)
+        shield.process_mode = Node.PROCESS_MODE_ALWAYS
         shield.ready.connect(func():
                 var tw := shield.create_tween()
+                tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
                 tw.tween_interval(0.05)
                 tw.tween_callback(func():
                         if shield != null and is_instance_valid(shield):
                                 shield.queue_free()))
+        root.add_child(shield)
+        root.move_child(shield, root.get_child_count() - 1)
         return vb
 
 func sheet_pop() -> void:

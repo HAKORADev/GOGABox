@@ -473,6 +473,19 @@ static func _settle_now() -> void:
 static func boot_window() -> void:
         if not is_pc() or DisplayServer.get_name() == "headless":
                 return
+        # v041-2 r3 THE BOOT PARITY LAW (the owner: "i guess it opens the
+        # window based on last position, currently it opened it in fullscreen
+        # but as horizontal but the content is vertical and stretched ... see
+        # why it works accurately with [F10] ... make the automatic switches
+        # be the same"). The persisted position choice used to be restored
+        # in menu._ready - AFTER this function: a persisted LANDSCAPE choice
+        # booted a portrait window (the static default) for the whole first
+        # beat, then flipped - the automatic boot switch worked differently
+        # from the manual one. The choice is restored HERE, before any shape
+        # write: the first frame wears the last F10 choice, exactly like F10
+        # itself leaves it.
+        if Box.has_method("pc_position"):
+                pc_position = String(Box.call("pc_position"))
         var want_fs: bool = Box.has_method("pc_fullscreen") \
                         and Box.call("pc_fullscreen")
         if want_fs:
@@ -486,7 +499,7 @@ static func boot_window() -> void:
                 DisplayServer.window_set_mode(
                                 DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
         else:
-                re_window(pc_kind)
+                re_window(pc_position)
         apply_window_lock()
 
 static func _usable_rect() -> Rect2i:

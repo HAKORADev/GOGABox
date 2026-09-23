@@ -87,8 +87,8 @@ func _ready() -> void:
                                 "black cap 45%% (row %d nb %d/%d)"
                                         % [row, nb, count])
                         var sp := absf(float(d["rot"]))
-                        _check(sp >= 0.6 and sp <= 2.45,
-                                "spin sane (%f)" % sp)
+                        _check(sp >= 0.3 and sp <= 1.35,
+                                "spin SLOW sane (%f)" % sp)
 
         # ---- seg_under_ball: a partition law (every rotation maps into range)
         for r in 200:
@@ -234,7 +234,8 @@ func _ready() -> void:
                 _check(game.get("cam") != null, "camera built")
                 _check(game.get("round_len") == 150,
                         "round 1 = 150 rows")
-                _check(game.get("phase") == "intro", "the intro waits first")
+                _check(game.get("phase") == "orient",
+                        "THE POSITION ASK waits first (r3 flow)")
                 _check(game.get("ball_mesh") != null, "Balldozer exists")
                 _check(bool(game.get("ball_mesh").visible),
                         "THE BALL IS VISIBLE FROM THE FIRST FRAME")
@@ -293,14 +294,15 @@ func _sim_play() -> void:
         await get_tree().create_timer(2.2).timeout
         var host: Node = GH.active_host
         var game: Node = host.game
-        _check(String(game.get("phase")) == "intro", "sim: intro first")
-        game.call("_intro_start")           # the tap-anywhere callback
+        _check(String(game.get("phase")) == "orient", "sim: the ask first")
+        game.call("_orient_choice", "vertical")   # judged vs the live window
         await get_tree().create_timer(0.3).timeout
-        _check(String(game.get("phase")) == "optionals",
-                "sim: the optionals show after the tap")
-        game.call("sheet_pop")
+        _check(String(game.get("phase")) == "mode",
+                "sim: the mode screen follows the position pick")
+        game.call("_show_ready_card")
         await get_tree().create_timer(0.2).timeout
-        game.call("_start_run")
+        _check(String(game.get("phase")) == "ready", "sim: the ready card")
+        game.call("_ready_go")              # the tap-anywhere callback
         await get_tree().create_timer(1.5).timeout
         _check(game.get("phase") == "run", "sim: ball run started")
         # the exact boost curve, LIVE: 34 breaks from the start land at 0.77
@@ -344,11 +346,10 @@ func _sim_play() -> void:
         await get_tree().create_timer(2.2).timeout
         host = GH.active_host
         game = host.game
-        game.call("_intro_start")
+        game.call("_show_ready_card")      # the reload path lands here
         await get_tree().create_timer(0.3).timeout
-        game.call("sheet_pop")
+        game.call("_ready_go")
         await get_tree().create_timer(0.2).timeout
-        game.call("_start_run")
         await get_tree().create_timer(1.5).timeout
         _check(game.get("phase") == "run", "sim: platform runs (no serve)")
         # the combo law: falls charge, the charged landing SMASHES THROUGH

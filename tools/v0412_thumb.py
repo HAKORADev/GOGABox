@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
-"""v041-2 - TOWER BALL thumbnail composer (the capture law 44: the real
+"""v041-2 r3 - TOWER BALL thumbnail composer (the capture law 44: the real
 render). Takes the posed captures from tests/tb_thumb.gd and composes the
 960x640 thumbnail: the BALL mode smash as the full-bleed hero, the
-PLATFORM mode ride in a rounded inset. No baked text (R2)."""
+PLATFORM mode ride in a rounded inset. No baked text (R2).
+r3: the rig now captures at the real 720x1280 window (the r2 rig assumed
+an 810-wide probe window - the right side came out black)."""
 from PIL import Image, ImageDraw
 
 RAW = "/tmp/tb_thumb"
 OUT = "projects/gogabox/assets/thumbs/towerball.png"
 W, H = 960, 640
-RAW_W = 810          # the rig's real capture width
+RAW_W = Image.open(f"{RAW}/ball_a.png").size[0]  # the real capture width
 
 
-def band(p, y0, h=540):
-    """a 3:2 band out of the raw capture, scaled to the canvas"""
+def band(p, y0, h=460):
+    """a wide band out of the raw capture, scaled to the canvas"""
     img = Image.open(p)
     y0 = max(0, min(y0, img.size[1] - h))
     return img.crop((0, y0, RAW_W, y0 + h)).resize((W, H), Image.LANCZOS)
 
 
-# the hero: the ball-mode smash (Balldozer mid-shatter)
-canvas = band(f"{RAW}/ball_a.png", 580).convert("RGBA")
+# the hero: the ball-mode smash (Balldozer mid-shatter, golden hour)
+canvas = band(f"{RAW}/ball_a.png", 470).convert("RGBA")
 
-# the inset: the platform ride (tower + ball), rounded, bottom-right
+# the inset: the platform ride (the rings + the eye ball), rounded,
+# bottom-right
 iw, ih = 386, 257
-inset = band(f"{RAW}/plat_a.png", 40, 540).resize((iw, ih), Image.LANCZOS)
+inset = band(f"{RAW}/plat_a.png", 400, 400).resize((iw, ih), Image.LANCZOS)
 rad = 24
 mask = Image.new("L", (iw, ih), 0)
 dm = ImageDraw.Draw(mask)

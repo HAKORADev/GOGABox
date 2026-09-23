@@ -1,0 +1,19 @@
+---
+Task ID: v041-2 r3
+Agent: Super Z (main)
+Task: the owner's report - the total input death (Tower Ball + the heavy war XP cards), the corrupted cursor-leak fix, the rotation roots ("make the automatic switches be the same as F10"), the Tower Ball flow/design/spin/gauge/thumbnail
+
+Work Log:
+- Sandbox verified (fdb13641 = v041-2 r2, clean); godot 4.7.2 alive at /tmp/my-project/godot; Xvfb :96 rig up
+- THE ROOTS (all proven on a real Xvfb window, none guessed):
+  (1) THE IMMORTAL BIRTH SHIELD - tests/pause_input_probe.gd: the r2 sheet shield connected `ready` AFTER add_child (ready had already fired inside it) so the kill-tween NEVER existed; the shield (full-rect STOP) sat over EVERY sheet_push sheet forever eating every click - Tower Ball's whole UI, the heavy war XP-level cards, "likely other games". A paused STOP control above an ALWAYS sheet still eats the pick (A2), and a pause-bound tween never dies (A3). FIX: ready connected BEFORE the add + PROCESS_MODE_ALWAYS + TWEEN_PAUSE_PROCESS (both twins), proven by A4-A7.
+  (2) THE DEFERRED-CORPSE CURSOR KILL - the dying game's _exit_tree fired AFTER the next seat armed (the replay's cursor or the box arrow on quit); the unconditional game_disarm nulled the arrow and every custom cursor died (the OS arrow everywhere, the setting honestly ON). FIX: THE SEAT TOKEN LAW - game_arm mints a token, only the live token disarms, a stale corpse is a no-op, the live seat hands the pointer back to the box cursor the same frame it dies.
+  (3) THE MENU'S UNGUARDED size_changed STOMP - menu._apply_base fired on every window echo during a game and rewrote the design to pc_menu_design: a landscape game rebooting inside a portrait canvas ("a vertical image in the horizontal view") on every automatic path while F10 always worked. FIX: the ONE-DESIGN-WRITER law (menu writes return while a host is active), the BOOT PARITY (pc_position restored inside boot_window BEFORE any shape write), the gate verifying BOTH truths (the real window px AND the canvas design), _assert_own_design(kind) explicit (the r7 probe caught my own first version asserting the portrait default mid-flight - MIDFLIGHT sample 0).
+  (4) heavywar's ScaleRule.apply() (the poison design-follows-window pattern) removed.
+- TOWER BALL: the r3 flow (snake verbatim: orient -> mode -> the ready card; the universal phone_*.png assets; the reload path lands on the mode screen; start_orientation skips the ask); THE BACK LAW (the ask screens are the root, back never closes them, the shop above them still closes); the spin slowed (0.4..1.3 rad/s); the two-tone discs/rings + the brighter world + the lifted night sky + the below-horizon stars; the landscape platform camera floor 15->18; the gauge after the score from the left (verified by eye); the thumbnail re-captured at the golden hour (the composer reads the real raw width now)
+- TESTS: pause_input_probe (the shield laws), click_probe (REAL synthetic clicks through the real GUI: towerball 16/16 - the flow, the reload law, the rotation input, the shop rows, the back law; heavywar 6/6 - the XP cards open, a real click picks a card, the pause law holds), towerball_probe 19,952/0, flow_test ALL PASSED, v0411_r7_window_probe 18/18, the NEW v0411_r3_window_probe 16/16 (the REAL main scene: launch/reload/quit x windowed/fullscreen, 90-frame design sampling each), the film rig re-shot + eyeballed
+- Docs: brainstorm/v041-2/r3 TRACKER, AGENTS law 54, the registry controls line re-worded to the r3 flow
+- Committed + pushed as v041-2 r3 -> CI
+
+Stage Summary:
+- v041-2 r3: the input death (the immortal shield), the cursor seat corruption (the deferred corpse), and the rotation roots (the menu stomp + the boot parity + the both-truths gate) all killed at the root with probe-proof; Tower Ball rebuilt around the universal three-screen flow with the owner's design laws. The owner-experience rig (real clicks) is now the ship gate for every sheet/UI fix.

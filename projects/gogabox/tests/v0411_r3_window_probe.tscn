@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/v0411_r3_window_probe.gd" id="1"]
+
+[node name="probe" type="Node"]
+script = ExtResource("1")

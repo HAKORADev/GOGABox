@@ -18,6 +18,10 @@ func _ready() -> void:
         Box.unlock_game("towerball", 0)
         var router := Node2D.new()
         add_child(router)
+        # the Xvfb screen is 1920x1080 - a 720x1280 boot window gets clamped
+        # (the r3 black-strip lesson); pose inside 540x960 instead
+        DisplayServer.window_set_size(Vector2i(540, 960))
+        await _wait(0.3)
 
         # ---- BALL mode: THE FIREBALL SMASH at golden hour
         Box.set_progress("towerball", "mode", "ball")
@@ -27,11 +31,9 @@ func _ready() -> void:
         var game: Node = host.game
         # THE LIVING WORLD POSE: force the golden hour (the thumbnail's sky)
         game.call("_force_golden_hour")
-        game.call("_intro_start")     # the intro walks to the optionals
+        game.call("_show_ready_card")  # the r3 flow: the ready card
         await _wait(0.3)
-        game.call("sheet_pop")        # the optionals close - clean field
-        await _wait(0.2)
-        game.call("_start_run")
+        game.call("_ready_go")
         await _wait(1.6)          # the transition banner clears
         # pose: the FIRE BALL mid-tower - the gauge full -> charged -> burning
         game.set("boost_v", 1.0)
@@ -55,11 +57,9 @@ func _ready() -> void:
         host = GH.active_host
         game = host.game
         game.call("_force_golden_hour")
-        game.call("_intro_start")
+        game.call("_show_ready_card")
         await _wait(0.3)
-        game.call("sheet_pop")
-        await _wait(0.2)
-        game.call("_start_run")
+        game.call("_ready_go")
         await _wait(1.6)
         game.call("_rotate_tower", 1.2)
         await _wait(0.6)

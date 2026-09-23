@@ -428,6 +428,22 @@ var _bg_mat: ShaderMaterial
 ## - even a missed signal self-corrects within one frame (the v0.1.2
 ## opened-as-landscape race).
 func _apply_base() -> void:
+        # v041-2 r3 THE ONE-DESIGN-WRITER LAW (the rotation mis-scale's ROOT
+        # ENGINE - the owner: "the window switched, content is not ... the
+        # app only switches accurately to F10 switches"). While a game
+        # lives, the HOST owns the canvas mapping. The menu's size_changed
+        # hook fired this UNGUARDED on every window resize - including the
+        # host's re_window at every game launch, orientation reload and
+        # quit: the WM echo landed AFTER the host's design write and
+        # STOMPED the game's design back to the menu's (pc_menu_design). A
+        # landscape game rebooting inside a portrait canvas letterboxed in
+        # a landscape window - "a vertical image in the horizontal view",
+        # the owner's exact report, on every automatic path, windowed AND
+        # fullscreen, while F10 (menu-only, no host) always worked. The
+        # menu still follows the real window px whenever NO game runs -
+        # the phone rotation governor is untouched.
+        if GameHost.active_host != null:
+                return
         var want := ScaleRule.DESIGN_PORTRAIT
         if orientation_override == "landscape":
                 want = ScaleRule.DESIGN_LANDSCAPE
@@ -469,6 +485,10 @@ func _apply_base() -> void:
 ## v0.1.3 GOVERNOR ENTRY - main._process calls this every frame (menu side:
 ## one compare at steady state).
 func apply_resolution() -> void:
+        # v041-2 r3: the one-design-writer law (see _apply_base) - the
+        # resume-path call (_lifecycle) honors it too.
+        if GameHost.active_host != null:
+                return
         var before := get_window().content_scale_size
         _apply_base()
         if get_window().content_scale_size != before:

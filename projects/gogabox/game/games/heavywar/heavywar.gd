@@ -215,7 +215,11 @@ const TANK_S := 0.34          # THE TANK SCALE: everything about the tank
                               # 3 times will make it good")
 
 func _goga_setup() -> void:
-        ScaleRule.apply(get_window())
+        # v041-2 r3: the old ScaleRule.apply() here was THE POISON PATTERN
+        # on a PC - it picked the design from the REAL WINDOW px
+        # (want_for), the exact law v0.4.1 killed ("the design follows the
+        # content"). The host owns the canvas mapping now (the
+        # one-design-writer law): the game just reads the live viewport.
         var vp := get_viewport_rect().size
         W = maxf(960.0, vp.x)
         H = maxf(540.0, vp.y)

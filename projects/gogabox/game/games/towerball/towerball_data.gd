@@ -175,7 +175,10 @@ static func ramp_color(skin: Dictionary, row: int) -> Color:
 ##   - no black in a round's first 8 rows (the warm-up is safe)
 ##   - black probability ramps with depth (0.05 -> ~0.30)
 ##   - a ring is never more than 45% black (there is always room)
-##   - rows spin slower than the eye can lose (0.7..2.4 rad/s)
+##   - rows spin SLOW (the owner r3: "platforms spin a little too fast" -
+##     the 0.7..2.4 rad/s law is retired: the readable seat is 0.4..1.3
+##     rad/s, easing deeper - the black always has time to be SEEN
+##     before it arrives)
 ## r2 + THE STACK BOUNCE RHYTHM: after every busy stretch comes a small
 ## clean stretch (their chunk pattern 0: 3-10 safe rings between the
 ## death-heavy ones) - the dive gets breathing room, the streak feels fair.
@@ -217,9 +220,9 @@ static func gen_row(row: int, round_len: int, rng: RandomNumberGenerator,
                                         black[i] = false
                                         nb -= 1
                                 i -= 1
-        var speed := 0.7 + rng.randf_range(0.0, 0.5) \
-                        + 0.8 * (float(row) / 900.0)
-        speed = minf(speed, 2.4)
+        var speed := 0.4 + rng.randf_range(0.0, 0.35) \
+                        + 0.45 * (float(row) / 900.0)
+        speed = minf(speed, 1.3)
         var dir := 1.0 if row % 2 == 0 else -1.0
         return {"count": count, "black": black, "rot": dir * speed}
 

@@ -189,36 +189,65 @@ static var _game_norm: Texture2D = null
 static var _game_click: Texture2D = null
 static var _game_hot := Vector2.ZERO
 static var _game_armed := false
+# v041-2 r3 THE SEAT TOKEN LAW (the owner: the r2 leak fix "silently kills
+# custom cursor and turns it off but in settings it is still recognized as
+# on, even if i replayed, it will not reload the game cursor, if i exited,
+# i see system cursor and not GOGACursor"). THE ROOT: queue_free is
+# DEFERRED - the dying game's _exit_tree fired AFTER the next seat was
+# armed (the replayed game's seat, or the box cursor's re-arm on the
+# game-closed road), and r2's unconditional game_disarm() nulled the
+# ARROW shape at that moment: the freshly armed seat died with it, every
+# custom cursor was gone (the OS arrow showed) while the SETTING stayed
+# honestly ON. THE LAW NOW: every game_arm mints a seat TOKEN; only the
+# seat that holds the LIVE token may disarm. A dying game with a stale
+# token is a no-op - the replayed game's seat, the box arrow, EVERY live
+# seat survives the deferred corpse. And when the LIVE game seat does
+# leave, it hands the pointer straight back to the box seat (never a
+# dead-cursor frame in between).
+static var _seat_token := 0
 
 ## Arm the game seat: `normal` is the everyday cursor, `click` (optional)
 ## swaps in while the LEFT button is held. Hotspot is inside the image.
 ## Idempotent - re-arming with the same images short-circuits in the
 ## engine cache. Headless (probes/CI): a no-op, reports false.
+## Returns the seat TOKEN - keep it; it is the only key that disarms.
 static func game_arm(normal: Texture2D, click: Texture2D = null,
-                hotspot := Vector2.ZERO) -> bool:
+                hotspot := Vector2.ZERO) -> int:
         if normal == null or DisplayServer.get_name() == "headless":
-                return false
+                return -1
         _game_norm = normal
         _game_click = click
         _game_hot = hotspot
         _game_armed = true
+        _seat_token += 1
         Input.set_custom_mouse_cursor(normal, Input.CURSOR_ARROW, hotspot)
-        return true
+        return _seat_token
 
-## The game seat leaves the pointer (the game closed, or it wants the box
-## arrow back for a sheet). Resets BOTH seats' images so the next box
-## arm() re-applies cleanly.
-static func game_disarm() -> void:
+## The LIVE game seat leaves the pointer: the box seat returns the same
+## frame (the owner's own cursor when the setting says ON, the honest OS
+## arrow when it says OFF). A STALE token (a queued-free game whose seat
+## was already replaced) does NOTHING - the live seat is untouchable.
+static func game_disarm(token: int = -1) -> void:
+        if token != -1 and token != _seat_token:
+                return   # a corpse's seat - the live seat owns the pointer
         if not _game_armed:
                 return
         _game_armed = false
         _game_norm = null
         _game_click = null
-        Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
-        # the box cursor re-arms through main._apply_gogacursor on the
-        # game-closed road; if the box seat believes it is still armed the
-        # cached texture pair is stale - force a fresh apply next arm().
-        _armed = false
+        _seat_token += 1   # the token dies with the seat
+        # THE HAND-BACK: the box seat is wanted whenever the setting says
+        # so - arm it HERE (a game quit then never shows the OS arrow for
+        # even one frame, and the game-closed re-arm below becomes a
+        # harmless re-assert). OFF: the honest OS arrow.
+        if Box.has_method("pc_gogacursor") and Box.pc_gogacursor() \
+                        and _arrow != null:
+                Input.set_custom_mouse_cursor(_arrow, Input.CURSOR_ARROW,
+                                _hotspot)
+                _armed = true
+        else:
+                Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+                _armed = false
 
 static func is_game_armed() -> bool:
         return _game_armed

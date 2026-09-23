@@ -1662,8 +1662,8 @@ const GAMES := [
                         + "that shatter their own way, and ice, metal, "
                         + "rubber and gold balls.",
                 "controls": [
-                        "Tap anywhere to start, pick the MODE and the "
-                                + "POSITION in the optionals menu, PLAY.",
+                        "Pick the POSITION, then the MODE, then tap "
+                                + "anywhere to start.",
                         "BALL: hold anywhere to dive and smash; release "
                                 + "to bounce. Black ends the run - fire "
                                 + "forgives.",

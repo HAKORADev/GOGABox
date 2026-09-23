@@ -967,3 +967,44 @@ reads without booting the scene.
     the owner-named originals FIRST (decompile/configs), quote the exact
     constants in the game data file, and log them in the manifest
     provenance (mechanics study only - assets stay derived in-repo).
+54. THE SHIELD DEATH + THE SEAT TOKEN + THE ONE-DESIGN-WRITER (v041-2 r3,
+    the owner: "the game itself even the shop in it and everything, does
+    not listen to any inputs at all" + "the cursor-leak fix is corrupted"
+    + "the app only switches accurately to F10 switches"):
+    a) THE SHIELD DEATH LAWS: the r2 birth shield connected `ready` AFTER
+    `add_child` - ready had already fired inside add_child, so the
+    kill-tween was NEVER created and the shield (full-rect, MOUSE_FILTER_
+    STOP) sat over EVERY sheet_push sheet forever, eating every click
+    (Tower Ball's whole UI, the heavy war XP cards; sheets opened under a
+    paused tree could never run the tween anyway). Law: connect ready
+    BEFORE the add, the shield is PROCESS_MODE_ALWAYS, the tween is
+    TWEEN_PAUSE_PROCESS - the shield dies 0.05s after birth in every
+    pause state. GUI input is delivered to PROCESS_MODE_ALWAYS nodes
+    under a paused tree, and a paused STOP control ABOVE them still eats
+    the pick (both proven on a real Xvfb window by
+    tests/pause_input_probe.gd - headless window px are 0x0 and verify
+    NOTHING).
+    b) THE SEAT TOKEN: the cursor game seat's disarm is TOKENED - the
+    dying game's _exit_tree fires DEFERRED (queue_free), AFTER the next
+    seat (the replayed game's cursor, or the box arrow on the quit road)
+    armed; an unconditional disarm killed the fresh seat and the OS arrow
+    showed everywhere while the setting stayed ON. Law: game_arm mints a
+    seat token, only the LIVE token may disarm, a stale corpse is a
+    no-op, and the live seat hands the pointer back to the box cursor
+    the same frame it dies (never a dead-cursor frame).
+    c) THE ONE-DESIGN-WRITER: while a game lives the HOST owns the canvas
+    mapping (content_scale_size/aspect). The menu's size_changed hook
+    fired _apply_base UNGUARDED on every window resize - including the
+    host's re_window at every launch/reload/quit - and the WM echo
+    STOMPED the game's design back to the menu's: a landscape game
+    rebooting inside a portrait canvas ("a vertical image in the
+    horizontal view"), on every automatic path, while F10 (menu-only)
+    always worked. Law: menu design writes return early while
+    GameHost.active_host != null; the boot restores pc_position BEFORE
+    shaping the window (boot parity with F10); the host's gate verifies
+    BOTH truths (the real window px AND the canvas design) and every
+    re-assert carries its kind explicitly (an implicit mid-flight read
+    once asserted the portrait default - the probe caught it).
+    THE OWNER-EXPERIENCE RIG: tests/click_probe.gd - real synthetic
+    clicks through the real GUI against the real games under Xvfb. A
+    sheet fix is not shipped until a CLICK lands on it.

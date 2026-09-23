@@ -114,6 +114,10 @@ func _goga_input(_event: InputEvent) -> void:
 ## no pointer, the seat is a no-op (games keep drawing their touch aim).
 const GogaCursorLib := preload("res://game/core/goga_cursor.gd")
 var _game_cur_armed := false
+# v041-2 r3 THE SEAT TOKEN LAW: the token returned by game_arm is the ONLY
+# key that disarms - a queued-free game's stale token is a no-op, so the
+# replayed game's seat and the box arrow survive the deferred corpse.
+var _game_seat_token := -1
 
 ## Arm this game's own cursor. `normal` is the everyday image, `click`
 ## (optional) swaps in while the LEFT button is held. Hotspot is the
@@ -122,7 +126,8 @@ func game_cursor_arm(normal: Texture2D, click: Texture2D = null,
                 hotspot := Vector2.ZERO) -> void:
         if not ScaleRule.is_pc() or normal == null:
                 return
-        _game_cur_armed = GogaCursorLib.game_arm(normal, click, hotspot)
+        _game_seat_token = GogaCursorLib.game_arm(normal, click, hotspot)
+        _game_cur_armed = _game_seat_token >= 0
 
 ## Hand the pointer back (the box cursor returns on the game-closed road;
 ## a game may also call this itself when it wants the OS arrow back).
@@ -130,21 +135,22 @@ func game_cursor_disarm() -> void:
         if not _game_cur_armed:
                 return
         _game_cur_armed = false
-        GogaCursorLib.game_disarm()
+        GogaCursorLib.game_disarm(_game_seat_token)
+        _game_seat_token = -1
 
 ## v041-2 r2 THE SEAT DEATH LAW (the owner's leak report: the Heavy War
 ## cursor "appears now in GOGABox in all other games and even GOGABox main
 ## menu when i click them"). The game seat is a STATIC in GogaCursorLib -
-## it outlived the game node that armed it: quitting re-armed the box
-## arrow, but _game_armed stayed TRUE with the war images, so the next
-## set_held (the menu's own LMB mirror, the next game's click swap) put
-## the war cursor back on every press. The seat is the GAME'S shadow: it
-## dies the frame the game node leaves the tree - quit, finish, the
-## orientation reload's _clear_game, every path frees the node.
+## it outlived the game node that armed it. v041-2 r3 THE TOKEN AMENDMENT:
+## _exit_tree fires DEFERRED (queue_free) - on the replay/reload paths the
+## NEXT seat is already armed by then, and the corpse's disarm must never
+## touch it. The token law makes the stale corpse a no-op; the LIVE seat
+## hands the pointer back to the box cursor the same frame it dies.
 func _exit_tree() -> void:
         if _game_cur_armed:
                 _game_cur_armed = false
-                GogaCursorLib.game_disarm()
+                GogaCursorLib.game_disarm(_game_seat_token)
+                _game_seat_token = -1
 
 ## THE CLICK SWAP: an `_input` observer, NOT _unhandled_input - a press
 ## that lands on a HUD Button dies at the GUI stage and never reaches the
@@ -227,18 +233,37 @@ func sheet_push(sheet_height := 0.0, id := "", sheet_width := -1.0) -> VBoxConta
         # optionals skipped themselves; the owner: "immediately starts"). One
         # full-rect shield eats every pointer event on the sheet's birth frame,
         # then dies. No UI underneath can self-press; nothing else changes.
+        # v041-2 r3 THE SHIELD DEATH LAWS (the owner: "the game itself even
+        # the shop in it and everything, does not listen to any inputs at
+        # all" + "in heavy war XP-level cards selection, mouse clicks aren't
+        # recognized"): TWO r2 bugs made the shield an IMMORTAL full-rect
+        # click-eater over EVERY sheet_push sheet since r2:
+        #   (1) ready was connected AFTER add_child - the parent was already
+        #       in the tree, so ready fired synchronously INSIDE add_child,
+        #       BEFORE the connect: the kill-tween was NEVER created and the
+        #       shield outlived every sheet (proven by
+        #       tests/pause_input_probe.gd A2-A5 on a REAL Xvfb window);
+        #   (2) the tween was bound to a node that inherits the tree pause -
+        #       a sheet opened under get_tree().paused = true (the heavy war
+        #       level cards pause BEFORE sheet_push) could never run it.
+        # THE LAWS NOW: ready is connected BEFORE the add; the shield is
+        # PROCESS_MODE_ALWAYS; the tween is TWEEN_PAUSE_PROCESS. The shield
+        # dies 0.05s after birth in every state, and the sheet below (dim+cc
+        # are ALWAYS) takes every click from then on.
         var shield := Control.new()
         shield.name = "SheetBirthShield"
         shield.set_anchors_preset(Control.PRESET_FULL_RECT)
         shield.mouse_filter = Control.MOUSE_FILTER_STOP
-        root.add_child(shield)
-        root.move_child(shield, root.get_child_count() - 1)
+        shield.process_mode = Node.PROCESS_MODE_ALWAYS
         shield.ready.connect(func():
                 var tw := shield.create_tween()
+                tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
                 tw.tween_interval(0.05)
                 tw.tween_callback(func():
                         if shield != null and is_instance_valid(shield):
                                 shield.queue_free()))
+        root.add_child(shield)
+        root.move_child(shield, root.get_child_count() - 1)
         return vb
 
 ## Close the top sheet - its EXACT pair dies (never a neighbor, never a
