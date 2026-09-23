@@ -1008,3 +1008,45 @@ reads without booting the scene.
     THE OWNER-EXPERIENCE RIG: tests/click_probe.gd - real synthetic
     clicks through the real GUI against the real games under Xvfb. A
     sheet fix is not shipped until a CLICK lands on it.
+55. THE MENU WIDTH LAW (v041-3, the owner: "why the fuck we even have
+    left-right scrolling to normal menus like a shop or in settings ...
+    make the base width itself be enough so user do not have to scroll
+    it ... in both positions vertical/horizontal in phone/PC the menus
+    will not have areas out-of-resolution"):
+    a) THE BASE WIDTH IS MEASURED: Arc.sheet_width_for(live canvas) -
+       82% of the design width, clamped 620..940 (portrait 1080 -> 885,
+       landscape 1920 -> 940; a phone's EXPAND canvas grows the spare
+       axis only, so the clamp holds everywhere - nothing out of
+       resolution). Arc.sheet opens EVERY sheet at it (the width min is
+       set even when the height rides free - an auto sheet used to be
+       as wide as its widest row, which is how 560 became the box's
+       de-facto width), and fit_sheet re-clamps with the same formula.
+    b) THE ROWS FOLLOW FOR FREE: PanelContainer stretches its child and
+       the VBox stretches its FILL children - hardcoded 560-min rows
+       open to the new inner width with zero call-site edits. Never
+       "fix" a narrow sheet by editing row widths; widen the sheet.
+    c) THE TEXT ANSWERS TO THE ROW: Arc.button / Arc.coin_button step
+       the font down (floor 14) when a line cannot fit the row - a long
+       row can never vote the panel wider than its base again (law 24's
+       OVERFLOW LAW extended to buttons; labels already wrap).
+    d) THE MECHANIC STAYS: BoxScroll's horizontal drag is not removed -
+       a pathological row can still scroll sideways; it is just never
+       the base width's fault anymore.
+56. THE THUMB SHAPE + GRAY LAWS (v041-3, the owner: "a grayed-out game
+    card: make the thumbnail top edges rounded ... the gray-out is more
+    like a wash-out, the curves make the gray out be weird, the gray-out
+    thing should be accurately on the thumbnail"):
+    a) THE SHAPE: clip_contents clips to the RECT, never the stylebox -
+       a TextureRect child paints a SQUARE corner right over the card's
+       rounded (24) corner. Rounded imagery rides a holder Panel whose
+       stylebox carries the card's top radius and whose clip_children =
+       CLIP_CHILDREN_ONLY masks children to the ROUNDED draw (the
+       menu.gd _add_thumb shape; the MYSTERY tile wears the same trick
+       as a rounded stylebox Panel).
+    b) THE GRAY: a grayed thumbnail is GRAY, not a wash-out - modulate
+       alpha washes the image through to the card behind it. The gray
+       rides assets/ui/thumb_gray.gdshader (grayscale + darken, fully
+       opaque, per-instance ShaderMaterial so states do not leak into
+       neighbours): strength 1.0, darken 0.42..0.62 by state (GATED the
+       darkest, LOCKED/daily 0.58-0.62, strip 0.55). The silhouette is
+       the thumbnail's own pixels, exact on the rounded shape.

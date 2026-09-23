@@ -1698,6 +1698,77 @@ const GAMES := [
                                 + "d-pad's left-right rotates the tower.",
                 ],
         },
+        # v041-3 THE FOUR-SEAT GRADUATION: the fire-ball-3d-like note
+        # (FUTURE_GAMES.md, "shoot/hurl balls that split and cascade into
+        # towers of blocks") graduates as TOWER DESTROYER - the box's
+        # second 3D game and its first MULTIPLAYER-SHAPED one: four ground
+        # seats, 1/2/3/4 crews (2+ = the human-like CPU shooters), the
+        # endless bottom-to-top tower, the black landing law, 1 platform
+        # = 1 point to the last hit, the /100 bonus, the GOGACoin after
+        # 200 destroyed (missable). THE LAN SEED: every shooter is a
+        # PlayerSeat (input source = human | cpu | network-later).
+        {"id": "towerdestroyer", "title": "TOWER DESTROYER",
+                "tag": "hold to fire, never let black land",
+                "script": "res://game/games/towerdestroyer/towerdestroyer.gd",
+                "thumb": "res://assets/thumbs/towerdestroyer.png",
+                "orientation": "portrait", "dim": "3d",
+                "os": ["android", "pc"],
+                "coin_div": 100, "price": 450, "fee": 8, "shop": true,
+                "reveal": {"kind": "direct", "appear_after": 8,
+                        "needs_games": 11},
+                "desc": "The box's first crew shooter. You sit at the "
+                        + "bottom of an endless tower that will not stop "
+                        + "coming down - hold to fire and break every "
+                        + "colored segment of every rotating platform "
+                        + "before it lands. Black never breaks: when a "
+                        + "platform crosses your line, the seat under a "
+                        + "black segment dies - yours ends the run. Every "
+                        + "platform rolls its own descent speed and its "
+                        + "own spin, so the tower never repeats itself. "
+                        + "Play solo or bring up to three CPU gunners: "
+                        + "each one watches the tower with its own eyes, "
+                        + "its own reaction, its own trigger rhythm - and "
+                        + "their scores are theirs. The shooter whose "
+                        + "ball breaks a platform's last colored segment "
+                        + "banks the point. Every 200 destroyed platforms "
+                        + "a GOGACoin boards a platform - break ITS "
+                        + "segment to bank it; let the platform land and "
+                        + "the coin is gone. One platform = 1 point, the "
+                        + "score bonus rides /100. Skins are designs: "
+                        + "iron, crystal, carbon and gold cannons, and "
+                        + "ice, lava, steel and gold shots.",
+                "controls": [
+                        "Pick the CREW (1-4), then tap anywhere to start.",
+                        "HOLD anywhere to fire; release to save your "
+                                + "shots. Gaps let balls fly through to "
+                                + "the platform above.",
+                        "Black eats balls and never breaks - never let "
+                                + "it land over your seat.",
+                        "The last hit on a platform banks its point; "
+                                + "CPU gunners keep their own scores.",
+                        "A GOGACoin rides the tower after every 200 "
+                                + "destroyed platforms - break its "
+                                + "segment or lose it.",
+                ],
+                "genres": {"main": ["arcade", "action", "casual"],
+                        "sub": ["singleplayer", "procedural"]},
+                "ach": [
+        {"id": "td_first", "title": "First Rubble", "desc": "Destroy your first platform", "tier": 1, "rule": {"k": "cnt", "key": "destroyed", "v": 1}},
+        {"id": "td_p50", "title": "Demolition Hand", "desc": "Score 50 in one run", "tier": 1, "rule": {"k": "score", "v": 50}},
+        {"id": "td_plays", "title": "Site Regular", "desc": "Play 10 runs", "tier": 1, "rule": {"k": "stat", "key": "plays", "v": 10}},
+        {"id": "td_squad", "title": "Full Crew", "desc": "Run a 4-shooter crew", "tier": 1, "rule": {"k": "cnt", "key": "mode4", "v": 1}},
+        {"id": "td_coin", "title": "Coin Crane", "desc": "Bank 3 tower GOGACoins (lifetime)", "tier": 2, "rule": {"k": "cnt", "key": "coins_taken", "v": 3}},
+        {"id": "td_p150", "title": "High Excavation", "desc": "Score 150 in one run", "tier": 2, "rule": {"k": "score", "v": 150}},
+        {"id": "td_200", "title": "The 200 Club", "desc": "Destroy 200 platforms in one run", "tier": 3, "rule": {"k": "max", "key": "run_destroyed", "v": 200}},
+        {"id": "td_500", "title": "Eternal Wreckage", "desc": "Destroy 500 platforms (lifetime)", "tier": 3, "rule": {"k": "cnt", "key": "destroyed", "v": 500}},
+],
+                "controls_pc": [
+                        "HOLD LEFT MOUSE / SPACE / DOWN to fire; release "
+                                + "to hold your fire.",
+                        "1-4 on the crew screen picks the shooters.",
+                        "GAMEPAD: X (or A) fires.",
+                ],
+        },
         # v040-15 THE SOON SHELF: the next five un-shipped names walking
         # FUTURE_GAMES.md top to bottom (the file order law) parked as
         # workshop teasers - gold miner graduated, the shelf never rests

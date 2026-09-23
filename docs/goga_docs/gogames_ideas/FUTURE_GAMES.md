@@ -413,6 +413,9 @@ stay.
   imperfect country outlines ofc to match real life geography".)
 - **fire-ball-3d-like** — Voodoo's Fire Ball 3D energy: shoot/hurl balls
   that split and cascade into towers of blocks.
+  **GRADUATED v041-3** as TOWER DESTROYER (the owner named the teacher and
+  handed the XAPK: Voodoo's Fire Balls 3D, com.NikSanTech.FireDots3D -
+  mechanics study only) — gogames_ideas/towerdestroyer.md.
 - **minesweeper-like** — the classic, untouched. (Owner: "a game like
   minesweeper".)
 

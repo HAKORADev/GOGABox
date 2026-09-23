@@ -42,6 +42,7 @@ func _ready() -> void:
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
         fails += _test("towerball: the 3D seat + tower laws", await _t_towerball())
+        fails += _test("towerdestroyer: the four-seat laws", _t_towerdestroyer())
         print("RESULT: %s" % ("ALL TESTS PASSED" if fails == 0 else "%d FAILURES" % fails))
         get_tree().quit(0 if fails == 0 else 1)
 
@@ -96,6 +97,102 @@ func _t_towerball() -> int:
         ok += _check(String(TB.break_skin()["id"]) == "glass"
                 and String(TB.break_skin()["sfx"]) == "tb_break_glass",
                 "the game reads the equipped break skin + its voice")
+        Box.reset_all()
+        return ok
+
+## v041-3 THE FOUR-SEAT LAWS (tower destroyer: the pure data + the crew)
+func _t_towerdestroyer() -> int:
+        var ok := 0
+        var TD: GDScript = load("res://game/games/towerdestroyer/towerdestroyer_data.gd")
+        # THE PACING: different speeds per platform, growing base, capped
+        var speeds := {}
+        for i in 400:
+                var sp: float = TD.platform_speed(1.2, float(i) / 400.0)
+                speeds[snappedf(sp, 0.01)] = true
+        ok += _check(speeds.size() > 40, "platforms roll their own speeds")
+        ok += _check(TD.speed_base(0) < TD.speed_base(100)
+                and TD.speed_base(100000) <= float(TD.SPEED_CAP),
+                "the base grows with the wreckage and caps")
+        # THE SLOT LOTTERY: every platform guarantees breakable content
+        var rng := RandomNumberGenerator.new()
+        rng.seed = 20260923
+        var all_ok := true
+        for i in 300:
+                var slots: Array = TD.build_slots(i, rng)
+                var colored := 0
+                var blacks := 0
+                var gaps := 0
+                for s in slots:
+                        match String(s["kind"]):
+                                "colored": colored += 1
+                                "black": blacks += 1
+                                "gap": gaps += 1
+                if colored < 4 or colored + blacks + gaps != slots.size():
+                        all_ok = false
+        ok += _check(all_ok, "300 seeded platforms: >= 4 colored each, "
+                + "the slot bands close")
+        # THE BLACK LAW (the pure read): black over the seat kills, colored
+        # and gaps forgive
+        var slots2 := [{"kind": "black"}, {"kind": "colored", "hp": 1},
+                {"kind": "gap"}, {"kind": "colored", "hp": 2}]
+        ok += _check(TD.seat_killed(slots2, 0.0, 0.0),
+                "black over the seat at landing kills")
+        ok += _check(not TD.seat_killed(slots2, 0.0, TAU * 0.3),
+                "colored over the seat forgives")
+        ok += _check(not TD.seat_killed(slots2, 0.0, TAU * 0.6),
+                "a gap over the seat forgives")
+        ok += _check(TD.slot_at(99.0, 0.0, slots2.size()) >= 0
+                and TD.slot_at(99.0, 0.0, slots2.size()) < slots2.size(),
+                "slot_at wraps honest")
+        # THE COIN LAW: after 200 destroyed (and every 200), never at 199
+        ok += _check(not TD.coin_due(199) and TD.coin_due(200)
+                and TD.coin_due(400) and not TD.coin_due(201),
+                "the coin waits after 200 destroyed (and 400, 600...)")
+        ok += _check(TD.coin_slot([{"kind": "gap"}], rng) == -1,
+                "a coinless platform refuses the coin seat")
+        # THE CPU PERSONALITY: bounded, human-different, black-respecting
+        var pers: Array = []
+        for i in 60:
+                pers.append(TD.cpu_personality(rng))
+        var leads := {}
+        for p in pers:
+                leads[snappedf(float(p["detection_lead"]), 0.01)] = true
+        ok += _check(leads.size() > 30, "every CPU rolls its own eyes")
+        var no_fire := true
+        for p in pers:
+                if TD.cpu_wants_fire(p, 0.1, 1.0, true, true, 0.0):
+                        no_fire = false
+        ok += _check(no_fire, "a disciplined CPU holds fire under black")
+        var some_fire := false
+        for p in pers:
+                if TD.cpu_wants_fire(p, 0.1, 1.0, false, true, 1.0):
+                        some_fire = true
+        ok += _check(some_fire, "an open segment pulls the trigger")
+        # THE REGISTRY SEAT
+        var g := GameReg.get_game("towerdestroyer")
+        ok += _check(String(g.get("dim", "")) == "3d", "dim 3d")
+        ok += _check(String(g.get("orientation", "")) == "portrait",
+                "portrait-only (the owner: vertical only)")
+        ok += _check(int(g.get("coin_div", 0)) == 100, "score bonus /100")
+        ok += _check(int(g.get("price", 0)) == 450 and int(g.get("fee", 0)) == 8,
+                "price 450, fee 8")
+        ok += _check(bool(g.get("shop", false)), "the shop seat")
+        ok += _check((g.get("ach", []) as Array).size() == 8, "8 achievements")
+        # THE CREW SEATS: 4 ground slots, 90 degrees apart
+        ok += _check((TD.SEAT_ANGLES as Array).size() == 4
+                and absf(float(TD.SEAT_ANGLES[1]) - PI * 0.5) < 0.001,
+                "four seats, one per side")
+        # THE SKINS ride the shared shelf laws (designs, not colors)
+        Box.reset_all()
+        Box.earn(10000)
+        ok += _check(Box.buy_item("towerdestroyer", "skin_cannon", "iron", 250),
+                "cannon skin buys")
+        ok += _check(Box.item_on("towerdestroyer", "skin_cannon") == "iron",
+                "cannon skin equips")
+        ok += _check(Box.buy_item("towerdestroyer", "skin_ball", "lava", 350),
+                "ball skin buys")
+        ok += _check(Box.item_on("towerdestroyer", "skin_ball") == "lava",
+                "ball skin equips")
         Box.reset_all()
         return ok
 
@@ -363,9 +460,10 @@ func _t_meta() -> int:
         return ok
 
 func _t_registry() -> int:
-        # v041-2: TOWER BALL graduated (the box's first 3D game) - 30 playable
-        var ok := _check(GameReg.playable().size() == 30,
-                "30 playable games (tower ball joined, v041-2)")
+        # v041-3: TOWER DESTROYER graduated (the second 3D game, the
+        # four-seat crew shooter) - 31 playable
+        var ok := _check(GameReg.playable().size() == 31,
+                "31 playable games (tower destroyer joined, v041-3)")
         # v0.4.0-1 THE SOON SHELF IS BACK (the owner's v040 report catch:
         # the four teasers vanished when snl graduated and were never
         # re-added) - and heavy war walks LAST in the catalog now (the
@@ -377,15 +475,16 @@ func _t_registry() -> int:
         var ids: Array = []
         for g in GameReg.GAMES:
                 ids.append(String(g["id"]))
-        ok += _check(ids.find("marble") == ids.size() - 8
-                        and ids.find("goldminer") == ids.size() - 7
-                        and ids.find("towerball") == ids.size() - 6
+        ok += _check(ids.find("marble") == ids.size() - 9
+                        and ids.find("goldminer") == ids.size() - 8
+                        and ids.find("towerball") == ids.size() - 7
+                        and ids.find("towerdestroyer") == ids.size() - 6
                         and ids[ids.size() - 5] == "knife"
                         and ids[ids.size() - 4] == "maskrush"
                         and ids[ids.size() - 3] == "stickbridge"
                         and ids[ids.size() - 2] == "bubbleshot"
                         and ids[ids.size() - 1] == "towertrim",
-                "tower ball walks last of the playable, five teasers after it (v041-2)")
+                "tower destroyer walks last of the playable, five teasers after it (v041-3)")
         # v0.3.7: the MAZE teaser graduated into the REAL MAZE ESCAPER
         # v0.3.7-1: Key Singer retired; the first 5 FUTURE_GAMES names
         # parked as SOON teasers (the owner: "name does not matter")

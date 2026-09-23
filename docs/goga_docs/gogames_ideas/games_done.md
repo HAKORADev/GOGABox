@@ -38,6 +38,13 @@ this folder (each game's own `<id>.md`) and in `FUTURE_GAMES.md`.
     FIRST 3D game: two modes - ball + platform - the 150..900 round
     ladder, lives 3, the every-6 coin, the fire ball; the 3D seat is
     real box infra now)
+31. TOWER DESTROYER — done (the fire-ball-3d-like graduated, v041-3; the
+    box's SECOND 3D game and its first MULTIPLAYER-SHAPED one: the
+    endless bottom-to-top tower, four ground seats, crews 1-4 with the
+    human-like CPU gunners, the black landing law, 1 platform = 1 point
+    to the last hit, the /100 bonus, the GOGACoin after 200 destroyed -
+    the LAN seed: every shooter is a PlayerSeat, input source = human |
+    cpu | network-later)
 
 ## SOON — the next five (the file's order law, the thirteenth dump's rule:
 ## the first five un-shipped names walking `FUTURE_GAMES.md` top to bottom;

@@ -138,8 +138,18 @@ static func button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
         b.text = txt
         b.custom_minimum_size = size
         b.size = size
-        b.add_theme_font_override("font", font_big() if use_display else font_ui())
-        b.add_theme_font_size_override("font_size", font_size)
+        # THE MENU WIDTH LAW step 4: a row's text fits the row - the font
+        # steps down (floor 14) instead of the row's min width voting the
+        # whole sheet wider (the h-scroll class dies here, box-wide).
+        var fs := font_size
+        var f := font_big() if use_display else font_ui()
+        var fit_w := size.x - 40.0
+        if fit_w > 0.0:
+                while fs > 14 and f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > fit_w:
+                        fs -= 1
+        b.add_theme_font_override("font", f)
+        b.add_theme_font_size_override("font_size", fs)
         b.add_theme_color_override("font_color", Color.WHITE)
         b.add_theme_color_override("font_hover_color", Color.WHITE)
         b.add_theme_color_override("font_pressed_color", CARD)
@@ -224,6 +234,8 @@ static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
 
 ## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so
 ## players never confuse GOGACoins with per-game currencies.
+## THE MENU WIDTH LAW step 4 rides here too: the label fits the row with
+## the icon's seat subtracted (the coin icon is never squeezed out).
 static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
                 on_press := Callable()) -> Button:
         var b := button("", size, font_size, bg, on_press)
@@ -232,7 +244,14 @@ static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCEN
         h.alignment = BoxContainer.ALIGNMENT_CENTER
         h.add_theme_constant_override("separation", 10)
         h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        var l := label(txt, font_size, Color.WHITE)
+        var fs := font_size
+        var f := font_big()
+        var fit_w := size.x - 40.0 - float(font_size + 10) - 10.0
+        if fit_w > 0.0:
+                while fs > 14 and f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > fit_w:
+                        fs -= 1
+        var l := label(txt, fs, Color.WHITE)
         h.add_child(l)
         var c := TextureRect.new()
         c.texture = load("res://assets/ui/coin.png")
@@ -344,7 +363,39 @@ static func toast(t: Dictionary, msg: String) -> void:
         tw.tween_property(l, "modulate:a", 0.0, 0.4)
 
 ## Full-screen dim + centered sheet. Returns the inner VBox to fill.
-## sheet_width > 0 overrides the default 620 (the wide shop/map walls).
+## sheet_width > 0 overrides the default (THE MENU WIDTH LAW below).
+## v041-3 THE MENU WIDTH LAW (the owner: "adding more width to all
+## GOGABox-related menus ... why the fuck we even have left-right scrolling
+## to normal menus like a shop or in settings or other areas ... make the
+## base width itself be enough so user do not have to scroll it ... in both
+## positions vertical/horizontal in phone/PC the menus will not have areas
+## out-of-resolution"): the 620-px sheet was as wide as its rows, every
+## wider row pushed the panel sideways and BoxScroll's horizontal drag
+## (SHOW_NEVER, the bar hidden but alive) carried it - "left-right
+## scrolling" in normal menus. The law:
+##   1. THE BASE WIDTH IS MEASURED, NOT A CONSTANT: every sheet opens at
+##      sheet_width_for(live canvas) - 82% of the design width, clamped
+##      620..940 (portrait 1080 -> 885, landscape 1920 -> 940, a phone's
+##      EXPAND canvas grows the spare axis only, so the clamp holds
+##      everywhere and nothing can sit out of resolution). The mechanic
+##      STAYS: a sheet taller than the screen still scrolls vertically,
+##      and a pathological row can still push a horizontal scroll - it is
+##      just never the base width's fault anymore.
+##   2. THE AUTO SHEETS WEAR IT TOO: the width min is set even when the
+##      height rides free (sheet_height 0) - an auto sheet used to be as
+##      wide as its widest row, which is exactly how 560 became the box's
+##      de-facto width.
+##   3. THE ROWS FOLLOW: PanelContainer stretches its child, the VBox
+##      stretches its FILL children - every 560-min row opens to the new
+##      inner width with zero call-site edits (269 hardcoded rows across
+##      27 games included).
+##   4. THE TEXT ANSWERS TO THE ROW: Arc.button steps its font down when
+##      a line cannot fit the row (floor 14) - a long row can never vote
+##      the panel wider than its base again (fit_label's OVERFLOW LAW,
+##      law 24, for buttons).
+static func sheet_width_for(avail_x: float) -> float:
+        return clampf(avail_x * 0.82, 620.0, 940.0)
+
 static func sheet(parent: Control, sheet_height := 0.0, sheet_width := -1.0) -> VBoxContainer:
         var dim := ColorRect.new()
         dim.color = DIM_BG
@@ -358,9 +409,9 @@ static func sheet(parent: Control, sheet_height := 0.0, sheet_width := -1.0) -> 
         var pc := PanelContainer.new()
         var sb := panel_style(CARD, 30, 30)
         pc.add_theme_stylebox_override("panel", sb)
-        if sheet_height > 0:
-                var w := 620.0 if sheet_width <= 0.0 else sheet_width
-                pc.custom_minimum_size = Vector2(w, sheet_height)
+        var w := sheet_width_for(parent.size.x) if sheet_width <= 0.0 \
+                        else sheet_width
+        pc.custom_minimum_size = Vector2(w, sheet_height)
         cc.add_child(pc)
         var vbox := VBoxContainer.new()
         vbox.add_theme_constant_override("separation", 16)
@@ -418,7 +469,8 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1, preserve_key := "") -> 
         if avail.y < 200.0:
                 return
         var avail_h := avail.y * 0.94
-        var avail_w := minf(620.0, avail.x - 24.0)
+        # THE MENU WIDTH LAW: the same measured width Arc.sheet opened with.
+        var avail_w := minf(sheet_width_for(avail.x), avail.x - 24.0)
         pc.custom_minimum_size = Vector2(avail_w, 0)
         var sep := float(vb.get_theme_constant("separation"))
         var margins := 60.0                    # panel_style(CARD, 30, 30)

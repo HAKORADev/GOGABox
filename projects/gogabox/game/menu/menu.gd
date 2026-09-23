@@ -1249,8 +1249,32 @@ func _card_base(size: Vector2, ignore_mouse := true) -> Button:
 ## v0.2.3: fit_whole = STRETCH_KEEP_ASPECT_CENTERED - the FULL artwork
 ## shows (the strip cards had their top cropped by COVERED); the grid
 ## tiles keep COVERED.
+## v041-3 THE THUMB SHAPE + GRAY LAWS (the owner: "a grayed-out game card:
+## make the thumbnail top edges rounded ... the gray-out is more like a
+## wash-out, the curves make the gray out be weird, the gray-out thing
+## should be accurately on the thumbnail"):
+##   THE SHAPE - the card panel is rounded (24) but a TextureRect child
+##   paints a SQUARE corner right over the curve; clip_contents clips to
+##   the RECT, never the stylebox. The thumb now lives inside a holder
+##   Panel whose stylebox carries the card's top radius and whose
+##   clip_children = CLIP_CHILDREN_ONLY masks children to the ROUNDED
+##   draw - the thumbnail's silhouette is the card's silhouette.
+##   THE GRAY - faded thumbs used modulate alpha: a translucent image
+##   washing through to the cream card. The gray now rides
+##   thumb_gray.gdshader (grayscale + darken, fully opaque) so the
+##   gray-out lands EXACTLY on the thumbnail's own pixels.
+const THUMB_GRAY := preload("res://assets/ui/thumb_gray.gdshader")
 func _add_thumb(b: Control, g: Dictionary, label_strip: float,
                 faded := false, fit_whole := false) -> TextureRect:
+        var holder := Panel.new()
+        var sb := Arc.panel_style(Arc.CARD, 0)
+        sb.corner_radius_top_left = 24
+        sb.corner_radius_top_right = 24
+        holder.add_theme_stylebox_override("panel", sb)
+        holder.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+        holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+        holder.offset_bottom = -label_strip
         var t := TextureRect.new()
         # v0.2.3 patch: the SOON ? law lives HERE now - every tile/strip art
         # spot (owned tiles under dev cheats included) wears the purple ?
@@ -1258,15 +1282,26 @@ func _add_thumb(b: Control, g: Dictionary, label_strip: float,
         var path := String(_soon_art(g).get("thumb", ""))
         t.texture = load(path) if ResourceLoader.exists(path) else null
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
-        t.offset_bottom = -label_strip
         t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if fit_whole \
                         else TextureRect.STRETCH_KEEP_ASPECT_COVERED
-        t.clip_contents = true
         t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        t.modulate = Color(1, 1, 1, 0.35) if faded else Color.WHITE
-        b.add_child(t)
+        if faded:
+                set_thumb_gray(t, 0.62)
+        holder.add_child(t)
+        b.add_child(holder)
         return t
+
+## THE GRAY-OUT SEAT: the material is per-instance (every thumb wears its
+## own ShaderMaterial), so a state paints the gray it needs without
+## leaking into the neighbours. darken ~0.42..0.62 = the dead reads.
+func set_thumb_gray(t: TextureRect, darken: float) -> void:
+        var mat := ShaderMaterial.new()
+        mat.shader = THUMB_GRAY
+        mat.set_shader_parameter("strength", 1.0)
+        mat.set_shader_parameter("darken", darken)
+        t.material = mat
+        t.modulate = Color.WHITE
 
 func _ribbon(b: Control, txt: String, bg: Color, top_right := true) -> void:
         var rib := Panel.new()
@@ -1354,7 +1389,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                                         or not Roadmap.window_ok(id)
                         var th := _add_thumb(b, g, 70, daily_dead)
                         if daily_dead:
-                                th.modulate = Color(1, 1, 1, 0.32)
+                                set_thumb_gray(th, 0.58)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1373,7 +1408,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                                 _right_chip(b, "best %d" % best, 272)
                 "LOCKED":
                         var th := _add_thumb(b, g, 70, true)
-                        th.modulate = Color(1, 1, 1, 0.45)
+                        set_thumb_gray(th, 0.62)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Arc.INK, 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1395,7 +1430,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         _feed_ribbon(b, bd)
                 "GATED":
                         var th := _add_thumb(b, g, 70, true)
-                        th.modulate = Color(1, 1, 1, 0.22)
+                        set_thumb_gray(th, 0.42)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Color(0.45, 0.38, 0.3), 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1433,7 +1468,7 @@ func _tile(g: Dictionary, st: String) -> Control:
                         # v0.1.4 THE CAPACITY TILE: visible (never a mystery),
                         # faded, with the live GOGACharges meter on it
                         var th := _add_thumb(b, g, 70, true)
-                        th.modulate = Color(1, 1, 1, 0.38)
+                        set_thumb_gray(th, 0.5)
                         var name_l := Arc.fit_label(String(g["title"]), 24, Color(0.45, 0.38, 0.3), 306)
                         name_l.position = Vector2(14, 242)
                         name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1454,8 +1489,11 @@ func _tile(g: Dictionary, st: String) -> Control:
                         b.add_child(lock_ic)
                         _feed_ribbon(b, bd)
                 "MYSTERY":
-                        var dark := ColorRect.new()
-                        dark.color = Color(0.07, 0.05, 0.04, 1.0)
+                        var dark := Panel.new()
+                        var dsb := Arc.panel_style(Color(0.07, 0.05, 0.04, 1.0), 0)
+                        dsb.corner_radius_top_left = 24
+                        dsb.corner_radius_top_right = 24
+                        dark.add_theme_stylebox_override("panel", dsb)
                         dark.set_anchors_preset(Control.PRESET_FULL_RECT)
                         dark.offset_bottom = -70
                         dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2965,7 +3003,8 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
         thumb.clip_contents = true
-        thumb.modulate = Color(1, 1, 1, 0.4) if faded else Color.WHITE
+        if faded:
+                set_thumb_gray(thumb, 0.55)
         head.add_child(thumb)
         var hv := VBoxContainer.new()
         hv.add_theme_constant_override("separation", 4)

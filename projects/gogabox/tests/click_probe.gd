@@ -7,7 +7,7 @@ extends Node
 ## while the birth shield ate every click alive. THE LAW: a sheet fix is
 ## not shipped until a CLICK lands on it here.
 ##
-## QA_CLICK=towerball|heavywar  godot --path . res://tests/click_probe.tscn
+## QA_CLICK=towerball|heavywar|towerdestroyer  godot --path . res://tests/click_probe.tscn
 
 var fails := 0
 
@@ -22,8 +22,11 @@ func _ready() -> void:
         Box.earn(100000)
         Box.unlock_game("towerball", 0)
         Box.unlock_game("heavywar", 0)
+        Box.unlock_game("towerdestroyer", 0)
         if rig == "towerball":
                 await _towerball()
+        elif rig == "towerdestroyer":
+                await _towerdestroyer()
         else:
                 await _heavywar()
         print("=== CLICK PROBE DONE: %d fails ===" % fails)
@@ -339,3 +342,126 @@ func _heavywar() -> void:
                 _verdict("pause: a real click RESUMES (the pause sheet law "
                                 + "holds)", not bool(game.paused))
         get_tree().paused = false
+
+# ---------------------------------------------------------- towerdestroyer
+func _towerdestroyer() -> void:
+        DisplayServer.window_set_size(Vector2i(720, 1280))
+        await _settle(4)
+        var GH: GDScript = load("res://game/core/game_host.gd")
+        var router := Node2D.new()
+        add_child(router)
+        GH.launch(router, "towerdestroyer")
+        var host: Node = null
+        for i in 120:
+                await _wait(0.1)
+                host = GH.active_host
+                if host != null and is_instance_valid(host) \
+                                and host.game != null:
+                        break
+        _verdict("boot: host alive", host != null and is_instance_valid(host))
+        if host == null:
+                return
+        var game: Node = host.game
+        _verdict("boot: game node alive (waited up to 12s)", game != null)
+        var overlay: Control = game._overlay_root_ref()
+
+        # ---- step 1: the CREW ask is FIRST (the portrait game skips the
+        # position ask) ----
+        _verdict("flow: phase players after boot",
+                        String(game.phase) == "players")
+        var crew_cards: Array = _buttons_of(overlay).filter(func(b):
+                var stack: Array = [b]
+                while not stack.is_empty():
+                        var n: Node = stack.pop_back()
+                        if n is Label and String((n as Label).text) \
+                                        in ["1", "2", "3", "4"]:
+                                return true
+                        for c in n.get_children():
+                                stack.append(c)
+                return false)
+        _verdict("flow: FOUR crew cards first (%d)" % crew_cards.size(),
+                        crew_cards.size() == 4)
+
+        # ---- step 2: back never closes the ask (the root law) ----
+        game.call("_back_pressed")
+        await _wait(0.3)
+        _verdict("back: back never closes the crew ask",
+                        String(game.phase) == "players")
+
+        # ---- step 3: a real click on the 4 picks the FULL CREW -> ready ----
+        var four := _btn_by_text(overlay, "4")
+        _verdict("flow: the 4 card found", four != null)
+        if four != null:
+                await _click_button(four)
+                await _wait(0.5)
+                _verdict("flow: the crew pick opens the ready card "
+                                + "(phase=%s, players=%s)" % [String(game.phase),
+                                str(game.players)],
+                                String(game.phase) == "ready"
+                                and int(game.players) == 4)
+
+        # ---- step 4: the ready tap starts the run ----
+        var vp := get_window().get_visible_rect().size
+        await _click_design(vp * 0.5)
+        await _wait(0.5)
+        for i in 200:
+                await _wait(0.1)
+                if String(game.phase) == "run":
+                        break
+        _verdict("flow: the run is LIVE (phase=%s)" % String(game.phase),
+                        String(game.phase) == "run")
+        var seats: Array = game.seats
+        _verdict("crew: the four seats sat (=%d)" % seats.size(),
+                        seats.size() == 4)
+        var tags := 0
+        for s in seats:
+                if s["tag"] != null and is_instance_valid(s["tag"]):
+                        tags += 1
+        _verdict("crew: the 3 CPU score tags ride (%d)" % tags, tags == 3)
+
+        # ---- step 5: a held LMB fires balls ----
+        # lift the tower first: the seeded platforms descend to the muzzle
+        # within seconds and a ball born inside a band dies honestly at
+        # birth - the check needs the flight a player's early seconds have
+        var lift: Array = game.plats
+        for pp in lift:
+                pp["y"] = float(pp["y"]) + 40.0
+        var mk := func(pressed: bool):
+                var ev := InputEventMouseButton.new()
+                ev.button_index = MOUSE_BUTTON_LEFT
+                ev.pressed = pressed
+                var wp := _design_to_window(vp * 0.5)
+                ev.position = wp
+                ev.global_position = wp
+                Input.parse_input_event(ev)
+        mk.call(true)
+        await _wait(0.6)
+        mk.call(false)
+        _verdict("run: a held LMB fires the cannon (%d balls live)"
+                        % (game.balls as Array).size(),
+                        (game.balls as Array).size() > 0)
+
+        # ---- step 6: the SHOP opens by a real click + THE WIDTH LAW ----
+        var shop := _btn_by_text(game, "SHOP")
+        _verdict("shop: the HUD SHOP button exists", shop != null)
+        if shop != null:
+                await _click_button(shop)
+                await _wait(0.5)
+                var rows: Array = _buttons_of(game._overlay_root_ref())
+                _verdict("shop: the sheet opened via a real click "
+                                + "(%d buttons live)" % rows.size(),
+                                rows.size() >= 5)
+                # THE MENU WIDTH LAW: the sheet's panel is the measured
+                # width (>= 800 design px even on a 720-wide window)
+                var sheet_cc: Control = game._sheet_stack[-1]["cc"]
+                var panel: Control = sheet_cc.get_child(0)
+                _verdict("width: the sheet wears the measured base width "
+                                + "(%.0f design px >= 800)" % panel.size.x,
+                                panel.size.x >= 800.0)
+                var close := _btn_by_text(game._overlay_root_ref(), "CLOSE")
+                _verdict("shop: the CLOSE row present", close != null)
+                if close != null:
+                        await _click_button(close)
+                        await _wait(0.4)
+                        _verdict("shop: a real click CLOSES the shop",
+                                        game.sheet_open_count() == 0)
