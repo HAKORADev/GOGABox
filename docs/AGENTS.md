@@ -1032,21 +1032,51 @@ reads without booting the scene.
     d) THE MECHANIC STAYS: BoxScroll's horizontal drag is not removed -
        a pathological row can still scroll sideways; it is just never
        the base width's fault anymore.
-56. THE THUMB SHAPE + GRAY LAWS (v041-3, the owner: "a grayed-out game
-    card: make the thumbnail top edges rounded ... the gray-out is more
-    like a wash-out, the curves make the gray out be weird, the gray-out
-    thing should be accurately on the thumbnail"):
-    a) THE SHAPE: clip_contents clips to the RECT, never the stylebox -
-       a TextureRect child paints a SQUARE corner right over the card's
-       rounded (24) corner. Rounded imagery rides a holder Panel whose
-       stylebox carries the card's top radius and whose clip_children =
-       CLIP_CHILDREN_ONLY masks children to the ROUNDED draw (the
-       menu.gd _add_thumb shape; the MYSTERY tile wears the same trick
-       as a rounded stylebox Panel).
-    b) THE GRAY: a grayed thumbnail is GRAY, not a wash-out - modulate
-       alpha washes the image through to the card behind it. The gray
-       rides assets/ui/thumb_gray.gdshader (grayscale + darken, fully
+    e) THE BUTTON OUT-OF-RESOLUTION LAW (v041-3 r2, the owner: "internal
+       buttons and the width will let like at least 10% free width 5
+       from each side on both positions on both platforms ... if a
+       button had more text, make it use same logic of dynamic smart
+       detection like the GOGABox pop-ups ... so a button can never go
+       out-of-resolution"): Arc.button / Arc.coin_button clamp their
+       declared min width to SHEET_INNER_MIN = 825 design px - DERIVED,
+       never guessed: portrait 1080 -> 0.82*1080 - 60 margins = 825.6 is
+       the TIGHTEST legal sheet inner width (landscape/PC clamp at 940
+       -> 880; a phone's EXPAND canvas grows the spare axis only; a PC's
+       content scale never changes design px) - so the >=5%-per-side
+       free width holds BY CONSTRUCTION on every seat, both axes, both
+       platforms. An explicit Arc.sheet(sheet_width) can NARROW, never
+       widen past the measured base. And the text answers to the POPUP
+       LAW (law 47): measure the rendered line against the row's real
+       fit width, step the font down to the floor, and a line that
+       cannot fit even AT THE FLOOR wraps at the full fit width (the
+       button grows the measured height it needs, never the width) -
+       the same measure/ladder/wrap ladder the achievement + battery
+       popups run, so no widget can ever paint itself out of
+       resolution.
+56. THE THUMB SHAPE + GRAY LAWS (v041-3, r2 CORRECTED by the owner: "i
+    do not want the thumbnails to get curved at the top, i want them to
+    be the same look ... the gray-out effect was making a curve to the
+    thumbnails while the gray-out itself was a layer on top of the
+    thumbnail without curves ... the fix was supposed to be make the
+    gray-out just to be on top of the thumbnail accurately, no need to
+    touch the thumbnail itself"):
+    a) THE SHAPE, CORRECTED: a thumbnail NEVER gets curved. The r1
+       rounded-holder clip (stylebox radius 24 + clip_children =
+       CLIP_CHILDREN_ONLY) curved the art to chase the card's rounded
+       silhouette - the owner rejected the whole approach: fix the
+       GRAY's alignment, never the thumb's geometry. _add_thumb rides a
+       plain holder Panel again (CARD paint, radius 0, no clip) that
+       only positions the square thumb above the label strip - the
+       thumbnails wear the exact same look they always wore. (The
+       MYSTERY tile's rounded stylebox stays - it is the card's own
+       dark cover matching the card's silhouette, not a thumbnail.)
+    b) THE GRAY (r1, stands - this was the accurate part): a grayed
+       thumbnail is GRAY, not a wash-out - modulate alpha washes the
+       image through to the card behind it. The gray rides
+       assets/ui/thumb_gray.gdshader (grayscale + darken, fully
        opaque, per-instance ShaderMaterial so states do not leak into
        neighbours): strength 1.0, darken 0.42..0.62 by state (GATED the
-       darkest, LOCKED/daily 0.58-0.62, strip 0.55). The silhouette is
-       the thumbnail's own pixels, exact on the rounded shape.
+       darkest, LOCKED/daily 0.58-0.62, strip 0.55). The material IS
+       the layer that sits EXACTLY on the thumbnail - per-pixel, on the
+       art's own silhouette, aligned by construction, zero geometry
+       touched.

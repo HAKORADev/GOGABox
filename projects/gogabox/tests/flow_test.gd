@@ -40,6 +40,7 @@ func _ready() -> void:
         fails += _test("dev: switches, code arm, all_owned-only, sheet", await _t_dev_cheats())
         fails += _test("isolation: own-world launch (0-ads)", await _t_isolation())
         fails += _test("sheets: fit_sheet button safety", await _t_fitsheet())
+        fails += _test("thumbs+buttons: the v041-3 r2 laws", _t_thumb_button_laws())
         fails += _test("plugins: GDScript/native name parity", _t_plugin_names())
         fails += _test("towerball: the 3D seat + tower laws", await _t_towerball())
         fails += _test("towerdestroyer: the four-seat laws", _t_towerdestroyer())
@@ -2124,15 +2125,15 @@ func _t_snl_rules() -> int:
         var SN: GDScript = load("res://game/games/snl/snl.gd")
         # THE BOARD: the boustrophedon - 1 bottom-left, 10 bottom-right,
         # 11 above 10, 100 top-left
-        ok += _check(String(SN.cell_grid(1)) == "(0, 0)",
+        ok += _check(str(SN.cell_grid(1)) == "(0, 0)",
                 "cell 1 sits bottom-left")
-        ok += _check(String(SN.cell_grid(10)) == "(9, 0)",
+        ok += _check(str(SN.cell_grid(10)) == "(9, 0)",
                 "cell 10 sits bottom-right")
-        ok += _check(String(SN.cell_grid(11)) == "(9, 1)",
+        ok += _check(str(SN.cell_grid(11)) == "(9, 1)",
                 "cell 11 turns back above 10 (the boustrophedon)")
-        ok += _check(String(SN.cell_grid(20)) == "(0, 1)",
+        ok += _check(str(SN.cell_grid(20)) == "(0, 1)",
                 "cell 20 ends the snake row at the left")
-        ok += _check(String(SN.cell_grid(100)) == "(0, 9)",
+        ok += _check(str(SN.cell_grid(100)) == "(0, 9)",
                 "cell 100 sits top-left (the crown)")
         ok += _check(int(SN.grid_cell(Vector2i(9, 0))) == 10 \
                         and int(SN.grid_cell(Vector2i(0, 9))) == 100,
@@ -2832,6 +2833,83 @@ func _t_all_games() -> int:
                         want_restore = ScaleRule.want_for(ws)
                 ok += _check(get_window().content_scale_size == want_restore,
                         id + " restore design honest (real px, else keeps game design)")
+        Box.reset_all()
+        return ok
+
+## v041-3 r2 THE THUMB SHAPE + BUTTON OUT-OF-RESOLUTION LAWS (the owner's
+## correction round): (1) a thumbnail NEVER gets curved - the r1
+## rounded-holder clip is dead, the holder wears a radius-0 stylebox and
+## no clip_children, the gray rides the texture's own material EXACTLY
+## (per-instance, states never leak); (2) a button's declared min width
+## clamps to SHEET_INNER_MIN (825 - the tightest legal sheet inner
+## width), a line that cannot fit even at the floor font WRAPS like the
+## popups (taller button, never wider), and an explicit sheet width can
+## narrow but never widen past the measured 82% base.
+func _t_thumb_button_laws() -> int:
+        Box.reset_all()
+        var ok := 0
+        # ---- the thumb shape law, through the real _add_thumb ----
+        var menu: Node = load("res://game/menu/menu.gd").new()
+        var card := Panel.new()
+        var th: TextureRect = menu._add_thumb(card,
+                        {"id": "xo", "title": "XO"}, 70.0, true)
+        var holder := th.get_parent() as Panel
+        ok += _check(holder != null, "thumb rides the holder panel")
+        if holder != null:
+                var sb := holder.get_theme_stylebox("panel") as StyleBoxFlat
+                ok += _check(sb != null and sb.corner_radius_top_left == 0 \
+                                and sb.corner_radius_top_right == 0,
+                                "holder corners are SQUARE (radius 0)")
+                ok += _check(holder.clip_children \
+                                == CanvasItem.CLIP_CHILDREN_DISABLED,
+                                "holder never clips the art to a curve")
+        var mat := th.material as ShaderMaterial
+        ok += _check(mat != null and mat.shader != null \
+                        and String(mat.shader.resource_path) \
+                                        .ends_with("thumb_gray.gdshader"),
+                        "the gray rides the thumb_gray shader")
+        ok += _check(mat != null and float(mat.get_shader_parameter(
+                        "darken")) > 0.0,
+                        "the gray darkens (faded state carried)")
+        var th2: TextureRect = menu._add_thumb(card,
+                        {"id": "xo", "title": "XO"}, 70.0, true)
+        ok += _check(th2.material is ShaderMaterial and th2.material != th.material,
+                        "the gray material is per-instance (no state leaks)")
+        menu.free()
+        card.free()
+        # ---- the button out-of-resolution law ----
+        var b1 := Arc.button("PLAY", Vector2(2000, 90), 30, Arc.ACCENT)
+        ok += _check(b1.custom_minimum_size.x <= Arc.SHEET_INNER_MIN,
+                        "oversized button min width clamps to the sheet stone")
+        ok += _check(b1.custom_minimum_size.y == 90.0 and b1.text == "PLAY",
+                        "a fitting line keeps the native text + height")
+        var long_txt := "THIS IS A VERY LONG SHOP BUTTON TEXT THAT CANNOT FIT"
+        var b2 := Arc.button(long_txt, Vector2(300, 64), 30, Arc.ACCENT)
+        var b2_wrapped := b2.text == "" and b2.get_child_count() > 0
+        ok += _check(b2.custom_minimum_size.x <= Arc.SHEET_INNER_MIN,
+                        "narrow long-text button stays inside the stone")
+        ok += _check(b2_wrapped and b2.custom_minimum_size.y > 64.0,
+                        "a line that cannot fit at the floor WRAPS, taller not wider")
+        # ~120 chars: overflows the coin row even AT the floor font 14,
+        # so the wrap seat (not just the font ladder) must catch it
+        var b3 := Arc.coin_button(long_txt + " AND IT KEEPS GOING WELL PAST "
+                        + "EVERY STEPPED-DOWN SIZE THE LADDER CAN OFFER", \
+                        Vector2(2000, 64), 26)
+        ok += _check(b3.custom_minimum_size.x <= Arc.SHEET_INNER_MIN \
+                        and b3.custom_minimum_size.y > 64.0,
+                        "coin button obeys clamp + wrap too")
+        # ---- the explicit sheet width can narrow, never widen ----
+        var root := Control.new()
+        root.set_anchors_preset(Control.PRESET_FULL_RECT)
+        add_child(root)
+        var vb := Arc.sheet(root, 0.0, 2000.0)
+        var pc := vb.get_parent() as PanelContainer
+        var base := Arc.sheet_width_for(root.size.x)
+        ok += _check(pc != null \
+                        and absf(pc.custom_minimum_size.x \
+                                        - minf(2000.0, base)) < 0.1,
+                        "explicit sheet width clamps to the 82% base")
+        root.free()   # frees the sheet's dim+cc+pc subtree with it
         Box.reset_all()
         return ok
 

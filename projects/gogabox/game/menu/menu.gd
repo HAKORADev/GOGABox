@@ -1249,29 +1249,24 @@ func _card_base(size: Vector2, ignore_mouse := true) -> Button:
 ## v0.2.3: fit_whole = STRETCH_KEEP_ASPECT_CENTERED - the FULL artwork
 ## shows (the strip cards had their top cropped by COVERED); the grid
 ## tiles keep COVERED.
-## v041-3 THE THUMB SHAPE + GRAY LAWS (the owner: "a grayed-out game card:
-## make the thumbnail top edges rounded ... the gray-out is more like a
-## wash-out, the curves make the gray out be weird, the gray-out thing
-## should be accurately on the thumbnail"):
-##   THE SHAPE - the card panel is rounded (24) but a TextureRect child
-##   paints a SQUARE corner right over the curve; clip_contents clips to
-##   the RECT, never the stylebox. The thumb now lives inside a holder
-##   Panel whose stylebox carries the card's top radius and whose
-##   clip_children = CLIP_CHILDREN_ONLY masks children to the ROUNDED
-##   draw - the thumbnail's silhouette is the card's silhouette.
-##   THE GRAY - faded thumbs used modulate alpha: a translucent image
-##   washing through to the cream card. The gray now rides
-##   thumb_gray.gdshader (grayscale + darken, fully opaque) so the
-##   gray-out lands EXACTLY on the thumbnail's own pixels.
+## v041-3 r2 THE THUMB SHAPE + GRAY LAWS, CORRECTED (the owner: "i do not
+## want the thumbnails to get curved at the top, i want them to be the
+## same look ... the fix was supposed to be make the gray-out just to be
+## on top of the thumbnail accurately, no need to touch the thumbnail
+## itself"): the r1 rounded-holder trick (corner_radius 24 + clip_children
+## CLIP_CHILDREN_ONLY) is DEAD - a thumbnail NEVER gets curved. The thumb
+## wears its own square look again, riding a plain holder Panel (CARD
+## paint, radius 0) that only positions it above the label strip - zero
+## geometry ever touches the art.
+##   THE GRAY (unchanged - the part that was right all along): the gray
+##   rides thumb_gray.gdshader (grayscale + darken, fully opaque) on the
+##   TextureRect's own material - a layer EXACTLY on the thumbnail's own
+##   pixels, every state, aligned by construction, nothing else moved.
 const THUMB_GRAY := preload("res://assets/ui/thumb_gray.gdshader")
 func _add_thumb(b: Control, g: Dictionary, label_strip: float,
                 faded := false, fit_whole := false) -> TextureRect:
         var holder := Panel.new()
-        var sb := Arc.panel_style(Arc.CARD, 0)
-        sb.corner_radius_top_left = 24
-        sb.corner_radius_top_right = 24
-        holder.add_theme_stylebox_override("panel", sb)
-        holder.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+        holder.add_theme_stylebox_override("panel", Arc.panel_style(Arc.CARD, 0))
         holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
         holder.set_anchors_preset(Control.PRESET_FULL_RECT)
         holder.offset_bottom = -label_strip

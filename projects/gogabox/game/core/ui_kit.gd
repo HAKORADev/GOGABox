@@ -136,18 +136,31 @@ static func button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
                 on_press := Callable(), use_display := true) -> Button:
         var b := Button.new()
         b.text = txt
+        # v041-3 r2 THE BUTTON OUT-OF-RESOLUTION LAW (the owner: "internal
+        # buttons and the width will let at least 10% free width, 5 from
+        # each side on both positions on both platforms ... same logic of
+        # dynamic smart detection like the pop-ups so a button can never
+        # go out-of-resolution"):
+        #   step 1 - THE MIN WIDTH ANSWERS TO THE SHEET: a row may never
+        #   vote the panel wider than the tightest legal sheet inner
+        #   width (SHEET_INNER_MIN) - the free width holds by
+        #   construction on every seat.
+        size.x = minf(size.x, SHEET_INNER_MIN)
         b.custom_minimum_size = size
         b.size = size
-        # THE MENU WIDTH LAW step 4: a row's text fits the row - the font
-        # steps down (floor 14) instead of the row's min width voting the
-        # whole sheet wider (the h-scroll class dies here, box-wide).
+        #   step 2 - THE TEXT FITS THE ROW (the menu width law step 4):
+        #   the font steps down (floor 14) instead of the row's min
+        #   width voting the whole sheet wider.
         var fs := font_size
         var f := font_big() if use_display else font_ui()
         var fit_w := size.x - 40.0
+        var fits := true
         if fit_w > 0.0:
                 while fs > 14 and f.get_string_size(txt,
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > fit_w:
                         fs -= 1
+                fits = f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= fit_w
         b.add_theme_font_override("font", f)
         b.add_theme_font_size_override("font_size", fs)
         b.add_theme_color_override("font_color", Color.WHITE)
@@ -173,6 +186,28 @@ static func button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
         sbd.shadow_size = 0
         b.add_theme_stylebox_override("disabled", sbd)
         b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.38))
+        #   step 3 - THE WRAP SEAT (the popups' own last step, AGENTS.md
+        #   law 47): a line that cannot fit even AT THE FLOOR font wraps
+        #   at the full fit width instead of overrunning the widget -
+        #   the button grows the MEASURED height it needs, never the
+        #   width. A button can never paint itself out of resolution.
+        if not fits:
+                b.text = ""
+                var body := HBoxContainer.new()
+                body.set_anchors_preset(Control.PRESET_FULL_RECT)
+                body.alignment = BoxContainer.ALIGNMENT_CENTER
+                body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                var wl := label(txt, fs, Color.WHITE, use_display)
+                wl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                wl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                wl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+                body.add_child(wl)
+                b.add_child(body)
+                var lines := maxi(1, int(ceil(f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+                                / maxf(fit_w, 1.0))))
+                b.custom_minimum_size.y = maxf(b.custom_minimum_size.y,
+                                float(lines) * (fs + 10.0) + 24.0)
         if on_press.is_valid():
                 b.pressed.connect(func():
                         Jukebox.sfx("click", -4.0)
@@ -234,10 +269,13 @@ static func meta_chip(kind: String, id: String, bg := Color(0, 0, 0, 0.14),
 
 ## Button with a trailing GOGACoin icon - use for EVERY coin-priced action so
 ## players never confuse GOGACoins with per-game currencies.
-## THE MENU WIDTH LAW step 4 rides here too: the label fits the row with
-## the icon's seat subtracted (the coin icon is never squeezed out).
+## v041-3 r2: the OUT-OF-RESOLUTION LAW rides here too - the min width
+## clamps to the sheet stone, the label fits the row with the icon's seat
+## subtracted (the coin icon is never squeezed out), and a line that
+## cannot fit even at the floor font WRAPS (the popups' own last step).
 static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCENT,
                 on_press := Callable()) -> Button:
+        size.x = minf(size.x, SHEET_INNER_MIN)
         var b := button("", size, font_size, bg, on_press)
         var h := HBoxContainer.new()
         h.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -247,11 +285,18 @@ static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCEN
         var fs := font_size
         var f := font_big()
         var fit_w := size.x - 40.0 - float(font_size + 10) - 10.0
+        var fits := true
         if fit_w > 0.0:
                 while fs > 14 and f.get_string_size(txt,
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > fit_w:
                         fs -= 1
+                fits = f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= fit_w
         var l := label(txt, fs, Color.WHITE)
+        if not fits:
+                l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         h.add_child(l)
         var c := TextureRect.new()
         c.texture = load("res://assets/ui/coin.png")
@@ -261,6 +306,12 @@ static func coin_button(txt: String, size: Vector2, font_size := 30, bg := ACCEN
         c.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.add_child(c)
         b.add_child(h)
+        if not fits:
+                var lines := maxi(1, int(ceil(f.get_string_size(txt,
+                                HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+                                / maxf(fit_w, 1.0))))
+                b.custom_minimum_size.y = maxf(b.custom_minimum_size.y,
+                                float(lines) * (fs + 10.0) + 24.0)
         return b
 
 ## Dynamic GOGABattery meter: body + level fill + color by charge.
@@ -396,6 +447,19 @@ static func toast(t: Dictionary, msg: String) -> void:
 static func sheet_width_for(avail_x: float) -> float:
         return clampf(avail_x * 0.82, 620.0, 940.0)
 
+## v041-3 r2 THE BUTTON OUT-OF-RESOLUTION LAW's floor stone - DERIVED,
+## never guessed: portrait design 1080 -> sheet_width_for = 0.82*1080 =
+## 885.6, minus the sheet panel's 30+30 content margins = 825.6 design px.
+## Landscape/PC sheets clamp at 940 -> 880 inner, a phone's EXPAND canvas
+## grows the SPARE axis only, and a PC's content scale never changes the
+## design px - so 825 is the tightest legal seat on EVERY seat, both
+## orientations, both platforms. Any row whose declared min width rides
+## under this stone leaves >=5% of the viewport free on each side BY
+## CONSTRUCTION (the sheet itself never exceeds the 82% base), and the
+## horizontal drag mechanic stays for the pathological - it just can
+## never be a normal row's fault again.
+const SHEET_INNER_MIN := 825.0
+
 static func sheet(parent: Control, sheet_height := 0.0, sheet_width := -1.0) -> VBoxContainer:
         var dim := ColorRect.new()
         dim.color = DIM_BG
@@ -409,8 +473,11 @@ static func sheet(parent: Control, sheet_height := 0.0, sheet_width := -1.0) -> 
         var pc := PanelContainer.new()
         var sb := panel_style(CARD, 30, 30)
         pc.add_theme_stylebox_override("panel", sb)
+        # v041-3 r2: an EXPLICIT width can narrow the sheet, never widen
+        # it past the measured base - no caller can vote a sheet out of
+        # the 82% law (and out of the >=5%-per-side free width) anymore.
         var w := sheet_width_for(parent.size.x) if sheet_width <= 0.0 \
-                        else sheet_width
+                        else minf(sheet_width, sheet_width_for(parent.size.x))
         pc.custom_minimum_size = Vector2(w, sheet_height)
         cc.add_child(pc)
         var vbox := VBoxContainer.new()
