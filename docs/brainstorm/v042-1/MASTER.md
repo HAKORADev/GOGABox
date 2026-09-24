@@ -278,3 +278,88 @@ seat is its own design round — documented in the open questions).
   builder, zero duplication.
 - fit_sheet's LineEdit rule stands (no BoxScroll around text sheets) —
   the input fix does not need it, and the wrap would eat nothing today.
+
+---
+
+## r2. THE OWNER'S ROUND-2 REPORT (2026-09-25, verbatim anchors) + THE R2 PLAN
+
+> "this will be done as just v042-1 round 2 at this point" - every item of
+> the second test report, and the roots found behind each.
+
+1. **The main-menu icon** - "supposed to show normal circle and an
+   arch-like curve as the body and plus sign at top left, current design
+   is more not-accurate for now" -> icon_lan.svg/.png redrawn to exactly
+   that (law 70).
+2. **The PFP placeholder** - "make it like the button icon but without
+   plus sign and be yellow and bigger, current thing tries to be full
+   body buy it is bad and wrong and not even accurate" -> paint_pfp IS
+   the icon's bust now (law 70).
+3. **Video formats + the source dump + the Windows placeholder**:
+   - "make video support, like video formats normally, and not weird
+     things, like WTF even is .oga" -> the picker filter carries the
+     NORMAL shapes (png/jpg/webp/bmp/tga/gif + mp4/webm/mov/ogv); an
+     undecodable video dies with its NAMED honest reason
+     (PfpMedia.VIDEO_REFUSE). The engine ships ONE decoder (Theora .ogv
+     - probed in ClassDB); mp4/webm stay honest refusals, never fakes.
+   - "dump/cache the PFP source file in somewhare safe ... if user
+     deleted original one, the PFP still exist until removed or
+     changed" -> ALREADY the cache law (user://pfp_cache hash entries +
+     the face mirror beside the profile); it never worked because of the
+     meta bug below.
+   - "after putting/selecting a PFP image on windows, the app behaves
+     like the image is set for real, but the thing visualized is still
+     the placeholder one" -> ROOT: _import_image wrote the fitted HEIGHT
+     over meta["h"] (the HASH) - cache_has(height) false forever. Law 69.
+4. **The typing roots** - "sometimes it double the letter ... jumps me
+   off-place ... deletes the wrong thing ... if i changed the head of
+   the place of writing, it returns me to the end after one char ...
+   the thing must be logical and easy like any writing area" (both
+   platforms, letters only - numbers/dots clean) -> ROOT: the box's own
+   WASD->arrow injection moved the caret inside focused fields (W=start,
+   S=end, A/D=walk). Law 63 + the commit-on-change law 64.
+5. **The Android explorer** - "it shows the gogabox file explorer while
+   on windows it should the windows explorer, android has one, make it
+   use it ... showed folders accurately, but showed no files in them" ->
+   use_native_dialog on BOTH platforms (the system SAF picker), clean
+   filters, the photo permission asks stay (law 69).
+6. **Showcase real-time** - "not update in real-time, it requires me to
+   close and re-open menu" -> the commit-on-change law + the flush belt.
+7. **The name law** - "hosting or joining can not even happen without
+   having a name, even 1 char is enough (must be not space only ...
+   there is a bug when the name is numbers only it get wiped" -> law 68
+   (digits survive, 1 char, space-only dies, the three doors gate).
+8. **The scan + the invites + the add-local** - "scan the network do
+   nothing, it only lists players that in the session ... when i press
+   add, it says invite refused ... add local player never adds anything"
+   -> law 66: every box answers pings, subnet broadcasts cross the wifi,
+   invites fire while hosting, the combo ADD reads the field directly.
+9. **The joiner's quit** - "make the joiners have the ability to 'quit'
+   the session when they open multiplayer menu in-session and see their
+   name" -> the QUIT SESSION button (the leave was there; it is NAMED
+   now).
+10. **The badge lie + the solo fall-through** - "when an session-on
+    session-off state toggled, the box main menu do not get updated
+    real-time ... we both are on the 'lan live' thing, i was not even
+    able to play lan, every time i play, i jump into solo" -> the badge
+    gate is a REAL partner (joined_ok + 2 seats) and repaints LIVE
+    (law 67); the join wears connecting/joined/honest-death states with
+    a 12s deadline and a firewall-honest toast.
+11. **The smart extra-line** - the owner's own recommendation, now law
+    65 (Arc.area + the 3-line link rows with the domain hint).
+12. **Chat/voice** - untested (the session never really started); the
+    v042-1 implementations stand; the r2 join honesty is what lets them
+    be tested for real.
+
+### THE R2 PROOF
+
+- qa_v042_lan: 130 checks 0 fails (the r2 section: the face meta law,
+  the honest video doors, the invite-while-hosting, the join flip
+  connecting->joined over real loopback TCP + the honest death, the
+  link domain, the area flush door).
+- flow_test: ALL PASSED (the r2 name law wears 5 new checks).
+- The eye pass (tests/v0421r2_shot, 5 shots under Xvfb, reviewed by
+  eye): the icon in the bar, the yellow bust placeholder, the visitor
+  links (invalid never renders + domain hints), the scan rows (FREE
+  PLAYER / HOSTS n/4), the honest 1-seat badge gate.
+- config 0.4.2-2 / code base 31460 (arm32 31461, arm64 31462), exe
+  stamp 0.4.2.2.

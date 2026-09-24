@@ -625,7 +625,18 @@ static func line(placeholder: String, value: String, max_len: int,
         le.set_meta("commit", on_commit)
         le.text_changed.connect(func(t: String):
                 if on_preview.is_valid():
-                        on_preview.call(t))
+                        on_preview.call(t)
+                # v042-1 r2 THE COMMIT-ON-CHANGE LAW: the field's word
+                # lands in the store on EVERY keystroke now - the showcase
+                # and the session seats read the store live, and the focus
+                # tricks that silently dropped the last field's text on
+                # Android are dead (the commit used to ride focus_exited,
+                # which never fires when a button does not steal focus).
+                # The commits write the STORE only - no field mutation,
+                # no sheet rebuild: the IME's composition is never touched
+                # mid-word (the input law holds).
+                if on_commit.is_valid():
+                        on_commit.call(t))
         le.text_submitted.connect(func(t: String):
                 if on_commit.is_valid():
                         on_commit.call(t))
@@ -633,6 +644,36 @@ static func line(placeholder: String, value: String, max_len: int,
                 if on_commit.is_valid():
                         on_commit.call(le.text))
         return le
+
+## v042-1 r2 THE SMART EXTRA-LINE LAW (the owner: "i recommend you to make
+## all of writing fields and the buttons. viewing of the profile have the
+## same logic of the smart extra line move from the pop-up of GOGABox
+## in-app messages like the trophies or batteries, make it to make new
+## lines for writing as soon as the current line is going to be full, it
+## is better than letting the users scroll a horizontal one-line of
+## text"): the LONG fields write in a multiline area - the text wraps to
+## a new line the moment the current one fills. Same commit doors as
+## Arc.line (change + the flush door), no horizontal scrolling anywhere.
+static func area(placeholder: String, value: String, max_len: int,
+                on_commit: Callable, min_lines := 3) -> TextEdit:
+        var te := TextEdit.new()
+        te.placeholder_text = placeholder
+        te.text = value
+        # NOTE: TextEdit has no max_length in Godot 4 - the cap rides the
+        # COMMIT door below (the store write trims), never a mid-typing
+        # field rewrite (the input law).
+        te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+        te.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        te.scroll_fit_content_height = true
+        te.custom_minimum_size = Vector2(0, 34.0 * min_lines + 26.0)
+        te.add_theme_font_override("font", font_ui())
+        te.add_theme_font_size_override("font_size", 24)
+        te.set_meta("commit", on_commit)
+        te.set_meta("cap", max_len)
+        te.text_changed.connect(func():
+                if on_commit.is_valid():
+                        on_commit.call(te.text.substr(0, max_len)))
+        return te
 
 ## THE FLUSH DOOR: every commit-carrier under `root` speaks its last word
 ## (call before freeing a sheet - the sheet close is a commit door).
@@ -642,11 +683,12 @@ static func flush_fields(root: Node) -> void:
         var stack := [root]
         while not stack.is_empty():
                 var n: Node = stack.pop_back()
-                if n is LineEdit and (n as LineEdit).has_meta("commit"):
-                        var le := n as LineEdit
-                        var cb: Callable = le.get_meta("commit")
+                # v042-1 r2: TextEdit rides the same commit door (Arc.area)
+                if (n is LineEdit or n is TextEdit) \
+                                and (n as Control).has_meta("commit"):
+                        var cb: Callable = (n as Control).get_meta("commit")
                         if cb.is_valid():
-                                cb.call(le.text)
+                                cb.call((n as Control).get("text"))
                 for c in n.get_children():
                         stack.append(c)
 
@@ -729,6 +771,42 @@ static func link_open(raw: String) -> String:
         if s.begins_with("http://") or s.begins_with("https://"):
                 return s
         return "https://" + s
+
+## v042-1 r2 THE LINK DOMAIN HINT (the owner: "with a hint at the bottom
+## of the button shows the domain of the link so users be notified, use
+## the internal thing to extract main domain and any subdomains"): the
+## host with its subdomains - "https://docs.google.com/spreadsheets/x"
+## reads "docs.google.com", "www.twitch.tv/y" reads "www.twitch.tv"
+## (the www is kept - it is a subdomain the owner asked to see), no
+## scheme, no port, no path. Empty when the validator would refuse it.
+static func link_domain(raw: String) -> String:
+        var s := raw.strip_edges()
+        var host := s
+        if s.begins_with("http://"):
+                host = s.substr(7)
+        elif s.begins_with("https://"):
+                host = s.substr(8)
+        elif s.contains("://"):
+                return ""
+        var cut := host.find("/")
+        if cut >= 0:
+                host = host.substr(0, cut)
+        cut = host.find("?")
+        if cut >= 0:
+                host = host.substr(0, cut)
+        cut = host.find("#")
+        if cut >= 0:
+                host = host.substr(0, cut)
+        cut = host.rfind(":")
+        if cut > 0 and host.find("]") < 0:
+                host = host.substr(0, cut)
+        cut = host.rfind("@")
+        if cut >= 0:
+                host = host.substr(cut + 1)
+        host = host.to_lower()
+        if not link_ok(host):
+                return ""
+        return host
 
 ## Undo gray_out_button - restore the palette of a fresh Arc.button.
 static func repaint_button(b: Button, bg: Color) -> void:

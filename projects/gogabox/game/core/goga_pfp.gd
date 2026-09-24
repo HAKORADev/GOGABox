@@ -118,14 +118,14 @@ func _draw() -> void:
                 # one which is yellow guy-icon in brown background following
                 # the theme"): the ONE yellow one-guy, painted big
                 LanProfile.paint_pfp(self, variant,
-                                Vector2(sz.x * 0.5, sz.y * 0.34), sz.y * 0.72,
+                                Vector2(sz.x * 0.5, sz.y * 0.5), sz.y * 0.94,
                                 GUY_YELLOW)
                 return
         if ext == "gif" and int(media.get("n", 1)) > 1:
                 var dec := _ensure_gif(hash_v)
                 if dec.is_empty():
                         LanProfile.paint_pfp(self, variant,
-                                        Vector2(sz.x * 0.5, sz.y * 0.30), sz.y * 0.58)
+                                        Vector2(sz.x * 0.5, sz.y * 0.5), sz.y * 0.94)
                         return
                 var texs: Array = dec["tex"]
                 var idx := int(_frame) % texs.size() if focused else 0
@@ -137,12 +137,12 @@ func _draw() -> void:
                         _draw_cover(_poster, r)
                 else:
                         LanProfile.paint_pfp(self, variant,
-                                        Vector2(sz.x * 0.5, sz.y * 0.30), sz.y * 0.58)
+                                        Vector2(sz.x * 0.5, sz.y * 0.5), sz.y * 0.94)
         else:
                 var tex := _static_tex(hash_v, ext)
                 if tex == null:
                         LanProfile.paint_pfp(self, variant,
-                                        Vector2(sz.x * 0.5, sz.y * 0.30), sz.y * 0.58)
+                                        Vector2(sz.x * 0.5, sz.y * 0.5), sz.y * 0.94)
                         return
                 _draw_cover(tex, r)
 

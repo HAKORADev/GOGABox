@@ -56,6 +56,15 @@ var _srv: TCPServer = null
 var _port := 0
 var _host_conn: StreamPeerTCP = null       # when joining: the wire to the host
 var _hello_sent := false
+# v042-1 r2 THE JOIN HONESTY LAW: a join used to flip the badge and the
+# sheet the MOMENT the connect was ASKED for - a blocked address (the
+# firewall, the wrong IP, AP isolation) left the joiner in a silent
+# 1-seat "session" wearing a LAN LIVE badge, playing solo forever (the
+# owner: "we both are on the lan live thing, i was not even able to play
+# lan, every time i play, i jump into solo"). The join now wears REAL
+# states: connecting -> joined (the seats arrive) or an HONEST death.
+var _joined := false
+var _join_started := 0.0
 var _conns := {}                           # dev -> StreamPeerTCP (host side)
 var _buffers := {}                         # conn instance id -> partial line bytes
 var _pending: Array = []                   # connections awaiting their hello
@@ -89,6 +98,13 @@ const ANCHOR_MIX := "gogabox-dev-v1"
 
 func session_active() -> bool:
         return mode != "idle"
+
+## v042-1 r2: the joiner's wire is truly IN (the welcome landed). A
+## session that is merely "connecting" holds no badges and no holds.
+func joined_ok() -> bool:
+        if mode == "host":
+                return true
+        return mode == "join" and _joined
 
 func session_size() -> int:
         return seats.size()
@@ -189,6 +205,8 @@ func join_session(addr_raw: String) -> String:
                 return "cannot reach " + ip
         mode = "join"
         is_host = false
+        _joined = false
+        _join_started = Time.get_unix_time_from_system()
         host_addr = "%s:%d" % [ip, port]
         _host_conn = conn
         _hello_sent = false
@@ -300,6 +318,8 @@ func _reseat() -> void:
 ## The box asks BEFORE booting a game: should this boot wear the LAN hold?
 func pre_open(game_id: String) -> bool:
         if not session_active() or seats.size() < 2:
+                return false
+        if not joined_ok():
                 return false
         return platform_ok(game_id)
 
@@ -536,10 +556,17 @@ func _pump_join(now: float) -> void:
         _host_conn.poll()
         var st := _host_conn.get_status()
         if st == StreamPeerTCP.STATUS_ERROR or st == StreamPeerTCP.STATUS_NONE:
-                _host_died("the host closed the session")
+                _host_died("cannot reach the host - check the address, the wifi and the firewall")
                 return
         if st != StreamPeerTCP.STATUS_CONNECTED:
+                # still connecting - the honest deadline (12 s of silence
+                # means the address is not answering, say so and drop)
+                if now - _join_started > 12.0:
+                        _host_died("cannot reach the host - check the address, the wifi and the firewall")
                 return
+        if not _joined:
+                _joined = true
+                session_changed.emit()
         if not _hello_sent:
                 _hello_sent = true
                 var idn := _ident()
@@ -555,7 +582,7 @@ func _pump_join(now: float) -> void:
                         "platform": MY_PLATFORM})
         for line in _drain_lines(_host_conn):
                 _handle_line(line, "__host")
-        if now - _last_host_msg > PRUNE_AFTER:
+        if _joined and now - _last_host_msg > PRUNE_AFTER:
                 _host_died("the host is gone")
 
 func _drain_lines(conn: StreamPeerTCP) -> Array:
@@ -756,6 +783,7 @@ func _host_died(why: String) -> void:
         _close_all()
         mode = "idle"
         is_host = false
+        _joined = false
         seats = []
         _holds = {}
         _lone_clock = {}
@@ -1182,3 +1210,5 @@ func _handle_line_ext(msg: Dictionary, who: String) -> bool:
                         _handle_pfp_data(msg, who)
                         return true
         return false
+
+# probe marker 2026

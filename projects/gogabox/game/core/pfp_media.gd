@@ -19,6 +19,23 @@ class_name PfpMedia
 const IMG_EXTS := ["png", "jpg", "jpeg", "webp", "bmp", "tga"]
 const GIF_EXTS := ["gif"]
 const OGV_EXTS := ["ogv"]
+# v042-1 r2 (the owner: "i told you to make video support, like video
+# formats normally, and not weird things, like WTF even is .oga"): the
+# POPULAR video shapes get their own honest door - named, not a mystery
+# "not a face" error. The engine ships ONE decoder (Theora .ogv); mp4/
+# webm/mov are H.264/VP8 and are refused with the exact reason + the
+# working alternative. Nothing fake, nothing weird listed.
+const VIDEO_REFUSE := {
+        "mp4": "MP4 CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "webm": "WEBM CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "mov": "MOV CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "avi": "AVI CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "mkv": "MKV CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "m4v": "M4V CANNOT PLAY IN GOGABOX - USE A GIF, OR CONVERT TO OGV",
+        "oga": "OGA IS AN AUDIO FILE - GOGABOX FACES ARE IMAGES, GIFS OR OGV VIDEO",
+        "mp3": "MP3 IS AN AUDIO FILE - GOGABOX FACES ARE IMAGES, GIFS OR OGV VIDEO",
+        "wav": "WAV IS AN AUDIO FILE - GOGABOX FACES ARE IMAGES, GIFS OR OGV VIDEO",
+}
 
 ## Import a picked file -> face meta {h, ext, w, h, fps, n, dur, bytes}
 ## or {err: "..."} (the caller toasts the err).
@@ -42,7 +59,9 @@ static func import_file(path: String) -> Dictionary:
                 return _import_gif(hash_v, bytes)
         if ext in OGV_EXTS:
                 return _import_ogv(hash_v, bytes)
-        return {"err": "%s is not a face - use png/jpg/webp/gif/ogv" % ext}
+        if VIDEO_REFUSE.has(ext):
+                return {"err": VIDEO_REFUSE[ext]}
+        return {"err": "%s IS NOT A FACE - USE PNG/JPG/WEBP/GIF/OGV" % ext.to_upper()}
 
 static func _import_image(hash_v: String, ext: String, bytes: PackedByteArray) -> Dictionary:
         var img := Image.new()
@@ -54,8 +73,15 @@ static func _import_image(hash_v: String, ext: String, bytes: PackedByteArray) -
         var meta := {"h": hash_v, "ext": "webp", "n": 1, "fps": 0.0,
                 "dur": 0.0, "bytes": 0}
         var res := _fit_720(img, LanProfile.MEDIA_720)
+        # v042-1 r2 THE FACE META LAW: "h" is THE HASH - never a dimension.
+        # The r1 code wrote the fitted HEIGHT over "h" (the hash key): the
+        # stored meta carried a number where the hash belongs, so
+        # cache_has(h) was false forever and every imported image face fell
+        # back to the drawn guy on EVERY seat while the profile acted like
+        # the face was set (the owner's Windows report). Dimensions live
+        # under "w" / "hh" - the gif meta's own shape.
         meta["w"] = res.x
-        meta["h"] = res.y
+        meta["hh"] = res.y
         var out := img.save_webp_to_buffer(true, 0.86)
         if out.is_empty():
                 return {"err": "the image cannot be stored"}

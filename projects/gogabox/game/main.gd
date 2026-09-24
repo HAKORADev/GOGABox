@@ -458,6 +458,25 @@ func _pad_button_key(btn: JoyButton) -> Key:
         return KEY_NONE
 
 func _push_key(keycode: Key, pressed: bool) -> void:
+        # v042-1 r2 THE TEXT GUARD (the owner: "it needs to be fixed from
+        # it's roots ... sometimes it double the letter when writing
+        # letters, sometimes it jumps me off-place, some times it literally
+        # when i delete something, it deletes the wrong thing ... if i
+        # changed the head of the place of writing, it returns me to the
+        # end after one char"): the WASD->arrow translation and the gamepad
+        # d-pad INJECT REAL ARROW EVENTS into the input pipeline. Inside a
+        # focused LineEdit/TextEdit those arrows ARE caret moves: W drove
+        # the caret to the START of the field, S drove it to the END, A/D
+        # walked it - every word containing w/a/s/d teleported the caret
+        # mid-word, deletes then hit the wrong characters, and typing LOOKED
+        # doubled/reordered. THE ROOT LAW: while a text field holds the
+        # keyboard focus, the box never injects a translated key - the
+        # field owns the keyboard. (Number pads were "clean" only because
+        # digits and dots are never translated - that asymmetry was the
+        # tell.) One door here covers every caller (keys + gamepad).
+        var focus := get_viewport().gui_get_focus_owner()
+        if focus is LineEdit or focus is TextEdit or focus is CodeEdit:
+                return
         var ev := InputEventKey.new()
         ev.keycode = keycode
         ev.physical_keycode = keycode

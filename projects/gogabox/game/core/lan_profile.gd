@@ -46,7 +46,14 @@ const ANDROID_MEDIA_DIR := "/storage/emulated/0/Android/media/hakora.dev.gogabox
 const WINDOWS_HOME_DIR := "GOGABox/profile"
 const ANCHOR_SALT := "gogabox-profile-anchor-v1"
 const NAME_MAX := 20
-const NAME_MIN := 2
+# v042-1 r2 THE NAME LAW r2 (the owner: "make hosting or joining can not
+# even happen without having a name, even 1 char is enough (must be not
+# space only ... there is a bug when the name is numbers only it get
+# wiped, if with numbers, it wipes the numbers but lets letters"): the
+# name carries DIGITS too now - "Player2", "4" are honest names - and
+# ONE character is a name. The sanitizer collapses/trimmes spaces, so a
+# space-only entry sanitizes to "" and name_ok refuses it.
+const NAME_MIN := 1
 const PFP_VARIANTS := 8
 const LINKS_MAX := 3
 const DESC_MAX := 140
@@ -113,6 +120,12 @@ static func _defaults() -> Dictionary:
                 "saved_ts": 0.0,
         }
 
+## v042-1 r2: saves now ride EVERY keystroke (the commit-on-change law
+## keeps the showcase and the seats real-time without focus tricks), so
+## the face mirror runs only when the LIVE face actually changed - a
+## 16MB copy per keystroke would be theft.
+static var _mirrored := ""
+
 static func save() -> void:
         _cache["saved_ts"] = Time.get_unix_time_from_system()
         _cache["anchor"] = anchor()
@@ -125,7 +138,10 @@ static func save() -> void:
                 if f != null:
                         f.store_string(body)
                         f.close()
-        _mirror_face()
+        var live := String(face_media().get("h", ""))
+        if live != _mirrored:
+                _mirror_face()
+                _mirrored = live
 
 ## The current face's media file mirrors beside the profile JSON (THE
 ## SURVIVAL LAW covers the face too). The hash stays the key.
@@ -261,13 +277,15 @@ static func anchor_short() -> String:
         var a := anchor()
         return a.substr(a.length() - 6, 6) if a.length() >= 6 else a
 
-## ---------- THE NAME LAW ----------
+## ---------- THE NAME LAW (r2, v042-1 r2) ----------
 
-## EN Unicode letters only + space + ' . - ; NO emoji, NO digits, max 20.
+## EN letters + DIGITS + space + ' . - ; NO emoji, max 20. Digits survive
+## (the owner's numbers-only wipe bug), spaces collapse, space-only dies.
 static func sanitize_name(raw: String) -> String:
         var out := ""
         for ch in raw:
                 if (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") \
+                                or (ch >= "0" and ch <= "9") \
                                 or ch == " " or ch == "'" or ch == "." or ch == "-":
                         out += ch
         # collapse spaces, trim
@@ -360,34 +378,39 @@ static func cache_has(hash_v: String) -> bool:
 ## GogaPfp (goga_pfp.gd) is the front door now - it paints the placeholder
 ## plate, the drawn variants, and the media faces through this.
 
+## v042-1 r2 THE PLACEHOLDER REWORK (the owner: "the guy PFP is weird,
+## make it like the button icon but without plus sign and be yellow and
+## bigger, current thing tries to be full body buy it is bad and wrong
+## and not even accurate"): the drawn face IS THE BUTTON ICON'S SHAPE
+## now - a round head + an ARCH curve as the body, nothing else (no legs,
+## no arms, no full body). Yellow on the brown plate, filling the seat.
+## The geometry mirrors assets/ui/icon_lan.svg minus the plus. The bust
+## spans the FULL height parameter (head top -4.5u .. base +5u), so the
+## callers pass the seat's own size - big at every seat.
 static func paint_pfp(canvas: Control, variant: int, center: Vector2, height: float,
                 tint_override := Color(0, 0, 0, 0)) -> void:
         var tint: Color = PFP_TINTS[clampi(variant, 0, PFP_VARIANTS - 1)]
         if tint_override.a > 0.0:
                 tint = tint_override
-        var dark := tint.darkened(0.35)
-        var skin := Color("e8c39a")
         var u := height / 10.0   # the unit
         var x := center.x
         var y := center.y
-        var line := maxf(1.5, u * 0.22)
-        # legs
-        canvas.draw_line(Vector2(x - u * 0.9, y + u * 2.6), Vector2(x - u * 0.9, y + u * 5.0), dark, line * 1.6)
-        canvas.draw_line(Vector2(x + u * 0.9, y + u * 2.6), Vector2(x + u * 0.9, y + u * 5.0), dark, line * 1.6)
-        # body
-        var body := Rect2(x - u * 1.6, y + u * 0.2, u * 3.2, u * 2.6)
-        Arc.safe_poly(canvas, _round_rect_pts(body, u * 0.8), tint)
-        # arms
-        canvas.draw_line(Vector2(x - u * 1.6, y + u * 0.8), Vector2(x - u * 2.7, y + u * 1.8), tint, line * 1.5)
-        canvas.draw_line(Vector2(x + u * 1.6, y + u * 0.8), Vector2(x + u * 2.7, y + u * 1.8), tint, line * 1.5)
-        # head
-        canvas.draw_circle(Vector2(x, y - u * 1.1), u * 1.15, skin)
-        # the variant's cap (the only per-variant face difference)
-        if variant % 2 == 1:
-                var cap := Rect2(x - u * 1.25, y - u * 2.35, u * 2.5, u * 0.55)
-                Arc.safe_poly(canvas, _round_rect_pts(cap, u * 0.25), dark)
-        elif variant % 4 >= 2:
-                canvas.draw_circle(Vector2(x, y - u * 1.75), u * 1.05, dark)
+        # the BODY first (behind the head): one arch - a half-disc, flat
+        # at the bottom, dome UP (y grows downward in Godot, so the arc's
+        # sin rides NEGATIVE - the r2 eye pass caught the dome bending
+        # under the plate when it rode positive)
+        var pts := PackedVector2Array()
+        var base := y + u * 5.0
+        var rad := u * 3.5
+        pts.append(Vector2(x - rad, base))
+        var steps := 32
+        for i in steps + 1:
+                var a := PI * float(i) / float(steps)
+                pts.append(Vector2(x + cos(a) * rad, base - sin(a) * rad))
+        pts.append(Vector2(x + rad, base))
+        Arc.safe_poly(canvas, pts, tint)
+        # the HEAD: a proper round circle floating over the arch
+        canvas.draw_circle(Vector2(x, y - u * 1.9), u * 2.6, tint)
 
 static func _round_rect_pts(r: Rect2, rad: float) -> PackedVector2Array:
         var pts := PackedVector2Array()

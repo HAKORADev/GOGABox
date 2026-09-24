@@ -1212,3 +1212,107 @@ reads without booting the scene.
     LAST CANNON verdict); towerball is solo-only. An owner correction
     overrides a freeze for the named feature only - nothing else in the
     frozen game may drift.
+
+## THE v042-1 r2 LAWS (the owner's second LAN report - "i was still not
+## able to test the actual thing at all, not even for a moment")
+
+63. THE TEXT GUARD (v042-1 r2, the owner: "it needs to be fixed from
+    it's roots ... sometimes it double the letter when writing letters,
+    sometimes it jumps me off-place, some times it literally when i
+    delete something, it deletes the wrong thing ... if i changed the
+    head of the place of writing, it returns me to the end after one
+    char"): the box's WASD->arrow and gamepad d-pad translations INJECT
+    real arrow key events (Input.parse_input_event) - inside a focused
+    LineEdit/TextEdit those arrows ARE caret moves: W drove the caret to
+    the START, S to the END, A/D walked it; every word containing w/a/s/d
+    teleported the caret mid-word, deletes hit the wrong characters, and
+    typing read as doubled/reordered. THE LAW: main._push_key (the ONE
+    injection door) refuses to fire while a LineEdit/TextEdit/CodeEdit
+    holds the keyboard focus. Number fields were "clean" only because
+    digits/dots are never translated - that asymmetry was the tell.
+64. THE COMMIT-ON-CHANGE LAW (v042-1 r2, the owner: "profile showcase
+    not update in real-time, it requires me to close and re-open menu"):
+    Arc.line commits on EVERY text_changed (the commit writes the STORE
+    only - never the field, never a rebuild - the IME is untouched), so
+    the showcase, the seats and every action button read the store's
+    live truth without focus tricks. Belt: action handlers flush_fields
+    (or read the field's text directly - the combo ADD) before reading.
+    LanProfile.save() mirrors the face file only when the live hash
+    actually changed (a 16MB copy per keystroke is theft).
+65. THE SMART EXTRA-LINE LAW (v042-1 r2, the owner: "make all of writing
+    fields and the buttons. viewing of the profile have the same logic
+    of the smart extra line move from the pop-up of GOGABox in-app
+    messages ... make it to make new lines for writing as soon as the
+    current line is going to be full, it is better than letting the
+    users scroll a horizontal one-line of text"):
+    a) LONG fields (about, links, chat-sized text) write in Arc.area -
+       a TextEdit with WORD_SMART wrap, the box fonts, no horizontal
+       scroll; the cap rides the COMMIT door (TextEdit has no
+       max_length in Godot 4 - a mid-typing rewrite is banned by 59a).
+    b) The visitor view's LINK ROW wraps to 3 lines max (the extra rides
+       the built-in ellipsis) and wears the DOMAIN HINT at the bottom
+       (Arc.link_domain: host + subdomains, no scheme/port/path) so the
+       reader knows where a link goes before it opens. Buttons keep the
+       v041-3 wrap seat.
+66. THE SCAN LAWS r2 (v042-1 r2, the owner: "scan the network do
+    nothing, it only lists players that in the session, it is supposed
+    to list players that in GOGABox in same network ... when i press
+    add, it says invite refused ... add local player never adds
+    anything"):
+    a) EVERY GOGABox answers discovery pings (LANFIND.set_answering
+       publishes the identity; in_session is a FLAG, not a gate). The
+       ping rides the subnet-directed broadcasts (/24, /16, /8 of every
+       private local IPv4) PLUS 255.255.255.255 - Android drops the
+       global one on many networks; the /24 is what crosses the wifi.
+    b) An invite is legal whenever the target is not already one of MY
+       seats - hosting or riding a session is NOT a refusal (the r1
+       invite_peer refused whenever session_active() was true, and the
+       host menu is always inside a session). ADD on a seated peer says
+       ALREADY IN YOUR SESSION; on a stranger's session, THEY ARE IN
+       ANOTHER SESSION; invite_peer auto-hosts for a free caller.
+    c) An action button that follows a field reads the FIELD's text
+       directly (the commit may never have fired - focus does not
+       always move on touch).
+67. THE JOIN HONESTY LAW (v042-1 r2, the owner: "we both are on the
+    'lan live' thing, i was not even able to play lan, every time i
+    play, i jump into solo"): a join wears REAL states - connecting
+    (LAN.joined_ok() is false: no badge, no hold, no pre_open) -> joined
+    (the welcome landed) -> or an HONEST death within 12 seconds
+    ("cannot reach the host - check the address, the wifi and the
+    firewall"), toasted through session_died. The LAN LIVE badge lives
+    only on a REAL partner: session_active() AND joined_ok() AND
+    session_size() >= 2 AND the game is LAN-capable - a 1-seat session
+    never wears it, and the badge repaints LIVE on every session_changed
+    (menu._lan_tiles + _paint_lan_badge) - never again only at tile
+    build.
+68. THE NAME LAW r2 (v042-1 r2, the owner: "make hosting or joining can
+    not even happen without having a name, even 1 char is enough (must
+    be not space only ... there is a bug when the name is numbers only
+    it get wiped"): EN letters + DIGITS + space + ' . - ; ONE character
+    is a name; the sanitizer collapses spaces so a space-only entry
+    dies at name_ok. HOST/JOIN gates flush the name field first and
+    refuse an empty name with "NAME YOURSELF FIRST".
+69. THE FACE META LAW (v042-1 r2, the owner's Windows report: "after
+    putting/selecting a PFP image on windows, the app behaves like the
+    image is set for real, but the thing visualized is still the
+    placeholder one"): in the face meta dict, "h" is THE HASH - never a
+    dimension. The r1 image import wrote the fitted HEIGHT over "h"
+    (the gif path's "hh" was right); cache_has(height-number) could
+    never be true, so every imported image face fell back to the drawn
+    guy on every seat while the profile acted set. Dimensions live
+    under "w"/"hh". The Android face picker is the SYSTEM explorer
+    (use_native_dialog on both platforms) with a NORMAL format list -
+    the popular video shapes included; an undecodable one dies with its
+    named honest reason (PfpMedia.VIDEO_REFUSE - "no weird .oga").
+70. THE PLACEHOLDER SHAPE LAW (v042-1 r2, the owner: "the guy PFP is
+    weird, make it like the button icon but without plus sign and be
+    yellow and bigger, current thing tries to be full body buy it is
+    bad and wrong"): the drawn face IS the button icon's shape - a
+    round head + ONE arch body (a half-disc, dome UP - y grows downward,
+    the arc's sin rides NEGATIVE; the eye pass caught the r2 draft
+    bending the dome under the plate), nothing else. No legs, no arms,
+    no full body. Yellow on the brown plate, filling the seat
+    (paint_pfp's height parameter spans the whole bust). The icon
+    itself (assets/ui/icon_lan.svg/.png) is the same shape PLUS the
+    plus badge top-left (the owner: "normal circle and an arch-like
+    curve as the body and plus sign at top left").

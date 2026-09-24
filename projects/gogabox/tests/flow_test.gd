@@ -446,10 +446,18 @@ func _t_windows() -> int:
 
 func _t_lan_laws() -> int:
         var ok := 0
-        # THE NAME LAW (EN letters, no emoji, max 20)
+        # THE NAME LAW r2 (v042-1 r2: EN letters + DIGITS, 1 char min,
+        # space-only dies, no emoji, max 20 - the owner's numbers-only wipe)
         ok += _check(LanProfile.sanitize_name("osama bin-ladin") == "osama bin-ladin",
                         "lan name: the owner's example survives")
-        ok += _check(LanProfile.sanitize_name("neo99") == "neo", "lan name: digits die")
+        ok += _check(LanProfile.sanitize_name("neo99") == "neo99",
+                        "lan name: digits survive (r2)")
+        ok += _check(LanProfile.sanitize_name("99") == "99",
+                        "lan name: numbers-only survives (r2)")
+        ok += _check(LanProfile.name_ok("9"),
+                        "lan name: 1 char is a name (r2)")
+        ok += _check(not LanProfile.name_ok("   "),
+                        "lan name: space-only is no name (r2)")
         ok += _check(LanProfile.sanitize_name("neo" + char(0x1F600) + "bad") == "neobad",
                         "lan name: emoji die")
         ok += _check(LanProfile.sanitize_name("ABCDEFGHIJKLMNOPQRSTU").length() == 20,

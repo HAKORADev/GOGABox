@@ -16,7 +16,7 @@ var _sheet: VBoxContainer = null
 var _list: VBoxContainer = null
 var _reply := -1             # the tapped message's index (-1 none)
 var _reply_bar: Label = null
-var _input: LineEdit = null
+var _input: TextEdit = null
 var _send_btn: Button = null
 var _count_l: Label = null
 var _connected := false
@@ -62,10 +62,12 @@ func _build() -> void:
         _sheet.add_child(_reply_bar)
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 10)
-        _input = Arc.line("english only, no emojis", "", LAN.CHAT_MSG_MAX,
-                        LineEdit.KEYBOARD_TYPE_DEFAULT, func(_t: String): pass)
+        # v042-1 r2 THE SMART EXTRA-LINE LAW: the chat writes in a wrapping
+        # area (1K chars can be long) - new lines as the line fills, the
+        # SEND button sends, nothing scrolls sideways.
+        _input = Arc.area("english only, no emojis", "", LAN.CHAT_MSG_MAX,
+                        func(_t: String): pass, 2)
         _input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        _input.text_submitted.connect(func(_t: String): _send())
         row.add_child(_input)
         _send_btn = Arc.button("SEND", Vector2(160, 64), 22, Arc.GOOD,
                         func(): _send())
