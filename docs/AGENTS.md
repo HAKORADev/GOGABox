@@ -92,7 +92,12 @@ belongs in `docs/goga_docs/`.
 **THE 0-ADS LAW (owner):** GOGABox is MIT-licensed open source with ZERO
 ads. (v042 amendment: the box carries the Android INTERNET permission —
 LAN peer-to-peer sockets need it even on a wifi — but gains NO servers, NO
-telemetry, NO online services; the offline BEHAVIOR law stands.)
+telemetry, NO online services; the offline BEHAVIOR law stands. v042-1
+amendment: RECORD_AUDIO rides the voice chat — requested AT RUNTIME from
+the voice-toggle press, never at boot; READ_MEDIA_IMAGES +
+READ_EXTERNAL_STORAGE ride the PFP upload picker, requested from the
+upload press. Every permission is user-visible in the patch notes and
+each one answers a feature the owner ordered.)
 The whole monetization stack was removed whole: the Unity Ads plugin
 (`plugins/unity_ads/`), the `Ads` autoload, the death-menu DOUBLE (watch
 ad) theatre, the per-3-runs interstitial pacing, the banner strip (the
@@ -1128,7 +1133,6 @@ reads without booting the scene.
        is ONE shared widget; the routing blocks (lan_hold_begin /
        _lan_route / _lan_unroute) are mirrored verbatim in game_base.gd
        and game_base3d.gd.
-
 58. THE SETTER-NAME TRAP (v042, cost the round an hour of ghost-hunting):
     a STATIC GDScript function named like a property setter (`set_name`,
     `name`, `set_...` of any native property) is SILENTLY rerouted by the
@@ -1140,3 +1144,71 @@ reads without booting the scene.
     that caught it: push_error inside the suspect function prints the
     GDScript backtrace - when a call "does nothing", trap it, don't
     theorize.
+
+
+
+59. THE INPUT LAWS (v042-1, the owner's report: "it writes the thing
+    double or triple and the head of the writing area is mis-placed...
+    the fields of join a session are un-write-able"):
+    a) A LineEdit NEVER mutates its own text (text/caret_column) while the
+       user types - a mid-composition write desyncs the Android IME (the
+       composing text re-lands: doubles/triples, the caret jumps to the
+       head). Validation rides the COMMIT DOORS: text_submitted,
+       focus_exited, and THE FLUSH (Arc.flush_fields on the sheet close).
+       Arc.line is the ONE factory; it never rewrites mid-typing.
+    b) text_changed runs CHEAP work only - a save-per-keystroke is three
+       disk writes behind the IME and reads as "lagging and weird". No
+       SceneTreeTimer may touch a focused field either (a timer-driven
+       rebuild under the keyboard is the same desync).
+    c) The OS keyboard does the filtering: virtual_keyboard_type NUMBER
+       for digits, URL for links - never a live strip-and-rewrite.
+    d) A sheet holding a focused field never rebuilds itself (the LAN
+       ticker asks Arc.focused_field first).
+    e) An interactive control inside a NON-BoxScroll sheet keeps its
+       native mouse_filter - the v042 picker buttons wore IGNORE (the
+       BoxScroll pattern) on plain sheets and were DEAD to taps (the
+       gender row the owner could not click). IGNORE is for controls
+       UNDER a tap router only.
+    f) Arc.link_ok is the lite link validator (pure string shape, zero
+       network): an invalid link never renders, a valid one opens the OS
+       browser via Arc.link_open.
+60. THE FACE LAWS (v042-1, the owner: "place holders to be only one
+    which is yellow guy-icon in brown background... support local media
+    uploading as PFPs... videos and GIFs to be PFPs up to 1 minute
+    cached with a hash... 30 days and caches not used get deleted"):
+    a) ONE placeholder: the YELLOW one-guy on the BROWN plate (GogaPfp
+       paints it; never reintroduce a placeholder fleet).
+    b) GogaPfp is the ONE renderer for every PFP seat (profile sheet,
+       hold rows, member rows, roster, chat labels) - media faces paint
+       everywhere or nowhere; keep-aspect-covered, no stretching.
+    c) The media budget: 60 seconds, 720 long side on import (GIFs ride
+       the PFP budget: 480/150 frames - GDScript LZW), 16MB import cap,
+       2MB wire cap. mp4/webm are REFUSED honestly (no engine decoder) -
+       a fake would be a dummy build.
+    d) The cache is hash-addressed (SHA-256 of the source bytes) under
+       user://pfp_cache/: a changed face busts every cache for free;
+       30-day LRU sweep at boot; the LIVE face is pinned.
+    e) THE FOCUS LAW: a GogaPfp paints ONE frame unless focused (the big
+       profile face / the visitor view) - rows never animate in the
+       corner of the eye.
+    f) The profile sheet has NO roles row (the owner: "remove the roles
+       thing, it is useless") - the role FIELD survives the protocol for
+       the future dev identities.
+    g) THE AGE SELECT LAW: a select menu of specific numbers, 1..21 plus
+       the 21+ bucket (stored 99); age_display renders anything over 21
+       as "21+"; the store keeps 3 chars max.
+61. THE TURN-RELAY WHO GATE (v042-1, caught while wiring combo): the
+    v042 TURN_RELAY games applied ANY arriving act while in the waiting
+    state - on a rotated seat table that lets a stranger's roll steal a
+    local turn (the sequences only align if every device maps the
+    sender's seat to its own local index). Law: an act lands ONLY when
+    who maps to the state machine's current turn (snl's _lan_local_turn,
+    ludo's seat-of-army compare); a relayed act from a COMBO seat rides
+    send_act_as(its own seat number), never the primary's.
+62. THE 3D SEAT CORRECTION (v042-1, the owner: "the 3D game that
+    supposed to get LAN was tower destroyer and not tower ball"): the
+    LAN registry seat lives on towerdestroyer (the RACE law: identical
+    seeded towers, one shooter per device, scores ride lan_prog, THE
+    LAST CANNON verdict); towerball is solo-only. An owner correction
+    overrides a freeze for the named feature only - nothing else in the
+    frozen game may drift.

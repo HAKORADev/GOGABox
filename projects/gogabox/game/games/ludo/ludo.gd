@@ -713,9 +713,28 @@ func _skin_id() -> String:
         return sid
 
 func _is_user_army(a: int) -> bool:
+        # v042-1 THE LAN SEAT + THE PERSPECTIVE LAW: the local army p rides
+        # the session seat (my_seat_no + p - 1) on the n-seat circle - army
+        # 1 is ME on every device; the combo seat owns a second army.
+        if lan_active:
+                return String(_lan_seat_of_army(int(a)).get("dev", "")) \
+                                in [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
         return int(teams.get(a, -1)) == int(teams.get(1, 1)) \
                         and playing.has(a) and teams.has(1) \
                         and int(teams[1]) == int(teams[a])
+
+## THE ROTATION MAPS: the local army p <-> the session seat.
+func _lan_seat_of_army(p: int) -> Dictionary:
+        var n: int = maxi(1, lan_seats.size())
+        var seat_no := posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
+        for s in lan_seats:
+                if int(s.get("seat", -1)) == seat_no:
+                        return s
+        return {}
+
+func _lan_seat_no_of_army(p: int) -> int:
+        var n: int = maxi(1, lan_seats.size())
+        return posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
 
 func _pawn_col(a: int) -> Color:
         var th: Array = _theme()["armies"]
@@ -1692,6 +1711,48 @@ func _mode_sheet() -> void:
         # an IGNORE filter makes the cards DEAD to taps (the film rig
         # caught the silent sheet: every tap landed on the dim below)
 
+# ================================================== THE LAN SEAT (v042-1)
+## BOARD LUDO WEARS LAN (the queued shred, the owner's order: "do it as
+## part of this patch too"): 2-4 armies, ONE army per seat, TURN_RELAY
+## (the snl pattern - the roll and the move are the two relayed acts).
+## THE SEAT PERSPECTIVE LAW: the local player's army wears seat 1 on every
+## device; the CPU never wakes in a LAN match; the shared seed shuffles
+## nothing (the board is fixed) but seats the die's RNG for the coin law.
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        mode = 1 if m_seats.size() <= 2 else 4
+        teams = teams_of(mode)
+        playing = []
+        for i in m_seats.size():
+                playing.append(i + 1)
+        opener = 1
+        rounds = 0
+        sheet_pop()
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _mode_sheet()
+
+func lan_act(who: int, a: Dictionary) -> void:
+        # THE WHO GATE (v042-1): the act lands only when it is THAT seat's
+        # turn here - the rotated sequences align, a stranger never steals
+        if who != _lan_seat_no_of_army(turn_army):
+                return
+        match String(a.get("k", "")):
+                "roll":
+                        if state == "roll_wait":
+                                _apply_roll(int(a.get("r", 1)))
+                "move":
+                        if state == "picking":
+                                _start_move(int(a.get("piece", 0)),
+                                                int(a.get("np", 0)), true)
+
+func lan_end(results: Array) -> void:
+        pass
+
 func _pick_mode(m: int) -> void:
         mode = m
         teams = teams_of(m)
@@ -1785,7 +1846,15 @@ func _banner() -> void:
 
 func _do_roll() -> void:
         roll = _rng.randi_range(1, 6)
-        die_face = roll
+        if lan_active:
+                LAN.send_act_as(_lan_seat_no_of_army(turn_army),
+                                {"k": "roll", "r": roll})
+        _apply_roll(roll)
+
+## The ONE roll body (the local roll and the relayed roll land identically).
+func _apply_roll(r: int) -> void:
+        roll = r
+        die_face = r
         die_alive = true
         die_fading = false
         die_t0 = _time
@@ -1822,7 +1891,10 @@ func _die_fade() -> void:
 
 # ============================================================ the move
 
-func _start_move(piece: int, np: int) -> void:
+func _start_move(piece: int, np: int, relayed := false) -> void:
+        if lan_active and not relayed:
+                LAN.send_act_as(_lan_seat_no_of_army(turn_army),
+                                {"k": "move", "piece": piece, "np": np})
         var from_pos := int(poss[(turn_army - 1) * 4 + piece])
         var pts := PackedVector2Array()
         if from_pos < 0:
@@ -2040,7 +2112,8 @@ func _goga_tick(delta: float) -> void:
                                 _after_roll()
                 "roll_wait":
                         if clock >= 0.0:
-                                if not _is_user_army(turn_army) \
+                                if not lan_active \
+                                                and not _is_user_army(turn_army) \
                                                 and not die_alive \
                                                 and clock >= CPU_THINK:
                                         _do_roll()
@@ -2048,7 +2121,8 @@ func _goga_tick(delta: float) -> void:
                         if clock >= 0.0 and not die_alive:
                                 _next_turn()
                 "picking":
-                        if not _is_user_army(turn_army) \
+                        if not lan_active \
+                                        and not _is_user_army(turn_army) \
                                         and clock >= CPU_PICK:
                                 # THE TACTICAL PICK (the owner's upgrade:
                                 # "logic that needs profiles and accurate

@@ -1241,7 +1241,10 @@ func _goga_input(event: InputEvent) -> void:
 ## THE TAP: the waiting die is the only seat (one token per player - no
 ## picking, the die does the deciding)
 func _tap(at: Vector2) -> void:
-        if state == "roll_wait" and turn == 1 and not die_alive:
+        # v042-1 COMBO: the die answers for ANY of this device's seats
+        var my_turn := turn == 1 if not lan_active \
+                        else _lan_my_turns().has(turn)
+        if state == "roll_wait" and my_turn and not die_alive:
                 if _die_rect(turn).grow(14.0).has_point(at):
                         _do_roll()
                         return
@@ -1299,10 +1302,39 @@ func _lan_name(p: int) -> String:
         var idx: int = (LAN.my_seat_no() - 1 + p - 1) % n
         return String(lan_seats[idx].get("name", "RIVAL"))
 
+## THE ROTATION MAPS (v042-1): the local turn p rides the session seat
+## (my_seat_no + p - 1) on the n-seat circle - and the inverse for an
+## arriving act. The gates below keep every device's state machine in the
+## SAME absolute sequence no matter which seat it wears.
+func _lan_seat_of_turn(p: int) -> int:
+        var n: int = maxi(1, lan_seats.size())
+        return posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
+
+func _lan_local_turn(who: int) -> int:
+        var n: int = maxi(1, lan_seats.size())
+        return posmod(who - LAN.my_seat_no(), n) + 1
+
+## this device's LOCAL turn indices (the combo seat owns two)
+func _lan_my_turns() -> Array:
+        var out := []
+        var n: int = maxi(1, lan_seats.size())
+        var mine := [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
+        for p in n:
+                var seat: Dictionary = lan_seats[_lan_seat_of_turn(p + 1) - 1] \
+                                if lan_seats.size() >= _lan_seat_of_turn(p + 1) \
+                                else {}
+                if String(seat.get("dev", "")) in mine:
+                        out.append(p + 1)
+        return out
+
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):
                 "roll":
-                        if state == "roll_wait":
+                        # THE WHO GATE (v042-1): the roll lands only when it
+                        # is THAT seat's turn here - the rotated sequences
+                        # align, a stranger never steals a turn
+                        if state == "roll_wait" \
+                                        and turn == _lan_local_turn(who):
                                 _apply_roll(int(a.get("r", 1)))
 
 func _pick_mode(m: int) -> void:
@@ -1370,7 +1402,9 @@ func _banner() -> void:
 func _do_roll() -> void:
         roll = _rng.randi_range(1, 6)
         if lan_active:
-                LAN.send_act({"k": "roll", "r": roll})
+                # the roll rides THE TURN'S OWN seat (the combo seat's roll
+                # carries its own number, not the primary's)
+                LAN.send_act_as(_lan_seat_of_turn(turn), {"k": "roll", "r": roll})
         _apply_roll(roll)
 
 ## The ONE roll body (the local roll and the relayed roll land identically).

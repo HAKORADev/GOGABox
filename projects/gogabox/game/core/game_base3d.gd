@@ -149,8 +149,21 @@ func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array) -> void:
         lan_active = true
         lan_seed = seed_v
         lan_seats = m_seats
+        _lan_add_chat_button()
         if has_method("lan_match_start"):
                 call("lan_match_start", seed_v, m_seats)
+
+## THE CHAT SEAT (the twin of the 2D base's law, verbatim shape)
+func _lan_add_chat_button() -> void:
+        if _hud_row == null or not is_instance_valid(_hud_row):
+                return
+        for c in _hud_row.get_children():
+                if c is Button and (c as Button).text == "CHAT":
+                        return
+        var b := Arc.button("CHAT", Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85),
+                        func(): LanChatUi.open(self))
+        _hud_row.add_child(b)
+        _hud_row.move_child(b, 1)      # right after the back button
 
 func _lan_on_left_out(gid: String) -> void:
         if gid == game_id and _lan_hold_ui != null:
@@ -223,6 +236,15 @@ func game_cursor_disarm() -> void:
         _game_seat_token = -1
 
 func _input(event: InputEvent) -> void:
+        # v042-1 THE CHAT SHORTCUT (PC): Ctrl+T - the twin of the 2D base
+        if event is InputEventKey and (event as InputEventKey).pressed \
+                        and not (event as InputEventKey).echo \
+                        and (event as InputEventKey).keycode == KEY_T \
+                        and (event as InputEventKey).ctrl_pressed \
+                        and lan_active:
+                get_viewport().set_input_as_handled()
+                LanChatUi.open(self)
+                return
         if not _game_cur_armed:
                 return
         if event is InputEventMouseButton \
@@ -491,12 +513,22 @@ func _pause_open() -> void:
                                 and (ev as InputEventMouseButton).button_index \
                                 == MOUSE_BUTTON_LEFT:
                         _pause_close())
+        _pause_fill(sheet)
+        Arc.fit_sheet(sheet, 3 if (_pause_end_ok_live()) else 2)
+
+func _pause_end_ok_live() -> bool:
+        return pause_end_run and _goga_pause_end_ok()
+
+func _pause_fill(sheet: VBoxContainer) -> void:
         var g := GameReg.get_game(game_id)
         var title := Arc.label(String(g.get("title", game_id)), 44, Arc.INK)
         title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sheet.add_child(title)
         sheet.add_child(Arc.button("RESUME", Vector2(460, 84), 30, Arc.GOOD, func():
                 _pause_close()))
+        if lan_active and not LAN.seats.is_empty():
+                sheet.add_child(Arc.button("MULTIPLAYER", Vector2(460, 84), 30,
+                                Arc.ACCENT, func(): _pause_roster()))
         var end_ok := pause_end_run and _goga_pause_end_ok()
         if end_ok:
                 sheet.add_child(Arc.button("END", Vector2(460, 84), 30, Arc.ACCENT, func():
@@ -505,7 +537,34 @@ func _pause_open() -> void:
         sheet.add_child(Arc.button("QUIT TO BOX", Vector2(460, 84), 26, Arc.BAD, func():
                 _pause_close()
                 quit_to_box()))
-        Arc.fit_sheet(sheet, 3 if end_ok else 2)
+
+func _pause_roster() -> void:
+        if _pause_pair.is_empty():
+                return
+        var cc: Control = _pause_pair[1]
+        if cc == null or not is_instance_valid(cc):
+                return
+        var sheet: VBoxContainer = (cc.get_child(0) as PanelContainer).get_child(0)
+        for c in sheet.get_children():
+                sheet.remove_child(c)
+                c.queue_free()
+        LanRoster.build(sheet, self)
+        sheet.add_child(Arc.button("BACK", Vector2(460, 70), 26,
+                        Color(0.42, 0.30, 0.16), func(): _pause_rebuild()))
+        Arc.fit_sheet(sheet, 1)
+
+func _pause_rebuild() -> void:
+        if _pause_pair.is_empty():
+                return
+        var cc: Control = _pause_pair[1]
+        if cc == null or not is_instance_valid(cc):
+                return
+        var sheet: VBoxContainer = (cc.get_child(0) as PanelContainer).get_child(0)
+        for c in sheet.get_children():
+                sheet.remove_child(c)
+                c.queue_free()
+        _pause_fill(sheet)
+        Arc.fit_sheet(sheet, 3 if _pause_end_ok_live() else 2)
 
 func _pause_close() -> void:
         get_tree().paused = false

@@ -473,22 +473,37 @@ func _t_lan_laws() -> int:
                                         String(g["id"]) + " lan players 2..4")
                         ok += _check(not (lan.get("platforms", []) as Array).is_empty(),
                                         String(g["id"]) + " lan platforms")
-        ok += _check(with_lan == 10, "exactly ten games wear the seat (%d)" % with_lan)
+        ok += _check(with_lan == 11, "exactly eleven games wear the seat (%d)" % with_lan)
         ok += _check(Meta.lan_list(GameReg.get_game("snl")).has("lan_4p"),
                         "snl derives the 4P chip")
         ok += _check(Meta.lan_list(GameReg.get_game("fourline")).has("lan_phone")
                         and Meta.lan_list(GameReg.get_game("fourline")).has("lan_pc")
                         and not Meta.lan_list(GameReg.get_game("fourline")).has("lan_cross"),
                         "fourline: both platforms, same-platform LAN only")
-        ok += _check(Meta.players_badge(GameReg.get_game("rally")) == "PLAYERS 2-2"
-                        or Meta.players_badge(GameReg.get_game("rally")) != "",
-                        "the PLAYERS badge exists for rally")
-        ok += _check(Meta.players_badge(GameReg.get_game("heavywar")) == "",
-                        "no badge on the out-of-radar games")
-        # THE PROFILE SEED
-        ok += _check(LanProfile.GENDERS.has("other") and LanProfile.ROLES.has("owner"),
-                        "the profile vocabulary")
+        # v042-1 THE BADGE PLACEMENT LAW (the owner: "by game tagging, i
+        # meant only in the pre-play and search filter, not to put a badge
+        # on the thumbnail for no reason"): the card ribbon is GONE from
+        # the feed; the tag vocabulary lives in the pre-play + search only
+        ok += _check(Meta.lan_list(GameReg.get_game("rally")).size() > 0,
+                        "rally still wears the LAN vocabulary (pre-play + search)")
+        ok += _check(Meta.lan_list(GameReg.get_game("heavywar")).is_empty(),
+                        "no LAN vocabulary on the out-of-radar games")
+        # THE PROFILE SEED (v042-1: roles removed from the sheet law, the
+        # face media vocabulary added)
+        ok += _check(LanProfile.GENDERS.has("other") and LanProfile.role() != "",
+                        "the profile vocabulary (gender; role lives in the field)")
         ok += _check(LanProfile.anchor() != "", "the device anchor exists")
+        ok += _check(LanProfile.age_display(19) == "19"
+                        and LanProfile.age_display(35) == "21+",
+                        "the age display law (over 21 reads 21+)")
+        ok += _check(Arc.link_ok("https://github.com/HAKORADev")
+                        and Arc.link_ok("github.com/HAKORADev")
+                        and not Arc.link_ok("not a link")
+                        and not Arc.link_ok("http:// localhost"),
+                        "the lite link validator (http/domain shapes, junk refused)")
+        ok += _check(LanProfile.sanitize_chat("hi there\tok") == "hi there ok"
+                        and LanProfile.sanitize_chat("caf\u00e9 \u263a ok") == "caf  ok",
+                        "the chat sanitizer (EN-only, no emoji, tabs folded)")
         # THE PERMISSION NOTE: the LAN round needs the sockets
         ok += _check(ProjectSettings.get_setting("autoload/LAN", "") != "",
                         "the LAN autoload sits")

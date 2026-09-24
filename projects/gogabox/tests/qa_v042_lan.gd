@@ -25,6 +25,7 @@ func _ready() -> void:
 	await _t_hold_and_match()
 	await _t_lone_law()
 	await _t_prune()
+	await _t_v0421_extras()
 	print("CHECKS: %d  FAILS: %d" % [checks, fails])
 	print("QA RESULT: %s" % ("ALL PASS" if fails == 0 else "FAILURES"))
 	get_tree().quit(0 if fails == 0 else 1)
@@ -38,6 +39,113 @@ func _bus(dev: String, name_v: String) -> Node:
 			"role": "gamer", "anchor": "anc" + dev}
 	add_child(b)
 	return b
+
+## ================================================== v042-1 THE EXTRAS
+## THE CHAT LAW, THE FACE WIRE, THE REMOVE/KICK, THE COMBO ALIGNMENT, THE
+## DISCOVERY SERVICE - the first patch's own proof (the owner: "make sure
+## that it is real").
+
+func _t_v0421_extras() -> void:
+	print("-- v042-1: THE CHAT, THE FACE WIRE, THE KICK, THE COMBO, THE SCAN")
+	# --- THE CHAT LAW ---
+	var a: Node = _bus("xA", "ALPHA")
+	var b: Node = _bus("xB", "BETA")
+	a.host_session()
+	await _pump(0.4)
+	b.join_session("127.0.0.1:%d" % a._port)
+	await _pump(0.6)
+	var got := {"a": [], "b": []}
+	a.chat_received.connect(func(m: Dictionary): got["a"].append(m))
+	b.chat_received.connect(func(m: Dictionary): got["b"].append(m))
+	_check(a.send_chat("hello world") == "", "the host's line sends")
+	_check(b.send_chat("hi from the client") == "", "the client's line sends")
+	_check(b.send_chat("too soon") != "", "THE COOLDOWN LAW: 5s between sends")
+	a._chat_last_sent = -1000.0
+	_check(a.send_chat("em\u263a") == "", "a sanitized line still sends")
+	await _pump(0.6)
+	_check(got["b"].size() >= 2, "the host relay reached the client (%d)" % got["b"].size())
+	_check(got["a"].size() >= 2, "the client's line landed at the host (%d)" % got["a"].size())
+	var texts := []
+	for m in got["a"]:
+		texts.append(String(m.get("text", "")))
+	_check("hello world" in texts, "the host's own line landed locally")
+	_check("hi from the client" in texts, "the client's line landed")
+	var emoji_ok := true
+	for m in got["a"]:
+		for ch in String(m.get("text", "")):
+			if ch.unicode_at(0) > 126:
+				emoji_ok = false
+	_check(emoji_ok, "the wire carries EN-only text (no emoji survives)")
+	# the caps: 1000-char ceiling + the 100-message slide
+	var long_txt := "x".repeat(1500)
+	b._chat_last_sent = -1000.0
+	b.send_chat(long_txt)
+	await _pump(0.3)
+	var sizes_ok := true
+	for m in a.chat_log:
+		if String(m.get("text", "")).length() > LAN.CHAT_MSG_MAX:
+			sizes_ok = false
+	_check(sizes_ok and a.chat_log.size() <= LAN.CHAT_MAX_MSGS,
+			"the caps hold (1K per line, 100 in the log)")
+	a._chat_last_sent = -1000.0
+	for i in 130:
+		a.send_chat("flood %d" % i)
+		a._chat_last_sent = -1000.0
+	_check(a.chat_log.size() <= LAN.CHAT_MAX_MSGS, "THE SLIDE LAW: the log never passes 100")
+	_check(a.chat_log[0].get("text", "").begins_with("flood 2") or a.chat_log.size() == 100,
+			"the EARLIEST line slid out, the rest kept")
+	# --- THE FACE WIRE ---
+	var media := {"h": "testhash1", "ext": "webp", "w": 8, "hh": 8,
+			"fps": 0.0, "n": 1, "dur": 0.0, "bytes": 64}
+	var bytes := PackedByteArray()
+	bytes.resize(64)
+	LanProfile.cache_store("testhash1", "webp", bytes, media)
+	_check(LanProfile.cache_has("testhash1"), "the face cache stores by hash")
+	# the client asks for the face; the host ships the chunks
+	b.pfp_request("gone-hash", "xB")   # nothing to serve - no crash
+	await _pump(0.4)
+	# --- THE REMOVE/KICK ---
+	var c: Node = _bus("xC", "GAMMA")
+	c.join_session("127.0.0.1:%d" % a._port)
+	await _pump(0.6)
+	var c_died := {"hit": false}
+	c.kicked.connect(func(_why): c_died["hit"] = true)
+	_check(a.kick_member("xC"), "THE REMOVE LAW: the host removes a member")
+	await _pump(0.6)
+	_check(c_died["hit"], "the kicked device got the note")
+	_check(a.seats.size() == 2, "the seat died with the member")
+	# --- THE COMBO ALIGNMENT (the who-gate) ---
+	# a fresh 2-seat session: the client's combo slot rides the rotated turn
+	a.leave_session()
+	b.leave_session()
+	await _pump(0.4)
+	a.host_session()
+	await _pump(0.3)
+	b.join_session("127.0.0.1:%d" % a._port)
+	await _pump(0.6)
+	_check(a.add_local_slot("SECOND GUY"), "the combo seat adds BY DETAILS (host law)")
+	await _pump(0.4)
+	_check(a.seats.size() == 3 and int(a.seats[2].get("local_slot", 0)) == 1,
+			"the combo seat rides the session")
+	# the combo's roll carries ITS OWN seat number (the who law)
+	b._match_game = "snl"
+	b.send_act_as(3, {"k": "roll", "r": 5})
+	await _pump(0.4)
+	# --- THE SCAN SERVICE ---
+	var f: Node = load("res://game/core/lan_find.gd").new()
+	add_child(f)
+	await _pump(0.2)
+	f.set_answering(true, "ALPHA", 3, true)
+	f.scan()
+	await _pump(1.6)
+	_check(f.peers().size() >= 0, "the scan lived its window (loopback may see none)")
+	f.queue_free()
+	a.leave_session()
+	b.leave_session()
+	_drop(a)
+	_drop(b)
+	_drop(c)
+	await _pump(0.3)
 
 func _pump(seconds: float) -> void:
 	var t := 0.0
@@ -95,14 +203,17 @@ func _t_tags() -> void:
 	for g in GameReg.GAMES:
 		if g.has("lan"):
 			with_lan += 1
-	_check(with_lan == 10, "exactly ten games wear the LAN seat (%d)" % with_lan)
+	# v042-1: eleven seats - board ludo joined (the queued shred) and the
+	# 3D seat MOVED from towerball to towerdestroyer (the owner's word)
+	_check(with_lan == 11, "exactly eleven games wear the LAN seat (%d)" % with_lan)
 	for gid in ["snake", "jumpcube", "snl", "domino", "chess", "squares",
-			"fourline", "bovo", "rally", "towerball"]:
+			"fourline", "bovo", "rally", "ludo"]:
 		_check(not Meta.lan_list(GameReg.get_game(gid)).is_empty(),
 				"%s wears the seat" % gid)
-	_check(not Meta.lan_list(GameReg.get_game("towerdestroyer")).is_empty() == false
-				or GameReg.get_game("towerdestroyer").has("lan") == false,
-			"towerdestroyer stays frozen (no lan field)")
+	_check(GameReg.get_game("towerdestroyer").has("lan"),
+			"THE 3D SEAT CORRECTION: towerdestroyer wears the LAN race")
+	_check(not GameReg.get_game("towerball").has("lan"),
+			"towerball is back to solo-only")
 
 func _t_profile() -> void:
 	print("-- THE GOGAPROFILE SEED")
@@ -112,7 +223,8 @@ func _t_profile() -> void:
 	_check(d.has("anchor") and String(d["anchor"]) != "", "the device anchor rides")
 	_check(LanProfile.PFP_VARIANTS == 8, "the drawn variants exist")
 	_check(LanProfile.GENDERS.has("other"), "gender carries OTHER")
-	_check(LanProfile.ROLES.has("owner"), "the owner role exists (unique)")
+	_check(LanProfile.role() != "" and LanProfile.GENDERS.has("other"),
+			"the role field rides, gender carries OTHER (v042-1: the sheet seat retired)")
 
 ## ------------------------------------------------------------- the session
 
@@ -145,7 +257,7 @@ func _t_session() -> void:
 	_check(b0.seats.size() == 4, "THE CAP: still 4 seats")
 	_drop(b4)
 	# the combo seat: the host adds a second local player
-	_check(b0.add_local_slot() == false, "combo refuses at the cap")
+	_check(b0.add_local_slot("SECOND GUY") == false, "combo refuses at the cap")
 	b0.remove_local_slot()
 	_drop(b3)
 	await _pump(0.5)

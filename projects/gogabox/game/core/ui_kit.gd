@@ -593,6 +593,143 @@ static func gray_out_button(b: Button) -> void:
         b.add_theme_color_override("font_hover_color", Color(1, 1, 1, 0.75))
         b.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.75))
 
+# ------------------------------------------------------- THE INPUT KIT (v042-1)
+## THE OWNER'S REPORT: on Android every writable field wrote double/triple
+## and the caret jumped to the head — the Godot 4 Android IME failure class,
+## caused by mutating LineEdit.text/caret mid-composition and by heavy work
+## inside text_changed. THE INPUT LAW (docs/brainstorm/v042-1/MASTER.md §1a):
+##   1. a LineEdit NEVER mutates its own text while it holds focus —
+##      validation happens at the COMMIT DOORS (submit / focus-out / the
+##      debounced commit), never per keystroke;
+##   2. text_changed runs CHEAP work only — persistence rides the debounce;
+##   3. the OS keyboard does the filtering (virtual_keyboard_type);
+##   4. a sheet holding a focused field never rebuilds itself (the tickers
+##      ask sheet_focused_field first).
+
+## The ONE LineEdit factory. on_commit(text) = sanitize + persist (the
+## commit door); on_preview(text) = cheap live read (no writes allowed).
+## The commit doors: text_submitted + focus_exited + THE FLUSH (a sheet
+## close flushes every field it frees - Arc.flush_fields). No per-keystroke
+## timers: a timer touching a focused field IS an IME desync.
+static func line(placeholder: String, value: String, max_len: int,
+                keyboard_type: int, on_commit: Callable,
+                on_preview := Callable()) -> LineEdit:
+        var le := LineEdit.new()
+        le.placeholder_text = placeholder
+        le.text = value
+        le.max_length = max_len
+        le.custom_minimum_size = Vector2(0, 64)
+        le.virtual_keyboard_type = keyboard_type
+        le.add_theme_font_override("font", font_ui())
+        le.add_theme_font_size_override("font_size", 24)
+        le.set_meta("commit", on_commit)
+        le.text_changed.connect(func(t: String):
+                if on_preview.is_valid():
+                        on_preview.call(t))
+        le.text_submitted.connect(func(t: String):
+                if on_commit.is_valid():
+                        on_commit.call(t))
+        le.focus_exited.connect(func():
+                if on_commit.is_valid():
+                        on_commit.call(le.text))
+        return le
+
+## THE FLUSH DOOR: every commit-carrier under `root` speaks its last word
+## (call before freeing a sheet - the sheet close is a commit door).
+static func flush_fields(root: Node) -> void:
+        if root == null or not is_instance_valid(root):
+                return
+        var stack := [root]
+        while not stack.is_empty():
+                var n: Node = stack.pop_back()
+                if n is LineEdit and (n as LineEdit).has_meta("commit"):
+                        var le := n as LineEdit
+                        var cb: Callable = le.get_meta("commit")
+                        if cb.is_valid():
+                                cb.call(le.text)
+                for c in n.get_children():
+                        stack.append(c)
+
+static func _noop() -> void:
+        pass
+
+## Any field inside this subtree that currently holds focus (the ticker
+## guard: a sheet with a focused field must not rebuild under the IME).
+static func focused_field(root: Node) -> LineEdit:
+        if root == null or not is_instance_valid(root):
+                return null
+        var stack := [root]
+        while not stack.is_empty():
+                var n: Node = stack.pop_back()
+                if n is LineEdit and (n as LineEdit).has_focus():
+                        return n
+                for c in n.get_children():
+                        stack.append(c)
+        return null
+
+## THE LINK VALIDATOR (the owner: "usually all links start with http... or
+## ends with .something ... try to use some sort of lite tool that
+## internally checks if link is valid in a friction of a second"). Pure
+## string shape check - zero network. Accepts:
+##   http(s)://<host>[more]   OR   a dotted-domain shape "name.tld[/more]"
+## with tld >= 2 letters. Rejects emoji, spaces, "@-only", bare words.
+static func link_ok(raw: String) -> bool:
+        var s := raw.strip_edges()
+        if s.length() < 4 or s.length() > 200:
+                return false
+        for ch in s:
+                if ch == " " or ch.unicode_at(0) < 33:
+                        return false
+        var host := s
+        if s.begins_with("http://"):
+                host = s.substr(7)
+        elif s.begins_with("https://"):
+                host = s.substr(8)
+        elif s.contains("://"):
+                return false        # ftp:// and friends are not links here
+        # strip a path/query tail, then a userinfo + port, keep the host
+        var cut := host.find("/")
+        if cut >= 0:
+                host = host.substr(0, cut)
+        cut = host.find("?")
+        if cut >= 0:
+                host = host.substr(0, cut)
+        cut = host.rfind(":")
+        if cut > 0 and host.find("]") < 0:
+                host = host.substr(0, cut)
+        cut = host.rfind("@")
+        if cut >= 0:
+                host = host.substr(cut + 1)
+        if host.begins_with("www."):
+                host = host.substr(4)
+        # the host must be dotted words with a 2+ letter tail
+        var parts := host.split(".")
+        if parts.size() < 2:
+                return false
+        for p in parts:
+                if String(p).length() == 0:
+                        return false
+                for ch in String(p):
+                        if not (ch.is_valid_identifier() or ch == "-"):
+                                # is_valid_identifier accepts digits too,
+                                # which is what a domain wants here
+                                if not (ch >= "0" and ch <= "9"):
+                                        return false
+        var tld := String(parts[parts.size() - 1])
+        if tld.length() < 2:
+                return false
+        for ch in tld:
+                if not (ch >= "a" and ch <= "z") and not (ch >= "A" and ch <= "Z"):
+                        return false
+        return true
+
+## Normalize a saved link for display/open: bare "name.tld" gains https://.
+static func link_open(raw: String) -> String:
+        var s := raw.strip_edges()
+        if s.begins_with("http://") or s.begins_with("https://"):
+                return s
+        return "https://" + s
+
 ## Undo gray_out_button - restore the palette of a fresh Arc.button.
 static func repaint_button(b: Button, bg: Color) -> void:
         var sb := panel_style(bg, int(b.size.y / 2.6) if b.size.y > 0 else 24)

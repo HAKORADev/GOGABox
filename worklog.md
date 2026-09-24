@@ -55,3 +55,33 @@ Work Log:
 
 Stage Summary:
 - v042: the LAN system is real end to end - the box, the wire, the waiting room, the profiles, the tags, ten games seated. The owner tests cross-platform (PC + phone); Tower Destroyer stayed frozen; ludo stays off the list per the order.
+
+---
+Task ID: v042-1
+Agent: main (Super Z)
+Task: the LAN first patch — the owner's full v042 test report + the queued shreds (embedded virtual net, board ludo, combo per-game) + the in-game multiplayer surface (roster, voice, chat), everything REAL.
+
+Work Log:
+- synced the sandbox clone (reset to origin/main 79fed2bf after the reset rolled it back to v040-2); verified the v042 state by git, not memory
+- docs first: docs/brainstorm/v042-1/MASTER.md (the report compressed, the diagnosis §1a-1j, the tracker), the LAN_MULTIPLAYER.md v042-1 section (the input law, the face law, the badge placement law, the 3D seat correction, the voice/chat laws)
+- A1 the input kit: Arc.line (the ONE LineEdit factory; commit doors = submit/focus-out/THE FLUSH on sheet close; zero mid-typing mutation; keyboard types), the top-up field stopped rewriting itself, the LAN ticker defers under a focused field
+- A2 the LAN button icon: assets/ui/icon_lan.svg (the proper plus+guy art) rasterized by tools/v0421_lan_icon.py; the drawn body retired
+- A3-A5 the profile: GogaPfp (the ONE renderer: the yellow-guy-on-brown placeholder, images, GIF frames, ogv video; one frame unfocused), PfpMedia (the import pipeline: png/jpg/webp/bmp/tga + the box's own GIF decoder PfpGif + ogv; 720p, hash-addressed cache, 30-day LRU sweep, mp4/webm refused honestly), the profile sheet rework (the big face, upload, the age select 1..21+21+, roles REMOVED, gender alive, the name law untouched), the visitor view (about + REAL links via Arc.link_ok/link_open + age + gender; device/ID gone), the SHOWCASE button
+- A6 the session sheet: add-local-player BY DETAILS (no clone seat), the smart scan (LANFIND UDP discovery port 31445 + invites + the invite popup), the REMOVE button per member (the host kicks)
+- A7 the badge law: the PLAYERS ribbon GONE from cards; LAN LIVE only during an active session
+- A8 the 3D seat correction: the registry seat moved towerball → towerdestroyer; TD's LAN RACE (identical seeded towers, remote rival cannons, score relays, THE LAST CANNON verdict); towerball's LAN block stripped; the freeze honored outside the named seat
+- B1 the embedded virtual net: LANFIND (the real UDP discovery + invite service) + the honest line in the docs (a bundled ZeroTier stack is a native-library round; UPnP + room codes + VLAN NICs ride free)
+- B2 board ludo LAN: TURN_RELAY (roll + move), the shared seed, the CPU never wakes
+- B3 combo per-game: the turn-relay WHO GATE (the v042 alignment bug found and fixed: acts land only on the mapped turn), send_act_as, snl + ludo consume the combo seats (pass-the-device turns)
+- C1 the pause MULTIPLAYER roster (LanRoster: seat numbers, faces, names, platform, YOU/HOST/COMBO) — both twins
+- C2 voice chat (lan_voice.gd autoload: the mic capture bus, UDP frames through the host with target masks, per-seat AudioStreamGenerator playback, MIC/HEAR two-layer toggles, per-layer device detection, the runtime RECORD_AUDIO ask)
+- C3 text chat (lan.gd chat log with the 1K/100/10MB caps + the 5s cooldown + the sanitizer; LanChatUi with the reply flow, hh:mm:ss stamps, face+name labels; the CHAT hud button between back and shop; Ctrl+T on PC; never saved)
+- permissions: record_audio + read_media_images + read_external_storage in both presets (documented in AGENTS §4)
+- tests: flow_test laws updated (the badge law, the profile vocabulary, the age display law, the link validator, the chat sanitizer), qa_v042_lan grew to 97 checks (the chat caps/cooldown/slide, the face cache, the kick law, the combo alignment, the scan smoke), ALL PASS; the v0421 eye pass 8 shots under Xvfb reviewed by eye (caught the placeholder tint, fixed to the yellow law)
+- the parse sweep: godot --headless --import + the --check-only passes (put_var signature, unicode_at, the FlowContainer alignment, the duplicate dict key, the TD type inference all caught and killed)
+- version 0.4.2-1 / code base 31450 (arm32 31451, arm64 31452), the exe stamp 0.4.2.1; AGENTS laws 59-62
+
+Stage Summary:
+- the LAN first patch is COMPLETE and green: flow_test ALL PASSED + qa_v042_lan 97/0 + the eye pass reviewed
+- the real bars: real voice capture/transport/playback, real discovery + invites, real hash-addressed face cache + wire transfer, real chat with the full cap law — no dummies
+- the honest refusals documented: mp4/webm (no engine decoder), ogv not transcoded, ZeroTier-in-GDScript not faked

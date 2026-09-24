@@ -219,3 +219,74 @@ everything above:
   sanitized at input).
 - Fairness note: the per-round economy already charges every device its
   own fee — multiplayer changes WHO you play against, never who pays.
+
+## THE V042-1 PATCH — THE FIRST REPORT ROUND (the owner's eyes on the build)
+
+The owner tested the v042 build (downloaded, not yet a real match) and
+the report plus the queued shreds landed as ONE patch. The plan lives in
+`docs/brainstorm/v042-1/MASTER.md`; the laws that CHANGE or GROW:
+
+- **THE INPUT LAW (Android first)**: a LineEdit never mutates its own text
+  mid-composition, never runs disk work per keystroke, and the OS keyboard
+  does the filtering (`virtual_keyboard_type`). A sheet holding a focused
+  field never rebuilds itself. This was the double/triple-writing +
+  caret-to-head bug that blocked the real match test.
+- **THE PFP MEDIA LAW**: the profile's face is the yellow one-guy on the
+  brown theme plate (THE ONE PLACEHOLDER), or LOCAL MEDIA — any image the
+  engine decodes (png/jpg/webp/bmp/tga), animated GIFs (the box's own
+  decoder), or Theora video (.ogv), up to 60 seconds, compressed to 720p,
+  hashed (SHA-256) into a 30-day LRU cache (the live face is pinned,
+  unused caches swept), riding ONE renderer (`GogaPfp`) that animates
+  while focused and paints ONE frame while away. Media travels to
+  visitors over the session wire in cached hash-addressed chunks. mp4/
+  webm are refused honestly — the engine has no decoder for them.
+- **THE VISITOR VIEW LAW**: a visited profile shows the name, the face,
+  the ABOUT line, REAL links (validated by the lite `Arc.link_ok` check —
+  http(s) or a dotted-domain shape; invalid links never render, valid ones
+  open the OS browser), the age (numbers over 21 wear "21+"), and the
+  gender. The device anchor + ID lines are GONE (useless). The SHOWCASE
+  button opens this exact view for your own profile.
+- **THE AGE SELECT LAW**: age is a select menu of numbers, max 3 chars,
+  anything above 21 renders "21+".
+- **THE ROLE REMOVAL**: gamer/developer/owner chips are gone from the
+  profile sheet (useless + tap-dead). The role field survives in the
+  protocol for the future dev identities; the sheet no longer offers it.
+- **THE ADD-PLAYER LAW**: "add local player" never clones you again. It
+  adds a player BY ITS DETAILS (name entry, a combo seat) or by SMART
+  NETWORK SCANNING — the UDP discovery service (`lan_find.gd`, port
+  31445) lists nearby GOGABox boxes; pressing ADD sends an INVITE and the
+  target's app pops the accept sheet that joins the session. The members
+  list wears a REMOVE button per row (the host removes anyone; the
+  removed device is dropped to the menu with a note).
+- **THE BADGE PLACEMENT LAW**: LAN tagging lives in the PRE-PLAY page and
+  the SEARCH FILTER — nowhere else. Thumbnails carry NO LAN badge in
+  normal play; a small LAN LIVE badge appears ONLY while this device is
+  in an active session (host or joiner).
+- **THE 3D SEAT CORRECTION**: the owner's word — the 3D game that wears
+  LAN is TOWER DESTROYER, not tower ball ("i am not sure if this was my
+  or your mistake"). The registry seat moved; TD races on identical seeded
+  towers (the v042 towerball RACE pattern, one shooter seat per device);
+  towerball returns to solo-only.
+- **THE EMBEDDED VIRTUAL NET (the honest line)**: the box ships its own
+  UDP discovery + the room-code leg (UPnP + VLAN NICs ride free). A
+  bundled ZeroTier/Tailscale userspace stack is a native-library round —
+  documented as the next step, never faked in GDScript.
+- **THE VOICE LAW**: per-player, two layers — MIC (they hear me) and HEAR
+  (I hear them) — toggles on every row including YOU; PCM 16kHz over UDP
+  through the host; per-layer device detection (a mic-less PC listens
+  only; RECORD_AUDIO is requested at runtime on Android).
+- **THE CHAT LAW**: one shared per-session chat, English-only, no emojis,
+  name + PFP labels, timestamp (hh:mm:ss) under every message, 1K chars
+  per message, a 5-second send cooldown, 100 messages / 10MB then the
+  earliest slides out, tap-to-reply (tap again cancels, tap another
+  switches) — and it is NEVER saved: the chat dies with the session.
+  The seat: a CHAT button in active-multiplayer games between the back
+  button and the first game button, plus Ctrl+T on PC.
+- **THE PAUSE ROSTER LAW**: the pause sheet wears a MULTIPLAYER button
+  opening the roster — every player NUMBER and who is behind it (face,
+  name, platform, YOU/HOST), one shared widget for both twins.
+- **THE COMBO CONSUMPTION**: turn-based boards (snl + ludo) seat their
+  local_slot players for real — one device, two seats, pass-the-device
+  turns; each seat's acts carry its own seat number.
+- **BOARD LUDO WEARS LAN** (the queued shred): 2-4 armies, TURN_RELAY,
+  the shared seeded shuffle, the CPU never wakes in a LAN match.

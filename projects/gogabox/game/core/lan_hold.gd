@@ -114,7 +114,13 @@ func _refresh() -> void:
 	for s in holders:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
-		row.add_child(LanProfile.pfp_control(int(s.get("pfp", 0)), Vector2(52, 52)))
+		# v042-1: the row's face rides GogaPfp - a media face paints here
+		# exactly like everywhere else (ONE renderer, every seat)
+		var media_v: Variant = s.get("pfpm", {})
+		var media: Dictionary = media_v if typeof(media_v) == TYPE_DICTIONARY else {}
+		var fig := GogaPfp.make(media, Vector2(52, 52))
+		fig.variant = int(s.get("pfp", 0))
+		row.add_child(fig)
 		var name_l := Arc.label(String(s.get("name", "PLAYER")), 24, Arc.INK)
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS

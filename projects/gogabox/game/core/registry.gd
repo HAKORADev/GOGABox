@@ -1206,6 +1206,9 @@ const GAMES := [
                 # board seats proper in portrait.
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042-1 THE LAN SEAT (the queued shred): 2-4 armies,
+                # TURN_RELAY, the CPU never wakes in a LAN match
+                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 1, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 15,
                         "needs_games": 16},
@@ -1661,8 +1664,9 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/towerball.png",
                 "orientation": "auto", "dim": "3d",
                 "os": ["android", "pc"],
-                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
-                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
+                # v042-1 THE 3D SEAT CORRECTION (the owner: "the 3D game
+                # that supposed to get LAN was tower destroyer and not
+                # tower ball"): the LAN seat MOVED to towerdestroyer.
                 "coin_div": 5, "price": 400, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},
@@ -1741,6 +1745,10 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/towerdestroyer.png",
                 "orientation": "portrait", "dim": "3d",
                 "os": ["android", "pc"],
+                # v042-1 THE 3D SEAT CORRECTION: Tower Destroyer wears the
+                # LAN race (identical seeded towers, one shooter per seat,
+                # the last-cannon verdict) - the owner's own word.
+                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 100, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},

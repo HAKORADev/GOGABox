@@ -192,7 +192,11 @@ const SEAT_TINTS := [Color("ffb020"), Color("e8574a"), Color("9d7ae8"), Color("4
 func _build_seats() -> void:
         _clear_seats()
         for i in players:
-                var is_cpu := i > 0
+                # v042-1 THE 3D SEAT: in a LAN race the rivals are REMOTE
+                # humans, never CPU (THE REAL-ONLY LAW) - their cannons
+                # render here, their fire happens on their devices, their
+                # scores ride lan_prog.
+                var is_cpu := i > 0 and not lan_active
                 var cannon := _build_cannon(_cannon_skin() if i == 0 \
                                 else TD.CANNON_SKINS[0], is_cpu, SEAT_TINTS[i])
                 var a: float = TD.SEAT_ANGLES[i]
@@ -206,7 +210,9 @@ func _build_seats() -> void:
                         "fire_clock": 0.0, "burst_left": 0, "burst_clock": 0.0,
                         "react_clock": 0.0, "target_id": -1,
                 }
-                if is_cpu:
+                if lan_active and i > 0:
+                        seat["tag"] = _build_lan_tag(i)
+                elif is_cpu:
                         seat["tag"] = _build_cpu_tag(i)
                 seats.append(seat)
 
@@ -287,6 +293,34 @@ func _build_cpu_tag(i: int) -> Control:
                         18, SEAT_TINTS[i])
         _overlay_root_ref().add_child(chip)
         return chip
+
+## the LAN rival's tag: the human's own name rides the cannon
+func _build_lan_tag(i: int) -> Control:
+        var chip := Arc.chip("%s 0" % _lan_name_of(i), "", Color(0, 0, 0, 0.45),
+                        18, SEAT_TINTS[i])
+        _overlay_root_ref().add_child(chip)
+        return chip
+
+## THE PERSPECTIVE MAP (v042-1): locally the human is always index 0, so
+## local seat i rides the session seat (my_seat_no + i) on the n-circle -
+## the same rotation the snl table wears.
+func _lan_name_of(i: int) -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        var n: int = lan_seats.size()
+        var seat_no := posmod(LAN.my_seat_no() + i, n) + 1
+        for s in lan_seats:
+                if int(s.get("seat", -1)) == seat_no:
+                        return String(s.get("name", "RIVAL")).to_upper()
+        return "RIVAL"
+
+func _lan_local_idx(seat_no: int) -> int:
+        var n: int = maxi(1, lan_seats.size())
+        return posmod(seat_no - LAN.my_seat_no(), n)
+
+func _lan_session_seat(idx: int) -> int:
+        var n: int = maxi(1, lan_seats.size())
+        return posmod(LAN.my_seat_no() + idx, n) + 1
 
 func _seat_world_pos(s: Dictionary, h := 0.0) -> Vector3:
         return Vector3(sin(s["angle"]) * TD.SEAT_R, h, cos(s["angle"]) * TD.SEAT_R)
@@ -646,6 +680,10 @@ func _platform_lands(p: Dictionary) -> void:
                         continue
                 if TD.seat_killed(p["slots"], float(p["rot"]), float(s["angle"])):
                         _kill_seat(s)
+                        if lan_active and s != seats[0]:
+                                var idx := seats.find(s)
+                                _lan_alive[_lan_session_seat(idx)] = false
+                                game_toast("%s IS OUT" % _lan_name_of(idx))
         if p["coin"] != null and is_instance_valid(p["coin"]):
                 (p["coin"] as Node3D).queue_free()
                 p["coin"] = null
@@ -679,7 +717,74 @@ func _run_over() -> void:
                 return
         phase = "over"
         achievement_max("run_destroyed", run_destroyed)
+        if lan_active:
+                LAN.send_prog({"k": "dead", "s": score})
+                _lan_alive[LAN.my_seat_no()] = false
+                _lan_check_last()
         finish_run(score, run_coins)
+
+# ================================================== THE LAN RACE (v042-1)
+## THE 3D SEAT CORRECTION: Tower Destroyer is the box's LAN 3D game (the
+## owner's word). THE RACE LAW (the tower ball pattern): identical seeded
+## towers on every device (the match seed drives the platform RNG), every
+## device simulates ONLY its own cannon, the landing judgments are
+## identical by construction (black segments are indestructible, so every
+## device rules the same deaths), scores ride lan_prog, and the verdict is
+## THE LAST CANNON standing.
+
+var _lan_alive := {}     # seat -> alive
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        lan_seed = seed_v
+        rng.seed = seed_v        # THE IDENTICAL TOWERS LAW
+        players = m_seats.size()
+        for s in m_seats:
+                _lan_alive[int(s.get("seat", 1))] = true
+        _clear_phase_ui()
+        _start_run()
+        game_toast("SAME TOWERS - LAST CANNON WINS")
+
+func lan_solo() -> void:
+        lan_active = false
+        _show_players_select()
+
+func lan_prog(from_dev: String, data: Dictionary) -> void:
+        if not lan_active:
+                return
+        var seat := -1
+        for st in lan_seats:
+                if String(st.get("dev", "")) == from_dev:
+                        seat = int(st.get("seat", -1))
+                        break
+        if seat < 0:
+                return
+        match String(data.get("k", "")):
+                "score":
+                        var idx := _lan_local_idx(seat)
+                        if idx >= 0 and idx < seats.size():
+                                seats[idx]["score"] = int(data.get("s", 0))
+                "dead":
+                        _lan_alive[seat] = false
+                        game_toast("%s IS OUT" % _lan_name_of(_lan_local_idx(seat)))
+                        _lan_check_last()
+
+func lan_end(results: Array) -> void:
+        pass
+
+## THE LAST CANNON: every rival out while I stand = the win (+1, the
+## towerball race verdict shape). The run keeps banking until my death.
+func _lan_check_last() -> void:
+        if phase == "over" or not lan_active:
+                return
+        for seat in _lan_alive:
+                if bool(_lan_alive[seat]):
+                        return
+        if seats.is_empty() or not bool(seats[0]["alive"]):
+                return
+        add_score(1)
+        game_toast("THE LAST CANNON  +1")
+        check_achievements()
 
 # ------------------------------------------------------------------- fire
 
@@ -811,6 +916,8 @@ func _ball_hits(b: Dictionary, p: Dictionary) -> void:
                 achievement_count("destroyed", 1)
                 if shooter == seats[0]:
                         add_score(1)
+                        if lan_active:
+                                LAN.send_prog({"k": "score", "s": score})
                 Jukebox.sfx("td_break", -5.0)
                 _shatter_platform(p, true)
                 plats.erase(p)
@@ -861,6 +968,8 @@ func _shatter_platform(p: Dictionary, scored: bool) -> void:
 ## reaction delay, fires in ITS burst rhythm, and respects black with ITS
 ## discipline (a mistake wastes balls into the armor - it never kills).
 func _cpu_tick(delta: float) -> void:
+        if lan_active:
+                return        # THE REAL-ONLY LAW: no CPU in a LAN race
         for i in range(1, seats.size()):
                 var s: Dictionary = seats[i]
                 if not bool(s["alive"]):
@@ -909,8 +1018,11 @@ func _tags_tick() -> void:
                 var wp := _seat_world_pos(s, 6.2)
                 var sp := cam.unproject_position(wp)
                 tag.position = sp - tag.size * 0.5
+                var tag_name: String = TD.SEAT_NAMES[i]
+                if lan_active:
+                        tag_name = _lan_name_of(i)
                 tag.get_child(0).get_child(tag.get_child(0).get_child_count() - 1).text = \
-                        "%s %d" % [TD.SEAT_NAMES[i], s["score"]]
+                        "%s %d" % [tag_name, s["score"]]
 
 # ---------------------------------------------------------------- the frags
 
