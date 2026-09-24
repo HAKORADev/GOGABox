@@ -48,3 +48,13 @@ cadence; the releases page should stay a deliberate shelf, not a log.
 3. `gh release create <tag>` with the APKs, or re-arm the existing tag
    (delete old assets, upload fresh under the same names).
 4. Release notes in the owner's voice: what changed, what to test.
+
+
+## THE LAN NOTE (v042)
+
+The v042 build carries the Android INTERNET permission — LAN peer-to-peer
+sockets need it even on a local wifi. The box still ships NO servers, NO
+telemetry and NO online services: the permission exists for the LAN
+sessions and the room-code joins only (see AGENTS.md §4 + law 57). The
+store-disclosure line: "GOGABox plays multiplayer on your local network;
+it never talks to a server."

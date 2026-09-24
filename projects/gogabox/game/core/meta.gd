@@ -89,6 +89,60 @@ static func ctrl_label(id: String) -> String:
                 return String(CTRL_TAGS[id]["label"])
         return id.to_upper()
 
+# v042 THE LAN TAGS (the multi-level vocabulary, the owner: "make sure LAN
+# tagging/support is like, many different levels, one is phone only, one is
+# PC only, one is both, one is 2P or 3P or 4P and one is a game that
+# supports both platforms but LAN is for one platform only too"). A registry
+# entry carries "lan": {"players": 2..4, "platforms": [...], "cross": bool};
+# the derived chips below ride the search sheet, the pre-play tags and the
+# PLAYERS badge (its own area - never a genre badge).
+const LAN_TAGS := {
+        "lan": {"label": "LAN"},
+        "lan_phone": {"label": "LAN PHONE"},
+        "lan_pc": {"label": "LAN PC"},
+        "lan_cross": {"label": "LAN CROSS"},
+        "lan_2p": {"label": "LAN 2P"},
+        "lan_3p": {"label": "LAN 3P"},
+        "lan_4p": {"label": "LAN 4P"},
+}
+
+## The derived LAN chips for one registry entry (empty = out of radar).
+static func lan_list(g: Dictionary) -> Array:
+        var lan: Dictionary = g.get("lan", {})
+        if lan.is_empty():
+                return []
+        var out: Array = ["lan"]
+        var plats: Array = lan.get("platforms", [])
+        var cross := bool(lan.get("cross", false))
+        if cross and plats.has("android") and plats.has("pc"):
+                out.append("lan_cross")
+        else:
+                if plats.has("android"):
+                        out.append("lan_phone")
+                if plats.has("pc"):
+                        out.append("lan_pc")
+        var players := int(lan.get("players", 0))
+        if players >= 2:
+                out.append("lan_%dp" % mini(players, 4))
+        return out
+
+static func lan_label(id: String) -> String:
+        if LAN_TAGS.has(id):
+                return String(LAN_TAGS[id]["label"])
+        return id.to_upper()
+
+## The PLAYERS badge text (its own badge area on cards + the pre-play
+## header): "PLAYERS 2-4" for a LAN game, "PLAYERS 1" never shows - a
+## single-seat game is OUT OF RADAR (the LAN spec's own law).
+static func players_badge(g: Dictionary) -> String:
+        var lan: Dictionary = g.get("lan", {})
+        if lan.is_empty():
+                return ""
+        var players := int(lan.get("players", 0))
+        if players < 2:
+                return ""
+        return "PLAYERS 2-%d" % mini(players, 4)
+
 static func genre_label(id: String) -> String:
         if GENRES.has(id):
                 return String(GENRES[id]["label"])

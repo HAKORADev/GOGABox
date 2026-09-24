@@ -529,7 +529,11 @@ func _goga_setup() -> void:
         add_hud_button("SHOP", func(): _shop_open())
         add_hud_button("OPTIONS", func(): _options_open())
         Jukebox.music("res://assets/audio/music/sq_theme.ogg")
-        _build_ready()
+        # v042 THE LAN SEAT: the waiting room replaces the gate
+        if lan_hold:
+                lan_hold_begin()
+        else:
+                _build_ready()
 
 func _new_board() -> void:
         edges = []
@@ -942,6 +946,34 @@ func _gate_down() -> void:
 
 # ============================================================ the rounds
 
+# ============================================================ v042 THE LAN SEAT
+## 2P TURN_RELAY: every device wears the local player as 1 and the rival
+## as 2; the edge placements ride the wire through the ONE _place door;
+## the CPU never wakes (REAL-ONLY).
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        next_opener = 1
+        done_rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _build_ready()
+
+func _lan_name(p: int) -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        var idx: int = clampi(p - 1, 0, lan_seats.size() - 1)
+        return String(lan_seats[idx].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "place":
+                        if state == "play" or state == "wait":
+                                _place(int(a.get("e", -1)), 2)
+
 func _new_round() -> void:
         _new_board()
         _dust = []
@@ -968,8 +1000,9 @@ func _new_round() -> void:
                 state = "play"      # the player opens: the board is live
         else:
                 state = "wait"      # the CPU opens: it thinks, then draws
-                cpu_think = true
-                think_beat = _rng.randf_range(0.4, 0.8)
+                if not lan_active:
+                        cpu_think = true
+                        think_beat = _rng.randf_range(0.4, 0.8)
         _banner()
         box_l.queue_redraw()
         line_l.queue_redraw()
@@ -1109,6 +1142,8 @@ func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 # ============================================================ the moves
 
 func _place(e: int, who: int) -> void:
+        if who == 1 and lan_active:
+                LAN.send_act({"k": "place", "e": e})
         edges[e] = who
         line_anim[e] = _time
         Jukebox.sfx("sq_line", -6.0, 1.0 + _rng.randf() * 0.05)
@@ -1138,6 +1173,9 @@ func _place(e: int, who: int) -> void:
                 _banner()
                 return
         if who == 2 and took > 0:
+                if lan_active:
+                        return     # the rival keeps the brush - their next
+                                   # place arrives over the wire (no CPU)
                 # the CPU keeps the brush too
                 cpu_think = true
                 think_beat = _rng.randf_range(0.35, 0.7)
@@ -1221,7 +1259,7 @@ func _resolve(w: int) -> void:
                 streak = 0
                 if score > 0:
                         add_score(-1)    # never under zero (the xo law)
-                verdict_lbl.text = "THE CPU TAKES THE BOARD  -1"
+                verdict_lbl.text = ("%s TAKES THE BOARD  -1" % _lan_name(2).to_upper()) if lan_active else "THE CPU TAKES THE BOARD  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 Jukebox.sfx("sq_lose", -3.0)
@@ -1242,7 +1280,7 @@ func _goga_tick(delta: float) -> void:
         _time += delta
         if state == "wait":
                 clock += delta
-                if cpu_think:
+                if cpu_think and not lan_active:
                         _banner()
                         if clock >= think_beat:
                                 cpu_think = false

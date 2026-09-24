@@ -573,6 +573,7 @@ var n := 4                     # THE BOARD SIZE (the equipped SIZES key)
 var size_id := "4"             # the equipped size key (SIZES)
 var turn := 1
 var state := "ready"           # ready | play | anim | wait | round_over
+var _coin_rot := 0             # v042: the LAN coin rotation (no shared RNG)
 var clock := 0.0
 var think_beat := 0.0
 var cpu_think := false
@@ -714,7 +715,11 @@ func _goga_setup() -> void:
         add_hud_button("OPTIONS", func(): _options_open())
         Jukebox.music("res://assets/audio/music/jc_theme.ogg")
         # THE LORE LAW (v0.3.9-13): the die speaks first - once ever
-        if Box.counter(game_id, "lore_start") == 0:
+        # (v042: a LAN boot wears the waiting room instead - the lore
+        # waits for a solo boot)
+        if lan_hold:
+                lan_hold_begin()
+        elif Box.counter(game_id, "lore_start") == 0:
                 Box.bump_counter(game_id, "lore_start", 1)
                 box_story_show("THE DIE", DIE_LORE, func(): _build_ready(),
                                 "ROLL", Color("e0533f"))
@@ -1234,6 +1239,34 @@ func _gate_down() -> void:
 
 # ============================================================ the rounds
 
+# ============================================================ v042 THE LAN SEAT
+## 2P TURN_RELAY (the squares bones): local 1, rival 2, the conquest taps
+## ride the ONE _place door (the anim + spill play out identically from
+## the same seeded board), the CPU never wakes.
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        next_opener = 1
+        done_rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _build_ready()
+
+func _lan_name(p: int) -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        var idx: int = clampi(p - 1, 0, lan_seats.size() - 1)
+        return String(lan_seats[idx].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "place":
+                        if state == "play" or state == "wait":
+                                _place(int(a.get("i", -1)), 2)
+
 func _new_round() -> void:
         _new_board()
         _refresh_widget()       # the tally reads the NEW board (0 | 0)
@@ -1267,15 +1300,20 @@ func _new_round() -> void:
         coin_cell = -1
         coin_t = 0.0
         if done_rounds > 0 and done_rounds % COIN_EVERY == 0:
-                coin_cell = _rng.randi() % (n * n)
+                if lan_active:
+                        coin_cell = _coin_rot % (n * n)
+                        _coin_rot += 1
+                else:
+                        coin_cell = _rng.randi() % (n * n)
         # THE STATE LAW (v0.3.9-1): _new_round is the round's ONLY door -
         # it seats the state machine whole
         if turn == 1:
                 state = "play"      # the player opens: the board is live
         else:
                 state = "wait"      # the CPU opens: it thinks, then taps
-                cpu_think = true
-                think_beat = _rng.randf_range(0.4, 0.8)
+                if not lan_active:
+                        cpu_think = true
+                        think_beat = _rng.randf_range(0.4, 0.8)
         _banner()
         dice_l.queue_redraw()
         fx_l.queue_redraw()
@@ -1399,6 +1437,8 @@ func _release(_at: Vector2) -> void:
 ## runs one breath per pop - the tick owns it (the STATE LAW: the move
 ## pipeline seats state = anim the moment a spill is armed)
 func _place(i: int, who: int) -> void:
+        if who == 1 and lan_active:
+                LAN.send_act({"k": "place", "i": i})
         var old := int(owners[i])
         owners[i] = who
         values[i] = int(values[i]) + 1
@@ -1507,8 +1547,9 @@ func _end_move() -> void:
         else:
                 turn = 2
                 state = "wait"
-                cpu_think = true
-                think_beat = _rng.randf_range(0.5, 0.95)
+                if not lan_active:
+                        cpu_think = true
+                        think_beat = _rng.randf_range(0.5, 0.95)
                 clock = 0.0
                 _banner()
 
@@ -1551,7 +1592,7 @@ func _resolve(w: int) -> void:
                 streak = 0
                 if score > 0:
                         add_score(-1)    # never under zero (the xo law)
-                verdict_lbl.text = "THE CPU CONQUERS THE BOARD  -1"
+                verdict_lbl.text = ("%s CONQUERS THE BOARD  -1" % _lan_name(2).to_upper()) if lan_active else "THE CPU CONQUERS THE BOARD  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 _tsfx("lose", -3.0)
@@ -1596,7 +1637,7 @@ func _goga_tick(delta: float) -> void:
                                 egg_idle = 0.0
         if state == "wait":
                 clock += delta
-                if cpu_think:
+                if cpu_think and not lan_active:
                         _banner()
                         if clock >= think_beat:
                                 cpu_think = false

@@ -248,6 +248,11 @@ func _goga_setup() -> void:
                         _show_mode_select()      # reload path: the ask is behind us
                 else:
                         _show_orient_select()
+        if lan_hold:
+                # v042 THE LAN SEAT: the waiting room replaces the lore and
+                # the asks - the match seats a shared portrait world
+                lan_hold_begin()
+                return
         if Box.counter(game_id, "lore_start") == 0:
                 Box.bump_counter(game_id, "lore_start", 1)
                 box_story_show("THE SNAKE", SNAKE_LORE, flow, "PLAY",
@@ -873,6 +878,182 @@ func _start() -> void:
 # Screen-space: left stays left when the head is upside down; identical in
 # vertical and horizontal. The bend budget still caps everything.
 
+# ============================================================ v042 THE LAN SEAT
+## 2-4 SNAKES, ONE WORLD (SELF_AUTH): a shared portrait board (1080x1920,
+## fit-zoomed on every screen), seeded fruits, no obstacles/powers/bugs -
+## the pure race. Every device owns its snake: it steers + advances it and
+## broadcasts its heading; deaths are self-judged and broadcast; the fruits
+## are deterministic per index. The rivals ride the enemies array with
+## ai=null, so every collision law of the war keeps working untouched.
+
+var _lan_rivals := []            # enemy indexes by seat (seat -> e index)
+var _lan_dir_clock := 0.0
+var _lan_fruit_i := -1
+var _lan_zoom := 1.0
+var _lan_done := false
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        lan_seed = seed_v
+        _lan_done = false
+        _lan_fruit_i = -1
+        _lan_rivals = []
+        survival = false
+        wrap_mode = false
+        peace = false
+        # THE SHARED WORLD: one portrait board for every device
+        board = Rect2(Vector2.ZERO, Vector2(1080, 1920))
+        var vp := get_viewport_rect().size
+        _lan_zoom = minf(vp.x / board.size.x, vp.y / board.size.y)
+        _cam = Vector2((board.size.x * _lan_zoom - vp.x) / (2.0 * _lan_zoom),
+                        (board.size.y * _lan_zoom - vp.y) / (2.0 * _lan_zoom))
+        enemies = []
+        var my_seat := LAN.my_seat_no()
+        player.setup(Vector2(board.get_center().x + 260.0,
+                        board.get_center().y), -PI / 2.0,
+                        _pal["pri"], _pal["milk"])
+        player.base_speed = START_SPEED
+        player.speed = START_SPEED
+        for i in m_seats.size():
+                var seat_no := int(m_seats[i].get("seat", i + 1))
+                if seat_no == my_seat:
+                        continue
+                var ang := float(seat_no - 1) * (TAU / 4.0)
+                var pos := board.get_center() \
+                                + Vector2.RIGHT.rotated(ang) * 260.0
+                var b := SnakeBody.new()
+                b.base_speed = START_SPEED
+                b.speed = START_SPEED
+                var tint: Color = _pal["pri"].lerp(
+                                LanProfile.PFP_TINTS[seat_no % 8], 0.7)
+                b.setup(pos, ang + PI, tint, _pal["milk"])
+                enemies.append({"body": b, "ai": null, "score": 0,
+                        "name": String(m_seats[i].get("name", "RIVAL")),
+                        "bite_cd": 0.0})
+                _lan_rivals[seat_no] = enemies.size() - 1
+        _phase = "run"
+        _lan_next_fruit()
+        Jukebox.sfx("snake_eat", -8.0, 0.8)
+
+func lan_solo() -> void:
+        lan_active = false
+        _show_orient_select()
+
+func _lan_next_fruit() -> void:
+        _lan_fruit_i += 1
+        var fr := RandomNumberGenerator.new()
+        fr.seed = lan_seed + _lan_fruit_i * 7919
+        var m := apple_r + 30.0
+        apple_pos = Vector2(fr.randf_range(board.position.x + m,
+                        board.end.x - m),
+                        fr.randf_range(board.position.y + m,
+                        board.end.y - m))
+        apple_live = true
+        apple_pop = 0.0
+
+func lan_match_seats_name(seat_no: int) -> String:
+        for s in lan_seats:
+                if int(s.get("seat", -1)) == seat_no:
+                        return String(s.get("name", "RIVAL"))
+        return "RIVAL"
+
+func lan_act(who: int, a: Dictionary) -> void:
+        if not lan_active:
+                return
+        match String(a.get("k", "")):
+                "dir":
+                        if _lan_rivals.has(who):
+                                var e: Dictionary = enemies[_lan_rivals[who]]
+                                (e["body"] as SnakeBody).head_dir = float(a.get("a", 0.0))
+                "eat":
+                        if _lan_rivals.has(who) and int(a.get("i", -1)) == _lan_fruit_i:
+                                var e2: Dictionary = enemies[_lan_rivals[who]]
+                                var b2: SnakeBody = e2["body"]
+                                b2.len_target += SnakeBody.LEN_PER_APPLE
+                                e2["score"] = int(e2["score"]) + 1
+                                _lan_next_fruit()
+                "die":
+                        if _lan_rivals.has(who):
+                                var e3: Dictionary = enemies[_lan_rivals[who]]
+                                if (e3["body"] as SnakeBody).alive:
+                                        _lan_rival_dies(e3)
+
+func _lan_rival_dies(e: Dictionary) -> void:
+        _kill_enemy(e)
+        _lan_check_last()
+
+func _lan_check_last() -> void:
+        if _lan_done or not player.alive:
+                return
+        for e in enemies:
+                if (e["body"] as SnakeBody).alive:
+                        return
+        # THE LAST SNAKE: the verdict, the placement point, the bank
+        _lan_done = true
+        add_score(1)
+        game_toast("THE LAST SNAKE  +1")
+        achievement_count("wins", 1)
+        check_achievements()
+        var tw := create_tween()
+        tw.tween_interval(1.4)
+        tw.tween_callback(func(): if player.alive: finish_run(score))
+
+func lan_end(results: Array) -> void:
+        pass
+
+func _lan_my_death() -> void:
+        if not player.alive or _lan_done:
+                return
+        LAN.send_act({"k": "die"})
+        _die()
+
+func _lan_fruit_tick() -> void:
+        if not apple_live:
+                return
+        apple_pop += 1.0 / 60.0
+        var hr := player.head_r()
+        if apple_pop > 0.5 and player.head_pos.distance_to(apple_pos) \
+                        < hr + apple_r * 0.9:
+                apple_live = false
+                player.len_target += SnakeBody.LEN_PER_APPLE
+                _eaten += 1
+                _award_pts(float(fruit_size), true)
+                achievement_count("apples", 1)
+                Jukebox.sfx("snake_eat", -4.0, 1.0 + 0.016 * mini(24, _eaten))
+                _burst(apple_pos, [SnakeFruits.FRUITS[edible_id]["body"],
+                                SnakeFruits.FRUITS[edible_id]["acc"],
+                                Color("fff3dc")], 11)
+                LAN.send_act({"k": "eat", "i": _lan_fruit_i})
+                _lan_next_fruit()
+
+func _lan_tick(delta: float) -> void:
+        if player.alive:
+                _steer(delta)
+                var kb := Input.get_axis("ui_left", "ui_right")
+                if kb != 0.0:
+                        player.head_dir += signf(kb) * TURN_RATE * delta
+                var adv := player.advance(delta, board, false)
+                player.tick_effects(delta)
+                _sync_speeds()
+                if adv["hit_wall"]:
+                        _lan_my_death()
+                else:
+                        _check_player_collisions()
+                        if player.alive:
+                                _lan_fruit_tick()
+        # the rivals advance on their received headings; their deaths are
+        # self-judged on their own devices (SELF_AUTH)
+        for e in enemies:
+                var b: SnakeBody = e["body"]
+                if b.alive:
+                        b.tick_effects(delta)
+                        b.advance(delta, board, false)
+        _lan_dir_clock += delta
+        if _lan_dir_clock >= 0.05 and player.alive:
+                _lan_dir_clock = 0.0
+                LAN.send_act({"k": "dir", "a": player.head_dir})
+        _view.queue_redraw()
+
 func _goga_input(event: InputEvent) -> void:
         if event is InputEventScreenTouch:
                 var t := event as InputEventScreenTouch
@@ -921,6 +1102,13 @@ func _goga_tick(delta: float) -> void:
         _time += delta
         _tick_fx(delta)
         _tick_tongue(delta)
+        if _phase == "run" and lan_active:
+                if _collapse_t > 0.0:
+                        pass    # the collapse keeps its own path below
+                _lan_tick(delta)
+                if _collapse_t > 0.0:
+                        _tick_collapse(delta)
+                return
         if _phase == "run" and player.alive:
                 _steer(delta)
                 # v0.4.1 THE FIXED STEERING LAW (the owner: arrows "have no
@@ -1528,11 +1716,17 @@ func _tick_enemies(delta: float) -> void:
                 if not b.alive:
                         continue
                 b.tick_effects(delta)
-                (e["ai"] as SnakeAI).think(delta, self)
-                var adv := b.advance(delta, board, wrap_mode)
-                if adv["hit_wall"] or b.self_bite(b.head_pos, b.head_r(), board) \
-                                or _in_obstacle(b.head_pos, -b.head_r() * 0.3):
-                        _kill_enemy(e)
+                if e["ai"] != null:
+                        (e["ai"] as SnakeAI).think(delta, self)
+                        var adv := b.advance(delta, board, wrap_mode)
+                        if adv["hit_wall"] or b.self_bite(b.head_pos, b.head_r(), board) \
+                                        or _in_obstacle(b.head_pos, -b.head_r() * 0.3):
+                                _kill_enemy(e)
+                                continue
+                elif lan_active:
+                        # v042: a LAN seat advances on its received heading;
+                        # its death is self-judged on its own device
+                        b.advance(delta, board, false)
                         continue
                 # enemy head vs the PLAYER's body = the enemy dies...
                 # ...UNLESS it wears the eater and found the tail zone: bite.
@@ -1933,7 +2127,7 @@ func _paint(v: Node2D) -> void:
                 _paint_sun(v, Vector2(vp.x - 88.0, 92.0))
         # v0.4.1 THE LAND LAW: the world draws through the camera transform -
         # screen-space dressing stays put, the WORLD rides under the snake
-        v.draw_set_transform(-_cam, 0.0, Vector2.ONE)
+        v.draw_set_transform(-_cam * _lan_zoom, 0.0, Vector2.ONE * _lan_zoom)
         # the field itself
         v.draw_rect(board, pl["field"])
         # drifting deco blobs (super subtle, alive) - also OUTSIDE the field
@@ -1976,7 +2170,7 @@ func _paint(v: Node2D) -> void:
                                 Vector2(cs * cpop, cs / cpop * coin_pop))
                 v.draw_texture(_coin_tex, -_coin_tex.get_size() / 2.0)
                 # back to the WORLD seat (the camera transform rides on)
-                v.draw_set_transform(-_cam, 0.0, Vector2.ONE)
+                v.draw_set_transform(-_cam * _lan_zoom, 0.0, Vector2.ONE * _lan_zoom)
         # the edible (pop + breathing - never an alpha fade)
         if apple_live and apple_pop > 0.0:
                 SnakeFruits.paint_fruit(v, edible_id, apple_pos,

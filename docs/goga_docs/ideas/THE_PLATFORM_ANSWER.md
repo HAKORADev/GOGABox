@@ -196,6 +196,55 @@ flow will enforce — the simulation is the contract.
   twin (the .so / GDExtension / GDScript-side equivalent) is not discussed
   yet — and the box is a two-platform ship since the Windows return.
 
+## THE GOGAPROFILE SEED (added by the owner, the v042 order — document + seed infra)
+
+The v042 LAN order carried a platform idea with it ("based on the
+appstore-idea doc file, an idea hovered in my mind"): a LOCAL PLAYER
+PROFILE, shaped like a GitHub profile, wearing exactly:
+
+- **PFP** — the simple drawn one-guy figure (the LAN spec's PFP LAW), in
+  pickable drawn variants;
+- **description** — a short bio;
+- **supporting links** — a few http(s) strings (the future dev's shops,
+  repos, pages);
+- **age** — the number only (the age-system return stays a separate
+  question);
+- **role** — `gamer` / `developer` / **`owner` (unique — one device)**;
+- **gender** — male / female / **"other"**.
+
+The laws around it, in the owner's own moves:
+
+- **NO USERNAME. NO DATABASE.** There is only a NAME (the LAN name law:
+  EN letters, no emoji, 20 chars max) — "there is no database, so why there
+  will be a profile?" — for the DEEP INFRA: "a developer in github could
+  later make a folder for the profile like GOGAProfile/ ... and for
+  hobbyists when push locally from the app". The profile is the platform
+  account that exists BEFORE the platform, exactly the sequel shape this
+  file predicts: when the token-push question (THE OPEN QUESTIONS) gets its
+  answer, the answer's user side already exists.
+- **THE LOCAL-TRUTH LAW (the multi-billion-dollar move)**: profiles stay
+  local but resist manipulation through the device's special ID (the
+  device anchor) — "to not make manipulating data too easy or
+  semi-impossible anyway" — implemented on BOTH platforms. With no server,
+  this is honest local enforcement: the anchor rides the profile, sessions
+  broadcast a short anchor hash, and a cloned profile shows up as a GHOST
+  (two seats, one anchor).
+- **THE SURVIVAL LAW**: profiles do NOT die with the app — "make sure
+  profiles do not get lost after app deletion or wiping data, make it like
+  those cursed multi-billion-dollar companies tricks for real" — the
+  Android `Android/media/<package>/` public mirror + the Windows
+  `%USERPROFILE%` mirror (the notify-toast registry trick is the house
+  precedent). The newest copy wins; a wiped app re-adopts its own mirror.
+- **THE VISIBILITY LAW**: members of one LAN session see each other — the
+  multiplayer menu lists the session and every member's profile is
+  visitable ("so they can visit each other").
+- **THE TWO-OPTION LAW**: the multiplayer button's menu wears exactly two
+  options: PROFILE and MULTIPLAYER.
+
+v042 plants this seed (the profile store, the anchor, the mirrors, the
+sheets); the platform future harvests it (GOGAProfile/ folders, dev
+identities, the push flow).
+
 ## THE WORKING AGREEMENT (the owner's own sequencing)
 
 "we are just going to talk about the plans step by step together until we

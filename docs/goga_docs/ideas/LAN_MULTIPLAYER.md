@@ -139,6 +139,69 @@ law, the real-only law all stand as written above.
   below), so the feed, the store page, the search and the LAN system all
   read the same numbers.
 
+## THE V042 BUILD (the round that built this — 2026-09-24)
+
+The owner green-lit the whole system as **v042** ("work on the LAN thing
+completely as v042 ... implement all of it accurately"), with the working
+plan in brainstorms/v042/MASTER.md. What the build carries, on top of
+everything above:
+
+- **THE CORE** (`game/core/lan.gd`, autoload `LAN`): plain TCP
+  (`TCPServer`/`StreamPeerTCP`, JSON lines), port 31440, host-authoritative
+  session, heartbeat prune, per-game holds, THE TEN SECONDS countdown on
+  the host's one clock, `start{game, seed, seats}` match births with a
+  shared seed so every device's board game stays deterministic, and the
+  match relays (TURN_RELAY for the board games, HOST_AUTH for the ball,
+  SELF_AUTH for snake, RACE for towerball). The session dies with the app.
+- **THE CROSS-PLATFORM LAW, BUILT**: phones and the PC build hold the same
+  sessions (same TCP road, same UI seats).
+- **THE LAN TAGS, BUILT** (the multi-level vocabulary): registry
+  `"lan": {"players": 2..4, "platforms": [...], "cross": bool}` → derived
+  chips `lan / lan_phone / lan_pc / lan_cross / lan_2p / lan_3p / lan_4p`
+  (a both-platforms game with `cross:false` wears lan_phone AND lan_pc —
+  the owner's "supports both platforms but LAN is for one platform only").
+  They ride the search sheet's LAN row, the pre-play tag rows, and the
+  PLAYERS badge (its own area on cards + the pre-play header — never a
+  genre badge).
+- **THE LIVE LINE, BUILT**: the pre-play page wears, under the LAN tags, a
+  live row when a session exists — how many of the session's players hold
+  THIS game out of the session size, and how many are waiting in the hold —
+  refreshed every second while the page is open.
+- **THE GOGAPROFILE** (`game/core/lan_profile.gd` + the PROFILE option in
+  the button's menu): the GitHub-shaped local profile — name (EN letters,
+  no emoji, max 20), drawn one-guy PFP variants, description, supporting
+  links, age, role (gamer / developer / owner-unique), gender with
+  "other". The device anchor resists casual manipulation; the
+  Android-media + Windows-home mirrors make the profile survive app
+  deletion and data wipes. Full laws: THE_PLATFORM_ANSWER.md, THE
+  GOGAPROFILE SEED.
+- **THE BUTTON, BUILT**: the main menu's plus+human drawn icon opens the
+  TWO-OPTION menu: PROFILE / MULTIPLAYER. The multiplayer menu carries the
+  name row, HOST (address + room code + the live session row with delete),
+  JOIN with TWO boxes — LOCAL (IP:port) and ONLINE (room code) — the
+  members list with visit-profile, and LEAVE.
+- **THE VLAN LEG (r1)**: the host tries UPnP on the port; a room code is
+  the reversible encoding of ip:port (works over the internet with UPnP,
+  works unchanged over any VLAN NIC — Tailscale/ZeroTier IPs are just IPs
+  to the LOCAL box). The EMBEDDED virtual net (bundled libzerotier/EOS-style
+  zero-setup NAT traversal, UDP hole punching) is the documented PATCH
+  PATH — it needs a native SDK decision and its own round; the UI's
+  ONLINE box is its seat.
+- **COMBO CO-OP (the infra)**: seats carry `local_slot` (0/1) so one device
+  can seat two local players beside remote ones; the host sheet offers the
+  second local seat on 4-seat games; games consume it in patches.
+- **THE LAN PERMISSION NOTE**: Android forbids ALL sockets without
+  `INTERNET` — even LAN ones. The presets now carry it; the box gains NO
+  servers, NO telemetry, NO online services — the OFFLINE-BEHAVIOR law
+  stands (peer-to-peer only).
+- **THE GAMES, BUILT**: snl (2-4), jumpcube (dice conquer), domino, chess,
+  squares, fourline, bovo (five in row) — TURN_RELAY through each game's
+  own move door; snake (2-4, SELF_AUTH shared world), rally (ping pong, 2P,
+  HOST_AUTH ball), towerball (the 3D game, 2-4 RACE on identical seeded
+  towers). CPU seats do not exist in LAN matches (THE REAL-ONLY LAW); a
+  lone holder falls through to the ordinary solo game. Tower Destroyer
+  stays FROZEN.
+
 ## THE OPEN TECH NOTES (for the plan that builds this)
 
 - Transport: plain TCP over the LAN (Godot's StreamPeerTCP/WebSocket

@@ -348,6 +348,7 @@ var state := "ready"          # ready | play | wait | round_over
 var clock := 0.0
 var think_beat := 0.0
 var cpu_think := false
+var _coin_rot := 0          # v042: the LAN coin rotation (no shared RNG)
 var rounds := 0
 var done_rounds := 0
 var wins := 0
@@ -435,7 +436,11 @@ func _goga_setup() -> void:
         _load_meta()
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/fl_theme.ogg")
-        _build_ready()
+        # v042 THE LAN SEAT: the waiting room replaces the gate
+        if lan_hold:
+                lan_hold_begin()
+        else:
+                _build_ready()
 
 func _skin() -> Dictionary:
         var sid := Box.skin_on(game_id)
@@ -788,6 +793,36 @@ func _gate_down() -> void:
 
 # ============================================================ the rounds
 
+# ============================================================ v042 THE LAN SEAT
+## 2P TURN_RELAY (same bones as squares): the local player wears 1, the
+## rival 2, the column drops ride the ONE _drop_disc door, the CPU never
+## wakes. THE CROSS LAW: this board's LAN is same-platform only (the
+## registry wears cross:false) - the system refuses mixed sessions here.
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        next_opener = 1
+        done_rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _build_ready()
+
+func _lan_name(p: int) -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        var idx: int = clampi(p - 1, 0, lan_seats.size() - 1)
+        return String(lan_seats[idx].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "drop":
+                        if state == "play" or state == "wait":
+                                _drop_disc(int(a.get("c", -1)), 2)
+                                Jukebox.sfx("fl_tap", -8.0, 0.9)
+
 func _new_round() -> void:
         for i in board.size():
                 board[i] = 0
@@ -813,7 +848,19 @@ func _new_round() -> void:
         coin_cell = Vector2i(-1, -1)
         coin_t = 0.0
         if done_rounds > 0 and done_rounds % COIN_EVERY == 0:
-                coin_cell = _random_empty_cell()
+                if lan_active:
+                        # v042: the _rng diverges with the drops - the LAN
+                        # coin rotates over the empties deterministically
+                        var empties_v: Array = []
+                        for c in COLS:
+                                for r in ROWS:
+                                        if int(board[idx(c, r)]) == 0:
+                                                empties_v.append(Vector2i(c, r))
+                        if not empties_v.is_empty():
+                                coin_cell = empties_v[_coin_rot % empties_v.size()]
+                                _coin_rot += 1
+                else:
+                        coin_cell = _random_empty_cell()
         # THE STATE LAW (v0.3.9-1): _new_round is the round's ONLY door -
         # the gate tap and the round-over advance both walk through it, so
         # it seats the state machine whole. The launch build left the
@@ -826,8 +873,9 @@ func _new_round() -> void:
                 state = "play"      # the player opens: the board is live
         else:
                 state = "wait"      # the CPU opens: it thinks, then drops
-                cpu_think = true
-                think_beat = _rng.randf_range(0.45, 0.9)
+                if not lan_active:
+                        cpu_think = true
+                        think_beat = _rng.randf_range(0.45, 0.9)
         _banner()
 
 func _settled_discs_clear() -> void:
@@ -925,6 +973,8 @@ func _player_drop(c: int) -> void:
         aim_col = -1
 
 func _drop_disc(c: int, who: int) -> void:
+        if who == 1 and lan_active:
+                LAN.send_act({"k": "drop", "c": c})
         var r := drop_row(board, c)
         if r < 0:
                 Jukebox.sfx("fl_denied", -6.0)
@@ -983,8 +1033,9 @@ func _on_landed(c: int, r: int, who: int) -> void:
         if who == 1:
                 # hand the turn to the CPU (it thinks, then drops)
                 turn = 2
-                cpu_think = true
-                think_beat = _rng.randf_range(0.45, 0.9)
+                if not lan_active:
+                        cpu_think = true
+                        think_beat = _rng.randf_range(0.45, 0.9)
                 clock = 0.0
                 state = "wait"
                 _banner()
@@ -1035,7 +1086,7 @@ func _resolve(w: int) -> void:
                 # loss = -1, the score NEVER goes negative (the xo law)
                 if score > 0:
                         add_score(-1)
-                verdict_lbl.text = "CPU WINS  -1"
+                verdict_lbl.text = ("%s WINS  -1" % _lan_name(2).to_upper()) if lan_active else "CPU WINS  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 Jukebox.sfx("fl_lose", -3.0)
@@ -1072,7 +1123,7 @@ func _goga_tick(delta: float) -> void:
         aim_a = move_toward(aim_a, 1.0 if live else 0.0, delta * 6.0)
         if state == "wait":
                 clock += delta
-                if cpu_think:
+                if cpu_think and not lan_active:
                         _banner()
                         if clock >= think_beat:
                                 cpu_think = false

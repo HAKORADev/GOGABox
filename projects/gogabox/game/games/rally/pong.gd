@@ -155,6 +155,11 @@ func _goga_setup() -> void:
         add_hud_button("SHOP", func(): _shop_open())
         Jukebox.music("res://assets/audio/music/pong_theme.ogg")
         # THE LORE LAW (v0.3.9-13): the platform speaks first - once ever
+        # (v042: a LAN boot wears the waiting room instead - every device
+        # plays its own natural position, the field is shared normalized)
+        if lan_hold:
+                lan_hold_begin()
+                return
         var flow := func():
                 if forced != "":
                         _show_options()   # the ask is behind us (reload path)
@@ -628,6 +633,172 @@ func _build_shreds() -> void:
                         "drift": rng.randf_range(4.0, 14.0),
                 })
 
+# ============================================================ v042 THE LAN SEAT
+## 2P HOST_AUTH: the HOST simulates the ball, the pads' collisions and the
+## goals; the wire carries normalized snaps at 20 Hz (the field is the
+## SAME logical court on every device - each device plays it in its own
+## natural orientation, my edge always the bottom, the view mirrors the
+## rival's half). The client owns its pad locally and streams its center
+## at 30 Hz; the coins, power-ups and the extra walls stay solo-only.
+
+var _lan_snap_clock := 0.0
+var _lan_send_clock := 0.0
+var _lan_goal_ev := ""
+var _lan_last_snap_t := 0.0
+var _lan_rend_bp := Vector2.ZERO
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        lan_seed = seed_v
+        _build_world()
+        # the walls stay solo-only
+        for p in pads.duplicate():
+                if String(p["id"]) != "user" and String(p["id"]) != "enemy":
+                        pads.erase(p)
+                        pads_by_id.erase(String(p["id"]))
+        _clear_overlay()
+        _phase = "run"
+        goals_user = 0
+        goals_enemy = 0
+        score = 0
+        set_score(0)
+        next_coin_at = SCORE_PER_COIN
+        rally = 0
+        _serve("user")
+        _update_goals_widget()
+        Jukebox.sfx("pong_serve", -6.0)
+
+func lan_solo() -> void:
+        lan_active = false
+        if start_orientation != "":
+                _show_options()
+        else:
+                _show_orient_select()
+
+## the field's logical space: u = the slide axis (0..1), v = 0 at the
+## rival's edge, 1 at MY edge. My view mirrors both axes.
+func _lan_to_logical(p: Vector2) -> Vector2:
+        var w := maxf(1.0, field.size.x)
+        var h := maxf(1.0, field.size.y)
+        return Vector2((p.x - field.position.x) / w,
+                        (p.y - field.position.y) / h)
+
+func _lan_from_logical(l: Vector2) -> Vector2:
+        return Vector2(field.position.x + (1.0 - l.x) * field.size.x,
+                        field.position.y + (1.0 - l.y) * field.size.y)
+
+func _lan_host_tick(delta: float) -> void:
+        # the rival's pad rides the wire (their touch, mirrored)
+        _lan_snap_clock += delta
+        if _lan_snap_clock >= 0.05:
+                _lan_snap_clock = 0.0
+                var up: Dictionary = pads_by_id["user"]
+                var lu := _lan_to_logical(up["c"] as Vector2)
+                var ev := _lan_goal_ev
+                _lan_goal_ev = ""
+                LAN.send_snap({"bu": _lan_bu(), "bv": _lan_bv(),
+                        "du": -ball_dir.x, "dv": -ball_dir.y,
+                        "spd": _ball_speed(), "st": serve_t,
+                        "su": goals_user, "se": goals_enemy,
+                        "uc": lu.x, "ev": ev})
+
+func _lan_bu() -> float:
+        return clampf(_lan_to_logical(ball_pos).x, 0.0, 1.0)
+
+func _lan_bv() -> float:
+        return clampf(_lan_to_logical(ball_pos).y, 0.0, 1.0)
+
+func _lan_client_tick(delta: float) -> void:
+        # the ball renders from the last snap (extrapolated on the dir)
+        if serve_t <= 0.0 and _lan_has_snap:
+                var age := _time - _lan_last_snap_t
+                ball_pos = _lan_rend_bp + Vector2(-_lan_last_dir.x,
+                                -_lan_last_dir.y) * _lan_last_spd * age
+        # my own pad lives here: the keyboard twin + the GLIDE law
+        var axis_i := 0
+        if pads_by_id.has("user"):
+                axis_i = int(pads_by_id["user"]["axis"])
+        var kb := Input.get_axis("ui_left", "ui_right") if axis_i == 0 \
+                        else Input.get_axis("ui_up", "ui_down")
+        if kb != 0.0:
+                _kb_move(signf(kb), delta)
+        _tick_pads()
+        var up: Dictionary = pads_by_id.get("user", {})
+        if not up.is_empty():
+                var fc: Vector2 = up["c"] as Vector2
+                var tg: Vector2 = up["follow"] as Vector2
+                var gap: float = fc.distance_to(tg)
+                if gap > 0.5:
+                        var step: float = clampf(gap * 14.0 * delta, 0.0,
+                                        minf(gap, 4200.0 * delta))
+                        up["c"] = fc.move_toward(tg, step)
+        _lan_send_clock += delta
+        if _lan_send_clock >= 0.033:
+                _lan_send_clock = 0.0
+                if not up.is_empty():
+                        LAN.send_in({"u": _lan_to_logical(up["c"] as Vector2).x})
+
+var _lan_has_snap := false
+var _lan_last_dir := Vector2.DOWN
+var _lan_last_spd := 0.0
+
+func lan_snap(data: Dictionary) -> void:
+        _lan_has_snap = true
+        _lan_last_snap_t = _time
+        _lan_last_dir = Vector2(float(data.get("du", 0.0)), float(data.get("dv", -1.0)))
+        _lan_last_spd = float(data.get("spd", 300.0))
+        serve_t = float(data.get("st", 0.0))
+        var bp := _lan_from_logical(Vector2(float(data.get("bu", 0.5)),
+                        float(data.get("bv", 0.5))))
+        _lan_rend_bp = bp
+        if serve_t > 0.0:
+                ball_pos = bp
+        goals_user = int(data.get("su", 0))
+        var my_goals := int(data.get("se", 0))
+        set_score(my_goals)
+        # the rival's pad (the host's own, mirrored)
+        var ep: Dictionary = pads_by_id.get("enemy", {})
+        if not ep.is_empty():
+                var lu := 1.0 - float(data.get("uc", 0.5))
+                ep["c"] = Vector2(field.position.x + lu * field.size.x,
+                                field.position.y + 54.0)
+                ep["follow"] = ep["c"]
+        var ev := String(data.get("ev", ""))
+        if ev == "goal:user":
+                # the host conceded - I scored
+                rally += 1
+                Jukebox.sfx("pong_goal", -2.0)
+                if score >= next_coin_at:
+                        next_coin_at += SCORE_PER_COIN
+                        add_run_coins(1)
+                        Jukebox.sfx("pong_coin", -4.0, 1.2)
+                        _toast_show("3 points = +1 GOGACoin")
+        elif ev == "goal:enemy":
+                Jukebox.sfx("pong_concede", -2.0)
+                _toast_show("goal on you -1")
+        _update_goals_widget()
+
+## the client's pad center arrives as a host-side "in" (who = -1)
+func lan_act(who: int, a: Dictionary) -> void:
+        if not lan_active or not is_host_route():
+                return
+        if who == -1 and a.has("u"):
+                var ep: Dictionary = pads_by_id.get("enemy", {})
+                if not ep.is_empty():
+                        var lu := 1.0 - float(a.get("u", 0.5))
+                        ep["c"] = Vector2(field.position.x + lu * field.size.x,
+                                        field.position.y + 54.0)
+                        ep["follow"] = ep["c"]
+
+func is_host_route() -> bool:
+        return LAN.is_host
+
+func lan_prog(from_dev: String, data: Dictionary) -> void:
+        pass
+
+func lan_end(results: Array) -> void:
+        pass
+
 func _begin_run() -> void:
         # v0.2.3 patch: a run ALWAYS starts on a world that matches the
         # CURRENT options - nothing survives from a previous boot (the belt
@@ -779,6 +950,11 @@ func _goga_tick(delta: float) -> void:
                 _view.queue_redraw()
         if _phase != "run":
                 return
+        # v042 THE LAN SEAT: the client renders the host's truth and
+        # streams its own pad; the host simulates and broadcasts
+        if lan_active and not LAN.is_host:
+                _lan_client_tick(delta)
+                return
         for p in pads:
                 if float(p["mega_t"]) > 0.0:
                         p["mega_t"] = maxf(0.0, float(p["mega_t"]) - delta)
@@ -816,11 +992,15 @@ func _goga_tick(delta: float) -> void:
                         var step: float = clampf(gap * 14.0 * delta, 0.0,
                                         minf(gap, 4200.0 * delta))
                         up["c"] = fc.move_toward(tg, step)
-        _tick_coins(delta)
-        _tick_pus(delta)
-        for p in pads:
-                if not bool(p["user"]):
-                        _tick_ai(p, delta)
+        if not lan_active:
+                _tick_coins(delta)
+                _tick_pus(delta)
+                for p in pads:
+                        if not bool(p["user"]):
+                                _tick_ai(p, delta)
+        else:
+                # v042: the rival's pad rides the wire; no coins, no pus
+                _lan_host_tick(delta)
 
 func _ball_speed() -> float:
         var s: float = BALL_BASE * heat
@@ -908,6 +1088,8 @@ func _hit_pitch() -> float:
 ## user; the user's edge = -1 (never below 0). The scorer's prize lands
 ## and the next ball is born at the CONCEDER's edge.
 func _goal(edge: String) -> void:
+        if lan_active:
+                _lan_goal_ev = "goal:" + edge
         _flash_t = 0.35
         _flash_pos = ball_pos
         if edge == String(pads_by_id["user"]["edge"]):

@@ -29,6 +29,14 @@ extends RefCounted
 ##   hours/blocked_hours time-of-day windows (live "unlocks at nn AM/PM")
 ##   daily_rounds / daily_minutes  per-day caps, 12AM 00:00 lazy reset
 ##   charges             per-game GOGABattery pool (per_round/capacity/regen)
+##   lan (v042)          {"players": 2..4, "platforms": [...], "cross": bool}
+##                       THE LAN SEAT - the multi-level multiplayer tag.
+##                       players = the session seat ceiling; platforms =
+##                       which devices may sit; cross = mixed phone+PC
+##                       sessions. Omit = OUT OF RADAR (single-player, the
+##                       LAN system pretends the game does not exist).
+##                       Meta.lan_list(g) derives the chips (lan / lan_phone
+##                       / lan_pc / lan_cross / lan_2p..4p).
 
 const GAMES := [
         {
@@ -39,6 +47,8 @@ const GAMES := [
                 # the game loads, from how the phone is held right then.
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
                 # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
                 # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
                 "gamepad": true,
@@ -84,6 +94,8 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/rally.png",
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 # v0.4.1 THE GAMEPAD SEAT: this game hears the pad
                 # (d-pad = arrows, A/B/X/Y = 1-4, START = back)
                 "gamepad": true,
@@ -715,6 +727,8 @@ const GAMES := [
                 # certified layout, horizontal is the new wide table
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0 (the xo shape), run bonus /2, a GOGACoin
@@ -756,6 +770,8 @@ const GAMES := [
                 # the board to nearly the full width, landscape stays as built
                 "orientation": "auto", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 # v0.3.8 THE GRADUATION: the SOON teaser is the real game
                 # (the ritual honored). THE OWNER'S ECONOMY: win +1 / lose
                 # -1 / draw 0, run bonus /1, a GOGACoin each 3 minutes on
@@ -796,6 +812,8 @@ const GAMES := [
                 # takes it. 8x7 mid-sized board. 5 disc skins + 5 themes.
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": false},
                 "coin_div": 3, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 9, "needs_games": 10},
                 "desc": "drop the discs, make four: the toy classic on an 8x7 board - tap a column and your disc falls with a real bounce. Four in any direction wins the round. One opponent with four invisible moods remembers your openings for two rounds and stops falling for the same trick; every win pays +1, every loss costs -1, and a GOGACoin waits in a hole after every 4 rounds - the disc that lands there takes it.",
@@ -832,6 +850,8 @@ const GAMES := [
                 # then applied (the 2048 mechanic). 5 stone skins + 5 themes.
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 10, "needs_games": 11},
                 "desc": "stones on a warm wooden board - place one per turn, five in a row (any direction) wins. The CPU wears four invisible moods, remembers your openings for two rounds and stops falling for the same trick. Grow the battlefield: the 10x10 and 12x12 boards are bought in the shop and applied in options, exactly like 2048. Every win pays +1, every loss costs -1, and a GOGACoin lands on the board after every 3 rounds - place a stone on it first.",
@@ -874,6 +894,8 @@ const GAMES := [
                 # the box's claimer takes it.
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 11,
                         "needs_games": 12},
@@ -1101,6 +1123,8 @@ const GAMES := [
                 # in the shop, applied from the options).
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 2, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 14,
                         "needs_games": 15},
@@ -1276,6 +1300,8 @@ const GAMES := [
                 # the loser opens the next round. VERTICAL.
                 "orientation": "portrait", "dim": "2d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 1, "price": 450, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 16,
                         "needs_games": 17},
@@ -1635,6 +1661,8 @@ const GAMES := [
                 "thumb": "res://assets/thumbs/towerball.png",
                 "orientation": "auto", "dim": "3d",
                 "os": ["android", "pc"],
+                # v042 THE LAN SEAT (the multi-level tag: players x platforms x cross)
+                "lan": {"players": 4, "platforms": ["android", "pc"], "cross": true},
                 "coin_div": 5, "price": 400, "fee": 8, "shop": true,
                 "reveal": {"kind": "direct", "appear_after": 8,
                         "needs_games": 11},

@@ -440,7 +440,11 @@ func _goga_setup() -> void:
                 # composed for this room (tools/v038p5_dc_music.py, 120 BPM D-major,
                 # original synthesis - nothing from the studied web game ships)
                 Jukebox.music("res://assets/audio/music/d_theme.ogg")
-                _build_ready()
+                # v042 THE LAN SEAT: the waiting room replaces the gate
+                if lan_hold:
+                        lan_hold_begin()
+                else:
+                        _build_ready()
                 _relayout()
                 _new_round()
                 # THE TOAST SEAT LAW (v0.3.8): the shared toast seat (-180..-120
@@ -1691,6 +1695,8 @@ func _is_opener(i: int) -> bool:
 ## THE SMOOTH FALL: the flight carries the tile STANDING and tips it to
 ## the horizontal pose as it lands - the real domino fall (doubles stand).
 func _place(who: int, hi: int, side: int, from_override = null) -> void:
+                if who == P and lan_active:
+                                LAN.send_act({"k": "place", "hi": hi, "side": side})
                 var hand: Array = hand_p if who == P else hand_c
                 var t: Array = hand[hi]
                 var e := ends(chain)
@@ -1914,6 +1920,8 @@ func _sync_draw_btn() -> void:
 ## THE TAKE: the player picked a face-down tile from the spread fan - it
 ## flies to the hand, the fan re-fans if the stuck door demands more
 func _player_take(i: int) -> void:
+                if lan_active:
+                                LAN.send_act({"k": "take", "i": i})
                 # v0.3.8-6 THE SPIN-FLIP TAKE (the owner's own design: "take the
                 # domino from that yard as is with the cover of it, then flip it
                 # 360 degrees in the air, while spinning it, fade in the face ...
@@ -2003,6 +2011,8 @@ func _draw_tile(who: int) -> void:
                 hand_l.queue_redraw()
 
 func _pass(who: int) -> void:
+                if who == P and lan_active:
+                                LAN.send_act({"k": "pass"})
                 pass_streak += 1
                 Jukebox.sfx("d_pass", -6.0)
                 if who == P:
@@ -2011,7 +2021,7 @@ func _pass(who: int) -> void:
                                                 draw_btn.queue_free()
                                                 draw_btn = null
                 else:
-                                game_toast("THE CPU PASSES")
+                                game_toast("%s PASSES" % (_lan_name().to_upper() if lan_active else "THE CPU"))
                 if pass_streak >= 2:
                                 _blocked()
                                 return
@@ -2064,14 +2074,78 @@ func _resolve(outcome: String, blocked: bool) -> void:
                 _refresh_widget()
                 check_achievements()
 
+# ============================================================ v042 THE LAN SEAT
+## 2P TURN_RELAY with a shared shuffle: both devices seed the deck shuffle
+## with the match seed; the seat-2 device swaps the dealt PAIRS so its own
+## hand is honest (P = the local player on EVERY device, C = the rival).
+## The moves ride the ONE doors: _place / _pass / the yard take.
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        done_rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _build_ready()
+
+func _lan_name() -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        return String(lan_seats[0].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "place":
+                        if state == "play" or state == "cpu_wait":
+                                _place(C, int(a.get("hi", -1)), int(a.get("side", 1)))
+                "pass":
+                        if state == "play" or state == "cpu_wait":
+                                _pass(C)
+                "take":
+                        _lan_take(int(a.get("i", -1)))
+
+## the C-side twin of _player_take's ledger (no theater): the yard slot
+## holes, the rival's hand grows, the turn does NOT flip (the drawer keeps
+## the brush until they place or pass)
+func _lan_take(i: int) -> void:
+        if i < 0 or i >= yard_tiles.size() or yard_holes.has(i):
+                return
+        var t: Array = yard_tiles[i]
+        var di: int = deck.find(t)
+        if di < 0:
+                return
+        deck.remove_at(di)
+        yard_holes[i] = true
+        hand_c.append(t)
+        cur["drew"] = int(cur.get("drew", 0)) + 1
+        Jukebox.sfx("d_draw", -10.0)
+        _relayout()
+        _sync_draw_btn()
+        chain_l.queue_redraw()
+        hand_l.queue_redraw()
+
 func _new_round() -> void:
                 rounds += 1
                 deck = full_deck()
+                if lan_active:
+                        _rng.seed = lan_seed
                 for i in deck.size() - 1:
                                 var j := _rng.randi_range(i, deck.size() - 1)
                                 var tmp: Array = deck[i]
                                 deck[i] = deck[j]
                                 deck[j] = tmp
+                if lan_active and LAN.my_seat_no() == 2:
+                        # v042: swap every dealt (P, C) pair so the seat-2
+                        # device's OWN hand is its own
+                        var n2 := deck.size()
+                        for k in HAND_N:
+                                var a2 := n2 - 1 - 2 * k
+                                var b2 := n2 - 2 - 2 * k
+                                var tmp2: Array = deck[a2]
+                                deck[a2] = deck[b2]
+                                deck[b2] = tmp2
                 hand_p = []
                 hand_c = []
                 chain = []
@@ -2139,7 +2213,7 @@ func _finish_deal() -> void:
                 else:
                                 state = "cpu_wait"
                                 think_beat = 0.8
-                                game_toast("THE CPU HOLDS THE OPENER")
+                                game_toast("%s HOLDS THE OPENER" % (_lan_name().to_upper() if lan_active else "THE CPU"))
                 _banner()
                 _sync_draw_btn()
 
@@ -2217,7 +2291,7 @@ func _goga_tick(delta: float) -> void:
                 elif state == "cpu_wait":
                                 clock += delta
                                 _banner()
-                                if clock >= think_beat:
+                                if clock >= think_beat and not lan_active:
                                                 _cpu_move()
                 elif state == "round_over":
                                 clock += delta

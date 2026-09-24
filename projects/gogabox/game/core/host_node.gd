@@ -13,6 +13,7 @@ var partial := false   # v0.1.4: snake partial-pay - retry charges min(fee, wall
 # GogaGame3D the Node3D) - both carry the same contract, so the type here
 # is the honest Node and every touch stays a duck call.
 var game: Node
+var _lan_game := false
 
 var W := 720.0
 var H := 1280.0
@@ -194,6 +195,13 @@ func _ready() -> void:
                 return
         game = (load(String(game_def["script"])) as GDScript).new()
         game.game_id = id
+        # v042 THE LAN SEAT: a multiplayer-capable game opened inside a LAN
+        # session with 2+ seats boots into the system waiting room instead
+        # of its mode asks (the seats arrive from the session, never the
+        # mode sheet). The report after add_child announces it to the wire.
+        _lan_game = LAN.pre_open(id)
+        if _lan_game:
+                game.set("lan_hold", true)
         game.request_finish.connect(_on_finish)
         game.request_quit.connect(_quit_to_menu)
         # v0.2.0 THE UNIVERSAL POSITION RELOAD: the game asks, the host reloads
@@ -205,6 +213,10 @@ func _ready() -> void:
         # v0.2.3 CAPACITY HOLD: THIS game's pool stops recharging while its
         # own session is open (menu / other games / closed app = charging)
         Box.set_active_game(id)
+        if _lan_game:
+                if not LAN.report_open(id):
+                        if game.has_method("lan_hold_end_solo"):
+                                game.lan_hold_end_solo()
 
 ## v0.2.0 - a game picked a DIFFERENT play position: unload it and reload
 ## it in that position. The session (fee, play count, host chrome) is kept
@@ -429,6 +441,10 @@ func _restore() -> void:
 
 func _quit_to_menu() -> void:
         _session_open = false
+        # v042: leaving the game leaves the LAN hold (the wire learns first)
+        if _lan_game:
+                LAN.report_close(String(game_def["id"]))
+                _lan_game = false
         _close_over_sheet()
         # THE PAUSE NEVER OUTLIVES ITS SESSION (v0.3.9-13, the flow rig's
         # catch): quitting from under an open character story card (the

@@ -748,6 +748,7 @@ static func move_name(st: Dictionary, m: Dictionary) -> String:
 
 # ============================================================ the scene state
 var state := "ready"           # ready | play | cpu_wait | round_over
+var _coin_rot := 0             # v042: the LAN coin rotation (no shared RNG)
 var clock := 0.0
 var think_beat := 0.0
 var anim_q: Array = []         # the move animations [{sq_from, sq_to, t}]
@@ -871,7 +872,11 @@ func _goga_setup() -> void:
         # scene - the color shelf is reached from the ready screen (the
         # first tap) and from the optionals flow itself
         Jukebox.music("res://assets/audio/music/c_theme.ogg")
-        _build_ready()
+        # v042 THE LAN SEAT: the waiting room replaces the gate
+        if lan_hold:
+                lan_hold_begin()
+        else:
+                _build_ready()
         # THE LORE LAW (v0.3.9-13): the pawns speak first - once ever -
         # then the position ask (if one is owed) seats itself over the gate
         var flow := func():
@@ -1637,6 +1642,8 @@ func _promo_picker() -> void:
     Arc.fit_sheet(sheet, 2)
 
 func _player_move(m: Dictionary) -> void:
+        if lan_active:
+                LAN.send_act({"k": "move", "m": m})
         _apply_move(m, true)
 
 ## the ONE place a move lands: animation, sound, ledger, verdict
@@ -1738,7 +1745,10 @@ func _apply_move(m: Dictionary, by_player: bool) -> void:
         if by_player:
                 state = "cpu_wait"
                 clock = 0.0
-                think_beat = _rng.randf_range(0.6, 1.0)
+                if not lan_active:
+                        think_beat = _rng.randf_range(0.6, 1.0)
+                else:
+                        think_beat = 0.0
         else:
                 state = "play"
         board_l.queue_redraw()
@@ -1764,7 +1774,7 @@ func _resolve(outcome: String) -> void:
                 losses += 1
                 if score > 0:
                         add_score(-1)
-                verdict = "CHECKMATE - THE CPU WINS  -1"
+                verdict = ("CHECKMATE - %s WINS  -1" % _lan_name().to_upper()) if lan_active else "CHECKMATE - THE CPU WINS  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                         Color(1.0, 0.6, 0.5))
                 Jukebox.sfx("c_lose", -3.0)
@@ -1802,9 +1812,42 @@ func _draw_reason() -> String:
 ## THE OPENER LAW (the xo shape): the first round wears the color the user
 ## picked in the optionals (white by default); after that the LOSER takes
 ## WHITE next and a draw flips - unless the user queued a color override.
+# ============================================================ v042 THE LAN SEAT
+## 2P TURN_RELAY: seat 1 wears WHITE, seat 2 BLACK (on every device the
+## LOCAL player reads as "the player" - player_white flips per device, the
+## moves ride the ONE _apply_move door: mine by_player=true, the wire's
+## by_player=false). The CPU never wakes (REAL-ONLY); the _rng stays
+## untouched in LAN (the coin square rotates deterministically instead).
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        player_white = LAN.my_seat_no() == 1
+        color_override = ""
+        rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _build_ready()
+
+func _lan_name() -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        return String(lan_seats[0].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "move":
+                        if state == "play" or state == "cpu_wait":
+                                _apply_move(a.get("m", {}), false)
+
 func _new_round() -> void:
         rounds += 1
-        if rounds == 1:
+        if lan_active:
+                # v042: the opener law rides the seat - white opens round 1,
+                # the loser takes white next (the resolve flip below)
+                pass
+        elif rounds == 1:
                 player_white = String(Box.get_progress(game_id,
                         "start_color", "white")) != "black"
         elif color_override != "":
@@ -1834,7 +1877,10 @@ func _new_round() -> void:
                 # the user took black: the CPU (white) opens the war
                 state = "cpu_wait"
                 clock = 0.0
-                think_beat = _rng.randf_range(0.6, 1.0)
+                if not lan_active:
+                        think_beat = _rng.randf_range(0.6, 1.0)
+                else:
+                        think_beat = 0.0   # the wire's move decides the beat
         board_l.queue_redraw()
         piece_l.queue_redraw()
 
@@ -1869,7 +1915,7 @@ func _goga_tick(delta: float) -> void:
                         _spawn_coin()
         if state == "cpu_wait":
                 clock += delta
-                if clock >= think_beat:
+                if clock >= think_beat and not lan_active:
                         _cpu_turn()
         elif state == "round_over":
                 clock += delta
@@ -1903,7 +1949,11 @@ func _spawn_coin() -> void:
                         cands.append(i)
         if cands.is_empty():
                 return
-        coin_sq = int(cands[_rng.randi() % cands.size()])
+        if lan_active:
+                coin_sq = int(cands[_coin_rot % cands.size()])
+                _coin_rot += 1
+        else:
+                coin_sq = int(cands[_rng.randi() % cands.size()])
         coin_t = 0.0
         Jukebox.sfx("c_coin", -8.0, 1.3)
         game_toast("A GOGACOIN APPEARED - RACE FOR IT")

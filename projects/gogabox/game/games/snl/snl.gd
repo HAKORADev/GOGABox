@@ -83,6 +83,7 @@ const FADE_T := 0.16        # the die's fade-in
 const SHUF_T := 0.62        # the shuffle
 const SETTLE_T := 0.16      # the settle bounce
 const CPU_THINK := 0.65     # the CPU's roll beat (pure RNG only breathes)
+var _coin_rot := 0          # v042: the LAN coin spot rotates (no shared RNG)
 const RIDE_BEAT := 0.20     # the pause on the base/head before the ride
 const CLIMB_CPS := 3.6      # the ladder's cells per second (the glide up)
 const FALL_CPS := 4.8       # the snake's cells per second (gravity helps)
@@ -320,8 +321,12 @@ func _goga_setup() -> void:
         Jukebox.music("res://assets/audio/music/snl_theme.ogg")
         ## THE FLOW LAW (the owner: "it should be the opposite") - the
         ## optionals ask opens the game FIRST, the TAP ANYWHERE gate
-        ## seats after the pick
-        _mode_sheet()
+        ## seats after the pick. v042: a LAN boot wears the system waiting
+        ## room instead (the seats arrive from the session, never a sheet).
+        if lan_hold:
+                lan_hold_begin()
+        else:
+                _mode_sheet()
 
 func _fresh_poss() -> void:
         poss = [0, 0, 0, 0]
@@ -1057,7 +1062,7 @@ func _draw_trays() -> void:
                 # THE MARK: the bare numeral + WHO (the ludo tray law),
                 # seated in the badge's middle air (the wide-badge round:
                 # the die and the pawn home keep their distance)
-                var who := "YOU" if int(p) == 1 else "CPU"
+                var who := "YOU" if int(p) == 1 else (_lan_name(int(p)).to_upper() if lan_active else "CPU")
                 fx_l.draw_string(f, tr.position + Vector2(
                                 12.0 + cell * 0.60 + 22.0,
                                 tr.size.y * 0.52), str(p),
@@ -1264,6 +1269,42 @@ func _mode_sheet() -> void:
         # THE CONFIRM-SHEET LAW: plain sheet buttons keep their default
         # mouse filter (an IGNORE filter makes the cards DEAD to taps)
 
+# ============================================================ v042 THE LAN SEAT
+## The waiting room owns the boot; the seats arrive in arrival order. On
+## EVERY device the local player wears id 1 and the rivals wear 2..N (the
+## display laws keep working); the turn order is the session's seat order
+## rotated so seat 1's device and seat 3's device agree on WHO acts while
+## each device labels its own token YOU. Moves ride TURN_RELAY: the roller
+## applies + broadcasts, receivers apply through the same door.
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        _rng.seed = seed_v
+        players = m_seats.size()
+        playing = []
+        for i in players:
+                playing.append(i + 1)
+        opener = 1
+        rounds = 0
+        _new_round()
+
+func lan_solo() -> void:
+        lan_active = false
+        _mode_sheet()
+
+func _lan_name(p: int) -> String:
+        if lan_seats.is_empty():
+                return "RIVAL"
+        var n: int = lan_seats.size()
+        var idx: int = (LAN.my_seat_no() - 1 + p - 1) % n
+        return String(lan_seats[idx].get("name", "RIVAL"))
+
+func lan_act(who: int, a: Dictionary) -> void:
+        match String(a.get("k", "")):
+                "roll":
+                        if state == "roll_wait":
+                                _apply_roll(int(a.get("r", 1)))
+
 func _pick_mode(m: int) -> void:
         players = m
         playing = []
@@ -1328,7 +1369,14 @@ func _banner() -> void:
 
 func _do_roll() -> void:
         roll = _rng.randi_range(1, 6)
-        die_face = roll
+        if lan_active:
+                LAN.send_act({"k": "roll", "r": roll})
+        _apply_roll(roll)
+
+## The ONE roll body (the local roll and the relayed roll land identically).
+func _apply_roll(r: int) -> void:
+        roll = r
+        die_face = r
         die_alive = true
         die_fading = false
         die_t0 = _time
@@ -1525,7 +1573,11 @@ func _coin_maybe_spawn() -> void:
         if spots.is_empty():
                 play_clock = COIN_EVERY   # try again next tick
                 return
-        coin_cell = spots[_rng.randi() % spots.size()]
+        if lan_active:
+                coin_cell = spots[_coin_rot % spots.size()]
+                _coin_rot += 1
+        else:
+                coin_cell = spots[_rng.randi() % spots.size()]
         coin_t = 0.0
         game_toast("A GOGACOIN SHINES ON THE BOARD")
 
@@ -1541,7 +1593,7 @@ func _coin_taken(player: int) -> void:
                 _dust_burst(at, Color("ffd24a"), 12)
         else:
                 Jukebox.sfx("snl_coin", -6.0, 0.8)
-                game_toast("A CPU GRABBED THE COIN")
+                game_toast("%s GRABBED THE COIN" % (_lan_name(player).to_upper() if lan_active else "A CPU"))
 
 # ============================================================ the tick
 
@@ -1566,7 +1618,7 @@ func _goga_tick(delta: float) -> void:
                                 _after_roll()
                 "roll_wait":
                         if clock >= CPU_THINK and turn != 1 \
-                                        and not die_alive:
+                                        and not die_alive and not lan_active:
                                 _do_roll()
                 "handoff":
                         if clock >= 0.0 and not die_alive:

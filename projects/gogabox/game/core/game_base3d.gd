@@ -33,6 +33,14 @@ func _goga_pause_end_ok() -> bool:
 var tk: TouchKit
 var start_orientation := ""
 
+## v042 THE LAN SEAT (the twin mirror of game_base's block — law 51):
+var lan_hold := false
+var lan_active := false
+var lan_seed := 0
+var lan_seats: Array = []
+var _lan_hold_ui: LanHold = null
+var _lan_routed := false
+
 func orientation_settled() -> void:
         pass
 
@@ -68,6 +76,7 @@ func _ready() -> void:
         _goga_setup()
 
 func _exit_tree() -> void:
+        _lan_unroute()
         var vp := get_viewport()
         if vp != null:
                 vp.msaa_3d = _prev_msaa
@@ -80,6 +89,100 @@ func _exit_tree() -> void:
                 _game_cur_armed = false
                 GogaCursorLib.game_disarm(_game_seat_token)
                 _game_seat_token = -1
+
+# ============================================== THE LAN SEAT (v042, twin)
+## The mirror of game_base.gd's LAN block (law 51): the system owns the
+## waiting room; the game answers the duck-typed lan_* calls.
+
+func lan_hold_begin() -> void:
+        if _lan_hold_ui != null:
+                return
+        lan_active = true
+        _lan_hold_ui = LanHold.mount(self, game_id)
+        _lan_hold_ui.cancelled.connect(_lan_hold_cancelled)
+        _lan_route()
+
+func lan_hold_close() -> void:
+        if _lan_hold_ui != null:
+                _lan_hold_ui.queue_free()
+                _lan_hold_ui = null
+
+func lan_hold_end_solo() -> void:
+        lan_hold_close()
+        if has_method("lan_solo"):
+                call("lan_solo")
+
+func _lan_hold_cancelled() -> void:
+        lan_hold_close()
+        quit_to_box()
+
+func _lan_route() -> void:
+        if _lan_routed:
+                return
+        _lan_routed = true
+        LAN.match_started.connect(_lan_on_match_started)
+        LAN.match_left_out.connect(_lan_on_left_out)
+        LAN.solo_fallthrough.connect(_lan_on_solo)
+        LAN.lan_denied.connect(_lan_on_denied)
+        LAN.match_ended.connect(_lan_on_ended)
+        LAN.act_received.connect(_lan_on_act)
+        LAN.snap_received.connect(_lan_on_snap)
+        LAN.prog_received.connect(_lan_on_prog)
+
+func _lan_unroute() -> void:
+        if not _lan_routed:
+                return
+        _lan_routed = false
+        LAN.match_started.disconnect(_lan_on_match_started)
+        LAN.match_left_out.disconnect(_lan_on_left_out)
+        LAN.solo_fallthrough.disconnect(_lan_on_solo)
+        LAN.lan_denied.disconnect(_lan_on_denied)
+        LAN.match_ended.disconnect(_lan_on_ended)
+        LAN.act_received.disconnect(_lan_on_act)
+        LAN.snap_received.disconnect(_lan_on_snap)
+        LAN.prog_received.disconnect(_lan_on_prog)
+
+func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array) -> void:
+        if gid != game_id:
+                return
+        lan_hold_close()
+        lan_active = true
+        lan_seed = seed_v
+        lan_seats = m_seats
+        if has_method("lan_match_start"):
+                call("lan_match_start", seed_v, m_seats)
+
+func _lan_on_left_out(gid: String) -> void:
+        if gid == game_id and _lan_hold_ui != null:
+                lan_hold_end_solo()
+
+func _lan_on_solo(gid: String) -> void:
+        if gid == game_id and _lan_hold_ui != null:
+                lan_hold_end_solo()
+
+func _lan_on_denied(gid: String, why: String) -> void:
+        if gid != game_id:
+                return
+        lan_hold_close()
+        game_toast(why if why != "" else "LAN NOT AVAILABLE HERE")
+        if has_method("lan_solo"):
+                call("lan_solo")
+
+func _lan_on_ended(gid: String, results: Array) -> void:
+        if gid == game_id and has_method("lan_end"):
+                call("lan_end", results)
+
+func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
+        if gid == game_id and has_method("lan_act"):
+                call("lan_act", who, a)
+
+func _lan_on_snap(gid: String, data: Dictionary) -> void:
+        if gid == game_id and has_method("lan_snap"):
+                call("lan_snap", data)
+
+func _lan_on_prog(gid: String, from_dev: String, data: Dictionary) -> void:
+        if gid == game_id and has_method("lan_prog"):
+                call("lan_prog", from_dev, data)
 
 func game_toast(msg: String) -> void:
         Arc.toast(_toast, msg)
@@ -482,7 +585,7 @@ func _unhandled_input(event: InputEvent) -> void:
         if over:
                 return
         if not _sheet_stack.is_empty() or not _pause_pair.is_empty() \
-                                or box_story_open():
+                                or box_story_open() or _lan_hold_ui != null:
                 return
         if not _tap_start.is_empty() and event is InputEventKey \
                         and (event as InputEventKey).pressed:

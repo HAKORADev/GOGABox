@@ -36,6 +36,16 @@ var tk: TouchKit
 ## reloaded for a picked orientation - the ask screens can skip themselves.
 var start_orientation := ""
 
+## v042 THE LAN SEAT: the host sets lan_hold BEFORE the game enters the
+## tree (the boot wears the waiting room instead of the mode asks); the
+## base routes the LAN signals into the game's duck-typed lan_* methods.
+var lan_hold := false
+var lan_active := false
+var lan_seed := 0
+var lan_seats: Array = []
+var _lan_hold_ui: LanHold = null
+var _lan_routed := false
+
 ## v0.2.1a: the host could NOT switch to the asked position (the window
 ## refused the sensor override). The ask resolves into the position the
 ## window actually kept - games with a position ask override this
@@ -147,6 +157,7 @@ func game_cursor_disarm() -> void:
 ## touch it. The token law makes the stale corpse a no-op; the LIVE seat
 ## hands the pointer back to the box cursor the same frame it dies.
 func _exit_tree() -> void:
+        _lan_unroute()
         if _game_cur_armed:
                 _game_cur_armed = false
                 GogaCursorLib.game_disarm(_game_seat_token)
@@ -640,7 +651,7 @@ func _unhandled_input(event: InputEvent) -> void:
         # the frozen game. Law: while one of MY sheets (or the pause pair, or
         # the story card) owns the screen, the game hears NOTHING raw.
         if not _sheet_stack.is_empty() or not _pause_pair.is_empty() \
-                                or box_story_open():
+                                or box_story_open() or _lan_hold_ui != null:
                 return
         # v0.4.1: a keyboard press also fires the universal intro tap (a PC
         # player's hands are on the keys - "tap anywhere" means ANYWHERE).
@@ -660,6 +671,104 @@ func _process(delta: float) -> void:
         if _ach_clock >= 3.0:
                 _ach_clock = 0.0
                 check_achievements()
+
+# ============================================== THE LAN SEAT (v042)
+## The system owns the waiting room; the game only answers the routed
+## calls (lan_match_start / lan_act / lan_snap / lan_prog / lan_end /
+## lan_hold_end_solo - duck-typed, both twins carry the same surface).
+
+func lan_hold_begin() -> void:
+        if _lan_hold_ui != null:
+                return
+        lan_active = true
+        _lan_hold_ui = LanHold.mount(self, game_id)
+        _lan_hold_ui.cancelled.connect(_lan_hold_cancelled)
+        _lan_route()
+
+func lan_hold_close() -> void:
+        if _lan_hold_ui != null:
+                _lan_hold_ui.queue_free()
+                _lan_hold_ui = null
+
+func lan_hold_end_solo() -> void:
+        ## The hold fell through: nobody joined (or the match left me out).
+        ## The game plays the ordinary solo game - CPU seats return.
+        lan_hold_close()
+        if has_method("lan_solo"):
+                call("lan_solo")
+
+func _lan_hold_cancelled() -> void:
+        ## The player cancelled the hold - back to the box.
+        lan_hold_close()
+        quit_to_box()
+
+func _lan_route() -> void:
+        if _lan_routed:
+                return
+        _lan_routed = true
+        LAN.match_started.connect(_lan_on_match_started)
+        LAN.match_left_out.connect(_lan_on_left_out)
+        LAN.solo_fallthrough.connect(_lan_on_solo)
+        LAN.lan_denied.connect(_lan_on_denied)
+        LAN.match_ended.connect(_lan_on_ended)
+        LAN.act_received.connect(_lan_on_act)
+        LAN.snap_received.connect(_lan_on_snap)
+        LAN.prog_received.connect(_lan_on_prog)
+
+func _lan_unroute() -> void:
+        if not _lan_routed:
+                return
+        _lan_routed = false
+        LAN.match_started.disconnect(_lan_on_match_started)
+        LAN.match_left_out.disconnect(_lan_on_left_out)
+        LAN.solo_fallthrough.disconnect(_lan_on_solo)
+        LAN.lan_denied.disconnect(_lan_on_denied)
+        LAN.match_ended.disconnect(_lan_on_ended)
+        LAN.act_received.disconnect(_lan_on_act)
+        LAN.snap_received.disconnect(_lan_on_snap)
+        LAN.prog_received.disconnect(_lan_on_prog)
+
+func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array) -> void:
+        if gid != game_id:
+                return
+        lan_hold_close()
+        lan_active = true
+        lan_seed = seed_v
+        lan_seats = m_seats
+        if has_method("lan_match_start"):
+                call("lan_match_start", seed_v, m_seats)
+
+func _lan_on_left_out(gid: String) -> void:
+        if gid == game_id and _lan_hold_ui != null:
+                lan_hold_end_solo()
+
+func _lan_on_solo(gid: String) -> void:
+        if gid == game_id and _lan_hold_ui != null:
+                lan_hold_end_solo()
+
+func _lan_on_denied(gid: String, why: String) -> void:
+        if gid != game_id:
+                return
+        lan_hold_close()
+        game_toast(why if why != "" else "LAN NOT AVAILABLE HERE")
+        if has_method("lan_solo"):
+                call("lan_solo")
+
+func _lan_on_ended(gid: String, results: Array) -> void:
+        if gid == game_id and has_method("lan_end"):
+                call("lan_end", results)
+
+func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
+        if gid == game_id and has_method("lan_act"):
+                call("lan_act", who, a)
+
+func _lan_on_snap(gid: String, data: Dictionary) -> void:
+        if gid == game_id and has_method("lan_snap"):
+                call("lan_snap", data)
+
+func _lan_on_prog(gid: String, from_dev: String, data: Dictionary) -> void:
+        if gid == game_id and has_method("lan_prog"):
+                call("lan_prog", from_dev, data)
 
 # ============================================== THE BOX STORY (v0.3.9-13)
 ## THE CHARACTERS' POP-UP DIALOGUE - the one shared lore card every new

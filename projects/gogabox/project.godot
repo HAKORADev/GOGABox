@@ -28,6 +28,7 @@ run/delta_smoothing=false
 Box="*res://game/core/store.gd"
 Jukebox="*res://game/core/audio.gd"
 Notify="*res://addons/notify/notify.gd"
+LAN="*res://game/core/lan.gd"
 
 [display]
 

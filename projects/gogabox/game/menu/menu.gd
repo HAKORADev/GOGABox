@@ -102,6 +102,9 @@ var _filter_os := ""
 # search menu filters (i see platforms but no controls)"): the control-
 # scheme tag filters the search sheet - "" = all | "touch" | "mkb" | "pad".
 var _filter_ctrl := ""
+# v042 THE LAN FILTER LAW: the multi-level LAN tag filters the search
+# sheet - "" = all | lan | lan_phone | lan_pc | lan_cross | lan_2p..4p.
+var _filter_lan := ""
 
 func _ready() -> void:
         # v0.4.1 THE POSITION SEAT: the PC menu restores its persisted
@@ -618,6 +621,9 @@ func _build_top_bar() -> void:
                 _open_topup())
         bar.add_child(wbtn)
 
+        # v042 THE MULTIPLAYER BUTTON (THE MENU BUTTON LAW: drawn, never an
+        # emoji glyph) - a plus + a human figure, code-drawn in the box style
+        bar.add_child(_icon_lan_button(func(): _open_multiplayer_menu()))
         bar.add_child(_icon_button("res://assets/meta/icon_search.png",
                         func(): _open_search()))
         bar.add_child(_icon_button("res://assets/ui/icon_help.png",
@@ -821,6 +827,43 @@ func _banner_safe_px() -> float:
         var phys := 52.0 * dpi / 160.0 + 12.0   # the 52dp banner + breathing room
         return maxf(64.0, ceilf(phys / maxf(0.05, px_per_logical)))
 
+## v042: the multiplayer seat's icon is DRAWN (plus + the one-guy figure)
+## through Arc.safe_poly - the same law the menu button spec pinned.
+func _icon_lan_button(cb: Callable) -> Button:
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(64, 64)
+        b.add_theme_stylebox_override("normal", Arc.panel_style(Color(0.16, 0.10, 0.05, 0.85), 22))
+        b.add_theme_stylebox_override("hover", Arc.panel_style(Color(0.22, 0.14, 0.07, 0.9), 22))
+        b.add_theme_stylebox_override("pressed", Arc.panel_style(Color(0.10, 0.06, 0.03, 0.9), 22))
+        var ic := Control.new()
+        ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+        ic.draw.connect(func():
+                var w := ic.size.x
+                var h := ic.size.y
+                var ink := Color(1, 1, 1, 0.92)
+                # the plus (top-left)
+                var px := w * 0.30
+                var py := h * 0.30
+                var arm := maxf(2.0, w * 0.055)
+                ic.draw_rect(Rect2(px - w * 0.14, py - arm * 0.5, w * 0.28, arm), ink)
+                ic.draw_rect(Rect2(px - arm * 0.5, py - h * 0.14, arm, h * 0.28), ink)
+                # the one-guy (bottom-right)
+                var cx := w * 0.66
+                var cy := h * 0.62
+                var u := h * 0.075
+                ic.draw_circle(Vector2(cx, cy - u * 2.2), u * 1.5, ink)
+                var body := Rect2(cx - u * 1.7, cy - u * 0.4, u * 3.4, u * 3.4)
+                Arc.safe_poly(ic, LanProfile._round_rect_pts(body, u * 1.1), ink)
+        )
+        b.add_child(ic)
+        b.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                cb.call())
+        return b
+
+## v042: the multiplayer seat's icon is DRAWN (plus + the one-guy figure)
+## through Arc.safe_poly - the same law the menu button spec pinned.
 func _icon_button(icon_path: String, cb: Callable) -> Button:
         var b := Button.new()
         b.custom_minimum_size = Vector2(64, 64)
@@ -1185,6 +1228,9 @@ func _passes_filters(g: Dictionary) -> bool:
         # v041-1 THE CONTROLS FILTER LAW: the scheme tag filters too
         if _filter_ctrl != "" and not (_filter_ctrl in Meta.ctrl_list(g)):
                 return false
+        # v042 THE LAN FILTER LAW: the derived multi-level LAN chips filter
+        if _filter_lan != "" and not (_filter_lan in Meta.lan_list(g)):
+                return false
         # THE SEARCH LAW: the name search - lowercase, spaces stripped, a
         # SUBSTRING of title+id. "slash" finds FRUIT SLASHER; "inv" finds
         # SPACE INVADERS. Case never matters.
@@ -1401,6 +1447,9 @@ func _tile(g: Dictionary, st: String) -> Control:
                         var best := Box.stat(id, "best")
                         if best > 0:
                                 _right_chip(b, "best %d" % best, 272)
+                        var badge_txt := Meta.players_badge(g)
+                        if badge_txt != "":
+                                _ribbon(b, badge_txt, Color(0.16, 0.10, 0.05, 0.88), false)
                 "LOCKED":
                         var th := _add_thumb(b, g, 70, true)
                         set_thumb_gray(th, 0.62)
@@ -1810,6 +1859,10 @@ func _open_search() -> void:
         # v041-1: the CONTROLS row - touch / mouse+keys / gamepad chips
         v.add_child(_chip_row(scroll, "CONTROLS", ["touch", "mkb", "pad"],
                         func(id: String): _filter_ctrl = "" if _filter_ctrl == id else id, "ctrl"))
+        # v042 THE LAN ROW - the multi-level multiplayer chips
+        v.add_child(_chip_row(scroll, "LAN", ["lan", "lan_2p", "lan_3p", "lan_4p",
+                        "lan_cross", "lan_phone", "lan_pc"],
+                        func(id: String): _filter_lan = "" if _filter_lan == id else id, "lan"))
         v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
         v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
@@ -1842,6 +1895,7 @@ func _open_search() -> void:
                 _filter_text = ""
                 _filter_os = ""
                 _filter_ctrl = ""
+                _filter_lan = ""
                 _close_sheet()
                 _feed_scroll.scroll_vertical = 0
                 _refresh()))
@@ -1849,7 +1903,7 @@ func _open_search() -> void:
 func _filters_dirty() -> bool:
         return _filter_genre != "" or _filter_sub != "" \
                         or _filter_state != "" or _filter_text != "" or _filter_os != "" \
-                        or _filter_ctrl != ""
+                        or _filter_ctrl != "" or _filter_lan != ""
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -1871,12 +1925,14 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "sub": active = _filter_sub == sid
                         "os": active = _filter_os == sid
                         "ctrl": active = _filter_ctrl == sid
+                        "lan": active = _filter_lan == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
                         "sub": lbl = Meta.sub_label(sid)
                         "os": lbl = "PHONE" if sid == "android" else "PC"
                         "ctrl": lbl = Meta.ctrl_label(sid)
+                        "lan": lbl = Meta.lan_label(sid)
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -2781,6 +2837,356 @@ func _open_settings() -> void:
 
 ## The AUDIO sheet: the two volume sliders moved out of the main seat
 ## (v0.4.1 - the AAA split; every platform gets this one).
+# ================================================== v042 THE LAN SEATS
+## THE MULTIPLAYER MENU (TWO OPTIONS: PROFILE / MULTIPLAYER - the owner's
+## own shape), the GOGAPROFILE sheets, and the LAN session sheet (host +
+## join with LOCAL and ONLINE boxes, the members list, combo co-op seat).
+
+func _open_multiplayer_menu() -> void:
+        var vb := _sheet_base(0.0, "mpmenu")
+        vb.add_child(Arc.label("PLAY TOGETHER", 42, Arc.INK))
+        vb.add_child(Arc.button("PROFILE", Vector2(480, 84), 30,
+                        Color(0.16, 0.10, 0.05, 0.85),
+                        func(): _close_sheet(); _open_profile()))
+        vb.add_child(Arc.button("MULTIPLAYER", Vector2(480, 84), 30,
+                        Color(0.16, 0.10, 0.05, 0.85),
+                        func(): _close_sheet(); _open_lan()))
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Arc.ACCENT,
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 1)
+
+## One labeled text row (the box's own LineEdit seat).
+func _line_row(parent: Control, title_: String, placeholder: String, value: String,
+                max_len: int, on_change: Callable, numeric := false) -> LineEdit:
+        parent.add_child(Arc.label(title_, 20, Arc.HOT))
+        var le := LineEdit.new()
+        le.placeholder_text = placeholder
+        le.text = value
+        le.max_length = max_len
+        le.custom_minimum_size = Vector2(0, 64)
+        le.add_theme_font_override("font", Arc.font_ui())
+        le.add_theme_font_size_override("font_size", 24)
+        if numeric:
+                le.text_changed.connect(func(t: String):
+                        var clean := ""
+                        for ch in t:
+                                if ch >= "0" and ch <= "9":
+                                        clean += ch
+                        if clean != t:
+                                var caret := le.caret_column
+                                le.text = clean
+                                le.caret_column = caret
+                        on_change.call(clean))
+        else:
+                le.text_changed.connect(func(t: String): on_change.call(t))
+        parent.add_child(le)
+        return le
+
+func _open_profile() -> void:
+        var vb := _sheet_base(0.0, "profile")
+        vb.add_child(Arc.label("YOUR PROFILE", 42, Arc.INK))
+        var p := LanProfile.data()
+        # the PFP picker: the drawn one-guy variants (THE PFP LAW)
+        vb.add_child(Arc.label("THE FACE", 20, Arc.HOT))
+        var pfp_row := HFlowContainer.new()
+        pfp_row.add_theme_constant_override("h_separation", 10)
+        pfp_row.add_theme_constant_override("v_separation", 10)
+        for v in LanProfile.PFP_VARIANTS:
+                var pv := int(v)
+                var b := Button.new()
+                b.custom_minimum_size = Vector2(72, 72)
+                var on := pv == LanProfile.pfp()
+                b.add_theme_stylebox_override("normal", Arc.panel_style(
+                                Arc.ACCENT if on else Color(0, 0, 0, 0.14), 18))
+                b.add_theme_stylebox_override("hover", Arc.panel_style(Color(0.2, 0.12, 0.06, 0.8), 18))
+                var fig := LanProfile.pfp_control(pv, Vector2(72, 72))
+                fig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.add_child(fig)
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        LanProfile.set_pfp(pv)
+                        LanProfile.save()
+                        _close_sheet()
+                        _open_profile())
+                pfp_row.add_child(b)
+        vb.add_child(pfp_row)
+        _line_row(vb, "THE NAME (ENGLISH LETTERS ONLY, MAX 20)", "type a name",
+                        LanProfile.player_name(), LanProfile.NAME_MAX,
+                        func(t: String):
+                                LanProfile.set_player_name(t)
+                                LanProfile.save())
+        _line_row(vb, "ABOUT YOU", "a line about yourself",
+                        LanProfile.desc(), LanProfile.DESC_MAX,
+                        func(t: String):
+                                LanProfile.data()["desc"] = t.substr(0, LanProfile.DESC_MAX)
+                                LanProfile.save())
+        var links: Array = LanProfile.links()
+        for i in LanProfile.LINKS_MAX:
+                var li := i
+                var cur := String(links[li]) if li < links.size() else ""
+                _line_row(vb, "LINK %d" % (li + 1), "https:// ...",
+                                cur, 90,
+                                func(t: String):
+                                        var arr := LanProfile.links().duplicate()
+                                        while arr.size() <= li:
+                                                arr.append("")
+                                        arr[li] = t.strip_edges().substr(0, 90)
+                                        LanProfile.data()["links"] = arr
+                                        LanProfile.save())
+        _line_row(vb, "AGE", "your age",
+                        str(LanProfile.age()) if LanProfile.age() > 0 else "", 3,
+                        func(t: String):
+                                LanProfile.data()["age"] = t.to_int()
+                                LanProfile.save(), true)
+        # THE ROLE: gamer / developer / owner-unique
+        vb.add_child(Arc.label("ROLE", 20, Arc.HOT))
+        var role_row := HFlowContainer.new()
+        role_row.add_theme_constant_override("h_separation", 10)
+        for r in ["gamer", "developer", "owner"]:
+                var rr := String(r)
+                var on := LanProfile.role() == rr
+                var b := Button.new()
+                b.text = " " + rr.to_upper() + " "
+                b.toggle_mode = true
+                b.button_pressed = on
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 20)
+                b.add_theme_color_override("font_color", Arc.CARD if on else Color("7a5a34"))
+                b.add_theme_stylebox_override("normal", Arc.panel_style(
+                                Color(0.98, 0.62, 0.1) if on else Color(0, 0, 0, 0.14), 20))
+                b.add_theme_stylebox_override("hover", Arc.panel_style(Color(0.2, 0.12, 0.06, 0.8), 20))
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        if rr == "owner" and not LanProfile.try_claim_owner():
+                                Arc.toast(_toast, "OWNER IS TAKEN ON THIS DEVICE FAMILY")
+                        else:
+                                LanProfile.data()["role"] = rr
+                                if rr != "owner":
+                                        LanProfile.data()["owner_claim"] = ""
+                                LanProfile.save()
+                        _close_sheet()
+                        _open_profile())
+                role_row.add_child(b)
+        vb.add_child(role_row)
+        # GENDER: male / female / other
+        vb.add_child(Arc.label("GENDER", 20, Arc.HOT))
+        var gen_row := HFlowContainer.new()
+        gen_row.add_theme_constant_override("h_separation", 10)
+        for gen in LanProfile.GENDERS:
+                var gg := String(gen)
+                var on := LanProfile.gender() == gg
+                var b := Button.new()
+                b.text = " " + gg.to_upper() + " "
+                b.toggle_mode = true
+                b.button_pressed = on
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 20)
+                b.add_theme_color_override("font_color", Arc.CARD if on else Color("7a5a34"))
+                b.add_theme_stylebox_override("normal", Arc.panel_style(
+                                Color(0.98, 0.62, 0.1) if on else Color(0, 0, 0, 0.14), 20))
+                b.add_theme_stylebox_override("hover", Arc.panel_style(Color(0.2, 0.12, 0.06, 0.8), 20))
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        LanProfile.data()["gender"] = gg
+                        LanProfile.save()
+                        _close_sheet()
+                        _open_profile())
+                gen_row.add_child(b)
+        vb.add_child(gen_row)
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Arc.ACCENT,
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 1)
+
+## Visit another member's profile (read-only, THE VISIBILITY LAW).
+func _open_profile_view(seat: Dictionary) -> void:
+        var vb := _sheet_base(0.0, "profileview")
+        vb.add_child(Arc.label("PROFILE", 42, Arc.INK))
+        var fig := LanProfile.pfp_control(int(seat.get("pfp", 0)), Vector2(120, 120))
+        var fc := CenterContainer.new()
+        fc.add_child(fig)
+        vb.add_child(fc)
+        vb.add_child(Arc.label(String(seat.get("name", "PLAYER")), 34, Arc.INK))
+        var tags := HFlowContainer.new()
+        tags.add_theme_constant_override("h_separation", 8)
+        tags.add_child(Arc.chip(String(seat.get("role", "gamer")).to_upper(), "",
+                        Color(0, 0, 0, 0.14), 18, Color("8a6a40")))
+        tags.add_child(Arc.chip("PHONE" if String(seat.get("platform", "")) == "android" else "PC",
+                        "", Color(0, 0, 0, 0.14), 18, Color("8a6a40")))
+        if bool(seat.get("ghost", false)):
+                tags.add_child(Arc.chip("GHOST", "", Color(0.5, 0.1, 0.1, 0.3), 18, Color(1, 1, 1, 0.9)))
+        vb.add_child(tags)
+        var anchor_short := String(seat.get("anchor", ""))
+        if anchor_short != "":
+                vb.add_child(Arc.label("DEVICE %s" % anchor_short, 16, Color("8a6a40"), false))
+        var d := String(seat.get("desc", ""))
+        if d != "":
+                var dl := Arc.label(d, 22, Arc.INK, false)
+                dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                vb.add_child(dl)
+        # the links only travel for the local profile (they are too wide for
+        # the wire's name seats) - the seat in a live session shows what the
+        # protocol carries
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Arc.ACCENT,
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 1)
+
+func _open_lan() -> void:
+        var vb := _sheet_base(0.0, "lan")
+        vb.add_child(Arc.label("MULTIPLAYER", 42, Arc.INK))
+        if not LAN.session_active():
+                _lan_build_join(vb)
+        else:
+                _lan_build_session(vb)
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Arc.ACCENT,
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 1)
+        # the session view rides a live ticker: the members list refreshes
+        # itself while the sheet is open (the batteries-sheet pattern)
+        _page_tick(vb, func():
+                if not is_instance_valid(vb):
+                        return
+                var sig := "%s|%d|%s" % [LAN.mode, LAN.session_size(),
+                                ",".join(LAN.seats.map(func(x): return String(x.get("name", ""))))]
+                if vb.get_meta("sig", "") != sig:
+                        vb.set_meta("sig", sig)
+                        _close_sheet()
+                        _open_lan())
+
+func _lan_build_join(vb: VBoxContainer) -> void:
+        _line_row(vb, "YOUR NAME", "type a name",
+                        LanProfile.player_name(), LanProfile.NAME_MAX,
+                        func(t: String):
+                                LanProfile.set_player_name(t)
+                                LanProfile.save())
+        vb.add_child(Arc.button("HOST A SESSION", Vector2(480, 84), 30, Arc.GOOD, func():
+                Jukebox.sfx("click", -4.0)
+                var err := LAN.host_session()
+                if err != "":
+                        Arc.toast(_toast, err.to_upper())
+                else:
+                        _close_sheet()
+                        _open_lan()))
+        vb.add_child(Arc.label("JOIN A SESSION", 26, Arc.HOT))
+        # THE LOCAL BOX (the LAN join)
+        var local_ip := LineEdit.new()
+        local_ip.placeholder_text = "the host address, like 192.168.1.20"
+        local_ip.custom_minimum_size = Vector2(0, 64)
+        local_ip.add_theme_font_override("font", Arc.font_ui())
+        local_ip.add_theme_font_size_override("font_size", 24)
+        vb.add_child(local_ip)
+        vb.add_child(Arc.button("JOIN LOCAL (LAN)", Vector2(480, 78), 26, Arc.ACCENT, func():
+                Jukebox.sfx("click", -4.0)
+                var err := LAN.join_session(local_ip.text)
+                if err != "":
+                        Arc.toast(_toast, err.to_upper())
+                else:
+                        _close_sheet()
+                        _open_lan()))
+        # THE ONLINE BOX (the room code - the VLAN leg)
+        var code_le := LineEdit.new()
+        code_le.placeholder_text = "room code, like GOGA-4A2B1C-9F8E7DX"
+        code_le.custom_minimum_size = Vector2(0, 64)
+        code_le.add_theme_font_override("font", Arc.font_ui())
+        code_le.add_theme_font_size_override("font_size", 24)
+        vb.add_child(code_le)
+        vb.add_child(Arc.button("JOIN ONLINE (ROOM CODE)", Vector2(480, 78), 26, Arc.ACCENT, func():
+                Jukebox.sfx("click", -4.0)
+                var err := LAN.join_session(code_le.text)
+                if err != "":
+                        Arc.toast(_toast, err.to_upper())
+                else:
+                        _close_sheet()
+                        _open_lan()))
+        var note := Arc.label("one wifi = just the address. far away = the host shares the code (works over any virtual LAN app too)", 17,
+                        Color("8a6a40"), false)
+        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        vb.add_child(note)
+
+func _lan_build_session(vb: VBoxContainer) -> void:
+        var hosting := LAN.is_host
+        vb.add_child(Arc.label("SESSION - %d OF %d SEATS" % [LAN.session_size(), 4], 24, Arc.HOT))
+        if hosting:
+                var addr := Arc.label("ADDRESS  " + LAN.host_addr, 22, Arc.INK, false)
+                addr.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+                vb.add_child(addr)
+                var code_txt := LAN.room_code if LAN.room_code != "" else "(no code - share the address)"
+                var code_l := Arc.label("CODE  " + code_txt, 22, Arc.INK, false)
+                code_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+                vb.add_child(code_l)
+                var share := Arc.button("COPY THE CODE", Vector2(480, 60), 20,
+                                Color(0.16, 0.10, 0.05, 0.85), func():
+                                Jukebox.sfx("click", -4.0)
+                                DisplayServer.clipboard_set(LAN.room_code if LAN.room_code != "" else LAN.host_addr)
+                                Arc.toast(_toast, "COPIED"))
+                vb.add_child(share)
+                if LAN.session_size() < 4:
+                        vb.add_child(Arc.button("ADD LOCAL PLAYER", Vector2(480, 60), 20,
+                                        Color(0.16, 0.10, 0.05, 0.85), func():
+                                        Jukebox.sfx("click", -4.0)
+                                        LAN.add_local_slot()))
+                else:
+                        vb.add_child(Arc.button("REMOVE LOCAL PLAYER", Vector2(480, 60), 20,
+                                        Color(0.16, 0.10, 0.05, 0.85), func():
+                                        Jukebox.sfx("click", -4.0)
+                                        LAN.remove_local_slot()))
+        var members := VBoxContainer.new()
+        members.add_theme_constant_override("separation", 8)
+        for seat in LAN.seats:
+                members.add_child(_member_row(seat))
+        vb.add_child(members)
+        if hosting:
+                vb.add_child(Arc.button("DELETE SESSION", Vector2(480, 78), 26, Arc.BAD, func():
+                        Jukebox.sfx("click", -4.0)
+                        LAN.leave_session()
+                        _close_sheet()
+                        _open_lan()))
+        else:
+                vb.add_child(Arc.button("LEAVE", Vector2(480, 78), 26, Arc.BAD, func():
+                        Jukebox.sfx("click", -4.0)
+                        LAN.leave_session()
+                        _close_sheet()
+                        _open_lan()))
+
+func _member_row(seat: Dictionary) -> Control:
+        var row := PanelContainer.new()
+        row.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.12), 18))
+        var h := HBoxContainer.new()
+        h.add_theme_constant_override("separation", 12)
+        var fig := LanProfile.pfp_control(int(seat.get("pfp", 0)), Vector2(56, 56))
+        fig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        h.add_child(fig)
+        var name_l := Arc.label(String(seat.get("name", "PLAYER")), 24, Arc.INK)
+        name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        h.add_child(name_l)
+        var me := String(seat.get("dev", "")) == LAN.my_dev()
+        var tag := "YOU" if me else ("HOST" if int(seat.get("seat", 1)) == 1 else "MEMBER")
+        h.add_child(Arc.label(tag, 18, Arc.GOOD, false))
+        if not me:
+                var visit := Arc.button("VISIT", Vector2(120, 52), 18,
+                                Color(0.16, 0.10, 0.05, 0.85), func():
+                                Jukebox.sfx("click", -4.0)
+                                _open_profile_view(seat))
+                h.add_child(visit)
+        row.add_child(h)
+        return row
+
+func _update_lan_line(l: Label, gid: String) -> void:
+        if not is_instance_valid(l):
+                return
+        if not LAN.session_active() or LAN.session_size() < 2:
+                l.text = ""
+                return
+        var holders := LAN.holders_of(gid).size()
+        var committed := LAN.committed_of(gid).size()
+        if holders <= 0:
+                l.text = "LAN SESSION LIVE - %d DEVICES CONNECTED" % LAN.session_size()
+        else:
+                l.text = "LAN: IN THE ROOM %d/%d  -  WAITING %d" % [holders, LAN.session_size(), maxi(0, holders - committed)]
+
 func _open_audio_settings() -> void:
         var vb := _sheet_base()
         var title := Arc.label("AUDIO", 40, Arc.INK)
@@ -3299,6 +3705,26 @@ func _open_game_page(g: Dictionary) -> void:
                         srow.add_child(Arc.meta_chip("sub", String(sid)))
                 content.add_child(srow)
 
+        # v042 THE LAN TAGS + THE LIVE LINE (the owner: "make the pre-play
+        # show a line under the LAN tags... it shows how many players in the
+        # pre-play menu out of how many total players, and shows how many
+        # player waiting")
+        var lan_list := Meta.lan_list(g)
+        if not lan_list.is_empty():
+                content.add_child(Arc.label("LAN", 20, Arc.HOT))
+                var lrow := HFlowContainer.new()
+                lrow.add_theme_constant_override("h_separation", 8)
+                lrow.add_theme_constant_override("v_separation", 8)
+                for sid in lan_list:
+                        lrow.add_child(Arc.chip(Meta.lan_label(String(sid)), "",
+                                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+                content.add_child(lrow)
+                var lan_line := Arc.label("", 19, Color("6a4a28"), false)
+                lan_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                content.add_child(lan_line)
+                _update_lan_line(lan_line, String(g["id"]))
+                _page_tick(vb, func(): _update_lan_line(lan_line, String(g["id"])))
+
         var reset_btn := Arc.button("RESET GAME PROGRESS", Vector2(540, 60), 20,
                         Color(0.6, 0.32, 0.24))
         content.add_child(reset_btn)
@@ -3733,6 +4159,7 @@ func _save_feed_state() -> void:
                 "text": _filter_text,
                 "os": _filter_os,
                 "ctrl": _filter_ctrl,
+                "lan": _filter_lan,
         }
         _launch_tile_idx = -1
         _launch_tile_off = 0.0
@@ -3767,6 +4194,7 @@ func _restore_feed_state() -> void:
                 _filter_text = String(_saved_feed.get("text", ""))
                 _filter_os = String(_saved_feed.get("os", ""))
                 _filter_ctrl = String(_saved_feed.get("ctrl", ""))
+                _filter_lan = String(_saved_feed.get("lan", ""))
                 _list_idx = int(_saved_feed.get("list", 0))
         _refresh()
         if _saved_feed.is_empty():

@@ -34,3 +34,24 @@ Work Log:
 
 Stage Summary:
 - The hidden plans now live in the repo as documentation: the platform answer file (verbatim-first, dense, house-style) + the LAN cross-platform update. The talk agenda is explicit (5 open questions), the working agreement is recorded, and the runway story (spark -> pulled attempt -> MIT/0-ads/two-platform clean room -> reveal) is preserved with commit hashes so the "everything connects" reading survives.
+
+---
+Task ID: v042
+Agent: Super Z (main)
+Task: the owner's order - the LAN thing completely as v042: core infra + cross-platform + in-games (snake, jumpcube, snl, domino, chess, squares, fourline, bovo, towerball, rally), the GOGAProfile seed with the device anchor + wipe-surviving mirrors, the VLAN leg (room codes), combo co-op seats, multi-level LAN tags, the pre-play live line, documenting first
+
+Work Log:
+- Sandbox was STALE (head at v040-2 era) - re-synced hard to origin/main (c419a471) before any work
+- DOCS FIRST: brainstorms/v042/MASTER.md (the spec + research + architecture + tracker); THE_PLATFORM_ANSWER.md += THE GOGAPROFILE SEED; LAN_MULTIPLAYER.md += THE V042 BUILD section
+- THE CORE: game/core/lan.gd (autoload LAN) - TCP JSON lines, port 31440, host-authoritative session, heartbeat prune, per-game holds, THE TEN SECONDS on the host's one clock, match relays (TURN_RELAY/HOST_AUTH/SELF_AUTH/RACE), room codes (GOGA-XXXXXX-XXXXXXC + UPnP), the name sanitize, combo co-op local_slot seats; game/core/lan_profile.gd (the GitHub-shaped local profile, the device anchor, Android/media + Windows-home mirrors); game/core/lan_hold.gd (the system waiting room, one widget, both twins); lan hooks mirrored in game_base.gd + game_base3d.gd (law 51); host_node pre_open/report_open/report_close; the INTERNET permission on both Android presets (the LAN note in AGENTS 4 + RELEASE_LAW)
+- THE TAGS: registry "lan" on exactly ten games (fourline cross:false = the both-platforms-same-platform-LAN case); Meta.lan_list/lan_label/players_badge; the search LAN row + _passes_filters + CLEAR + feed-state round-trip; the PLAYERS badge on cards; the pre-play LAN chips + the live line (the _page_tick law)
+- THE MENU: the drawn plus+human LAN button (Arc.safe_poly), the TWO-OPTION menu (PROFILE/MULTIPLAYER), the profile sheet (name/PFP variants/desc/links/age/role-owner-unique/gender+other), the profile viewer, the LAN sheet (host + join with LOCAL and ONLINE boxes, members with visit, combo add/remove, delete/leave)
+- THE GAMES: snl (roll relay + the seat-rotation perspective law), squares/fourline/bovo (edge/drop/stone relays, no CPU), chess (the seat-1-white law, by_player mapping), domino (the shared seeded shuffle + the seat-2 pair swap + place/pass/take relays), jumpcube (conquest relay), snake (SELF_AUTH: a shared portrait world with the fit-zoom, dir/eat/die broadcasts, the last-snake verdict), rally (HOST_AUTH: normalized 20Hz snaps, the mirrored view, the 30Hz pad stream), towerball (RACE: re-seeded identical towers, prog/dead, the last-ball verdict)
+- THE TESTS: tests/qa_v042_lan (THE LOOPBACK RIG: 4 real LAN cores over real TCP - the session, the seats, the cap, combo, the hold, THE TEN SECONDS, the birth, the turn relay, THE LEFT-OUT, the solo fallback, THE LONE LAW, the prune) 77/0; flow_test += _t_lan_laws; the EYE PASS (7 shots under Xvfb: the button, the two-option menu, the profile sheet, the join boxes, the live session, the LAN tags + the live line, the waiting room over a real snl boot)
+- THE TRAP CAUGHT: static set_name/name were SILENT no-ops (the engine's property-setter convention) - renamed to set_player_name/player_name, law 58 written; the profile _load's defaults-merge healed
+- THE BUGS THE RIG KILLED BEFORE THE OWNER: the StreamPeerTCP.close() lie (disconnect_from_host is the truth), the start broadcast reaching the left-out seats, the solo-fallthrough leaving ghost holders, the left_out client path
+- Version: 0.4.2 / code base 31440 (arm32 31441, arm64 31442), the exe stamp 0.4.2.0
+- Gates: flow_test ALL PASSED + qa_v042_lan 77/0 + the eye pass reviewed
+
+Stage Summary:
+- v042: the LAN system is real end to end - the box, the wire, the waiting room, the profiles, the tags, ten games seated. The owner tests cross-platform (PC + phone); Tower Destroyer stayed frozen; ludo stays off the list per the order.

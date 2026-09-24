@@ -15,6 +15,7 @@ func _ready() -> void:
         fails += _test("batteries: pools, consumption, refill", _t_batteries())
         fails += _test("windows: hour math", _t_windows())
         fails += _test("meta: registry metadata sane", _t_meta())
+        fails += _test("lan: the v042 laws", _t_lan_laws())
         fails += _test("registry: entries sane", _t_registry())
         fails += _test("xo: sketch CPU sanity", _t_xo_ai())
         fails += _test("fourline: drop CPU sanity", _t_fourline_ai())
@@ -441,6 +442,56 @@ func _t_windows() -> int:
                 and not Roadmap._hour_in(22, 16, 22), "16-22 window edges")
         ok += _check(Roadmap.window_text("hopper") != "", "hopper has a window text")
         ok += _check(Roadmap.window_text("snake") == "", "snake has no window")
+        return ok
+
+func _t_lan_laws() -> int:
+        var ok := 0
+        # THE NAME LAW (EN letters, no emoji, max 20)
+        ok += _check(LanProfile.sanitize_name("osama bin-ladin") == "osama bin-ladin",
+                        "lan name: the owner's example survives")
+        ok += _check(LanProfile.sanitize_name("neo99") == "neo", "lan name: digits die")
+        ok += _check(LanProfile.sanitize_name("neo" + char(0x1F600) + "bad") == "neobad",
+                        "lan name: emoji die")
+        ok += _check(LanProfile.sanitize_name("ABCDEFGHIJKLMNOPQRSTU").length() == 20,
+                        "lan name: max 20")
+        # THE ROOM CODE round-trip
+        var lp: Node = load("res://game/core/lan.gd").new()
+        var code: String = lp.encode_code("192.168.1.20", 31440)
+        ok += _check(code.begins_with("GOGA-"), "lan code: the prefix")
+        ok += _check(lp.decode_code(code) == "192.168.1.20:31440",
+                        "lan code: the round-trip")
+        ok += _check(lp.decode_code("GOGA-BADCODE") == "", "lan code: garbage dies")
+        lp.free()
+        # THE MULTI-LEVEL TAGS on the owner's ten games
+        var with_lan := 0
+        for g in GameReg.GAMES:
+                if g.has("lan"):
+                        with_lan += 1
+                        var lan: Dictionary = g["lan"]
+                        ok += _check(int(lan.get("players", 0)) >= 2
+                                        and int(lan.get("players", 0)) <= 4,
+                                        String(g["id"]) + " lan players 2..4")
+                        ok += _check(not (lan.get("platforms", []) as Array).is_empty(),
+                                        String(g["id"]) + " lan platforms")
+        ok += _check(with_lan == 10, "exactly ten games wear the seat (%d)" % with_lan)
+        ok += _check(Meta.lan_list(GameReg.get_game("snl")).has("lan_4p"),
+                        "snl derives the 4P chip")
+        ok += _check(Meta.lan_list(GameReg.get_game("fourline")).has("lan_phone")
+                        and Meta.lan_list(GameReg.get_game("fourline")).has("lan_pc")
+                        and not Meta.lan_list(GameReg.get_game("fourline")).has("lan_cross"),
+                        "fourline: both platforms, same-platform LAN only")
+        ok += _check(Meta.players_badge(GameReg.get_game("rally")) == "PLAYERS 2-2"
+                        or Meta.players_badge(GameReg.get_game("rally")) != "",
+                        "the PLAYERS badge exists for rally")
+        ok += _check(Meta.players_badge(GameReg.get_game("heavywar")) == "",
+                        "no badge on the out-of-radar games")
+        # THE PROFILE SEED
+        ok += _check(LanProfile.GENDERS.has("other") and LanProfile.ROLES.has("owner"),
+                        "the profile vocabulary")
+        ok += _check(LanProfile.anchor() != "", "the device anchor exists")
+        # THE PERMISSION NOTE: the LAN round needs the sockets
+        ok += _check(ProjectSettings.get_setting("autoload/LAN", "") != "",
+                        "the LAN autoload sits")
         return ok
 
 func _t_meta() -> int:

@@ -90,7 +90,10 @@ belongs in `docs/goga_docs/`.
 ## 4. The platforms + THE 0-ADS LAW (the open-source round, 2026-09-19)
 
 **THE 0-ADS LAW (owner):** GOGABox is MIT-licensed open source with ZERO
-ads. The whole monetization stack was removed whole: the Unity Ads plugin
+ads. (v042 amendment: the box carries the Android INTERNET permission —
+LAN peer-to-peer sockets need it even on a wifi — but gains NO servers, NO
+telemetry, NO online services; the offline BEHAVIOR law stands.)
+The whole monetization stack was removed whole: the Unity Ads plugin
 (`plugins/unity_ads/`), the `Ads` autoload, the death-menu DOUBLE (watch
 ad) theatre, the per-3-runs interstitial pacing, the banner strip (the
 registry `banner` keys and the 52dp reservation), `ads_config.json`,
@@ -1080,3 +1083,60 @@ reads without booting the scene.
        the layer that sits EXACTLY on the thumbnail - per-pixel, on the
        art's own silhouette, aligned by construction, zero geometry
        touched.
+
+57. THE LAN LAWS (v042, the owner: "work on the LAN thing completely as
+    v042 ... implement all of it accurately" — the whole spec lives in
+    docs/goga_docs/ideas/LAN_MULTIPLAYER.md, the build plan in
+    docs/brainstorm/v042/MASTER.md):
+    a) THE CORE: game/core/lan.gd (autoload LAN) — plain TCP
+       (TCPServer/StreamPeerTCP, JSON lines), port 31440, the host owns
+       the truth, the session dies with the app. THE TEN SECONDS LAW and
+       the match births run on the HOST's one clock. The probe
+       (tests/qa_v042_lan) lives the whole session over REAL loopback
+       sockets: 4 cores, the hold, the countdown, the birth, the relay,
+       the left-out, THE LONE LAW, the prune, the cap.
+    b) THE GAME CONTRACT (duck-typed, both twins): lan_match_start(seed,
+       seats) / lan_act(who, a) / lan_snap(data) / lan_prog(from_dev,
+       data) / lan_end(results) / lan_hold_end_solo(); the moves ride the
+       game's OWN move door (apply locally, then LAN.send_act). The CPU
+       never wakes in a LAN match (THE REAL-ONLY LAW). The relay models:
+       TURN_RELAY (snl/jumpcube/domino/chess/squares/fourline/bovo),
+       HOST_AUTH (rally's ball), SELF_AUTH (snake's shared world), RACE
+       (towerball's identical seeded towers).
+    c) THE SEAT PERSPECTIVE LAW: on EVERY device the local player wears
+       id 1 and the rivals 2..N — the display laws (YOU / the verdict
+       lines) keep working; turn order is the session's arrival order.
+    d) THE NAME LAW: EN letters + space + ' . - only, NO emoji, NO digits,
+       max 20 (LanProfile.sanitize_name) — sanitized at input AND at
+       protocol intake (never trust a peer's name).
+    e) THE GOGAPROFILE (game/core/lan_profile.gd): the local GitHub-shaped
+       profile (name / drawn one-guy PFP variants / desc / links / age /
+       role gamer-developer-OWNER-unique / gender with other). THE ANCHOR:
+       hash(OS.get_unique_id()+salt) rides the profile and a short hash
+       rides the session (a cloned profile shows as a GHOST). THE
+       SURVIVAL LAW: the profile mirrors to Android/media/<package>/ and
+       Windows %USERPROFILE%/GOGABox/profile/ — newest copy wins, a wiped
+       app re-adopts its mirror.
+    f) THE MULTI-LEVEL TAGS: registry "lan": {players, platforms, cross}
+       -> Meta.lan_list chips (lan / lan_phone / lan_pc / lan_cross /
+       lan_2p..4p); the PLAYERS badge is its own area (cards + pre-play);
+       the search sheet wears the LAN row; the pre-play page wears the
+       live LAN line under the tags ("IN THE ROOM x/y - WAITING z").
+    g) THE PERMISSION: Android INTERNET=true is REQUIRED for the sockets
+       (both presets) — the owner-visible trade is documented in §4.
+    h) THE TWIN LAW holds: the LAN hold overlay (game/core/lan_hold.gd)
+       is ONE shared widget; the routing blocks (lan_hold_begin /
+       _lan_route / _lan_unroute) are mirrored verbatim in game_base.gd
+       and game_base3d.gd.
+
+58. THE SETTER-NAME TRAP (v042, cost the round an hour of ghost-hunting):
+    a STATIC GDScript function named like a property setter (`set_name`,
+    `name`, `set_...` of any native property) is SILENTLY rerouted by the
+    engine's property convention - the call returns nothing, no error, no
+    warning, the body never runs. `LanProfile.set_name()` no-op'd for a
+    full session while `save()` beside it worked. THE LAW: name statics
+    with unambiguous verbs (`set_player_name`, `player_name`) - never
+    `set_<property>`/`<property>` shapes on RefCounted helpers. The rig
+    that caught it: push_error inside the suspect function prints the
+    GDScript backtrace - when a call "does nothing", trap it, don't
+    theorize.

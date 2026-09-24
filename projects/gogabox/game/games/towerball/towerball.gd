@@ -154,6 +154,11 @@ func _goga_setup() -> void:
         _build_round()           # the tower IS the menu scenery - the ball
                                  # bounces on it from the FIRST frame
         Jukebox.music("res://assets/audio/music/tb_theme.wav")
+        if lan_hold:
+                # v042 THE LAN SEAT: the waiting room replaces the asks -
+                # the race seats identical seeded towers on every device
+                lan_hold_begin()
+                return
         # v041-2 r3 THE UNIVERSAL FLOW LAW (the owner: "position selection is
         # first, mode/optionals second, tap anywhere is last to get ready" +
         # "see all other games and follow them"): THE SNAKE ASK DESIGN, screen
@@ -847,6 +852,75 @@ func _ready_go() -> void:
         _ready_card = null
         _start_run()
 
+# ============================================================ v042 THE LAN SEAT
+## 2-4 RACE (RACE relay): every device builds the SAME seeded towers
+## (the rng re-seats at every round build, so the cosmetic drift can never
+## skew the world), plays it locally, and broadcasts the round progress +
+## the death. The last ball standing takes the +1. Coins/fees stay per
+## device; the mode is BALL for the race.
+
+var _lan_alive := {}             # seat -> alive
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        lan_seed = seed_v
+        mode = "ball"
+        for s in m_seats:
+                _lan_alive[int(s.get("seat", 1))] = true
+        round_idx = 1
+        set_score(0)
+        run_coins = 0
+        if _coins_label != null:
+                _coins_label.text = "0"
+        _build_round()
+        _transition()
+        game_toast("SAME TOWERS - LAST BALL WINS")
+
+func lan_solo() -> void:
+        lan_active = false
+        _show_orient_select()
+
+func _lan_names_of(seat_no: int) -> String:
+        for s in lan_seats:
+                if int(s.get("seat", -1)) == seat_no:
+                        return String(s.get("name", "RIVAL"))
+        return "RIVAL"
+
+func lan_prog(from_dev: String, data: Dictionary) -> void:
+        if not lan_active:
+                return
+        var seat := -1
+        for st in lan_seats:
+                if String(st.get("dev", "")) == from_dev:
+                        seat = int(st.get("seat", -1))
+                        break
+        if seat < 0:
+                return
+        match String(data.get("k", "")):
+                "prog":
+                        game_toast("%s: ROUND %d" % [
+                                        _lan_names_of(seat).to_upper(),
+                                        int(data.get("r", 0))])
+                "dead":
+                        _lan_alive[seat] = false
+                        game_toast("%s IS OUT" % _lan_names_of(seat).to_upper())
+                        _lan_check_last()
+
+func _lan_check_last() -> void:
+        if phase == "over" or not lan_active:
+                return
+        for seat in _lan_alive:
+                if bool(_lan_alive[seat]):
+                        return
+        # the last ball standing
+        add_score(1)
+        game_toast("THE LAST BALL  +1")
+        achievement_count("wins", 1)
+        check_achievements()
+
+func lan_end(results: Array) -> void:
+        pass
+
 func _start_run() -> void:
         round_idx = 1
         set_score(0)
@@ -859,6 +933,10 @@ func _start_run() -> void:
 # ----------------------------------------------------------------- rounds
 
 func _build_round() -> void:
+        if lan_active:
+                # v042: the tower re-seats from the match seed every round -
+                # identical worlds on every device, forever
+                rng.seed = lan_seed + round_idx * 104729
         round_len = TB.round_length(round_idx)
         rows_data.clear()
         for i in round_len:
@@ -931,6 +1009,8 @@ func _round_won() -> void:
         add_score(1)
         achievement_count("rounds_won", 1)
         achievement_max("round_max", round_idx)
+        if lan_active:
+                LAN.send_prog({"k": "prog", "r": round_idx + 1, "s": score})
         Jukebox.sfx("tb_win", -3.0)
         var vp := get_viewport().get_visible_rect().size
         Arc.confetti(_overlay_root_ref(), vp * 0.5)
@@ -947,6 +1027,10 @@ func _run_over() -> void:
         if phase == "over":
                 return
         phase = "over"
+        if lan_active:
+                LAN.send_prog({"k": "dead", "s": score})
+                _lan_alive[LAN.my_seat_no()] = false
+                _lan_check_last()
         var tw := create_tween()
         tw.tween_interval(0.55)
         tw.tween_callback(func(): finish_run(score, run_coins))
