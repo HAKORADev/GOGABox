@@ -44,6 +44,19 @@ func _ready() -> void:
         var achiever: Node = load("res://game/core/achiever.gd").new()
         add_child(achiever)
 
+        # v042-1 r3 THE TOP-LEVEL NOTES: the multiplayer invitations and
+        # the critical session lines live ANYWHERE - the menu, a sheet,
+        # inside any game, mid-match, even paused (the owner: "make all
+        # of them be top-level to appear anywhere any time in any
+        # position even in-games because they are very important").
+        var notes: Node = load("res://game/core/lan_notes.gd").new()
+        add_child(notes)
+        LANFIND.invite.connect(func(nm: String, addr: String, switch: bool):
+                LanNotes.invite_card(nm, addr, switch))
+        LAN.kicked.connect(func(why: String): LanNotes.note(why.to_upper()))
+        LAN.session_died.connect(func(why: String): LanNotes.note(why.to_upper()))
+        LAN.room_refused.connect(func(why: String): LanNotes.note(why.to_upper()))
+
         _show_splash()
 
         # v0.3.8-5 THE COMFORT LAW (the owner: "high phone battery usage with

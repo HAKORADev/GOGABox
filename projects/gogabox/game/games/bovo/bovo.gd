@@ -674,7 +674,7 @@ func _paint_stone(l: Node2D, mid: Vector2, rad: float, col: Color) -> void:
 func _draw_fx() -> void:
         var sk := _skin()
         # the aim ghost: a translucent stone on the nearest intersection
-        if state == "play" and turn == 1 and aim_i >= 0:
+        if state == "play" and turn == my_slot() and aim_i >= 0:
                 var rad := cell * 0.40
                 var mid := _point_mid(aim_i)
                 var pulse := 0.5 + 0.22 * sin(_time * 5.2)
@@ -844,14 +844,62 @@ func _gate_down() -> void:
 # ============================================================ the rounds
 
 # ============================================================ v042 THE LAN SEAT
-## 2P TURN_RELAY (the squares/fourline bones): local 1, rival 2, the stone
-## placements ride the ONE _place door, the CPU never wakes.
+## 2P TURN_RELAY (r3 THE ABSOLUTE SEATS): `turn` is the ABSOLUTE slot -
+## 1 = the room's first-ready player on EVERY device, 2 = the second.
+## The stones wear the slot's color on both devices (never "everyone is
+## red"), the placements ride the ONE _place door, the CPU never wakes,
+## and the WHO GATE (law 61) drops any act that is not the turn's.
+
+## MY slot: my absolute seat number (1 in solo; my join-order seat in LAN).
+func my_slot() -> int:
+        return maxi(1, lan_my_index() + 1) if lan_active else 1
+
+## r3 THE ROOM SETTINGS (the owner: "when the first player change the
+## game stuff like position or modes ... it gives the other players the
+## correct parameters"): the board size rides the room params.
+func lan_room_settings(vb: VBoxContainer) -> void:
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 10)
+        for id in SIZES:
+                var sid := String(id)
+                var owned: bool = Box.item_owned(game_id, "size", sid) \
+                                or sid == "8"
+                var on := String(lan_params.get("board", "8")) == sid
+                var b := Button.new()
+                b.text = String(SIZES[sid]["name"]) + ("" if owned else " (LOCKED)")
+                b.custom_minimum_size = Vector2(150, 64)
+                b.disabled = not owned
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 20)
+                b.add_theme_color_override("font_color", Arc.CARD if on else Color("7a5a34"))
+                b.add_theme_stylebox_override("normal", Arc.panel_style(
+                                Arc.GOOD if on else Color(0, 0, 0, 0.14), 16))
+                b.pressed.connect(func():
+                        Jukebox.sfx("click", -4.0)
+                        lan_params_local["board"] = sid
+                        LAN.set_room_params(lan_params_local))
+                row.add_child(b)
+        vb.add_child(row)
+
+var lan_params_local := {}
+
+func lan_params_lines(params: Dictionary) -> Array:
+        var sid := String(params.get("board", "8"))
+        var nm := String(SIZES[sid]["name"]) if SIZES.has(sid) else "8 x 8"
+        return ["BOARD: %s" % nm]
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
-        next_opener = 1
+        next_opener = 1          # ABSOLUTE: the room's first player opens
         done_rounds = 0
+        # THE ONE-BOARD LAW: the board is the OWNER's room params - never
+        # each device's own equipped size (the different-boards bug).
+        var sid := String(lan_params.get("board", "8"))
+        if SIZES.has(sid):
+                size_id = sid
+                grid_n = int(sid)
         _new_round()
 
 func lan_solo() -> void:
@@ -867,8 +915,10 @@ func _lan_name(p: int) -> String:
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):
                 "place":
-                        if state == "play" or state == "wait":
-                                _place(int(a.get("i", -1)), 2)
+                        # THE WHO GATE: the act lands ONLY when its sender
+                        # is the turn's absolute slot.
+                        if (state == "play" or state == "wait") and who == turn:
+                                _place(int(a.get("i", -1)), who)
 
 func _new_round() -> void:
         _new_board()
@@ -914,10 +964,10 @@ func _new_round() -> void:
         # early-returned - the owner played a board that could not be
         # touched. The rigs never caught it because they all set
         # state="play" by hand after _new_round (THE MASK LAW).
-        if turn == 1:
+        if turn == my_slot():
                 state = "play"      # the player opens: the board is live
         else:
-                state = "wait"      # the CPU opens: it thinks, then places
+                state = "wait"      # the rival opens: they think, then place
                 if not lan_active:
                         cpu_think = true
                         think_beat = _rng.randf_range(0.4, 0.8)
@@ -937,13 +987,16 @@ func _random_empty_cell() -> int:
 func _banner() -> void:
         if state == "round_over":
                 return
-        if turn == 1:
+        if turn == my_slot():
                 turn_lbl.text = "YOUR MOVE"
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.95))
         else:
                 var n := int(_time * 2.5) % 3 + 1
-                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(n)
+                # THE CPU WORD LAW: in a LAN match the wait reads the
+                # CURRENT PLAYER's name - never "CPU".
+                turn_lbl.text = ("%s IS THINKING%s" % [_lan_name(turn).to_upper(), " .".repeat(n)]) \
+                                if lan_active else "CPU IS THINKING%s" % " .".repeat(n)
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.8))
 
@@ -963,10 +1016,10 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         _lift(t.position)
         elif event is InputEventScreenDrag:
-                if state == "play" and turn == 1:
+                if state == "play" and turn == my_slot():
                         _aim_at((event as InputEventScreenDrag).position)
         elif event is InputEventMouseMotion:
-                if state == "play" and turn == 1:
+                if state == "play" and turn == my_slot():
                         _aim_at((event as InputEventMouseMotion).position)
         elif event is InputEventMouseButton:
                 var mb := event as InputEventMouseButton
@@ -1005,7 +1058,7 @@ func _lift(_at: Vector2) -> void:
                 return
         var i := aim_i
         aim_i = -1
-        _place(i, 1)
+        _place(i, my_slot())
 
 func _nearest_point(at: Vector2) -> int:
         var g := _grid_rect()
@@ -1021,7 +1074,7 @@ func _nearest_point(at: Vector2) -> int:
         return idx(c, r, grid_n)
 
 func _place(i: int, who: int) -> void:
-        if who == 1 and lan_active:
+        if lan_active and who == my_slot():
                 LAN.send_act({"k": "place", "i": i})
         board[i] = who
         _last_i = i
@@ -1041,15 +1094,15 @@ func _place(i: int, who: int) -> void:
         if w != 0:
                 _resolve(w)      # the stone rests - the verdict is now
                 return
-        if who == 1:
-                turn = 2
+        if who == my_slot():
+                turn = 3 - my_slot()
                 if not lan_active:
                         cpu_think = true
                         think_beat = _rng.randf_range(0.4, 0.8)
                 clock = 0.0
                 _banner()
         else:
-                turn = 1
+                turn = my_slot()
                 state = "play"
                 _banner()
 
@@ -1073,7 +1126,7 @@ func _resolve(w: int) -> void:
         done_rounds += 1
         if w == 1 or w == 2:
                 last_win_line = win_line(board, grid_n)
-        if w == 1:
+        if w == my_slot():
                 wins += 1
                 streak += 1
                 add_score(1)                     # THE OWNER'S LAW: win = +1
@@ -1087,12 +1140,12 @@ func _resolve(w: int) -> void:
                         var mid := (_point_mid(int(last_win_line[0]))
                                         + _point_mid(int(last_win_line[4]))) * 0.5
                         Arc.confetti(_overlay_root_ref(), mid, 30)
-        elif w == 2:
+        elif w != 0 and w != my_slot():
                 losses += 1
                 streak = 0
                 if score > 0:
                         add_score(-1)
-                verdict_lbl.text = ("%s WINS  -1" % _lan_name(2).to_upper()) if lan_active else "CPU WINS  -1"
+                verdict_lbl.text = ("%s WINS  -1" % _lan_name(w).to_upper()) if lan_active else "CPU WINS  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 Jukebox.sfx("bv_lose", -3.0)
@@ -1103,13 +1156,14 @@ func _resolve(w: int) -> void:
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("c8cdd4"))
                 Jukebox.sfx("bv_draw", -4.0)
-        # THE OPENER LAW: the loser starts next; a draw flips
-        if w == 1:
-                next_opener = 2
-        elif w == 2:
-                next_opener = 1
+        # THE OPENER LAW (absolute): the loser's SLOT starts next; a draw
+        # flips - the same slot wins on every device, so the openers agree.
+        if w == my_slot():
+                next_opener = 3 - my_slot()
+        elif w != 0:
+                next_opener = my_slot()
         else:
-                next_opener = 2 if last_opener == 1 else 1
+                next_opener = 3 - last_opener
         if last_win_line.size() == 5:
                 strike_t = 0.0
         achievement_max("max_score", score)
@@ -1177,14 +1231,14 @@ func _dust_burst(at: Vector2, col: Color, n := 6) -> void:
 
 func _coin_taken(who: int) -> void:
         coin_cell = -1
-        if who == 1:
+        if who == my_slot():
                 add_run_coins(1)
                 Jukebox.sfx("bv_coin", -3.0)
                 game_toast("YOU TOOK THE GOGACOIN  +1")
                 _dust_burst(_point_mid(_last_i), Color("ffd24a"), 14)
         else:
                 Jukebox.sfx("coin", -6.0, 0.8)
-                game_toast("THE CPU GRABBED THE COIN")
+                game_toast("%s GRABBED THE COIN" % _lan_name(who).to_upper())
 
 # ============================================================ the options
 ## THE BOARD SIZES (the 2048 mechanic word for word): the options sheet

@@ -363,3 +363,62 @@ seat is its own design round — documented in the open questions).
   PLAYER / HOSTS n/4), the honest 1-seat badge gate.
 - config 0.4.2-2 / code base 31460 (arm32 31461, arm64 31462), exe
   stamp 0.4.2.2.
+
+---
+
+## R3 - THE ROOM ROUND (the owner's third report, worked to the roots)
+
+The owner tested v042-1 r2 on real devices and the report re-seated the
+whole infra. Verbatim anchors (the full report lives in the session
+journal): "PFP is set, accurately, BUT! only for me, on other devices, i
+see the placeholder forever" / "make a host be able handle up to 12
+different players" / "make it possible to each different group of
+players to play at the same time ... other 3 players can play ludo in
+another dimension" / "in the wait menu, it auto-ends the wait and jump
+solo, remove this mechanic" / "i managed to join on other device by
+clicking same button at exact same moment, this thing should not even
+happen" / "when someone get disconnected or close game whether he is
+host or joiner, it corrupts the game, just end the game when one
+disconnected" / "i bet you are just trolling me and have not truly
+integrated the tech for real here" / "make the color of the player be
+different and not same" / "change label CPU anywhere to the perspective
+player name" / "make the game fruit ninja be LAN 2 players ... blue as
+the first player and red is the second" / "make all of them be top-level
+to appear anywhere any time in any position even in-games" / "android
+app deleting deletes profile data, you have not accurately made it
+immune against hard-wipes".
+
+1. **The rooms** - law 71: 12-seat lobby, rooms (dimensions), the owner
+   start, live params, join-order seats, room-scoped relays. The lone
+   law and the ten seconds are dead.
+2. **The absolute seats** - law 72: colors/names/turns ride the room
+   seat everywhere; the local rotation era is over (the dual-P1 dice bug
+   was its child).
+3. **The serialized claims** - law 73: the host's one pump is the
+   serializer; the racing loser reads the owner's confliction line.
+4. **The honest ends** - law 74: disconnects fold the match with a dq
+   row and the why; the pause-proof pump (law 75) kills the random
+   drop root.
+5. **Anywhere notifications** - law 76 (LanNotes, the switch invite).
+6. **The live scan** - law 77; **the online honesty** - law 78; **the
+   add-local-player retirement** - law 79.
+7. **Chat r3** - law 80 (dedupe, live cooldown, dots, last-read, ids).
+8. **Voice r3** - law 81 (the four gates on the wire, dev keys, the
+   beacon, the unhang).
+9. **Face r3** - law 82 (row asks, arrival repaint, 8MB wire, the clip,
+   re-adopt, verified mirrors).
+10. **The CPU word law** - 83; **the slasher LAN 2P** - law 84.
+
+### THE R3 PROOF
+
+- qa_v042_lan: 165 checks 0 fails (the r3 sections: the rooms, the
+  owner start, the absolute rseats, the disconnect fold, the no-solo
+  law, the confliction race, the 12 cap + the honest 13th, the two
+  dimensions, the params wire + scope, the dedupe, the live cooldown).
+- flow_test: ALL TESTS PASSED (the 12-game LAN seat law).
+- The eye pass (tests/v0421r3_shot, Xvfb, 6 shots reviewed by eye): the
+  session sheet (12 seats, the ONLINE OFF truth, no add-local-player),
+  the live scan rows (FREE / HOSTS 2/12 / IN A SESSION - PLAYING LUDO),
+  the top-level invite card over the feed AND over a running game, the
+  room picker, the owner's room (1ST/2ND, YOU - OWNER, START THE GAME).
+- config 0.4.2-3 / code base 31470 (arm32 31471, arm64 31472).

@@ -86,6 +86,14 @@ func _cannon_skin() -> Dictionary:
 # ----------------------------------------------------------------- setup
 
 func _goga_setup() -> void:
+        # v042-1 r3 THE MISSING GATE (the owner: "game tower destroyer is
+        # one of games that are fake-lan"): the r2 seat move never called
+        # lan_hold_begin - the room screen could never mount and the LAN
+        # match was unreachable in production. The gate rides FIRST, like
+        # every other LAN game.
+        if lan_hold:
+                lan_hold_begin()
+                return
         rng.randomize()
         pause_end_run = true     # the pause sheet banks the run
         add_hud_button("SHOP", func(): _shop_open())
@@ -191,6 +199,34 @@ const SEAT_TINTS := [Color("ffb020"), Color("e8574a"), Color("9d7ae8"), Color("4
 
 func _build_seats() -> void:
         _clear_seats()
+        if lan_active and not lan_seats.is_empty():
+                # r3 THE ABSOLUTE SEATS: the visual ring ROTATES for
+                # comfort (I stand at the first angle) but the IDENTITY is
+                # absolute - cannon i wears tint i and the name of room
+                # seat i on EVERY device (the shazam/marble law).
+                var n: int = lan_seats.size()
+                var my_idx := maxi(0, lan_my_index())
+                for i in n:
+                        var angle_i := posmod(i - my_idx, n)
+                        var a: float = TD.SEAT_ANGLES[angle_i % TD.SEAT_ANGLES.size()]
+                        var is_me := i == my_idx
+                        var cannon := _build_cannon(_cannon_skin() if is_me \
+                                        else TD.CANNON_SKINS[0], false, SEAT_TINTS[i % SEAT_TINTS.size()])
+                        cannon.position = Vector3(sin(a) * TD.SEAT_R, 0.0, cos(a) * TD.SEAT_R)
+                        cannon.rotation.y = a
+                        world.add_child(cannon)
+                        var seat := {
+                                "angle": a, "alive": true, "score": 0,
+                                "is_cpu": false, "pers": {},
+                                "cannon": cannon, "tag": null, "tint": SEAT_TINTS[i % SEAT_TINTS.size()],
+                                "fire_clock": 0.0, "burst_left": 0, "burst_clock": 0.0,
+                                "react_clock": 0.0, "target_id": -1,
+                                "rseat": i + 1,
+                        }
+                        if not is_me:
+                                seat["tag"] = _build_lan_tag(i)
+                        seats.append(seat)
+                return
         for i in players:
                 # v042-1 THE 3D SEAT: in a LAN race the rivals are REMOTE
                 # humans, never CPU (THE REAL-ONLY LAW) - their cannons
@@ -210,9 +246,7 @@ func _build_seats() -> void:
                         "fire_clock": 0.0, "burst_left": 0, "burst_clock": 0.0,
                         "react_clock": 0.0, "target_id": -1,
                 }
-                if lan_active and i > 0:
-                        seat["tag"] = _build_lan_tag(i)
-                elif is_cpu:
+                if is_cpu:
                         seat["tag"] = _build_cpu_tag(i)
                 seats.append(seat)
 
@@ -296,31 +330,16 @@ func _build_cpu_tag(i: int) -> Control:
 
 ## the LAN rival's tag: the human's own name rides the cannon
 func _build_lan_tag(i: int) -> Control:
-        var chip := Arc.chip("%s 0" % _lan_name_of(i), "", Color(0, 0, 0, 0.45),
-                        18, SEAT_TINTS[i])
+        var chip := Arc.chip("%s 0" % lan_name_of(i).to_upper(), "", Color(0, 0, 0, 0.45),
+                        18, SEAT_TINTS[i % SEAT_TINTS.size()])
         _overlay_root_ref().add_child(chip)
         return chip
 
-## THE PERSPECTIVE MAP (v042-1): locally the human is always index 0, so
-## local seat i rides the session seat (my_seat_no + i) on the n-circle -
-## the same rotation the snl table wears.
-func _lan_name_of(i: int) -> String:
-        if lan_seats.is_empty():
-                return "RIVAL"
-        var n: int = lan_seats.size()
-        var seat_no := posmod(LAN.my_seat_no() + i, n) + 1
-        for s in lan_seats:
-                if int(s.get("seat", -1)) == seat_no:
-                        return String(s.get("name", "RIVAL")).to_upper()
-        return "RIVAL"
-
-func _lan_local_idx(seat_no: int) -> int:
-        var n: int = maxi(1, lan_seats.size())
-        return posmod(seat_no - LAN.my_seat_no(), n)
-
-func _lan_session_seat(idx: int) -> int:
-        var n: int = maxi(1, lan_seats.size())
-        return posmod(LAN.my_seat_no() + idx, n) + 1
+## THE PERSPECTIVE MAP (r3 THE ABSOLUTE SEATS): seats[i] IS room seat i
+## on every device - no rotation of identity, only the ring's angles
+## rotate for comfort. The old seat-number rotation is dead.
+func _lan_name_of(_i: int) -> String:
+        return lan_name_of(_i).to_upper()
 
 func _seat_world_pos(s: Dictionary, h := 0.0) -> Vector3:
         return Vector3(sin(s["angle"]) * TD.SEAT_R, h, cos(s["angle"]) * TD.SEAT_R)
@@ -680,10 +699,10 @@ func _platform_lands(p: Dictionary) -> void:
                         continue
                 if TD.seat_killed(p["slots"], float(p["rot"]), float(s["angle"])):
                         _kill_seat(s)
-                        if lan_active and s != seats[0]:
+                        if lan_active and s != seats[lan_my_index()]:
                                 var idx := seats.find(s)
-                                _lan_alive[_lan_session_seat(idx)] = false
-                                game_toast("%s IS OUT" % _lan_name_of(idx))
+                                _lan_alive[idx + 1] = false
+                                game_toast("%s IS OUT" % lan_name_of(idx).to_upper())
         if p["coin"] != null and is_instance_valid(p["coin"]):
                 (p["coin"] as Node3D).queue_free()
                 p["coin"] = null
@@ -719,7 +738,7 @@ func _run_over() -> void:
         achievement_max("run_destroyed", run_destroyed)
         if lan_active:
                 LAN.send_prog({"k": "dead", "s": score})
-                _lan_alive[LAN.my_seat_no()] = false
+                _lan_alive[maxi(1, lan_my_index() + 1)] = false
                 _lan_check_last()
         finish_run(score, run_coins)
 
@@ -732,15 +751,16 @@ func _run_over() -> void:
 ## device rules the same deaths), scores ride lan_prog, and the verdict is
 ## THE LAST CANNON standing.
 
-var _lan_alive := {}     # seat -> alive
+var _lan_alive := {}     # rseat -> alive
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
         lan_seed = seed_v
         rng.seed = seed_v        # THE IDENTICAL TOWERS LAW
+        lan_seats = m_seats
         players = m_seats.size()
-        for s in m_seats:
-                _lan_alive[int(s.get("seat", 1))] = true
+        for i in m_seats.size():
+                _lan_alive[i + 1] = true
         _clear_phase_ui()
         _start_run()
         game_toast("SAME TOWERS - LAST CANNON WINS")
@@ -752,25 +772,34 @@ func lan_solo() -> void:
 func lan_prog(from_dev: String, data: Dictionary) -> void:
         if not lan_active:
                 return
-        var seat := -1
-        for st in lan_seats:
-                if String(st.get("dev", "")) == from_dev:
-                        seat = int(st.get("seat", -1))
+        var idx := -1
+        for i in lan_seats.size():
+                if String(lan_seats[i].get("dev", "")) == from_dev:
+                        idx = i
                         break
-        if seat < 0:
+        if idx < 0 or idx >= seats.size():
                 return
+        var rseat := idx + 1
         match String(data.get("k", "")):
                 "score":
-                        var idx := _lan_local_idx(seat)
-                        if idx >= 0 and idx < seats.size():
+                        if idx < seats.size():
                                 seats[idx]["score"] = int(data.get("s", 0))
                 "dead":
-                        _lan_alive[seat] = false
-                        game_toast("%s IS OUT" % _lan_name_of(_lan_local_idx(seat)))
+                        _lan_alive[rseat] = false
+                        game_toast("%s IS OUT" % lan_name_of(idx).to_upper())
                         _lan_check_last()
 
 func lan_end(results: Array) -> void:
-        pass
+        # THE DISCONNECT LAW: the room folded under us - an honest verdict
+        # card, never a corrupted limbo (the base already toasted the why).
+        var dq := ""
+        for r in results:
+                if typeof(r) == TYPE_DICTIONARY and bool(r.get("dq", false)):
+                        dq = String(r.get("name", "A PLAYER"))
+                        break
+        if dq != "" and phase != "over":
+                game_toast("%s LEFT - THE MATCH IS OVER" % dq.to_upper())
+                finish_run(score, run_coins)
 
 ## THE LAST CANNON: every rival out while I stand = the win (+1, the
 ## towerball race verdict shape). The run keeps banking until my death.
@@ -780,7 +809,9 @@ func _lan_check_last() -> void:
         for seat in _lan_alive:
                 if bool(_lan_alive[seat]):
                         return
-        if seats.is_empty() or not bool(seats[0]["alive"]):
+        var my_idx := lan_my_index()
+        if my_idx < 0 or my_idx >= seats.size() \
+                        or not bool(seats[my_idx]["alive"]):
                 return
         add_score(1)
         game_toast("THE LAST CANNON  +1")

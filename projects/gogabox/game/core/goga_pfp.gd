@@ -36,6 +36,7 @@ var _frame := 0.0
 var _video: VideoStreamPlayer = null
 var _poster: ImageTexture = null
 var _poster_tried := false
+var _last_seat := Vector2.ZERO
 
 static func make(p_face: Dictionary, p_size: Vector2, p_focused := false) -> GogaPfp:
         var g := GogaPfp.new()
@@ -51,11 +52,34 @@ static func face_of_seat(seat: Dictionary) -> Dictionary:
 
 func _ready() -> void:
         mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # r3 THE WIDE-MEDIA LAW (the owner: "when the media is wide it
+        # overlaps with the name text, this can be fixed too by making it
+        # dynamic"): the plate CLIPS its children - a wide video can never
+        # spill over the name row again - and the video itself is seated
+        # keep-aspect INSIDE the plate (the dynamic fit).
+        clip_contents = true
+        resized.connect(_seat_video)
+        # r3 THE FACE ARRIVAL: a face fetched over the wire repaints every
+        # renderer that waited for it (the placeholder-forever fix's other
+        # half - the rows asked, now they also SEE the answer).
+        LAN.face_arrived.connect(_on_face_arrived)
         if not _swept:
                 _swept = true
                 LanProfile.cache_sweep()
         if not media.is_empty() and String(media.get("ext", "")) == "ogv":
                 _mount_video()
+
+func _exit_tree() -> void:
+        if LAN.face_arrived.is_connected(_on_face_arrived):
+                LAN.face_arrived.disconnect(_on_face_arrived)
+
+func _on_face_arrived(hash_v: String) -> void:
+        if String(media.get("h", "")) != hash_v:
+                return
+        if _video == null and String(media.get("ext", "")) == "ogv":
+                _mount_video()
+        _poster_tried = false
+        queue_redraw()
 
 func _mount_video() -> void:
         var hash_v := String(media.get("h", ""))
@@ -71,6 +95,36 @@ func _mount_video() -> void:
         _video.visible = false
         _video.mouse_filter = Control.MOUSE_FILTER_IGNORE
         add_child(_video)
+        _seat_video()
+
+## THE DYNAMIC SEAT: the video fits INSIDE the plate, keep-aspect,
+## centered (a wide face letterboxes on the plate - the name below the
+## plate is never touched).
+func _seat_video() -> void:
+        if _video == null or not is_instance_valid(_video):
+                return
+        var sz := size
+        if sz.x <= 0.0 or sz.y <= 0.0:
+                sz = custom_minimum_size
+        if sz.x <= 0.0 or sz.y <= 0.0:
+                return
+        var vw := float(media.get("w", 0.0))
+        var vh := float(media.get("hh", 0.0))
+        if vw <= 0.0 or vh <= 0.0:
+                # the meta is silent - the stream's own size, then square
+                var ts: Vector2 = Vector2.ZERO
+                if _video.get_texture() != null:
+                        ts = _video.get_texture().get_size()
+                if ts.x <= 0.0 or ts.y <= 0.0:
+                        vw = sz.x
+                        vh = sz.y
+                else:
+                        vw = ts.x
+                        vh = ts.y
+        var k := minf(sz.x / vw, sz.y / vh)
+        var ds := Vector2(vw * k, vh * k)
+        _video.position = (sz - ds) * 0.5
+        _video.size = ds
 
 func _process(delta: float) -> void:
         if media.is_empty():
@@ -81,6 +135,9 @@ func _process(delta: float) -> void:
                 _frame = fmod(_frame + float(n) * float(media.get("fps", 8.0)) * delta,
                                 float(n))
         elif ext == "ogv" and _video != null:
+                if size.distance_squared_to(_last_seat) > 1.0:
+                        _last_seat = size
+                        _seat_video()
                 if focused and is_visible_in_tree():
                     if not _video.is_playing():
                             _video.play()

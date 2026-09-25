@@ -217,6 +217,11 @@ const GAMES := [
                         "the shop sells the vegetable basket (1500) and the dessert shelf (2400) - the options toggle whatever you own",
                 ],
                 "genres": {"main": ["action", "arcade"], "sub": ["hacknslash", "singleplayer"]},
+                # v042-1 r3 THE SLASHER LAN (the owner: "make the game fruit
+                # ninja be LAN 2 players ... make the players be blue as the
+                # first player and red is the second"): 2P race, seeded
+                # harvests, the blade wears the seat's absolute color.
+                "lan": {"players": 2, "platforms": ["android", "pc"], "cross": true},
                 "ach": [
     {"id": "score_t1", "title": "Sharp Blade", "desc": "Score 300 in one run", "tier": 1, "rule": {"k": "max", "key": "max_score", "v": 300}},
     {"id": "score_t2", "title": "Juice Storm", "desc": "Score 800 in one run", "tier": 2, "rule": {"k": "max", "key": "max_score", "v": 800}},

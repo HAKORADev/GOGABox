@@ -64,7 +64,11 @@ const MEDIA_720 := 720              # the long-side cap (the compress law)
 const MEDIA_GIF_720 := 480          # GIFs decode in GDScript - a smaller cap
 const MEDIA_GIF_MAX_FRAMES := 150
 const MEDIA_FILE_MAX := 16 * 1024 * 1024   # the import file cap (16MB)
-const MEDIA_WIRE_MAX := 2 * 1024 * 1024    # the visitor transfer cap
+## r3: the wire cap rides the video faces - a 60s 720p ogv dwarfed the old
+## 2MB and its owner saw the placeholder forever on every other device.
+## 8MB carries every legal face (the import cap is 16MB, the wire stays
+## honest about the refuse).
+const MEDIA_WIRE_MAX := 8 * 1024 * 1024    # the visitor transfer cap
 const CACHE_DAYS := 30              # the cache's age law
 
 const GENDERS := ["male", "female", "other"]
@@ -103,8 +107,42 @@ static func _load() -> void:
         # THE ANCHOR LAW: the device always stamps its own anchor.
         merged["anchor"] = anchor()
         _cache = merged
+        # r3 THE RE-ADOPT LAW (the owner: "android app deleting deletes
+        # profile data, you have not accurately made it immune against
+        # hard-wipes"): a wiped app re-adopts its mirror - but the FACE
+        # died anyway: the mirror's face file sat beside the JSON while
+        # the cache was empty, and cache_has(h) was false forever (the
+        # drawn guy came back). The face file now rides BACK into the
+        # cache on load, so the whole profile - face included - survives.
+        _readopt_face()
         if float(_cache.get("saved_ts", 0.0)) <= 0.0:
                 save()
+
+## The mirror's face_<hash>.<ext> re-enters the cache when the cache
+## lost it (the hard-wipe return, the 30-day sweep's collateral).
+static func _readopt_face() -> void:
+        var meta := face_media()
+        if meta.is_empty():
+                return
+        var h := String(meta.get("h", ""))
+        var ext := String(meta.get("ext", "webp"))
+        if h == "" or cache_has(h):
+                return
+        for path in _all_paths():
+                var dir := String(path).get_base_dir()
+                if dir.begins_with("user://") or not dir.begins_with("/"):
+                        continue
+                var src := dir.path_join("face_" + h + "." + ext)
+                if not FileAccess.file_exists(src):
+                        continue
+                var f := FileAccess.open(src, FileAccess.READ)
+                if f == null:
+                        continue
+                var bytes := f.get_buffer(f.get_length())
+                f.close()
+                if not bytes.is_empty():
+                        cache_store(h, ext, bytes, meta)
+                        return
 
 static func _defaults() -> Dictionary:
         return {
@@ -138,10 +176,24 @@ static func save() -> void:
                 if f != null:
                         f.store_string(body)
                         f.close()
+                        # r3 THE VERIFIED MIRROR: a mirror that silently
+                        # failed (an old Android without the write grant,
+                        # a scoped-storage refusal) is HOW the hard-wipe
+                        # ate the profile. Every non-user write is read
+                        # back; the failure is visible, never silent.
+                        if not path.begins_with("user://"):
+                                if not FileAccess.file_exists(path):
+                                        push_warning("lan_profile: the survival mirror FAILED to write: " + path)
+                                else:
+                                        mirror_ok = true
         var live := String(face_media().get("h", ""))
         if live != _mirrored:
                 _mirror_face()
                 _mirrored = live
+
+## Did any EXTERNAL mirror verify this boot? (the profile sheet reads
+## this and says the survival truth out loud.)
+static var mirror_ok := false
 
 ## The current face's media file mirrors beside the profile JSON (THE
 ## SURVIVAL LAW covers the face too). The hash stays the key.

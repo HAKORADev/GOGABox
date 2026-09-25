@@ -713,37 +713,40 @@ func _skin_id() -> String:
         return sid
 
 func _is_user_army(a: int) -> bool:
-        # v042-1 THE LAN SEAT + THE PERSPECTIVE LAW: the local army p rides
-        # the session seat (my_seat_no + p - 1) on the n-seat circle - army
-        # 1 is ME on every device; the combo seat owns a second army.
+        # r3 THE ABSOLUTE SEATS: army a IS room seat a on every device -
+        # no rotation. The local army is the one whose seat's dev is mine;
+        # the combo seat owns a second army.
         if lan_active:
-                return String(_lan_seat_of_army(int(a)).get("dev", "")) \
+                var idx: int = int(a) - 1
+                if idx < 0 or idx >= lan_seats.size():
+                        return false
+                return String(lan_seats[idx].get("dev", "")) \
                                 in [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
         return int(teams.get(a, -1)) == int(teams.get(1, 1)) \
                         and playing.has(a) and teams.has(1) \
                         and int(teams[1]) == int(teams[a])
 
-## THE ROTATION MAPS: the local army p <-> the session seat.
+## THE ABSOLUTE MAPS (r3): the army number IS the room seat - the seat
+## dict of army p is lan_seats[p-1], everywhere.
 func _lan_seat_of_army(p: int) -> Dictionary:
-        var n: int = maxi(1, lan_seats.size())
-        var seat_no := posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
-        for s in lan_seats:
-                if int(s.get("seat", -1)) == seat_no:
-                        return s
-        return {}
+        var idx: int = int(p) - 1
+        if idx < 0 or idx >= lan_seats.size():
+                return {}
+        return lan_seats[idx]
 
 func _lan_seat_no_of_army(p: int) -> int:
-        var n: int = maxi(1, lan_seats.size())
-        return posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
+        return int(p)
 
 func _pawn_col(a: int) -> Color:
         var th: Array = _theme()["armies"]
-        var col: Color = th[(a - 1) % 4]
-        if _is_user_army(a):
+        # r3 THE ABSOLUTE COLOR LAW: in a LAN match every army wears its
+        # ROOM seat's color on every device - the owned skin is local and
+        # would repaint me differently per device (the dice-conquer law).
+        if not lan_active and _is_user_army(a):
                 var sid := _skin_id()
                 if sid != "theme":
-                        col = SKINS[sid]["col"]
-        return col
+                        return SKINS[sid]["col"]
+        return th[(a - 1) % 4]
 
 func _pawn_ink(a: int) -> Color:
         var col := _pawn_col(a)
@@ -1370,8 +1373,10 @@ func _draw_trays() -> void:
                         _draw_rr(fx_l, dr.grow(9.0 + 3.0 * breath), 14.0,
                                         ring, false, 2.6)
                         _draw_waiting_die(dr)
-                # THE MARK: the bare numeral (the owner's "1,2,3,4" law)
-                var who := "YOU" if _is_user_army(army) else "CPU"
+                # THE MARK: the bare numeral + the seat's name in a LAN
+                # match (THE CPU WORD LAW - a human never reads "CPU")
+                var who := "YOU" if _is_user_army(army) \
+                                else (_lan_name_of_army(army) if lan_active else "CPU")
                 fx_l.draw_string(f, tr.position + Vector2(12.0,
                                 tr.size.y * 0.52), str(army),
                                 HORIZONTAL_ALIGNMENT_LEFT, -1, 34, word)
@@ -1721,12 +1726,13 @@ func _mode_sheet() -> void:
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
         mode = 1 if m_seats.size() <= 2 else 4
         teams = teams_of(mode)
         playing = []
         for i in m_seats.size():
-                playing.append(i + 1)
+                playing.append(i + 1)     # the ABSOLUTE room seats
         opener = 1
         rounds = 0
         sheet_pop()
@@ -1736,10 +1742,15 @@ func lan_solo() -> void:
         lan_active = false
         _mode_sheet()
 
+## The army's display name (its room seat's human).
+func _lan_name_of_army(a: int) -> String:
+        var s := _lan_seat_of_army(a)
+        return String(s.get("name", "RIVAL")).to_upper()
+
 func lan_act(who: int, a: Dictionary) -> void:
-        # THE WHO GATE (v042-1): the act lands only when it is THAT seat's
-        # turn here - the rotated sequences align, a stranger never steals
-        if who != _lan_seat_no_of_army(turn_army):
+        # THE WHO GATE: the act lands only when its sender IS the turn's
+        # absolute seat (army numbers ARE room seats now).
+        if who != turn_army:
                 return
         match String(a.get("k", "")):
                 "roll":
@@ -1751,7 +1762,16 @@ func lan_act(who: int, a: Dictionary) -> void:
                                                 int(a.get("np", 0)), true)
 
 func lan_end(results: Array) -> void:
-        pass
+        # THE DISCONNECT LAW: the room folded under us - the honest verdict
+        # (the base already toasted the why).
+        var dq := ""
+        for r in results:
+                if typeof(r) == TYPE_DICTIONARY and bool(r.get("dq", false)):
+                        dq = String(r.get("name", "A PLAYER"))
+                        break
+        if dq != "" and not over:
+                game_toast("%s LEFT - THE MATCH IS OVER" % dq.to_upper())
+                finish_run(score, run_coins)
 
 func _pick_mode(m: int) -> void:
         mode = m
@@ -1847,8 +1867,9 @@ func _banner() -> void:
 func _do_roll() -> void:
         roll = _rng.randi_range(1, 6)
         if lan_active:
-                LAN.send_act_as(_lan_seat_no_of_army(turn_army),
-                                {"k": "roll", "r": roll})
+                # r3: the stamp rides automatically - my room seat IS the
+                # turn's army here (the WHO GATE guarantees it)
+                LAN.send_act({"k": "roll", "r": roll})
         _apply_roll(roll)
 
 ## The ONE roll body (the local roll and the relayed roll land identically).
@@ -1893,8 +1914,7 @@ func _die_fade() -> void:
 
 func _start_move(piece: int, np: int, relayed := false) -> void:
         if lan_active and not relayed:
-                LAN.send_act_as(_lan_seat_no_of_army(turn_army),
-                                {"k": "move", "piece": piece, "np": np})
+                LAN.send_act({"k": "move", "piece": piece, "np": np})
         var from_pos := int(poss[(turn_army - 1) * 4 + piece])
         var pts := PackedVector2Array()
         if from_pos < 0:
@@ -2004,7 +2024,14 @@ func _resolve(winner_team: int) -> void:
         state = "round_over"
         clock = 0.0
         _die_fade()
-        var user_team := int(teams[1])
+        # r3 THE ABSOLUTE VERDICT: MY team is the team of MY first army
+        # (the local army is no longer army 1 - it is my room seat's army).
+        var my_army := 1
+        for a in playing:
+                if _is_user_army(int(a)):
+                        my_army = int(a)
+                        break
+        var user_team := int(teams.get(my_army, 1))
         var w := 1 if winner_team == user_team else 2
         if w == 1:
                 wins += 1
@@ -2087,7 +2114,7 @@ func _coin_taken(who_army: int) -> void:
                 _dust_burst(at, Color("ffd24a"), 12)
         else:
                 Jukebox.sfx("ld_coin", -6.0, 0.8)
-                game_toast("THE CPU GRABBED THE COIN")
+                game_toast("%s GRABBED THE COIN" % (_lan_name_of_army(who_army) if lan_active else "THE CPU"))
 
 # ============================================================ the tick
 

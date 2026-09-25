@@ -2,10 +2,13 @@ extends RefCounted
 class_name LanRoster
 ## THE PAUSE ROSTER (v042-1, the owner: "in the pause menu, add button
 ## called multiplayer, in it, show each player number and who is the
-## player behind it, in a proper well-designed way") + THE VOICE LAW
-## seat: per-player two-layer toggles (MIC = they hear me / HEAR = I hear
-## them) including the YOU row's master pair, with per-LAYER device
-## detection ("some people may hear only or listen only and that is ok").
+## player behind it, in a proper well-designed way") + THE VOICE LAW r3:
+## the FOUR honest gates, all visible (the owner's semantics law):
+##   THEIR MIC  - their live transmission state (the VST wire's truth)
+##   THEIR HEAR - their live speaker state (do they hear the room?)
+##   MY MIC     - the toggle: can THIS player hear me?
+##   MY HEAR    - the toggle: do I hear this player?
+## Everything is dev-keyed (the seat numbers renumbered; devs are forever).
 
 ## Build the roster into a pause sheet's VBox. `game` is the GogaGame /
 ## GogaGame3D (the base carries lan_seats).
@@ -18,15 +21,14 @@ static func build(vb: VBoxContainer, game: Node) -> void:
         vb.add_child(list)
         var my_dev := LAN.my_dev()
         for s in LAN.seats:
+                LAN.pfp_touch(s)
                 list.add_child(_seat_row(s, my_dev))
         if LAN.seats.is_empty():
                 list.add_child(Arc.label("no seats - the session ended", 20,
                                 Color("8a6a40"), false))
-        # THE VOICE LAW (the owner: "add mic support for devices that has
-        # both in/out audio devices... two buttons next to each player...
-        # one for hearing and second for listening")
+        # THE VOICE LAW (the owner's semantics, all four gates visible)
         vb.add_child(Arc.label("VOICE", 20, Arc.HOT))
-        var note := Arc.label("MIC = they hear me.  HEAR = I hear them.  every layer turns alone - a mic-less PC listens only, and that is fine", 17,
+        var note := Arc.label("their mic = you hear them. their hear = they hear the room. my mic = they hear me. my hear = I hear them", 17,
                         Color("8a6a40"), false)
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         vb.add_child(note)
@@ -39,9 +41,6 @@ static func build(vb: VBoxContainer, game: Node) -> void:
         vb.add_child(vlist)
         for s in LAN.seats:
                 vlist.add_child(_voice_row(s, my_dev))
-        # the state refresh rides a per-frame tick on the sheet's owner
-        # (the toggles repaint through their own press handlers - a live
-        # chorus here would fight the pause)
 
 static func _seat_row(s: Dictionary, my_dev: String) -> Control:
         var row := PanelContainer.new()
@@ -65,6 +64,11 @@ static func _seat_row(s: Dictionary, my_dev: String) -> Control:
         var tag := "YOU" if me else ("HOST" if int(s.get("seat", 1)) == 1 else "MEMBER")
         if int(s.get("local_slot", 0)) == 1:
                 tag = "COMBO"
+        var st := String(s.get("state", ""))
+        if st.begins_with("play:"):
+                tag += "  ·  IN-GAME"
+        elif st.begins_with("room:"):
+                tag += "  ·  IN ROOM"
         var plat := "PHONE" if String(s.get("platform", "pc")) == "android" else "PC"
         h.add_child(Arc.label("%s  ·  %s" % [tag, plat], 17, Arc.GOOD, false))
         row.add_child(h)
@@ -73,6 +77,8 @@ static func _seat_row(s: Dictionary, my_dev: String) -> Control:
 static func _voice_row(s: Dictionary, my_dev: String) -> Control:
         var row := PanelContainer.new()
         row.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.12), 16))
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
         var h := HBoxContainer.new()
         h.add_theme_constant_override("separation", 10)
         var no := Arc.label(str(int(s.get("seat", 1))), 22, Arc.HOT)
@@ -82,37 +88,55 @@ static func _voice_row(s: Dictionary, my_dev: String) -> Control:
         nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
         h.add_child(nm)
-        var seat := int(s.get("seat", 1))
-        var me := String(s.get("dev", "")) == my_dev
+        var dev := String(s.get("dev", ""))
+        var me := dev == my_dev
         if me:
-                # THE YOU ROW: the master pair (my mic to the room, my hear)
-                h.add_child(_voice_btn("MIC", func(): return Voice.mic_on,
+                # THE YOU ROW: my master pair - my mic (nobody hears me when
+                # it is off) and my hear (I hear nobody when it is off).
+                h.add_child(_voice_btn("MY MIC", func(): return Voice.mic_on,
                                 func(): Voice.toggle_mic_master()))
-                h.add_child(_voice_btn("HEAR", func(): return Voice.hear_on,
+                h.add_child(_voice_btn("MY HEAR", func(): return Voice.hear_on,
                                 func(): Voice.toggle_hear_master()))
+                v.add_child(h)
         else:
+                # THE REMOTE TRUTH: their live mic/hear states (the VST
+                # wire), then my two gates toward them.
+                var rs: Dictionary = Voice.remote_of(dev)
+                var tm := Arc.label("THEIR MIC %s" % ("ON" if bool(rs.get("mic", false)) else "OFF"),
+                                16, Arc.GOOD if bool(rs.get("mic", false)) else Color("9a8a70"), false)
+                tm.custom_minimum_size = Vector2(150, 0)
+                h.add_child(tm)
+                var th := Arc.label("THEIR HEAR %s" % ("ON" if bool(rs.get("hear", true)) else "OFF"),
+                                16, Arc.GOOD if bool(rs.get("hear", true)) else Color("9a8a70"), false)
+                h.add_child(th)
+                v.add_child(h)
+                var h2 := HBoxContainer.new()
+                h2.add_theme_constant_override("separation", 10)
                 var mic_ok: bool = Voice.has_mic and Voice.mic_granted
-                var mic := _voice_btn("MIC", func(): return Voice.can_hear_me(seat),
+                var mic := _voice_btn("MY MIC TO THEM", func(): return Voice.can_hear_me(dev),
                                 func():
                                         if OS.get_name() == "Android" \
                                                         and not Voice.mic_granted:
                                                 Voice.request_mic()
-                                        Voice.toggle_mic_to(seat))
+                                        Voice.toggle_mic_to(dev))
                 if not mic_ok:
                         mic.disabled = true
-                h.add_child(mic)
-                h.add_child(_voice_btn("HEAR", func(): return Voice.i_can_hear(seat),
-                                func(): Voice.toggle_hear_from(seat)))
-        row.add_child(h)
+                h2.add_child(mic)
+                h2.add_child(_voice_btn("MY HEAR OF THEM", func(): return Voice.i_can_hear(dev),
+                                func(): Voice.toggle_hear_from(dev)))
+                v.add_child(h2)
+        row.add_child(v)
         return row
 
-## The toggle chip: green = on, gray = off. The press runs the toggle then
-## repaints from the LIVE getter - no full-sheet rebuild, the pause stays
-## calm. (Callable returns bool - GDScript lambdas: `func(): return x`.)
+## The toggle chip: green = on, gray = off. The press runs the toggle
+## then repaints from the LIVE getter - and the press's OWN visual state
+## is reset (r3 THE UNHANG LAW: the Android chip held its pressed paint
+## after the lift, reading as a stuck "holding" state).
 static func _voice_btn(txt: String, get_state: Callable, cb: Callable) -> Button:
         var b := Button.new()
         b.text = " %s " % txt
         b.custom_minimum_size = Vector2(120, 52)
+        b.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
         b.add_theme_font_override("font", Arc.font_ui())
         b.add_theme_font_size_override("font_size", 18)
         var paint := func():
@@ -126,4 +150,8 @@ static func _voice_btn(txt: String, get_state: Callable, cb: Callable) -> Button
                 Jukebox.sfx("click", -4.0)
                 cb.call()
                 paint.call())
+        b.pressed.connect(func():
+                # the lift cleans the pressed paint on every state
+                b.release_focus()
+                b.accept_event())
         return b

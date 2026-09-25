@@ -955,7 +955,7 @@ func _draw_dice() -> void:
                                         face.size.x, int(cell * 0.42), ink)
                 # THE GRAY-OUT PRESS (the hold law)
                 if holding and ghost_cell == i and state == "play" \
-                                and turn == 1:
+                                and turn == my_slot():
                         var pulse := 0.30 + 0.10 * sin(_time * 7.0)
                         _draw_rr(dice_l, face, radius,
                                         Color(0.10, 0.09, 0.07, pulse))
@@ -1246,10 +1246,15 @@ func _gate_down() -> void:
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
-        next_opener = 1
+        next_opener = 1          # ABSOLUTE: the room's first player opens
         done_rounds = 0
         _new_round()
+
+## MY slot: my absolute seat number (1 in solo; my join-order seat in LAN).
+func my_slot() -> int:
+        return maxi(1, lan_my_index() + 1) if lan_active else 1
 
 func lan_solo() -> void:
         lan_active = false
@@ -1264,8 +1269,9 @@ func _lan_name(p: int) -> String:
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):
                 "place":
-                        if state == "play" or state == "wait":
-                                _place(int(a.get("i", -1)), 2)
+                        # THE WHO GATE: only the turn's absolute slot lands.
+                        if (state == "play" or state == "wait") and who == turn:
+                                _place(int(a.get("i", -1)), who)
 
 func _new_round() -> void:
         _new_board()
@@ -1307,10 +1313,10 @@ func _new_round() -> void:
                         coin_cell = _rng.randi() % (n * n)
         # THE STATE LAW (v0.3.9-1): _new_round is the round's ONLY door -
         # it seats the state machine whole
-        if turn == 1:
+        if turn == my_slot():
                 state = "play"      # the player opens: the board is live
         else:
-                state = "wait"      # the CPU opens: it thinks, then taps
+                state = "wait"      # the rival opens: they think, then tap
                 if not lan_active:
                         cpu_think = true
                         think_beat = _rng.randf_range(0.4, 0.8)
@@ -1321,13 +1327,15 @@ func _new_round() -> void:
 func _banner() -> void:
         if state == "round_over":
                 return
-        if turn == 1:
+        if turn == my_slot():
                 turn_lbl.text = "YOUR MOVE"
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.95))
         else:
                 var k := int(_time * 2.5) % 3 + 1
-                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(k)
+                # THE CPU WORD LAW: the LAN wait reads the player's name.
+                turn_lbl.text = ("%s IS THINKING%s" % [_lan_name(turn).to_upper(), " .".repeat(k)]) \
+                                if lan_active else "CPU IS THINKING%s" % " .".repeat(k)
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.8))
 
@@ -1368,7 +1376,7 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         _release(t.position)
         elif event is InputEventScreenDrag:
-                if holding and state == "play" and turn == 1:
+                if holding and state == "play" and turn == my_slot():
                         ghost_cell = _cell_at(
                                         (event as InputEventScreenDrag).position)
                         dice_l.queue_redraw()
@@ -1384,7 +1392,7 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         _release(mb.position)
         elif event is InputEventMouseMotion:
-                if holding and state == "play" and turn == 1:
+                if holding and state == "play" and turn == my_slot():
                         ghost_cell = _cell_at(
                                         (event as InputEventMouseMotion).position)
                         dice_l.queue_redraw()
@@ -1406,7 +1414,7 @@ func _cell_at(at: Vector2) -> int:
 ## THE PRESS: the gray-out wakes on the die under the finger - unless
 ## the gate's tap shadow still rides (THE GATE HUSH)
 func _press(at: Vector2) -> void:
-        if state != "play" or turn != 1 or move_who != 0:
+        if state != "play" or turn != my_slot() or move_who != 0:
                 return
         if _time < gate_hush:
                 return
@@ -1424,12 +1432,12 @@ func _release(_at: Vector2) -> void:
         dice_l.queue_redraw()
         if i < 0:
                 return          # the cancel: nothing is placed
-        if state != "play" or turn != 1 or move_who != 0:
+        if state != "play" or turn != my_slot() or move_who != 0:
                 return
-        if not legal_at(owners, i, 1):
+        if not legal_at(owners, i, my_slot()):
                 _tsfx("denied", -8.0)
                 return
-        _place(i, 1)
+        _place(i, my_slot())
 
 # ============================================================ the moves
 
@@ -1437,7 +1445,7 @@ func _release(_at: Vector2) -> void:
 ## runs one breath per pop - the tick owns it (the STATE LAW: the move
 ## pipeline seats state = anim the moment a spill is armed)
 func _place(i: int, who: int) -> void:
-        if who == 1 and lan_active:
+        if lan_active and who == my_slot():
                 LAN.send_act({"k": "place", "i": i})
         var old := int(owners[i])
         owners[i] = who
@@ -1530,7 +1538,7 @@ func _land(l: Dictionary) -> void:
 func _end_move() -> void:
         var who := move_who
         move_who = 0
-        if who == 1:
+        if who == my_slot():
                 achievement_max("chain", chain_n)
                 player_best_chain = maxi(player_best_chain, chain_n)
                 if move_flips > 0:
@@ -1540,12 +1548,12 @@ func _end_move() -> void:
         if count_owned(owners, who) == n * n:
                 _resolve(who)        # TOTAL CONQUEST - the original's law
                 return
-        if who == 2:
-                turn = 1
+        if who != my_slot():
+                turn = my_slot()
                 state = "play"
                 _banner()
         else:
-                turn = 2
+                turn = 3 - my_slot()
                 state = "wait"
                 if not lan_active:
                         cpu_think = true
@@ -1573,7 +1581,7 @@ func _resolve(w: int) -> void:
         done_rounds += 1
         mem = remember(mem, {"mass": player_best_chain, "result": w,
                         "profile": profile})
-        if w == 1:
+        if w == my_slot():
                 wins += 1
                 streak += 1
                 add_score(1)                     # THE OWNER'S LAW: win = +1
@@ -1592,15 +1600,16 @@ func _resolve(w: int) -> void:
                 streak = 0
                 if score > 0:
                         add_score(-1)    # never under zero (the xo law)
-                verdict_lbl.text = ("%s CONQUERS THE BOARD  -1" % _lan_name(2).to_upper()) if lan_active else "THE CPU CONQUERS THE BOARD  -1"
+                verdict_lbl.text = ("%s CONQUERS THE BOARD  -1" % _lan_name(w).to_upper()) if lan_active else "THE CPU CONQUERS THE BOARD  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 _tsfx("lose", -3.0)
-        # THE OPENER LAW: the loser starts next (no draws on this board)
-        if w == 1:
-                next_opener = 2
+        # THE OPENER LAW (absolute): the loser's SLOT starts next (no
+        # draws on this board)
+        if w == my_slot():
+                next_opener = 3 - my_slot()
         else:
-                next_opener = 1
+                next_opener = my_slot()
         achievement_max("max_score", score)
         _refresh_widget()
         verdict_lbl.visible = true
@@ -1725,7 +1734,7 @@ func _dust_burst(at: Vector2, col: Color, cnt := 6) -> void:
 func _coin_taken(who: int, i: int) -> void:
         coin_cell = -1
         var at := cell_center(i)
-        if who == 1:
+        if who == my_slot():
                 add_run_coins(1)
                 achievement_count("coins", 1)
                 _tsfx("coin", -3.0)
@@ -1733,7 +1742,7 @@ func _coin_taken(who: int, i: int) -> void:
                 _dust_burst(at, Color("ffd24a"), 14)
         else:
                 Jukebox.sfx("coin", -6.0, 0.8)
-                game_toast("THE CPU GRABBED THE COIN")
+                game_toast("%s GRABBED THE COIN" % _lan_name(who).to_upper())
 
 # ============================================================ the options
 ## THE BOARD SIZES (the 2048 mechanic word for word): the options sheet

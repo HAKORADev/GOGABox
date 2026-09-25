@@ -1821,7 +1821,9 @@ func _draw_reason() -> String:
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
-        player_white = LAN.my_seat_no() == 1
+        # r3 THE ABSOLUTE SEATS: white is the ROOM's first player (join
+        # order) on every device - the board still draws from my side.
+        player_white = lan_my_index() == 0
         color_override = ""
         rounds = 0
         _new_round()
@@ -1831,9 +1833,9 @@ func lan_solo() -> void:
         _build_ready()
 
 func _lan_name() -> String:
-        if lan_seats.is_empty():
-                return "RIVAL"
-        return String(lan_seats[0].get("name", "RIVAL"))
+        # the RIVAL's name (the other absolute seat in the 2P match)
+        var rival := 0 if lan_my_index() != 0 else 1
+        return lan_name_of(rival)
 
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):

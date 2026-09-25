@@ -262,6 +262,23 @@ func _user_col() -> Color:
                 return SKINS[skin]["col"]
         return SKINS["classic"]["col"]
 
+## r3 THE ABSOLUTE COLOR LAW (the owner: "in ping pong both players are
+## controlling red and on both sides they see the opponent is blue
+## instead of one see himself blue and the other see himself red"): in a
+## LAN match the pads wear their ROOM SEAT's color on every device -
+## seat 1 blue, seat 2 red. Solo keeps the owned skin.
+const COL_USER_ABS := Color("3f7fd4")
+
+func _abs_my_col() -> Color:
+        if not lan_active:
+                return _user_col()
+        return COL_USER_ABS if lan_my_index() == 0 else COL_ENEMY
+
+func _abs_enemy_col() -> Color:
+        if not lan_active:
+                return COL_ENEMY
+        return COL_ENEMY if lan_my_index() == 0 else COL_USER_ABS
+
 func _show_options() -> void:
         _phase = "options"
         _clear_overlay()
@@ -1190,8 +1207,8 @@ func _tick_pads() -> void:
                 _flash_t = maxf(_flash_t, 0.12)
                 _flash_pos = ball_pos
                 if _sparkles_on():
-                        var dcol: Color = _user_col() if bool(p["user"]) \
-                                        else COL_ENEMY
+                        var dcol: Color = _abs_my_col() if bool(p["user"]) \
+                                        else _abs_enemy_col()
                         _dust_at(contact, ball_dir, dcol)
                 break   # one honest bounce per frame
 
@@ -1531,7 +1548,7 @@ func _paint(v: Node2D) -> void:
         _paint_fx(v)
 
 func _paint_shreds(v: Node2D) -> void:
-        var tint := _user_col() if _sparkles_on() else Color(1, 1, 1)
+        var tint := _abs_my_col() if _sparkles_on() else Color(1, 1, 1)
         for s in _shreds:
                 var tw := 0.5 + 0.5 * sin(float(s["ph"]) * 2.0)
                 # v0.2.3 OWNER CALL: the lights were "too mute" - brighter
@@ -1557,7 +1574,7 @@ func _paint_court(v: Node2D) -> void:
         var u: Dictionary = pads_by_id.get("user", null)
         if u != null:
             for p in pads:
-                var col: Color = _user_col() if bool(p["user"]) else COL_ENEMY
+                var col: Color = _abs_my_col() if bool(p["user"]) else _abs_enemy_col()
                 col.a = 0.32 if bool(p["user"]) else 0.24
                 match String(p["edge"]):
                         "top":
@@ -1657,7 +1674,7 @@ func _chevron(v: Node2D, at: Vector2, col: Color, wd: float) -> void:
 
 func _paint_pads(v: Node2D) -> void:
         for p in pads:
-                var col: Color = _user_col() if bool(p["user"]) else COL_ENEMY
+                var col: Color = _abs_my_col() if bool(p["user"]) else _abs_enemy_col()
                 if String(p["id"]).begins_with("extra"):
                         col = COL_ENEMY_2
                 var hl := _pad_half_len(p)
@@ -1765,22 +1782,22 @@ func _build_goals_widget() -> void:
         row.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _overlay_root_ref().add_child(row)
         var sq_u := ColorRect.new()
-        sq_u.color = _user_col()
+        sq_u.color = _abs_my_col()
         sq_u.custom_minimum_size = Vector2(22, 22)
         sq_u.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         sq_u.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(sq_u)
-        _goals_lbl_u = Arc.label("0", 30, _user_col())
+        _goals_lbl_u = Arc.label("0", 30, _abs_my_col())
         _goals_lbl_u.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(_goals_lbl_u)
         var sep := Arc.label("-", 26, Color(1, 1, 1, 0.45))
         sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(sep)
-        _goals_lbl_e = Arc.label("0", 30, COL_ENEMY)
+        _goals_lbl_e = Arc.label("0", 30, _abs_enemy_col())
         _goals_lbl_e.mouse_filter = Control.MOUSE_FILTER_IGNORE
         row.add_child(_goals_lbl_e)
         var sq_e := ColorRect.new()
-        sq_e.color = COL_ENEMY
+        sq_e.color = _abs_enemy_col()
         sq_e.custom_minimum_size = Vector2(22, 22)
         sq_e.size_flags_vertical = Control.SIZE_SHRINK_CENTER
         sq_e.mouse_filter = Control.MOUSE_FILTER_IGNORE

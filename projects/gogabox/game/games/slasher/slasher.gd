@@ -147,6 +147,12 @@ var _red_pulse: ColorRect
 # ============================================================ setup / flow
 
 func _goga_setup() -> void:
+        # r3 THE ROOM LAW: the LAN room screen owns the boot (the owner:
+        # "make the game fruit ninja be LAN 2 players, i want to see how
+        # it will work")
+        if lan_hold:
+                lan_hold_begin()
+                return
         _rng.randomize()
         tk.dragged.connect(_on_drag)
         add_hud_button("SHOP", func(): _shop_open())
@@ -455,12 +461,17 @@ func _paint_splats() -> void:
                                 Color(1, 1, 0.9, 0.30 * tw))
 
 func _paint_trail() -> void:
-        # the blade ribbon
+        # the blade ribbon - r3: in a LAN match MY blade wears MY absolute
+        # color (first player BLUE, second RED - the owner's spec)
+        var core := Color(1, 1, 1, 0.92)
+        var halo := Color(1.0, 0.95, 0.8, 0.28)
+        if lan_active:
+                core = _my_blade_col()
+                halo = Color(core.r, core.g, core.b, 0.30)
         if trail.size() >= 2:
                 for pass_i in 2:
                         var w := 26.0 if pass_i == 0 else 9.0
-                        var col := Color(1.0, 0.95, 0.8, 0.28) if pass_i == 0 \
-                                        else Color(1, 1, 1, 0.92)
+                        var col := halo if pass_i == 0 else core
                         for i in range(1, trail.size()):
                                 var p0: Dictionary = trail[i - 1]
                                 var p1: Dictionary = trail[i]
@@ -481,6 +492,15 @@ func _paint_trail() -> void:
                                 cc.a *= minf(f0, f1)
                                 trail_painter.draw_polygon(quad,
                                                 PackedColorArray([cc, cc, cc, cc]))
+        # r3: the rival's slash ghosts, in their absolute color, fading
+        for i in _lan_marks.duplicate():
+                var age: float = _time - float(i["t0"])
+                if age > 0.35:
+                        _lan_marks.erase(i)
+                        continue
+                var mcol: Color = i["col"]
+                mcol.a = 0.8 * (1.0 - age / 0.35)
+                trail_painter.draw_line(i["a"], i["b"], mcol, 7.0)
         # the +1 / -2 floaters (one per event, right where it happened)
         var font := ThemeDB.fallback_font
         for f in floats:
@@ -694,6 +714,17 @@ func _goga_tick(delta: float) -> void:
                 splat_painter.queue_redraw()
                 return
         clock += delta
+        # r3 THE LAN ROUND CLOCK + the score beacon
+        if lan_active:
+                if _lan_clock > 0.0 and not _over:
+                        _lan_clock -= delta
+                        if _lan_clock <= 0.0:
+                                _lan_clock = 0.0
+                                _run_over()
+                _lan_beacon -= delta
+                if _lan_beacon <= 0.0:
+                        _lan_beacon = 0.5
+                        LAN.send_prog({"k": "score", "s": score})
         # THE FRENZY CLOCK (v0.3.9-11): a quiet spell, then the rain
         if frenzy_t < 0.0:
                 frenzy_clock -= delta
@@ -953,6 +984,9 @@ func _cut_item(p: Dictionary, from: Vector2, to: Vector2) -> void:
         add_score(1)
         slashed_total += 1
         achievement_count("slashed", 1)
+        if lan_active:
+                # the rival sees MY blade ghost in MY color, right here
+                LAN.send_prog({"k": "slice", "x": n.position.x, "y": n.position.y})
         var cut_names := ["sl_cut_a", "sl_cut_b", "sl_cut_c"]
         Jukebox.sfx(cut_names[_rng.randi() % 3], -4.0,
                 _rng.randf_range(0.9, 1.18))
@@ -1058,10 +1092,155 @@ func _run_over() -> void:
         achievement_max("hearts_kept", hearts)
         achievement_max("max_score", score)
         check_achievements()
+        if lan_active:
+                # r3 THE LAN VERDICT: my run ended (hearts out or the clock)
+                # - the score rides, then the honest wait for the rival.
+                _lan_finish()
+                return
         var tw := create_tween()
         tw.tween_property(world, "modulate", Color(0.75, 0.55, 0.5), 0.4)
         tw.tween_interval(0.5)
         tw.tween_callback(func(): finish_run(score))
+
+# ============================================================ THE LAN SEAT (r3)
+## 2P RACE (the towerdestroyer pattern): identical SEEDED harvests on
+## every device (the match seed drives _rng), each device scores its own
+## slices, the scores ride lan_prog, and the verdict is the higher score
+## when both are done (a 90-second round; 0 hearts ends a run early).
+## THE BLADE COLORS (the owner's spec, absolute): the FIRST player's
+## slash is BLUE, the SECOND's RED - on both devices.
+
+const LAN_ROUND_SECS := 90.0
+const SLASH_P1 := Color("3f7fd4")   # the first blade - BLUE
+const SLASH_P2 := Color("e8402f")   # the second blade - RED
+
+var _lan_scores := {}              # rseat -> score
+var _lan_done := {}                # rseat -> bool
+var _lan_clock := 0.0
+var _lan_beacon := 0.0
+var _lan_marks: Array = []         # the rival's slash ghosts {a,b,t0,col}
+var _lan_wait_card: Control = null
+var _lan_verdict_shown := false
+
+func _my_blade_col() -> Color:
+        return SLASH_P1 if lan_my_index() == 0 else SLASH_P2
+
+func lan_solo() -> void:
+        lan_active = false
+        if start_orientation != "":
+                _show_options()
+        else:
+                _show_orient_select()
+
+func lan_match_start(seed_v: int, m_seats: Array) -> void:
+        lan_active = true
+        lan_seats = m_seats
+        _rng.seed = seed_v          # THE IDENTICAL HARVEST LAW
+        _build_world()
+        _clear_overlay()
+        _over = false
+        _phase = "run"
+        clock = 0.0
+        spawn_clock = 0.9
+        coin_clock = COIN_EVERY_S
+        hearts = START_HEARTS
+        _build_hearts()
+        set_score(0)
+        _lan_scores = {}
+        _lan_done = {}
+        _lan_marks = []
+        _lan_verdict_shown = false
+        _lan_clock = LAN_ROUND_SECS
+        game_toast("BLUE VS RED - %d SECONDS" % int(LAN_ROUND_SECS))
+
+func lan_prog(from_dev: String, data: Dictionary) -> void:
+        if not lan_active:
+                return
+        var idx := -1
+        for i in lan_seats.size():
+                if String(lan_seats[i].get("dev", "")) == from_dev:
+                        idx = i
+                        break
+        if idx < 0:
+                return
+        var rseat := idx + 1
+        match String(data.get("k", "")):
+                "score":
+                        _lan_scores[rseat] = int(data.get("s", 0))
+                "slice":
+                        # the rival's blade ghost, in THEIR color
+                        _lan_marks.append({"a": Vector2(float(data.get("x", 0)) - 46.0,
+                                        float(data.get("y", 0)) + 46.0),
+                                "b": Vector2(float(data.get("x", 0)) + 46.0,
+                                        float(data.get("y", 0)) - 46.0),
+                                "t0": _time, "col": SLASH_P1 if idx == 0 else SLASH_P2})
+                        trail_painter.queue_redraw()
+                "dead":
+                        _lan_done[rseat] = true
+                        game_toast("%s IS OUT" % lan_name_of(idx).to_upper())
+                "done":
+                        _lan_done[rseat] = true
+                        _lan_scores[rseat] = int(data.get("s", 0))
+                        _lan_maybe_verdict()
+
+func lan_end(_results: Array) -> void:
+        # the room folded (the host's verdict relay) - my own verdict card
+        # is already up or arrives through _lan_maybe_verdict; nothing more.
+        pass
+
+func _lan_finish() -> void:
+        var my_rseat := maxi(1, lan_my_index() + 1)
+        _lan_scores[my_rseat] = score
+        _lan_done[my_rseat] = true
+        LAN.send_prog({"k": "done", "s": score})
+        var rival_rseat := 3 - my_rseat
+        if bool(_lan_done.get(rival_rseat, false)):
+                _lan_show_verdict()
+        else:
+                _lan_wait_card = CenterContainer.new()
+                _lan_wait_card.set_anchors_preset(Control.PRESET_FULL_RECT)
+                _lan_wait_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                _overlay_root_ref().add_child(_lan_wait_card)
+                var p := PanelContainer.new()
+                p.add_theme_stylebox_override("panel", Arc.panel_style(Arc.CARD, 26, 22))
+                _lan_wait_card.add_child(p)
+                var l := Arc.label("WAITING FOR %s TO FINISH" % lan_name_of(3 - lan_my_index()).to_upper(),
+                                26, Arc.INK)
+                l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                p.add_child(l)
+
+func _lan_maybe_verdict() -> void:
+        if _lan_verdict_shown or not _over:
+                return
+        var my_rseat := maxi(1, lan_my_index() + 1)
+        if bool(_lan_done.get(3 - my_rseat, false)):
+                _lan_show_verdict()
+
+func _lan_show_verdict() -> void:
+        if _lan_verdict_shown:
+                return
+        _lan_verdict_shown = true
+        if _lan_wait_card != null and is_instance_valid(_lan_wait_card):
+                _lan_wait_card.queue_free()
+                _lan_wait_card = null
+        var my_rseat := maxi(1, lan_my_index() + 1)
+        var my_s := int(_lan_scores.get(my_rseat, score))
+        var rival_s := int(_lan_scores.get(3 - my_rseat, -1))
+        if my_s >= rival_s:
+                add_score(1)
+                achievement_count("wins", 1)
+                game_toast("YOU WIN THE HARVEST  %d : %d" % [my_s, rival_s])
+        else:
+                game_toast("%s WINS THE HARVEST  %d : %d" % [
+                                lan_name_of(3 - lan_my_index()).to_upper(), rival_s, my_s])
+        # the HOST folds the room once the verdict is known
+        if LAN.is_host:
+                var results := []
+                for i in lan_seats.size():
+                        results.append({"name": String(lan_seats[i].get("name", "PLAYER")),
+                                "score": int(_lan_scores.get(i + 1, 0))})
+                LAN.report_match_end(results)
+        finish_run(score)
 
 # ============================================================ the juice
 

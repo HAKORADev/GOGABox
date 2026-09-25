@@ -361,15 +361,19 @@ func _skin_id() -> String:
         return sid
 
 func _token_col(p: int) -> Color:
-        if p == 1:
+        var th: Array = _theme()["armies"]
+        # r3 THE ABSOLUTE COLOR LAW: in a LAN match every token wears its
+        # ROOM seat's color on every device - the owned skin is a local
+        # thing and would paint me red here and blue there (the owner's
+        # dice-conquer report). Solo keeps the skin seat.
+        if not lan_active and p == 1:
                 var sid := _skin_id()
                 if sid != "theme":
                         return SKINS[sid]["col"]
-        var th: Array = _theme()["armies"]
         return th[(p - 1) % 4]
 
 func _token_ink(p: int) -> Color:
-        if p == 1:
+        if not lan_active and p == 1:
                 var sid := _skin_id()
                 if sid != "theme":
                         return SKINS[sid]["ink"]
@@ -1062,7 +1066,9 @@ func _draw_trays() -> void:
                 # THE MARK: the bare numeral + WHO (the ludo tray law),
                 # seated in the badge's middle air (the wide-badge round:
                 # the die and the pawn home keep their distance)
-                var who := "YOU" if int(p) == 1 else (_lan_name(int(p)).to_upper() if lan_active else "CPU")
+                var is_me: bool = (not lan_active and int(p) == 1) \
+                                or (lan_active and _lan_my_turns().has(int(p)))
+                var who := "YOU" if is_me else (_lan_name(int(p)).to_upper() if lan_active else "CPU")
                 fx_l.draw_string(f, tr.position + Vector2(
                                 12.0 + cell * 0.60 + 22.0,
                                 tr.size.y * 0.52), str(p),
@@ -1273,21 +1279,22 @@ func _mode_sheet() -> void:
         # mouse filter (an IGNORE filter makes the cards DEAD to taps)
 
 # ============================================================ v042 THE LAN SEAT
-## The waiting room owns the boot; the seats arrive in arrival order. On
-## EVERY device the local player wears id 1 and the rivals wear 2..N (the
-## display laws keep working); the turn order is the session's seat order
-## rotated so seat 1's device and seat 3's device agree on WHO acts while
-## each device labels its own token YOU. Moves ride TURN_RELAY: the roller
-## applies + broadcasts, receivers apply through the same door.
+## r3 THE ABSOLUTE SEATS: `turn`, the tokens and the colors ride the
+## ROOM seat numbers (1..N = the join order) on EVERY device - the local
+## rotation is dead (the owner: "the second player dice is not rolled at
+## all because the two players are recognized as the first player" - the
+## dual-me opener was that bug's root). Moves ride TURN_RELAY with the
+## WHO GATE: a roll lands only when its sender IS the turn's seat.
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
         players = m_seats.size()
         playing = []
         for i in players:
-                playing.append(i + 1)
-        opener = 1
+                playing.append(i + 1)     # the ABSOLUTE room seats
+        opener = 1                         # the room's first player opens
         rounds = 0
         _new_round()
 
@@ -1298,43 +1305,24 @@ func lan_solo() -> void:
 func _lan_name(p: int) -> String:
         if lan_seats.is_empty():
                 return "RIVAL"
-        var n: int = lan_seats.size()
-        var idx: int = (LAN.my_seat_no() - 1 + p - 1) % n
+        var idx: int = clampi(p - 1, 0, lan_seats.size() - 1)
         return String(lan_seats[idx].get("name", "RIVAL"))
 
-## THE ROTATION MAPS (v042-1): the local turn p rides the session seat
-## (my_seat_no + p - 1) on the n-seat circle - and the inverse for an
-## arriving act. The gates below keep every device's state machine in the
-## SAME absolute sequence no matter which seat it wears.
-func _lan_seat_of_turn(p: int) -> int:
-        var n: int = maxi(1, lan_seats.size())
-        return posmod(LAN.my_seat_no() - 1 + p - 1, n) + 1
-
-func _lan_local_turn(who: int) -> int:
-        var n: int = maxi(1, lan_seats.size())
-        return posmod(who - LAN.my_seat_no(), n) + 1
-
-## this device's LOCAL turn indices (the combo seat owns two)
+## this device's ABSOLUTE turn seats (the combo seat owns two)
 func _lan_my_turns() -> Array:
         var out := []
-        var n: int = maxi(1, lan_seats.size())
         var mine := [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
-        for p in n:
-                var seat: Dictionary = lan_seats[_lan_seat_of_turn(p + 1) - 1] \
-                                if lan_seats.size() >= _lan_seat_of_turn(p + 1) \
-                                else {}
-                if String(seat.get("dev", "")) in mine:
-                        out.append(p + 1)
+        for i in lan_seats.size():
+                if String(lan_seats[i].get("dev", "")) in mine:
+                        out.append(i + 1)
         return out
 
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):
                 "roll":
-                        # THE WHO GATE (v042-1): the roll lands only when it
-                        # is THAT seat's turn here - the rotated sequences
-                        # align, a stranger never steals a turn
-                        if state == "roll_wait" \
-                                        and turn == _lan_local_turn(who):
+                        # THE WHO GATE: the roll lands only when its
+                        # sender IS the turn's absolute seat.
+                        if state == "roll_wait" and who == turn:
                                 _apply_roll(int(a.get("r", 1)))
 
 func _pick_mode(m: int) -> void:
@@ -1402,9 +1390,9 @@ func _banner() -> void:
 func _do_roll() -> void:
         roll = _rng.randi_range(1, 6)
         if lan_active:
-                # the roll rides THE TURN'S OWN seat (the combo seat's roll
-                # carries its own number, not the primary's)
-                LAN.send_act_as(_lan_seat_of_turn(turn), {"k": "roll", "r": roll})
+                # r3: the stamp rides automatically - my room seat IS the
+                # turn's seat here (the WHO GATE guarantees it)
+                LAN.send_act({"k": "roll", "r": roll})
         _apply_roll(roll)
 
 ## The ONE roll body (the local roll and the relayed roll land identically).
@@ -1548,7 +1536,10 @@ func _resolve(winner: int) -> void:
         state = "round_over"
         clock = 0.0
         _die_fade()
-        var w := 1 if winner == 1 else 2
+        # r3 THE ABSOLUTE VERDICT: the winner is a room seat; I win when
+        # the seat is MINE (the combo seat counts too).
+        var w := winner if (lan_active and _lan_my_turns().has(winner)) \
+                        else (1 if winner == 1 else 2)
         if w == 1:
                 wins += 1
                 streak += 1
@@ -1574,7 +1565,10 @@ func _resolve(winner: int) -> void:
         # THE OPENER LAW: the loser opens the next round. At the 1v1
         # table that is exactly the rival; at the bigger tables the next
         # player after the winner takes the seat (the one beaten first).
-        if w == 1:
+        if lan_active:
+                var idx2 := playing.find(winner)
+                opener = int(playing[(idx2 + 1) % playing.size()])
+        elif w == 1:
                 var idx := playing.find(1)
                 opener = int(playing[(idx + 1) % playing.size()])
         else:

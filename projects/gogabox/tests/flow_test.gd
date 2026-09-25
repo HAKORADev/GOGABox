@@ -481,7 +481,7 @@ func _t_lan_laws() -> int:
                                         String(g["id"]) + " lan players 2..4")
                         ok += _check(not (lan.get("platforms", []) as Array).is_empty(),
                                         String(g["id"]) + " lan platforms")
-        ok += _check(with_lan == 11, "exactly eleven games wear the seat (%d)" % with_lan)
+        ok += _check(with_lan == 12, "exactly twelve games wear the seat (%d)" % with_lan)
         ok += _check(Meta.lan_list(GameReg.get_game("snl")).has("lan_4p"),
                         "snl derives the 4P chip")
         ok += _check(Meta.lan_list(GameReg.get_game("fourline")).has("lan_phone")

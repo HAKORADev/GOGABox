@@ -616,7 +616,7 @@ func _draw_fx() -> void:
         # thing fades in on the line, rides the finger, fades out when
         # the finger leaves the board)
         var sk := _skin()
-        if aim_a > 0.015 and state == "play" and turn == 1 and aim_col >= 0 \
+        if aim_a > 0.015 and state == "play" and turn == my_slot() and aim_col >= 0 \
                         and drop_row(board, aim_col) >= 0:
                 var rad := cell * 0.40
                 var mouth := Vector2(board_origin.x + aim_col * cell + cell * 0.5,
@@ -794,15 +794,21 @@ func _gate_down() -> void:
 # ============================================================ the rounds
 
 # ============================================================ v042 THE LAN SEAT
-## 2P TURN_RELAY (same bones as squares): the local player wears 1, the
-## rival 2, the column drops ride the ONE _drop_disc door, the CPU never
-## wakes. THE CROSS LAW: this board's LAN is same-platform only (the
-## registry wears cross:false) - the system refuses mixed sessions here.
+## 2P TURN_RELAY (r3 THE ABSOLUTE SEATS, the bovo bones): `turn` is the
+## ABSOLUTE slot - 1 = the room's first-ready player on EVERY device.
+## THE CROSS LAW: this board's LAN is same-platform only (the registry
+## wears cross:false) - the system refuses mixed sessions here, so a
+## phone room and a PC room run as separate dimensions, never a conflict.
+
+## MY slot: my absolute seat number (1 in solo; my join-order seat in LAN).
+func my_slot() -> int:
+        return maxi(1, lan_my_index() + 1) if lan_active else 1
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
-        next_opener = 1
+        next_opener = 1          # ABSOLUTE: the room's first player opens
         done_rounds = 0
         _new_round()
 
@@ -819,8 +825,9 @@ func _lan_name(p: int) -> String:
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):
                 "drop":
-                        if state == "play" or state == "wait":
-                                _drop_disc(int(a.get("c", -1)), 2)
+                        # THE WHO GATE: only the turn's absolute slot lands.
+                        if (state == "play" or state == "wait") and who == turn:
+                                _drop_disc(int(a.get("c", -1)), who)
                                 Jukebox.sfx("fl_tap", -8.0, 0.9)
 
 func _new_round() -> void:
@@ -869,10 +876,10 @@ func _new_round() -> void:
         # early-returned - the owner played a board that could not be
         # touched. The rigs never caught it because they all set
         # state="play" by hand after _new_round (THE MASK LAW).
-        if turn == 1:
+        if turn == my_slot():
                 state = "play"      # the player opens: the board is live
         else:
-                state = "wait"      # the CPU opens: it thinks, then drops
+                state = "wait"      # the rival opens: they think, then drop
                 if not lan_active:
                         cpu_think = true
                         think_beat = _rng.randf_range(0.45, 0.9)
@@ -894,13 +901,15 @@ func _random_empty_cell() -> Vector2i:
 func _banner() -> void:
         if state == "round_over":
                 return
-        if turn == 1:
+        if turn == my_slot():
                 turn_lbl.text = "YOUR MOVE"
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.95))
         else:
                 var n := int(_time * 2.5) % 3 + 1
-                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(n)
+                # THE CPU WORD LAW: the LAN wait reads the player's name.
+                turn_lbl.text = ("%s IS THINKING%s" % [_lan_name(turn).to_upper(), " .".repeat(n)]) \
+                                if lan_active else "CPU IS THINKING%s" % " .".repeat(n)
                 turn_lbl.add_theme_color_override("font_color",
                                 Color(1, 1, 1, 0.8))
 
@@ -920,10 +929,10 @@ func _goga_input(event: InputEvent) -> void:
                 else:
                         _release(t.position)
         elif event is InputEventScreenDrag:
-                if state == "play" and turn == 1:
+                if state == "play" and turn == my_slot():
                         _aim((event as InputEventScreenDrag).position)
         elif event is InputEventMouseMotion:
-                if state == "play" and turn == 1:
+                if state == "play" and turn == my_slot():
                         _aim((event as InputEventMouseMotion).position)
         elif event is InputEventMouseButton:
                 var mb := event as InputEventMouseButton
@@ -968,12 +977,12 @@ func _release(at: Vector2) -> void:
 func _player_drop(c: int) -> void:
         if cur["open"] < 0:
                 cur["open"] = c
-        _drop_disc(c, 1)
+        _drop_disc(c, my_slot())
         Jukebox.sfx("fl_tap", -6.0)
         aim_col = -1
 
 func _drop_disc(c: int, who: int) -> void:
-        if who == 1 and lan_active:
+        if lan_active and who == my_slot():
                 LAN.send_act({"k": "drop", "c": c})
         var r := drop_row(board, c)
         if r < 0:
@@ -991,7 +1000,7 @@ func _drop_disc(c: int, who: int) -> void:
         turn_lbl.text = ""
         Jukebox.sfx("fl_drop", -8.0)
         # the live fork spy (feeds the memory's fork flag)
-        if who == 1 and winning_cols(board, 1).size() >= 2:
+        if who == my_slot() and winning_cols(board, my_slot()).size() >= 2:
                 cur["fork"] = true
 
 ## the disc physics: accelerate, land, one squash-bounce, then report
@@ -1030,9 +1039,9 @@ func _on_landed(c: int, r: int, who: int) -> void:
                 _pending_resolve = 0
                 _resolve(w2)
                 return
-        if who == 1:
-                # hand the turn to the CPU (it thinks, then drops)
-                turn = 2
+        if who == my_slot():
+                # hand the turn to the rival (they think, then drop)
+                turn = 3 - my_slot()
                 if not lan_active:
                         cpu_think = true
                         think_beat = _rng.randf_range(0.45, 0.9)
@@ -1040,7 +1049,7 @@ func _on_landed(c: int, r: int, who: int) -> void:
                 state = "wait"
                 _banner()
         else:
-                turn = 1
+                turn = my_slot()
                 state = "play"
                 _banner()
 
@@ -1066,7 +1075,7 @@ func _resolve(w: int) -> void:
         done_rounds += 1
         if w == 1 or w == 2:
                 last_win_line = win_line(board)
-        if w == 1:
+        if w == my_slot():
                 wins += 1
                 streak += 1
                 add_score(1)                     # THE OWNER'S LAW: win = +1
@@ -1080,13 +1089,13 @@ func _resolve(w: int) -> void:
                         var mid := (_cell_mid(int(last_win_line[0]))
                                         + _cell_mid(int(last_win_line[3]))) * 0.5
                         Arc.confetti(_overlay_root_ref(), mid, 30)
-        elif w == 2:
+        elif w != 0 and w != my_slot():
                 losses += 1
                 streak = 0
                 # loss = -1, the score NEVER goes negative (the xo law)
                 if score > 0:
                         add_score(-1)
-                verdict_lbl.text = ("%s WINS  -1" % _lan_name(2).to_upper()) if lan_active else "CPU WINS  -1"
+                verdict_lbl.text = ("%s WINS  -1" % _lan_name(w).to_upper()) if lan_active else "CPU WINS  -1"
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("f2a09a"))
                 Jukebox.sfx("fl_lose", -3.0)
@@ -1097,13 +1106,13 @@ func _resolve(w: int) -> void:
                 verdict_lbl.add_theme_color_override("font_color",
                                 Color("c8cdd4"))
                 Jukebox.sfx("fl_draw", -4.0)
-        # THE OPENER LAW: the loser starts next; a draw flips
-        if w == 1:
-                next_opener = 2
-        elif w == 2:
-                next_opener = 1
+        # THE OPENER LAW (absolute): the loser's SLOT starts next.
+        if w == my_slot():
+                next_opener = 3 - my_slot()
+        elif w != 0:
+                next_opener = my_slot()
         else:
-                next_opener = 2 if last_opener == 1 else 1
+                next_opener = 3 - last_opener
         if last_win_line.size() == 4:
                 strike_t = 0.0                   # the strike draws ONCE
         achievement_max("max_score", score)
@@ -1119,7 +1128,7 @@ func _goga_tick(delta: float) -> void:
         _time += delta
         # THE GHOST FADE animator: in while the finger holds a column,
         # out when it leaves (or the turn hands over)
-        var live: bool = state == "play" and turn == 1 and aim_col >= 0
+        var live: bool = state == "play" and turn == my_slot() and aim_col >= 0
         aim_a = move_toward(aim_a, 1.0 if live else 0.0, delta * 6.0)
         if state == "wait":
                 clock += delta
@@ -1159,7 +1168,7 @@ func _dust_burst(at: Vector2, col: Color, n := 8) -> void:
 
 func _coin_taken(who: int) -> void:
         coin_cell = Vector2i(-1, -1)
-        if who == 1:
+        if who == my_slot():
                 add_run_coins(1)
                 Jukebox.sfx("fl_coin", -3.0)
                 game_toast("YOU TOOK THE GOGACOIN  +1")
@@ -1167,7 +1176,7 @@ func _coin_taken(who: int) -> void:
                         _last_col(), _last_row()), Color("ffd24a"), 14)
         else:
                 Jukebox.sfx("coin", -6.0, 0.8)
-                game_toast("THE CPU GRABBED THE COIN")
+                game_toast("%s GRABBED THE COIN" % _lan_name(who).to_upper())
 
 var _last_c := -1
 var _last_r := -1

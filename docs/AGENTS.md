@@ -1316,3 +1316,142 @@ reads without booting the scene.
     itself (assets/ui/icon_lan.svg/.png) is the same shape PLUS the
     plus badge top-left (the owner: "normal circle and an arch-like
     curve as the body and plus sign at top left").
+
+## THE v042-1 r3 LAWS (the owner's third LAN report - "the LAN infra
+## really needs real work on it" - the ROOM round)
+
+71. THE ROOM LAW (the owner: "in games there is whether server-side world
+    or the host-side world, currently we do not have the host-side world
+    ... make a host be able handle up to 12 different players ... make it
+    possible to each different group of players to play at the same
+    time, like if group one 2 players joined ludo, then other 3 players
+    can play ludo in another dimension"): a session is a LOBBY of up to
+    12 seats; any member CREATES a room ("dimension") for a game; the
+    room's members are its players in JOIN ORDER; the room's OWNER
+    carries the config (lan_params, set live via the room settings hook
+    lan_room_settings(vb)) and STARTS the match - the game is NEVER
+    loaded or initialized before that moment. Many rooms live at once
+    and every relay (act/snap/in/prog/end) is scoped to its own room.
+    THE LONE LAW and THE TEN SECONDS LAW are DEAD - a lone room waits
+    forever, nobody is ever thrown to solo by a timer.
+72. THE ABSOLUTE SEAT LAW (the owner: "make the color of the player be
+    different and not same ... both players see themself as shazam and
+    both see the other player as marble ... in ping pong both players
+    are controlling red"): match seats ride in JOIN ORDER with an
+    absolute rseat on every device - seat 1's color, name and turn slot
+    are the SAME everywhere. The local player is highlighted with YOU,
+    never re-colored. A game's turn index IS the absolute seat (the
+    games' my_slot()/lan_my_index()); the WHO GATE drops any act whose
+    sender is not the turn's seat. The owned skins (a LOCAL thing) never
+    re-ink a LAN token - the seat's army color rules.
+73. THE CONFLICTION LAW (the owner: "i managed to join on other device
+    by clicking same button at exact same moment, this thing should not
+    even happen ... make it trust the network data flow so the first
+    always get executed, others just get a message 'confliction happened
+    with another player'"): every room mutation is serialized on the
+    host's ONE pump - the first message in wins, a racing loser reads
+    "CONFLICTION HAPPENED WITH ANOTHER PLAYER" (the last-seat race is
+    the proof case; the room cap refuses with the line).
+74. THE DISCONNECT LAW (the owner: "when someone get disconnected or
+    close game whether he is host or joiner, it corrupts the game, just
+    end the game when one disconnected ... with notifications"): a
+    member leaving/dropping/kicked mid-match folds the room's match for
+    everyone left - match_ended carries results with a dq row and the
+    WHY ("X LEFT THE MATCH - GAME OVER"); the games show the honest
+    verdict, never a corrupted limbo. A folded room stays folded.
+75. THE PAUSE-PROOF PUMP (the joiner-drop root): the games pause the
+    tree - a paused LAN/LANFIND/Voice pump stops the heartbeats and both
+    sides prune each other mid-match (the "random disconnect when i
+    quitted a game"). All three autoloads ride PROCESS_MODE_ALWAYS now,
+    and PRUNE_AFTER is 15s.
+76. THE TOP-LEVEL NOTES (the owner: "the invitation message appears only
+    in menu ... make all of them be top-level to appear anywhere any
+    time in any position even in-games because they are very
+    important"): LanNotes (game/core/lan_notes.gd, layer 95, built by
+    main.gd, PROCESS_MODE_ALWAYS) owns the invites (JOIN / LEAVE AND
+    JOIN when I ride a session - the switch law - / DECLINE) and the
+    critical lines (kicked, session died, room refused). The menu never
+    duplicates them.
+77. THE SCAN LAWS r3 (the owner: "make it more smart, like once it
+    detect that player is in, it changes word from 'add' to something
+    else ... make it smart and low-level detection"): the pong carries
+    the LIVE state (in_session, is_host, size, playing - the game a
+    live match runs) and the scan sheet RE-PINGS every 2.2s while open -
+    a box that joins a session or starts a match while I watch flips
+    its own row. The row's word IS the truth: ADD / IN YOURS (disabled)
+    / INVITE (+ "PLAYING <game>").
+78. THE ONLINE HONESTY LAW (the owner: "i bet you are just trolling me
+    and have not truly integrated the tech for real here"): the UPnP
+    mapping is attempted HARDER (2s discover, 3 mapping tries) and the
+    session sheet SAYS the truth - "ONLINE ON - the code reaches the
+    internet" when the router opened the port (the code then carries the
+    PUBLIC address), "ONLINE OFF - LAN + VPN only" when it refused.
+    Without the mapping there is no serverless online play - the sheet
+    says so instead of lying.
+79. THE ADD-LOCAL-PLAYER RETIREMENT (the owner: "the button add local
+    player is useless ... even if it is fake"): the host menu's button
+    and its sheet are GONE - sessions fill with REAL devices through the
+    scan only. The engine API (add_local_slot) survives for the game
+    hooks.
+80. THE CHAT r3 LAWS (the owner: "in android, sending a message makes it
+    appear as two ... the cooldown is not dynamic ... the button chat
+    itself, get top right and top left yellow dots ... make the chat
+    opens from where is the last read message was"): a) THE DEDUPE - the
+    host never echoes a sender's line back (the sender lands it
+    locally; the echo was the double); b) THE LIVE COOLDOWN - the send
+    door shows WAIT n S always while it runs (a 0.25s Timer on the
+    sheet), flipping to SEND the second it ends; c) THE DOTS - the HUD
+    CHAT button wears the yellow unread dot (top-right) and the mention
+    dot (top-left; a line naming me counts); d) THE LAST-READ SEAT -
+    LAN.chat_read_id tracks the newest seen line and the sheet opens
+    scrolled there; e) THE ID LAW - replies carry stable message ids,
+    never array indexes (the sliding window retargeted index replies).
+81. THE VOICE r3 LAWS (the owner's semantics, verbatim: "other players
+    mic's mean you do not hear them, and their speakers mean they do not
+    hear you and your mic means none of them hear you and your speaker
+    means you hear none of them"): a) THE FOUR GATES are all real and
+    all VISIBLE - the roster shows THEIR MIC / THEIR HEAR (the live
+    remote truth off the VST wire) and MY MIC TO THEM / MY HEAR OF THEM
+    (my toggles); b) THE VST WIRE - every toggle broadcasts the sender's
+    state to the session; c) THE DEV-KEY LAW - every voice map keys by
+    device id, never the seat number (the seats renumbered on leave and
+    silently re-pointed frames to the wrong humans); d) THE BEACON LAW -
+    every device re-announces its UDP address every 2s (the r2 hello
+    fired once; a lost packet meant the host relayed to nobody - "my
+    voice from phone mic did not reached PC"); e) THE UNHANG LAW - the
+    toggle chips ride ACTION_MODE_BUTTON_RELEASE and repaint from the
+    live getter (the Android chip held its pressed paint).
+82. THE FACE r3 LAWS (the owner: "PFP is set, accurately, BUT! only for
+    me, on other devices, i see the placeholder forever" + "when the
+    media is wide it overlaps with the name text" + "android app
+    deleting deletes profile data"): a) THE ROW LAW - every seat that
+    shows a face asks for its media once (LAN.pfp_touch; the profile
+    viewer was the only asker), and the arrival repaints every waiting
+    renderer (LAN.face_arrived); b) THE WIRE CAP rides to 8MB - a legal
+    60s video face dwarfed 2MB and never arrived; c) THE WIDE-MEDIA LAW
+    - the GogaPfp plate CLIPS its children and the video fits
+    keep-aspect INSIDE the plate (a wide face letterboxes; the name row
+    is never touched); d) THE RE-ADOPT LAW - the mirror's
+    face_<hash>.<ext> rides BACK into the cache on load (the mirror had
+    the face while the wiped cache answered cache_has=false - the drawn
+    guy came back); e) THE VERIFIED MIRROR - every non-user write is
+    read back (a silent mirror failure is HOW the hard-wipe ate the
+    profile), the WRITE_EXTERNAL_STORAGE grant rides the picker press
+    for the older Androids, and the picker itself stays the SYSTEM
+    explorer.
+83. THE CPU WORD LAW (the owner: "change label CPU anywhere to the
+    perspective player name, whether the message is 'CPU is thinking'
+    or anything else"): a turn banner, a tray mark or a coin toast in a
+    LAN match reads the CURRENT PLAYER's name - "CPU" survives only in
+    solo. The banner shows only on the WAITING device ("<RIVAL> IS
+    THINKING"); the actor's device says YOUR MOVE.
+84. THE SLASHER LAN (the owner: "make the game fruit ninja be LAN 2
+    players ... make the players be blue as the first player and red is
+    the second, red and blue i mean the color of the slash line"): a 2P
+    RACE (the towerdestroyer pattern) - identical seeded harvests, each
+    device scores its own slices, scores ride lan_prog, a 90-second
+    round, the verdict is the higher score when both are done (0 hearts
+    ends a run early into the honest wait card). The blades wear the
+    ABSOLUTE colors: seat 1 BLUE, seat 2 RED - on both devices - and a
+    slice flashes the rival's blade ghost in their color. The registry
+    wears the lan block (12 games now).

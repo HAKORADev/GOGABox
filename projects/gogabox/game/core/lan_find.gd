@@ -1,20 +1,18 @@
 extends Node
-## LAN FIND (v042-1, r2) - the box's own discovery service. THE SMART SCAN
-## (the owner: "by smart network scanning to see if someone else exist as
-## local player and i press add") + THE INVITE leg + the honest
-## "embedded virtual net" line.
+## LAN FIND (v042-1, r2; r3 THE LIVE SCAN + THE SWITCH INVITE) - the box's
+## own discovery service. THE SMART SCAN + THE INVITE leg.
 ##
-## v042-1 r2 THE SCAN LAWS (the owner's report):
-##   "scan the network do nothing, it only lists players that in the
-##   session, it is supposed to list players that in GOGABox in same
-##   network" - EVERY GOGABox process answers a ping now, in a session or
-##   not; the answer carries in_session so the scan sheet can show FREE
-##   boxes and LIVE sessions apart.
-##   "when i press add, it says invite refused, i bet because the user is
-##   already in" - the invite rode a session_active() refusal, and the
-##   host menu is ALWAYS inside a session: the refusal fired every time.
-##   An invite is legal whenever the target is not already one of MY
-##   seats; the address it carries is the session I host or ride.
+## r3 (the owner: "make it more smart, like once it detect that player is
+## in, it changes word from 'add' to something else ... so make it smart
+## and low-level detection i mean"): the pong now carries the LIVE state -
+## in_session, is_host, size, AND `playing` (the game a live match runs).
+## The scan sheet re-pings while it is open, so a box that joins a session
+## (or starts a match) while I watch flips its row live - no re-scan.
+##
+## r3 THE SWITCH INVITE: an invite is delivered even when I already ride
+## a session - the top-level card offers LEAVE AND JOIN with synced
+## updates (the owner's 3-device law: the second box must be able to
+## abandon host 1 for host 3 from the card itself).
 ##
 ## THE WIRE: UDP pings on port 31445. The ping rides EVERY local
 ## interface's subnet-directed broadcast + the global one - Android
@@ -22,26 +20,24 @@ extends Node
 ## (192.168.x.255) is the one that actually crosses the wifi. No cloud,
 ## no rendezvous, no servers - pure local network (and VLAN NICs: an
 ## invite to a Tailscale/ZeroTier address is just a unicast).
-##
-## THE EMBEDDED VIRTUAL NET, HONESTLY (docs/brainstorm/v042-1/MASTER.md
-## §1e): this service + the room codes + UPnP + free VLAN-NIC support is
-## the no-setup ladder. A bundled ZeroTier/Tailscale userspace stack is a
-## native-library round and is NOT faked in GDScript.
 
 signal found(peers: Array)          # a scan tick produced a fresh list
-signal invite(name_v: String, addr: String)
+signal invite(name_v: String, addr: String, switch: bool)
 
 const FIND_PORT := 31445
 const SCAN_TICK := 1.0              # the scan's answer window per burst
 const PEER_TTL := 4.0               # a listed peer stops answering -> gone
 
 var _udp: PacketPeerUDP = null
-var _peers := {}                    # dev -> {name, pfpm, size, is_host, in_session, addr, seen}
+var _peers := {}                    # dev -> {name, pfpm, size, is_host, in_session, playing, addr, seen}
 var _scanning := false
 var _scan_left := 0.0
 var _self_info := {}
 
 func _ready() -> void:
+        # THE PAUSE LAW (r3): the answer side lives above the game pause -
+        # a paused box must still answer pings and invites.
+        process_mode = Node.PROCESS_MODE_ALWAYS
         _udp = PacketPeerUDP.new()
         if _udp.bind(FIND_PORT) != OK:
                 _udp = null
@@ -92,6 +88,16 @@ func _broadcast_addrs() -> Array:
                 out["%d.255.255.255" % a0] = true              # /8
         return out.keys()
 
+## The answer's honest state block (what the scan sheet reads).
+func self_state() -> Dictionary:
+        var playing := ""
+        var r: Dictionary = LAN.my_room()
+        if not r.is_empty() and String(r.get("phase", "")) == "play":
+                var g: Dictionary = GameReg.get_game(String(r.get("game", "")))
+                playing = String(g.get("title", String(r.get("game", ""))))
+        return {"in_session": LAN.session_active(), "size": LAN.session_size(),
+                "is_host": LAN.is_host, "playing": playing}
+
 func _process(delta: float) -> void:
         if _udp == null:
                 return
@@ -116,6 +122,7 @@ func _process(delta: float) -> void:
                                                 "is_host": bool(_self_info.get("is_host", false)),
                                                 "in_session": bool(_self_info.get("in_session", false)),
                                                 "pfpm": _self_info.get("pfpm", {})}
+                                        pong.merge(self_state(), true)
                                         _udp.set_dest_address(ip, FIND_PORT)
                                         _udp.put_var([pong])
                         "iam":
@@ -127,13 +134,17 @@ func _process(delta: float) -> void:
                                         "size": int(msg.get("size", 0)),
                                         "is_host": bool(msg.get("is_host", false)),
                                         "in_session": bool(msg.get("in_session", false)),
+                                        "playing": String(msg.get("playing", "")),
                                         "pfpm": msg.get("pfpm", {}),
                                         "addr": ip, "seen": Time.get_unix_time_from_system()}
                         "invite":
-                                if String(msg.get("to", "")) == LAN.my_dev() \
-                                                and not LAN.session_active():
+                                # r3 THE SWITCH INVITE: delivered even when
+                                # I ride a session - the card carries the
+                                # switch offer (the switch bool).
+                                if String(msg.get("to", "")) == LAN.my_dev():
                                         invite.emit(String(msg.get("name", "PLAYER")),
-                                                String(msg.get("addr", "")))
+                                                String(msg.get("addr", "")),
+                                                LAN.session_active())
         # THE SCAN side: re-broadcast while scanning, expire stale peers
         if _scanning:
                 _scan_left -= delta
@@ -166,8 +177,8 @@ func peers() -> Array:
         out.sort_custom(func(a, b): return String(a["name"]) < String(b["name"]))
         return out
 
-## THE INVITE: press ADD on a scanned peer -> their app pops the sheet.
-## r2: hosting (or riding) a session is NO LONGER a refusal - the invite
+## THE INVITE: press ADD on a scanned peer -> their app pops the card.
+## Hosting (or riding) a session is NO LONGER a refusal - the invite
 ## carries the session I already hold (host_addr answers for the host AND
 ## the joiner; a joiner inviting a friend pulls them into the session
 ## they ride). The caller refuses peers already seated (the menu checks

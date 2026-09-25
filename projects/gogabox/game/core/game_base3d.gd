@@ -33,13 +33,17 @@ func _goga_pause_end_ok() -> bool:
 var tk: TouchKit
 var start_orientation := ""
 
-## v042 THE LAN SEAT (the twin mirror of game_base's block — law 51):
+## v042 THE LAN SEAT (the twin mirror of game_base's block — law 51; r3):
 var lan_hold := false
 var lan_active := false
 var lan_seed := 0
 var lan_seats: Array = []
+var lan_params: Dictionary = {}     # r3: the room owner's config
 var _lan_hold_ui: LanHold = null
 var _lan_routed := false
+var _chat_btn: Button = null
+var _chat_dot_unread: ColorRect = null
+var _chat_dot_mention: ColorRect = null
 
 func orientation_settled() -> void:
         pass
@@ -121,34 +125,35 @@ func _lan_route() -> void:
                 return
         _lan_routed = true
         LAN.match_started.connect(_lan_on_match_started)
-        LAN.match_left_out.connect(_lan_on_left_out)
-        LAN.solo_fallthrough.connect(_lan_on_solo)
         LAN.lan_denied.connect(_lan_on_denied)
         LAN.match_ended.connect(_lan_on_ended)
+        LAN.session_died.connect(_lan_on_session_died)
         LAN.act_received.connect(_lan_on_act)
         LAN.snap_received.connect(_lan_on_snap)
         LAN.prog_received.connect(_lan_on_prog)
+        LAN.chat_received.connect(_lan_chat_live)
 
 func _lan_unroute() -> void:
         if not _lan_routed:
                 return
         _lan_routed = false
         LAN.match_started.disconnect(_lan_on_match_started)
-        LAN.match_left_out.disconnect(_lan_on_left_out)
-        LAN.solo_fallthrough.disconnect(_lan_on_solo)
         LAN.lan_denied.disconnect(_lan_on_denied)
         LAN.match_ended.disconnect(_lan_on_ended)
+        LAN.session_died.disconnect(_lan_on_session_died)
         LAN.act_received.disconnect(_lan_on_act)
         LAN.snap_received.disconnect(_lan_on_snap)
         LAN.prog_received.disconnect(_lan_on_prog)
+        LAN.chat_received.disconnect(_lan_chat_live)
 
-func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array) -> void:
+func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array, params: Dictionary) -> void:
         if gid != game_id:
                 return
         lan_hold_close()
         lan_active = true
         lan_seed = seed_v
         lan_seats = m_seats
+        lan_params = params
         _lan_add_chat_button()
         if has_method("lan_match_start"):
                 call("lan_match_start", seed_v, m_seats)
@@ -164,14 +169,38 @@ func _lan_add_chat_button() -> void:
                         func(): LanChatUi.open(self))
         _hud_row.add_child(b)
         _hud_row.move_child(b, 1)      # right after the back button
+        _chat_btn = b
+        var dot := ColorRect.new()
+        dot.color = Color(1.0, 0.82, 0.1)
+        dot.size = Vector2(14, 14)
+        dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        dot.visible = false
+        b.add_child(dot)
+        _chat_dot_unread = dot
+        var mdot := ColorRect.new()
+        mdot.color = Color(1.0, 0.82, 0.1)
+        mdot.size = Vector2(14, 14)
+        mdot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mdot.visible = false
+        b.add_child(mdot)
+        _chat_dot_mention = mdot
+        _lan_chat_live({})
+        _place_chat_dots.call_deferred()
 
-func _lan_on_left_out(gid: String) -> void:
-        if gid == game_id and _lan_hold_ui != null:
-                lan_hold_end_solo()
+func _place_chat_dots() -> void:
+        if _chat_btn == null or not is_instance_valid(_chat_btn):
+                return
+        if _chat_dot_unread != null and is_instance_valid(_chat_dot_unread):
+                _chat_dot_unread.position = Vector2(_chat_btn.size.x - 16, -4)
+        if _chat_dot_mention != null and is_instance_valid(_chat_dot_mention):
+                _chat_dot_mention.position = Vector2(2, -4)
 
-func _lan_on_solo(gid: String) -> void:
-        if gid == game_id and _lan_hold_ui != null:
-                lan_hold_end_solo()
+func _lan_chat_live(_msg: Dictionary) -> void:
+        if _chat_dot_unread != null and is_instance_valid(_chat_dot_unread):
+                _chat_dot_unread.visible = LAN.chat_unread > 0
+        if _chat_dot_mention != null and is_instance_valid(_chat_dot_mention):
+                _chat_dot_mention.visible = LAN.chat_mention_unread > 0
+        _place_chat_dots()
 
 func _lan_on_denied(gid: String, why: String) -> void:
         if gid != game_id:
@@ -181,9 +210,20 @@ func _lan_on_denied(gid: String, why: String) -> void:
         if has_method("lan_solo"):
                 call("lan_solo")
 
-func _lan_on_ended(gid: String, results: Array) -> void:
-        if gid == game_id and has_method("lan_end"):
+func _lan_on_ended(gid: String, results: Array, why: String) -> void:
+        if gid != game_id:
+                return
+        if why != "":
+                game_toast(why)
+        if lan_active and has_method("lan_end"):
                 call("lan_end", results)
+
+## THE DISCONNECT LAW in-game (the twin mirror).
+func _lan_on_session_died(why: String) -> void:
+        if not lan_active or not has_method("lan_end"):
+                return
+        game_toast(why)
+        call("lan_end", [{"name": "THE HOST", "dq": true}])
 
 func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
         if gid == game_id and has_method("lan_act"):
@@ -196,6 +236,32 @@ func _lan_on_snap(gid: String, data: Dictionary) -> void:
 func _lan_on_prog(gid: String, from_dev: String, data: Dictionary) -> void:
         if gid == game_id and has_method("lan_prog"):
                 call("lan_prog", from_dev, data)
+
+# ---------- r3 THE ABSOLUTE SEAT HELPERS (the twin mirror, verbatim) ----------
+
+## My absolute index in the match seats (-1 when not seated).
+func lan_my_index() -> int:
+        var my_devs := [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
+        for i in lan_seats.size():
+                if my_devs.has(String(lan_seats[i].get("dev", ""))):
+                        return i
+        return -1
+
+## The absolute seat's display name.
+func lan_name_of(idx: int) -> String:
+        if idx < 0 or idx >= lan_seats.size():
+                return "PLAYER"
+        return String(lan_seats[idx].get("name", "PLAYER"))
+
+## The absolute seat's dev.
+func lan_dev_of(idx: int) -> String:
+        if idx < 0 or idx >= lan_seats.size():
+                return ""
+        return String(lan_seats[idx].get("dev", ""))
+
+## THE CPU WORD LAW: a turn banner in a LAN match reads the player's name.
+func lan_turn_name(idx: int) -> String:
+        return lan_name_of(idx).to_upper()
 
 func game_toast(msg: String) -> void:
         Arc.toast(_toast, msg)

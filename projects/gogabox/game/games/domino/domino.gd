@@ -1876,7 +1876,9 @@ func _banner() -> void:
                                                 Color(0.45, 0.9, 0.6))
                 else:
                                 var n := int(_time * 2.5) % 3 + 1
-                                turn_lbl.text = "CPU IS THINKING%s" % " .".repeat(n)
+                                # THE CPU WORD LAW: the LAN wait reads the rival.
+                                turn_lbl.text = ("%s IS THINKING%s" % [_lan_name().to_upper(), " .".repeat(n)]) \
+                                                if lan_active else "CPU IS THINKING%s" % " .".repeat(n)
                                 turn_lbl.add_theme_color_override("font_color",
                                                 Color(1.0, 0.6, 0.5))
 
@@ -2082,6 +2084,7 @@ func _resolve(outcome: String, blocked: bool) -> void:
 
 func lan_match_start(seed_v: int, m_seats: Array) -> void:
         lan_active = true
+        lan_seats = m_seats
         _rng.seed = seed_v
         done_rounds = 0
         _new_round()
@@ -2091,9 +2094,9 @@ func lan_solo() -> void:
         _build_ready()
 
 func _lan_name() -> String:
-        if lan_seats.is_empty():
-                return "RIVAL"
-        return String(lan_seats[0].get("name", "RIVAL"))
+        # the RIVAL's name (the other absolute seat in the 2P match)
+        var rival := 0 if lan_my_index() != 0 else 1
+        return lan_name_of(rival)
 
 func lan_act(who: int, a: Dictionary) -> void:
         match String(a.get("k", "")):

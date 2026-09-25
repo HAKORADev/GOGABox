@@ -2,9 +2,10 @@ extends Node
 ## qa_v042_lan — THE LOOPBACK RIG (the owner's "weird full simulation of 4
 ## players"): four REAL LAN cores in one process, wired over REAL TCP
 ## sockets on 127.0.0.1, living a whole session's life — host, three
-## joins, the hold, THE TEN SECONDS, the match birth, the left-outs, the
-## turn relay, THE LONE LAW, the heartbeat prune, the combo seat and the
-## room code. Exit 0 = the LAN laws hold.
+## joins, THE ROOMS (r3: dimensions, the owner-start birth, the
+## confliction race, the no-solo law, the disconnect end), the turn
+## relay, the heartbeat prune, the combo seat and the room code.
+## Exit 0 = the LAN laws hold.
 
 var checks := 0
 var fails := 0
@@ -22,11 +23,12 @@ func _ready() -> void:
         _t_tags()
         _t_profile()
         await _t_session()
-        await _t_hold_and_match()
-        await _t_lone_law()
+        await _t_rooms_and_match()
+        await _t_no_solo_law()
         await _t_prune()
         await _t_v0421_extras()
         await _t_r2_laws()
+        await _t_r3_laws()
         print("CHECKS: %d  FAILS: %d" % [checks, fails])
         print("QA RESULT: %s" % ("ALL PASS" if fails == 0 else "FAILURES"))
         get_tree().quit(0 if fails == 0 else 1)
@@ -128,10 +130,22 @@ func _t_v0421_extras() -> void:
         await _pump(0.4)
         _check(a.seats.size() == 3 and int(a.seats[2].get("local_slot", 0)) == 1,
                         "the combo seat rides the session")
-        # the combo's roll carries ITS OWN seat number (the who law)
-        b._match_game = "snl"
-        b.send_act_as(3, {"k": "roll", "r": 5})
+        # the combo's roll carries ITS OWN seat number through a room
+        a.report_open("snl")
+        b.report_open("snl")
+        await _pump(0.3)
+        _check(a.open_room("snl") == "", "the combo rig opens a room")
         await _pump(0.4)
+        _check(b.join_room(int(b.rooms_for_game("snl")[0]["rid"])) == "", "the combo rival joins")
+        await _pump(0.5)
+        _check(a.start_match() == "", "the combo room's match births")
+        await _pump(0.6)
+        var combo_who := {"v": -1}
+        b.act_received.connect(func(_g, who, _a): combo_who["v"] = who)
+        a.send_act_as(3, {"k": "roll", "r": 5})   # the combo seat's own number
+        await _pump(0.5)
+        _check(combo_who["v"] == 3, "the combo's act carries ITS OWN room seat (%d)" % combo_who["v"])
+        a.report_match_end([])
         # --- THE SCAN SERVICE ---
         var f: Node = load("res://game/core/lan_find.gd").new()
         add_child(f)
@@ -212,10 +226,11 @@ func _t_tags() -> void:
                 if g.has("lan"):
                         with_lan += 1
         # v042-1: eleven seats - board ludo joined (the queued shred) and the
-        # 3D seat MOVED from towerball to towerdestroyer (the owner's word)
-        _check(with_lan == 11, "exactly eleven games wear the LAN seat (%d)" % with_lan)
+        # 3D seat MOVED from towerball to towerdestroyer (the owner's word).
+        # r3: twelve - fruit slasher wears the 2P blade race.
+        _check(with_lan == 12, "exactly twelve games wear the LAN seat (%d)" % with_lan)
         for gid in ["snake", "jumpcube", "snl", "domino", "chess", "squares",
-                        "fourline", "bovo", "rally", "ludo"]:
+                        "fourline", "bovo", "rally", "ludo", "slasher"]:
                 _check(not Meta.lan_list(GameReg.get_game(gid)).is_empty(),
                                 "%s wears the seat" % gid)
         _check(GameReg.get_game("towerdestroyer").has("lan"),
@@ -257,16 +272,15 @@ func _t_session() -> void:
         _check(order == ["devA", "devB", "devC", "devD"],
                         "THE SEAT LAW: arrival order fixes the seats")
         _check(int(b1.seats[1]["seat"]) == 2, "the seat numbers follow arrival")
-        # the cap: a fifth dies politely
+        # r3: the CAP is 12 now - a 5th joins fine; the combo seat rides too
         var b4 := _bus("devE", "ECHO")
         var e5: String = b4.join_session("127.0.0.1:%d" % b0._port)
         await _pump(1.0)
-        _check(b4.seats.is_empty() or b4.mode == "join", "the 5th waits outside")
-        _check(b0.seats.size() == 4, "THE CAP: still 4 seats")
+        _check(e5 == "" and b0.seats.size() == 5, "THE 12-CAP: the 5th seat joins (%d)" % b0.seats.size())
+        # the combo seat: the host adds a second local player (engine API)
+        _check(b0.add_local_slot("SECOND GUY") == true, "the combo seat joins by details")
+        _check(b0.remove_local_slot() == true, "the combo seat removes")
         _drop(b4)
-        # the combo seat: the host adds a second local player
-        _check(b0.add_local_slot("SECOND GUY") == false, "combo refuses at the cap")
-        b0.remove_local_slot()
         _drop(b3)
         await _pump(0.5)
         # leave cleanly (b2)
@@ -278,102 +292,113 @@ func _t_session() -> void:
 
 var _t_session_ctx := []
 
-## THE HOLD + THE TEN SECONDS + THE MATCH BIRTH + THE LEFT-OUTS
-func _t_hold_and_match() -> void:
-        print("-- THE HOLD, THE TEN SECONDS, THE MATCH")
+## THE ROOMS (r3): the dimensions, the owner-start birth, the absolute
+## seats, the confliction race, the room-scoped relay, the disconnect end.
+func _t_rooms_and_match() -> void:
+        print("-- THE ROOMS, THE OWNER START, THE MATCH")
         var b0: Node = _t_session_ctx[0]
         var b1: Node = _t_session_ctx[1]
-        var started := {"b0": false, "b1": false, "left_b0": false, "left_b1": false}
+        var started := {"b0": false, "b1": false}
+        var seats_box := {"v": []}
+        var ended := {"b0": false, "b1": false, "why": ""}
         var got := {"b1_act": null, "b1_who": -1}
-        b0.match_started.connect(func(_g, _s, _seats): started["b0"] = true)
-        b1.match_started.connect(func(_g, _s, _seats): started["b1"] = true)
-        b0.match_left_out.connect(func(_g): started["left_b0"] = true)
-        b1.match_left_out.connect(func(_g): started["left_b1"] = true)
+        b0.match_started.connect(func(_g, _s, _seats, _p): started["b0"] = true)
+        b1.match_started.connect(func(_g, _s, seats, _p): started["b1"] = true; seats_box["v"] = seats)
+        b0.match_ended.connect(func(_g, _r, why): ended["b0"] = true; ended["why"] = why)
+        b1.match_ended.connect(func(_g, _r, _why): ended["b1"] = true)
         b1.act_received.connect(func(_g, who, a): got["b1_act"] = a; got["b1_who"] = who)
-        _check(b0.report_open("snl") == true, "the host holds (2 seats in session)")
-        _check(b1.report_open("snl") == true, "the client holds")
-        await _pump(0.8)
-        _check(b0.holders_of("snl").size() == 2, "both sit in the hold")
-        _check(b0.hold_info("snl").get("phase", "") == "waiting", "the hold waits")
-        b0.commit("snl")
+        _check(b0.report_open("snl") == true, "the host opens the game (2 seats)")
+        _check(b1.report_open("snl") == true, "the client opens the game")
         await _pump(0.4)
-        _check(String(b0.hold_info("snl").get("phase", "")) == "count",
-                        "THE TEN SECONDS arms on the first commit")
-        b1.commit("snl")
-        await _pump(1.0)
-        # both committed: the birth fires as soon as the countdown ends
-        _check(b0.holders_of("snl").size() == 2 and b0.committed_of("snl").size() == 2,
-                        "both are READY")
-        await _pump(9.6)
+        _check(b0.rooms_for_game("snl").is_empty(), "no room exists before a CREATE")
+        # THE FIRST PLAYER CREATES - the owner's own flow
+        _check(b0.open_room("snl") == "", "the first player creates the room")
+        await _pump(0.6)
+        _check(b0.rooms_for_game("snl").size() == 1, "one room lives")
+        _check(b1.rooms_for_game("snl").size() == 1, "the client sees the room (the mirror)")
+        var rid := int(b0.rooms_for_game("snl")[0]["rid"])
+        _check(String(b0.my_room().get("owner", "")) == "devA", "the creator is the OWNER")
+        _check(b0.my_room_seat() == 1, "the owner is room seat 1")
+        # THE SECOND JOINS - the join order is the seat order
+        _check(b1.join_room(rid) == "", "the second player joins")
+        await _pump(0.6)
+        _check((b0.my_room().get("members", []) as Array).size() == 2, "two in the room")
+        _check(b1.my_room_seat() == 2, "THE JOIN ORDER: the joiner is room seat 2")
+        # THE OWNER-ONLY START
+        _check(b1.start_match() != "", "a member cannot start the match")
+        await _pump(0.3)
+        _check(not started["b0"], "no match births without the owner")
+        # THE OWNER STARTS - the only birth door (no timers anymore)
+        _check(b0.start_match() == "", "THE OWNER STARTS THE MATCH")
+        await _pump(0.8)
         _check(started["b0"] and started["b1"], "the match births on both devices")
-        _check(not started["left_b0"] and not started["left_b1"],
-                        "nobody was left out (both committed)")
-        _check(b0.probe_state()["match"] == "snl" and b1.probe_state()["match"] == "snl",
-                        "both cores wear the match")
-        # THE TURN RELAY: the host rolls, the client receives the same door call
+        _check((seats_box["v"] as Array).size() == 2, "the match seats arrived (%d)" % (seats_box["v"] as Array).size())
+        _check(int((seats_box["v"] as Array)[0].get("rseat", 0)) == 1 and int((seats_box["v"] as Array)[1].get("rseat", 0)) == 2,
+                        "THE ABSOLUTE SEATS: rseat rides the join order")
+        _check(String((seats_box["v"] as Array)[0].get("dev", "")) == "devA",
+                        "room seat 1 is room seat 1 on EVERY device")
+        # THE TURN RELAY: the host's act carries its ROOM seat
         b0.send_act({"k": "roll", "r": 4})
         await _pump(0.5)
         _check(got["b1_act"] != null and String(got["b1_act"].get("k", "")) == "roll",
-                        "TURN_RELAY delivers the move")
-        _check(int(got["b1_who"]) == 1, "the move carries the actor's seat")
-        # the match ends; the session returns to the lobby
-        b0.report_match_end("snl", [{"dev": "devA", "place": 1}])
-        await _pump(0.6)
-        _check(b1.probe_state()["match"] == "", "the match ends everywhere")
-        _check(String(b1.seats[0].get("state", "")) != "playing:snl", "the lobby returns")
-        # THE SOLO FALLBACK: the countdown ran and nobody joined the committer
-        var fell := {"b0": false, "b1": false}
-        b0.solo_fallthrough.connect(func(_g): fell["b0"] = true)
-        b1.solo_fallthrough.connect(func(_g): fell["b1"] = true)
-        started["b0"] = false
-        started["b1"] = false
-        b0.report_open("snl")
-        b1.report_open("snl")
-        await _pump(0.5)
-        b1.commit("snl")
-        await _pump(10.8)
-        _check(fell["b1"] and fell["b0"],
-                        "nobody joined = the whole room falls to solo (%s/%s)" % [fell["b0"], fell["b1"]])
-        _check(not started["b0"] and not started["b1"], "no match births for one seat")
-        # THE LEFT-OUT: a third device holds while two commit - the match
-        # births without it
-        var b4 := _bus("devF", "FOX")
-        var jerr: String = b4.join_session("127.0.0.1:%d" % b0._port)
-        _check(jerr == "", "the third device joins: %s" % jerr)
-        await _pump(1.0)
-        var left4 := {"v": false}
-        b4.match_left_out.connect(func(_g): left4["v"] = true)
-        b0.report_open("snl")
-        b1.report_open("snl")
-        b4.report_open("snl")
-        await _pump(0.6)
-        _check(b0.holders_of("snl").size() == 3, "three in the room")
-        b0.commit("snl")
-        b1.commit("snl")
-        await _pump(10.8)
-        _check(started["b0"] and started["b1"], "the committed two play")
-        _check(left4["v"], "THE LEFT-OUT: the hesitant third watches solo")
-        _check(not b4.probe_state()["match"] == "snl", "the left-out wears no match")
+                        "TURN_RELAY delivers the move (room-scoped)")
+        _check(int(got["b1_who"]) == 1, "the move carries the actor's ROOM seat")
+        # THE DISCONNECT LAW: a member leaving ends the live match, honestly
+        b1.leave_session()
+        await _pump(0.8)
+        _check(ended["b0"], "THE DISCONNECT LAW: the match ends for the one left")
+        _check(String(ended["why"]).contains("LEFT"), "the end says WHY (%s)" % ended["why"])
+        _check(int(b0.probe_state()["my_room"]) == 0, "the room folded")
         b0.report_close("snl")
-        b1.report_close("snl")
-        b4.leave_session()
-        await _pump(0.4)
+        await _pump(0.3)
 
-## THE LONE LAW: one holder alone falls through to solo
-func _t_lone_law() -> void:
-        print("-- THE LONE LAW (the grace, then solo)")
+## THE CONFLICTION RACE + THE NO-SOLO LAW (r3)
+func _t_no_solo_law() -> void:
+        print("-- THE NO-SOLO LAW + THE CONFLICTION RACE")
         var b0: Node = _t_session_ctx[0]
         var b1: Node = _t_session_ctx[1]
-        var fell := {"v": false}
-        b1.solo_fallthrough.connect(func(_g): fell["v"] = true)
-        b1.report_open("chess")
+        var b2: Node = _t_session_ctx[2]
+        # the disconnect law consumed b1's wire and b2 left cleanly - both
+        # rejoin for this section (a session is the precondition)
+        b1.join_session("127.0.0.1:%d" % b0._port)
+        b2.join_session("127.0.0.1:%d" % b0._port)
         await _pump(1.0)
-        _check(not fell["v"], "the grace holds")
-        await _pump(4.8)
-        _check(fell["v"], "alone for 5s = the solo fallthrough")
-        _check(b1.holders_of("chess").is_empty(), "the hold empties")
+        # --- THE NO-SOLO LAW: a lone room waits FOREVER (no fallthrough) ---
+        _check(b1.report_open("chess") == true, "the client opens chess")
+        await _pump(0.4)
+        _check(b1.open_room("chess") == "", "a lone player opens a room")
+        await _pump(1.6)
+        _check(not b1.rooms_for_game("chess").is_empty(), "the lone room still waits")
+        b1.leave_room()
+        await _pump(0.4)
+        _check(b1.rooms_for_game("chess").is_empty(), "the empty room died")
         b1.report_close("chess")
-        await _pump(0.3)
+        # --- THE CONFLICTION: two racers, ONE seat (the 2-player cap) ---
+        _check(b0.report_open("bovo") == true, "the host opens bovo (cap 2)")
+        _check(b1.report_open("bovo") == true, "racer 1 opens bovo")
+        _check(b2.report_open("bovo") == true, "racer 2 opens bovo")
+        await _pump(0.4)
+        _check(b0.open_room("bovo") == "", "the 1-seat room is born")
+        await _pump(0.6)
+        var brid := int(b0.rooms_for_game("bovo")[0]["rid"])
+        var refused := {"v": false, "why": ""}
+        b2.room_refused.connect(func(why): refused["v"] = true; refused["why"] = why)
+        _check(b1.join_room(brid) == "", "racer 1's join ask rides")
+        b2.join_room(brid)              # racer 2 rides a beat later
+        await _pump(0.8)
+        _check((b0.my_room().get("members", []) as Array).size() == 2,
+                        "the room holds its cap (2 for bovo)")
+        _check(refused["v"], "THE CONFLICTION: the racing loser is refused")
+        _check(String(refused["why"]).contains("CONFLICTION"),
+                        "the refusal reads the owner's line (%s)" % refused["why"])
+        _check(b2.my_room_seat() == 0, "the loser holds no room seat")
+        # fold the test room
+        b0.leave_room()
+        b0.report_close("bovo")
+        b1.report_close("bovo")
+        b2.report_close("bovo")
+        b2.leave_session()          # the prune section wants the 2-seat shape
+        await _pump(0.4)
 
 ## THE HEARTBEAT: a silent seat is pruned, never a ghost
 func _t_prune() -> void:
@@ -383,7 +408,7 @@ func _t_prune() -> void:
         _check(b0.seats.size() == 2, "two seats before the crash")
         # the hard kill: no bye, no grace - the wire just dies
         b1._host_conn.disconnect_from_host()
-        await _pump(11.5)
+        await _pump(16.5)
         _check(b0.seats.size() == 1, "the silent seat is pruned (%d left)" % b0.seats.size())
         b0.leave_session()
         await _pump(0.3)
@@ -510,3 +535,95 @@ func _t_r2_laws() -> void:
         _check(got["t"] == "hello there", "the area's text rides the flush door")
         holder.queue_free()
         await _pump(0.2)
+
+## ================================================== v042-1 r3 THE LAWS
+## The third round's own proof: the dedupe, the live cooldown, the 12
+## cap with the honest 13th refusal, the dimensions (two rooms at once),
+## the room params broadcast.
+
+func _t_r3_laws() -> void:
+        print("-- v042-1 r3: THE DEDUPE, THE 12 CAP, THE DIMENSIONS, THE PARAMS")
+        # --- THE DEDUPE: a sender's line lands ONCE on every device ---
+        var a: Node = _bus("r3A", "A3")
+        var b: Node = _bus("r3B", "B3")
+        a.host_session()
+        await _pump(0.4)
+        b.join_session("127.0.0.1:%d" % a._port)
+        await _pump(0.6)
+        var seen := {"a": 0, "b": 0}
+        var mine_twice := {"v": 0}
+        a.chat_received.connect(func(_m): seen["a"] += 1)
+        b.chat_received.connect(func(m):
+                seen["b"] += 1
+                if String(m.get("text", "")) == "me too once":
+                        mine_twice["v"] += 1)
+        a.send_chat("once only")
+        b._chat_last_sent = -1000.0
+        b.send_chat("me too once")
+        await _pump(0.8)
+        # each side lands its OWN line locally + hears the other ONCE
+        _check(seen["a"] == 2 and seen["b"] == 2,
+                        "one copy each way (%d/%d)" % [seen["a"], seen["b"]])
+        _check(mine_twice["v"] == 1,
+                        "THE DEDUPE: the client's own line lands ONCE (%d)" % mine_twice["v"])
+        _check(LAN.CHAT_COOLDOWN > 0.0 and a.chat_cooldown_left() <= LAN.CHAT_COOLDOWN,
+                        "the live cooldown reads")
+        a._chat_last_sent = Time.get_unix_time_from_system()
+        _check(a.chat_cooldown_left() > 0.0, "the cooldown runs right after a send")
+        a.leave_session()
+        b.leave_session()
+        await _pump(0.3)
+        # --- THE 12 CAP: 12 seats live, the 13th refused, combo dies at it ---
+        var h: Node = _bus("r3H", "HOST3")
+        _check(h.host_session() == "", "the 12-cap rig hosts")
+        var joiners := []
+        for i in 11:
+                var j: Node = _bus("r3J%d" % i, "J%d" % i)
+                joiners.append(j)
+                j.join_session("127.0.0.1:%d" % h._port)
+        await _pump(2.5)
+        _check(h.seats.size() == 12, "THE 12 CAP: 12 seats live (%d)" % h.seats.size())
+        var late: Node = _bus("r3LATE", "LATE")
+        late.join_session("127.0.0.1:%d" % h._port)
+        await _pump(1.0)
+        _check(h.seats.size() == 12, "the 13th never gets a seat")
+        _check(h.add_local_slot("NO ROOM") == false, "the combo seat refuses at the cap")
+        # --- THE DIMENSIONS: two rooms of the SAME game live at once ---
+        for j in joiners:
+                j.report_open("snl")
+        h.report_open("snl")
+        await _pump(0.3)
+        _check(h.open_room("snl") == "", "dimension one is born")
+        await _pump(0.5)
+        var rid1 := int(h.rooms_for_game("snl")[0]["rid"])
+        _check(joiners[0].join_room(rid1) == "", "joiner 1 rides dimension one")
+        await _pump(0.5)
+        _check(joiners[1].open_room("snl") == "", "joiner 2 births dimension TWO")
+        await _pump(0.5)
+        var rooms_now: Array = h.rooms_for_game("snl")
+        _check(rooms_now.size() == 2, "TWO DIMENSIONS of one game live (%d)" % rooms_now.size())
+        var rid2 := int(rooms_now[1]["rid"]) if int(rooms_now[1]["rid"]) != rid1 \
+                        else int(rooms_now[0]["rid"])
+        rid2 = int(rooms_now[0]["rid"]) if int(rooms_now[0]["rid"]) != rid1 else int(rooms_now[1]["rid"])
+        _check(joiners[2].join_room(rid2) == "", "joiner 3 rides dimension two")
+        await _pump(0.6)
+        _check((h.room_by_id(rid1).get("members", []) as Array).size() == 2,
+                        "dimension one holds its own two")
+        _check((h.room_by_id(rid2).get("members", []) as Array).size() == 2,
+                        "dimension two holds its own two")
+        # --- THE PARAMS BROADCAST: the owner's config reaches the members ---
+        h.set_room_params({"mode": 4, "board": "12"})
+        await _pump(0.5)
+        _check(String(joiners[0].my_room().get("params", {}).get("board", "")) == "12",
+                        "THE PARAMS WIRE: the owner's config reaches the members")
+        _check(String(joiners[1].my_room().get("params", {}).get("board", "x")) != "12",
+                        "THE PARAMS SCOPE: dimension two never saw dimension one's config")
+        h.leave_session()
+        for j in joiners:
+                j.leave_session()
+                _drop(j)
+        late.leave_session()
+        _drop(late)
+        _drop(a)
+        _drop(b)
+        await _pump(0.3)

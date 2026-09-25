@@ -43,8 +43,10 @@ var lan_hold := false
 var lan_active := false
 var lan_seed := 0
 var lan_seats: Array = []
+var lan_params: Dictionary = {}     # r3: the room owner's config (mode/position/size)
 var _lan_hold_ui: LanHold = null
 var _lan_routed := false
+var _chat_btn: Button = null
 
 ## v0.2.1a: the host could NOT switch to the asked position (the window
 ## refused the sensor override). The ask resolves into the position the
@@ -728,10 +730,11 @@ func _process(delta: float) -> void:
                 _ach_clock = 0.0
                 check_achievements()
 
-# ============================================== THE LAN SEAT (v042)
-## The system owns the waiting room; the game only answers the routed
+# ============================================== THE LAN SEAT (v042; r3 ROOMS)
+## The system owns the room screen; the game only answers the routed
 ## calls (lan_match_start / lan_act / lan_snap / lan_prog / lan_end /
-## lan_hold_end_solo - duck-typed, both twins carry the same surface).
+## lan_solo - duck-typed, both twins carry the same surface). The match
+## params (the room owner's config) ride LAN.match_params -> lan_params.
 
 func lan_hold_begin() -> void:
         if _lan_hold_ui != null:
@@ -747,8 +750,9 @@ func lan_hold_close() -> void:
                 _lan_hold_ui = null
 
 func lan_hold_end_solo() -> void:
-        ## The hold fell through: nobody joined (or the match left me out).
-        ## The game plays the ordinary solo game - CPU seats return.
+        ## The no-session fallback (pre_open false): the game plays the
+        ## ordinary solo game - CPU seats return. The hold itself NEVER
+        ## falls through to this anymore (the solo law is dead).
         lan_hold_close()
         if has_method("lan_solo"):
                 call("lan_solo")
@@ -763,41 +767,47 @@ func _lan_route() -> void:
                 return
         _lan_routed = true
         LAN.match_started.connect(_lan_on_match_started)
-        LAN.match_left_out.connect(_lan_on_left_out)
-        LAN.solo_fallthrough.connect(_lan_on_solo)
         LAN.lan_denied.connect(_lan_on_denied)
         LAN.match_ended.connect(_lan_on_ended)
+        LAN.session_died.connect(_lan_on_session_died)
         LAN.act_received.connect(_lan_on_act)
         LAN.snap_received.connect(_lan_on_snap)
         LAN.prog_received.connect(_lan_on_prog)
+        LAN.chat_received.connect(_lan_chat_live)
 
 func _lan_unroute() -> void:
         if not _lan_routed:
                 return
         _lan_routed = false
         LAN.match_started.disconnect(_lan_on_match_started)
-        LAN.match_left_out.disconnect(_lan_on_left_out)
-        LAN.solo_fallthrough.disconnect(_lan_on_solo)
         LAN.lan_denied.disconnect(_lan_on_denied)
         LAN.match_ended.disconnect(_lan_on_ended)
+        LAN.session_died.disconnect(_lan_on_session_died)
         LAN.act_received.disconnect(_lan_on_act)
         LAN.snap_received.disconnect(_lan_on_snap)
         LAN.prog_received.disconnect(_lan_on_prog)
+        LAN.chat_received.disconnect(_lan_chat_live)
 
-func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array) -> void:
+func _lan_on_match_started(gid: String, seed_v: int, m_seats: Array, params: Dictionary) -> void:
         if gid != game_id:
                 return
         lan_hold_close()
         lan_active = true
         lan_seed = seed_v
         lan_seats = m_seats
+        lan_params = params
         _lan_add_chat_button()
         if has_method("lan_match_start"):
                 call("lan_match_start", seed_v, m_seats)
 
 ## THE CHAT SEAT (the owner: "add button in active-multiplayer games that
 ## is right after back button before the shop button, be in-between, and
-## labeled chat")
+## labeled chat") + THE CHAT BUTTON DOTS (the owner: "the button chat
+## itself, get top right and top left yellow dots, top right for new
+## messages that has not been read, and top left is for mentions").
+var _chat_dot_unread: ColorRect = null
+var _chat_dot_mention: ColorRect = null
+
 func _lan_add_chat_button() -> void:
         if _hud_row == null or not is_instance_valid(_hud_row):
                 return
@@ -808,14 +818,38 @@ func _lan_add_chat_button() -> void:
                         func(): LanChatUi.open(self))
         _hud_row.add_child(b)
         _hud_row.move_child(b, 1)      # right after the back button
+        _chat_btn = b
+        var dot := ColorRect.new()
+        dot.color = Color(1.0, 0.82, 0.1)
+        dot.size = Vector2(14, 14)
+        dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        dot.visible = false
+        b.add_child(dot)
+        _chat_dot_unread = dot
+        var mdot := ColorRect.new()
+        mdot.color = Color(1.0, 0.82, 0.1)
+        mdot.size = Vector2(14, 14)
+        mdot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mdot.visible = false
+        b.add_child(mdot)
+        _chat_dot_mention = mdot
+        _lan_chat_live({})
+        _place_chat_dots.call_deferred()
 
-func _lan_on_left_out(gid: String) -> void:
-        if gid == game_id and _lan_hold_ui != null:
-                lan_hold_end_solo()
+func _place_chat_dots() -> void:
+        if _chat_btn == null or not is_instance_valid(_chat_btn):
+                return
+        if _chat_dot_unread != null and is_instance_valid(_chat_dot_unread):
+                _chat_dot_unread.position = Vector2(_chat_btn.size.x - 16, -4)
+        if _chat_dot_mention != null and is_instance_valid(_chat_dot_mention):
+                _chat_dot_mention.position = Vector2(2, -4)
 
-func _lan_on_solo(gid: String) -> void:
-        if gid == game_id and _lan_hold_ui != null:
-                lan_hold_end_solo()
+func _lan_chat_live(_msg: Dictionary) -> void:
+        if _chat_dot_unread != null and is_instance_valid(_chat_dot_unread):
+                _chat_dot_unread.visible = LAN.chat_unread > 0
+        if _chat_dot_mention != null and is_instance_valid(_chat_dot_mention):
+                _chat_dot_mention.visible = LAN.chat_mention_unread > 0
+        _place_chat_dots()
 
 func _lan_on_denied(gid: String, why: String) -> void:
         if gid != game_id:
@@ -825,9 +859,21 @@ func _lan_on_denied(gid: String, why: String) -> void:
         if has_method("lan_solo"):
                 call("lan_solo")
 
-func _lan_on_ended(gid: String, results: Array) -> void:
-        if gid == game_id and has_method("lan_end"):
+func _lan_on_ended(gid: String, results: Array, why: String) -> void:
+        if gid != game_id:
+                return
+        if why != "":
+                game_toast(why)
+        if lan_active and has_method("lan_end"):
                 call("lan_end", results)
+
+## THE DISCONNECT LAW in-game: the host's wire died mid-match - the
+## verdict lands with an honest dq row (never a corrupted limbo).
+func _lan_on_session_died(why: String) -> void:
+        if not lan_active or not has_method("lan_end"):
+                return
+        game_toast(why)
+        call("lan_end", [{"name": "THE HOST", "dq": true}])
 
 func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
         if gid == game_id and has_method("lan_act"):
@@ -840,6 +886,40 @@ func _lan_on_snap(gid: String, data: Dictionary) -> void:
 func _lan_on_prog(gid: String, from_dev: String, data: Dictionary) -> void:
         if gid == game_id and has_method("lan_prog"):
                 call("lan_prog", from_dev, data)
+
+# ---------- r3 THE ABSOLUTE SEAT HELPERS (both twins) ----------
+## The match seats ride in JOIN ORDER and never rotate to the reader:
+## index 0 is the room's first-ready player on EVERY device. Colors,
+## names and turns key off these indexes; the local player is only
+## highlighted with YOU, never re-colored (the owner: "make the color of
+## the player be different and not same ... both players see themself as
+## shazam and both see the other player as marble").
+
+## My absolute index in the match seats (-1 when not seated).
+func lan_my_index() -> int:
+        var my_devs := [LAN.my_dev(), LAN.my_dev() + LAN.COMBO_DEV]
+        for i in lan_seats.size():
+                if my_devs.has(String(lan_seats[i].get("dev", ""))):
+                        return i
+        return -1
+
+## The absolute seat's display name.
+func lan_name_of(idx: int) -> String:
+        if idx < 0 or idx >= lan_seats.size():
+                return "PLAYER"
+        return String(lan_seats[idx].get("name", "PLAYER"))
+
+## The absolute seat's dev.
+func lan_dev_of(idx: int) -> String:
+        if idx < 0 or idx >= lan_seats.size():
+                return ""
+        return String(lan_seats[idx].get("dev", ""))
+
+## THE CPU WORD LAW (the owner: "change label CPU anywhere to the
+## perspective player name"): a turn banner in a LAN match reads the
+## CURRENT PLAYER's name - never "CPU".
+func lan_turn_name(idx: int) -> String:
+        return lan_name_of(idx).to_upper()
 
 # ============================================== THE BOX STORY (v0.3.9-13)
 ## THE CHARACTERS' POP-UP DIALOGUE - the one shared lore card every new

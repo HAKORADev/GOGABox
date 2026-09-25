@@ -908,24 +908,27 @@ func lan_match_start(seed_v: int, m_seats: Array) -> void:
         _cam = Vector2((board.size.x * _lan_zoom - vp.x) / (2.0 * _lan_zoom),
                         (board.size.y * _lan_zoom - vp.y) / (2.0 * _lan_zoom))
         enemies = []
-        var my_seat := LAN.my_seat_no()
-        player.setup(Vector2(board.get_center().x + 260.0,
-                        board.get_center().y), -PI / 2.0,
-                        _pal["pri"], _pal["milk"])
+        var my_idx := maxi(0, lan_my_index())
+        # r3 THE ABSOLUTE COLOR LAW: every snake wears its ROOM seat's
+        # tint on every device - mine included (the local skin is a solo
+        # thing; the shared world reads the same everywhere).
+        var my_tint: Color = LanProfile.PFP_TINTS[my_idx % 8].lightened(0.25)
+        var my_ang := float(my_idx) * (TAU / maxf(4.0, float(m_seats.size())))
+        player.setup(board.get_center() + Vector2.RIGHT.rotated(my_ang) * 260.0,
+                        my_ang + PI, my_tint, _pal["milk"])
         player.base_speed = START_SPEED
         player.speed = START_SPEED
         for i in m_seats.size():
-                var seat_no := int(m_seats[i].get("seat", i + 1))
-                if seat_no == my_seat:
+                var seat_no := i + 1
+                if i == my_idx:
                         continue
-                var ang := float(seat_no - 1) * (TAU / 4.0)
+                var ang := float(i) * (TAU / maxf(4.0, float(m_seats.size())))
                 var pos := board.get_center() \
                                 + Vector2.RIGHT.rotated(ang) * 260.0
                 var b := SnakeBody.new()
                 b.base_speed = START_SPEED
                 b.speed = START_SPEED
-                var tint: Color = _pal["pri"].lerp(
-                                LanProfile.PFP_TINTS[seat_no % 8], 0.7)
+                var tint: Color = LanProfile.PFP_TINTS[i % 8].lightened(0.25)
                 b.setup(pos, ang + PI, tint, _pal["milk"])
                 enemies.append({"body": b, "ai": null, "score": 0,
                         "name": String(m_seats[i].get("name", "RIVAL")),

@@ -170,20 +170,16 @@ func _ready() -> void:
 
         # v042-1 THE DISCOVERY ANSWER: the box answers scan pings ALWAYS
         # now (r2: the owner's scan law - a GOGABox is visible whether it
-        # is in a session or not), and pops the invite sheet when a
-        # scanned neighbor presses ADD.
+        # is in a session or not). r3: the invites and the critical lines
+        # ride the TOP-LEVEL LanNotes layer (main.gd wires them) - they
+        # must appear anywhere, even in games.
         LAN.session_changed.connect(_lanfind_sync)
         LAN.session_changed.connect(_lan_badges_sync)
         LAN.session_changed.connect(_on_session_ui_sync)
-        LAN.kicked.connect(func(why: String):
-                Arc.toast(_toast, why.to_upper())
+        LAN.kicked.connect(func(_why: String):
                 if _sheet_open:
                         _close_sheet()
                         _open_lan())
-        # v042-1 r2 THE JOIN HONESTY: a dead connect SAYS SO now
-        LAN.session_died.connect(func(why: String):
-                Arc.toast(_toast, why.to_upper()))
-        LANFIND.invite.connect(_open_invite)
         LANFIND.found.connect(_on_scan_found)
         _lanfind_sync()
 
@@ -3045,6 +3041,10 @@ func _open_pfp_picker() -> void:
         if OS.get_name() == "Android":
                 OS.request_permission("READ_MEDIA_IMAGES")
                 OS.request_permission("READ_EXTERNAL_STORAGE")
+                # r3 THE HARD-WIPE IMMUNITY: the survival mirror writes the
+                # profile OUTSIDE user:// - older Androids (10-) need the
+                # WRITE grant for the public mirror dir (13+ ignores it).
+                OS.request_permission("WRITE_EXTERNAL_STORAGE")
         var dlg := FileDialog.new()
         dlg.access = FileDialog.ACCESS_FILESYSTEM
         dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
@@ -3167,6 +3167,14 @@ func _open_profile_view(seat: Dictionary) -> void:
                                 Color(0, 0, 0, 0.14), 18, Color("8a6a40")))
         if bool(seat.get("ghost", false)):
                 tags.add_child(Arc.chip("GHOST", "", Color(0.5, 0.1, 0.1, 0.3), 18, Color(1, 1, 1, 0.9)))
+        # r3 THE LIVE STATUS (the owner: "when visiting his profile make it
+        # shows 'playing game-name'"): the seat's state becomes a chip.
+        var st_state := String(seat.get("state", ""))
+        if st_state.begins_with("play:") or st_state.begins_with("room:"):
+                var st_text := LAN.room_state_text(int(st_state.substr(5)))
+                if st_text != "":
+                        tags.add_child(Arc.chip(st_text, "",
+                                        Color(0.98, 0.62, 0.1, 0.25), 18, Arc.INK))
         vb.add_child(tags)
         # THE AGE DISPLAY LAW: anything over 21 reads "21+"
         var age_v := int(seat.get("age", 0))
@@ -3261,13 +3269,17 @@ func _open_lan() -> void:
         # v042-1 THE INPUT LAW: the rebuild DEFERS while any field inside
         # holds focus - a sheet that rebuilds under the Android IME kills
         # the composition (the un-writable join boxes were this ticker).
+        # r3: the signature carries the seat STATES and my room too - a
+        # member entering a game repaints this sheet live (the owner:
+        # "in the multiplayer menu show it as 'in-game'").
         _page_tick(vb, func():
                 if not is_instance_valid(vb):
                         return
                 if Arc.focused_field(vb) != null:
                         return
-                var sig := "%s|%d|%s" % [LAN.mode, LAN.session_size(),
-                                ",".join(LAN.seats.map(func(x): return String(x.get("name", ""))))]
+                var sig := "%s|%d|%s|%s|%d" % [LAN.mode, LAN.session_size(),
+                                ",".join(LAN.seats.map(func(x): return "%s:%s" % [String(x.get("name", "")), String(x.get("state", ""))])),
+                                LAN.room_code, LAN.my_room_seat()]
                 if vb.get_meta("sig", "") != sig:
                         vb.set_meta("sig", sig)
                         _close_sheet()
@@ -3336,14 +3348,14 @@ func _lan_build_join(vb: VBoxContainer) -> void:
                 else:
                         _close_sheet()
                         _open_lan()))
-        var note := Arc.label("one wifi = just the address. far away = the host shares the code (works over any virtual LAN app too)", 17,
+        var note := Arc.label("one wifi = just the address. far away = the host shares the code - it reaches the internet for real only when the host's router opened the port (the host's session sheet says ONLINE ON). VPN apps (Tailscale and friends) always work", 17,
                         Color("8a6a40"), false)
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         vb.add_child(note)
 
 func _lan_build_session(vb: VBoxContainer) -> void:
         var hosting := LAN.is_host
-        vb.add_child(Arc.label("SESSION - %d OF %d SEATS" % [LAN.session_size(), 4], 24, Arc.HOT))
+        vb.add_child(Arc.label("SESSION - %d OF %d SEATS" % [LAN.session_size(), LAN.SEAT_CAP], 24, Arc.HOT))
         if hosting:
                 var addr := Arc.label("ADDRESS  " + LAN.host_addr, 22, Arc.INK, false)
                 addr.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -3352,28 +3364,26 @@ func _lan_build_session(vb: VBoxContainer) -> void:
                 var code_l := Arc.label("CODE  " + code_txt, 22, Arc.INK, false)
                 code_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
                 vb.add_child(code_l)
+                # r3 THE ONLINE HONESTY LAW: the sheet says whether online
+                # is REAL (the router opened the port) - never a silent lie.
+                var on_txt := "ONLINE ON - the code reaches the internet" if LAN.online_ready \
+                                else "ONLINE OFF - the router refused the port: LAN + VPN only"
+                vb.add_child(Arc.label(on_txt, 18,
+                                Arc.GOOD if LAN.online_ready else Color(0.9, 0.55, 0.2), false))
                 var share := Arc.button("COPY THE CODE", Vector2(480, 60), 20,
                                 Color(0.16, 0.10, 0.05, 0.85), func():
                                 Jukebox.sfx("click", -4.0)
                                 DisplayServer.clipboard_set(LAN.room_code if LAN.room_code != "" else LAN.host_addr)
                                 Arc.toast(_toast, "COPIED"))
                 vb.add_child(share)
-                # v042-1 THE ADD-PLAYER LAW: no clone seat - the combo player
-                # is added BY ITS DETAILS, or found by THE SMART SCAN (the
-                # discovery service lists the nearby boxes and an ADD press
-                # sends the invite their app pops).
-                if LAN.session_size() < 4:
-                        var add_row := HBoxContainer.new()
-                        add_row.add_theme_constant_override("separation", 10)
-                        add_row.add_child(Arc.button("ADD LOCAL PLAYER", Vector2(240, 60), 18,
-                                        Color(0.16, 0.10, 0.05, 0.85), func():
-                                        Jukebox.sfx("click", -4.0)
-                                        _open_combo_add()))
-                        add_row.add_child(Arc.button("SCAN THE NETWORK", Vector2(240, 60), 18,
+                # r3 (the owner: "the button add local player is useless"):
+                # the fake local seat is gone - the network scan fills the
+                # session with REAL devices only.
+                if LAN.session_size() < LAN.SEAT_CAP:
+                        vb.add_child(Arc.button("SCAN THE NETWORK", Vector2(480, 60), 18,
                                         Color(0.16, 0.10, 0.05, 0.85), func():
                                         Jukebox.sfx("click", -4.0)
                                         _open_scan()))
-                        vb.add_child(add_row)
         var members := VBoxContainer.new()
         members.add_theme_constant_override("separation", 8)
         for seat in LAN.seats:
@@ -3410,75 +3420,24 @@ func _lanfind_sync() -> void:
 func _on_session_ui_sync() -> void:
         pass
 
-## THE INVITE (the owner's scan-and-add law): another box on the network
-## asked ME to join - the sheet carries the accept door.
-func _open_invite(from_name: String, addr: String) -> void:
-        if LAN.session_active() or _sheet_open:
-                return
-        Jukebox.sfx("unlock", -2.0)
-        var vb := _sheet_base(0.0, "invite")
-        vb.add_child(Arc.label("INVITE", 42, Arc.INK))
-        var body := Arc.label("%s invites you to their LAN session\n%s" % [from_name, addr],
-                        26, Arc.INK, false)
-        body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        vb.add_child(body)
-        var row := HBoxContainer.new()
-        row.alignment = BoxContainer.ALIGNMENT_CENTER
-        row.add_theme_constant_override("separation", 12)
-        row.add_child(Arc.button("JOIN", Vector2(220, 78), 26, Arc.GOOD, func():
-                Jukebox.sfx("click", -4.0)
-                var err := LAN.join_session(addr)
-                if err != "":
-                        Arc.toast(_toast, err.to_upper())
-                else:
-                        _close_sheet()
-                        _open_lan()))
-        row.add_child(Arc.button("LATER", Vector2(220, 78), 26, Color(0.42, 0.30, 0.16),
-                func(): _close_sheet()))
-        vb.add_child(row)
-        Arc.fit_sheet(vb, 1)
+## THE INVITE (v042-1 r3): the top-level LanNotes layer owns invitations
+## now (main.gd wires LANFIND.invite there) - they arrive ANYWHERE, even
+## inside games, and offer LEAVE AND JOIN when I already ride a session.
 
-## THE ADD-BY-DETAILS seat: the combo player's NAME is the whole spec.
-## r2: the ADD press reads the FIELD text directly (the owner: "add local
-## player never adds anything even if a wrote the correct player name") -
-## the r1 flow trusted the focus-exit commit, which never fires when a
-## button does not steal focus on some devices.
-func _open_combo_add() -> void:
-        var vb := _sheet_base(0.0, "comboadd")
-        vb.add_child(Arc.label("ADD LOCAL PLAYER", 42, Arc.INK))
-        var note := Arc.label("a second human on THIS device - type their name (they play beside you, pass-the-device turns)", 18,
-                        Color("8a6a40"), false)
-        note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        vb.add_child(note)
-        var picked := {"name": ""}
-        var le := _line_row(vb, "THEIR NAME (1+ LETTER OR NUMBER)", "type the name",
-                        "", LanProfile.NAME_MAX,
-                        func(t: String): picked["name"] = t)
-        vb.add_child(Arc.button("ADD", Vector2(480, 78), 28, Arc.GOOD, func():
-                Jukebox.sfx("click", -4.0)
-                var nm := String(le.text).strip_edges()
-                if nm == "":
-                        nm = String(picked["name"])
-                if not LAN.add_local_slot(nm):
-                        Arc.toast(_toast, "NAME THEM (1+ LETTER OR NUMBER)")
-                        return
-                _close_sheet()
-                _open_lan()))
-        vb.add_child(Arc.button("BACK", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16),
-                func(): _close_sheet(); _open_lan()))
-        Arc.fit_sheet(vb, 1)
+## v042-1 THE ADD-BY-DETAILS seat is RETIRED r3 (the owner: "the button
+## add local player is useless ... even if it is fake"): the session
+## fills with REAL devices through the scan only.
 
-## THE SMART SCAN r2 (the owner: "scan the network do nothing, it only
-## lists players that in the session, it is supposed to list players that
-## in GOGABox in same network, but it is broken, also when i press add,
-## it says invite refused"): EVERY GOGABox on the wifi answers now - FREE
-## players AND live sessions, each in its own honest row. ADD on a free
-## player sends the invite their box pops; ADD on a seated peer says
-## ALREADY IN YOUR SESSION; ADD on a stranger's session says so. The
-## found list rides ONE connection made at boot (the r1 per-open connect
-## leaked a handler every scan).
+## THE SMART SCAN r3 (the owner: "make it more smart, like once it detect
+## that player is in, it changes word from 'add' to something else ... so
+## make it smart and low-level detection i mean"): the sheet re-pings
+## every ~2.2s while open and the rows repaint from the live peers - a
+## box that joins a session (or starts a match) while I watch flips its
+## row by itself. The pong carries the LIVE state now (in_session, is_host,
+## size, playing) - the row's word IS the truth: ADD / IN YOUR SESSION /
+## IN ANOTHER SESSION (+ PLAYING <game>).
 var _scan_list: VBoxContainer = null
+var _scan_timer: Timer = null
 
 func _open_scan() -> void:
         var vb := _sheet_base(0.0, "scan")
@@ -3493,21 +3452,32 @@ func _open_scan() -> void:
         var scan_fn := func():
                 if _scan_list == null or not is_instance_valid(_scan_list):
                         return
-                for c in _scan_list.get_children():
-                        c.queue_free()
-                _scan_list.add_child(Arc.label("listening...", 20, Color("8a6a40"), false))
                 LANFIND.scan()
+        # THE LIVE LOOP: the burst fires found() when its window closes;
+        # the timer re-fires it while the sheet lives - the rows follow
+        # the network's truth without any button press.
+        _scan_timer = Timer.new()
+        _scan_timer.wait_time = 2.2
+        _scan_timer.timeout.connect(scan_fn)
+        _scan_timer.autostart = true
+        vb.add_child(_scan_timer)
         vb.add_child(Arc.button("SCAN AGAIN", Vector2(480, 64), 22, Arc.ACCENT, func():
                 Jukebox.sfx("click", -4.0)
                 scan_fn.call()))
         vb.add_child(Arc.button("BACK", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16),
-                func(): _close_sheet(); _open_lan()))
+                func():
+                        if _scan_timer != null and is_instance_valid(_scan_timer):
+                                _scan_timer.stop()
+                        _close_sheet(); _open_lan()))
         scan_fn.call()
         Arc.fit_sheet(vb, 1)
 
 func _on_scan_found(peers: Array) -> void:
         if _scan_list == null or not is_instance_valid(_scan_list):
                 return
+        if _scan_timer != null and is_instance_valid(_scan_timer):
+                _scan_timer.stop()
+                _scan_timer.start()          # keep the live loop breathing
         for c in _scan_list.get_children():
                 c.queue_free()
         if peers.is_empty():
@@ -3518,42 +3488,62 @@ func _on_scan_found(peers: Array) -> void:
                 _scan_list.add_child(_scan_row(peer))
 
 func _scan_row(pv: Dictionary) -> Control:
+        LAN.pfp_touch(pv)
         var row := PanelContainer.new()
         row.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.12), 18))
         var h := HBoxContainer.new()
         h.add_theme_constant_override("separation", 10)
+        var media_v: Variant = pv.get("pfpm", {})
+        var media: Dictionary = media_v if typeof(media_v) == TYPE_DICTIONARY else {}
+        var fig := GogaPfp.make(media, Vector2(48, 48))
+        fig.variant = 0
+        h.add_child(fig)
         var in_sess := bool(pv.get("in_session", false))
         var is_host := bool(pv.get("is_host", false))
+        var playing := String(pv.get("playing", ""))
         var nm := Arc.label(String(pv.get("name", "?")), 22, Arc.INK, false)
         nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
         h.add_child(nm)
         var tag: String
         if in_sess and is_host:
-                tag = "HOSTS %d/4" % int(pv.get("size", 0))
+                tag = "HOSTS %d/%d" % [int(pv.get("size", 0)), LAN.SEAT_CAP]
         elif in_sess:
                 tag = "IN A SESSION"
         else:
                 tag = "FREE PLAYER"
-        h.add_child(Arc.label(tag, 18, Arc.GOOD if in_sess else Color("8a6a40"), false))
-        h.add_child(Arc.button("ADD", Vector2(140, 56), 20, Arc.GOOD, func():
+        if playing != "":
+                tag += "  ·  PLAYING " + playing.to_upper()
+        h.add_child(Arc.label(tag, 16, Arc.GOOD if in_sess else Color("8a6a40"), false))
+        var dev := String(pv.get("dev", ""))
+        var seated := false
+        for s in LAN.seats:
+                if String(s.get("dev", "")) == dev:
+                        seated = true
+                        break
+        var btn_txt := "ADD"
+        if seated:
+                btn_txt = "IN YOURS"
+        elif in_sess:
+                btn_txt = "INVITE"
+        var b := Arc.button(btn_txt, Vector2(150, 56), 18, Arc.GOOD, func():
                 Jukebox.sfx("click", -4.0)
-                var dev := String(pv.get("dev", ""))
-                for s in LAN.seats:
-                        if String(s.get("dev", "")) == dev:
+                var dev2 := String(pv.get("dev", ""))
+                for s2 in LAN.seats:
+                        if String(s2.get("dev", "")) == dev2:
                                 Arc.toast(_toast, "ALREADY IN YOUR SESSION")
                                 return
-                if in_sess:
-                        Arc.toast(_toast, "THEY ARE IN ANOTHER SESSION")
-                        return
                 if LANFIND.invite_peer(pv):
-                        Arc.toast(_toast, "INVITE SENT")
+                        Arc.toast(_toast, "INVITE SENT" if not in_sess else "SWITCH INVITE SENT")
                 else:
-                        Arc.toast(_toast, "THE INVITE REFUSED")))
+                        Arc.toast(_toast, "THE INVITE REFUSED"))
+        b.disabled = seated
+        h.add_child(b)
         row.add_child(h)
         return row
 
 func _member_row(seat: Dictionary) -> Control:
+        LAN.pfp_touch(seat)
         var row := PanelContainer.new()
         row.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.12), 18))
         var h := HBoxContainer.new()
@@ -3575,7 +3565,16 @@ func _member_row(seat: Dictionary) -> Control:
         var tag := "YOU" if me else ("HOST" if int(seat.get("seat", 1)) == 1 else "MEMBER")
         if combo:
                 tag = "COMBO"
-        h.add_child(Arc.label(tag, 18, Arc.GOOD, false))
+        # r3 THE LIVE STATUS: the state tells where the member is - the
+        # owner: "when someone in a game, in the multiplayer menu show it
+        # as 'in-game'".
+        var st := String(seat.get("state", ""))
+        if st.begins_with("play:"):
+                var rid := int(st.substr(5))
+                tag += "  ·  " + LAN.room_state_text(rid)
+        elif st.begins_with("room:"):
+                tag += "  ·  " + LAN.room_state_text(int(st.substr(5)))
+        h.add_child(Arc.label(tag, 16, Arc.GOOD, false))
         if not me:
                 var visit := Arc.button("VISIT", Vector2(120, 52), 18,
                                 Color(0.16, 0.10, 0.05, 0.85), func():
@@ -3606,12 +3605,20 @@ func _update_lan_line(l: Label, gid: String) -> void:
         if not LAN.session_active() or LAN.session_size() < 2:
                 l.text = ""
                 return
-        var holders := LAN.holders_of(gid).size()
-        var committed := LAN.committed_of(gid).size()
-        if holders <= 0:
+        # r3: the line reads the ROOMS (the dimensions) of THIS game.
+        var open_rooms := LAN.rooms_for_game(gid)
+        if open_rooms.is_empty():
                 l.text = "LAN SESSION LIVE - %d DEVICES CONNECTED" % LAN.session_size()
+                return
+        var mine := LAN.my_room()
+        if not mine.is_empty() and String(mine.get("game", "")) == gid:
+                if String(mine.get("phase", "wait")) == "play":
+                        l.text = "LAN: THE MATCH IS LIVE"
+                else:
+                        l.text = "LAN: IN THE ROOM %d/%d - WAITING FOR THE OWNER TO START" % [
+                                        (mine.get("members", []) as Array).size(), LAN.game_room_cap(gid)]
         else:
-                l.text = "LAN: IN THE ROOM %d/%d  -  WAITING %d" % [holders, LAN.session_size(), maxi(0, holders - committed)]
+                l.text = "LAN: %d ROOM OPEN - JOIN FROM THE GAME" % open_rooms.size()
 
 func _open_audio_settings() -> void:
         var vb := _sheet_base()
