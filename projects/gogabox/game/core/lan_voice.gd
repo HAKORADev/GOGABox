@@ -83,6 +83,7 @@ func _on_session_changed() -> void:
                 drop_session()
 
 func _detect_devices() -> void:
+        var was_granted := mic_granted
         has_mic = AudioServer.get_input_device_list().size() > 0
         has_out = AudioServer.get_output_device_list().size() > 0
         # the Android grant state: POLLED - the user answers the ask while
@@ -91,6 +92,10 @@ func _detect_devices() -> void:
                 mic_granted = has_mic
         else:
                 mic_granted = "RECORD_AUDIO" in OS.get_granted_permissions()
+        if mic_granted != was_granted:
+                _granted_changed = true
+                voice_state_changed.emit()
+                _publish_state()
 
 ## The Android runtime ask (called from the UI press, never at boot).
 func request_mic() -> void:
@@ -206,6 +211,23 @@ func _process(delta: float) -> void:
         if _beacon >= BEACON_SECS:
                 _beacon = 0.0
                 _beacon_hello()
+        # r4 THE CAPTURE TRUTH (the owner: "the voice chat still not correct,
+        # looks like it is not even sending data at all"): the capture used
+        # to arm ONCE at the session start - on Android the mic permission
+        # was rarely granted by then, has_mic read false, _setup_capture
+        # early-returned and NOBODY ever re-armed it: the device "sent"
+        # silence forever. The arm is LIVE now: the heartbeat re-runs
+        # _setup_capture the moment the device gains a mic or the grant
+        # lands, and a fresh grant restarts the mic stream (the engine only
+        # opens the input when the stream plays AFTER the grant).
+        _detect_devices()
+        if has_mic and _capture == null:
+                _setup_capture()
+        if _rec_player != null and is_instance_valid(_rec_player) \
+                        and _granted_changed:
+                _rec_player.stop()
+                _rec_player.play()
+                _granted_changed = false
         # 1. CAPTURE -> my frame
         if _capture != null and mic_on and mic_granted and has_mic:
                 var frames := _capture.get_frames_available()
@@ -228,22 +250,26 @@ func _process(delta: float) -> void:
         # 3. keep the players fed
         for dev in _players.keys():
                 _feed(String(dev))
-        if _hb >= 1.0:
-                _hb = 0.0
-                var was := mic_granted
-                _detect_devices()
-                if was != mic_granted:
-                        voice_state_changed.emit()
-                        _publish_state()
+
+var _granted_changed := false
 
 ## THE BEACON: my UDP address rides to the host every 2s (the host needs
 ## it to relay the room's frames TO me - a listener-only device too).
+## r4: the target is LAN.conn_addr - the address the session wire REALLY
+## rides (a mapped host shows a PUBLIC host_addr; the hairpin route to it
+## eats the LAN's own voice - the joiner must beacon to the dialed wire).
+func _voice_host_ip() -> String:
+        if LAN.is_host:
+                return ""
+        var addr := LAN.conn_addr if LAN.conn_addr != "" else LAN.host_addr
+        return addr.split(":")[0] if addr != "" else ""
+
 func _beacon_hello() -> void:
         if _udp == null:
                 return
         if LAN.is_host:
                 return          # the host's addr is known (host_addr)
-        var host_ip := LAN.host_addr.split(":")[0] if LAN.host_addr != "" else ""
+        var host_ip := _voice_host_ip()
         if host_ip == "":
                 return
         _udp.set_dest_address(host_ip, 31440 + VOICE_PORT_OFF)
@@ -269,13 +295,13 @@ func _send_frame(samples: PackedFloat32Array) -> void:
         var pkt := {"t": "v", "dev": LAN.my_dev(), "seq": _seq,
                 "to": targets, "pcm": Marshalls.raw_to_base64(pcm)}
         _seq += 1
-        var host_ip := LAN.host_addr.split(":")[0] if LAN.host_addr != "" else ""
-        if host_ip == "":
-                return
+        var host_ip := _voice_host_ip()
         if LAN.is_host:
                 # the host relays its own frame directly to the targets
                 _relay_frame(pkt, "")
         else:
+                if host_ip == "":
+                        return
                 _udp.set_dest_address(host_ip, 31440 + VOICE_PORT_OFF)
                 _udp.put_var([pkt])
 

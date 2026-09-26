@@ -22,7 +22,10 @@ extends Node
 ## invite to a Tailscale/ZeroTier address is just a unicast).
 
 signal found(peers: Array)          # a scan tick produced a fresh list
-signal invite(name_v: String, addr: String, switch: bool)
+signal invite(name_v: String, addr: String, switch: bool, from_ip: String, from_dev: String)
+## r4 THE DECLINE WIRE: an invited box answered NO (or never answered) -
+## the inviter hears it through the top-level note layer.
+signal declined(name_v: String, why: String)
 
 const FIND_PORT := 31445
 const SCAN_TICK := 1.0              # the scan's answer window per burst
@@ -115,13 +118,17 @@ func _process(delta: float) -> void:
                 match String(msg.get("t", "")):
                         "ping":
                                 if port != 0:
+                                        # r4 THE LIVE FACE: the pong reads the
+                                        # face truth FRESH - a face set moments
+                                        # ago reaches the next scan without any
+                                        # re-answering dance.
                                         var pong := {"t": "iam",
                                                 "dev": LAN.my_dev(),
                                                 "name": String(_self_info.get("name", "")),
                                                 "size": int(_self_info.get("size", 0)),
                                                 "is_host": bool(_self_info.get("is_host", false)),
                                                 "in_session": bool(_self_info.get("in_session", false)),
-                                                "pfpm": _self_info.get("pfpm", {})}
+                                                "pfpm": LAN.my_face_meta()}
                                         pong.merge(self_state(), true)
                                         _udp.set_dest_address(ip, FIND_PORT)
                                         _udp.put_var([pong])
@@ -140,11 +147,22 @@ func _process(delta: float) -> void:
                         "invite":
                                 # r3 THE SWITCH INVITE: delivered even when
                                 # I ride a session - the card carries the
-                                # switch offer (the switch bool).
+                                # switch offer (the switch bool). r4: the
+                                # packet's source rides too - the decline
+                                # needs the road back to the inviter.
                                 if String(msg.get("to", "")) == LAN.my_dev():
                                         invite.emit(String(msg.get("name", "PLAYER")),
                                                 String(msg.get("addr", "")),
-                                                LAN.session_active())
+                                                LAN.session_active(), ip,
+                                                String(msg.get("pdev", "")))
+                        "invite_declined":
+                                # r4 THE DECLINE WIRE (the owner: "the
+                                # invitation when declined, the host do not
+                                # even know the decline")
+                                if String(msg.get("to_dev", "")) == LAN.my_dev():
+                                        declined.emit(
+                                                String(msg.get("dname", "A PLAYER")),
+                                                String(msg.get("why", "")))
         # THE SCAN side: re-broadcast while scanning, expire stale peers
         if _scanning:
                 _scan_left -= delta
@@ -198,5 +216,15 @@ func invite_peer(peer: Dictionary) -> bool:
                 return false
         _udp.set_dest_address(addr, FIND_PORT)
         _udp.put_var([{"t": "invite", "to": String(peer.get("dev", "")),
-                "name": LAN.my_name(), "addr": target}])
+                "name": LAN.my_name(), "addr": target, "pdev": LAN.my_dev()}])
         return true
+
+## r4 THE DECLINE WIRE: the invited box tells the inviter NO (their
+## discovery socket hears it - same road the invite rode in on).
+func send_decline(inviter_ip: String, inviter_dev: String,
+                my_name: String, why: String) -> void:
+        if _udp == null or inviter_ip == "":
+                return
+        _udp.set_dest_address(inviter_ip, FIND_PORT)
+        _udp.put_var([{"t": "invite_declined", "to_dev": inviter_dev,
+                "dname": my_name, "why": why}])

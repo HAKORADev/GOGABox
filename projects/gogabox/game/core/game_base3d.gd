@@ -58,6 +58,11 @@ var _score_prefix := ""
 var _overlay_root: Control
 var _toast: Dictionary
 var _ach_clock := 0.0
+# r4 THE KIND WATCHER (the twin mirror): the view kind this game built at;
+# a once-a-second heal through the host's own reload door when the live
+# canvas kind disagrees (the half-background class).
+var view_kind := ""
+var _view_watch := 0.0
 var _hud_row: HBoxContainer
 var _flow_btns := 0
 var _sheet_stack: Array = []
@@ -77,6 +82,8 @@ func _ready() -> void:
         if vp != null:
                 _prev_msaa = vp.msaa_3d
                 vp.msaa_3d = Viewport.MSAA_2X
+        var vp0 := get_viewport().get_visible_rect().size
+        view_kind = "horizontal" if vp0.x > vp0.y else "vertical"
         _goga_setup()
 
 func _exit_tree() -> void:
@@ -213,17 +220,27 @@ func _lan_on_denied(gid: String, why: String) -> void:
 func _lan_on_ended(gid: String, results: Array, why: String) -> void:
         if gid != game_id:
                 return
+        if not lan_active:
+                return
+        # r4 THE FOLD VERDICT (the twin mirror): the fold ends the game for
+        # everyone left - the base owns the honest end whenever the game's
+        # own verdict (lan_end) left it alive.
         if why != "":
                 game_toast(why)
-        if lan_active and has_method("lan_end"):
+        if has_method("lan_end"):
                 call("lan_end", results)
+        if not over:
+                finish_run(score, run_coins)
 
 ## THE DISCONNECT LAW in-game (the twin mirror).
 func _lan_on_session_died(why: String) -> void:
-        if not lan_active or not has_method("lan_end"):
+        if not lan_active:
                 return
         game_toast(why)
-        call("lan_end", [{"name": "THE HOST", "dq": true}])
+        if has_method("lan_end"):
+                call("lan_end", [{"name": "THE HOST", "dq": true}])
+        if not over:
+                finish_run(score, run_coins)
 
 func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
         if gid == game_id and has_method("lan_act"):
@@ -338,6 +355,13 @@ func finish_run(final_score: int, final_coins := -1) -> void:
                 return
         over = true
         run_coins = final_coins if final_coins >= 0 else run_coins
+        # r4 THE END LAW (the twin mirror): ending the run inside a live
+        # LAN match ends the MATCH for the whole room.
+        if lan_active and LAN.my_room_seat() > 0 \
+                        and String(LAN.my_room().get("phase", "")) == "play":
+                LAN.request_match_end(
+                        [{"name": LAN.my_name(), "score": final_score}],
+                        "%s ENDED THE MATCH" % LAN.my_name().to_upper())
         request_finish.emit(final_score, run_coins)
 
 func quit_to_box() -> void:
@@ -513,13 +537,35 @@ func banner_safe_px() -> float:
 func banner_bottom() -> float:
         return 0.0
 
+## r4 THE DEEP SETTINGS LOCK (the twin mirror): the HUD doors guard
+## themselves through the owner's lock - one seat, every game.
 func add_hud_button(txt: String, cb: Callable) -> void:
         if _hud_row == null or not is_instance_valid(_hud_row):
                 return
-        var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85), cb)
+        var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85),
+                        func():
+                                if lan_guard_lock():
+                                        return
+                                cb.call())
         _hud_row.add_child(b)
         _hud_row.move_child(b, 1 + _flow_btns)
         _flow_btns += 1
+
+## r4 THE DEEP SETTINGS LOCK (the twin mirror, verbatim shapes).
+func lan_settings_locked() -> bool:
+        if not lan_active:
+                return false
+        var r := LAN.my_room()
+        if r.is_empty():
+                return true   # mid-match: the config froze at START
+        return String(r.get("owner", "")) != LAN.my_dev()
+
+func lan_guard_lock() -> bool:
+        if not lan_settings_locked():
+                return false
+        Jukebox.sfx("error", -4.0)
+        game_toast("THE ROOM OWNER LOCKS THE SETTINGS")
+        return true
 
 func add_hud_chip(txt: String, icon_path := "") -> Label:
         if _hud_row == null or not is_instance_valid(_hud_row):
@@ -722,7 +768,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
         if over or paused:
                 return
+        # r4 THE ROOM SCREEN LAW (the twin mirror): the room screen owns
+        # the boot - the game's tick has nothing to tick (the world was
+        # never built before START; the 3D camera does not exist yet).
+        if _lan_hold_ui != null:
+                return
         _goga_tick(delta)
+        # r4 THE KIND WATCHER (the twin mirror): the half-background heal
+        _view_watch += delta
+        if _view_watch >= 1.0:
+                _view_watch = 0.0
+                var vpw := get_viewport().get_visible_rect().size
+                if vpw.x > 0.0 and vpw.y > 0.0:
+                        var k: String = "horizontal" if vpw.x > vpw.y else "vertical"
+                        if k != view_kind:
+                                view_kind = k
+                                request_orientation_reload.emit(k)
         _ach_clock += delta
         if _ach_clock >= 3.0:
                 _ach_clock = 0.0

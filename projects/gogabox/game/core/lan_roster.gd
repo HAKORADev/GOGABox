@@ -2,13 +2,21 @@ extends RefCounted
 class_name LanRoster
 ## THE PAUSE ROSTER (v042-1, the owner: "in the pause menu, add button
 ## called multiplayer, in it, show each player number and who is the
-## player behind it, in a proper well-designed way") + THE VOICE LAW r3:
-## the FOUR honest gates, all visible (the owner's semantics law):
-##   THEIR MIC  - their live transmission state (the VST wire's truth)
-##   THEIR HEAR - their live speaker state (do they hear the room?)
-##   MY MIC     - the toggle: can THIS player hear me?
-##   MY HEAR    - the toggle: do I hear this player?
-## Everything is dev-keyed (the seat numbers renumbered; devs are forever).
+## player behind it, in a proper well-designed way") + THE VOICE LAW r4:
+## the toggles speak the owner's own words - LISTEN/TALK, direct:
+##
+##   MY TALK      - off: none of them hear me (my mic gate)
+##   MY LISTEN    - off: I hear none of them (my speaker gate)
+##   THEIR TALK   - off: my device does not hear their talk
+##   THEIR LISTEN - off: their device does not take my talk
+##
+## r4 THE LIVE TRUTH: the remote states (THEY TALK / THEY LISTEN) repaint
+## the moment the VST wire lands a change - the roster was a static
+## snapshot before. r4 THE UNHANG PAINT: every chip wears ALL its own
+## styleboxes (normal/hover/pressed/disabled/focus) - the engine's gray
+## pressed paint can never bleed through and hang "until another click
+## happens somewhere else" (the owner: "it should be off/on and that gray
+## be on-click only").
 
 ## Build the roster into a pause sheet's VBox. `game` is the GogaGame /
 ## GogaGame3D (the base carries lan_seats).
@@ -26,9 +34,9 @@ static func build(vb: VBoxContainer, game: Node) -> void:
         if LAN.seats.is_empty():
                 list.add_child(Arc.label("no seats - the session ended", 20,
                                 Color("8a6a40"), false))
-        # THE VOICE LAW (the owner's semantics, all four gates visible)
+        # THE VOICE LAW (the owner's semantics, all gates visible)
         vb.add_child(Arc.label("VOICE", 20, Arc.HOT))
-        var note := Arc.label("their mic = you hear them. their hear = they hear the room. my mic = they hear me. my hear = I hear them", 17,
+        var note := Arc.label("MY TALK off = nobody hears me. MY LISTEN off = I hear nobody. THEIR TALK off = I do not hear them. THEIR LISTEN off = they do not hear me", 17,
                         Color("8a6a40"), false)
         note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         vb.add_child(note)
@@ -91,67 +99,102 @@ static func _voice_row(s: Dictionary, my_dev: String) -> Control:
         var dev := String(s.get("dev", ""))
         var me := dev == my_dev
         if me:
-                # THE YOU ROW: my master pair - my mic (nobody hears me when
-                # it is off) and my hear (I hear nobody when it is off).
-                h.add_child(_voice_btn("MY MIC", func(): return Voice.mic_on,
+                # THE YOU ROW: my master pair - MY TALK (nobody hears me
+                # when it is off) and MY LISTEN (I hear nobody when off).
+                h.add_child(_voice_btn("MY TALK", func(): return Voice.mic_on,
                                 func(): Voice.toggle_mic_master()))
-                h.add_child(_voice_btn("MY HEAR", func(): return Voice.hear_on,
+                h.add_child(_voice_btn("MY LISTEN", func(): return Voice.hear_on,
                                 func(): Voice.toggle_hear_master()))
                 v.add_child(h)
         else:
-                # THE REMOTE TRUTH: their live mic/hear states (the VST
-                # wire), then my two gates toward them.
-                var rs: Dictionary = Voice.remote_of(dev)
-                var tm := Arc.label("THEIR MIC %s" % ("ON" if bool(rs.get("mic", false)) else "OFF"),
-                                16, Arc.GOOD if bool(rs.get("mic", false)) else Color("9a8a70"), false)
-                tm.custom_minimum_size = Vector2(150, 0)
-                h.add_child(tm)
-                var th := Arc.label("THEIR HEAR %s" % ("ON" if bool(rs.get("hear", true)) else "OFF"),
-                                16, Arc.GOOD if bool(rs.get("hear", true)) else Color("9a8a70"), false)
-                h.add_child(th)
-                v.add_child(h)
+                # THE REMOTE TRUTH (live): THEY TALK / THEY LISTEN repaint
+                # from the VST wire the moment it changes.
+                var h0 := HBoxContainer.new()
+                h0.add_theme_constant_override("separation", 14)
+                h0.add_child(_live_truth(dev, "THEY TALK",
+                                func(): return bool(Voice.remote_of(dev).get("mic", false))))
+                h0.add_child(_live_truth(dev, "THEY LISTEN",
+                                func(): return bool(Voice.remote_of(dev).get("hear", true))))
+                v.add_child(h0)
                 var h2 := HBoxContainer.new()
                 h2.add_theme_constant_override("separation", 10)
                 var mic_ok: bool = Voice.has_mic and Voice.mic_granted
-                var mic := _voice_btn("MY MIC TO THEM", func(): return Voice.can_hear_me(dev),
+                # THEIR LISTEN: their device takes my talk (my mic gate).
+                var listen := _voice_btn("THEIR LISTEN",
+                                func(): return Voice.can_hear_me(dev),
                                 func():
                                         if OS.get_name() == "Android" \
                                                         and not Voice.mic_granted:
                                                 Voice.request_mic()
                                         Voice.toggle_mic_to(dev))
                 if not mic_ok:
-                        mic.disabled = true
-                h2.add_child(mic)
-                h2.add_child(_voice_btn("MY HEAR OF THEM", func(): return Voice.i_can_hear(dev),
+                        listen.disabled = true
+                h2.add_child(listen)
+                # THEIR TALK: my device hears their talk (my hear gate).
+                h2.add_child(_voice_btn("THEIR TALK",
+                                func(): return Voice.i_can_hear(dev),
                                 func(): Voice.toggle_hear_from(dev)))
                 v.add_child(h2)
         row.add_child(v)
         return row
 
-## The toggle chip: green = on, gray = off. The press runs the toggle
-## then repaints from the LIVE getter - and the press's OWN visual state
-## is reset (r3 THE UNHANG LAW: the Android chip held its pressed paint
-## after the lift, reading as a stuck "holding" state).
+## A live remote-truth label: repaints on every VST arrival (r4), dies
+## quiet (the connection rides away with the label's tree exit).
+static func _live_truth(dev: String, word: String, get_on: Callable) -> Label:
+        var l := Arc.label("", 16, Arc.GOOD, false)
+        l.custom_minimum_size = Vector2(150, 0)
+        var paint := func():
+                var on: bool = get_on.call()
+                l.text = "%s %s" % [word, "ON" if on else "OFF"]
+                l.add_theme_color_override("font_color",
+                                Arc.GOOD if on else Color("9a8a70"))
+        paint.call()
+        var conn := Voice.voice_state_changed.connect(paint)
+        l.tree_exited.connect(func():
+                if Voice.voice_state_changed.is_connected(paint):
+                        Voice.voice_state_changed.disconnect(paint))
+        return l
+
+## The toggle chip: green = on, dark = off. r4 THE UNHANG PAINT: the chip
+## wears EVERY state's own stylebox - the engine's default gray pressed
+## look cannot bleed through anymore, and the paint re-runs from the LIVE
+## getter on the press AND on every remote state change (the gray used to
+## hang until the next click somewhere else).
 static func _voice_btn(txt: String, get_state: Callable, cb: Callable) -> Button:
         var b := Button.new()
         b.text = " %s " % txt
-        b.custom_minimum_size = Vector2(120, 52)
+        b.custom_minimum_size = Vector2(150, 52)
         b.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
         b.add_theme_font_override("font", Arc.font_ui())
         b.add_theme_font_size_override("font_size", 18)
         var paint := func():
                 var on: bool = get_state.call()
+                for st in ["normal", "hover", "focus"]:
+                        b.add_theme_stylebox_override(st, Arc.panel_style(
+                                        Arc.GOOD if on else Color(0, 0, 0, 0.18), 16))
+                # THE PRESS FLASH: the held/lift paint is the chip's OWN
+                # ink one step brighter - never the engine's gray
+                b.add_theme_stylebox_override("pressed", Arc.panel_style(
+                                Arc.GOOD.lightened(0.18) if on
+                                else Color(0, 0, 0, 0.30), 16))
+                b.add_theme_stylebox_override("disabled", Arc.panel_style(
+                                Color(0, 0, 0, 0.10), 16))
                 b.add_theme_color_override("font_color",
                                 Arc.CARD if on else Color("9a8a70"))
-                b.add_theme_stylebox_override("normal", Arc.panel_style(
-                                Arc.GOOD if on else Color(0, 0, 0, 0.18), 16))
+                b.add_theme_color_override("font_pressed_color",
+                                Arc.CARD if on else Color("b0a088"))
+                b.add_theme_color_override("font_hover_color",
+                                Arc.CARD if on else Color("9a8a70"))
+                b.add_theme_color_override("font_focus_color",
+                                Arc.CARD if on else Color("9a8a70"))
         paint.call()
         b.pressed.connect(func():
                 Jukebox.sfx("click", -4.0)
                 cb.call()
                 paint.call())
-        b.pressed.connect(func():
-                # the lift cleans the pressed paint on every state
-                b.release_focus()
-                b.accept_event())
+        b.button_down.connect(paint)
+        var conn := Voice.voice_state_changed.connect(paint)
+        b.tree_exited.connect(func():
+                if Voice.voice_state_changed.is_connected(paint):
+                        Voice.voice_state_changed.disconnect(paint))
         return b

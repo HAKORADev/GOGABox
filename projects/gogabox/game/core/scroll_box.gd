@@ -233,6 +233,32 @@ func _clipped_out(pos: Vector2) -> bool:
                 n = n.get_parent()
         return false
 
+## r4 THE CARD BLOCK LAW (the owner: "the join/decline when appear in main
+## menu, it is tap-through and not tappable, it is tappable in-game, but
+## in menu, it taps the thing behind it or if nothing behind it, the
+## click/tap do nothing there"): the top-level LanNotes card lives in
+## ANOTHER CanvasLayer (95) - _covered_by_overlay only sees SIBLING
+## subtrees and was blind to it, so the scroll captured the raw touch at
+## the _input stage (BEFORE the GUI stage) and the card's JOIN/DECLINE
+## buttons starved. In-game the early GameHost return masked it. A point
+## the notes card owns is NEVER mine now.
+func _blocked_by_card(pos: Vector2) -> bool:
+        return LanNotes.blocks_point(pos)
+
+## r4 THE FIELD LAW: a BoxScroll that hosts WRITABLE fields (the profile
+## sheet rides a scroll now) never captures a press that lands on one -
+## the field's focus IS the event's destiny, and a captured press starves
+## it (the same starvation class the topmost law fixed for buttons).
+func _field_at(c: Control, pos: Vector2) -> bool:
+        if (c is LineEdit or c is TextEdit or c is Slider or c is SpinBox) \
+                        and c.get_global_rect().has_point(pos):
+                return true
+        for ch in c.get_children():
+                if ch is Control and (ch as Control).is_visible_in_tree() \
+                                and _field_at(ch as Control, pos):
+                        return true
+        return false
+
 func _init() -> void:
         horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
         vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -322,14 +348,19 @@ func _input(event: InputEvent) -> void:
 func _mouse(m: InputEventMouseButton) -> void:
         if m.button_index != MOUSE_BUTTON_LEFT:
                 return
+        if _field_at(self, m.position):
+                return
         if get_global_rect().has_point(m.position) \
-                        and not _covered_by_overlay(m.position):
+                        and not _covered_by_overlay(m.position) \
+                        and not _blocked_by_card(m.position):
                 get_viewport().set_input_as_handled()
 
 func _owns(pos: Vector2) -> bool:
         return _idx == -1 and get_global_rect().has_point(pos) \
                         and _visible_point(pos) \
-                        and not _covered_by_overlay(pos)
+                        and not _covered_by_overlay(pos) \
+                        and not _blocked_by_card(pos) \
+                        and not _field_at(self, pos)
 
 func _touch(t: InputEventScreenTouch) -> void:
         if t.pressed:
@@ -359,8 +390,10 @@ func _touch(t: InputEventScreenTouch) -> void:
         if not _dragging:
                 if dist <= TAP_PX and ms <= TAP_MS:
                         # the clip law re-checks at dispatch: a layout shift
-                        # between down and up must not fire a hidden tap
-                        if _clipped_out(t.position):
+                        # between down and up must not fire a hidden tap;
+                        # r4: a note card born over the finger by then owns
+                        # the release too
+                        if _clipped_out(t.position) or _blocked_by_card(t.position):
                                 return
                         get_viewport().set_input_as_handled()
                         tapped.emit(t.position)

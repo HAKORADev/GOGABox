@@ -229,8 +229,18 @@ func _on_orientation_reload(o: String) -> void:
         if o != "vertical" and o != "horizontal":
                 return
         var vps := get_viewport_rect().size
+        # r4 THE KIND WATCHER'S DOOR: the same-ask early return now checks
+        # the GAME'S OWN seated kind too - when the game was built in a
+        # DIFFERENT kind than the ask says (the refused-settle / foreign-
+        # stomp class the owner filmed as the half background), the reload
+        # PROCEEDS and re-seats the whole world honestly. A game that sits
+        # where it was built still does nothing.
+        var gk := ""
+        if game != null and is_instance_valid(game):
+                gk = String(game.get("view_kind"))
         if o == _orient_now:
-                if (vps.x > vps.y) == (o == "horizontal"):
+                if (vps.x > vps.y) == (o == "horizontal") \
+                                and (gk == "" or gk == o):
                         return   # the window truly sits there: do nothing
         # v041-1 r7 THE MID-FLIGHT GUARD OWNS EVERY PATH (the owner: "in
         # android build, the thing handled more accurately where the game

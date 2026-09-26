@@ -572,6 +572,11 @@ func _phone_card(kind: String, selected: bool, on_pick: Callable) -> Button:
                 return b
 
 func _orient_choice(choice: String) -> void:
+                # r4 THE DEEP SETTINGS LOCK: a member rotating mid-room
+                # rebooted the game out of the live match (the corrupted-room
+                # class) - the owner's config is the only one that moves.
+                if lan_guard_lock():
+                                return
                 Jukebox.sfx("confirm", -4.0)
                 Box.set_progress(game_id, "orient_pref", choice)
                 if choice == ("horizontal" if _auto_landscape() else "vertical"):

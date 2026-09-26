@@ -51,8 +51,17 @@ func _ready() -> void:
         # position even in-games because they are very important").
         var notes: Node = load("res://game/core/lan_notes.gd").new()
         add_child(notes)
-        LANFIND.invite.connect(func(nm: String, addr: String, switch: bool):
-                LanNotes.invite_card(nm, addr, switch))
+        LANFIND.invite.connect(func(nm: String, addr: String, switch: bool,
+                        from_ip: String, from_dev: String):
+                LanNotes.invite_card(nm, addr, switch, from_ip, from_dev))
+        LANFIND.declined.connect(func(nm: String, why: String):
+                # r4 THE DECLINE WIRE: the inviter learns the NO anywhere
+                # they are (the owner: "the invitation when declined, the
+                # host do not even know the decline")
+                var line: String = "%s DECLINED YOUR INVITE" % nm.to_upper()
+                if why != "":
+                        line = "%s %s YOUR INVITE" % [nm.to_upper(), why]
+                LanNotes.note(line))
         LAN.kicked.connect(func(why: String): LanNotes.note(why.to_upper()))
         LAN.session_died.connect(func(why: String): LanNotes.note(why.to_upper()))
         LAN.room_refused.connect(func(why: String): LanNotes.note(why.to_upper()))

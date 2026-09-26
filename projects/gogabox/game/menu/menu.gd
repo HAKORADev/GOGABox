@@ -2921,7 +2921,12 @@ func _line_row(parent: Control, title_: String, placeholder: String, value: Stri
         return le
 
 func _open_profile() -> void:
-        var vb := _sheet_base(0.0, "profile")
+        # r4 THE SCROLLABLE PROFILE (the owner: "i even realized the profile
+        # menu is not up-down scrollable, make it scrollable"): the profile
+        # wears a BOUNDED sheet - fit_sheet wraps the body in a BoxScroll
+        # (the fields ride the r4 field law, the buttons ride the tappable
+        # law), so every row is reachable on the shortest phone screen.
+        var vb := _sheet_base(_sheet_height(1180.0), "profile")
         vb.add_child(Arc.label("YOUR PROFILE", 42, Arc.INK))
         # v042-1 THE FACE LAW: ONE placeholder (the yellow one-guy on the
         # brown plate) or the uploaded media. THE BIG FACE rides focused
@@ -2942,6 +2947,7 @@ func _open_profile() -> void:
                                 Color(0.42, 0.30, 0.16), func():
                                 Jukebox.sfx("click", -4.0)
                                 LanProfile.clear_face_media()
+                                LAN.announce_face()   # r4: instant, both ways
                                 _close_sheet()
                                 _open_profile()))
         vb.add_child(face_row)
@@ -3069,6 +3075,7 @@ func _open_pfp_picker() -> void:
                         Arc.toast(_toast, String(res["err"]))
                         return
                 LanProfile.set_face_media(res)
+                LAN.announce_face()      # r4 THE FACE-CHANGE WIRE: instant
                 Jukebox.sfx("coin", -4.0)
                 _close_sheet()
                 _open_profile())
@@ -3278,7 +3285,7 @@ func _open_lan() -> void:
                 if Arc.focused_field(vb) != null:
                         return
                 var sig := "%s|%d|%s|%s|%d" % [LAN.mode, LAN.session_size(),
-                                ",".join(LAN.seats.map(func(x): return "%s:%s" % [String(x.get("name", "")), String(x.get("state", ""))])),
+                                ",".join(LAN.seats.map(func(x): return "%s:%s:%s" % [String(x.get("name", "")), String(x.get("state", "")), String((x.get("pfpm", {}) as Dictionary).get("h", ""))])),
                                 LAN.room_code, LAN.my_room_seat()]
                 if vb.get_meta("sig", "") != sig:
                         vb.set_meta("sig", sig)

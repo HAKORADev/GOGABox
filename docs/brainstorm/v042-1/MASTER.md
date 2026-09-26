@@ -422,3 +422,140 @@ immune against hard-wipes".
   the top-level invite card over the feed AND over a running game, the
   room picker, the owner's room (1ST/2ND, YOU - OWNER, START THE GAME).
 - config 0.4.2-3 / code base 31470 (arm32 31471, arm64 31472).
+
+---
+
+## R4 - THE WIRE + THE LOCK ROUND (the owner's fourth report, verbatim anchors)
+
+> "ok here it is my report so you work on v042-1 another round and not new
+> version: first, the profile image syncing is not instant, there is some
+> weird stuff happens like i should rejoin so it loads the downloaded image
+> or weird things, make it accurate and not buggy like this, for vLAN
+> (online) it does not work saying wifi refused the port, try to fix it, if
+> you will keep trolling, then just remove it if it is not really possible,
+> i do not want players to run another tool to play vLAN but you are not
+> helping"
+
+- THE FACE: seats' pfpm was a join-time snapshot -> THE FACE-CHANGE WIRE
+  (law 94): announce_face on the profile doors, the host re-books the
+  seats, face_arrived repaints, the pong reads the face fresh. No rejoin.
+- THE ONLINE: the honest single-protocol answer became THE REAL MAPPING
+  STACK (law 99): UPnP -> NAT-PMP -> PCP in a thread, the public-address
+  ask is part of the success, the LAN truth is the code until a door
+  opens, ONLINE ON means a real internet dial.
+
+> "also the invitation when declined, the host do not even know the
+> decline, also the join/decline when appear in main menu, it is
+> tap-through and not tappable, it is tappable in-game, but in menu, it
+> taps the thing behind it or if nothing behind it, the click/tap do
+> nothing there"
+
+- THE DECLINE WIRE (law 90): the no (and the 20s silence) rides back to
+  the inviter's discovery socket; the top-level note layer delivers.
+- THE CARD BLOCK LAW (law 91): the root cause was BoxScroll._input's
+  sibling-only overlay law - another CanvasLayer was invisible to it;
+  the live card registers its rect, the scroll yields.
+
+> "also, the voice chat still not correct, looks like it is not even
+> sending data at all, also the click on the toggles still has that gray
+> look, it should be off/on and that gray be on-click only and not waiting
+> for another click to happen somewhere else to get updated, also make the
+> toggles more direct like listen/talk, more better, where 'you' will not
+> listen/hear or not be heard/listened, same for others where listen is
+> their device do not take the user talk and their talk means user device
+> do not hear their talk, and make them for real, there is something
+> likely in the core of the LAN infra prevents streaming of the stuff"
+
+- THE CAPTURE TRUTH (law 96): the root was the once-only capture arm -
+  the Android mic permission almost never preceded it; the arm is live
+  now and a fresh grant restarts the stream.
+- THE REAL-WIRE VOICE LAW (law 97): the frames/beacons ride conn_addr -
+  a mapped public host_addr was a hairpin death for LAN voice.
+- THE TALK/LISTEN LAW (law 98): the owner's own words on the chips, the
+  live THEY TALK / THEY LISTEN truth, and every stylebox owned so the
+  engine's gray can never hang.
+
+> "also, both fruit slasher and tower destroyer crashed in multiplayer
+> wait menu even before the game starts"
+
+- THE ROOM SCREEN LAW (law 102): the ticks ticked null worlds (the
+  painters/camera were never built under the hold) - the base skips
+  _goga_tick while the room screen lives. Rig-proven: both room screens
+  run 4+ seconds, zero script errors.
+
+> "also i spotted a bug related to rotation in dominoes and fruit slasher
+> ... if game started as horizontal and i switched it to vertical, the app
+> resolution will be correct, ratio is correct, scale is correct, but
+> background, appears from top to middle, under middle is the brown GOGABox
+> fallback"
+
+- THE KIND WATCHER (law 103): the stuck class (the world wearing the old
+  shape under the moved canvas - the refused-settle / foreign-stomp
+  paths) heals through the host's own reload door; the host's early
+  return honors the game's own view_kind. The Xvfb rig verified the
+  reload path seats full-bleed backgrounds (domino census 1.3% host
+  brown in the bottom half; slasher's wood covers edge to edge).
+
+> "also about rooms, make sure if two pressed 'make room' at same time,
+> the app will choose only one ... also make sure if a third player opened
+> wait menu, he will see the first room as in-game and grayed out so he
+> can not join ofc, that's first, about the same multiplayer things, as
+> example, when someone quit game, it only shows a notification and not
+> end game for others, also if someone pressed 'end' instead of quit, the
+> others will not be game over-ed and this is very stupid, also the room
+> maker/host-er is not the rule-er here, i mean others can still de-sync
+> things like change game position and make corrupted room where the room
+> maker see that the other player still here while the other went solo
+> weirdly, also others can change board sizes or skins on their own, this
+> should not happen, host should make a thing, and all get it as a must,
+> whether it is position or board size or whatever"
+
+- THE ONE-WAITING-ROOM LAW (85) + THE PICKER TRUTH (86): the host's pump
+  chooses one; the IN-GAME room is grayed, dead to taps.
+- THE END LAW (87) + THE FOLD VERDICT (88): the END seat folds the room
+  from EVERY seat; the base owns the honest end for every game (lan_end
+  games keep their verdict; everything else gets the RUN OVER + the
+  banked coins).
+- THE DEEP SETTINGS LOCK (89): ONE function pair in both twins, the HUD
+  doors guard inside the base - "make like function or whatever" is the
+  letter of the law; the orientation asks of domino/slasher ride it.
+
+> "also i even realized the profile menu is not up-down scrollable, make
+> it scrollable" / "ummmm, also make sure video media like gif will be
+> loop-ed as described earlier and the out of focus thing and like that i
+> mean" / "also make sure a host-er can not be a join-er at the same time"
+
+- THE SCROLLABLE PROFILE (93) + THE FIELD LAW (92) + THE POSTER
+  EVERYWHERE (95) + THE ONE-SESSION LAW (101).
+
+> "i am not going to test this next build directly, i will just let you
+> work on it accurately and take your time on it, next thing we are going
+> to do is the games as standalone stuff and not baked in the binary, so
+> take your time doing your work in the infra itself because we will need
+> it later, make sure to make the locking thing very deep so you do not
+> have to code every single game to it, make like function or whatever,
+> just try to work and make something perfect, keep testing it"
+
+- The infra-first posture held: every law above landed in the CORE (lan.gd,
+  lan_find.gd, lan_notes.gd, lan_voice.gd, lan_roster.gd, lan_hold.gd,
+  scroll_box.gd, goga_pfp.gd, game_base.gd, game_base3d.gd, host_node.gd,
+  menu.gd) - the games touched only where the report named them
+  (domino/slasher orientation guards). THE STANDALONE-SPLIT POSTURE: the
+  lock, the fold, the params wire and the room lifecycle are all
+  duck-typed base surfaces a split-out game binary will inherit for free.
+
+### THE R4 PROOF
+- qa_v042_lan: 185 checks 0 fails (+ the r4 sections: the create race +
+  the one-waiting-room law, the dimension-after-start law, the END law
+  from a joiner seat, the face-change wire both halves, the decline wire
+  over the real UDP loopback).
+- flow_test: ALL TESTS PASSED (the r4 eye-pass scene boots the real main
+  scene; the towerball/towerdestroyer 3D laws still green after the
+  watcher - the Node3D viewport lesson is in the law text).
+- THE EYE PASS tests/v0421r4_shot under Xvfb (law 32): the scrollable
+  profile (portrait + the bounded landscape wrap), the invite card
+  taking a REAL click over the feed and going down (the tap-through fix
+  proven by the click, not by an assert), domino's landscape ask ->
+  VERTICAL pick -> full-bleed bg, slasher's same dance, and both the
+  named crash games' LAN room screens alive with zero script errors.
+- config 0.4.2-4 / code base 31480 (arm32 31481, arm64 31482).

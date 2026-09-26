@@ -598,26 +598,50 @@ func _t_r3_laws() -> void:
         var rid1 := int(h.rooms_for_game("snl")[0]["rid"])
         _check(joiners[0].join_room(rid1) == "", "joiner 1 rides dimension one")
         await _pump(0.5)
-        _check(joiners[1].open_room("snl") == "", "joiner 2 births dimension TWO")
+        # --- r4 THE ONE-WAITING-ROOM LAW: the same-moment create race ---
+        # (the owner: "if two pressed 'make room' at same time, the app
+        # will choose only one, this means there must be a source of
+        # truth") - the second waiting room for the SAME game is refused.
+        var create_race := {"v": false, "why": ""}
+        joiners[1].room_refused.connect(func(why): create_race["v"] = true; create_race["why"] = why)
+        _check(joiners[1].open_room("snl") == "", "the racing create ask rides")
+        await _pump(0.6)
+        _check(create_race["v"], "THE CREATE RACE: the second maker is refused")
+        _check(String(create_race["why"]).contains("CONFLICTION"),
+                        "the create race reads the confliction line")
+        _check(h.rooms_for_game("snl").size() == 1,
+                        "ONE waiting room for the game (the host chose one)")
+        # --- THE DIMENSIONS: a second room is legal once the first MATCH
+        # RUNS (the owner's own example: group one plays ludo, other 3
+        # players play ludo in another dimension) ---
+        _check(h.start_match() == "", "dimension one's owner starts the match")
+        await _pump(0.6)
+        _check(String(h.my_room().get("phase", "")) == "play",
+                        "dimension one's match is live")
+        _check(joiners[1].open_room("snl") == "",
+                        "dimension two is born (the first room is IN-GAME now)")
         await _pump(0.5)
         var rooms_now: Array = h.rooms_for_game("snl")
         _check(rooms_now.size() == 2, "TWO DIMENSIONS of one game live (%d)" % rooms_now.size())
-        var rid2 := int(rooms_now[1]["rid"]) if int(rooms_now[1]["rid"]) != rid1 \
-                        else int(rooms_now[0]["rid"])
-        rid2 = int(rooms_now[0]["rid"]) if int(rooms_now[0]["rid"]) != rid1 else int(rooms_now[1]["rid"])
+        var rid2 := -1
+        for rr in rooms_now:
+                if int(rr.get("rid", 0)) != rid1:
+                        rid2 = int(rr.get("rid", 0))
+        _check(rid2 > 0, "dimension two has its own rid")
         _check(joiners[2].join_room(rid2) == "", "joiner 3 rides dimension two")
         await _pump(0.6)
         _check((h.room_by_id(rid1).get("members", []) as Array).size() == 2,
                         "dimension one holds its own two")
         _check((h.room_by_id(rid2).get("members", []) as Array).size() == 2,
                         "dimension two holds its own two")
-        # --- THE PARAMS BROADCAST: the owner's config reaches the members ---
-        h.set_room_params({"mode": 4, "board": "12"})
+        # --- THE PARAMS BROADCAST: the owner's config reaches the members
+        # (dimension two's owner set it - dimension one is mid-match) ---
+        joiners[1].set_room_params({"mode": 4, "board": "12"})
         await _pump(0.5)
-        _check(String(joiners[0].my_room().get("params", {}).get("board", "")) == "12",
+        _check(String(joiners[2].my_room().get("params", {}).get("board", "")) == "12",
                         "THE PARAMS WIRE: the owner's config reaches the members")
-        _check(String(joiners[1].my_room().get("params", {}).get("board", "x")) != "12",
-                        "THE PARAMS SCOPE: dimension two never saw dimension one's config")
+        _check(String(joiners[0].my_room().get("params", {}).get("board", "x")) != "12",
+                        "THE PARAMS SCOPE: the match room never saw dimension two's config")
         h.leave_session()
         for j in joiners:
                 j.leave_session()
@@ -627,3 +651,87 @@ func _t_r3_laws() -> void:
         _drop(a)
         _drop(b)
         await _pump(0.3)
+
+        # ================================================== v042-1 r4 THE
+        # FOURTH REPORT LAWS (the room round's completion)
+        # --- r4 THE END LAW: a JOINER's END folds the match for everyone ---
+        var eh: Node = _bus("r4H", "ENDHOST")
+        _check(eh.host_session() == "", "the END rig hosts")
+        var ej: Node = _bus("r4J", "ENDJOIN")
+        ej.join_session("127.0.0.1:%d" % eh._port)
+        await _pump(1.0)
+        eh.report_open("slasher")
+        ej.report_open("slasher")
+        await _pump(0.3)
+        _check(eh.open_room("slasher") == "", "the END room is born")
+        await _pump(0.5)
+        var erid := int(eh.rooms_for_game("slasher")[0]["rid"])
+        _check(ej.join_room(erid) == "", "the joiner rides the END room")
+        await _pump(0.5)
+        _check(eh.start_match() == "", "the END match starts")
+        await _pump(0.6)
+        var host_saw_end := {"v": false}
+        eh.match_ended.connect(func(_g, _r, _w): host_saw_end["v"] = true)
+        # the JOINER ends the match (what the base's finish_run calls in a
+        # live match - THE END LAW's wire door)
+        ej.request_match_end([{"name": "ENDJOIN", "score": 120}],
+                "ENDJOIN ENDED THE MATCH")
+        await _pump(0.8)
+        _check(host_saw_end["v"],
+                        "THE END LAW: the joiner's END game-overs the host")
+        _check(eh.my_room().is_empty(), "the fold erased the room for the host")
+        _check(ej.my_room().is_empty(), "the fold erased the room for the ender")
+        eh.leave_session()
+        ej.leave_session()
+        _drop(eh)
+        _drop(ej)
+        await _pump(0.3)
+
+        # --- r4 THE FACE-CHANGE WIRE: a face set mid-session reaches the
+        # others without any rejoin (the owner: "i should rejoin so it
+        # loads the downloaded image") ---
+        var fh: Node = _bus("r4FH", "FACEHOST")
+        _check(fh.host_session() == "", "the FACE rig hosts")
+        var fj: Node = _bus("r4FJ", "FACEJOIN")
+        fj.join_session("127.0.0.1:%d" % fh._port)
+        await _pump(1.0)
+        fj.ident_override = {"name": "FACEJ", "pfp": 0, "pfpm": {},
+                "desc": "", "links": [], "age": 0, "gender": "other",
+                "role": "gamer", "anchor": "faceanchor1"}
+        var new_meta := {"h": "facehash123", "ext": "webp", "n": 1,
+                "fps": 0.0, "dur": 0.0, "w": 64, "hh": 64}
+        var host_saw_face := {"v": false}
+        fh.face_arrived.connect(func(_h): host_saw_face["v"] = true)
+        # the joiner announces a fresh face (the profile sheet's door)
+        fj.ident_override["pfpm"] = new_meta
+        fj.announce_face()
+        await _pump(0.6)
+        var host_seat: Dictionary = fh.seat_by_dev(fj.my_dev())
+        _check(String((host_seat.get("pfpm", {}) as Dictionary).get("h", "")) == "facehash123",
+                        "THE FACE WIRE: the host's seat book wears the new face")
+        _check(host_saw_face["v"], "THE FACE WIRE: the repaint bell rang on the host")
+        # the host re-broadcasts the seats - the joiner mirrors stay honest
+        # (the broadcast half of the law rides fh._broadcast_seats below)
+        fh._broadcast_seats()
+        await _pump(0.4)
+        _check(fh.seats.size() == 2, "the face broadcast kept the session whole")
+        fh.leave_session()
+        fj.leave_session()
+        _drop(fh)
+        _drop(fj)
+        await _pump(0.3)
+
+        # --- r4 THE DECLINE WIRE: a decline line over the REAL UDP loopback
+        # reaches the inviter's discovery socket (the owner: "the invitation
+        # when declined, the host do not even know the decline") ---
+        var decline_seen := {"v": false, "nm": "", "why": "x"}
+        LANFIND.declined.connect(func(nm, why): decline_seen["v"] = true; decline_seen["nm"] = nm; decline_seen["why"] = why)
+        var du := PacketPeerUDP.new()
+        du.bind(0)
+        du.set_dest_address("127.0.0.1", 31445)
+        du.put_var([{"t": "invite_declined", "to_dev": LAN.my_dev(),
+                "dname": "HANNA", "why": ""}])
+        await _pump(0.6)
+        _check(decline_seen["v"], "THE DECLINE WIRE: the inviter hears the no")
+        _check(String(decline_seen["nm"]) == "HANNA", "the decline carries the name")
+        du.close()

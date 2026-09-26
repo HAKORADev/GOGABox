@@ -1455,3 +1455,154 @@ reads without booting the scene.
     ABSOLUTE colors: seat 1 BLUE, seat 2 RED - on both devices - and a
     slice flashes the rival's blade ghost in their color. The registry
     wears the lan block (12 games now).
+
+## THE v042-1 r4 LAWS (the owner's fourth report - the LOCK + the WIRE
+## round; the owner: "i will just let you work on it accurately and take
+## your time on it, next thing we are going to do is the games as
+## standalone stuff and not baked in the binary, so take your time doing
+## your work in the infra itself because we will need it later")
+
+85. THE ONE-WAITING-ROOM LAW (the owner: "make sure if two pressed 'make
+    room' at same time, the app will choose only one, this means there
+    must be a source of truth, likely the data will go to host to them"):
+    the host's one pump IS the source of truth - the first create wins;
+    while a room for the SAME game still WAITS, a second create is
+    refused with the confliction line. Rooms whose match RUNS block
+    nothing (the dimension law) - a second room for the game is legal
+    the moment the first room is IN-GAME.
+86. THE PICKER TRUTH (the owner: "make sure if a third player opened wait
+    menu, he will see the first room as in-game and grayed out so he can
+    not join ofc"): the room picker lists BOTH kinds - waiting rooms
+    joinable, IN-GAME rooms grayed (Arc.gray_out_button) and dead to
+    taps. The room state rides the existing rooms broadcast.
+87. THE END LAW (the owner: "if someone pressed 'end' instead of quit,
+    the others will not be game over-ed and this is very stupid"):
+    ending the run inside a live LAN match ends the MATCH for the whole
+    room - LAN.request_match_end(results, why) (the host folds directly,
+    a joiner asks through room_end; the host names the ender in the why).
+    The base's finish_run is the ONE door (both twins) - zero game code.
+88. THE FOLD VERDICT (the owner: "when someone quit game, it only shows
+    a notification and not end game for others"): the base owns the
+    honest end for EVERY game now - _lan_on_ended toasts the why, calls
+    the game's lan_end when it exists, and when the game stayed alive
+    after its own verdict (or has none), finish_run banks the run into
+    the honest RUN OVER sheet. Nobody plays a folded match, in any game.
+89. THE DEEP SETTINGS LOCK (the owner: "the room maker/host-er is not
+    the rule-er here ... others can change board sizes or skins on their
+    own, this should not happen, host should make a thing, and all get
+    it as a must ... make the locking thing very deep so you do not have
+    to code every single game to it, make like function or whatever"):
+    ONE pair of functions in BOTH twins - lan_settings_locked() (TRUE
+    when I ride a room/match whose config I do not own; the frozen
+    mid-match room locks too) + lan_guard_lock() (the toast + the error
+    sfx). The HUD doors (add_hud_button - SHOP/OPTIONS/every game's
+    shelf of settings) guard themselves inside the base; the orientation
+    asks of the reported games guard through the same function. The
+    room's OWNER is never locked - his changes ride the params wire.
+90. THE DECLINE WIRE (the owner: "the invitation when declined, the
+    host do not even know the decline"): DECLINE - and the 20s silence
+    ("DID NOT ANSWER") - rides a UDP line back to the inviter's
+    discovery socket (LANFIND.send_decline; the invite now carries the
+    inviter's dev + the packet's source ip), and the inviter reads the
+    top-level note anywhere they are.
+91. THE CARD BLOCK LAW (the owner: "the join/decline when appear in main
+    menu, it is tap-through and not tappable, it is tappable in-game,
+    but in menu, it taps the thing behind it"): BoxScroll._input runs
+    BEFORE the GUI stage and _covered_by_overlay only sees SIBLING
+    subtrees - the LanNotes card (layer 95) was invisible to it, the
+    scroll captured the raw touch, and the card's buttons starved
+    (in-game the GameHost early-return masked it). Law: the live card
+    registers its rect under LanNotes.blocks_point(pos), and the scroll
+    yields every touch the card owns - at capture AND at dispatch.
+92. THE FIELD LAW (the scrollable profile's companion): a BoxScroll
+    hosting WRITABLE fields never captures a press that lands on one
+    (LineEdit/TextEdit/Slider/SpinBox own their presses) - the
+    r4-scrollable profile sheet rides fit_sheet's wrap with live fields.
+93. THE SCROLLABLE PROFILE (the owner: "i even realized the profile menu
+    is not up-down scrollable, make it scrollable"): the profile sheet
+    opens BOUNDED (_sheet_height) - fit_sheet wraps the body into a
+    BoxScroll on every canvas it cannot fill; the buttons ride the
+    tappable law, the fields ride law 92.
+94. THE FACE-CHANGE WIRE (the owner: "the profile image syncing is not
+    instant ... i should rejoin so it loads the downloaded image"): the
+    seats' pfpm was a JOIN-TIME snapshot - a face set mid-session never
+    reached the others. The face change now RIDES the wire: the changer
+    announces (the profile sheet's doors call LAN.announce_face()), the
+    host updates its seat book + re-broadcasts the seats, every
+    renderer repaints through face_arrived; the scan pong reads the
+    face FRESH each answer. Instant, both directions, no rejoin.
+95. THE POSTER EVERYWHERE (the owner: "make sure video media like gif
+    will be loop-ed as described earlier and the out of focus thing"):
+    the focused face LOOPS the media's own length forever (GIF fmod /
+    OGV loop=true); the UNFOCUSED seat paints the media's OWN first
+    frame (the poster harvest runs focused or not) - never the
+    placeholder guy, never a black stopped-Theora frame.
+96. THE CAPTURE TRUTH (the owner: "the voice chat still not correct,
+    looks like it is not even sending data at all"): the mic capture
+    used to arm ONCE at the session start - on Android the permission
+    was rarely granted by then, has_mic read false, and NOBODY ever
+    re-armed: the device "sent" silence forever. Law: the arm is LIVE -
+    the heartbeat re-arms _setup_capture the moment the device gains a
+    mic, a fresh grant restarts the mic stream (the engine opens the
+    input only when the stream plays AFTER the grant), and the grant
+    flip republishes the VST state.
+97. THE REAL-WIRE VOICE LAW: the voice frames and the beacons ride
+    LAN.conn_addr - the address the session wire REALLY uses (the LAN
+    ip when I host, the dialed ip when I join) - never a mapped PUBLIC
+    host_addr whose hairpin route eats the LAN's own voice.
+98. THE TALK/LISTEN LAW (the owner: "make the toggles more direct like
+    listen/talk ... where listen is their device do not take the user
+    talk and their talk means user device do not hear their talk" +
+    "that gray be on-click only"): the roster speaks the owner's words -
+    MY TALK / MY LISTEN (the masters), THEIR TALK (I hear them) / THEIR
+    LISTEN (they hear me) - the remote truth labels (THEY TALK / THEY
+    LISTEN) repaint live off the VST wire, and every chip wears ALL its
+    own styleboxes (normal/hover/pressed/disabled/focus) so the
+    engine's gray pressed paint can never hang "until another click
+    happens somewhere else".
+99. THE REAL MAPPING STACK (the owner: "for vLAN (online) it does not
+    work saying wifi refused the port, try to fix it ... i do not want
+    players to run another tool to play vLAN"): the host-side mapping
+    attempts THREE router doors in order - UPnP, then NAT-PMP (RFC
+    6886, raw UDP 5351), then PCP (RFC 6887) - the gateway's real
+    address from the UPnP device object (never a guessed .1). The
+    attempt runs IN A THREAD (the LAN session is live meanwhile; the
+    LAN truth is the code until the door opens) and the result lands
+    deferred: the code upgrades to the PUBLIC address, the sheet says
+    ONLINE ON. All doors refuse -> ONLINE OFF, never a silent lie. A
+    map without a public address is NOT a success (the honesty law).
+100. THE JOIN DEATH TRUTH: a dead join names the REAL wall - a public
+     address that refused reads "the host's router closed the port (the
+     host's session sheet must say ONLINE ON)"; a private one reads the
+     wifi/firewall line.
+101. THE ONE-SESSION LAW (the owner: "make sure a host-er can not be a
+     join-er at the same time"): host_session and join_session refuse
+     while ANY session lives; the invite card's switch (LEAVE AND JOIN)
+     is the only road between them; invite_peer auto-hosts only for a
+     free caller.
+102. THE ROOM SCREEN LAW (the owner: "both fruit slasher and tower
+     destroyer crashed in multiplayer wait menu even before the game
+     starts"): while the LAN room screen owns the boot, the game's tick
+     has NOTHING to tick - the match world was never built (the setup
+     returned early for the hold) and the tick dereferenced its null
+     nodes (slasher's painters, the 3D camera) 60 times a second. The
+     base's _process skips _goga_tick while _lan_hold_ui lives (both
+     twins). The game is never initialized before START - the tick is
+     part of that promise.
+103. THE KIND WATCHER (the owner: "if game started as horizontal and i
+     switched it to vertical, the app resolution will be correct ... but
+     background, appears from top to middle, under middle is the brown
+     GOGABox fallback"): the stuck class - a refused settle or a foreign
+     design write leaves the game's world wearing the OLD shape under
+     the NEW canvas, and nothing ever re-checked. Law: both twins carry
+     view_kind (the kind the world actually built at, seated at _ready);
+     once a second the watcher compares the LIVE viewport kind and walks
+     the game through the host's OWN reload door on a disagreement; the
+     host's same-ask early return honors the GAME'S own view_kind (a
+     game built in a different kind reloads even when the ask matches
+     _orient_now). One heal, every path, no per-game code.
+104. THE THREAD JOIN LAW: a background thread that calls back into its
+     owner must be JOINED before the owner tears down (the mapping
+     thread joins in _reset_session + _host_died) - "previously freed"
+     cores are the rig's proof, the wait is bounded by the 0.4s
+     roundtrips.

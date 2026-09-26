@@ -74,6 +74,17 @@ var _toast: Dictionary
 var _ach_clock := 0.0
 var _hud_row: HBoxContainer   # the top bar (v0.0.8: game buttons live IN it)
 var _flow_btns := 0           # game buttons inserted after the back button
+
+# r4 THE KIND WATCHER: the view kind THIS game actually built at. The
+# owner's rotation report ("background appears from top to middle, under
+# middle is the brown GOGABox fallback") is the stuck class: a refused
+# settle or a foreign design write leaves the game's world wearing the OLD
+# shape under the NEW canvas - and nothing ever re-checked. The watcher
+# reads the live viewport once a second and walks the game through the
+# host's OWN reload door when the kinds disagree (the same path a position
+# pick rides - the one that provably re-seats everything).
+var view_kind := ""
+var _view_watch := 0.0
 # v0.3.3-p2 THE SHEET STACK + BACK LAW: every game-owned modal sheet goes
 # through sheet_push/sheet_pop - exact dim+center pairs, the newest on top.
 # The HUD back button AND the Android back button both walk this stack:
@@ -97,6 +108,7 @@ func _ready() -> void:
         # under the HUD's own canvas let the shop's sheet paint over it.
         _toast = Arc.toast_overlay(self)
         _toast["layer"].process_mode = Node.PROCESS_MODE_ALWAYS
+        view_kind = _live_view_kind()
         _goga_setup()
 
 ## THE TOAST LAW: every game toast goes through HERE - one layer, one label,
@@ -211,6 +223,16 @@ func finish_run(final_score: int, final_coins := -1) -> void:
                 return
         over = true
         run_coins = final_coins if final_coins >= 0 else run_coins
+        # r4 THE END LAW (the owner: "if someone pressed 'end' instead of
+        # quit, the others will not be game over-ed and this is very
+        # stupid"): ending the run INSIDE a live LAN match ends the MATCH
+        # for the whole room - the ender's results ride the fold, everyone
+        # left reads their honest game over.
+        if lan_active and LAN.my_room_seat() > 0 \
+                        and String(LAN.my_room().get("phase", "")) == "play":
+                LAN.request_match_end(
+                        [{"name": LAN.my_name(), "score": final_score}],
+                        "%s ENDED THE MATCH" % LAN.my_name().to_upper())
         request_finish.emit(final_score, run_coins)
 
 func quit_to_box() -> void:
@@ -460,15 +482,53 @@ func banner_bottom() -> float:
 ## overlap each other or the right-aligned score/coins chips, and the bar
 ## wraps nothing off-screen (the old floating fixed-position layout put SHOP
 ## right on top of the score chip).
+## r4 THE DEEP SETTINGS LOCK: every HUD-button door (SHOP / OPTIONS / modes
+## / sizes / skins) rides through the owner's lock guard - one seat here
+## locks the door for EVERY game, no per-game code (the owner: "make the
+## locking thing very deep so you do not have to code every single game to
+## it, make like function or whatever"). The room's OWNER keeps everything:
+## his changes ride the room-params wire to every seat.
 func add_hud_button(txt: String, cb: Callable) -> void:
         if _hud_row == null or not is_instance_valid(_hud_row):
                 return
-        var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85), cb)
+        var b := Arc.button(txt, Vector2(96, 56), 20, Color(0.16, 0.10, 0.05, 0.85),
+                        func():
+                                if lan_guard_lock():
+                                        return
+                                cb.call())
         _hud_row.add_child(b)
         # children: [back, spacer, score, coins] -> insert right after back,
         # keeping every previously added game button in order
         _hud_row.move_child(b, 1 + _flow_btns)
         _flow_btns += 1
+
+# ============ r4 THE DEEP SETTINGS LOCK (the owner: "the room maker/
+# host-er is not the rule-er here, i mean others can still de-sync things
+# like change game position and make corrupted room ... also others can
+# change board sizes or skins on their own, this should not happen, host
+# should make a thing, and all get it as a must, whether it is position or
+# board size or whatever") ============
+## TRUE when this device rides a room/match whose config it does NOT own:
+## the owner carries the params (position, mode, board size, the shared
+## skin) and every member receives them - a member changing anything local
+## is the corrupted-room class. The owner is NEVER locked.
+func lan_settings_locked() -> bool:
+        if not lan_active:
+                return false
+        var r := LAN.my_room()
+        if r.is_empty():
+                return true   # mid-match: the config froze at START
+        return String(r.get("owner", "")) != LAN.my_dev()
+
+## The ONE door guard: call at any settings-changing seat (the HUD doors
+## guard themselves; the orientation asks guard through this). TRUE = the
+## change was refused and the honest line is already on the toast.
+func lan_guard_lock() -> bool:
+        if not lan_settings_locked():
+                return false
+        Jukebox.sfx("error", -4.0)
+        game_toast("THE ROOM OWNER LOCKS THE SETTINGS")
+        return true
 
 ## A live-updating HUD chip inserted next to the score (the speed chip
 ## today, anything tomorrow). Returns the inner Label - write .text to it.
@@ -723,12 +783,37 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
         if over or paused:
                 return
+        # r4 THE ROOM SCREEN LAW (the owner: "both fruit slasher and tower
+        # destroyer crashed in multiplayer wait menu even before the game
+        # starts"): while the LAN room screen owns the boot, the game's
+        # tick has NOTHING to tick - the match world was never built (the
+        # setup returned early for the hold), and the per-frame tick
+        # dereferenced its null nodes (slasher's painters, tower
+        # destroyer's camera) 60 times a second. The game is never
+        # initialized before START - the tick is part of that promise.
+        if _lan_hold_ui != null:
+                return
         _goga_tick(delta)
+        # r4 THE KIND WATCHER: the half-background heal (once a second)
+        _view_watch += delta
+        if _view_watch >= 1.0:
+                _view_watch = 0.0
+                var k := _live_view_kind()
+                if k != view_kind:
+                        view_kind = k
+                        request_orientation_reload.emit(k)
         # live achievement sweep every ~3s so the shared popup fires mid-run
         _ach_clock += delta
         if _ach_clock >= 3.0:
                 _ach_clock = 0.0
                 check_achievements()
+
+## The live canvas kind - the truth the watcher heals against.
+func _live_view_kind() -> String:
+        var vp := get_viewport_rect().size
+        if vp.x <= 0.0 or vp.y <= 0.0:
+                return view_kind
+        return "horizontal" if vp.x > vp.y else "vertical"
 
 # ============================================== THE LAN SEAT (v042; r3 ROOMS)
 ## The system owns the room screen; the game only answers the routed
@@ -862,18 +947,34 @@ func _lan_on_denied(gid: String, why: String) -> void:
 func _lan_on_ended(gid: String, results: Array, why: String) -> void:
         if gid != game_id:
                 return
+        if not lan_active:
+                return
+        # r4 THE FOLD VERDICT (the owner: "when someone quit game, it only
+        # shows a notification and not end game for others"): the fold
+        # ENDS the game for everyone left. Games that own a verdict answer
+        # lan_end; the base finishes the run for every other game (the
+        # honest RUN OVER + the banked coins), and even a lan_end game
+        # that stayed alive after its own verdict gets the base's end -
+        # nobody is left playing a folded match, in ANY game, forever.
         if why != "":
                 game_toast(why)
-        if lan_active and has_method("lan_end"):
+        if has_method("lan_end"):
                 call("lan_end", results)
+        if not over:
+                finish_run(score, run_coins)
 
 ## THE DISCONNECT LAW in-game: the host's wire died mid-match - the
 ## verdict lands with an honest dq row (never a corrupted limbo).
 func _lan_on_session_died(why: String) -> void:
-        if not lan_active or not has_method("lan_end"):
+        if not lan_active:
                 return
         game_toast(why)
-        call("lan_end", [{"name": "THE HOST", "dq": true}])
+        if has_method("lan_end"):
+                call("lan_end", [{"name": "THE HOST", "dq": true}])
+        # r4: the fold verdict law - the base owns the honest end when the
+        # game's own verdict left it alive
+        if not over:
+                finish_run(score, run_coins)
 
 func _lan_on_act(gid: String, who: int, a: Dictionary) -> void:
         if gid == game_id and has_method("lan_act"):

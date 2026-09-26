@@ -105,18 +105,26 @@ func _refresh() -> void:
                 _build_room(r)
 
 ## THE PICKER: the open rooms of THIS game (the dimensions) + create.
+## r4: a room whose match RUNS shows too - grayed, IN-GAME, dead to taps
+## (the owner: "make sure if a third player opened wait menu, he will see
+## the first room as in-game and grayed out so he can not join ofc").
 func _build_picker() -> void:
         var open_rooms := LAN.rooms_for_game(game_id)
-        var joinable := []
+        var waiting := []
+        var playing := []
         for rr in open_rooms:
                 if String(rr.get("phase", "wait")) == "wait":
-                        joinable.append(rr)
-        if joinable.is_empty():
+                        waiting.append(rr)
+                else:
+                        playing.append(rr)
+        if waiting.is_empty() and playing.is_empty():
                 _body.add_child(Arc.label("NO ROOM OPEN YET - MAKE THE FIRST ONE", 22, Arc.HOT))
         else:
                 _body.add_child(Arc.label("OPEN ROOMS - PICK YOURS", 22, Arc.HOT))
-                for rr in joinable:
-                        _body.add_child(_room_row(rr))
+                for rr in waiting:
+                        _body.add_child(_room_row(rr, false))
+                for rr in playing:
+                        _body.add_child(_room_row(rr, true))
         var cap := LAN.game_room_cap(game_id)
         _body.add_child(Arc.button("CREATE MY ROOM", Vector2(0, 84), 30, Arc.GOOD,
                         func():
@@ -130,7 +138,7 @@ func _build_picker() -> void:
                         17, Color("6a4a28"), false))
         _body.add_child(Arc.button("CANCEL", Vector2(0, 64), 24, Arc.BAD, func(): _close(true)))
 
-func _room_row(rr: Dictionary) -> Control:
+func _room_row(rr: Dictionary, in_game: bool) -> Control:
         var row := PanelContainer.new()
         row.add_theme_stylebox_override("panel", Arc.panel_style(Color(0, 0, 0, 0.12), 18))
         var h := HBoxContainer.new()
@@ -147,7 +155,10 @@ func _room_row(rr: Dictionary) -> Control:
         var full := n >= cap
         var mine := (rr.get("members", []) as Array).has(LAN.my_dev())
         var tag := "YOURS" if mine else ("FULL" if full else "OPEN")
-        h.add_child(Arc.label(tag, 17, Arc.GOOD if not full else Color(0.9, 0.45, 0.3), false))
+        if in_game:
+                tag = "IN-GAME"
+        h.add_child(Arc.label(tag, 17,
+                        Color(0.9, 0.45, 0.3) if (full or in_game) else Arc.GOOD, false))
         var b := Arc.button("JOIN", Vector2(140, 56), 20, Arc.ACCENT, func():
                 Jukebox.sfx("click", -4.0)
                 var err := LAN.join_room(int(rr.get("rid", 0)))
@@ -155,7 +166,10 @@ func _room_row(rr: Dictionary) -> Control:
                         _body.add_child(Arc.label(err.to_upper(), 20, Color(0.9, 0.45, 0.3), false))
                 else:
                         _refresh())
-        b.disabled = full or mine
+        # r4: an IN-GAME room is grayed and dead to taps - the honest show
+        b.disabled = full or mine or in_game
+        if b.disabled:
+                Arc.gray_out_button(b)
         h.add_child(b)
         row.add_child(h)
         return row

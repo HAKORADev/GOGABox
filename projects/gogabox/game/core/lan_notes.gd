@@ -16,6 +16,20 @@ class_name LanNotes
 ##     died, the confliction line, the match aborted) sliding from the
 ##     top and leaving on their own.
 ## The card measures like the popup law (the font ladder, the real wrap).
+##
+## r4 THE DECLINE WIRE (the owner: "the invitation when declined, the
+## host do not even know the decline"): DECLINE - and the 20s silence -
+## rides a UDP line back to the inviter's discovery socket, and the
+## inviter reads the top-level note "<NAME> DECLINED YOUR INVITE" (or
+## "... DID NOT ANSWER") anywhere they are.
+##
+## r4 THE CARD BLOCK LAW (the owner: "the join/decline when appear in main
+## menu, it is tap-through and not tappable, it is tappable in-game, but
+## in menu, it taps the thing behind it"): the menu's BoxScroll captured
+## raw touches at the _input stage - BEFORE the GUI stage - and its
+## overlay law only sees SIBLING subtrees, never another CanvasLayer. The
+## card now registers its live rect under blocks_point(), and the scroll
+## yields every touch the card owns. One truth for the tap, any layer.
 
 signal invite_answered(accepted: bool)
 
@@ -34,7 +48,8 @@ static func note(text: String) -> void:
                 return
         instance._push({"kind": "note", "text": text})
 
-static func invite_card(from_name: String, addr: String, switch: bool) -> void:
+static func invite_card(from_name: String, addr: String, switch: bool,
+                from_ip := "", from_dev := "") -> void:
         if instance == null:
                 return
         # one invite at a time - the freshest wins
@@ -43,13 +58,23 @@ static func invite_card(from_name: String, addr: String, switch: bool) -> void:
         if instance._live.get("kind", "") == "invite":
                 instance._down()
         instance._push({"kind": "invite", "from": from_name, "addr": addr,
-                "switch": switch})
+                "switch": switch, "from_ip": from_ip, "from_dev": from_dev})
 
 func _ready() -> void:
         instance = self
         layer = 95
         process_mode = Node.PROCESS_MODE_ALWAYS
         visible = true
+
+## THE CARD BLOCK LAW (read by BoxScroll): does a live card own this
+## screen point? The panel's own rect answers - its buttons and body all
+## live inside it.
+static func blocks_point(pos: Vector2) -> bool:
+        if instance == null or instance._card == null:
+                return false
+        if not is_instance_valid(instance._card):
+                return false
+        return (instance._card as Control).get_global_rect().has_point(pos)
 
 func _push(q: Dictionary) -> void:
         _queue.append(q)
@@ -124,10 +149,12 @@ func _build_card() -> void:
                 row.add_child(Arc.button("DECLINE", Vector2(200, 68), 22,
                                 Color(0.42, 0.30, 0.16), func(): _answer(false)))
                 v.add_child(row)
-                # the invite waits for an answer, but not forever (20s)
+                # the invite waits for an answer, but not forever (20s) -
+                # and the silence rides home as an honest "no answer" (r4)
                 var t := get_tree().create_timer(20.0, true, false, true)
                 t.timeout.connect(func():
                         if _live.get("kind", "") == "invite":
+                                _send_decline("DID NOT ANSWER")
                                 _down())
         else:
                 var body := Arc.label(String(_live.get("text", "")), 22, Color(1.0, 0.94, 0.85), false)
@@ -148,9 +175,12 @@ func _build_card() -> void:
         _tween.tween_property(panel, "modulate:a", 1.0, 0.22)
         _tween.tween_property(panel, "position:y", panel.position.y + 40.0, 0.22)
 
+## r4: the answer tells the inviter when the answer is NO.
 func _answer(accepted: bool) -> void:
         Jukebox.sfx("click", -4.0)
         var addr := String(_live.get("addr", ""))
+        if not accepted:
+                _send_decline("")
         _down()
         invite_answered.emit(accepted)
         if not accepted or addr == "":
@@ -162,3 +192,13 @@ func _answer(accepted: bool) -> void:
         var err := LAN.join_session(addr)
         if err != "":
                 note(err.to_upper())
+
+## r4 THE DECLINE WIRE: the no rides the discovery socket back to the
+## inviter (their box answers pings there all day - it hears this too).
+func _send_decline(reason: String) -> void:
+        var ip := String(_live.get("from_ip", ""))
+        var dev := String(_live.get("from_dev", ""))
+        if ip == "" or dev == "":
+                return
+        LANFIND.send_decline(ip, dev,
+                String(_live.get("from", "A PLAYER")), reason)

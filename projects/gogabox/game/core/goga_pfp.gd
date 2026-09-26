@@ -132,29 +132,42 @@ func _process(delta: float) -> void:
         var ext := String(media.get("ext", ""))
         var n := int(media.get("n", 1))
         if ext == "gif" and n > 1 and focused and is_visible_in_tree():
+                # THE LOOP LAW: the focused face loops the media's own
+                # length forever (fmod) - a GIF face never freezes mid-seat
                 _frame = fmod(_frame + float(n) * float(media.get("fps", 8.0)) * delta,
                                 float(n))
         elif ext == "ogv" and _video != null:
                 if size.distance_squared_to(_last_seat) > 1.0:
                         _last_seat = size
                         _seat_video()
-                if focused and is_visible_in_tree():
-                    if not _video.is_playing():
-                            _video.play()
-                    # THE POSTER HARVEST: one 0.2s play grabs the first frame
-                    if not _poster_tried and _video.is_playing():
-                            _poster_tried = true
-                            var t := get_tree().create_timer(0.2)
-                            t.timeout.connect(func():
-                                    if is_instance_valid(_video) \
-                                                    and _video.get_texture() != null:
-                                            _poster = _video.get_texture().get_image() \
-                                                            .duplicate()
-                                            if is_instance_valid(self):
-                                                    queue_redraw())
-                else:
-                    if _video.is_playing():
-                            _video.stop()
+                if is_visible_in_tree():
+                        # r4 THE POSTER EVERYWHERE + THE LOOP LAW:
+                        # one 0.2s play harvests frame 1 - focused or not -
+                        # so the unfocused seat paints the video's OWN first
+                        # frame (never the placeholder guy, never black).
+                        # Focused, the player runs with loop = true forever;
+                        # unfocused, it stops on the poster.
+                        if not _poster_tried:
+                                if not _video.is_playing():
+                                        _video.play()
+                                _poster_tried = true
+                                var t := get_tree().create_timer(0.2)
+                                t.timeout.connect(func():
+                                        if is_instance_valid(_video) \
+                                                        and _video.get_texture() != null:
+                                                _poster = _video.get_texture() \
+                                                                .get_image().duplicate()
+                                        if is_instance_valid(_video) \
+                                                        and _video.is_playing() \
+                                                        and not focused:
+                                                _video.stop()
+                                        if is_instance_valid(self):
+                                                queue_redraw())
+                        elif focused:
+                                if not _video.is_playing():
+                                        _video.play()
+                        elif _video.is_playing():
+                                _video.stop()
         queue_redraw()
 
 func _draw() -> void:
@@ -188,10 +201,13 @@ func _draw() -> void:
                 var idx := int(_frame) % texs.size() if focused else 0
                 _draw_cover(texs[idx], r)
         elif ext == "ogv":
-                if _video != null and _video.get_texture() != null:
-                        _draw_cover(_video.get_texture(), r)
-                elif _poster != null:
+                if _poster != null and (not focused or _video == null \
+                                or not _video.is_playing()):
+                        # the poster owns the unfocused seat AND the breath
+                        # between loops - the frame is honest, never black
                         _draw_cover(_poster, r)
+                elif _video != null and _video.get_texture() != null:
+                        _draw_cover(_video.get_texture(), r)
                 else:
                         LanProfile.paint_pfp(self, variant,
                                         Vector2(sz.x * 0.5, sz.y * 0.5), sz.y * 0.94)
