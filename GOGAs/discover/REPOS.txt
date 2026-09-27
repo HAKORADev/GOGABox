@@ -1,0 +1,3 @@
+# GOGABox community register - one repo per line, user/repo form.
+# The two-step publish: make your repo (DISCOVER.md), PR one line here,
+# CI validates, merge = the community tier. developers/PUBLISHING.md
