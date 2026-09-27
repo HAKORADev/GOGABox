@@ -1,0 +1,132 @@
+{
+  "id": "merge",
+  "title": "2048",
+  "tag": "swipe and double",
+  "script": "res://game/games/merge/merge2048.gd",
+  "thumb": "res://assets/thumbs/merge.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 100,
+  "price": 400,
+  "fee": 15,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 2,
+    "orders": [
+      {
+        "type": "earn_in",
+        "game": "hopper",
+        "amount": 120
+      },
+      {
+        "type": "spend_in",
+        "game": "slasher",
+        "amount": 150
+      }
+    ],
+    "needs_games": 5
+  },
+  "charges": {
+    "per_round": 2,
+    "capacity": 10,
+    "regen_minutes": 5
+  },
+  "daily_rounds": 8,
+  "desc": "The classic brain cooker, rebuilt: a big centered board on warm paper, tiles that really slide and splash. Every fusion pays +1, and every 15 fusions a GOGACoin grows on the board - slide a tile onto it to take it. The OPTIONS sell bigger boards (6x6 and 8x8) and three themes: Classic, Minecraft and a Deep Sea whose water answers every real move.",
+  "controls": [
+    "swipe the finger in ANY direction - every tile slides that way, equal tiles merge and double",
+    "each successful fusion is worth exactly +1 score",
+    "after every 15 fusions a GOGACoin grows in an empty cell - slide any tile INTO it to collect (a tile that lands there takes it, even mid-merge)",
+    "the OPTIONS sell the bigger boards: 6 x 6 (bonus /80) and 8 x 8 (bonus /160) - bought once, switching starts a fresh board",
+    "the SHOP sells themes: Minecraft (block tiles, lava-glow numbers, stone + lava sounds) and Deep Sea (glass cells with real water - it moves ONLY when the tile really moves)",
+    "big tiles pulse the board gold; reach 2048 and the run keeps going",
+    "the run ends when no move is left - plan the corners"
+  ],
+  "genres": {
+    "main": [
+      "puzzle",
+      "casual"
+    ],
+    "sub": [
+      "minimal",
+      "turnbased",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "tile_t1",
+      "title": "Getting Warm",
+      "desc": "Create the 256 tile",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_tile",
+        "v": 256
+      }
+    },
+    {
+      "id": "tile_t2",
+      "title": "Halfway Hero",
+      "desc": "Create the 512 tile",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_tile",
+        "v": 512
+      }
+    },
+    {
+      "id": "tile_t3",
+      "title": "The Cold One",
+      "desc": "Create the 1024 tile",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_tile",
+        "v": 1024
+      }
+    },
+    {
+      "id": "tile_t4",
+      "title": "The Real 2048",
+      "desc": "Create the 2048 tile",
+      "tier": 4,
+      "rule": {
+        "k": "max",
+        "key": "max_tile",
+        "v": 2048
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "Doubler",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "the ARROW keys slide the board"
+  ]
+}

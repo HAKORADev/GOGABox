@@ -1,0 +1,54 @@
+{
+  "schema": 2,
+  "project": "gogabox/matcher",
+  "_doc": "Every visual/audio asset the MATCHER game wears, where it came from, its license, and how to re-fetch or re-derive it. Re-derive everything: python3 tools/v033_matcher_art.py (art) + python3 tools/v033_sfx.py (sound). All sources are CC0; derivations inherit CC0.",
+  "sources": [
+    {
+      "id": "candyrush-history-gem-match-3",
+      "name": "OpenGameArt - Gem Match 3 Set by Andrew Tidey (via the candyrush commit ec82c09 in this repo's history)",
+      "url": "https://opengameart.org/content/gem-match-3-set",
+      "license": "CC0 1.0 Universal",
+      "used_for": "Gem Vault skin (the default 5 gems) - gems/gem_0..4.png, 100px, trimmed+centered"
+    },
+    {
+      "id": "candyrush-history-candy-match-3",
+      "name": "OpenGameArt - Candy Match 3 (via the candyrush commit ec82c09)",
+      "url": "https://opengameart.org/content/candy-match-3",
+      "license": "CC0 1.0 Universal",
+      "used_for": "Candy Shop skin - gems/candy_0..4.png; the 8-frame explosion sheet - fx/explosion_0..7.png"
+    },
+    {
+      "id": "candyrush-history-audio",
+      "name": "OpenGameArt pops + Happy Adventure loop + Kenney interface sounds (via the candyrush commit ec82c09)",
+      "url": "https://opengameart.org/content/pop-sounds-0",
+      "license": "CC0 1.0 Universal",
+      "used_for": "pop_1..4 / pop_deep / m_swap / m_special / m_star / m_coin / m_boom / m_fail (sfx) and the happy theme matcher_happy.mp3 (music)"
+    },
+    {
+      "id": "kenney-particle-pack",
+      "name": "Kenney - Particle Pack (fetched via OpenGameArt mirror)",
+      "url": "https://opengameart.org/content/particle-pack-80-sprites",
+      "license": "CC0 1.0 Universal",
+      "used_for": "star_01/star_02 (the star sparkle + hypercube core + bomb fuse + the armed cursor), flame_01 (the flame gem ring center) - luminance-to-alpha converted"
+    },
+    {
+      "id": "oga-animated-butterfly",
+      "name": "OpenGameArt - animated butterfly (monarch photo-cut)",
+      "url": "https://opengameart.org/content/butterfly-animated",
+      "license": "CC0 1.0 Universal",
+      "used_for": "modes/butterfly.png - the studio background flood-filled away, cropped square"
+    },
+    {
+      "id": "pil-originals",
+      "name": "PIL-generated originals (tools/v033_matcher_art.py, deterministic)",
+      "license": "CC0 (project license applies)",
+      "used_for": "spider, ice_1..3, earth, gold/diamond/artifact, the 4 power icons, ov_flame/ov_star/ov_hyper overlays, bg_day/bg_peace skies, board cell + plate, the 5 mode cards, the thumbnail"
+    },
+    {
+      "id": "numpy-synth",
+      "name": "numpy synth (tools/v033_sfx.py, 44.1k stereo)",
+      "license": "CC0 (project license applies)",
+      "used_for": "m_flame/m_hyper/m_melt/m_freeze/m_dig/m_gold/m_diamond/m_artifact/m_descend/m_shuffle/m_arm/m_refill/m_flutter/m_gulp/m_goal/m_gong/m_spider (sfx) + matcher_peace.wav (the calm theme)"
+    }
+  ]
+}

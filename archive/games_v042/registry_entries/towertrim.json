@@ -1,0 +1,18 @@
+{
+  "id": "towertrim",
+  "title": "TOWER TRIM",
+  "tag": "stack it tall, keep it inside",
+  "coming_soon": true,
+  "orientation": "portrait",
+  "dim": "2d",
+  "price": 300,
+  "fee": 5,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 8,
+    "needs_games": 11
+  },
+  "desc": "the clipped tower: stack the falling shapes ",
+  "": "+ \"trimmed off - the workshop version is baking\"",
+  "whatever": "hangs OUT of the tower gets \""
+}

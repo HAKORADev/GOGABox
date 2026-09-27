@@ -1,0 +1,206 @@
+{
+  "id": "invaders",
+  "title": "Space Invaders",
+  "tag": "hold the solar system",
+  "script": "res://game/games/invaders/invaders.gd",
+  "thumb": "res://assets/thumbs/invaders.png",
+  "orientation": "landscape",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "gamepad": true,
+  "coin_div": 500,
+  "price": 350,
+  "fee": 100,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 5,
+    "orders": [
+      {
+        "type": "spend_in",
+        "game": "dario",
+        "amount": 200
+      },
+      {
+        "type": "plays",
+        "game": "xo",
+        "count": 6
+      }
+    ],
+    "needs_games": 8
+  },
+  "desc": "The aliens reached our solar system. Fly the Protector from Neptune inward to the Sun and into their Hideout: ten worlds, ten waves each, a named boss over every one - and three of them will run and come back for the finale. Rent the SSDS crew with DEFEND, buy Thunder or the Bomb Launcher, chase THE INVADER down. Small scores, a big war, and a line that never breaks while you hold it.",
+  "controls": [
+    "left half of the screen: slide to fly - the ship steers with you",
+    "right half: tap or HOLD to fire (every crew ship fires something of its own)",
+    "enemies pay +1/+2/+3, bosses +25 to +200; a heart loss costs -500 score",
+    "one enemy past the bottom reaches the solar system - the run is lost. Intercept the divers",
+    "a GOGACoin drifts in every 2-10 waves, a weapon point every 1-2 waves; your ship's own icon feeds its weapon ladder (5 levels, damage = the level)",
+    "DEFEND rents a crew ship for 10 waves - one hit ends its shift, and it never touches your loot",
+    "the shop sells Thunder (an electric beam that chains around itself) and the Bomb Launcher (no ammo, contact fuse only) - the Stage Themes pack paints every world",
+    "bosses 3, 6 and 9 escape at low health and return for the Hideout gauntlet; THE INVADER never truly dies - and neither does the war"
+  ],
+  "genres": {
+    "main": [
+      "shooter",
+      "arcade"
+    ],
+    "sub": [
+      "retro",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "Solar Shield",
+      "desc": "Score 2000 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 2000
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "Star Breaker",
+      "desc": "Score 6000 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 6000
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "The System's Fist",
+      "desc": "Score 15000 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 15000
+      }
+    },
+    {
+      "id": "kills_t1",
+      "title": "Star Sweep",
+      "desc": "Destroy 500 enemies total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "kills",
+        "v": 500
+      }
+    },
+    {
+      "id": "kills_t2",
+      "title": "Void Cleaner",
+      "desc": "Destroy 2000 enemies total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "kills",
+        "v": 2000
+      }
+    },
+    {
+      "id": "kills_t3",
+      "title": "The Long War's Toll",
+      "desc": "Destroy 6000 enemies total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "kills",
+        "v": 6000
+      }
+    },
+    {
+      "id": "tour_t1",
+      "title": "The Long War",
+      "desc": "Finish the full tour",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "tour_done",
+        "v": 1
+      }
+    },
+    {
+      "id": "boss_t1",
+      "title": "Duke Hunter",
+      "desc": "Meet all three runaway keepers",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "bosses_met",
+        "v": 3
+      }
+    },
+    {
+      "id": "defend_t1",
+      "title": "Crew Trust",
+      "desc": "Call 3 defenders total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "defenders_called",
+        "v": 3
+      }
+    },
+    {
+      "id": "stage_t1",
+      "title": "Deep Patrol",
+      "desc": "Reach stage 12",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_stage",
+        "v": 12
+      }
+    },
+    {
+      "id": "stage_t2",
+      "title": "The Far Orbit",
+      "desc": "Reach stage 24",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_stage",
+        "v": 24
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 8 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "Watch Commander",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "LEFT / RIGHT arrow keys steer",
+    "SPACE holds the fire",
+    "PC: the ship follows the CURSOR, the LEFT button holds the fire (arrows + SPACE still work)"
+  ]
+}

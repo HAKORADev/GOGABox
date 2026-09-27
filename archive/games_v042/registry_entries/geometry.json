@@ -1,0 +1,184 @@
+{
+  "id": "geometry",
+  "title": "Geometry Flash",
+  "tag": "the real one",
+  "script": "res://game/games/geometry/geometry.gd",
+  "thumb": "res://assets/thumbs/geometry.png",
+  "orientation": "landscape",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 50,
+  "price": 350,
+  "fee": 10,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 8,
+    "orders": [
+      {
+        "type": "ach_in",
+        "game": "pop_siege",
+        "count": 2
+      },
+      {
+        "type": "spend_in",
+        "game": "matcher",
+        "amount": 200
+      }
+    ],
+    "needs_games": 11
+  },
+  "desc": "The owner's own Geometry Flash: an ENDLESS neon world - no pre-made levels, the generator is the level. One square, one verb (tap = jump) and three hidden verbs it wears: NORMAL hops, FLIP taps gravity to the roof and back, STICK changes gravity only when you TOUCH the other floor - each 10/20/30/40 secret seconds. Golden orbits pay the score, every 10 speeds the world x1.1, and the world is FULL: block staircases up and down, pyramids, twin towers, small triple spikes, saws and floating threats fill the lanes. Blocks shove (they never kill), pits and wrong timing do. Buy POWER-UPS and they spawn in your runs: rocket jumps, a slower world, an extra life. The SFX sing.",
+  "controls": [
+    "TAP ANYWHERE TO START - then touch = jump, the square spins its 90 degrees over the real flight",
+    "golden orbits = +1 score each; every 10 the world runs x1.1 faster - watch the x1.00 chip",
+    "the chip next to the score is the LIVE MECHANIC: circle+arrow = jump, split arrows = tap ANYTIME flips gravity to the roof and back, linked arrows = gravity changes only when you TOUCH the ground or the roof (climb the lines to reach the roof!)",
+    "spikes live on the ground, the lines, the roof and FLOAT between the lanes - most are small triple rows you hop, the big triangle is a rare wall",
+    "the world is BUILT: block staircases climb up and down, pyramids, twin towers and bridges fill the lanes - every block top is a real surface (the square lands its 90 and jumps again)",
+    "blocks in the road SHOVE you back (jump over them or ride and escape); pushed off-screen ends the run",
+    "holes open in the ground AND the roof - fall in one and the run ends",
+    "the GOGACoin appears every 30-50s (never at the start) - catch it for real coins",
+    "POWER-UPS you buy spawn in your runs, 10s each: ROCKET JUMP (x1.5 hops + the burn), SLOW WORLD (everything runs 50% slower), EXTRA LIFE (the most expensive - pits bounce you, off-screen re-enters you, spikes pass through)",
+    "the shop wears 5 skins, 3 world themes, TAILS (neon/fire/rainbow/gold/match - they stream BEHIND you) and the powers"
+  ],
+  "genres": {
+    "main": [
+      "action",
+      "arcade"
+    ],
+    "sub": [
+      "rhythm",
+      "singleplayer",
+      "endless"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "Flash 100",
+      "desc": "Score 100 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 100
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "Speed Demon",
+      "desc": "Score 300 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 300
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "Neon Ghost",
+      "desc": "Score 1000 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 1000
+      }
+    },
+    {
+      "id": "score_t4",
+      "title": "The Matrix Runner",
+      "desc": "Score 2500 in one run",
+      "tier": 4,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 2500
+      }
+    },
+    {
+      "id": "orbit_t1",
+      "title": "Orbit Hunter",
+      "desc": "Collect 500 golden orbits total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "orbits",
+        "v": 500
+      }
+    },
+    {
+      "id": "orbit_t2",
+      "title": "The Orbit Lord",
+      "desc": "Collect 2500 golden orbits total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "orbits",
+        "v": 2500
+      }
+    },
+    {
+      "id": "flip_t1",
+      "title": "Gravity Adept",
+      "desc": "Flip gravity 250 times total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "flips",
+        "v": 250
+      }
+    },
+    {
+      "id": "flip_t2",
+      "title": "The World Upside Down",
+      "desc": "Flip gravity 1000 times total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "flips",
+        "v": 1000
+      }
+    },
+    {
+      "id": "triple_t1",
+      "title": "Triple Threat",
+      "desc": "Survive all 3 mechanics in one run",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "triple",
+        "v": 1
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 8 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Loop's Regular",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "SPACE / UP (or a click) is the one verb - jump or flip gravity, per the live mechanic"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "bubbleshot",
+  "title": "BUBBLE SHOT",
+  "tag": "aim, bounce, pop the cluster",
+  "coming_soon": true,
+  "orientation": "portrait",
+  "dim": "2d",
+  "price": 300,
+  "fee": 5,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 8,
+    "needs_games": 11
+  },
+  "desc": "the bubble cluster shooter: aim the throw, pop ",
+  "": "+ \"closes - the workshop version is baking\""
+}

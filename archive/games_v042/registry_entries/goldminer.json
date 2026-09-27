@@ -1,0 +1,143 @@
+{
+  "id": "goldminer",
+  "title": "GOLD MINER",
+  "tag": "swing, drop, reel the gold",
+  "script": "res://game/games/goldminer/goldminer.gd",
+  "thumb": "res://assets/thumbs/goldminer.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 30,
+  "price": 450,
+  "fee": 8,
+  "shop": true,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 8,
+    "needs_games": 11
+  },
+  "desc": "The claw never stops swinging - drop it at the ",
+  "": "+ \"Skins for the miner rig and for the whole vein.\"",
+  "deep": "veins",
+  "bomb": "minefields - cleared by \"",
+  "then": "the next one loads. Gold \"",
+  "rocks": "pay 2/4/6 but crawl \"",
+  "and": "every touch blasts everything \"",
+  "controls": [
+    "Tap anywhere to start the dig.",
+    "Tap to release the swinging claw along its angle.",
+    "Whatever the claw bites gets reeled to the top - ",
+    "+ \"heavy things crawl home slowly.\"",
+    "Take every gold to clear the ground; rocks are ",
+    "+ \"optional but pay more.\"",
+    "Never touch a bomb: it costs a life and blasts the ",
+    "+ \"things around it. Three bombs end the run.\"",
+    "The glowing gold carries a GOGACoin - reel it in.",
+    "END in the pause menu banks the run any time."
+  ],
+  "genres": {
+    "main": [
+      "arcade",
+      "action"
+    ],
+    "sub": [
+      "timing",
+      "procedural",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "gm_first",
+      "title": "First Nugget",
+      "desc": "Reel in your first gold",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "golds_taken",
+        "v": 1
+      }
+    },
+    {
+      "id": "gm_score_1",
+      "title": "Claim Staked",
+      "desc": "Score 150 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "score",
+        "v": 150
+      }
+    },
+    {
+      "id": "gm_plays",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "gm_coins",
+      "title": "Glow Snatcher",
+      "desc": "Bank 10 glowing golds",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "coins_taken",
+        "v": 10
+      }
+    },
+    {
+      "id": "gm_gold_100",
+      "title": "Gold Rush",
+      "desc": "Reel in 100 golds (lifetime)",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "golds_taken",
+        "v": 100
+      }
+    },
+    {
+      "id": "gm_rock_50",
+      "title": "Stone Broker",
+      "desc": "Reel in 50 rocks (lifetime)",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "rocks_taken",
+        "v": 50
+      }
+    },
+    {
+      "id": "gm_score_2",
+      "title": "The Mother Lode",
+      "desc": "Score 600 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "score",
+        "v": 600
+      }
+    },
+    {
+      "id": "gm_deep",
+      "title": "Deep Digger",
+      "desc": "Reach ground 8 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "gm_level",
+        "v": 8
+      }
+    }
+  ],
+  "controls_pc": [
+    "LEFT CLICK or SPACE releases the claw"
+  ]
+}

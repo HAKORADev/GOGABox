@@ -1,0 +1,192 @@
+{
+  "id": "hopper",
+  "title": "Snowy Tower",
+  "tag": "climb till you slip",
+  "script": "res://game/games/hopper/hopper.gd",
+  "thumb": "res://assets/thumbs/hopper.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 10,
+  "price": 300,
+  "fee": 12,
+  "shop": true,
+  "reveal": {
+    "kind": "chain"
+  },
+  "charges": {
+    "per_round": 2,
+    "capacity": 10,
+    "regen_minutes": 5
+  },
+  "hours": {
+    "from": 16,
+    "to": 22
+  },
+  "desc": "Climb an endless tower of icy platforms while real snow falls, lands and piles up. Eat the snow with MELTING to grow - or shrink away where it's bare. Seven platform kinds, two walls, a scroll that never waits, and jumps that widen the higher you get.",
+  "controls": [
+    "touch the LEFT half of the screen and SLIDE your finger: that is the movement - the further from where you touched, the faster and harder, back to your touch point = stop (left-right only)",
+    "tap the RIGHT half of the screen to JUMP - one tap, one jump",
+    "score is platforms climbed: land higher than ever for +1, skipping platforms still pays 1, landing lower pays nothing - the start platform pays nothing",
+    "the scroll starts after 2 platforms and climbs x1.1 every 10 - falling below the screen ends the run",
+    "snow falls for REAL: platforms start bare and catch it flake by flake (moving platforms shake it off), and flakes that reach YOU make you slow and heavy - roll to shed it",
+    "MELTING (shop, toggle): ON, you eat the snow under you and GROW (max x1.5); moving fast eats slower; where there is no snow you SHRINK until the run ends - a real risk",
+    "powerups bought in the shop spawn on platforms: x2 double jump, up arrow big jump, >> speed, -50% slow slide - each 10s, shown in the widget on top with its timer",
+    "GOGACoins hang between platforms (real, visible, fading in) - one every 5-25 platforms from the last coin on screen; powerups now wait 20-40 platforms apart",
+    "after platform 25 the jumps WIDEN toward your real jump ceiling - build speed, time the leap",
+    "past 30 a new kind joins: SIZE platforms that breathe wide and small; past 50: DROPPERS that drop away when you land on them, wait, then rise back - jump off in time",
+    "vanish platforms crack (jagged, growing cracks) and SHATTER into chunks; blinking platforms take their snow with them when they blink",
+    "the shop sells characters (ball/square/triangle/egg, each its own physics and its own real tumbling), platform skins (sand/rock/metal/grass), the night place, the powerups and MELTING"
+  ],
+  "genres": {
+    "main": [
+      "arcade",
+      "adventure"
+    ],
+    "sub": [
+      "platformer",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "tower_t1",
+      "title": "Warming Up",
+      "desc": "Climb 30 platforms in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_tower",
+        "v": 30
+      }
+    },
+    {
+      "id": "tower_t2",
+      "title": "Above the Clouds",
+      "desc": "Climb 80 platforms in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_tower",
+        "v": 80
+      }
+    },
+    {
+      "id": "tower_t3",
+      "title": "The Stratosphere",
+      "desc": "Climb 150 platforms in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_tower",
+        "v": 150
+      }
+    },
+    {
+      "id": "tower_t4",
+      "title": "The Edge of the Sky",
+      "desc": "Climb 300 platforms in one run",
+      "tier": 4,
+      "rule": {
+        "k": "max",
+        "key": "max_tower",
+        "v": 300
+      }
+    },
+    {
+      "id": "hops_t1",
+      "title": "Bunny Boots",
+      "desc": "Jump 50 times total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "hops",
+        "v": 50
+      }
+    },
+    {
+      "id": "hops_t2",
+      "title": "Spring Legs",
+      "desc": "Jump 500 times total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "hops",
+        "v": 500
+      }
+    },
+    {
+      "id": "hops_t3",
+      "title": "The Thousand Knees",
+      "desc": "Jump 5000 times total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "hops",
+        "v": 5000
+      }
+    },
+    {
+      "id": "height_t1",
+      "title": "Where Birds Rest",
+      "desc": "Climb 500 height in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_height",
+        "v": 500
+      }
+    },
+    {
+      "id": "height_t2",
+      "title": "Thin Air",
+      "desc": "Climb 1500 height in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_height",
+        "v": 1500
+      }
+    },
+    {
+      "id": "height_t3",
+      "title": "The Quiet Zone",
+      "desc": "Climb 3000 height in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_height",
+        "v": 3000
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Mountain's Own",
+      "desc": "Play 60 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 60
+      }
+    }
+  ],
+  "controls_pc": [
+    "LEFT / RIGHT arrow keys run",
+    "SPACE jumps"
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "id": "xo",
+  "title": "XO",
+  "tag": "sketch showdown",
+  "script": "res://game/games/xo/xo.gd",
+  "thumb": "res://assets/thumbs/xo.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 2,
+  "price": 450,
+  "fee": 10,
+  "shop": false,
+  "reveal": {
+    "kind": "inbox",
+    "minutes": 45,
+    "appear_after": 4,
+    "needs_games": 7
+  },
+  "desc": "Sketchbook tic-tac-toe: paper, ink and one adaptive opponent. It wears four profiles (The Wall, The Trickster, The Rusher, The Sage), remembers your last two rounds and stops falling for your patterns. Every win pays +1, every loss costs -1, a GOGACoin lands on the board after every 3 rounds - mark its cell first to take it.",
+  "controls": [
+    "tap a cell to draw your X - the red pencil",
+    "win = +1 score, loss = -1, draw = 0 (run bonus /2)",
+    "the CPU is hard to beat but never perfect - it adapts to your patterns for 2 rounds, then forgets",
+    "after every 3 rounds a GOGACoin grows in an empty cell - mark that cell FIRST and it is yours (the CPU can take it too)",
+    "the bank is in the pause sheet: END ends the run and pays"
+  ],
+  "genres": {
+    "main": [
+      "strategy",
+      "puzzle"
+    ],
+    "sub": [
+      "turnbased",
+      "competitive",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "wins_t1",
+      "title": "Pencil Pusher",
+      "desc": "Win 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 10
+      }
+    },
+    {
+      "id": "wins_t2",
+      "title": "Sketch Master",
+      "desc": "Win 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 40
+      }
+    },
+    {
+      "id": "wins_t3",
+      "title": "The Graphite Hand",
+      "desc": "Win 120 rounds",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 120
+      }
+    },
+    {
+      "id": "streak_t1",
+      "title": "Unstoppable",
+      "desc": "Win 5 rounds in a row",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "streak",
+        "v": 5
+      }
+    },
+    {
+      "id": "streak_t2",
+      "title": "The Machine",
+      "desc": "Win 10 rounds in a row",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "streak",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Doodler",
+      "desc": "Play 15 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 15
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Page's Owner",
+      "desc": "Play 60 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 60
+      }
+    }
+  ],
+  "controls_pc": [
+    "click a square with the mouse"
+  ]
+}

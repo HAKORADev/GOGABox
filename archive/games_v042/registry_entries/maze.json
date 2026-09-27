@@ -1,0 +1,159 @@
+{
+  "id": "maze",
+  "title": "Maze Escaper",
+  "tag": "the matrix escapee",
+  "script": "res://game/games/maze/maze.gd",
+  "thumb": "res://assets/thumbs/maze.png",
+  "orientation": "landscape",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 3,
+  "price": 350,
+  "fee": 10,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 9,
+    "orders": [
+      {
+        "type": "earn_in",
+        "game": "geometry",
+        "amount": 200
+      },
+      {
+        "type": "plays",
+        "game": "pop_siege",
+        "count": 4
+      }
+    ],
+    "needs_games": 12
+  },
+  "desc": "Geoquare's own puzzle: an endless neon maze woven fresh every map - a REAL labyrinth (branching corridors, honest dead ends - never one path with noise). The start and the exit roll EVERY map, so there is nothing to memorize: read the walls, pick the route, swipe grid by grid. The queue animates and SPEEDS UP as your inputs pile up. Time and scale are the only enemies - the clock is tight, the mazes grow, the cell shrinks. A GOGACoin waits one step off the route every 5th map, and the PATH FINDER earns one charge every 2 maps to light the way when the walls win. One map = one point.",
+  "controls": [
+    "TAP ANYWHERE TO START - then SWIPE: one swipe moves one cell, keep swiping and the square flows",
+    "reach the glowing portal before the clock runs out - every map solved = +1 score",
+    "the start and the exit move every map - read the maze fresh each time",
+    "a GOGACoin waits just off the route every 5th map - a small detour for real coins",
+    "the PATH FINDER (shop) earns one charge every 2 maps - tap its button next to the score to light the next 8 cells",
+    "the mazes grow as you escape - the cell shrinks to fit until the limit"
+  ],
+  "genres": {
+    "main": [
+      "puzzle",
+      "arcade"
+    ],
+    "sub": [
+      "maze",
+      "singleplayer",
+      "endless"
+    ]
+  },
+  "ach": [
+    {
+      "id": "maps_t1",
+      "title": "Escape Artist",
+      "desc": "Escape 10 mazes in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_maps",
+        "v": 10
+      }
+    },
+    {
+      "id": "maps_t2",
+      "title": "Wall Reader",
+      "desc": "Escape 30 mazes in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_maps",
+        "v": 30
+      }
+    },
+    {
+      "id": "maps_t3",
+      "title": "The Cartographer",
+      "desc": "Escape 60 mazes in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_maps",
+        "v": 60
+      }
+    },
+    {
+      "id": "esc_t1",
+      "title": "Loop Breaker",
+      "desc": "Escape 100 mazes total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "escapes",
+        "v": 100
+      }
+    },
+    {
+      "id": "esc_t2",
+      "title": "Matrix Free",
+      "desc": "Escape 300 mazes total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "escapes",
+        "v": 300
+      }
+    },
+    {
+      "id": "esc_t3",
+      "title": "No Walls Hold Me",
+      "desc": "Escape 1000 mazes total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "escapes",
+        "v": 1000
+      }
+    },
+    {
+      "id": "finder_t1",
+      "title": "Cheater",
+      "desc": "Use the path finder 25 times",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "finder_used",
+        "v": 25
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 8 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Maze Walker",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "the ARROW keys walk - one press, one step",
+    "SPACE starts the run"
+  ]
+}

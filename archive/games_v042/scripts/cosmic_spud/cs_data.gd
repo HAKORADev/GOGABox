@@ -1,0 +1,750 @@
+class_name CSData
+## COSMIC SPUD - the data tables (the GDD's numbers, frozen).
+## Every price in COSMIC COINS (the game's own currency). Every law the
+## probe asserts lives here as data.
+
+# ================================================================== STARTS
+## the 6 STARTS (the owner: "each game start it gives 6 options in the game
+## optionals menu while each one of them has different base skills set")
+const STARTS := {
+        "soldier": {"name": "THE SOLDIER", "hp": 100.0, "dmg": 1.00, "spd": 1.00,
+                "aspeed": 1.00, "range": 1.00, "armor": 0, "crit": 0.00, "regen": 0.0,
+                "perk": "+10% damage with every weapon", "tint": Color(1, 1, 1)},
+        "ranger": {"name": "THE RANGER", "hp": 70.0, "dmg": 1.00, "spd": 1.15,
+                "aspeed": 1.10, "range": 1.30, "armor": 0, "crit": 0.15, "regen": 0.0,
+                "perk": "+15% crit chance, +10% luck", "tint": Color(0.8, 1, 0.85),
+                "luck": 0.10},
+        "brawler": {"name": "THE BRAWLER", "hp": 140.0, "dmg": 1.30, "spd": 1.05,
+                "aspeed": 1.00, "range": 0.65, "armor": 2, "crit": 0.00, "regen": 0.0,
+                "perk": "+2 armor, contact damage -20%", "tint": Color(1, 0.85, 0.8)},
+        "engineer": {"name": "THE ENGINEER", "hp": 90.0, "dmg": 0.85, "spd": 1.00,
+                "aspeed": 1.00, "range": 1.00, "armor": 0, "crit": 0.05, "regen": 0.0,
+                "perk": "starts with a free DRONE BUDDY, +25% ally damage",
+                "tint": Color(0.85, 0.9, 1), "ally": "drone"},
+        "pyro": {"name": "THE PYRO", "hp": 85.0, "dmg": 1.10, "spd": 1.00,
+                "aspeed": 1.00, "range": 1.00, "armor": 0, "crit": 0.00, "regen": 0.0,
+                "perk": "every hit applies BURN (2/s for 3s)", "tint": Color(1, 0.8, 0.6)},
+        "frostbite": {"name": "THE FROSTBITE", "hp": 95.0, "dmg": 0.95, "spd": 1.00,
+                "aspeed": 1.00, "range": 1.05, "armor": 0, "crit": 0.05, "regen": 0.0,
+                "perk": "every hit CHILLS (-20% enemy speed, +10% taken), 5% dodge",
+                "tint": Color(0.8, 0.92, 1), "dodge": 0.05},
+}
+const START_ORDER := ["soldier", "ranger", "brawler", "engineer", "pyro", "frostbite"]
+
+# ================================================================== WEAPONS
+## 12 weapons x 3 tiers. price = the T1 GogaShop price (high, the owner's
+## law); t2/t3 derive: t2 = t1*2.2, t3 = t1*3.8 (rounded to 10). Merging
+## two same-tier copies costs HALF the next tier's price (the owner's law).
+const WEAPONS := {
+        "smg":       {"name": "SPUD SMG",       "dmg": 8.0,  "cad": 0.25, "rng": 300.0,
+                "pspd": 640.0, "count": 1, "spread": 0.06, "pierce": 0, "price": 250,
+                "shot": "cs_shot_smg", "proj": "bolt"},
+        "shotgun":   {"name": "SCATTER SPUD",   "dmg": 5.0,  "cad": 0.90, "rng": 240.0,
+                "pspd": 560.0, "count": 5, "spread": 0.42, "pierce": 0, "price": 320,
+                "shot": "cs_shot_shotgun", "proj": "pellet"},
+        "rifle":     {"name": "RUSTY RIFLE",    "dmg": 20.0, "cad": 1.10, "rng": 420.0,
+                "pspd": 820.0, "count": 1, "spread": 0.02, "pierce": 1, "price": 380,
+                "shot": "cs_shot_rifle", "proj": "slug"},
+        "laser":     {"name": "LASER PEELER",   "dmg": 14.0, "cad": 0.65, "rng": 380.0,
+                "pspd": 980.0, "count": 1, "spread": 0.0, "pierce": 2, "price": 460,
+                "shot": "cs_shot_laser", "proj": "lance"},
+        "cannon":    {"name": "SPUD CANNON",    "dmg": 30.0, "cad": 1.40, "rng": 340.0,
+                "pspd": 480.0, "count": 1, "spread": 0.04, "pierce": 0, "price": 520,
+                "shot": "cs_boom", "proj": "bomb", "aoe": 60.0},
+        "frost":     {"name": "FROST BLOOMER",  "dmg": 10.0, "cad": 0.80, "rng": 300.0,
+                "pspd": 600.0, "count": 2, "spread": 0.18, "pierce": 0, "price": 480,
+                "shot": "cs_frost", "proj": "shard", "chill": 1.5},
+        "flame":     {"name": "FLAME TATER",    "dmg": 6.0,  "cad": 0.13, "rng": 170.0,
+                "pspd": 380.0, "count": 1, "spread": 0.22, "pierce": 9, "price": 500,
+                "shot": "cs_burn", "proj": "flamepuff", "burn": true},
+        "rail":      {"name": "RAIL TATER",     "dmg": 45.0, "cad": 1.60, "rng": 560.0,
+                "pspd": 1400.0, "count": 1, "spread": 0.0, "pierce": 99, "price": 720,
+                "shot": "cs_rail", "proj": "rail"},
+        "boomerang": {"name": "BOOMERANG PEEL", "dmg": 16.0, "cad": 1.10, "rng": 330.0,
+                "pspd": 520.0, "count": 1, "spread": 0.0, "pierce": 99, "price": 560,
+                "shot": "cs_flash", "proj": "boomerang"},
+        "minigun":   {"name": "PRICKLY MINIGUN", "dmg": 5.0, "cad": 0.11, "rng": 280.0,
+                "pspd": 700.0, "count": 1, "spread": 0.14, "pierce": 0, "price": 640,
+                "shot": "cs_shot_minigun", "proj": "tracer"},
+        "fryer":     {"name": "ORBITAL FRYER",  "dmg": 35.0, "cad": 3.00, "rng": 900.0,
+                "pspd": 0.0, "count": 1, "spread": 0.0, "pierce": 0, "price": 820,
+                "shot": "cs_boom", "proj": "strike", "aoe": 70.0},
+        "gravity":   {"name": "GRAVITY WELL",   "dmg": 18.0, "cad": 2.20, "rng": 420.0,
+                "pspd": 260.0, "count": 1, "spread": 0.0, "pierce": 0, "price": 900,
+                "shot": "cs_boom", "proj": "orb", "aoe": 90.0, "pull": 2.0},
+        "molotov":   {"name": "MOLOTOV PEEL",   "dmg": 12.0, "cad": 2.40,
+                "rng": 400.0, "pspd": 540.0, "count": 1, "spread": 0.04,
+                "pierce": 0, "price": 640, "shot": "cs_burn", "proj": "bottle",
+                "pool": 3.4, "pool_r": 96.0},
+        "cleaver":   {"name": "PEEL CLEAVER",    "dmg": 16.0, "cad": 0.55, "rng": 130.0,
+                "pspd": 0.0, "count": 1, "spread": 0.0, "pierce": 99, "price": 350,
+                "shot": "cs_slash", "proj": "melee", "melee": true, "arc": 2.1},
+}
+const WEAPON_ORDER := ["smg", "shotgun", "rifle", "laser", "cannon", "frost",
+        "flame", "rail", "boomerang", "minigun", "fryer", "gravity", "molotov",
+        "cleaver"]
+
+## THE HEAVY KICK (v0.3.9-5, the owner: "making heavy weapons/shots have
+## like a weapon-shake effect where the shot goes slightly out of line by
+## specific angle from shot to shot and happens after rapid firing like a
+## real thing"): the big single shells lose their line when the barrel
+## heats - every shot pours HEAT in, every second cools some out, and the
+## aim walks a cone that grows with the heat. Slow firing keeps the cone
+## microscopic; rapid fire (adrenaline, high cadence tiers) shakes it.
+## kick = the max cone half-angle (rad) at full heat.
+const HEAVY_KICK := {
+        "rifle":   {"kick": 0.055},
+        "cannon":  {"kick": 0.095},
+        "rail":    {"kick": 0.075},
+        "fryer":   {"kick": 0.105},
+        "gravity": {"kick": 0.085},
+        "molotov": {"kick": 0.095},
+}
+const KICK_HEAT := 0.22   # heat poured per shot (full heat in ~5 fast shots)
+const KICK_COOL := 0.30   # heat shed per second of not spamming
+## the 3 weapons every new player owns (the owner: "starts with only 3")
+const START_WEAPONS := ["smg", "shotgun", "rifle"]
+## THE VARIED HOLSTER LAW (v0.3.4-5, the owner: "it is weird how all types of
+## characters starts with same weapons"): each start's signature gun rides
+## slot 1 on DROP IN (when owned).
+const START_SIG := {
+        "soldier": "smg", "ranger": "rifle", "brawler": "shotgun",
+        "engineer": "smg", "pyro": "shotgun", "frostbite": "rifle",
+}
+
+static func tier_mult(tier: int) -> Dictionary:
+        # T1 = the table; T2 = x1.6 dmg / x0.9 cad / x1.1 rng;
+        # T3 = x2.4 dmg / x0.8 cad / x1.25 rng +1 proj
+        # THE TIER RANGE LAW (v0.3.4-5, the owner: "a merge should really
+        # increase those stuff"): range climbs with the tier now too.
+        match tier:
+                2: return {"dmg": 1.6, "cad": 0.9, "count": 0, "rng": 1.1}
+                3: return {"dmg": 2.4, "cad": 0.8, "count": 1, "rng": 1.25}
+        return {"dmg": 1.0, "cad": 1.0, "count": 0, "rng": 1.0}
+
+static func weapon_price(wid: String, tier: int) -> int:
+        var base: int = int(WEAPONS[wid]["price"])
+        var p := base
+        if tier == 2:
+                p = int(round(base * 2.2 / 10.0)) * 10
+        elif tier >= 3:
+                p = int(round(base * 3.8 / 10.0)) * 10
+        return p
+
+static func merge_price(wid: String, from_tier: int) -> int:
+        # THE MERGE LAW: half of the NEXT tier's buy price
+        return int(ceil(weapon_price(wid, from_tier + 1) / 2.0))
+
+# ================================================================== ENEMIES
+## the python v1.3.8 numbers preserved (hp/spd/dmg/xp) + the new six.
+## score = the kill score law (the owner: basic +1, most +2, bosses big).
+const ENEMIES := {
+        "blab":     {"name": "BLAB", "hp": 30.0, "spd": 80.0, "dmg": 10.0, "size": 22.0,
+                "xp": 1, "score": 1, "tex": "blab", "from": 1},
+        "sprinter": {"name": "SPRINTER", "hp": 15.0, "spd": 160.0, "dmg": 8.0, "size": 17.0,
+                "xp": 1, "score": 1, "tex": "sprinter", "from": 2},
+        "chunk":    {"name": "CHUNK", "hp": 80.0, "spd": 40.0, "dmg": 20.0, "size": 30.0,
+                "xp": 2, "score": 2, "tex": "chunk", "from": 3},
+        "spitter":  {"name": "SPITTER", "hp": 25.0, "spd": 60.0, "dmg": 15.0, "size": 23.0,
+                "xp": 2, "score": 2, "tex": "spitter", "from": 4, "shoot": true,
+                "keep": 260.0,
+                "hint": "THE SPITTER spits - watch the green glob and dodge it!"},
+        "wraith":   {"name": "AURA WRAITH", "hp": 100.0, "spd": 30.0, "dmg": 10.0, "size": 30.0,
+                "xp": 4, "score": 4, "tex": "wraith", "from": 5, "aura": 250.0,
+                "aura_dps": 15.0,
+                "hint": "THE AURA WRAITH - its violet ring hurts you while you stand inside!"},
+        "brood":    {"name": "BROODMOTHER", "hp": 50.0, "spd": 45.0, "dmg": 10.0, "size": 26.0,
+                "xp": 3, "score": 3, "tex": "brood", "from": 6, "split": ["minion", "minion"]},
+        "trishield": {"name": "TRI-SHIELD", "hp": 300.0, "spd": 50.0, "dmg": 20.0, "size": 30.0,
+                "xp": 6, "score": 6, "tex": "trishield", "from": 7, "shield": true,
+                "hint": "THE TRI-SHIELD - its spinning shards never break: slip the gaps! The blue shell breaks AREA by AREA - the deeper the color, the tougher the cut!"},
+        "mender":   {"name": "MENDER", "hp": 1000.0, "spd": 35.0, "dmg": 10.0, "size": 30.0,
+                "xp": 8, "score": 8, "tex": "mender", "from": 8, "heal": 500.0,
+                "hint": "THE MENDER heals its friends inside the green ring - end it first!"},
+        "charger":  {"name": "CHARGER", "hp": 45.0, "spd": 95.0, "dmg": 18.0, "size": 26.0,
+                "xp": 2, "score": 2, "tex": "charger", "from": 9, "charge": true},
+        "boomling": {"name": "BOOMLING", "hp": 20.0, "spd": 115.0, "dmg": 5.0, "size": 20.0,
+                "xp": 1, "score": 1, "tex": "boomling", "from": 10, "bomb": true},
+        "splitter": {"name": "SPLITTER", "hp": 40.0, "spd": 80.0, "dmg": 12.0, "size": 22.0,
+                "xp": 2, "score": 2, "tex": "splitter", "from": 11, "split_gen": 2},
+        "orbiter":  {"name": "ORBITER", "hp": 35.0, "spd": 135.0, "dmg": 10.0, "size": 24.0,
+                "xp": 2, "score": 2, "tex": "orbiter", "from": 12, "orbit": true},
+        "warden":   {"name": "THE WARDEN", "hp": 320.0, "spd": 38.0, "dmg": 15.0, "size": 30.0,
+                "xp": 7, "score": 7, "tex": "warden", "from": 9, "ward": 260.0,
+                "hint": "THE WARDEN - its friends take HALF damage inside the gold ring!"},
+        "minion":   {"name": "MINION", "hp": 15.0, "spd": 140.0, "dmg": 8.0, "size": 13.0,
+                "xp": 1, "score": 1, "tex": "minion", "from": 99},
+}
+const SPAWN_POOL := ["blab", "blab", "blab", "sprinter"]  # wave 1
+
+const ELITE_AFFIX := {
+        "frenzied": {"name": "FRENZIED", "spd": 1.4, "hurt": 1.0},
+        "armored":  {"name": "ARMORED", "spd": 1.0, "hurt": 0.7},
+        "colossal": {"name": "COLOSSAL", "spd": 1.0, "hurt": 1.0, "hp": 1.5,
+                "scale": 1.5, "dmg": 1.5},
+        "vampiric": {"name": "VAMPIRIC", "spd": 1.0, "hurt": 1.0},
+}
+const ELITE_SCORE := 3
+
+# ========================================================== THE SHIELD TRUTH
+## v0.3.8-3 (the owner's report: "the shield is impossible to break... the
+## logic was taken from an older game i made"). TWO shields, both orbits:
+##
+## THE SHATTER ORBIT - unbreakable FRAGMENTS spinning around the body:
+## up to 3, each its own radius (a different size), its own arc span and
+## its own speed (some spin backwards). THE ALWAYS-A-WAY LAW: no orbit's
+## spans ever cover the full circle - a gap is always opening somewhere.
+##
+## THE LAYER SHELL - the COMPLETE shield: up to 5 layers, each layer cut
+## into AREAS. An area's LEVEL (1..5) is the amount of damage that breaks
+## it: every hit lowers the level until the area is GONE - a window in
+## that layer. A level wears a DEEPER color, so the toughness reads at a
+## glance.
+const TRISHIELD_SHARDS := [
+        {"r": 92.0, "span": 1.75, "spd": 1.7},
+        {"r": 76.0, "span": 1.2, "spd": -2.3},
+        {"r": 62.0, "span": 1.5, "spd": 1.15},
+]
+const TRISHIELD_LAYERS := [
+        {"r": 50.0, "lv": 1}, {"r": 41.0, "lv": 2}, {"r": 33.0, "lv": 3},
+]
+const TRISHIELD_AREAS := 5
+const PRISM_SHARDS := [
+        {"r": 124.0, "span": 1.4, "spd": 2.0},
+        {"r": 135.0, "span": 1.0, "spd": -1.4},
+]
+const PRISM_LAYERS := [
+        {"r": 108.0, "lv": 1}, {"r": 96.0, "lv": 2}, {"r": 84.0, "lv": 3},
+        {"r": 72.0, "lv": 4}, {"r": 60.0, "lv": 5},
+]
+const PRISM_AREAS := 6
+
+# =================================================================== BOSSES
+const BOSSES := {
+        "heap": {"name": "THE HEAP", "hp": 2600.0, "spd": 42.0, "dmg": 30.0,
+                "size": 56.0, "score": 50, "xp": 40, "coins": 30, "tex": "boss_heap",
+                "slam": true, "summon": "brood", "summon_n": 4, "charge": true},
+        "prism": {"name": "THE PRISM MATRIARCH", "hp": 5200.0, "spd": 34.0, "dmg": 26.0,
+                "size": 56.0, "score": 100, "xp": 80, "coins": 55, "tex": "boss_prism",
+                "shield": true, "burst": true, "self_mend": 12.0},
+        "reaper": {"name": "SPUD REAPER", "hp": 7400.0, "spd": 105.0, "dmg": 34.0,
+                "size": 56.0, "score": 80, "xp": 60, "coins": 45, "tex": "boss_reaper",
+                "triple_charge": true, "aura": 160.0, "aura_dps": 18.0, "teleport": 4},
+}
+const BOSS_CYCLE := 10          # a boss every 10 waves
+const BOSS_ORDER := ["heap", "prism", "reaper"]
+const BOSS_CYCLE_MULT := 1.25   # per cycle stats
+const BOSS_CYCLE_SCORE := 20
+
+# =================================================================== ALLIES
+## v0.3.8-2 THE ROSTER LAW (the owner: "make allies be persistent with their
+## upgrades like the skills"): an ally's level NEVER resets with a run now.
+## FIVE levels - the first two behaviors the L2/L3 signatures, the last two
+## ride NEW L4/L5 signatures in the tick. `lvs` = what each level MEANS
+## (index = level - 1) - the armory's RAISE rows speak it.
+const ALLY_MAX_LEVEL := 5
+const ALLY_ORDER := ["drone", "turret", "guard", "medic", "bomber", "scout"]
+
+const ALLIES := {
+        "drone":  {"name": "DRONE BUDDY", "price": 1200, "tex": "ally_drone",
+                "desc": "orbits you, shoots 2/s (damage grows with level)",
+                "lvs": ["orbits you, shoots 2/s", "TWIN SHOT - a second barrel joins",
+                        "the rounds PIERCE one body", "faster spin - 0.4s cadence",
+                        "TRIPLE VOLLEY - a third barrel joins"]},
+        "turret": {"name": "TATER TURRET", "price": 1500, "tex": "ally_turret",
+                "desc": "plants near you, sweeps 360",
+                "lvs": ["plants near you, sweeps 360", "faster sweep - 0.28s",
+                        "EXPLOSIVE SHELLS - every hit booms", "hunger - 0.22s cadence",
+                        "bigger booms - the shells blast 64px wide"]},
+        "guard":  {"name": "GUARD SPUD", "price": 1800, "tex": "ally_guard",
+                "desc": "bodyblocks - its AURA cuts the damage you take inside",
+                "lvs": ["the aura cuts 12% of the damage inside",
+                        "WIDER AURA - 15% bigger", "DREAD - the aura slows the swarm",
+                        "the cut deepens - 24%", "the deepest cut - 28% and a huge ring"]},
+        "medic":  {"name": "MEDIC SPROUT", "price": 2000, "tex": "ally_medic",
+                "desc": "heals you 2 HP/s (+1 per level), the care pulses",
+                "lvs": ["heals 2 HP/s, the care pulses", "stronger care - 4.5 HP/s",
+                        "SEARING CARE - the pulse burns the crowd", "stronger care still - 7 HP/s",
+                        "the care ring WIDENS - 150px of flame"]},
+        "bomber": {"name": "BOMBER CHIP", "price": 2300, "tex": "ally_bomber",
+                "desc": "kamikaze dives every 8s, respawns in 5s",
+                "lvs": ["kamikaze dives every 8s", "BIGGER BLAST - 96px",
+                        "SCORCHED DIVE - the crash leaves fire", "eager - dives every 6.5s",
+                        "quick rebuild - respawn 3s, the biggest blast"]},
+        "scout":  {"name": "SCOUT FRY", "price": 2600, "tex": "ally_scout",
+                "desc": "marks enemies in 300px: +15% taken, plinks a pea dart",
+                "lvs": ["marks +15% taken, plinks a dart", "DEEPER MARKS - +30% taken",
+                        "TRIPLE BURST - three darts a volley", "the deepest marks - +40% taken",
+                        "FIVE-DART STORM"]},
+}
+
+static func ally_level_price(aid: String, level: int) -> int:
+        # the price to DEPLOY/RAISE an owned ally to `level` in the wave shop
+        var base: int = int(ALLIES[aid]["price"])
+        return int(round(base * 0.28 * level / 10.0)) * 10
+
+## v0.3.8-2 THE ROSTER LAW: the price to RAISE the PERSISTENT level in the
+## armory (cosmic coins): to 2 = half the base, to 3 = the base, to 4 = 1.5x,
+## to 5 = 2x - every raise costs more, the roster grows like the tree.
+static func ally_raise_price(aid: String, to_lv: int) -> int:
+        return int(round(float(ALLIES[aid]["price"]) * 0.5 * float(maxi(1, to_lv) - 1)
+                        / 10.0)) * 10
+
+static func ally_merge_price(aid: String, level: int) -> int:
+        # merging two level `level` allies -> level+1: HALF the next level price
+        return int(ceil(ally_level_price(aid, level + 1) / 2.0))
+
+# ==================================================================== TREE
+## 18 nodes, 4 branches, chains unlock ONE BY ONE for cosmic coins
+## (the owner: "like advanced ubisoft games"). `need` = the prerequisite
+## node id ("" = root). `clv` = the character level gate.
+const TREE := {
+        "o1": {"name": "SHARP PEEL", "branch": "OFFENSE", "cost": 120, "need": "",
+                "clv": 1, "desc": "+8% run damage"},
+        "o2": {"name": "HOT STARCH", "branch": "OFFENSE", "cost": 260, "need": "o1",
+                "clv": 1, "desc": "+8% more run damage"},
+        "o3": {"name": "THIRD HOLSTER", "branch": "OFFENSE", "cost": 520, "need": "o2",
+                "clv": 3, "desc": "+1 weapon slot (5 total)"},
+        "o4": {"name": "EYE OF THE SPUD", "branch": "OFFENSE", "cost": 640, "need": "o3",
+                "clv": 6, "desc": "+10% crit chance"},
+        "o5": {"name": "CRIT MASTERY", "branch": "OFFENSE", "cost": 980, "need": "o4",
+                "clv": 9, "desc": "crits deal x3 (was x2)"},
+        "d1": {"name": "THICK SKIN", "branch": "DEFENSE", "cost": 120, "need": "",
+                "clv": 1, "desc": "+20 run max HP"},
+        "d2": {"name": "IRON PEEL", "branch": "DEFENSE", "cost": 300, "need": "d1",
+                "clv": 2, "desc": "+2 armor"},
+        "d3": {"name": "REGEN ROOT", "branch": "DEFENSE", "cost": 560, "need": "d2",
+                "clv": 4, "desc": "+1 HP/s regen"},
+        "d4": {"name": "SECOND WIND", "branch": "DEFENSE", "cost": 1100, "need": "d3",
+                "clv": 7, "desc": "one revive per run at 50% HP"},
+        "u1": {"name": "MAGNET MASH", "branch": "UTILITY", "cost": 100, "need": "",
+                "clv": 1, "desc": "+30% pickup magnet"},
+        "u2": {"name": "GOLDEN DRIP", "branch": "UTILITY", "cost": 240, "need": "u1",
+                "clv": 1, "desc": "+10% cosmic coins earned"},
+        "u3": {"name": "FATE REROLL", "branch": "UTILITY", "cost": 480, "need": "u2",
+                "clv": 3, "desc": "1 free market reroll each break"},
+        "u4": {"name": "MARKET TONGUE", "branch": "UTILITY", "cost": 760, "need": "u3",
+                "clv": 6, "desc": "wave shop prices -10%"},
+        "l1": {"name": "EXTRA LEASH", "branch": "LAB", "cost": 340, "need": "",
+                "clv": 2, "desc": "+1 deployed ally (3 total)"},
+        "l2": {"name": "ALLY POWER", "branch": "LAB", "cost": 620, "need": "l1",
+                "clv": 4, "desc": "+25% ally damage"},
+        "l3": {"name": "WEAPON LAB", "branch": "LAB", "cost": 900, "need": "l2",
+                "clv": 4, "desc": "LEARN WEAPON MERGING (the owner's law)"},
+        "l4": {"name": "FOUNDRY", "branch": "LAB", "cost": 1200, "need": "l3",
+                "clv": 8, "desc": "merge prices -25%"},
+        "l5": {"name": "SIXTH SLOT", "branch": "LAB", "cost": 1400, "need": "l4",
+                "clv": 10, "desc": "+1 weapon slot (6 total)"},
+}
+const TREE_ORDER := ["o1", "o2", "o3", "o4", "o5", "d1", "d2", "d3", "d4",
+        "u1", "u2", "u3", "u4", "l1", "l2", "l3", "l4", "l5"]
+
+# =================================================================== THEMES
+## THE ECONOMY BORDER LAW (v0.3.4-2): places are GOGACoin purchases (the
+## owner's universal-shop law) - "gogacoins" is the BOX wallet price.
+const THEMES := {
+        "desert": {"name": "DECAYED DESERT", "gogacoins": 0,
+                "day": "res://assets/games/cosmic_spud/ground/desert_day.png",
+                "night": "res://assets/games/cosmic_spud/ground/desert_night.png",
+                "day_music": "res://assets/audio/music/cs_desert_day.ogg",
+                "night_music": "res://assets/audio/music/cs_desert_night.ogg",
+                "props": ["rock", "skull", "crate", "barrel", "shrub"],
+                "night_props": ["rock", "skull", "barrel"],
+                "tint_day": Color(1, 1, 1), "tint_night": Color(0.62, 0.66, 0.95)},
+        "park": {"name": "ABANDONED PARK", "gogacoins": 400,
+                "day": "res://assets/games/cosmic_spud/ground/park_day.png",
+                "night": "res://assets/games/cosmic_spud/ground/park_night.png",
+                "day_music": "res://assets/audio/music/cs_park_day.ogg",
+                "night_music": "res://assets/audio/music/cs_park_night.ogg",
+                "props": ["tree", "bench", "fence", "shrub", "crate"],
+                "night_props": ["tree", "bench", "fence"],
+                "tint_day": Color(1, 1, 1), "tint_night": Color(0.6, 0.7, 0.9)},
+}
+const THEME_ORDER := ["desert", "park"]
+
+# ================================================================= THE SHOP
+## v0.3.4-4 THE SHOP LIST LAW: the universal THE SHOP (the HUD button) sells
+## REAL-GOGACoins shelves. THE GUNS: owning one plants its offer in EVERY
+## wave market roll (the invaders law - "they join the wave loot"). THE CREW:
+## owning one lists the ally in the deploy rows forever. Prices are
+## GOGACoins; the in-run costs stay cosmic coins.
+const SHOP_GUNS := {
+        "shotgun": 300, "laser": 350, "rail": 450, "gravity": 550,
+        "cleaver": 350,
+}
+const SHOP_CREW := {
+        "drone": 250, "turret": 300, "guard": 300,
+        "medic": 350, "bomber": 400, "scout": 350,
+}
+
+# =============================================================== WAVE DRAFTS
+## per-wave drafts WITH TEETH (the owner: "offer things and take things,
+## like +20 damage and -20 speed"). Each card: an UP and most a DOWN.
+const WAVE_DRAFTS := [
+        {"t": "+20% DAMAGE", "d": "-10% move speed", "up": {"dmg": 0.20},
+                "down": {"spd": -0.10}, "w": 10},
+        {"t": "+25% ATTACK SPEED", "d": "-8% damage", "up": {"aspeed": 0.25},
+                "down": {"dmg": -0.08}, "w": 10},
+        {"t": "+30 MAX HP", "d": "-5% move speed", "up": {"hp": 30},
+                "down": {"spd": -0.05}, "w": 10},
+        {"t": "+15% MOVE SPEED", "d": "-10 max HP", "up": {"spd": 0.15},
+                "down": {"hp": -10}, "w": 10},
+        {"t": "+1 PROJECTILE", "d": "-15% range", "up": {"proj": 1},
+                "down": {"range": -0.15}, "w": 5},
+        {"t": "+20% RANGE", "d": "-8% attack speed", "up": {"range": 0.20},
+                "down": {"aspeed": -0.08}, "w": 10},
+        {"t": "+2 ARMOR", "d": "-6% move speed", "up": {"armor": 2},
+                "down": {"spd": -0.06}, "w": 8},
+        {"t": "+1 HP/S REGEN", "d": "-10% damage", "up": {"regen": 1.0},
+                "down": {"dmg": -0.10}, "w": 8},
+        {"t": "+10% CRIT", "d": "-5% max HP", "up": {"crit": 0.10},
+                "down": {"hp": -5}, "w": 6},
+        {"t": "PURE POWER", "d": "no catch - rare", "up": {"dmg": 0.12}, "down": {},
+                "w": 2},
+        {"t": "PURE SWIFTNESS", "d": "no catch - rare", "up": {"spd": 0.12},
+                "down": {}, "w": 2},
+]
+
+# ============================================================ STAT TRACKS
+## v0.3.8-2 THE STAT TRACKS (the owner: "make stats be persistent with their
+## upgrades like the skills... make both skills and stats to have 5 upgrades
+## each one with higher points and gives extra stuff, design that"):
+## every old pack is a LIFETIME track of FIVE upgrades now. `ladder` = the
+## point cost per level (it ONLY climbs); `steps` bundles EXTRA gains onto
+## levels 3 and 5; `final` (the pierce track only) turns the last level into
+## the old god-tier. Every delta rides the same _apply_stat tongue the
+## drafts speak. One STAT POINT is minted per run level-up, LIFETIME - they
+## never reset with a round (the skills' own law).
+const STAT_TRACKS := [
+        {"id": "dmg", "t": "DAMAGE", "d": "+10% damage on every gun",
+                "k": "dmg", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["crit", 0.04, "+4% crit"]],
+                        5: [["aspeed", 0.08, "+8% attack speed"]]}},
+        {"id": "hp", "t": "MAX HP", "d": "+20 max HP, healed in full",
+                "k": "hp", "v": 20.0, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["armor", 2, "+2 armor"]],
+                        5: [["regen", 1.0, "+1 HP/s regen"]]}},
+        {"id": "spd", "t": "MOVE SPEED", "d": "+8% walk speed",
+                "k": "spd", "v": 0.08, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dodge", 0.04, "+4% dodge"]],
+                        5: [["magnet", 0.25, "+25% pickup range"]]}},
+        {"id": "aspeed", "t": "ATTACK SPEED", "d": "+10% on every gun",
+                "k": "aspeed", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["crit", 0.03, "+3% crit"]],
+                        5: [["dmg", 0.08, "+8% damage"]]}},
+        {"id": "range", "t": "RANGE", "d": "+10% weapon range",
+                "k": "range", "v": 0.10, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dmg", 0.05, "+5% damage"]],
+                        5: [["aspeed", 0.08, "+8% attack speed"]]}},
+        {"id": "crit", "t": "CRIT", "d": "+8% critical chance",
+                "k": "crit", "v": 0.08, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["dmg", 0.10, "+10% damage"]],
+                        5: [["luck", 0.15, "+15% luck"]]}},
+        {"id": "luck", "t": "LUCK", "d": "+15% luck (rarer shelves, fatter drops)",
+                "k": "luck", "v": 0.15, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["coin", 0.10, "+10% cosmic coins"]],
+                        5: [["dodge", 0.05, "+5% dodge"]]}},
+        {"id": "magnet", "t": "MAGNET", "d": "+30% pickup range",
+                "k": "magnet", "v": 0.30, "ladder": [1, 2, 3, 5, 8],
+                "steps": {3: [["luck", 0.10, "+10% luck"]],
+                        5: [["spd", 0.05, "+5% move speed"]]}},
+        {"id": "armor", "t": "ARMOR", "d": "+2 armor - every hit lands softer",
+                "k": "armor", "v": 2, "ladder": [1, 2, 4, 6, 9],
+                "steps": {3: [["hp", 20.0, "+20 max HP"]],
+                        5: [["regen", 1.5, "+1.5 HP/s regen"]]}},
+        {"id": "regen", "t": "REGEN", "d": "+1.5 HP per second, forever",
+                "k": "regen", "v": 1.5, "ladder": [1, 2, 4, 6, 9],
+                "steps": {3: [["hp", 20.0, "+20 max HP"]],
+                        5: [["armor", 2, "+2 armor"]]}},
+        {"id": "dodge", "t": "DODGE", "d": "+6% dodge (cap 60%)",
+                "k": "dodge", "v": 0.06, "ladder": [2, 3, 4, 6, 9],
+                "steps": {3: [["spd", 0.08, "+8% move speed"]],
+                        5: [["crit", 0.05, "+5% crit"]]}},
+        {"id": "lifesteal", "t": "LIFESTEAL", "d": "3% of damage dealt returns as HP",
+                "k": "lifesteal", "v": 0.03, "ladder": [2, 3, 4, 6, 9],
+                "steps": {3: [["regen", 1.0, "+1 HP/s regen"]],
+                        5: [["dmg", 0.10, "+10% damage"]]}},
+        {"id": "proj", "t": "PROJECTILE", "d": "every gun fires one more shot",
+                "k": "proj", "v": 1, "ladder": [3, 4, 6, 9, 14],
+                "steps": {3: [["dmg", 0.10, "+10% damage"]],
+                        5: [["aspeed", 0.10, "+10% attack speed"]]}},
+        {"id": "pierce", "t": "PIERCE", "d": "every gun drills +1 body deeper",
+                "k": "pierce", "v": 1, "ladder": [2, 3, 5, 8, 12],
+                "steps": {3: [["dmg", 0.05, "+5% damage"]]},
+                "final": {"k": "pierce_all", "v": 1,
+                        "d": "PIERCE ALL - drills through everything"}},
+]
+
+# ================================================================ SKILLS
+## THE TEN (v0.3.4-3, the owner: "skills should be unique... a real high
+## cool-factor skills that feels amazing"). ONE point per 100 kills,
+## LIFETIME - they never reset with a round. cost = SKILL POINTS.
+const SKILL_PT_KILLS := 100
+const SKILLS := {
+        "shattered_shield": {"name": "SHATTERED SHIELD", "cost": 2,
+                "desc": "a shield blocks ONE hit whole, reforms 12s later"},
+        "leech_aura": {"name": "LEECH AURA", "cost": 2,
+                "desc": "enemies within 140px bleed 2 HP/s each to you (3 max)"},
+        "frost_aura": {"name": "FROST AURA", "cost": 2,
+                "desc": "enemies within 170px crawl 30% slower, always"},
+        "ghost_round": {"name": "GHOST ROUND", "cost": 2,
+                "desc": "shots that hit you FLY THROUGH and strike enemies behind for half damage"},
+        "starch_rage": {"name": "STARCH RAGE", "cost": 1,
+                "desc": "below 35% HP: +40% damage - the potato bites back"},
+        "static_burst": {"name": "STATIC BURST", "cost": 1,
+                "desc": "every 6s lightning zaps the 3 nearest enemies"},
+        "twin_tail": {"name": "TWIN TAIL", "cost": 2,
+                "desc": "a ghost gun guards your back - every volley fires backwards at 40%"},
+        "split_sight": {"name": "SPLIT SIGHT", "cost": 2,
+                "desc": "TWO weapons each pick their own prey (by range and distance) - the rest hunt together"},
+        "adrenaline": {"name": "ADRENALINE ROOT", "cost": 1,
+                "desc": "a dodge revs +80% attack speed for 2s"},
+        "golden_gut": {"name": "GOLDEN GUT", "cost": 1,
+                "desc": "+25% cosmic coins from every source"},
+        "magnetic_skin": {"name": "MAGNETIC SKIN", "cost": 1,
+                "desc": "pickups fly to you from 60% farther, hearts heal +50%"},
+}
+const SKILL_ORDER := ["shattered_shield", "leech_aura", "frost_aura",
+        "ghost_round", "starch_rage", "static_burst", "twin_tail",
+        "split_sight", "adrenaline", "golden_gut", "magnetic_skin"]
+
+## v0.3.8-2 THE SKILL DEPTHS (the owner: "make both skills and stats to have
+## 5 upgrades each one with higher points and gives extra stuff, design
+## that"): every skill wears FIVE levels. `lvs` = what each level SAYS
+## (index = level - 1, level 1 = the base law); the number tables are read
+## by the run through skill_num(). The costs climb through
+## skill_level_cost() - the SKILL's own `cost` is level 1's price.
+const SKILL_LEVELS := {
+        "shattered_shield": {"lvs": ["a shield blocks ONE hit whole, reforms 12s later",
+                        "the reform quickens - 9s", "the reform quickens - 7s",
+                        "the shatter BURSTS - 25 dmg burns the 150px ring",
+                        "TWO charges, the reform quickens - 5s"],
+                "reform": [12.0, 9.0, 7.0, 7.0, 5.0],
+                "burst": [0.0, 0.0, 0.0, 25.0, 25.0],
+                "charges": [1, 1, 1, 1, 2]},
+        "leech_aura": {"lvs": ["enemies within 140px bleed 2 HP/s each to you (3 max)",
+                        "170px, 3 HP/s each (4 max)", "200px, 4 HP/s each (5 max)",
+                        "230px, 5 HP/s each (6 max)", "260px, 6 HP/s each (8 max)"],
+                "radius": [140.0, 170.0, 200.0, 230.0, 260.0],
+                "dps": [2.0, 3.0, 4.0, 5.0, 6.0],
+                "cap": [3, 4, 5, 6, 8]},
+        "frost_aura": {"lvs": ["enemies within 170px crawl 30% slower, always",
+                        "190px, 34% slower", "210px, 38% slower",
+                        "230px, 42% slower", "250px, 46% slower"],
+                "radius": [170.0, 190.0, 210.0, 230.0, 250.0],
+                "slow": [0.70, 0.66, 0.62, 0.58, 0.54]},
+        "ghost_round": {"lvs": ["shots that hit you FLY THROUGH and strike enemies behind for half damage",
+                        "the turned shots answer for 65%",
+                        "the turned shots answer for 80% - and drill one extra body",
+                        "the turned shots answer at FULL damage",
+                        "the turned shots answer for 125% - the swarm's own bullets judge it"],
+                "frac": [0.5, 0.65, 0.8, 1.0, 1.25],
+                "pierce": [0, 0, 1, 1, 2]},
+        "starch_rage": {"lvs": ["below 35% HP: +40% damage - the potato bites back",
+                        "below 38% HP: +50%", "below 41% HP: +60%",
+                        "below 44% HP: +75%", "below HALF HP: +90% - the potato SNAPS"],
+                "thresh": [0.35, 0.38, 0.41, 0.44, 0.50],
+                "rage": [1.40, 1.50, 1.60, 1.75, 1.90]},
+        "static_burst": {"lvs": ["every 6s lightning zaps the 3 nearest enemies",
+                        "every 5.4s, 4 targets", "every 4.8s, 5 targets - the zaps CHILL 0.4s",
+                        "every 4.2s, 6 targets, +30% zap damage",
+                        "every 3.6s, 8 targets, +60% zap damage"],
+                "period": [6.0, 5.4, 4.8, 4.2, 3.6],
+                "targets": [3, 4, 5, 6, 8],
+                "dmg_m": [1.0, 1.0, 1.0, 1.3, 1.6],
+                "chill": [0.0, 0.0, 0.4, 0.4, 0.4]},
+        "twin_tail": {"lvs": ["a ghost gun guards your back - every volley fires backwards at 40%",
+                        "the ghost gun answers at 50%", "the ghost gun answers at 60%",
+                        "the ghost gun answers at 70% - and PIERCES like its twin",
+                        "the ghost gun answers at 85%, pierced"],
+                "frac": [0.4, 0.5, 0.6, 0.7, 0.85],
+                "melee_r": [0.6, 0.65, 0.7, 0.75, 0.8],
+                "pierce": [0, 0, 0, 1, 2]},
+        "split_sight": {"lvs": ["TWO weapons each pick their own prey - the rest hunt together",
+                        "THREE weapons spread their fire", "FOUR weapons spread their fire",
+                        "FIVE weapons spread their fire",
+                        "SIX weapons spread their fire - the whole holster hunts alone"],
+                "guns": [2, 3, 4, 5, 6]},
+        "adrenaline": {"lvs": ["a dodge revs +80% attack speed for 2s",
+                        "the rev hits +95% for 2.3s", "the rev hits +110% for 2.6s - and heals 3 HP",
+                        "the rev hits +130% for 3s",
+                        "the rev hits +150% for 3.5s - and the legs join (+25% speed)"],
+                "aspeed": [1.80, 1.95, 2.10, 2.30, 2.50],
+                "dur": [2.0, 2.3, 2.6, 3.0, 3.5],
+                "heal": [0.0, 0.0, 3.0, 3.0, 3.0],
+                "spd": [1.0, 1.0, 1.0, 1.0, 1.25]},
+        "golden_gut": {"lvs": ["+25% cosmic coins from every source",
+                        "+35% cosmic coins", "+45% cosmic coins",
+                        "+60% cosmic coins", "+80% cosmic coins - the gut GLOWS"],
+                "coin": [0.25, 0.35, 0.45, 0.60, 0.80]},
+        "magnetic_skin": {"lvs": ["pickups fly to you from 60% farther, hearts heal +50%",
+                        "75% farther, hearts +65%", "90% farther, hearts +80% - and +5% luck",
+                        "110% farther, hearts +100%",
+                        "140% farther, hearts +130% - and +10% luck"],
+                "magnet": [0.6, 0.75, 0.9, 1.1, 1.4],
+                "hearts": [1.5, 1.65, 1.8, 2.0, 2.3],
+                "reach": [1.6, 1.75, 1.9, 2.05, 2.2],
+                "luck": [0.0, 0.0, 0.05, 0.05, 0.10]},
+}
+
+## the number reader: skill_num("leech_aura", "dps", 3, 2.0) -> 4.0
+static func skill_num(sid: String, key: String, level: int, def: Variant) -> Variant:
+        var tabs: Dictionary = SKILL_LEVELS.get(sid, {})
+        var arr: Array = tabs.get(key, [])
+        if arr.is_empty():
+                return def
+        return arr[clampi(level - 1, 0, arr.size() - 1)]
+
+## the level's line for the menus (level 0 -> the base desc of SKILLS)
+static func skill_lv_line(sid: String, level: int) -> String:
+        if level <= 0:
+                return String(SKILLS[sid]["desc"])
+        var lvs: Array = SKILL_LEVELS[sid]["lvs"]
+        return String(lvs[clampi(level - 1, 0, lvs.size() - 1)])
+
+## the cost ladder: level 1 = the SKILL's own cost, then it ONLY climbs
+## (cost 1 -> 1/2/3/5/7, cost 2 -> 2/3/4/6/8)
+static func skill_level_cost(sid: String, level: int) -> int:
+        var base := int(SKILLS[sid]["cost"])
+        match clampi(level, 1, 5):
+                2: return base + 1
+                3: return base + 2
+                4: return base + 4
+                5: return base + 6
+        return base
+
+# ==================================================================== SHOP
+## the wave shop consumables (in-run coins)
+const CONSUMABLES := {
+        "heal30": {"name": "MASH PATCH", "desc": "heal 30 HP now", "price": 45},
+        "plate":  {"name": "ARMOR PLATE", "desc": "+1 armor this run", "price": 70},
+        "crate":  {"name": "BOMB CRATE", "desc": "blast every enemy on screen", "price": 120},
+}
+
+# ============================================================== RARITIES
+## the store's colored cards (the example HTML's shape): the price mult and
+## the weight both live here. LUCK bends the roll (roll_rarity).
+const RARITIES := {
+        "common":    {"name": "COMMON",    "pm": 1.0,  "w": 46,
+                "col": Color(0.72, 0.73, 0.75), "blurb": "the honest shelf"},
+        "uncommon":  {"name": "UNCOMMON",  "pm": 1.35, "w": 28,
+                "col": Color(0.44, 0.88, 0.5), "blurb": "a good find"},
+        "rare":      {"name": "RARE",      "pm": 1.8,  "w": 17,
+                "col": Color(0.46, 0.68, 1.0), "blurb": "the swarm will hate this"},
+        "epic":      {"name": "EPIC",      "pm": 2.4,  "w": 7,
+                "col": Color(0.78, 0.55, 1.0), "blurb": "the shelf sparkles"},
+        "legendary": {"name": "LEGENDARY", "pm": 3.2,  "w": 2,
+                "col": Color(1.0, 0.83, 0.3), "blurb": "take it and run"},
+}
+
+static func roll_rarity(luck: float) -> String:
+        # luck SHIFTs the weights toward the shine (1.0 luck = x2 on epics+)
+        var ids := RARITIES.keys()
+        var total := 0.0
+        for k in ids:
+                var boost := 1.0 + maxf(0.0, luck) * (0.0 if k == "common" \
+                                else (0.3 if k == "uncommon" else 0.8))
+                total += float(RARITIES[k]["w"]) * boost
+        var r := randf() * total
+        for k2 in ids:
+                var boost2 := 1.0 + maxf(0.0, luck) * (0.0 if k2 == "common" \
+                                else (0.3 if k2 == "uncommon" else 0.8))
+                r -= float(RARITIES[k2]["w"]) * boost2
+                if r <= 0.0:
+                        return String(k2)
+        return "common"
+
+# ================================================================= ITEMS
+## the wave shop's stat items (the Brotato shelf). `stat` + `v` ride the
+## same _apply_stat law as the drafts.
+const ITEMS := {
+        "spikeplate": {"name": "SPIKE PLATE",   "stat": "armor",  "v": 1,
+                "desc": "+1 armor", "price": 55},
+        "coffee":     {"name": "SPUD COFFEE",   "stat": "aspeed", "v": 0.08,
+                "desc": "+8% attack speed", "price": 40},
+        "clover":     {"name": "LUCKY CLOVER",  "stat": "luck",   "v": 0.15,
+                "desc": "+15% luck (rarer shelves, fatter drops)", "price": 45},
+        "rabbit":     {"name": "RABBIT FOOT",   "stat": "dodge",  "v": 0.08,
+                "desc": "+8% dodge (cap 60%)", "price": 60},
+        "protein":    {"name": "PROTEIN MASH",  "stat": "dmg",    "v": 0.10,
+                "desc": "+10% damage", "price": 50},
+        "boots":      {"name": "SWIFT BOOTS",   "stat": "spd",    "v": 0.08,
+                "desc": "+8% move speed", "price": 40},
+        "magnetring": {"name": "MAGNET RING",   "stat": "magnet", "v": 0.3,
+                "desc": "+30% pickup range", "price": 30},
+        "lens":       {"name": "FOCUS LENS",    "stat": "crit",   "v": 0.06,
+                "desc": "+6% crit", "price": 45},
+        "salve":      {"name": "ROOT SALVE",    "stat": "regen",  "v": 0.8,
+                "desc": "+0.8 HP/s regen", "price": 50},
+        "leech":      {"name": "LEECH FANG",    "stat": "lifesteal", "v": 0.02,
+                "desc": "+2% lifesteal", "price": 70},
+        "scope":      {"name": "LONG SCOPE",    "stat": "range",  "v": 0.10,
+                "desc": "+10% range", "price": 40},
+        "battery":    {"name": "SPARE BATTERY", "stat": "proj",   "v": 1,
+                "desc": "+1 projectile on every gun", "price": 90},
+}
+const ITEM_ORDER := ["spikeplate", "coffee", "clover", "rabbit", "protein",
+        "boots", "magnetring", "lens", "salve", "leech", "scope", "battery"]
+
+## the reroll law (the Brotato mouthful #3, v0.3.4-3 edition): the reroll
+## lives in THE WAVE MARKET only - the drafts lost theirs (the owner:
+## "a re-roll should be for shop items"). The price climbs 8 + 6n; the u3
+## tree node owns one FREE market shuffle per break.
+static func shop_reroll_cost(n: int) -> int:
+        return 8 + n * 6
+
+# =================================================================== WAVES
+const WAVE_SECS := 25.0
+const BOSS_WAVE_SECS := 30.0
+const WAVE_HEAL := 15.0
+const WAVE_COINS := 10          # + 2*wave (the GDD law)
+
+## the difficulty laws (the python's math, extended - see the GDD 3.1)
+static func spawn_interval(wave: int) -> float:
+        return maxf(0.30, 1.60 - float(wave) * 0.08)
+
+static func burst_size(wave: int) -> int:
+        return 3 + int(wave / 2.0)
+
+static func hp_scale(wave: int) -> float:
+        var base := 1.0 + float(wave) * 0.12
+        if wave > 20:
+                base *= pow(1.015, float(wave - 20))
+        return base
+
+static func dmg_scale(wave: int) -> float:
+        return 1.0 + float(wave) * 0.04
+
+static func spd_scale(wave: int) -> float:
+        return minf(1.35, 1.0 + float(wave) * 0.015)
+
+static func elite_chance(wave: int) -> float:
+        if wave < 6:
+                return 0.0
+        return minf(0.25, 0.08 + 0.01 * float(wave - 6))
+
+## the unlock table (the GDD: w2 sprinter ... w12 orbiter)
+static func pool_for_wave(wave: int) -> Array:
+        var pool: Array = ["blab", "blab", "blab"]
+        var unlock := {"sprinter": 2, "chunk": 3, "spitter": 4, "wraith": 5,
+                "brood": 6, "trishield": 7, "mender": 8, "warden": 9, "charger": 9,
+                "boomling": 10, "splitter": 11, "orbiter": 12}
+        for k in unlock:
+                if wave >= int(unlock[k]):
+                        pool.append(k)
+                        if wave >= int(unlock[k]) + 4:
+                                pool.append(k)   # older types weigh more over time
+        return pool
+
+# =================================================================== ECONOMY
+static func xp_for_run_level(level: int) -> int:
+        return int(100.0 * pow(1.2, float(level - 1)))
+
+static func xp_for_char_level(level: int) -> int:
+        return int(80.0 * pow(1.35, float(level - 1)))
+
+static func tier_cap_for(char_level: int) -> int:
+        return clampi(1 + int(char_level / 3), 1, 3)
+
+static func sell_price(kind_price: int) -> int:
+        return int(floor(kind_price * 0.4))   # the 40% sell law
