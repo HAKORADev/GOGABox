@@ -9,6 +9,101 @@ extends RefCounted
 const MAIN_LIMIT := 3
 const SUB_LIMIT := 3
 
+# v043 THE AGE LADDER RETURNS (THE APP STORE QUESTION §7 archive, the
+# owner's own tier texts, SIMPLIFIED per his v043 order: "the age system
+# will be simplified, a game can be discovered, downloaded, owned and
+# everything by people under the age, but the button 'play nn
+# goga_coins_icon' in the pre-play will just gray-out and say you must be
+# +nn"). Nothing is hidden, nothing is filtered OUT of discovery - the
+# ladder touches ONLY the play button (Meta.age_allowed + the pre-play
+# door). The tier names below are the archive's own legal descriptions,
+# shortened to chip size; the full texts live in the archive file.
+const AGES := {
+        "3": {"label": "+3 EVERYONE"},
+        "5": {"label": "+5 SIMPLE"},
+        "7": {"label": "+7 MODERATE"},
+        "9": {"label": "+9 LITTLE VIOLENCE"},
+        "12": {"label": "+12 YOUNG TEENS"},
+        "16": {"label": "+16 TEENS"},
+        "18": {"label": "+18 MATURE"},
+        "21": {"label": "+21 ADULT ONLY"},
+}
+## THE AGE CEILING LAW: a profile with NO age number set (LanProfile.age()
+## == 0) opens games up to +12 - the archive's "young teens" band is the
+## default audience until the player declares themselves older. Anything
+## stricter (+16/+18/+21) wears the same gray-out + lock message.
+const AGE_UNSET_CEILING := 12
+
+## v043 THE CONTENT TAGS (the owner: "i guess we made them for horror,
+## gambling, politics, porn, psycho, and many other content i mean, i
+## forgot what every tag was ofc" - rebuilt from the archive's own tier
+## texts: porn, gore, gambling, intense horror, political-sensitive,
+## psychological-intense, nudity, illegal trading; politics + psycho are
+## the owner's two named adds). A game's entry carries
+## "content": ["horror", ...] - chips ride search + the pages.
+const CONTENT := {
+        "horror": {"label": "Horror"},
+        "psycho": {"label": "Psychological"},
+        "gore": {"label": "Gore"},
+        "porn": {"label": "Porn"},
+        "gambling": {"label": "Gambling"},
+        "politics": {"label": "Politics"},
+        "illegal_trading": {"label": "Illegal Trading"},
+        "nudity": {"label": "Nudity"},
+}
+
+## v043 THE LOWERCASE LAW (the owner: "in-game genre/sub-genre tags should
+## be case-insensitive i mean if someone wrote BOarD or boARd, all will
+## lead to same genre/sub-genre in the gogabox"): every tag id - genre,
+## sub, content - normalizes to lowercase at READ time. Data from any
+## package, any hand, any case joins the same chip and the same filter.
+static func normalize_tag(id: String) -> String:
+        return id.strip_edges().to_lower()
+
+## THE AGE DOOR (the whole simplified system in one function): can this
+## profile press PLAY on a game tagged `game_age`?
+##   - profile age set (LanProfile.age() > 0): the game plays when the
+##     profile is at least as old as the tag.
+##   - profile age UNSET (0): games up to +12 play (AGE_UNSET_CEILING),
+##     the rest wear the same gray-out + "you must be +nn".
+## NOTHING else reads this - discovery, search, download, import, buying
+## and owning all work normally under any age (the owner's simplification).
+static func age_allowed(game_age: int, profile_age: int) -> bool:
+        var ga := maxi(3, game_age)
+        if profile_age <= 0:
+                return ga <= AGE_UNSET_CEILING
+        return profile_age >= ga
+
+static func age_label(id: String) -> String:
+        if AGES.has(id):
+                return String(AGES[id]["label"])
+        return "+" + id
+
+static func content_label(id: String) -> String:
+        if CONTENT.has(id):
+                return String(CONTENT[id]["label"])
+        return normalize_tag(id).capitalize()
+
+## v043 THE DUAL THUMB LAW: a baked game's thumb is a res:// resource; an
+## installed package's thumb is a FILE on disk (GOGAs/games/<id>/...).
+## Every thumb seat asks here and gets a texture either way.
+static var _thumb_cache := {}
+static func thumb_texture(path: String) -> Texture2D:
+        if path == "":
+                return null
+        if path.begins_with("res://"):
+                return load(path) if ResourceLoader.exists(path) else null
+        if _thumb_cache.has(path):
+                return _thumb_cache[path]
+        if not FileAccess.file_exists(path):
+                return null
+        var img := Image.load_from_file(path)
+        if img == null:
+                return null
+        var tex := ImageTexture.create_from_image(img)
+        _thumb_cache[path] = tex
+        return tex
+
 ## Main genres (id -> label + optional icon under assets/meta/).
 const GENRES := {
         "arcade": {"label": "Arcade", "icon": "res://assets/meta/genre_arcade.png"},
@@ -170,21 +265,70 @@ static func icon_for(kind: String, id: String) -> String:
                 return String(table[id]["icon"])
         return ""
 
-## All ids currently used by registry games (feeds the filter sheet; grows
-## automatically as games adopt new genres).
+## All ids currently used by the unified entries (baked + installed; feeds
+## the filter sheet; grows automatically as games adopt new genres).
+## v043: every id rides THE LOWERCASE LAW on the way out.
 static func used_genres() -> Array:
         var out := []
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 for gid in (g.get("genres", {}).get("main", []) as Array):
-                        if not out.has(String(gid)):
-                                out.append(String(gid))
+                        var sid := normalize_tag(String(gid))
+                        if sid != "" and not out.has(sid):
+                                out.append(sid)
         return out
 
 static func used_subs() -> Array:
         var out := []
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 for sid in (g.get("genres", {}).get("sub", []) as Array):
-                        if not out.has(String(sid)):
-                                out.append(String(sid))
+                        var sid2 := normalize_tag(String(sid))
+                        if sid2 != "" and not out.has(sid2):
+                                out.append(sid2)
+        return out
+
+## v043 the content-tag census (the search CONTENT row feeds off this).
+static func used_contents() -> Array:
+        var out := []
+        for g in GameReg.games():
+                for cid in (g.get("content", []) as Array):
+                        var sid := normalize_tag(String(cid))
+                        if sid != "" and not out.has(sid):
+                                out.append(sid)
+        return out
+
+## v043 THE SELF-LEARNING INDEX (the owner: "add a feature in the search
+## engine of GOGABox to index games genres/sub-genres to detect unsupported
+## keywords, when there is +10 games in the user library have same
+## genre/sub-genre, then index it too"). `entries` = the unified entries,
+## `owns` = Callable(id) -> bool (the user-library check). A tag NOT in the
+## const tables that >= LEARN_THRESHOLD owned games share becomes a
+## first-class filter chip. Returns the learned ids per kind; the caller
+## persists them (Box meta) so the index survives restarts.
+const LEARN_THRESHOLD := 10
+
+static func learn_tags(entries: Array, owns: Callable) -> Dictionary:
+        var tally := {"genre": {}, "sub": {}}
+        for g in entries:
+                var gid := String(g["id"])
+                if not bool(owns.call(gid)):
+                        continue
+                var geo: Dictionary = g.get("genres", {})
+                for kind in ["genre", "sub"]:
+                        for raw in (geo.get("main" if kind == "genre" else "sub", []) as Array):
+                                var sid := normalize_tag(String(raw))
+                                if sid == "":
+                                        continue
+                                var table := GENRES if kind == "genre" else SUBS
+                                if table.has(sid):
+                                        continue   # a known tag - nothing to learn
+                                if not tally[kind].has(sid):
+                                        tally[kind][sid] = 0
+                                tally[kind][sid] = int(tally[kind][sid]) + 1
+        var out := {"genre": [], "sub": []}
+        for kind in ["genre", "sub"]:
+                for sid in tally[kind]:
+                        if int(tally[kind][sid]) >= LEARN_THRESHOLD:
+                                out[kind].append(sid)
+                out[kind].sort()
         return out
 

@@ -154,6 +154,18 @@ func reset_all() -> void:
 func meta() -> Dictionary:
         return data["meta"]
 
+## v043 THE META DICT DOORS (the self-learning index's persistence seat):
+## a dictionary slot inside Box meta that survives restarts with the save.
+func get_meta_dict(key: String) -> Dictionary:
+        var m: Dictionary = data["meta"]
+        if not m.has(key) or not (m[key] is Dictionary):
+                m[key] = {}
+        return m[key]
+
+func set_meta_dict(key: String, v: Dictionary) -> void:
+        data["meta"][key] = v
+        save()
+
 func owned_count() -> int:
         return (data["owned"] as Array).size()
 
@@ -536,7 +548,7 @@ func coins_compact() -> String:
 ## every battery pool full, every charge meter full, every extra ON (the
 ## parent included). No restart, no reload - the feed just refreshes.
 func dev_grant_everything() -> void:
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var id := String(g["id"])
                 if not (data["owned"] as Array).has(id):
                         (data["owned"] as Array).append(id)
@@ -561,7 +573,7 @@ func dev_grant_everything() -> void:
         save()
         coins_changed.emit(coins())
         batteries_changed.emit()
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 game_unlocked.emit(String(g["id"]))
 
 func earn(amount: int) -> void:
@@ -662,7 +674,7 @@ func snake_entry_cost(fee: int) -> int:
 ## Anti-softlock: the cheapest fee across owned, playable games.
 func cheapest_owned_fee() -> int:
         var best := -1
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 if g.get("coming_soon", false):
                         continue
                 if not owns_game(String(g["id"])):

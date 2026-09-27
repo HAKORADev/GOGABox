@@ -31,6 +31,7 @@ Notify="*res://addons/notify/notify.gd"
 LAN="*res://game/core/lan.gd"
 LANFIND="*res://game/core/lan_find.gd"
 Voice="*res://game/core/lan_voice.gd"
+GOGA="*res://game/core/goga_core.gd"
 
 [display]
 

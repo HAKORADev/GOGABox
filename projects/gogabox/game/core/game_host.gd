@@ -13,6 +13,13 @@ static func launch(router: Node, id: String) -> bool:
                 return false
         if not Box.owns_game(id):
                 return false
+        # v043 THE PACKAGE MOUNT (the runner's first half): an INSTALLED
+        # game mounts its own pck before the host loads the script - the
+        # entry's "script" (injected at entries() time) then loads from the
+        # mounted pack exactly like a baked path ever did. replace_files=
+        # false protects every box path (the pck law in goga_core.gd).
+        if g.has("root") and not GOGA.mount_for(g):
+                return false
         # v0.2.5 THE ALWAYS-PLAYABLE CHEAT (owner: all_owned "ignores all
         # limits and make the games always playable even if there is no
         # enough coins/batteries/playtime-window and like that"): one flag

@@ -105,6 +105,17 @@ var _filter_ctrl := ""
 # v042 THE LAN FILTER LAW: the multi-level LAN tag filters the search
 # sheet - "" = all | lan | lan_phone | lan_pc | lan_cross | lan_2p..4p.
 var _filter_lan := ""
+# v043 THE AGE + CONTENT FILTERS (the app-store question returns,
+# simplified): the AGE chip filters to games WEARING that exact age tag;
+# the CONTENT chip filters the content-tag list. Filtering is discovery
+# only - the age never hides anything by itself (THE AGE DOOR LAW lives
+# on the pre-play play button, nowhere else).
+var _filter_age := ""
+var _filter_content := ""
+# v043 THE SELF-LEARNING INDEX (the owner: "when there is +10 games in the
+# user library have same genre/sub-genre, then index it too") - the
+# learned chips ride the search sheet; the index persists in Box meta.
+var _learned := {"genre": [], "sub": []}
 
 func _ready() -> void:
         # v0.4.1 THE POSITION SEAT: the PC menu restores its persisted
@@ -1206,10 +1217,21 @@ func _passes_filters(g: Dictionary) -> bool:
         if Roadmap.state(String(g["id"])) == "MYSTERY":
                 return true
         var geo: Dictionary = g.get("genres", {})
-        if _filter_genre != "" and not (_filter_genre in (geo.get("main", []) as Array)):
+        # v043 THE LOWERCASE LAW: filters and data meet normalized - BOarD
+        # and boARd are the same genre everywhere.
+        var mains := (geo.get("main", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+        var subs := (geo.get("sub", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+        if _filter_genre != "" and not (_filter_genre in mains):
                 return false
-        if _filter_sub != "" and not (_filter_sub in (geo.get("sub", []) as Array)):
+        if _filter_sub != "" and not (_filter_sub in subs):
                 return false
+        # v043 THE AGE + CONTENT FILTERS (discovery-only; see the vars)
+        if _filter_age != "" and String(g.get("age", 3)) != _filter_age:
+                return false
+        if _filter_content != "":
+                var cons := (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+                if not (_filter_content in cons):
+                        return false
         # THE PLATFORM LAW: the os tag filters (every game wears one now)
         if _filter_os != "" and not (_filter_os in (g.get("os", ["android", "pc"]) as Array)):
                 return false
@@ -1309,7 +1331,7 @@ func _add_thumb(b: Control, g: Dictionary, label_strip: float,
         # spot (owned tiles under dev cheats included) wears the purple ?
         # for a coming_soon game; final art is for SHIPPED games only
         var path := String(_soon_art(g).get("thumb", ""))
-        t.texture = load(path) if ResourceLoader.exists(path) else null
+        t.texture = Meta.thumb_texture(path)
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
         t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if fit_whole \
@@ -1899,10 +1921,29 @@ func _open_search() -> void:
         v.add_child(_chip_row(scroll, "LAN", ["lan", "lan_2p", "lan_3p", "lan_4p",
                         "lan_cross", "lan_phone", "lan_pc"],
                         func(id: String): _filter_lan = "" if _filter_lan == id else id, "lan"))
-        v.add_child(_chip_row(scroll, "GENRE", Meta.used_genres(),
+        # v043: the learned chips join the const tables (the self-learning
+        # index - >= 10 owned games sharing an unknown tag index it) and
+        # every row label reads the owner's rename: MORE -> SUB GENRES.
+        _learn_tags()
+        var genres: Array = Meta.used_genres()
+        for lid in (_learned["genre"] as Array):
+                if not genres.has(String(lid)):
+                        genres.append(String(lid))
+        v.add_child(_chip_row(scroll, "GENRES", genres,
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
-        v.add_child(_chip_row(scroll, "MORE", Meta.used_subs(),
+        var subs: Array = Meta.used_subs()
+        for lid in (_learned["sub"] as Array):
+                if not subs.has(String(lid)):
+                        subs.append(String(lid))
+        v.add_child(_chip_row(scroll, "SUB GENRES", subs,
                         func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
+        # v043 THE AGE ROW (the ladder, 3..+21 - the archive's own bands)
+        v.add_child(_chip_row(scroll, "AGE", Meta.AGES.keys(),
+                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
+        # v043 THE CONTENT ROW (horror / gambling / politics / porn / psycho
+        # / gore / nudity / illegal trading - the archive's taxonomy)
+        v.add_child(_chip_row(scroll, "CONTENT", Meta.used_contents(),
+                        func(id: String): _filter_content = "" if _filter_content == id else id, "content"))
         # STATES (single-select): none -> all games; favorites -> owned hearts;
         # mystery -> the unlisted black boxes. The grid headline follows.
         v.add_child(_state_row(scroll))
@@ -1932,6 +1973,8 @@ func _open_search() -> void:
                 _filter_os = ""
                 _filter_ctrl = ""
                 _filter_lan = ""
+                _filter_age = ""
+                _filter_content = ""
                 _close_sheet()
                 _feed_scroll.scroll_vertical = 0
                 _refresh()))
@@ -1939,7 +1982,24 @@ func _open_search() -> void:
 func _filters_dirty() -> bool:
         return _filter_genre != "" or _filter_sub != "" \
                         or _filter_state != "" or _filter_text != "" or _filter_os != "" \
-                        or _filter_ctrl != "" or _filter_lan != ""
+                        or _filter_ctrl != "" or _filter_lan != "" \
+                        or _filter_age != "" or _filter_content != ""
+
+## v043 THE SELF-LEARNING INDEX, the box side: Meta.learn_tags counts the
+## user library (owned games only); survivors persist in Box meta and
+## re-serve even before the next census. Cheap: runs on search-open.
+func _learn_tags() -> void:
+        var res := Meta.learn_tags(GameReg.games(), func(id: String) -> bool:
+                return Box.owns_game(id))
+        var stored: Dictionary = Box.get_meta_dict("learned_tags")
+        for kind in ["genre", "sub"]:
+                var merged: Array = (stored.get(kind, []) as Array).duplicate()
+                for sid in (res[kind] as Array):
+                        if not merged.has(String(sid)):
+                                merged.append(String(sid))
+                stored[kind] = merged
+        Box.set_meta_dict("learned_tags", stored)
+        _learned = stored
 
 ## A wrapped row of proper toggle buttons (icon + label in ONE control -
 ## no nested Panel-in-Button hacks, that's what overlapped weirdly).
@@ -1962,6 +2022,8 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "os": active = _filter_os == sid
                         "ctrl": active = _filter_ctrl == sid
                         "lan": active = _filter_lan == sid
+                        "age": active = _filter_age == sid
+                        "content": active = _filter_content == sid
                 var lbl := ""
                 match kind:
                         "genre": lbl = Meta.genre_label(sid)
@@ -1969,6 +2031,8 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "os": lbl = "PHONE" if sid == "android" else "PC"
                         "ctrl": lbl = Meta.ctrl_label(sid)
                         "lan": lbl = Meta.lan_label(sid)
+                        "age": lbl = "+" + sid
+                        "content": lbl = Meta.content_label(sid)
                 var b := Button.new()
                 b.text = " " + lbl
                 b.toggle_mode = true
@@ -2237,8 +2301,23 @@ func _open_guide(g: Dictionary) -> void:
         fk.custom_minimum_size = Vector2(540, 0)
         v.add_child(fk)
 
-        # GENRES / MORE TAGS each in their OWN labeled section (owner rule:
-        # never mixed together in one pile)
+        # GENRES / SUB GENRES each in their OWN labeled section (owner rule:
+        # never mixed together in one pile). v043: AGE + CONTENT join above
+        # them (the app-store question returns) and every tag id normalizes
+        # (THE LOWERCASE LAW).
+        v.add_child(Arc.label("AGE", 24, Arc.HOT))
+        v.add_child(Arc.chip(Meta.age_label(str(maxi(3, int(g.get("age", 3))))), "",
+                        Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
+        var gcons: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+        if not gcons.is_empty():
+                v.add_child(Arc.label("CONTENT", 24, Arc.HOT))
+                var conrow := HFlowContainer.new()
+                conrow.add_theme_constant_override("h_separation", 8)
+                conrow.add_theme_constant_override("v_separation", 8)
+                for cid in gcons:
+                        conrow.add_child(Arc.chip(Meta.content_label(String(cid)), "",
+                                        Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
+                v.add_child(conrow)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 v.add_child(Arc.label("GENRES", 24, Arc.HOT))
@@ -2246,15 +2325,15 @@ func _open_guide(g: Dictionary) -> void:
                 grow.add_theme_constant_override("h_separation", 8)
                 grow.add_theme_constant_override("v_separation", 8)
                 for gid in (geo.get("main", []) as Array):
-                        grow.add_child(Arc.meta_chip("genre", String(gid)))
+                        grow.add_child(Arc.meta_chip("genre", Meta.normalize_tag(String(gid))))
                 v.add_child(grow)
         if not (geo.get("sub", []) as Array).is_empty():
-                v.add_child(Arc.label("MORE TAGS", 24, Arc.HOT))
+                v.add_child(Arc.label("SUB GENRES", 24, Arc.HOT))
                 var srow := HFlowContainer.new()
                 srow.add_theme_constant_override("h_separation", 8)
                 srow.add_theme_constant_override("v_separation", 8)
                 for sid in (geo.get("sub", []) as Array):
-                        srow.add_child(Arc.meta_chip("sub", String(sid)))
+                        srow.add_child(Arc.meta_chip("sub", Meta.normalize_tag(String(sid))))
                 v.add_child(srow)
 
         vb.add_child(Arc.button("BACK", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
@@ -2709,7 +2788,7 @@ func _open_dev_sheet() -> void:
         v.add_child(_dev_switch_row(scroll, Box.DEV_EXTRA_PARENT,
                         "ALL EXTRAS (PARENT)"))
         var any_extra := false
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 for ex in g.get("extras", []):
                         any_extra = true
                         var gid := String(g["id"])
@@ -2724,7 +2803,7 @@ func _open_dev_sheet() -> void:
                                 Color(0.55, 0.48, 0.38), false))
         # the games index
         v.add_child(Arc.label("GAMES INDEX", 24, Arc.HOT))
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var id := String(g["id"])
                 var st := "owned" if Box.owns_game(id) else "locked"
                 if bool(g.get("coming_soon", false)):
@@ -3788,7 +3867,7 @@ func _confirm_reset_all() -> void:
         vb.add_child(warn)
         vb.add_child(Arc.button("YES, WIPE IT ALL", Vector2(480, 80), 26, Arc.BAD, func():
                 Box.reset_all()
-                for g in GameReg.GAMES:
+                for g in GameReg.games():
                         Box.meta().erase("state_" + String(g["id"]))
                 Notify.cancel_all()
                 Jukebox.sfx("boom", -4.0)
@@ -3839,7 +3918,9 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         # dev cheats all wore the FINAL art here (owner: "the pre-play
         # shows the final art somehow")
         var tp := String(_soon_art(g).get("thumb", ""))
-        thumb.texture = load(tp) if ResourceLoader.exists(tp) else null
+        # v043 THE DUAL THUMB LAW: res:// for baked-era art, the file for a
+        # package's own thumb (Meta handles both seats).
+        thumb.texture = Meta.thumb_texture(tp)
         thumb.custom_minimum_size = Vector2(220, 150)
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -3944,7 +4025,15 @@ func _open_game_page(g: Dictionary) -> void:
         var can_time := Roadmap.window_ok(id)
         # v0.1.4: the daily caps (rounds / playtime) gate the button too
         var can_daily := Box.daily_ok(id)
-        var can_play := cheat_play or (can_pay and can_batt and can_time and can_daily)
+        # v043 THE AGE DOOR (the simplified age system, the whole of it):
+        # the profile's age number vs the game's age tag - NOTHING else in
+        # the box reads age. Unset profile opens up to +12 (Meta's ceiling);
+        # the rest wear the same gray-out + "you must be +nn". Discovery,
+        # download, buying and owning are age-blind forever.
+        var game_age := int(g.get("age", 3))
+        var profile_age := LanProfile.age()
+        var can_age := cheat_play or Meta.age_allowed(game_age, profile_age)
+        var can_play := can_age and (cheat_play or (can_pay and can_batt and can_time and can_daily))
         # NOTE: the feed tile's "ready to play" chip calls Roadmap.can_play_now,
         # the same fee + pools + window + daily oracle this page mirrors.
 
@@ -4035,14 +4124,25 @@ func _open_game_page(g: Dictionary) -> void:
                 dv.add_child(dsub)
                 content.add_child(dpanel)
 
-        var play_txt := "PLAY  -%d" % pay if (pay > 0) else "PLAY  FREE"
+        # v043 THE AGE GRAY-OUT LAW (the owner: "the button 'play nn
+        # goga_coins_icon' in the pre-play will just gray-out and say you
+        # must be +nn"): the play button ITSELF wears the lock message when
+        # the age door says no - the price disappears, the law stays.
+        var play_txt := "YOU MUST BE +%d" % maxi(3, game_age) if (not can_age) \
+                        else ("PLAY  -%d" % pay if (pay > 0) else "PLAY  FREE")
         var play_btn := Arc.coin_button(play_txt, Vector2(540, 92), 34, Arc.ACCENT) \
-                        if (pay > 0) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
+                        if (pay > 0 and can_age) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
         content.add_child(play_btn)
         if not can_play:
                 play_btn.disabled = true
                 var why := ""
-                if not can_time:
+                if not can_age:
+                        # v043 the age why: the unset case names the ceiling + the fix
+                        if profile_age <= 0:
+                                why = "this one is +%d - set your age in the profile to open it" % maxi(3, game_age)
+                        else:
+                                why = "you must be +%d for this one - your profile age says %d" % [maxi(3, game_age), profile_age]
+                elif not can_time:
                         why = "this one %s - come back in the window" % win
                 elif not can_daily:
                         why = "daily limit reached - get back tomorrow to play"
@@ -4127,6 +4227,22 @@ func _open_game_page(g: Dictionary) -> void:
                 for c in ctrl_list:
                         crow.add_child(Arc.meta_chip("ctrl", String(c)))
                 content.add_child(crow)
+        # v043 THE AGE + CONTENT SECTIONS (the app-store question returns):
+        # the age chip + the content tags seat right above GENRES, their own
+        # labeled rows, the same design language.
+        content.add_child(Arc.label("AGE", 20, Arc.HOT))
+        content.add_child(Arc.chip(Meta.age_label(str(maxi(3, game_age))), "",
+                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+        var cons_list: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+        if not cons_list.is_empty():
+                content.add_child(Arc.label("CONTENT", 20, Arc.HOT))
+                var crow2 := HFlowContainer.new()
+                crow2.add_theme_constant_override("h_separation", 8)
+                crow2.add_theme_constant_override("v_separation", 8)
+                for cid in cons_list:
+                        crow2.add_child(Arc.chip(Meta.content_label(String(cid)), "",
+                                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+                content.add_child(crow2)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 content.add_child(Arc.label("GENRES", 20, Arc.HOT))
@@ -4134,15 +4250,15 @@ func _open_game_page(g: Dictionary) -> void:
                 grow.add_theme_constant_override("h_separation", 8)
                 grow.add_theme_constant_override("v_separation", 8)
                 for gid in (geo.get("main", []) as Array):
-                        grow.add_child(Arc.meta_chip("genre", String(gid)))
+                        grow.add_child(Arc.meta_chip("genre", Meta.normalize_tag(String(gid))))
                 content.add_child(grow)
         if not (geo.get("sub", []) as Array).is_empty():
-                content.add_child(Arc.label("MORE TAGS", 20, Arc.HOT))
+                content.add_child(Arc.label("SUB GENRES", 20, Arc.HOT))
                 var srow := HFlowContainer.new()
                 srow.add_theme_constant_override("h_separation", 8)
                 srow.add_theme_constant_override("v_separation", 8)
                 for sid in (geo.get("sub", []) as Array):
-                        srow.add_child(Arc.meta_chip("sub", String(sid)))
+                        srow.add_child(Arc.meta_chip("sub", Meta.normalize_tag(String(sid))))
                 content.add_child(srow)
 
         # v042 THE LAN TAGS + THE LIVE LINE (the owner: "make the pre-play
