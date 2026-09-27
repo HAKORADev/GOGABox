@@ -42,7 +42,7 @@ static func check() -> Dictionary:
                 return out
         var s: Dictionary = v
         var served := String(s.get("engine_version", ""))
-        var g := Engine.get_main_loop().root.get_node_or_null("GOGA")
+        var g := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GOGA")
         var current: String = "dev"
         if g != null:
                 current = String(g.call("self_version"))
@@ -63,7 +63,7 @@ static func check() -> Dictionary:
         return out
 
 static func _vcmp(a: String, b: String) -> int:
-        var g := Engine.get_main_loop().root.get_node_or_null("GOGA")
+        var g := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GOGA")
         if g != null:
                 return int(g.call("version_compare", a, b))
         return 0
@@ -77,7 +77,7 @@ static func download(census: Dictionary) -> Dictionary:
         if not bool(census.get("available", false)):
                 out["why"] = "no update available"
                 return out
-        var g := Engine.get_main_loop().root.get_node_or_null("GOGA")
+        var g := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GOGA")
         if g == null:
                 out["why"] = "the GOGA runtime is not up"
                 return out
@@ -183,7 +183,7 @@ const CHECK_ON_BOOT := true
 const CHECK_INTERVAL_HOURS := 24
 
 static func should_check() -> bool:
-        var box := Engine.get_main_loop().root.get_node_or_null("Box")
+        var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
         if box == null:
                 return false
         var last := int(box.call("get_meta_dict", "update_check").get("last_ts", 0))
@@ -191,7 +191,7 @@ static func should_check() -> bool:
         return now - last >= CHECK_INTERVAL_HOURS * 3600
 
 static func mark_checked() -> void:
-        var box := Engine.get_main_loop().root.get_node_or_null("Box")
+        var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
         if box != null:
                 var m: Dictionary = box.call("get_meta_dict", "update_check")
                 m["last_ts"] = int(Time.get_unix_time_from_system())

@@ -178,7 +178,7 @@
   },
   "updated": "2026-09-27",
   "versions_count": 1,
-  "size_bytes": 7666829,
+  "size_bytes": 1884315,
   "files": [
     {
       "path": "data/audio/music/ambience.wav",
@@ -197,12 +197,8 @@
       "sha256": "7e50164e39c391b0cfb6b716e739f52bdb170f2f"
     },
     {
-      "path": "data/visuals/assets/wood_landscape.png",
-      "sha256": "6480868c4715200b64d945d5f1b708ddfe0a97c5"
-    },
-    {
-      "path": "data/visuals/assets/wood_portrait.png",
-      "sha256": "b99a480e1f64686d3c55dc7664f4b40a61da7514"
+      "path": "data/visuals/assets/board_bg.png",
+      "sha256": "a4dcc649f19ff7148f31fbc6ae567e710b200910"
     },
     {
       "path": "data/visuals/shaders/vignette.gdshader",
@@ -218,11 +214,15 @@
     },
     {
       "path": "game/android/goga.pck",
-      "sha256": "0135786274e15053e9b0de34720ff6065e81be3b"
+      "sha256": "5b5dae40cad1b0a6dafc6293324a176f23715176"
     },
     {
       "path": "game/pc/goga.pck",
-      "sha256": "0135786274e15053e9b0de34720ff6065e81be3b"
+      "sha256": "5b5dae40cad1b0a6dafc6293324a176f23715176"
+    },
+    {
+      "path": "save/README.md",
+      "sha256": "ac701c8345614ce7447700494fb7ca9e894aee7b"
     }
   ]
 }

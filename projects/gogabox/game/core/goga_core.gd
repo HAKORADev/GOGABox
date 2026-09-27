@@ -360,6 +360,11 @@ func import_path(path: String) -> Dictionary:
                         if not DirAccess.dir_exists_absolute(root.path_join("save")):
                                 DirAccess.make_dir_recursive_absolute(root.path_join("save"))
         elif DirAccess.dir_exists_absolute(path):
+                # THE STRICT FOLDER LAW: a folder that really lacks save/
+                # is a broken package - refuse it by name. (The zip branch
+                # above re-seats save/ ONLY because zips physically cannot
+                # carry empty folders; a folder has no such excuse, and
+                # git repos carry save/README.md - see THE SAVE SEAT LAW.)
                 roots = _roots_under(path)
         else:
                 report["refused"].append({"name": path.get_file(),
@@ -417,20 +422,20 @@ func _import_root(root: String, report: Dictionary) -> void:
                 report["refused"].append({"name": name,
                                 "errors": ["cannot create the install dir (%d)" % err]})
                 return
-        if _move_dir(root, dest_root) != OK:
+        # THE NON-DESTRUCTIVE IMPORT LAW: the install COPIES, never moves.
+        # A package may live anywhere the player or the developer points
+        # at - the official repo tree, a virtual-repo dev folder, a shared
+        # drive - and the source must survive the install untouched (the
+        # rig itself installs the repo's own GOGAs tree; a move would eat
+        # the source out of the working copy). The zip path already reads
+        # like a copy (extract to .cache first); now the folder path does
+        # too. Disk cost: one extra copy at install time - the honest price
+        # of never destroying a source.
+        if _copy_dir(root, dest_root) != OK:
                 report["refused"].append({"name": name,
-                                "errors": ["cannot move the package into games/ (disk or permission)"]})
+                                "errors": ["cannot copy the package into games/ (disk or permission)"]})
                 return
         report["installed"].append({"id": id, "version": String(data["version"])})
-
-## Move a folder across the SAME filesystem (rename) with a copy fallback.
-func _move_dir(src: String, dst: String) -> int:
-        var da := DirAccess.open(src.get_base_dir())
-        if da != null:
-                var err := da.rename(src.get_file(), dst)
-                if err == OK:
-                        return OK
-        return _copy_dir(src, dst)
 
 func _copy_dir(src: String, dst: String) -> int:
         var err := DirAccess.make_dir_recursive_absolute(dst)

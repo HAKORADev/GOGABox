@@ -17,12 +17,17 @@ func _ready() -> void:
         add_child(menu)
         await get_tree().create_timer(2.5).timeout
         await _shot("01_all_games_feed")
-        # THE SWITCHER: the arrow flips to DISCOVER (local source: the repo
-        # itself served through a virtual-repo sim, so the shot needs no net)
+        # THE SWITCHER: the arrow flips to DISCOVER (the official source
+        # fetches over the network + the local sim - WAIT for the rows
+        # instead of a blind sleep, the feed arrival is async)
         GogaDiscover.add_source({"kind": "local",
                         "path": repo_root.path_join("GOGAs/games")})
         menu.call("_toggle_feed_kind")
-        await get_tree().create_timer(2.5).timeout
+        var waited := 0.0
+        while (menu.get("_discover_rows") as Array).is_empty() and waited < 25.0:
+                await get_tree().create_timer(0.5).timeout
+                waited += 0.5
+        await get_tree().create_timer(0.8).timeout
         await _shot("02_discover_feed")
         # THE DISCOVER PAGE: open the first row's page
         var rows: Array = menu.get("_discover_rows")

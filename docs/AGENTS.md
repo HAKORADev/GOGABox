@@ -1691,3 +1691,35 @@ reads without booting the scene.
      (the catalog, the agents playbooks, the acknowledgment); the repo
      root carries REPORTING.md + AGREEMENT.md; nothing agreement-shaped
      ships inside the app (the owner: the agreements live in the repo).
+
+## THE v043 PASS 2 LAWS (the owner's review round: "binary stayed same
+## size?", the failed goga-packages run, the AISlop docs)
+
+122. THE STRIP IS PHYSICAL: `GAMES := []` alone ships nothing - the
+     export packs every file not excluded, so the baked generation
+     stayed in the binary (~95 MB) AND shadowed the package pcks (law
+     110 cuts both ways: the box's loose game scripts beat the pack's
+     staged copies). The strip is a filesystem act:
+     tools/v043_strip_binary.py (idempotent) deletes game/games/ +
+     assets/games/, trims assets/audio + assets/thumbs to the box keep-
+     set (ui/, notify/, jingles/, box_theme.mp3, boom/coin/unlock.ogg,
+     soon.png), archives what it removes. Any future "remove X from the
+     binary" order means DELETE THE FILES, not stop referencing them.
+123. THE SAVE SEAT LAW: git cannot carry an empty folder, so a package
+     that lives in a repo needs a real file in save/ or every fresh
+     clone reads as invalid (goga-packages CI caught it). save/README.md
+     seats it (the law's text and the proof); the rig writes it on
+     assemble; the CI validator keeps demanding it.
+124. THE TRANSPORT-ARTIFACT LAW, the folder seat: the save/ re-seat is
+     NOT zip-only - a fresh clone of a package repo loses empty save/
+     exactly like a zip does. import_path re-seats save/ on the folder
+     branch too; data/ minimums stay strict everywhere.
+125. THE NON-DESTRUCTIVE IMPORT LAW: installs COPY, never move. A
+     package source (the repo's own GOGAs/games in the flow test, a
+     developer's virtual-repo folder, a shared drive) must survive the
+     install untouched; _move_dir is gone from the engine.
+126. THE FRONT-DOOR DOCS LAW: README (and the other player-facing docs)
+     read like documentation, not like a changelog - no version-anchored
+     headers ("the v043 platform shape"), no law-jargon walls; the
+     version-anchored law-speak belongs in AGENTS.md, the plans and the
+     engine comments. The owner reads the front door; write it for him.

@@ -28,7 +28,7 @@ var _feed_vb: VBoxContainer
 # duplicated these lists ("last played twice" bug family).
 const LIST_TITLES := ["TODAY'S PICKS", "LAST PLAYED", "LESS PLAYED",
                 "MOST PLAYED", "ABANDONED", "NOT PLAYED YET"]
-const LIST_HINTS := ["", "play something and it lands here",
+const LIST_HINTS := ["own a game and the day's picks land here", "play something and it lands here",
                         "every game you played lines up here",
                         "your most-played games line up here",
                         "the games gathering dust line up here",
@@ -1002,10 +1002,12 @@ func _apply_list() -> void:
                 var hint := _card_base(Vector2(252, 186), true)
                 var hl := Arc.label(LIST_HINTS[_list_idx], 22, Color(0.55, 0.42, 0.25), false)
                 hl.set_anchors_preset(Control.PRESET_FULL_RECT)
+                hl.offset_left = 10
+                hl.offset_right = -10
                 hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
                 hl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
                 hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-                hl.custom_minimum_size = Vector2(260, 0)
+                hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
                 hint.add_child(hl)
                 _strip_row.add_child(hint)
                 return
@@ -5054,19 +5056,10 @@ func _discover_card(row: Dictionary) -> Control:
         desc.max_lines_visible = 2
         desc.clip_text = false
         v.add_child(desc)
-        var installed_v := String(row.get("installed_version", ""))
-        # THE UPDATE LABEL LAW: none = DOWNLOAD, older = UPDATE, same =
-        # INSTALLED (dead - the update law would skip it anyway), newer
-        # local than the source = the source is behind (dead too)
-        var btn_txt := "DOWNLOAD"
-        var same := false
-        if installed_v != "":
-                var cmp := GOGA.version_compare(String(row.get("version", "0")), installed_v)
-                if cmp > 0:
-                        btn_txt = "UPDATE to v%s" % String(row.get("version", ""))
-                else:
-                        btn_txt = "INSTALLED"
-                        same = true
+        # THE UPDATE LABEL LAW - the engine owns the words, the card obeys
+        var lbl: Dictionary = GogaDiscover.update_label(row)
+        var btn_txt := String(lbl["txt"])
+        var same := bool(lbl["dead"])
         var btn := Arc.button(btn_txt, Vector2(560, 60), 20, Arc.ACCENT)
         if same:
                 btn.disabled = true
@@ -5131,8 +5124,12 @@ func _open_discover_page(row: Dictionary) -> void:
         thumb.clip_contents = true
         content.add_child(thumb)
         _discover_fill_thumb(thumb, row)
-        # the facts line
-        var facts := "%s  ·  v%s" % [String(row.get("source", "")), String(row.get("version", ""))]
+        # the facts line (a local source's absolute path is machine noise -
+        # the player only needs to know it IS the local shelf)
+        var src_txt := String(row.get("source", ""))
+        if src_txt.begins_with("local:"):
+                src_txt = "local source"
+        var facts := "%s  ·  v%s" % [src_txt, String(row.get("version", ""))]
         if row.has("size") and int(row.get("size", 0)) > 0:
                 facts += "  ·  %s bytes" % Arc.short_num(int(row["size"]))
         if row.has("updated") and String(row.get("updated", "")) != "":
@@ -5159,17 +5156,10 @@ func _open_discover_page(row: Dictionary) -> void:
         desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         desc_l.custom_minimum_size = Vector2(540, 0)
         content.add_child(desc_l)
-        # the download seat (the same label law as the feed cards)
-        var installed_v := String(row.get("installed_version", ""))
-        var btn_txt := "DOWNLOAD"
-        var same := false
-        if installed_v != "":
-                var cmp := GOGA.version_compare(String(row.get("version", "0")), installed_v)
-                if cmp > 0:
-                        btn_txt = "UPDATE to v%s" % String(row.get("version", ""))
-                else:
-                        btn_txt = "INSTALLED"
-                        same = true
+        # the download seat (the same label law as the feed cards - engine-owned)
+        var lbl2: Dictionary = GogaDiscover.update_label(row)
+        var btn_txt := String(lbl2["txt"])
+        var same := bool(lbl2["dead"])
         var btn := Arc.button(btn_txt, Vector2(540, 80), 26, Arc.ACCENT)
         if same:
                 btn.disabled = true

@@ -39,6 +39,23 @@ GOGAS = ROOT / "GOGAs"
 GODOT = ROOT / ".cache" / "godot" / "bin" / "godot"
 ARCH = ROOT / "archive" / "games_v042"
 
+# THE SAVE SEAT NOTE - the real file that lives in every package's save/
+# (git cannot carry an empty folder; the strict validator demands the seat;
+# this file is both the law's text and the law's proof)
+SAVE_SEAT_NOTE = """# save/ - the portable save seat
+
+Saves live here, inside the package, never in app-data bloat. Copy the
+folder and you copied the player's progress.
+
+- the game reads and writes through the GOGA SDK door
+  (GOGA.save_read / save_write / save_json_read / save_json_write),
+  paths are relative to this folder
+- JSON in, JSON out - human-readable, agent-readable, moddable
+- the engine never writes outside this folder; a package that does is
+  broken by definition
+- delete this file only if you replace it with real save files
+"""
+
 # the four pilots - the owner's exact port list
 PILOTS = [
     # id, script file, version, platforms, age, content, renderer notes,
@@ -271,6 +288,11 @@ def assemble(p: dict, pcks: dict) -> Path:
         shutil.rmtree(root)
     for d in ["index", "discover/media", "save"]:
         (root / d).mkdir(parents=True, exist_ok=True)
+    # THE SAVE SEAT LAW: git cannot carry an empty folder, so a package
+    # committed to a repo needs a real file in save/ or the strict
+    # validator (and every fresh clone of it) reads the seat as missing.
+    # The README documents the contract AND satisfies the law.
+    (root / "save" / "README.md").write_text(SAVE_SEAT_NOTE, encoding="utf-8")
     # the pcks
     files = []
     for plat, path in pcks.items():

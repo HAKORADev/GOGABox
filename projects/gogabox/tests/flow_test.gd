@@ -35,6 +35,7 @@ func _ready() -> void:
         fails += _test("goga: THE STRICT VALIDATOR refusals", _t_goga_validator())
         fails += _test("goga: import shapes + rename + update laws", _t_goga_import())
         fails += _test("goga: the SDK doors (data/save/visual)", _t_goga_sdk())
+        fails += _test("discover: the local source feed + sorts + labels", _t_discover())
         fails += _test("sdk: the bridge roundtrip (a standalone client over TCP)", await _t_sdk_bridge())
         fails += _test("update: the schedule + the Windows replace-after-close helper", _t_update())
         # ---- lan (the v042 regression shield, platform-era ids)
@@ -532,6 +533,111 @@ func _t_goga_sdk() -> int:
                         "a missing override is empty, never a crash")
         GOGA.set_home(home_before)
         _wipe(lab)
+        return ok
+
+# ============================================================ DISCOVER
+
+## The discover engine's offline-truth seat (the plan's qa_discover, the
+## hermetic half): the LOCAL source's feed rows, the search sorts (the
+## owner's size/date/version arrows), the filters, and THE UPDATE LABEL
+## LAW. The github side rides the same row shape (one raw fetch, no API).
+func _t_discover() -> int:
+        var ok := 0
+        var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
+        var src := repo_root.path_join("GOGAs/games")
+        var notes: Array = []
+        var rows: Array = GogaDiscover._feed_for_local(src, [], {}, notes)
+        ok += _check(rows.size() >= PILOT_GAME_IDS.size(),
+                        "the local source serves %d rows" % rows.size())
+        ok += _check(notes.is_empty(), "the local source notes nothing (%s)" % str(notes))
+        if rows.size() < PILOT_GAME_IDS.size():
+                return ok
+        # the row shape the feed cards consume (local rows carry thumb_path)
+        var r0: Dictionary = rows[0]
+        for key in ["pkg_id", "game_id", "title", "version", "age", "size",
+                        "tier", "thumb_path", "base_url", "os", "genres"]:
+                ok += _check(r0.has(key), "a row carries \"%s\"" % key)
+        ok += _check(String(r0["pkg_id"]).begins_with("gogabox_github-"),
+                        "the row wears the long publishing id")
+        ok += _check(String(r0["tier"]) == "hobbyist",
+                        "a bare local source reads hobbyist (no repo file)")
+        # the virtual-repo law: a folder carrying gogabox.repo.json simulates
+        # the github flow - the row wears the repo's name, and the tier
+        # follows the repo through the SAME tier_for door (community only
+        # when the register lists it)
+        var vr := repo_root.path_join("GOGAs/discover/.rig_virtual")
+        _wipe(vr)
+        DirAccess.make_dir_recursive_absolute(vr)
+        var vf := FileAccess.open(vr.path_join("gogabox.repo.json"), FileAccess.WRITE)
+        vf.store_string(JSON.stringify({"repo": "someone/their-box", "branch": "main"}))
+        vf.close()
+        _copy_tree(src.path_join("gogabox_github-HAKORADev_hakora.rally.001_official"),
+                        vr.path_join("whatever_folder_name"))
+        var vnotes: Array = []
+        var vrows: Array = GogaDiscover._feed_for_local(vr, ["someone/their-box"], {}, vnotes)
+        ok += _check(vrows.size() == 1, "the virtual repo serves its root")
+        if vrows.size() == 1:
+                ok += _check(String(vrows[0]["source"]) == "someone/their-box",
+                                "the virtual row carries the repo name")
+                ok += _check(String(vrows[0]["tier"]) == "community",
+                                "a registered virtual repo reads community")
+        var vrows2: Array = GogaDiscover._feed_for_local(vr, [], {}, [])
+        if vrows2.size() == 1:
+                ok += _check(String(vrows2[0]["tier"]) == "hobbyist",
+                                "an unregistered virtual repo reads hobbyist")
+        _wipe(vr)
+        # THE SEARCH SORTS (the owner's exact arrows) - synthetic rows so
+        # the order assertions are exact
+        var mk := func(id: String, size: int, date: String, versions: int) -> Dictionary:
+                return {"pkg_id": id, "title": id, "size": size, "updated": date,
+                                "versions_count": versions, "age": 3,
+                                "genres": {"main": ["board"], "sub": []},
+                                "content": [], "tier": "official",
+                                "installed_version": ""}
+        var srows: Array = [
+                mk.call("a", 300, "2026-01-01", 1),
+                mk.call("b", 100, "2026-03-01", 3),
+                mk.call("c", 200, "2026-02-01", 2),
+        ]
+        var by_size: Array = GogaDiscover.search(srows.duplicate(true), "", "", "", "", "", "size_up")
+        ok += _check(String(by_size[0]["pkg_id"]) == "b" and String(by_size[2]["pkg_id"]) == "a",
+                        "size up arrows small-first")
+        var by_size_d: Array = GogaDiscover.search(srows.duplicate(true), "", "", "", "", "", "size_down")
+        ok += _check(String(by_size_d[0]["pkg_id"]) == "a", "size down arrows big-first")
+        var by_date: Array = GogaDiscover.search(srows.duplicate(true), "", "", "", "", "", "date_up")
+        ok += _check(String(by_date[0]["pkg_id"]) == "a" and String(by_date[2]["pkg_id"]) == "b",
+                        "date up arrows oldest-first")
+        var by_date_d: Array = GogaDiscover.search(srows.duplicate(true), "", "", "", "", "", "date_down")
+        ok += _check(String(by_date_d[0]["pkg_id"]) == "b", "date down arrows newest-first")
+        var by_ver: Array = GogaDiscover.search(srows.duplicate(true), "", "", "", "", "", "version_down")
+        ok += _check(String(by_ver[0]["pkg_id"]) == "b" and String(by_ver[2]["pkg_id"]) == "a",
+                        "version down arrows most-versions-first")
+        # the filters ride the same door: keyword, genre, age, tier
+        ok += _check(GogaDiscover.search(srows, "b").size() == 1, "the keyword finds one")
+        ok += _check(GogaDiscover.search(srows, "", "BOARD").size() == 3,
+                        "the genre filter is case-insensitive")
+        ok += _check(GogaDiscover.search(srows, "", "", "", "9").is_empty(),
+                        "the age filter compares exactly")
+        ok += _check(GogaDiscover.search(srows, "", "", "", "", "", "", "community").is_empty(),
+                        "the tier filter drops other tiers")
+        # THE UPDATE LABEL LAW through the engine's own words
+        var none: Dictionary = mk.call("x", 1, "2026-01-01", 1)
+        ok += _check(GogaDiscover.update_label(none)["txt"] == "DOWNLOAD",
+                        "no install reads DOWNLOAD")
+        var older := {"pkg_id": "y", "title": "y", "version": "1.2.0",
+                        "installed_version": "1.0.0"}
+        var upd: Dictionary = GogaDiscover.update_label(older)
+        ok += _check(String(upd["txt"]) == "UPDATE to v1.2.0" and not bool(upd["dead"]),
+                        "an older install reads UPDATE to vX (alive)")
+        var same_v := {"pkg_id": "z", "title": "z", "version": "1.0.0",
+                        "installed_version": "1.0.0"}
+        var inst: Dictionary = GogaDiscover.update_label(same_v)
+        ok += _check(String(inst["txt"]) == "INSTALLED" and bool(inst["dead"]),
+                        "the same version reads INSTALLED (dead)")
+        var newer := {"pkg_id": "w", "title": "w", "version": "1.0.0",
+                        "installed_version": "2.0.0"}
+        ok += _check(bool(GogaDiscover.update_label(newer)["dead"]),
+                        "a newer local build reads dead (the source is behind)")
         return ok
 
 # ============================================================ LAN (the shield)

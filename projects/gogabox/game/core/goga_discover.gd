@@ -60,6 +60,21 @@ static func _vcmp(a: String, b: String) -> int:
                         return 1
         return 0
 
+## THE UPDATE LABEL LAW (the feed cards AND the page button share it):
+##   no installed version  -> DOWNLOAD (alive)
+##   older installed       -> UPDATE to vX (alive)
+##   same version          -> INSTALLED (dead - the update law skips it)
+##   newer local than src  -> INSTALLED (dead - the source is behind)
+static func update_label(row: Dictionary) -> Dictionary:
+        var installed := String(row.get("installed_version", ""))
+        if installed == "":
+                return {"txt": "DOWNLOAD", "dead": false}
+        var cmp := _vcmp(String(row.get("version", "0")), installed)
+        if cmp > 0:
+                return {"txt": "UPDATE to v%s" % String(row.get("version", "")),
+                                "dead": false}
+        return {"txt": "INSTALLED", "dead": true}
+
 # ------------------------------------------------------------- the http seat
 
 ## Raw HTTP GET -> body text ("" on any failure). THE NO-API-LIMIT LAW's
@@ -344,25 +359,32 @@ static func search(rows: Array, query := "", genre := "", sub := "", age := "",
                 content := "", sort := "", tier := "") -> Array:
         var out: Array = []
         var q := query.to_lower().replace(" ", "")
+        # THE LOWERCASE LAW (the owner: "if someone wrote BOarD or boARd, all
+        # will lead to same genre/sub-genre"): the FILTER VALUE normalizes
+        # too - the data side is normalized below, the filter meets it there
+        var gq := genre.to_lower()
+        var sq := sub.to_lower()
+        var cq := content.to_lower()
+        var tq := tier.to_lower()
         for r in rows:
                 var row: Dictionary = r
-                if tier != "" and String(row.get("tier", "")) != tier:
+                if tq != "" and String(row.get("tier", "")) != tq:
                         continue
                 if q != "" and not (q in (String(row.get("title", "")) + " " + String(row.get("pkg_id", ""))).to_lower().replace(" ", "")):
                         continue
-                if genre != "" or sub != "":
+                if gq != "" or sq != "":
                         var geo: Dictionary = row.get("genres", {})
                         var mains: Array = (geo.get("main", []) as Array).map(func(t): return String(t).to_lower())
                         var subs: Array = (geo.get("sub", []) as Array).map(func(t): return String(t).to_lower())
-                        if genre != "" and not (genre in mains):
+                        if gq != "" and not (gq in mains):
                                 continue
-                        if sub != "" and not (sub in subs):
+                        if sq != "" and not (sq in subs):
                                 continue
                 if age != "" and str(row.get("age", 3)) != age:
                         continue
-                if content != "":
+                if cq != "":
                         var cons: Array = (row.get("content", []) as Array).map(func(t): return String(t).to_lower())
-                        if not (content in cons):
+                        if not (cq in cons):
                                 continue
                 out.append(row)
         match sort:

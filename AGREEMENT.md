@@ -2,10 +2,9 @@
 
 This is the END-USERS agreement. It lives in the REPO (not inside the
 app) on purpose: you can read it before you install, and nothing here
-is a click-through theatre. It replaces the old app-store-era draft
-(the v0.3.7 age-gate sheet) with the v043 reality: the box is a
-platform, the games come from open sources, and the platform itself
-takes no cut, no side and no custody of you.
+is a click-through theatre. It reflects what GOGABox actually is: the
+box is a platform, the games come from open sources, and the platform
+itself takes no cut, no side and no custody of you.
 
 ## The plain terms
 

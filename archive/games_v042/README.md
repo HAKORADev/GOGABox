@@ -6,14 +6,17 @@ arrives as a GOGA package (see `docs/goga_docs/plans/PLAN_v043.md` and the
 developers catalog). The owner's order: "save the original current games
 in the repo somewhere" — this is the somewhere.
 
-Everything here is the exact v042 state (commit 444c38c9):
+The base state is the exact v042 tree (commit 444c38c9); the pass 2 strip
+topped it up with the audio + the probes (see the table).
 
 | folder | what |
 |---|---|
 | `scripts/<id>/` | the game's `.gd` source (the whole game — these games are code-drawn) |
 | `assets/<id>/` | the game's asset folder from `projects/gogabox/assets/games/` |
+| `audio/sfx/`, `audio/music/` | the game-owned audio from `projects/gogabox/assets/audio/` (topped up in the v043 pass 2 strip — the first archive pass forgot it; the box-owned keep-set stays in the engine: `ui/`, `notify/`, `jingles/`, `music/box_theme.mp3`, `sfx/{boom,coin,unlock}.ogg`) |
 | `thumbs/<id>.png` | the feed thumbnail |
 | `registry_entries/<id>.json` | the exact registry dict (revival seed: the v043 package index consumes this shape almost verbatim) |
+| `probes/` | the per-game test probes, moved out of `projects/gogabox/tests/` by the pass 2 strip (they reference the deleted baked paths; revived with their games) |
 
 The games: snake, rally, lanes, slasher, hopper, merge, dario, xo, matcher,
 invaders, cosmic_spud, pop_siege, geometry, maze, domino, chess, fourline,

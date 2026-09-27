@@ -128,3 +128,53 @@
    class references resolve to the box's real classes at runtime.
 6. **"Dice conquer"** = CONQUER DICE = machine id `jumpcube` (the owner's own
    rename, docs/goga_docs/gogames_ideas/jumpcube.md).
+
+## PASS 2 — THE REAL STRIP (the owner's catches, worked to the bone)
+
+The owner reviewed the first v043 push and caught three things: the main
+binary "stayed same size", a build failed before the finished one, and the
+rewritten docs read like slop ("What GOGABox is (the v043 platform
+shape)"). All three were real.
+
+**The size catch — the empty binary was not empty.** `GAMES := []`
+stopped referencing the baked games but left every file in place, and the
+export packs everything not excluded: `game/games/` (35 folders),
+`assets/games/` (42 MB), `assets/audio` game music+sfx (43 MB), game
+thumbs (5.6 MB) still rode the APK/exe. Worse — the packaging rig stages
+the game script at the SAME `res://game/games/<id>/` path inside the pck,
+and the box mounts with `replace_files=false`, so the box's stale loose
+copy SHADOWED the packaged port: the pilots ran their baked twins, not
+the packages. The strip (`tools/v043_strip_binary.py`, idempotent):
+
+- archived the forgotten game audio (585 files → `archive/games_v042/audio/`)
+  + the 135 dead-path test probes (→ `archive/games_v042/probes/`)
+- deleted `game/games/` + `assets/games/`, trimmed `assets/audio` to the
+  box-owned keep-set (ui/, notify/, jingles/, box_theme.mp3,
+  boom/coin/unlock.ogg) and `assets/thumbs/` to soon.png
+- `projects/gogabox`: 192.8 → 112.8 MB on disk (the .godot import cache is
+  most of the rest and never ships); the packed payload is the engine +
+  the store only
+- export presets exclude `tests/*` from every build
+
+**The failed build — goga-packages.** The workflow's validator demands
+`save/` in every committed package; the packaging rig creates `save/`
+empty and git cannot commit an empty folder, so the pushed tree read as
+broken while the local one was fine. Fixed at three layers: every
+committed package carries `save/README.md` (the law's text AND the law's
+proof), the rig writes it on every assemble, and the importer re-seats
+`save/` on the FOLDER import path too (the transport-artifact law — git
+and zip-less shares lose empty folders exactly like zips do; `data/`
+minimums stay strict). `tools/goga_ci_validate.py tree` → ALL VALID.
+
+**The destructive-import catch (the rig's own).** `_import_root` MOVED
+the source root into `games/` — the flow test installs the repo's own
+`GOGAs/games`, so every test run ate the committed packages out of the
+working copy (and a developer's virtual-repo source would suffer the
+same). THE NON-DESTRUCTIVE IMPORT LAW: installs COPY, never move; the
+source survives untouched.
+
+**The docs.** README rewritten as a plain professional front door (what
+the platform is, how packages work, repo map, quickstart, publishing) —
+no version-anchored headers, no law-jargon walls; AGREEMENT.md intro
+de-changelogged. The law-speak stays where it belongs (AGENTS.md, the
+developers catalog, the engine comments).
