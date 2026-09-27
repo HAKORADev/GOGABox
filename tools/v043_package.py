@@ -430,6 +430,10 @@ def main() -> int:
         "name": "GOGABox Official",
         "repo": "HAKORADev/GOGABox",
         "engine_version": "0.4.3",
+        "update_assets": {
+            "android": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-v0.4.3-arm64-v8a.apk",
+            "pc": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-windows.zip",
+        },
         "games": games,
     }, indent=2) + "\n", encoding="utf-8")
     print(f"official source manifest: {games}")

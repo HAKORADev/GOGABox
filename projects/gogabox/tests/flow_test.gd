@@ -36,6 +36,7 @@ func _ready() -> void:
         fails += _test("goga: import shapes + rename + update laws", _t_goga_import())
         fails += _test("goga: the SDK doors (data/save/visual)", _t_goga_sdk())
         fails += _test("sdk: the bridge roundtrip (a standalone client over TCP)", await _t_sdk_bridge())
+        fails += _test("update: the schedule + the Windows replace-after-close helper", _t_update())
         # ---- lan (the v042 regression shield, platform-era ids)
         fails += _test("lan: the v042 laws", _t_lan_laws())
         # ---- the games, through the runner
@@ -935,6 +936,45 @@ func _t_sdk_bridge() -> int:
                         "THE SAVE LAW holds for standalone clients (libs/clients/)")
         peer.disconnect_from_host()
         Box.reset_all()
+        return ok
+
+# ============================================================ APP SELF-UPDATE
+
+func _t_update() -> int:
+        var ok := 0
+        # THE SCHEDULE: once a day - mark_checked closes the window
+        Box.reset_all()
+        GogaUpdate.mark_checked()
+        ok += _check(not GogaUpdate.should_check(),
+                        "a fresh check closes the 24h window")
+        var m: Dictionary = Box.get_meta_dict("update_check")
+        m["last_ts"] = int(Time.get_unix_time_from_system()) - 25 * 3600
+        Box.set_meta_dict("update_check", m)
+        ok += _check(GogaUpdate.should_check(),
+                        "25h since the last check reopens the window")
+        Box.reset_all()
+        # THE PLATFORM TRICKS (the honest refusals)
+        var bad: Dictionary = GogaUpdate.apply_windows("")
+        ok += _check(not bool(bad["ok"]) and String(bad["why"]) != "",
+                        "a staged-less apply refuses with the why")
+        # THE WINDOWS HELPER (the replace-after-close law, written for real)
+        if not OS.has_feature("android"):
+                var lab := GOGA.cache_dir().path_join("update_lab")
+                _wipe(lab)
+                DirAccess.make_dir_recursive_absolute(lab)
+                var stage := lab.path_join("GOGABox_update.zip")
+                var fw := FileAccess.open(stage, FileAccess.WRITE)
+                fw.store_string("fake-zip")
+                fw.close()
+                var cmd := GogaUpdate.write_windows_helper(stage)
+                ok += _check(cmd != "" and FileAccess.file_exists(cmd),
+                                "the apply helper writes")
+                if cmd != "":
+                        var txt := FileAccess.get_file_as_string(cmd)
+                        ok += _check(txt.contains("STAGE=") and txt.contains("copy /Y")
+                                        and txt.contains("goto wait"),
+                                        "the helper waits for close then replaces")
+                _wipe(lab)
         return ok
 
 # ============================================================ LAB HELPERS

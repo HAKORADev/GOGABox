@@ -25,6 +25,11 @@ func _ready() -> void:
         # BEFORE the menu reads the pixels - the first frame is already the
         # right shape. Phones: is_pc() is false, this is a no-op.
         ScaleRule.boot_window()
+        # v043 THE UPDATE SCHEDULE (the boot check seat): the official
+        # source's engine_version vs this build - a quiet top-level note
+        # when an update waits; the schedule re-checks every 24h. Never a
+        # gate, never a nag - the note rides the LanNotes layer once.
+        _boot_update_check()
         # v0.1.3 THE RESOLUTION & SCALE RULE (ScaleRule.gd = source of truth):
         # internal resolution FIXED at 1080x1920 portrait / 1920x1080
         # landscape; stretch canvas_items + aspect EXPAND fills ANY window
@@ -520,3 +525,18 @@ func _pad_axis(pname: String, on: bool, key: Key) -> void:
                 return
         _pad_held[pname] = on
         _push_key(key, on)
+
+## v043 THE BOOT UPDATE CHECK: once a day (the schedule), the official
+## source's engine_version is read over raw http; a newer one leaves ONE
+## quiet note pointing at SETTINGS > APP UPDATES. Fire-and-forget: the
+## box never waits on the wire.
+func _boot_update_check() -> void:
+        if not GogaUpdate.should_check():
+                return
+        GogaUpdate.mark_checked()
+        var task := func() -> void:
+                var census: Dictionary = await GogaUpdate.check()
+                if bool(census.get("available", false)):
+                        LanNotes.note("GOGABox v%s is out - SETTINGS > APP UPDATES"
+                                        % String(census.get("served")))
+        task.call()

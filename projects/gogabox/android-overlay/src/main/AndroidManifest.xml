@@ -7,13 +7,28 @@
 
     <!-- GOGABox overlay: the box rotates freely (fullSensor; games force their
          own orientation at runtime via GameHost) + local notification system
-         (Notify plugin). THE 0-ADS LAW: no ad plugin, and the box is fully
-         offline - no INTERNET permission at all. -->
+         (Notify plugin). THE 0-ADS LAW: no ad plugin. v042: INTERNET rides the
+         LAN peer sockets + the v043 discover (raw http, no servers of ours).
+         v043: MANAGE_EXTERNAL_STORAGE gates the GOGAs home in Downloads
+         (games/saves live in the public tree); REQUEST_INSTALL_PACKAGES
+         gates the app self-update's package-installer hand-off - both
+         asked AT USE-TIME, never at boot (the box's permission law). -->
 
     <!-- local notifications (timed game reveals + return reminders) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- v042: LAN peer-to-peer sockets + v043 the discover engine (raw http) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- v043 THE GOGAs HOME: games/, saves/ and .cache/ live in the public
+         Downloads tree (the owner's law: the GOGAs folder in Downloads) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- v043 THE SELF-UPDATE: the package installer hand-off after the
+         user taps APPLY (asked at use-time; the OS shows its own sheet) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <supports-screens
         android:smallScreens="true"

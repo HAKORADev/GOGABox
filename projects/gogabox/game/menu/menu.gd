@@ -2995,9 +2995,83 @@ func _open_settings() -> void:
                         Color("8a6a40"), false)
         note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         vb.add_child(note)
+        # v043 THE APP UPDATE SEAT (the self-update tricks: the Android
+        # package installer + the Windows replace-after-close)
+        vb.add_child(Arc.button("APP UPDATES", Vector2(480, 78), 28,
+                        Color(0.16, 0.10, 0.05, 0.85),
+                        func(): _close_sheet(); _open_update_sheet()))
         vb.add_child(Arc.button("CLOSE", Vector2(480, 72), 26, Arc.ACCENT,
                         func(): _close_sheet()))
         Arc.fit_sheet(vb, 4)
+
+## THE APP UPDATES sheet: the honest census (current vs served), the
+## download into GOGAs/.cache/update/, then the platform's apply trick.
+func _open_update_sheet() -> void:
+        var vb := _sheet_base()
+        var t := Arc.label("APP UPDATES", 40, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var status := Arc.label("checking the official source...", 20,
+                        Color("6a4a28"), false)
+        status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        vb.add_child(status)
+        var action := Arc.button("DOWNLOAD & APPLY", Vector2(480, 76), 24, Arc.ACCENT)
+        action.visible = false
+        var apply_state := {"census": {}}
+        vb.add_child(action)
+        action.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                action.disabled = true
+                action.text = "FETCHING..."
+                _update_download_and_apply(apply_state["census"], action))
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 1)
+        var census: Dictionary = await GogaUpdate.check()
+        GogaUpdate.mark_checked()
+        apply_state["census"] = census
+        if not is_instance_valid(status):
+                return
+        var why := String(census.get("why", ""))
+        if why != "":
+                status.text = why
+                return
+        if bool(census.get("available", false)):
+                status.text = "an update is waiting: v%s (you run v%s)" \
+                                % [String(census.get("served")), String(census.get("current"))]
+                action.visible = true
+        else:
+                status.text = "you are on the newest build (v%s)" \
+                                % String(census.get("current"))
+
+## The apply: download into .cache, then the platform trick - Android
+## hands the apk to the package installer (permission asked at use-time),
+## Windows writes the replace-after-close helper and tells the player.
+func _update_download_and_apply(census: Dictionary, btn: Button) -> void:
+        var dl: Dictionary = await GogaUpdate.download(census)
+        var path := String(dl.get("path", ""))
+        if path == "":
+                btn.disabled = false
+                btn.text = "RETRY"
+                Arc.toast(_toast, String(dl.get("why", "the download failed")))
+                return
+        if OS.has_feature("android"):
+                var res: Dictionary = GogaUpdate.apply_android(path)
+                if bool(res.get("ok", false)):
+                        Arc.toast(_toast, "the installer opened - confirm to update")
+                else:
+                        btn.disabled = false
+                        btn.text = "RETRY"
+                        Arc.toast(_toast, String(res.get("why", "")))
+        else:
+                var res2: Dictionary = GogaUpdate.apply_windows(path)
+                if bool(res2.get("ok", false)):
+                        Arc.toast(_toast, "staged - close GOGABox when ready and it applies itself")
+                else:
+                        btn.disabled = false
+                        btn.text = "RETRY"
+                        Arc.toast(_toast, String(res2.get("why", "")))
 
 ## The AUDIO sheet: the two volume sliders moved out of the main seat
 ## (v0.4.1 - the AAA split; every platform gets this one).

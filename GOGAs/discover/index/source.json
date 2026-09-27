@@ -24,5 +24,9 @@
       "id": "gogabox_github-HAKORADev_hakora.slasher.002_official",
       "version": "1.0.0"
     }
-  ]
+  ],
+  "update_assets": {
+    "android": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-v0.4.3-arm64-v8a.apk",
+    "pc": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-windows.zip"
+  }
 }
