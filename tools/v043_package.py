@@ -294,6 +294,11 @@ def assemble(p: dict, pcks: dict) -> Path:
         "version": p["version"],
         "age": p["age"],
         "content": p["content"],
+        # v043 THE PLATFORM-ERA REVEAL: the archive's reveal trees
+        # (appear_after days, orders on archived games) made no sense in a
+        # 4-game box - the discover feed IS the reveal now; everything
+        # sits visible from the first boot
+        "reveal": {"kind": "direct", "appear_after": 0},
         "runs": runs,
         "os": p["platforms"],
         "updated": date.today().isoformat(),

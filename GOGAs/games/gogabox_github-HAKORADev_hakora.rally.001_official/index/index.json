@@ -24,7 +24,8 @@
   "fee": 8,
   "shop": true,
   "reveal": {
-    "kind": "chain"
+    "kind": "direct",
+    "appear_after": 0
   },
   "charges": {
     "per_round": 2,

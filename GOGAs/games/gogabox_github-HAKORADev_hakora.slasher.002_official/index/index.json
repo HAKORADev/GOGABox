@@ -15,21 +15,8 @@
   "fee": 15,
   "shop": true,
   "reveal": {
-    "kind": "orders",
-    "appear_after": 1,
-    "orders": [
-      {
-        "type": "spend_in",
-        "game": "lanes",
-        "amount": 120
-      },
-      {
-        "type": "plays",
-        "game": "rally",
-        "count": 5
-      }
-    ],
-    "needs_games": 3
+    "kind": "direct",
+    "appear_after": 0
   },
   "charges": {
     "per_round": 2,

@@ -23,8 +23,7 @@
   "shop": true,
   "reveal": {
     "kind": "direct",
-    "appear_after": 14,
-    "needs_games": 15
+    "appear_after": 0
   },
   "desc": "the jumping-dice war: every die holds dots, tap a ",
   "": "+ \"four-mood CPU that learns from its spills.\"",

@@ -17,6 +17,14 @@ func _check(cond: bool, why: String) -> void:
                 print("  FAIL: %s" % why)
 
 func _ready() -> void:
+        # v043 THE RIG: the pilots install first (the rooms/open seats run
+        # against REAL installed packages - the box bakes zero games)
+        GOGA.set_home("user://goga_rig")
+        _wipe_dir("user://goga_rig")
+        GOGA.set_home("user://goga_rig")
+        var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
+        GOGA.import_path(repo_root.path_join("GOGAs/games"))
+
         print("=== qa_v042_lan: THE LOOPBACK RIG ===")
         _t_name_law()
         _t_code()
@@ -131,12 +139,12 @@ func _t_v0421_extras() -> void:
         _check(a.seats.size() == 3 and int(a.seats[2].get("local_slot", 0)) == 1,
                         "the combo seat rides the session")
         # the combo's roll carries ITS OWN seat number through a room
-        a.report_open("snl")
-        b.report_open("snl")
+        a.report_open("rally")
+        b.report_open("rally")
         await _pump(0.3)
-        _check(a.open_room("snl") == "", "the combo rig opens a room")
+        _check(a.open_room("rally") == "", "the combo rig opens a room")
         await _pump(0.4)
-        _check(b.join_room(int(b.rooms_for_game("snl")[0]["rid"])) == "", "the combo rival joins")
+        _check(b.join_room(int(b.rooms_for_game("rally")[0]["rid"])) == "", "the combo rival joins")
         await _pump(0.5)
         _check(a.start_match() == "", "the combo room's match births")
         await _pump(0.6)
@@ -210,7 +218,7 @@ func _t_tags() -> void:
         var cross := {"lan": {"players": 4, "platforms": ["android", "pc"], "cross": true}}
         var same_only := {"lan": {"players": 2, "platforms": ["android", "pc"], "cross": false}}
         var phone_only := {"lan": {"players": 2, "platforms": ["android"], "cross": true}}
-        var solo := {"id": "snake"}
+        var solo := {"id": "jumpcube"}
         var lc := Meta.lan_list(cross)
         _check(lc.has("lan") and lc.has("lan_cross") and lc.has("lan_4p"), "cross tags derive: %s" % str(lc))
         var ls := Meta.lan_list(same_only)
@@ -225,18 +233,14 @@ func _t_tags() -> void:
         for g in GameReg.games():
                 if g.has("lan"):
                         with_lan += 1
-        # v042-1: eleven seats - board ludo joined (the queued shred) and the
-        # 3D seat MOVED from towerball to towerdestroyer (the owner's word).
-        # r3: twelve - fruit slasher wears the 2P blade race.
-        _check(with_lan == 12, "exactly twelve games wear the LAN seat (%d)" % with_lan)
-        for gid in ["snake", "jumpcube", "snl", "domino", "chess", "squares",
-                        "fourline", "bovo", "rally", "ludo", "slasher"]:
+        # v043: the four pilots wear the seat (the box bakes zero games -
+        # the census counts the INSTALLED world)
+        _check(with_lan == 4, "exactly four pilots wear the LAN seat (%d)" % with_lan)
+        for gid in ["rally", "slasher", "domino", "jumpcube"]:
                 _check(not Meta.lan_list(GameReg.get_game(gid)).is_empty(),
                                 "%s wears the seat" % gid)
-        _check(GameReg.get_game("towerdestroyer").has("lan"),
-                        "THE 3D SEAT CORRECTION: towerdestroyer wears the LAN race")
-        _check(not GameReg.get_game("towerball").has("lan"),
-                        "towerball is back to solo-only")
+        _check(Meta.lan_list(GameReg.get_game("rally")).has("lan_cross"),
+                        "rally derives the cross chip (both platforms, cross seat)")
 
 func _t_profile() -> void:
         print("-- THE GOGAPROFILE SEED")
@@ -307,16 +311,16 @@ func _t_rooms_and_match() -> void:
         b0.match_ended.connect(func(_g, _r, why): ended["b0"] = true; ended["why"] = why)
         b1.match_ended.connect(func(_g, _r, _why): ended["b1"] = true)
         b1.act_received.connect(func(_g, who, a): got["b1_act"] = a; got["b1_who"] = who)
-        _check(b0.report_open("snl") == true, "the host opens the game (2 seats)")
-        _check(b1.report_open("snl") == true, "the client opens the game")
+        _check(b0.report_open("rally") == true, "the host opens the game (2 seats)")
+        _check(b1.report_open("rally") == true, "the client opens the game")
         await _pump(0.4)
-        _check(b0.rooms_for_game("snl").is_empty(), "no room exists before a CREATE")
+        _check(b0.rooms_for_game("rally").is_empty(), "no room exists before a CREATE")
         # THE FIRST PLAYER CREATES - the owner's own flow
-        _check(b0.open_room("snl") == "", "the first player creates the room")
+        _check(b0.open_room("rally") == "", "the first player creates the room")
         await _pump(0.6)
-        _check(b0.rooms_for_game("snl").size() == 1, "one room lives")
-        _check(b1.rooms_for_game("snl").size() == 1, "the client sees the room (the mirror)")
-        var rid := int(b0.rooms_for_game("snl")[0]["rid"])
+        _check(b0.rooms_for_game("rally").size() == 1, "one room lives")
+        _check(b1.rooms_for_game("rally").size() == 1, "the client sees the room (the mirror)")
+        var rid := int(b0.rooms_for_game("rally")[0]["rid"])
         _check(String(b0.my_room().get("owner", "")) == "devA", "the creator is the OWNER")
         _check(b0.my_room_seat() == 1, "the owner is room seat 1")
         # THE SECOND JOINS - the join order is the seat order
@@ -349,7 +353,7 @@ func _t_rooms_and_match() -> void:
         _check(ended["b0"], "THE DISCONNECT LAW: the match ends for the one left")
         _check(String(ended["why"]).contains("LEFT"), "the end says WHY (%s)" % ended["why"])
         _check(int(b0.probe_state()["my_room"]) == 0, "the room folded")
-        b0.report_close("snl")
+        b0.report_close("rally")
         await _pump(0.3)
 
 ## THE CONFLICTION RACE + THE NO-SOLO LAW (r3)
@@ -364,23 +368,23 @@ func _t_no_solo_law() -> void:
         b2.join_session("127.0.0.1:%d" % b0._port)
         await _pump(1.0)
         # --- THE NO-SOLO LAW: a lone room waits FOREVER (no fallthrough) ---
-        _check(b1.report_open("chess") == true, "the client opens chess")
+        _check(b1.report_open("domino") == true, "the client opens chess")
         await _pump(0.4)
-        _check(b1.open_room("chess") == "", "a lone player opens a room")
+        _check(b1.open_room("domino") == "", "a lone player opens a room")
         await _pump(1.6)
-        _check(not b1.rooms_for_game("chess").is_empty(), "the lone room still waits")
+        _check(not b1.rooms_for_game("domino").is_empty(), "the lone room still waits")
         b1.leave_room()
         await _pump(0.4)
-        _check(b1.rooms_for_game("chess").is_empty(), "the empty room died")
-        b1.report_close("chess")
+        _check(b1.rooms_for_game("domino").is_empty(), "the empty room died")
+        b1.report_close("domino")
         # --- THE CONFLICTION: two racers, ONE seat (the 2-player cap) ---
-        _check(b0.report_open("bovo") == true, "the host opens bovo (cap 2)")
-        _check(b1.report_open("bovo") == true, "racer 1 opens bovo")
-        _check(b2.report_open("bovo") == true, "racer 2 opens bovo")
+        _check(b0.report_open("slasher") == true, "the host opens bovo (cap 2)")
+        _check(b1.report_open("slasher") == true, "racer 1 opens bovo")
+        _check(b2.report_open("slasher") == true, "racer 2 opens bovo")
         await _pump(0.4)
-        _check(b0.open_room("bovo") == "", "the 1-seat room is born")
+        _check(b0.open_room("slasher") == "", "the 1-seat room is born")
         await _pump(0.6)
-        var brid := int(b0.rooms_for_game("bovo")[0]["rid"])
+        var brid := int(b0.rooms_for_game("slasher")[0]["rid"])
         var refused := {"v": false, "why": ""}
         b2.room_refused.connect(func(why): refused["v"] = true; refused["why"] = why)
         _check(b1.join_room(brid) == "", "racer 1's join ask rides")
@@ -394,9 +398,9 @@ func _t_no_solo_law() -> void:
         _check(b2.my_room_seat() == 0, "the loser holds no room seat")
         # fold the test room
         b0.leave_room()
-        b0.report_close("bovo")
-        b1.report_close("bovo")
-        b2.report_close("bovo")
+        b0.report_close("slasher")
+        b1.report_close("slasher")
+        b2.report_close("slasher")
         b2.leave_session()          # the prune section wants the 2-seat shape
         await _pump(0.4)
 
@@ -487,11 +491,11 @@ func _t_r2_laws() -> void:
         _check(jerr == "", "the join ask is accepted (the verdict rides the wire)")
         _check(LAN.session_active(), "the join is session_active while connecting")
         _check(not LAN.joined_ok(), "a connecting join wears NO joined_ok (no badge)")
-        _check(not LAN.pre_open("snl"), "a connecting join opens no hold")
+        _check(not LAN.pre_open("rally"), "a connecting join opens no hold")
         await _pump(2.0)
         _check(LAN.joined_ok(), "the welcome flips joined_ok (the badge may live)")
         _check(LAN.session_size() == 2, "the joined joiner sees both seats")
-        _check(LAN.pre_open("snl"), "a joined 2-seat session opens the hold")
+        _check(LAN.pre_open("rally"), "a joined 2-seat session opens the hold")
         LAN.leave_session()
         jhost.leave_session()
         jhost.free()
@@ -590,12 +594,12 @@ func _t_r3_laws() -> void:
         _check(h.add_local_slot("NO ROOM") == false, "the combo seat refuses at the cap")
         # --- THE DIMENSIONS: two rooms of the SAME game live at once ---
         for j in joiners:
-                j.report_open("snl")
-        h.report_open("snl")
+                j.report_open("rally")
+        h.report_open("rally")
         await _pump(0.3)
-        _check(h.open_room("snl") == "", "dimension one is born")
+        _check(h.open_room("rally") == "", "dimension one is born")
         await _pump(0.5)
-        var rid1 := int(h.rooms_for_game("snl")[0]["rid"])
+        var rid1 := int(h.rooms_for_game("rally")[0]["rid"])
         _check(joiners[0].join_room(rid1) == "", "joiner 1 rides dimension one")
         await _pump(0.5)
         # --- r4 THE ONE-WAITING-ROOM LAW: the same-moment create race ---
@@ -604,12 +608,12 @@ func _t_r3_laws() -> void:
         # truth") - the second waiting room for the SAME game is refused.
         var create_race := {"v": false, "why": ""}
         joiners[1].room_refused.connect(func(why): create_race["v"] = true; create_race["why"] = why)
-        _check(joiners[1].open_room("snl") == "", "the racing create ask rides")
+        _check(joiners[1].open_room("rally") == "", "the racing create ask rides")
         await _pump(0.6)
         _check(create_race["v"], "THE CREATE RACE: the second maker is refused")
         _check(String(create_race["why"]).contains("CONFLICTION"),
                         "the create race reads the confliction line")
-        _check(h.rooms_for_game("snl").size() == 1,
+        _check(h.rooms_for_game("rally").size() == 1,
                         "ONE waiting room for the game (the host chose one)")
         # --- THE DIMENSIONS: a second room is legal once the first MATCH
         # RUNS (the owner's own example: group one plays ludo, other 3
@@ -618,10 +622,10 @@ func _t_r3_laws() -> void:
         await _pump(0.6)
         _check(String(h.my_room().get("phase", "")) == "play",
                         "dimension one's match is live")
-        _check(joiners[1].open_room("snl") == "",
+        _check(joiners[1].open_room("rally") == "",
                         "dimension two is born (the first room is IN-GAME now)")
         await _pump(0.5)
-        var rooms_now: Array = h.rooms_for_game("snl")
+        var rooms_now: Array = h.rooms_for_game("rally")
         _check(rooms_now.size() == 2, "TWO DIMENSIONS of one game live (%d)" % rooms_now.size())
         var rid2 := -1
         for rr in rooms_now:
@@ -735,3 +739,20 @@ func _t_r3_laws() -> void:
         _check(decline_seen["v"], "THE DECLINE WIRE: the inviter hears the no")
         _check(String(decline_seen["nm"]) == "HANNA", "the decline carries the name")
         du.close()
+
+
+func _wipe_dir(path: String) -> void:
+        if DirAccess.dir_exists_absolute(path):
+                var da := DirAccess.open(path)
+                if da != null:
+                        da.list_dir_begin()
+                        var n := da.get_next()
+                        while n != "":
+                                var full := path.path_join(n)
+                                if da.current_is_dir():
+                                        _wipe_dir(full)
+                                else:
+                                        da.remove(n)
+                                n = da.get_next()
+                        da.list_dir_end()
+                DirAccess.remove_absolute(path)

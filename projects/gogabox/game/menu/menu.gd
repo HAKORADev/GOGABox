@@ -1373,7 +1373,7 @@ func _add_thumb(b: Control, g: Dictionary, label_strip: float,
         # spot (owned tiles under dev cheats included) wears the purple ?
         # for a coming_soon game; final art is for SHIPPED games only
         var path := String(_soon_art(g).get("thumb", ""))
-        t.texture = Meta.thumb_texture(path)
+        t.texture = Meta.thumb_texture(path, String(g.get("root", "")))
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
         t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if fit_whole \
@@ -4035,8 +4035,9 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         # shows the final art somehow")
         var tp := String(_soon_art(g).get("thumb", ""))
         # v043 THE DUAL THUMB LAW: res:// for baked-era art, the file for a
-        # package's own thumb (Meta handles both seats).
-        thumb.texture = Meta.thumb_texture(tp)
+        # package's own thumb (Meta handles both seats; the package's
+        # relative thumb joins its root)
+        thumb.texture = Meta.thumb_texture(tp, String(g.get("root", "")))
         thumb.custom_minimum_size = Vector2(220, 150)
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -5054,10 +5055,21 @@ func _discover_card(row: Dictionary) -> Control:
         desc.clip_text = false
         v.add_child(desc)
         var installed_v := String(row.get("installed_version", ""))
-        var btn_txt := "UPDATE to v%s" % String(row.get("version", ""))
-        if installed_v == "":
-                btn_txt = "DOWNLOAD"
+        # THE UPDATE LABEL LAW: none = DOWNLOAD, older = UPDATE, same =
+        # INSTALLED (dead - the update law would skip it anyway), newer
+        # local than the source = the source is behind (dead too)
+        var btn_txt := "DOWNLOAD"
+        var same := false
+        if installed_v != "":
+                var cmp := GOGA.version_compare(String(row.get("version", "0")), installed_v)
+                if cmp > 0:
+                        btn_txt = "UPDATE to v%s" % String(row.get("version", ""))
+                else:
+                        btn_txt = "INSTALLED"
+                        same = true
         var btn := Arc.button(btn_txt, Vector2(560, 60), 20, Arc.ACCENT)
+        if same:
+                btn.disabled = true
         v.add_child(btn)
         var pkg_id := String(row.get("pkg_id", ""))
         btn.pressed.connect(func():
@@ -5145,12 +5157,22 @@ func _open_discover_page(row: Dictionary) -> void:
         # the description
         var desc_l := Arc.label(String(row.get("desc", "")), 19, Arc.INK, false)
         desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        desc_l.custom_minimum_size = Vector2(540, 0)
         content.add_child(desc_l)
-        # the download seat
+        # the download seat (the same label law as the feed cards)
         var installed_v := String(row.get("installed_version", ""))
-        var btn_txt := "UPDATE to v%s" % String(row.get("version", "")) \
-                        if installed_v != "" else "DOWNLOAD"
+        var btn_txt := "DOWNLOAD"
+        var same := false
+        if installed_v != "":
+                var cmp := GOGA.version_compare(String(row.get("version", "0")), installed_v)
+                if cmp > 0:
+                        btn_txt = "UPDATE to v%s" % String(row.get("version", ""))
+                else:
+                        btn_txt = "INSTALLED"
+                        same = true
         var btn := Arc.button(btn_txt, Vector2(540, 80), 26, Arc.ACCENT)
+        if same:
+                btn.disabled = true
         content.add_child(btn)
         btn.pressed.connect(func():
                 Jukebox.sfx("click", -4.0)

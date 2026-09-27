@@ -86,22 +86,28 @@ static func content_label(id: String) -> String:
 
 ## v043 THE DUAL THUMB LAW: a baked game's thumb is a res:// resource; an
 ## installed package's thumb is a FILE on disk (GOGAs/games/<id>/...).
-## Every thumb seat asks here and gets a texture either way.
+## Every thumb seat asks here and gets a texture either way. `root` joins
+## a package's RELATIVE thumb path (the index points inside the package).
 static var _thumb_cache := {}
-static func thumb_texture(path: String) -> Texture2D:
+static func thumb_texture(path: String, root := "") -> Texture2D:
         if path == "":
                 return null
         if path.begins_with("res://"):
                 return load(path) if ResourceLoader.exists(path) else null
-        if _thumb_cache.has(path):
-                return _thumb_cache[path]
-        if not FileAccess.file_exists(path):
+        var full := path
+        if not full.is_absolute_path():
+                if root == "":
+                        return null
+                full = root.path_join(path)
+        if _thumb_cache.has(full):
+                return _thumb_cache[full]
+        if not FileAccess.file_exists(full):
                 return null
-        var img := Image.load_from_file(path)
+        var img := Image.load_from_file(full)
         if img == null:
                 return null
         var tex := ImageTexture.create_from_image(img)
-        _thumb_cache[path] = tex
+        _thumb_cache[full] = tex
         return tex
 
 ## Main genres (id -> label + optional icon under assets/meta/).
