@@ -93,6 +93,23 @@ bands is too much for one person ("there is already olymptrade and
 1xbet for gambling bruh"). This section keeps the FULL specs so a
 future round can bring either back without reinventing it.
 
+### 7.4 THE RETURN (v043) — the age system came back, simplified
+
+The owner brought the ladder back with the v043 platform round — his
+simplification, verbatim: "the age system will be simplified, a game
+can be discovered, downloaded, owned and everything by people under the
+age, but the button 'play nn goga_coins_icon' in the pre-play will just
+gray-out and say you must be +nn based on the age tag of the game and
+it will detect this by the profile age number only, if number is not
+set, it will open games up to +12 and the rest will say same message
+with the lock". GOGAds stays DEAD (the 0-ads law). The ladder lives in
+Meta.AGES + Meta.CONTENT, the door is Meta.age_allowed (the ONLY reader
+is the pre-play play button), the tags ride the search + the pages, and
+the genre/sub content tags returned case-insensitive with the
+self-learning index. The GOGAds taxonomy (§7.2) returned as the
+content-tag vocabulary only - porn/gore/gambling/intense-horror/
+politics/psycho/nudity/illegal_trading - never as an ad system.
+
 ### 7.1 THE AGE SYSTEM (removed in v0.3.7-2)
 
 What it was: the +3..+21 content ladder. Every registry entry wore

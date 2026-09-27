@@ -6,7 +6,16 @@
 > round shipped. It is the direct sequel to THE_APP_STORE_QUESTION.md (the
 > v0.2.8 spark + the age/GOGAds archive) and it lives next to
 > LAN_MULTIPLAYER.md (updated the same day: LAN goes cross-platform + tagged).
-> DOCUMENT ONLY — nothing here is scheduled, designed for real, or built.
+> BUILT IN v043 (2026-09-27): the talk converged and the platform shipped —
+> the GOGAs tree, the package contract + the strict validator, the
+> importer (.goga/.gogas/folder), the discover engine (raw-http sources,
+> the tiers, the feed switcher, the search sorts), the SDK (the plugin +
+> the bridge + the C ABI), the four pilot ports, the self-update tricks,
+> the developers catalog + the agreements + the report flow. The open
+> questions below are answered in developers/ (PACKAGING.md, DISCOVER.md,
+> PUBLISHING.md) and in docs/AGENTS.md THE v043 LAWS (105-121).
+> THE v042 HISTORY FOLLOWS, KEPT WHOLE — the reveal message is the file's
+> soul.
 > The owner's own working agreement: "we are just going to talk about the
 > plans step by step together until we have something suitable so we do not
 > do refactor over another" — no code moves until the talk converges.

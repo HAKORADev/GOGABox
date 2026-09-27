@@ -30,11 +30,19 @@ Then, in order:
 
 ## 1. What this repo is (and is not)
 
-**This repo is GOGABox** — the Godot all-in-one Game box. One product: the
-`projects/gogabox/` Godot project (menu + games + economy + plugins). The
+**This repo is GOGABox** — the games platform (the engine + the store +
+the launcher). One product: the `projects/gogabox/` Godot project (the
+menu box + the economy + the GOGA runtime + the discover engine + the
+package runner). The box bakes ZERO games since v043 (THE EMPTY BINARY
+LAW): every game arrives as an installed GOGA package through the GOGAs
+tree, and the four official pilots live in `GOGAs/` + `packaging/`. The
 machinery around it (`build.sh`, `.ci/`, `tools/`, `config/`, `plugins/`,
 CI) exists to build and ship that one product — it stays generic in
-mechanics (registry-driven, no hardcoded IDs) but serves nothing else.
+mechanics (registry-driven, no hardcoded IDs). The DEVELOPERS' side of
+the house (the SDK, the package contract, publishing, modding, the
+agents playbooks) lives in `developers/` — its own manual
+(`developers/AGENTS.md`) governs agents working ON the platform's
+outward face; THIS file governs working ON the repo.
 
 | layer | rule |
 |---|---|
@@ -1606,3 +1614,80 @@ reads without booting the scene.
      thread joins in _reset_session + _host_died) - "previously freed"
      cores are the rig's proof, the wait is bounded by the 0.4s
      roundtrips.
+
+
+## THE v043 LAWS (the platform round - THE PLATFORM ANSWER graduated)
+
+105. THE EMPTY BINARY LAW (the owner: "make the GOGAs/ folder now and
+     remove all games from the main binary and make GOGABox itself an
+     app by itself like engine"): registry.GAMES = []; the whole box
+     reads games through GameReg.games() = baked + GOGA.entries() (the
+     unified entries door; 24 consumers switched). The v042 generation
+     lives whole in archive/games_v042/ (the revival seed).
+106. THE GOGAs HOME LAW: Windows next to the exe, Android the system
+     Downloads; the tree = libs/ games/ discover/ .cache/.
+107. THE PACKAGE CONTRACT: index/index.json (the registry vocabulary
+     flat + the long publishing id gogabox_github-<user>_<slug>_<tier>
+     + the short game_id the box keys on), game/ (per-platform builds -
+     the index decides), discover/ (page + media), data/ (THE OPEN DATA
+     LAW: the five strict minimums - logic/sfx/music/shaders/assets -
+     populated, voice/characters/vfx recognized), save/ (THE PORTABLE
+     SAVE LAW). Every refusal names the missing thing.
+108. THE ID SPLIT: the long id is the publishing identity (folders,
+     discover, reports); the short game_id is the box's internal key.
+     Collision law: first installed wins a short id.
+109. THE IMPORTER LAWS: .goga/.gogas zips (the engine's own ZIPReader)
+     + folder + parent-of-roots; THE RENAME LAW (installed folder = the
+     package id); THE UPDATE LAW (same skips / older refuses / newer
+     replaces); THE TRANSPORT-ARTIFACT LAW (zips carry files, not empty
+     folders - save/ re-seats in transit).
+110. THE PCK LAW: load_resource_pack(path, false) - the box's own files
+     can never be shadowed; the packaging rig stages the box core at
+     the SAME res:// paths so the pack's compiled base-class references
+     resolve to the box's real classes. The four pilots prove it:
+     they boot in-box from their pcks.
+111. THE RUNNER KINDS: godot_embedded (shared renderer, documented) /
+     native (own process on PC, in-process .so on Android - the Steam
+     model + the scale door) / web (in-app WebView, no tabs). Platform
+     exclusives live in the index (domino PC-only, jumpcube
+     Android-only - the wrong platform refuses honestly).
+112. THE SDK LAWS: ONE API, four transports (embedded doors / the
+     localhost bridge 31442 for standalone / the C ABI for native /
+     window.GOGA.* for web). THE ONE WALLET (GOGACoins are the box's).
+     THE HONEST DOOR (false/0/"" when the box is not there, never a
+     hang). Standalone client saves land in libs/clients/<id>/.
+113. THE NO-API-LIMIT LAW (realized): discover rides raw.githubusercontent
+     known-file URLs ONLY (source.json + per-game index + the files
+     manifest); the REST API is never touched.
+114. THE TIERS LAW: official = the hardcoded repo list; community =
+     the official REPOS.txt register (a PR, CI-validated - the two-step
+     publish); hobbyist = everything else. Engine-decided, never
+     source-claimed.
+115. THE AGE DOOR (the simplified return): Meta.AGES (the archive's own
+     tier texts, 3..+21) + Meta.CONTENT (horror/psycho/gore/porn/
+     gambling/politics/illegal_trading/nudity); LanProfile.age() vs the
+     game's tag; an unset profile opens up to +12; the ONLY reader is
+     the pre-play play button ("YOU MUST BE +nn"). Discovery, download,
+     owning: age-blind forever.
+116. THE LOWERCASE LAW: BOarD and boARd are the same tag - normalize at
+     read time, filters meet data normalized (the filter VALUE too).
+117. THE SELF-LEARNING INDEX: >= 10 OWNED games sharing an unknown
+     genre/sub index it as a first-class filter chip (persisted in Box
+     meta).
+118. THE FEED SWITCHER: the right-arrow beside ALL GAMES toggles
+     installed <-> DISCOVER; the discover feed wears the sorts row
+     (size/date/versions x arrows - the owner's exact ask), the tier
+     chips, IMPORT PACKAGE + ADD SOURCE.
+119. THE SELF-UPDATE LAWS: the official source's engine_version + the
+     release URLs; the 24h schedule + the boot check (one quiet note);
+     Android hands the apk to the package installer (permission at
+     use-time); Windows writes the replace-after-close helper - a
+     running exe is never touched.
+120. THE REPORT LAW: github issues, the game id REQUIRED, the triage
+     routes game reports to the game owner's repo; "i do not like it" /
+     country / religion / family-kids asks are not reports (games are
+     not a must - do not like it = be away from it).
+121. THE PLATFORM DOCS LAW: the developers' side lives in developers/
+     (the catalog, the agents playbooks, the acknowledgment); the repo
+     root carries REPORTING.md + AGREEMENT.md; nothing agreement-shaped
+     ships inside the app (the owner: the agreements live in the repo).

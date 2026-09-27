@@ -1,44 +1,103 @@
 # GOGABox
 
-**Godot all-in-one Game box** — one app that is a whole shelf of
-games: unlock them, play them, collect GOGACoins, climb achievements.
-Open source under **MIT**, **zero ads**, fully offline.
+**The games platform that is also a game box** — an engine, a store and
+a launcher in one: the box bakes ZERO games; every game arrives as an
+open GOGA package (a plain folder a human or an agent can read) through
+the discover engine (github raw + local), plays inside the box with the
+shared wallet (GOGACoins), the portable saves, the LAN seat and the
+achievements. Open source under **MIT**, **zero ads**, no accounts, no
+servers of ours, no DRM.
 
-Everything is pinned, scripted and identical on GitHub Actions and on any
-developer machine — no IDE, no manual setup, no mystery steps.
+Everything is pinned, scripted and identical on GitHub Actions and on
+any developer machine — no IDE, no manual setup, no mystery steps.
 
 ```
-clone → ./tools/bootstrap.sh → ./build.sh gogabox      # that's the whole pipeline
+clone → ./tools/bootstrap.sh → ./tools/test.sh gogabox → ./build.sh gogabox
 ```
 
-## What GOGABox is
+## What GOGABox is (the v043 platform shape)
 
-- A single Godot 4 project (`projects/gogabox`) shipping a menu "box" that
-  hosts multiple games (snake, hopper, lanes, rally, slasher, merge2048, ...).
-- A locked/soonest tile economy: games unlock with GOGACoins, mysteries
-  reveal, favorites are hearted.
+- **The empty binary law**: `projects/gogabox` is the ENGINE + the store
+  (the feed, the wallet, the LAN, the profiles, the discover engine, the
+  package runner). It ships zero games by law.
+- **The GOGAs tree** — the player's game home: Windows next to the exe,
+  Android in the system Downloads. `libs/` (the SDK bridges) ·
+  `games/<pkg id>/` (installed packages) · `discover/` (the sources +
+  the register) · `.cache/`.
+- **The GOGA package** — a plain folder: `index/` (the manifest), `game/`
+  (the runnable: a godot pck, a native binary, or a web entry), `discover/`
+  (the page), `data/` (THE OPEN DATA LAW: plain moddable logic/sfx/music/
+  shaders/assets), `save/` (THE PORTABLE SAVE LAW). Distributed as a
+  folder, a `.goga` (one game zipped) or a `.gogas` (many).
+- **The discover engine** — sources over RAW http only (the known-file
+  convention, github's API never touched): the official repo (this one)
+  is hardcoded-official, `GOGAs/discover/REPOS.txt` is the community
+  register (a PR, CI-validated — the two-step publish), everything else
+  is hobbyist. Local sources and "virtual repos" simulate the full
+  github flow with zero network (the local flow IS the contract).
+- **The four transports of one SDK** — embedded games ride the box's own
+  doors; standalone Godot games talk to the running box over localhost
+  (the Steam model); native games link the C ABI (`sdk/native/`); web
+  games ride the in-app WebView bridge (`window.GOGA.*`).
+- **The runner kinds** — `godot_embedded` (a pck loaded in-box, the box's
+  files un-shadowable), `native` (own process on PC, in-process .so on
+  Android — the scale door), `web` (HTML5 in-app, no pop-up tabs).
+- **The simplified age system** — the ladder (3..+21) and the content
+  tags describe honestly; the profile's age number gates ONLY the play
+  button. Discovery, downloading and owning are age-blind.
+- **The self-update** — the official source serves `engine_version` +
+  release URLs; Android hands the apk to the package installer
+  (permission asked at use-time), Windows writes a replace-after-close
+  helper and tells the player.
 - TWO platforms from ONE build action: Android APKs (arm32 + arm64) and
-  THE one Windows exe — `GOGABox.exe` (32-bit, SSE2 baseline: it runs on
-  pre-2014 CPUs with no SSE4.2, 32-bit natively and 64-bit through WOW64).
-- Android-native extra through a small Godot plugin: local notifications
-  ("reminders") — a desktop no-op by law.
+  THE one Windows exe — `GOGABox.exe` (32-bit, SSE2 baseline).
+- The last generation of baked games lives whole in
+  `archive/games_v042/` (31 games + teasers, scripts + assets + the
+  registry entries as the revival seed); the four PILOT ports
+  (rally + slasher both devices, dominoes PC-only, CONQUER DICE
+  Android-only) ship as the first official packages under `GOGAs/`.
 
 ## Repo map
 
 | path | role |
 |---|---|
+| `GOGAs/` | THE OFFICIAL SOURCE — the committed packages tree + the discover manifest + the community register (served over raw URLs) |
+| `projects/gogabox/` | The engine + the store (the one Godot product) |
+| `game/core/goga_core.gd` | The GOGA runtime: the home tree, the validator, the importer, the runner, the SDK bridge |
+| `game/core/goga_discover.gd` | The discover engine: sources, tiers, feed, search, downloads, updates |
+| `game/core/goga_update.gd` | The app self-update (the Android/Windows tricks) |
+| `developers/` | THE DEVELOPERS CATALOG (SDK, packaging, discover, web, native, publishing, modding, the agents playbooks, the acknowledgment) |
+| `sdk/godot/gogabox_sdk/` | The Godot SDK plugin (one API, two transports) |
+| `sdk/native/` | The C ABI header + the reference client (compiles clean) |
+| `packaging/` | The packaging rig's per-game sources + specs (the four pilots) |
+| `archive/games_v042/` | The v042 baked generation, saved whole |
 | `config/environment.lock` | Pinned toolchain: Godot 4.7.2, JDK 17, Android SDK, AGP, Gradle |
-| `config/projects.json` | The GOGABox build registry (version, ABIs, plugins, keystore) |
 | `tools/bootstrap.sh` | One-shot env setup (idempotent, same on CI and local) |
+| `tools/v043_package.py` | The packaging rig (stage → export-pack → assemble → manifest) |
+| `tools/goga_ci_validate.py` | The CI's mirror of the strict validator |
+| `tools/test.sh` | Headless integration tests (the rig installs the official source first) |
 | `build.sh` | Build CLI: materialize → patch presets → export → verify |
-| `tools/test.sh` | Headless integration tests (`projects/gogabox/tests/flow_test.tscn`) |
-| `tools/sync-assets.py` | Re-download/re-vendor assets from `assets.manifest.json` |
 | `.ci/` | Shared plumbing (SDK/Godot installers, preset patcher, APK verifier) |
 | `plugins/` | GOGABox Godot android plugin (`notify`) |
-| `projects/gogabox/` | The GOGABox Godot project (the whole product) |
-| `docs/` | Guides: SETUP · CI · ADS · ASSETS · RESOLUTION_RULE · AGENTS |
-| `docs/goga_docs/` | GOGABox planning home: `gogames_ideas/` (game GDDs), `ideas/`, `plans/`, `brainstorms/` |
+| `docs/goga_docs/` | Planning home: `gogames_ideas/` (game GDDs), `ideas/`, `plans/`, `brainstorms/` |
 | `docs/AGENTS.md` | Operating manual for AI agents / returning sessions |
+| `REPORTING.md` | The report flow (github issues, the game id, the triage) |
+
+## For players
+
+Install the box, open it, pull the discover feed (the arrow beside
+ALL GAMES), download a game, play. Import a `.goga`/`.gogas`/folder any
+time. The GOGAs folder in your Downloads (or next to the exe) is YOURS —
+games, saves, mods and all. See `developers/` for everything a game can
+do, and `REPORTING.md` for what a report is.
+
+## For developers (human and AI)
+
+Start at `developers/README.md` — the indexed catalog. The short path:
+read `developers/PACKAGING.md`, copy the pilot shape from `packaging/`,
+validate against the box, publish with the two-step
+(`developers/PUBLISHING.md`). Modding is a first-class door
+(`developers/MODDING.md`), written aggressive on purpose.
 
 ## Quickstart (local)
 
@@ -46,70 +105,7 @@ Ubuntu (24.04 tested) with `curl unzip zip jq python3` — then:
 
 ```bash
 ./tools/bootstrap.sh                 # JDK17 + Android SDK + Godot 4.7.2 (cached in .cache/)
-./tools/test.sh gogabox              # headless integration tests
+./tools/test.sh gogabox              # headless integration tests (installs the official source first)
 ./build.sh gogabox                   # both ABIs → dist/gogabox/*.apk
-./build.sh gogabox --abi arm64-v8a   # single ABI
+python3 tools/v043_package.py        # rebuild the four pilot packages into GOGAs/
 ```
-
-Details & troubleshooting: [docs/SETUP.md](docs/SETUP.md)
-
-## Returning to this repo (AI agents included)
-
-One obvious step, then real work:
-
-```bash
-git pull && ./tools/bootstrap.sh && ./tools/test.sh gogabox
-```
-
-Then read [docs/AGENTS.md](docs/AGENTS.md) — how everything works: build,
-commit/push/CI conventions, sandbox recovery.
-
-## CI
-
-`.github/workflows/build.yml` (THE ONE BUILD LAW):
-
-- **push to main** → builds GOGABox: both Android ABIs + THE Windows exe
-  (x86_32), all uploaded as artifacts.
-- **manual dispatch** → choose ABI / build type, optionally publish a GitHub
-  release (APKs + the Windows zip).
-
-The exe job seats the official 32-bit Windows templates (SSE2 baseline —
-no SSE4.2 needed) and verifies the binary with THE REAL-EXE LAW: it must
-be a genuine `PE32 executable ... Intel (i386|80386)` with the embedded
-pck. Caching is keyed on `config/environment.lock`, so bumping a version
-re-fetches exactly once. See [docs/CI.md](docs/CI.md).
-
-## Open source & 0 ads
-
-THE 0-ADS LAW: there are no ads anywhere — no ad SDK, no ad config, no ad
-IDs, no ad permissions; the box does not even hold the INTERNET permission.
-The game economy runs on GOGACoins alone. The project is MIT-licensed
-(see [LICENSE](LICENSE)).
-
-## Assets
-
-All art/audio is CC0 (Kenney packs + in-repo generated SFX). General policy,
-manifest schema, source catalogs and the asset-store download log:
-[docs/ASSETS.md](docs/ASSETS.md).
-
-## Planning & ideas
-
-Planning lives in [docs/goga_docs/](docs/goga_docs/):
-
-- `gogames_ideas/` — GDDs for the games inside the box
-- `ideas/` — general product ideas
-- `plans/` — version plans (what shipped in each release and why)
-- `brainstorms/` — raw brainstorm material
-
-## Release checklist
-
-1. Bump `version_name` / `version_code_base` in `config/projects.json`
-2. For Play Store upload, produce an `.aab`: `./build.sh gogabox --aab`
-3. Real release signing: set `GDA_RELEASE_KEYSTORE*` env vars (CI: repo secrets, see docs/CI.md)
-4. Change `package` in `config/projects.json` if the current one must stay unique
-
-## License
-
-GOGABox is **MIT licensed** — Copyright HAKORADev (see [LICENSE](LICENSE)).
-Bundled third-party content keeps its own licenses (Godot Engine: MIT,
-Kenney assets: CC0).
