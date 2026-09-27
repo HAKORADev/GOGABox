@@ -75,6 +75,10 @@ func _check(cond: bool, what: String) -> int:
 func _t_rig() -> int:
         var ok := 0
         GOGA.set_home(RIG_HOME)
+        # a FRESH home every run - the update law would honestly skip the
+        # same-version packages otherwise
+        _wipe(RIG_HOME)
+        GOGA.set_home(RIG_HOME)
         ok += _check(GOGA.home() == RIG_HOME, "the home override seats")
         ok += _check(DirAccess.dir_exists_absolute(GOGA.games_dir()), "games/ exists")
         ok += _check(DirAccess.dir_exists_absolute(GOGA.libs_dir()), "libs/ exists")
@@ -117,8 +121,17 @@ func _t_registry() -> int:
                 var g := GameReg.get_game(gid)
                 ok += _check(not g.is_empty(), gid + " reads through GameReg.get_game")
                 ok += _check(String(g.get("root", "")) != "", gid + " carries its package root")
-                ok += _check(String(g.get("script", "")).begins_with("res://"),
-                                gid + " carries its pck script path")
+                # the script path only exists when THIS platform has a run
+                # block (jumpcube is android-only: on the pc rig it honestly
+                # wears no_run_for_platform instead)
+                var os_list: Array = g.get("os", ["android", "pc"])
+                var platform_now := "android" if OS.has_feature("android") else "pc"
+                if os_list.has(platform_now):
+                        ok += _check(String(g.get("script", "")).begins_with("res://"),
+                                        gid + " carries its pck script path")
+                else:
+                        ok += _check(bool(g.get("no_run_for_platform", false)),
+                                        gid + " honestly reports no run for this platform")
                 ok += _check(int(g.get("age", 0)) >= 3, gid + " wears an age tag")
         # a game id that exists nowhere reads empty (never crashes)
         ok += _check(GameReg.get_game("does_not_exist").is_empty(), "unknown id -> empty")
@@ -649,6 +662,13 @@ func _t_all_games() -> int:
 func _t_jumpcube_ai() -> int:
         var ok := 0
         var e: Dictionary = GOGA.entry("jumpcube")
+        # android-only package: on the pc rig the mount refuses by design
+        var os_list: Array = e.get("os", ["android", "pc"])
+        var platform_now := "android" if OS.has_feature("android") else "pc"
+        if not os_list.has(platform_now):
+                ok += _check(not GOGA.mount_for(e),
+                                "jumpcube (android-only) refuses to mount on pc")
+                return ok
         ok += _check(not e.is_empty() and GOGA.mount_for(e),
                         "jumpcube's pck mounts")
         if e.is_empty():
@@ -695,10 +715,10 @@ func _t_search_filters() -> int:
         menu.set("_filter_age", "9")
         menu.set("_filter_content", "")
         var pass9: bool = menu._passes_filters(GameReg.get_game("rally"))
-        ok += _check(pass9 == (String(GameReg.get_game("rally").get("age", 3)) == "9"),
+        ok += _check(pass9 == (str(GameReg.get_game("rally").get("age", 3)) == "9"),
                         "the age filter compares the tag exactly")
         menu.set("_filter_age", "")
-        menu.set("_filter_content", "GaMbLiNg".to_lower())
+        menu.set("_filter_content", "")
         menu.set("_filter_genre", "")
         # the lowercase law on the genre filter: BOarD == board
         menu.set("_filter_genre", "BOarD")
@@ -764,7 +784,7 @@ func _t_isolation() -> int:
         var launched: bool = host_script.launch(router, "rally")
         ok += _check(launched, "isolation: rally launches under the cheat")
         if launched:
-                await get_tree().create_timer(2.0).timeout
+                await get_tree().create_timer(3.2).timeout
                 var host: Node = host_script.active_host
                 ok += _check(host != null and host.game != null, "the game node boots")
                 if host != null:

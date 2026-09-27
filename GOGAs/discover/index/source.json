@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "GOGABox Official",
+  "repo": "HAKORADev/GOGABox",
+  "engine_version": "0.4.3",
+  "games": [
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.domino.003_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.domino.003_official",
+      "version": "1.0.0"
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.jumpcube.004_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.jumpcube.004_official",
+      "version": "1.0.0"
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.rally.001_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.rally.001_official",
+      "version": "1.0.0"
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.slasher.002_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.slasher.002_official",
+      "version": "1.0.0"
+    }
+  ]
+}

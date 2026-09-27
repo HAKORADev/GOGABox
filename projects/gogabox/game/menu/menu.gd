@@ -1262,16 +1262,17 @@ func _passes_filters(g: Dictionary) -> bool:
         # and boARd are the same genre everywhere.
         var mains := (geo.get("main", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
         var subs := (geo.get("sub", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
-        if _filter_genre != "" and not (_filter_genre in mains):
+        # the filter VALUE normalizes too - a typed BOarD finds board data
+        if _filter_genre != "" and not (Meta.normalize_tag(_filter_genre) in mains):
                 return false
-        if _filter_sub != "" and not (_filter_sub in subs):
+        if _filter_sub != "" and not (Meta.normalize_tag(_filter_sub) in subs):
                 return false
         # v043 THE AGE + CONTENT FILTERS (discovery-only; see the vars)
-        if _filter_age != "" and String(g.get("age", 3)) != _filter_age:
+        if _filter_age != "" and str(g.get("age", 3)) != _filter_age:
                 return false
         if _filter_content != "":
-                var cons := (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
-                if not (_filter_content in cons):
+                var cons := (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(str(t)))
+                if not (Meta.normalize_tag(_filter_content) in cons):
                         return false
         # THE PLATFORM LAW: the os tag filters (every game wears one now)
         if _filter_os != "" and not (_filter_os in (g.get("os", ["android", "pc"]) as Array)):

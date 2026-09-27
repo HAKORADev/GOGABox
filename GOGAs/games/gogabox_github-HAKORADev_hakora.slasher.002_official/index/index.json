@@ -1,0 +1,241 @@
+{
+  "id": "gogabox_github-HAKORADev_hakora.slasher.002_official",
+  "title": "Fruit Slasher",
+  "tag": "swipe everything",
+  "script": "res://game/games/slasher/slasher.gd",
+  "thumb": "discover/media/thumb.png",
+  "orientation": "auto",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 30,
+  "price": 250,
+  "fee": 15,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 1,
+    "orders": [
+      {
+        "type": "spend_in",
+        "game": "lanes",
+        "amount": 120
+      },
+      {
+        "type": "plays",
+        "game": "rally",
+        "count": 5
+      }
+    ],
+    "needs_games": 3
+  },
+  "charges": {
+    "per_round": 2,
+    "capacity": 10,
+    "regen_minutes": 5
+  },
+  "daily_minutes": 20,
+  "desc": "Fruit fly, your finger is the blade - for real: the fruit splits along YOUR cut and the halves tumble. Choose your position first - portrait tosses from below, landscape lobs across. Every fruit +1, every fall -2, three hearts, and a slashed bomb takes one. A GOGACoin rides by every 20 seconds. Now and then the sky opens: FRENZY - for ten seconds it rains produce with bombs riding along. The shop sells the vegetable basket and the dessert shelf.",
+  "controls": [
+    "pick a position - portrait and landscape throw differently",
+    "swipe THROUGH a fruit to cut it where your finger crossed: +1",
+    "a fruit that falls unsliced costs -2 - the score never goes below 0",
+    "three hearts; slash a bomb and one bursts - lose all three and the run ends",
+    "when IT'S RAINING! shows at the top, the frenzy pours for ten seconds - cut fast, dodge the bombs riding along",
+    "cut several fruits in one fast swipe and the top reads +1 +2 +3; falls flush as one -N",
+    "a GOGACoin flies by every 20 seconds - slash it like a fruit",
+    "the shop sells the vegetable basket (1500) and the dessert shelf (2400) - the options toggle whatever you own"
+  ],
+  "genres": {
+    "main": [
+      "action",
+      "arcade"
+    ],
+    "sub": [
+      "hacknslash",
+      "singleplayer"
+    ]
+  },
+  "lan": {
+    "players": 2,
+    "platforms": [
+      "android",
+      "pc"
+    ],
+    "cross": true
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "Sharp Blade",
+      "desc": "Score 300 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 300
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "Juice Storm",
+      "desc": "Score 800 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 800
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "The Blade Saint",
+      "desc": "Score 2000 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 2000
+      }
+    },
+    {
+      "id": "slash_t1",
+      "title": "Juice Bar",
+      "desc": "Slash 100 fruits total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "slashed",
+        "v": 100
+      }
+    },
+    {
+      "id": "slash_t2",
+      "title": "Fruit Hurricane",
+      "desc": "Slash 1000 fruits total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "slashed",
+        "v": 1000
+      }
+    },
+    {
+      "id": "slash_t3",
+      "title": "The Orchard Falls",
+      "desc": "Slash 5000 fruits total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "slashed",
+        "v": 5000
+      }
+    },
+    {
+      "id": "hearts_t1",
+      "title": "Untouchable",
+      "desc": "End a run with all three hearts",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "hearts_kept",
+        "v": 3
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "Blade Regular",
+      "desc": "Play 60 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 60
+      }
+    }
+  ],
+  "controls_pc": [
+    "hold the LEFT MOUSE BUTTON and swipe across the fruit"
+  ],
+  "schema": 1,
+  "game_id": "slasher",
+  "version": "1.0.0",
+  "age": 7,
+  "content": [],
+  "runs": {
+    "android": {
+      "kind": "godot_embedded",
+      "pck": "game/android/goga.pck",
+      "script": "res://game/games/slasher/slasher.gd",
+      "renderer": "mobile"
+    },
+    "pc": {
+      "kind": "godot_embedded",
+      "pck": "game/pc/goga.pck",
+      "script": "res://game/games/slasher/slasher.gd",
+      "renderer": "forward_plus"
+    }
+  },
+  "updated": "2026-09-27",
+  "versions_count": 1,
+  "size_bytes": 7666829,
+  "files": [
+    {
+      "path": "data/audio/music/ambience.wav",
+      "sha256": "3705c56e1fd10abc78b1a782e34c97acab6cd5d9"
+    },
+    {
+      "path": "data/audio/sfx/blip.wav",
+      "sha256": "1b3885d97b546815861813c045c30fb02c299f30"
+    },
+    {
+      "path": "data/audio/sfx/thud.wav",
+      "sha256": "6ad10c7c3809855a5877f17e49073d5c4a73f73d"
+    },
+    {
+      "path": "data/logic/modes.json",
+      "sha256": "7e50164e39c391b0cfb6b716e739f52bdb170f2f"
+    },
+    {
+      "path": "data/visuals/assets/wood_landscape.png",
+      "sha256": "6480868c4715200b64d945d5f1b708ddfe0a97c5"
+    },
+    {
+      "path": "data/visuals/assets/wood_portrait.png",
+      "sha256": "b99a480e1f64686d3c55dc7664f4b40a61da7514"
+    },
+    {
+      "path": "data/visuals/shaders/vignette.gdshader",
+      "sha256": "fa34842fb869e89e3f5b86b95c69f18d104dfb2f"
+    },
+    {
+      "path": "discover/media/thumb.png",
+      "sha256": "286841d8e342bdc98dcb4a644bcf56f89b144dac"
+    },
+    {
+      "path": "discover/page.json",
+      "sha256": "be791043eadd4176ccd7df0f0e9acd3f7e76c57a"
+    },
+    {
+      "path": "game/android/goga.pck",
+      "sha256": "0135786274e15053e9b0de34720ff6065e81be3b"
+    },
+    {
+      "path": "game/pc/goga.pck",
+      "sha256": "0135786274e15053e9b0de34720ff6065e81be3b"
+    }
+  ]
+}

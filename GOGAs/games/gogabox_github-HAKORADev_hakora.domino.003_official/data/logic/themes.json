@@ -1,0 +1,37 @@
+{
+  "_about": "this table drives the game through GOGA.data_json - edit it and the game obeys; the packed default wins only when the file is absent or broken\n",
+  "table": {
+    "tavern": {
+      "name": "TAVERN",
+      "price": 0,
+      "ground": "bg2",
+      "desc": "the green table",
+      "room": "Color(\"1c3a0e\")",
+      "rail": "Color(\"5d4028\")"
+    },
+    "bluequilt": {
+      "name": "AZURE",
+      "price": 200,
+      "ground": "bg1",
+      "desc": "the azure table",
+      "room": "Color(\"122c4e\")",
+      "rail": "Color(\"5d4028\")"
+    },
+    "sunset": {
+      "name": "SUNSET",
+      "price": 260,
+      "ground": "bg4",
+      "desc": "the warm red table",
+      "room": "Color(\"40120e\")",
+      "rail": "Color(\"5d4028\")"
+    },
+    "marble": {
+      "name": "VIOLET",
+      "price": 320,
+      "ground": "bg6",
+      "desc": "the violet table",
+      "room": "Color(\"241640\")",
+      "rail": "Color(\"5d4028\")"
+    }
+  }
+}

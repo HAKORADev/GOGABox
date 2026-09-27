@@ -1,0 +1,14 @@
+{
+  "title": "PING-PONG",
+  "desc": "Real pong now: goals pay points, every hit heats the ball x1.1 until it burns red, coins and powerups ride the court, and the extra walls hunt YOU. The pause menu's END banks the run.",
+  "media": [
+    {
+      "kind": "thumb",
+      "file": "media/thumb.png"
+    }
+  ],
+  "entry": {
+    "fee": 8,
+    "price": 150
+  }
+}

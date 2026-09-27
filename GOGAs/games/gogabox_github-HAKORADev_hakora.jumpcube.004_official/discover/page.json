@@ -1,0 +1,14 @@
+{
+  "title": "CONQUER DICE",
+  "desc": "the jumping-dice war: every die holds dots, tap a ",
+  "media": [
+    {
+      "kind": "thumb",
+      "file": "media/thumb.png"
+    }
+  ],
+  "entry": {
+    "fee": 8,
+    "price": 450
+  }
+}

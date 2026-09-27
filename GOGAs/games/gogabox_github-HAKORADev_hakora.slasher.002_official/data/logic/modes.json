@@ -1,0 +1,38 @@
+{
+  "_about": "this table drives the game through GOGA.data_json - edit it and the game obeys; the packed default wins only when the file is absent or broken\n",
+  "table": {
+    "vertical": {
+      "gravity": 1560.0,
+      "from_bottom": true,
+      "vx": [
+        -140.0,
+        140.0
+      ],
+      "vy": [
+        -1580.0,
+        -1200.0
+      ],
+      "spin": [
+        -3.2,
+        3.2
+      ]
+    },
+    "horizontal": {
+      "gravity": 1240.0,
+      "from_bottom": true,
+      "center_spread": 0.42,
+      "vx": [
+        -320.0,
+        320.0
+      ],
+      "vy": [
+        -1420.0,
+        -1080.0
+      ],
+      "spin": [
+        -4.2,
+        4.2
+      ]
+    }
+  }
+}

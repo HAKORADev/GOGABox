@@ -59,3 +59,5 @@ projects/build/
 # data lives in the local locker again. Pattern WITHOUT the trailing slash
 # on purpose (the .cache lesson): catches a file OR a dir named study_locker.
 study_locker
+packaging/.build/
+GOGAs/dist/
