@@ -85,3 +85,24 @@ Stage Summary:
 - the LAN first patch is COMPLETE and green: flow_test ALL PASSED + qa_v042_lan 97/0 + the eye pass reviewed
 - the real bars: real voice capture/transport/playback, real discovery + invites, real hash-addressed face cache + wire transfer, real chat with the full cap law — no dummies
 - the honest refusals documented: mp4/webm (no engine decoder), ogv not transcoded, ZeroTier-in-GDScript not faked
+
+---
+Task ID: v043-pass-2
+Agent: Super Z (main)
+Task: the owner's review round - "binary stayed same size?", the failed build before the finished one, the AISlop docs; finish the v043 work for real
+
+Work Log:
+- the sandbox was STALE (head at v040-2, mode-only diffs) - reset hard to origin/main 5ec9a54e before any work; verified by git, not memory
+- THE SIZE CATCH PROVEN: v043 arm64 116.2MB vs v042 115.8MB - the games never left; GAMES := [] stopped referencing them, the files stayed, the export packs everything not excluded (~95MB); WORSE - the box's loose game/games/<id> scripts SHADOWED the package pcks (replace_files=false), the pilots ran their baked twins
+- tools/v043_strip_binary.py (idempotent): archived 585 game-audio files the first pass forgot (archive/games_v042/audio/) + 135 dead-path probes; deleted game/games/ + assets/games/; trimmed assets/audio to ui/notify/jingles/box_theme/boom/coin/unlock + thumbs to soon.png; presets exclude tests/*; 192.8 -> 112.8MB on disk
+- THE goga-packages RED RUN: the validator demands save/, git cannot commit an empty folder; save/README.md seated in all four packages (the law's text AND the proof), the packer writes it on assemble, the CI validator = ALL VALID
+- THE PARSE LANDMINES the pushed build carried (CI never runs the tests): goga_update.gd's Engine.get_main_loop().root inference = a hard parse error in 4.7.2 (five sites, the cast pattern applied); menu.gd's 2-arg Meta.thumb_texture vs the packs' stale 1-arg staged core - the four packages REBUILT with the current core (pcks + manifests fresh)
+- parse_gate REWRITTEN as a scene: a --script run has no autoloads (every Box/GOGA reference read as a false "identifier not found") and the old gate died on its own reloadable() call and hung; the new gate = 86 scripts in GAME context, ALL CLEAN
+- THE NON-DESTRUCTIVE IMPORT LAW: _import_root MOVED the source - the flow rig ate the repo's GOGAs/games every run; installs COPY now, _move_dir gone
+- THE DISCOVER ROUND the plan promised: flow_test _t_discover (local rows, the six sorts, filters, the virtual-repo tier law, GogaDiscover.update_label after deduplicating the label logic out of two menu sites) - and the test caught a REAL break: the discover search normalized data but not the filter value (BOARD never matched board, the owner's A7 law); fixed
+- THE EYE PASS re-shot (6 frames, reviewed): the rig POLLS for discover rows (the async fetch raced the blind 2.5s sleep), the picks hint card speaks, the discover page stops leaking the machine path
+- THE DOCS: README rewritten professional (the owner: "(the v043 platform shape)" reads like slop), AGREEMENT intro de-changelogged, PLAN_v043 PASS 2 section, AGENTS laws 122-126
+- PUSH 70f8fb8d -> CI: build ALL GREEN + goga-packages GREEN (was the red one) - artifacts: arm64 26.7MB / arm32 28.0MB / windows zip 39.0MB (were 116.2/117.5/125.6); the exe dissected: template ~116MB + pck 1.73MB (was ~105MB of games)
+
+Stage Summary:
+- the empty binary is REAL now: the game payload in the shipped binaries collapsed from ~105MB to 1.73MB; the pilots run their PACKAGED ports (no more shadowing); the discover engine has its test seat + the lowercase law holds filter-side; every validator green; the docs read like docs
