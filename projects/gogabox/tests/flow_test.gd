@@ -800,8 +800,11 @@ func _t_scroll() -> int:
 func _t_fitsheet() -> int:
         var ok := 0
         # fit_sheet wraps the body of a REAL sheet: the vb must sit inside
-        # panel > cc > root (the _sheet_base shape) - seat it exactly so
+        # panel > cc > root (the _sheet_base shape) - seat it exactly so,
+        # and the root needs a REAL size so the avail math can decide
         var root := Control.new()
+        root.custom_minimum_size = Vector2(800, 1000)
+        root.size = Vector2(800, 1000)
         add_child(root)
         var cc := CenterContainer.new()
         root.add_child(cc)
@@ -809,13 +812,23 @@ func _t_fitsheet() -> int:
         cc.add_child(pc)
         var vb := VBoxContainer.new()
         pc.add_child(vb)
-        for i in 12:
+        for i in 24:
                 var b := Arc.button("ROW %d WITH A REALLY LONG TEXT LINE TO WRAP AROUND" % i,
                                 Vector2(540, 64), 22, Arc.ACCENT)
                 vb.add_child(b)
         Arc.fit_sheet(vb)
         await get_tree().process_frame
-        ok += _check(vb.get_parent() is BoxScroll, "a tall body wraps into a BoxScroll")
+        await get_tree().process_frame
+        # fit_sheet's wrap law: a BoxScroll joins the vb's children and the
+        # rows move INSIDE it - vb itself never re-parents
+        var wrapped: BoxScroll = null
+        for c in vb.get_children():
+                if c is BoxScroll:
+                        wrapped = c
+        ok += _check(wrapped != null, "a tall body wraps into a BoxScroll")
+        if wrapped != null:
+                ok += _check((wrapped.get_child(0) as Node).get_child_count() > 0,
+                                "the rows moved inside the wrap")
         root.queue_free()
         await get_tree().process_frame
         return ok
@@ -830,13 +843,13 @@ func _t_thumb_laws() -> int:
 
 func _t_plugin_names() -> int:
         var ok := 0
-        # the notify plugin's GDScript/native pair stays honest
-        var cfg := ConfigFile.new()
-        var loaded := cfg.load("res://addons/notify/plugin.cfg") == OK
-        ok += _check(loaded, "the notify plugin config loads")
-        if loaded:
-                ok += _check(String(cfg.get_value("plugin", "name", "")) != "",
-                                "the plugin wears a name")
+        # the notify bridge stays the one plugin seat: the autoload script
+        # loads and the singleton answers (the android side lives in
+        # plugins/notify - materialized into addons/ at build time)
+        ok += _check(ResourceLoader.exists("res://addons/notify/notify.gd"),
+                        "the notify bridge script exists")
+        ok += _check(Notify != null and Notify.has_method("schedule"),
+                        "the notify singleton answers")
         return ok
 
 # ============================================================ SDK BRIDGE

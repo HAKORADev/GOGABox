@@ -21,7 +21,7 @@ func _ready() -> void:
         menu._close_sheet()
         # 2. a SOON page - the purple ? must be in the header now
         var soon_g: Dictionary = {}
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 if bool(g.get("coming_soon", false)):
                         soon_g = g
                         break

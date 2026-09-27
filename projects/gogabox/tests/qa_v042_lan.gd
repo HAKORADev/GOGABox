@@ -222,7 +222,7 @@ func _t_tags() -> void:
         _check(Meta.players_badge(solo) == "", "no badge for the single seat")
         # the registry truth: the owner's ten games wear the seat
         var with_lan := 0
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 if g.has("lan"):
                         with_lan += 1
         # v042-1: eleven seats - board ludo joined (the queued shred) and the

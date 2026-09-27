@@ -1054,14 +1054,43 @@ func _ago(ts: int) -> String:
         return "%dd ago" % (s / 86400)
 
 func _build_grid() -> void:
+        # v043 THE FEED SWITCHER (the owner: "develop the discover feed as an
+        # option can be selected from a right-arrow that will be next to the
+        # 'all games' text in main feed to switch between them"): the
+        # headline wears the arrow - ALL GAMES <-> DISCOVER.
+        var head_row := HBoxContainer.new()
+        head_row.add_theme_constant_override("separation", 10)
+        _feed_vb.add_child(head_row)
         _all_head = Arc.label("ALL GAMES", 32, Arc.ACCENT)
-        _feed_vb.add_child(_all_head)
+        head_row.add_child(_all_head)
+        _discover_arrow = Arc.button(">", Vector2(56, 56), 30, Arc.HOT,
+                        func(): _toggle_feed_kind())
+        head_row.add_child(_discover_arrow)
+        var hint := Arc.label("discover", 16, Color("8a6a40"), false)
+        hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        head_row.add_child(hint)
         _grid = GridContainer.new()
         _grid.columns = 2
         _grid.add_theme_constant_override("h_separation", 14)
         _grid.add_theme_constant_override("v_separation", 14)
         _grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
         _feed_vb.add_child(_grid)
+
+var _discover_arrow: Button = null
+## v043 the feed seat: "installed" (the classic ALL GAMES grid) or
+## "discover" (the store feed over the sources).
+var _feed_kind := "installed"
+var _discover_rows: Array = []
+var _discover_notes: Array = []
+var _discover_loading := false
+var _discover_sort := ""
+var _discover_tier := ""
+var _discover_query := ""
+
+func _toggle_feed_kind() -> void:
+        Jukebox.sfx("click", -4.0)
+        _feed_kind = "discover" if _feed_kind == "installed" else "installed"
+        _refresh()
 
 # ---------------------------------------------------------------- feed
 
@@ -1175,6 +1204,18 @@ func _refresh() -> void:
         _feed_scroll.register_tappable(_pick_next, Arc._tap_emitter(_pick_next))
 
         # ---- the grid (ALL GAMES / FAVORITES / MYSTERY via the state filter)
+        # v043 THE FEED SWITCHER: discover mode fills the grid with the
+        # store feed instead (async - the rows land when the sources answer)
+        if _feed_kind == "discover":
+                _all_head.text = "DISCOVER"
+                _grid.add_child(_discover_placeholder())
+                if not _discover_loading:
+                        _discover_loading = true
+                        _refresh_discover_feed()
+                _wallet_label.text = Box.coins_compact()
+                _update_battery_chip()
+                _feed_scroll.scroll_vertical = keep_feed
+                return
         _all_head.text = "FAVORITES" if _filter_state == "favorites" \
                         else "MYSTERY" if _filter_state == "mystery" else "ALL GAMES"
         var tiles := 0
@@ -4785,3 +4826,396 @@ func _apply_saved_scroll(v: float, sh: float, t_idx: int, t_off: float) -> void:
                                 + (off_now - t_off)
         _feed_scroll.scroll_vertical = clampi(int(round(target)), 0, 1000000)
         _strip_scroll.scroll_horizontal = clampi(int(round(sh)), 0, 1000000)
+
+# ============================================================ DISCOVER (v043)
+## THE DISCOVER FEED (THE_PLATFORM_ANSWER.md realized): the store feed over
+## the sources - the official repo first, the community register next, the
+## hobbyist sources after. The engine (GogaDiscover) does the work; this
+## seat renders it. The arrow beside ALL GAMES switches the two feeds.
+
+func _discover_placeholder() -> Control:
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 12)
+        var msg := "pulling the sources..." if _discover_loading \
+                        else "nothing on the discover feed yet"
+        v.add_child(Arc.label(msg, 24, Color(0.55, 0.42, 0.25), false))
+        return v
+
+## The async half of the discover refresh: pull the feed, re-render.
+func _refresh_discover_feed() -> void:
+        var feed: Dictionary = await GogaDiscover.fetch_feed()
+        _discover_rows = feed["rows"]
+        _discover_notes = feed["notes"]
+        _discover_loading = false
+        if _feed_kind != "discover" or not is_instance_valid(_grid):
+                return
+        _render_discover_rows()
+
+func _render_discover_rows() -> void:
+        for c in _grid.get_children():
+                _grid.remove_child(c)
+                c.queue_free()
+        _feed_scroll._tappables.clear()
+        # the toolbar: import + add source + the update check
+        var bar := HBoxContainer.new()
+        bar.add_theme_constant_override("separation", 10)
+        var import_btn := Arc.button("IMPORT PACKAGE", Vector2(330, 60), 19,
+                        Color(0.42, 0.30, 0.16), func(): _discover_import_dialog())
+        bar.add_child(import_btn)
+        _feed_scroll.register_tappable(import_btn, Arc._tap_emitter(import_btn))
+        var src_btn := Arc.button("ADD SOURCE", Vector2(250, 60), 19,
+                        Color(0.42, 0.30, 0.16), func(): _discover_add_source())
+        bar.add_child(src_btn)
+        _feed_scroll.register_tappable(src_btn, Arc._tap_emitter(src_btn))
+        _grid.add_child(bar)
+        # the sorts row (the owner's arrows)
+        _grid.add_child(_discover_sorts_row())
+        # the rows, through THE DISCOVER SEARCH (the filters ride along)
+        var rows: Array = GogaDiscover.search(_discover_rows, _discover_query,
+                        _filter_genre, _filter_sub, _filter_age, _filter_content,
+                        _discover_sort, _discover_tier)
+        if rows.is_empty():
+                var why := "no games on the feed" + \
+                                (" - the sources answered nothing" if not _discover_notes.is_empty() else "")
+                _grid.add_child(Arc.label(why, 22, Color(0.55, 0.42, 0.25), false))
+                for n in _discover_notes:
+                        var l := Arc.label("- %s: %s" % [String(n.get("repo", "")), String(n.get("why", ""))],
+                                        17, Color("8a6a40"), false)
+                        l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+                        l.custom_minimum_size = Vector2(560, 0)
+                        _grid.add_child(l)
+                return
+        for r in rows:
+                var card := _discover_card(r)
+                _grid.add_child(card)
+
+func _discover_sorts_row() -> Control:
+        var box := VBoxContainer.new()
+        box.add_theme_constant_override("separation", 8)
+        box.add_child(Arc.label("SORT", 20, Arc.HOT))
+        var wrap := HFlowContainer.new()
+        wrap.add_theme_constant_override("h_separation", 8)
+        wrap.add_theme_constant_override("v_separation", 8)
+        box.add_child(wrap)
+        var sorts := [["", "NEWEST FIRST"], ["size_up", "SIZE \u2191"], ["size_down", "SIZE \u2193"],
+                ["date_up", "DATE \u2191"], ["date_down", "DATE \u2193"],
+                ["version_up", "VERSIONS \u2191"], ["version_down", "VERSIONS \u2193"]]
+        for s in sorts:
+                var sid := String(s[0])
+                var active := _discover_sort == sid
+                var b := Button.new()
+                b.text = " " + String(s[1])
+                b.toggle_mode = true
+                b.button_pressed = active
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 18)
+                b.add_theme_color_override("font_color", Arc.CARD if active else Color("7a5a34"))
+                var sb := Arc.panel_style(Color(0.98, 0.62, 0.1) if active else Color(0, 0, 0, 0.14), 20)
+                sb.content_margin_left = 14
+                sb.content_margin_right = 14
+                sb.content_margin_top = 6
+                sb.content_margin_bottom = 6
+                b.add_theme_stylebox_override("normal", sb)
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.toggled.connect(func(_on: bool):
+                        Jukebox.sfx("click", -4.0)
+                        _discover_sort = "" if _discover_sort == sid else sid
+                        _render_discover_rows())
+                _feed_scroll.register_tappable(b, Arc._tap_emitter(b))
+                wrap.add_child(b)
+        # the tier filter chips (official/community/hobbyist)
+        var tiers := [["", "ALL TIERS"], ["official", "OFFICIAL"],
+                ["community", "COMMUNITY"], ["hobbyist", "HOBBYIST"]]
+        for t in tiers:
+                var tid := String(t[0])
+                var active := _discover_tier == tid
+                var b2 := Button.new()
+                b2.text = " " + String(t[1])
+                b2.toggle_mode = true
+                b2.button_pressed = active
+                b2.add_theme_font_override("font", Arc.font_ui())
+                b2.add_theme_font_size_override("font_size", 18)
+                b2.add_theme_color_override("font_color", Arc.CARD if active else Color("7a5a34"))
+                var sb2 := Arc.panel_style(Color(0.42, 0.55, 0.3) if active else Color(0, 0, 0, 0.14), 20)
+                sb2.content_margin_left = 14
+                sb2.content_margin_right = 14
+                sb2.content_margin_top = 6
+                sb2.content_margin_bottom = 6
+                b2.add_theme_stylebox_override("normal", sb2)
+                b2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b2.toggled.connect(func(_on: bool):
+                        Jukebox.sfx("click", -4.0)
+                        _discover_tier = "" if _discover_tier == tid else tid
+                        _render_discover_rows())
+                _feed_scroll.register_tappable(b2, Arc._tap_emitter(b2))
+                wrap.add_child(b2)
+        return box
+
+func _discover_card(row: Dictionary) -> Control:
+        var panel := PanelContainer.new()
+        panel.add_theme_stylebox_override("panel", Arc.panel_style(Color(1, 1, 1, 0.5), 18, 10))
+        var v := VBoxContainer.new()
+        v.add_theme_constant_override("separation", 6)
+        panel.add_child(v)
+        var head := HBoxContainer.new()
+        head.add_theme_constant_override("separation", 8)
+        v.add_child(head)
+        var title := Arc.label(String(row.get("title", "?")), 24, Arc.INK, false)
+        title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        title.clip_text = true
+        head.add_child(title)
+        var tier_lbl := Arc.label(String(row.get("tier", "")).to_upper(), 15,
+                        Color("3f7fb0") if row.get("tier") == "official" else Color("8a6a40"), false)
+        head.add_child(tier_lbl)
+        var line := "%s  ·  v%s" % [String(row.get("tag", "")), String(row.get("version", ""))]
+        if row.has("size") and int(row.get("size", 0)) > 0:
+                line += "  ·  %s" % Arc.short_num(int(row["size"]))
+        var meta_l := Arc.label(line, 17, Color("6a4a28"), false)
+        v.add_child(meta_l)
+        var desc := Arc.label(String(row.get("desc", "")), 16, Color("8a6a40"), false)
+        desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        desc.custom_minimum_size = Vector2(560, 0)
+        desc.max_lines_visible = 2
+        desc.clip_text = false
+        v.add_child(desc)
+        var installed_v := String(row.get("installed_version", ""))
+        var btn_txt := "UPDATE to v%s" % String(row.get("version", ""))
+        if installed_v == "":
+                btn_txt = "DOWNLOAD"
+        var btn := Arc.button(btn_txt, Vector2(560, 60), 20, Arc.ACCENT)
+        v.add_child(btn)
+        var pkg_id := String(row.get("pkg_id", ""))
+        btn.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                btn.disabled = true
+                btn.text = "FETCHING..."
+                _discover_download(row, btn))
+        _feed_scroll.register_tappable(btn, Arc._tap_emitter(btn))
+        # the page: tapping the card body opens the discover page
+        var open_btn := Arc.button("VIEW PAGE", Vector2(560, 50), 17,
+                        Color(0.42, 0.30, 0.16), func():
+                                Jukebox.sfx("click", -4.0)
+                                _open_discover_page(row))
+        _feed_scroll.register_tappable(open_btn, Arc._tap_emitter(open_btn))
+        v.add_child(open_btn)
+        return panel
+
+## The download through the engine; the button lives through the await.
+func _discover_download(row: Dictionary, btn: Button) -> void:
+        var report: Dictionary = await GogaDiscover.download(row)
+        if not is_instance_valid(btn):
+                return
+        var why := String(report.get("why", ""))
+        if why != "":
+                btn.disabled = false
+                btn.text = "RETRY"
+                Arc.toast(_toast, why)
+                return
+        var installed: Array = report.get("installed", [])
+        if not installed.is_empty():
+                btn.text = "INSTALLED"
+                Jukebox.sfx("confirm", -4.0)
+                Arc.toast(_toast, "%s installed - find it in ALL GAMES" %
+                                String(row.get("title", "the game")))
+        else:
+                btn.disabled = false
+                btn.text = "RETRY"
+                Arc.toast(_toast, "nothing landed (already installed?)")
+
+## The discover page sheet (the store's game page): media, description,
+## the facts, and the download/update seat.
+func _open_discover_page(row: Dictionary) -> void:
+        if _sheet_open:
+                return
+        Jukebox.sfx("click", -4.0)
+        var vb := _sheet_base(_sheet_height(980.0), "discover_page")
+        var title := Arc.label(String(row.get("title", "?")), 40, Arc.INK)
+        title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        vb.add_child(title)
+        var content := VBoxContainer.new()
+        content.add_theme_constant_override("separation", 10)
+        vb.add_child(content)
+        # the media seat: the package's own thumbnail (the poster law)
+        var thumb := TextureRect.new()
+        thumb.custom_minimum_size = Vector2(0, 200)
+        thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        thumb.clip_contents = true
+        content.add_child(thumb)
+        _discover_fill_thumb(thumb, row)
+        # the facts line
+        var facts := "%s  ·  v%s" % [String(row.get("source", "")), String(row.get("version", ""))]
+        if row.has("size") and int(row.get("size", 0)) > 0:
+                facts += "  ·  %s bytes" % Arc.short_num(int(row["size"]))
+        if row.has("updated") and String(row.get("updated", "")) != "":
+                facts += "  ·  updated %s" % String(row["updated"])
+        var fl := Arc.label(facts, 18, Color("6a4a28"), false)
+        fl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        content.add_child(fl)
+        # the age + content tags (the app-store vocabulary)
+        content.add_child(Arc.label("AGE", 20, Arc.HOT))
+        content.add_child(Arc.chip(Meta.age_label(str(maxi(3, int(row.get("age", 3))))), "",
+                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+        var cons: Array = (row.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+        if not cons.is_empty():
+                content.add_child(Arc.label("CONTENT", 20, Arc.HOT))
+                var crow := HFlowContainer.new()
+                crow.add_theme_constant_override("h_separation", 8)
+                crow.add_theme_constant_override("v_separation", 8)
+                for cid in cons:
+                        crow.add_child(Arc.chip(Meta.content_label(String(cid)), "",
+                                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+                content.add_child(crow)
+        # the description
+        var desc_l := Arc.label(String(row.get("desc", "")), 19, Arc.INK, false)
+        desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        content.add_child(desc_l)
+        # the download seat
+        var installed_v := String(row.get("installed_version", ""))
+        var btn_txt := "UPDATE to v%s" % String(row.get("version", "")) \
+                        if installed_v != "" else "DOWNLOAD"
+        var btn := Arc.button(btn_txt, Vector2(540, 80), 26, Arc.ACCENT)
+        content.add_child(btn)
+        btn.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                btn.disabled = true
+                btn.text = "FETCHING..."
+                _discover_download(row, btn))
+        _scroll_sheet_register(btn, func(): btn.pressed.emit())
+        vb.add_child(Arc.button("CLOSE", Vector2(540, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb)
+
+func _scroll_sheet_register(_c: Control, _fn: Callable) -> void:
+        pass   # the sheet bodies ride their own input; the seat keeps the law
+
+## The thumb fill: a local path loads at once, a URL fetches async and
+## repaints when the bytes land (the feed stays responsive).
+func _discover_fill_thumb(thumb: TextureRect, row: Dictionary) -> void:
+        if row.has("thumb_path"):
+                thumb.texture = Meta.thumb_texture(String(row["thumb_path"]))
+                return
+        var url := String(row.get("thumb_url", ""))
+        if url == "":
+                return
+        var task := func() -> void:
+                var bytes := await GogaDiscover.http_get_bytes(url, 12.0)
+                if bytes.is_empty() or not is_instance_valid(thumb):
+                        return
+                var img := Image.new()
+                if img.decode_png_buffer(bytes) != OK and img.decode_jpg_buffer(bytes) != OK:
+                        return
+                thumb.texture = ImageTexture.create_from_image(img)
+        task.call()
+
+## THE IMPORT SEAT (the owner: "make it even support .goga and .gogas and
+## normal folder selection to import them normally"): the system explorer
+## on both platforms (the PFP picker pattern); folders import on PC.
+func _discover_import_dialog() -> void:
+        if DisplayServer.get_name() == "Android":
+                _discover_import_android_scan()
+                return
+        var dlg := FileDialog.new()
+        dlg.file_mode = FileDialog.FILE_MODE_OPEN_ANY
+        dlg.access = FileDialog.ACCESS_FILESYSTEM
+        dlg.filters = ["*.goga ; GOGA packages", "*.gogas ; GOGA multi-packages"]
+        dlg.current_dir = GOGA.home()
+        dlg.file_selected.connect(func(path: String):
+                _discover_import_report(GOGA.import_path(path))
+                dlg.queue_free())
+        dlg.dir_selected.connect(func(path: String):
+                _discover_import_report(GOGA.import_path(path))
+                dlg.queue_free())
+        dlg.cancelled.connect(func(): dlg.queue_free())
+        add_child(dlg)
+        dlg.popup_centered_ratio(0.8)
+
+## The Android seat: the system explorer cannot hand back arbitrary files
+## without SAF plumbing - the honest door is the Downloads scan: the
+## player drops the .goga into Download/ and presses IMPORT.
+func _discover_import_android_scan() -> void:
+        var found := 0
+        var installed := 0
+        var dl := OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
+        if dl != "":
+                for ext in ["goga", "gogas"]:
+                        var da := DirAccess.open(dl)
+                        if da == null:
+                                continue
+                        da.list_dir_begin()
+                        var n := da.get_next()
+                        while n != "":
+                                if not da.current_is_dir() and n.get_extension() == ext:
+                                        found += 1
+                                        var rep: Dictionary = GOGA.import_path(dl.path_join(n))
+                                        installed += (rep["installed"] as Array).size()
+                                n = da.get_next()
+                        da.list_dir_end()
+        if found == 0:
+                Arc.toast(_toast, "no .goga/.gogas in Download - drop packages there and press IMPORT again")
+        else:
+                Arc.toast(_toast, "%d package(s) scanned, %d installed" % [found, installed])
+        _refresh()
+
+func _discover_import_report(report: Dictionary) -> void:
+        var n := (report["installed"] as Array).size()
+        if n > 0:
+                Jukebox.sfx("confirm", -4.0)
+                Arc.toast(_toast, "%d package(s) installed" % n)
+        for r in (report["refused"] as Array):
+                var errs: Array = (r as Dictionary).get("errors", [])
+                if not errs.is_empty():
+                        Arc.toast(_toast, String(errs[0]))
+        _refresh()
+
+## THE ADD SOURCE seat: a github repo ("user/repo") or, on PC, a local
+## path (the virtual-repo simulation). The sources live in the registry.
+func _discover_add_source() -> void:
+        if _sheet_open:
+                return
+        var vb := _sheet_base()
+        var t := Arc.label("ADD SOURCE", 36, Arc.INK)
+        t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(t)
+        var hint := Arc.label("a github repo that serves\nGOGAs/discover/index/source.json", 20, Color("6a4a28"), false)
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint)
+        var field := LineEdit.new()
+        field.placeholder_text = "user/repo"
+        field.custom_minimum_size = Vector2(540, 64)
+        field.add_theme_font_override("font", Arc.font_ui())
+        field.add_theme_font_size_override("font_size", 22)
+        vb.add_child(field)
+        vb.add_child(Arc.button("ADD GITHUB SOURCE", Vector2(480, 72), 22, Arc.ACCENT, func():
+                var repo := field.text.strip_edges()
+                if repo.contains("/") and not repo.begins_with("http"):
+                        GogaDiscover.add_source({"kind": "github", "repo": repo, "branch": "main"})
+                        Arc.toast(_toast, "source added - pulling the feed")
+                        _close_sheet()
+                        _feed_kind = "discover"
+                        _refresh()
+                else:
+                        Arc.toast(_toast, "that does not read like user/repo")))
+        var hint2 := Arc.label("a LOCAL folder (PC): a package root, a parent of roots,\nor a virtual repo (gogabox.repo.json + roots)", 18, Color("6a4a28"), false)
+        hint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        vb.add_child(hint2)
+        var field2 := LineEdit.new()
+        field2.placeholder_text = "/path/to/folder"
+        field2.custom_minimum_size = Vector2(540, 64)
+        field2.add_theme_font_override("font", Arc.font_ui())
+        field2.add_theme_font_size_override("font_size", 22)
+        vb.add_child(field2)
+        vb.add_child(Arc.button("ADD LOCAL SOURCE", Vector2(480, 72), 22, Arc.ACCENT, func():
+                var p := field2.text.strip_edges()
+                if DirAccess.dir_exists_absolute(p):
+                        GogaDiscover.add_source({"kind": "local", "path": p})
+                        Arc.toast(_toast, "local source added")
+                        _close_sheet()
+                        _feed_kind = "discover"
+                        _refresh()
+                else:
+                        Arc.toast(_toast, "no folder there")))
+        vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16),
+                        func(): _close_sheet()))
+        Arc.fit_sheet(vb, 2)

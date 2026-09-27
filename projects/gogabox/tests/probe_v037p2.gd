@@ -385,7 +385,7 @@ func _feed_restore() -> void:
         # no age keys anywhere, no gogads anywhere
         var age_free := true
         var ads_free := true
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 if g.has("age"):
                         age_free = false
                 if g.has("gogads"):

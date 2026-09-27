@@ -67,7 +67,7 @@ static func state(id: String) -> String:
 ## The caller guarantees `id` itself is unresolved; it never counts itself.
 static func _mystery_rank(id: String) -> int:
         var rank := 0
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var gid := String(g["id"])
                 if gid == id:
                         return rank
@@ -304,7 +304,7 @@ static func _seen_at(id: String) -> int:
 ## Call on menu refresh + a slow timer + after runs/unlocks.
 static func tick() -> void:
         var now := int(Time.get_unix_time_from_system())
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var id := String(g["id"])
                 var st := state(id)
                 var key := "state_" + id
@@ -414,7 +414,7 @@ static func daily_picks() -> Array:
         var rng := RandomNumberGenerator.new()
         rng.seed = hash(seed_text)
         var pool := []
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 if g.get("coming_soon", false):
                         continue   # the workshop is not a playlist
                 if not Box.owns_game(String(g["id"])):
@@ -450,10 +450,10 @@ static func daily_picks() -> Array:
 ## oldest game first and the newest game last, on every save, forever.
 static func feed_rows() -> Array:
         var reg_idx := {}
-        for k in GameReg.GAMES.size():
-                reg_idx[String(GameReg.GAMES[k]["id"])] = k
+        for k in GameReg.games().size():
+                reg_idx[String(GameReg.games()[k]["id"])] = k
         var rows: Array = []
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var id := String(g["id"])
                 var st := state(id)
                 if st == "HIDDEN":

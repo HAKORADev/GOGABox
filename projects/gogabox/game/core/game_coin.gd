@@ -26,7 +26,7 @@ extends RefCounted
 ## never appear (THE GAME PICKER LAW).
 static func games() -> Array:
         var out: Array = []
-        for g in GameReg.GAMES:
+        for g in GameReg.games():
                 var cur: Dictionary = g.get("currency", {})
                 if cur.is_empty():
                         continue
