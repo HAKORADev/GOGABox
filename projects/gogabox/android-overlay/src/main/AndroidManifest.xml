@@ -48,6 +48,7 @@
         android:isGame="true"
         android:hasFragileUserData="false"
         android:requestLegacyExternalStorage="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:ignore="GoogleAppIndexingWarning" >
         <profileable
             android:shell="true"
@@ -58,6 +59,14 @@
         <meta-data
             android:name="org.godotengine.plugin.v1.Notify"
             android:value="org.godotengine.plugin.notify.NotifyPlugin" />
+
+        <!-- v043 pass 3 THE IN-APP BROWSER SEAT: web games run in the system
+             WebView inside the activity (no tabs, no redirection). The page
+             reaches the box's WebSocket bridge on the loopback - cleartext
+             to 127.0.0.1 only, nothing else leaves the device in the clear. -->
+        <meta-data
+            android:name="org.godotengine.plugin.v1.GogaBrowser"
+            android:value="org.godotengine.plugin.gogabrowser.GogaBrowserPlugin" />
 
         <activity
             android:name=".GodotApp"

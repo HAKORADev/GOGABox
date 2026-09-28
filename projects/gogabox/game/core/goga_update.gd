@@ -178,9 +178,34 @@ static func apply_windows(path: String) -> Dictionary:
 # ------------------------------------------------------------- the schedule
 
 ## THE UPDATE SCHEDULE (the settings' engine seat): a boot check + a
-## periodic re-check. The menu owns the timer; these carry the cadence.
+## periodic re-check; the interval + auto-download live in Box meta
+## (update_prefs) and the APP UPDATES sheet edits them. v043 pass 3 - the
+## sheet was the honest census only; the plan's schedule ("develop the
+## update/download stuff in the GOGABox ofc and the schedule") wants the
+## interval, the auto-download toggle and the staged-apply seat IN the
+## menu, not just in the engine constants.
 const CHECK_ON_BOOT := true
 const CHECK_INTERVAL_HOURS := 24
+const INTERVALS := [[12, "12 H"], [24, "24 H"], [48, "2 DAYS"], [168, "WEEKLY"]]
+
+static func prefs() -> Dictionary:
+        var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
+        if box == null:
+                return {"interval_h": CHECK_INTERVAL_HOURS, "auto": false}
+        var p: Dictionary = box.call("get_meta_dict", "update_prefs")
+        if not p.has("interval_h"):
+                p["interval_h"] = CHECK_INTERVAL_HOURS
+        if not p.has("auto"):
+                p["auto"] = false
+        return p
+
+static func set_pref(key: String, val: Variant) -> void:
+        var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
+        if box == null:
+                return
+        var p := prefs()
+        p[key] = val
+        box.call("set_meta_dict", "update_prefs", p)
 
 static func should_check() -> bool:
         var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
@@ -188,7 +213,8 @@ static func should_check() -> bool:
                 return false
         var last := int(box.call("get_meta_dict", "update_check").get("last_ts", 0))
         var now := int(Time.get_unix_time_from_system())
-        return now - last >= CHECK_INTERVAL_HOURS * 3600
+        var interval_h := int(prefs().get("interval_h", CHECK_INTERVAL_HOURS))
+        return now - last >= maxi(1, interval_h) * 3600
 
 static func mark_checked() -> void:
         var box := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Box")
@@ -196,3 +222,31 @@ static func mark_checked() -> void:
                 var m: Dictionary = box.call("get_meta_dict", "update_check")
                 m["last_ts"] = int(Time.get_unix_time_from_system())
                 box.call("set_meta_dict", "update_check", m)
+
+# ------------------------------------------------------------- the staged seat
+
+## The staged update file (GOGAs/.cache/update/), if one waits. The APPLY
+## NOW seat reads this; a staged file survives restarts (the cache is the
+## staging area, the player may close before applying).
+static func staged_path() -> String:
+        var g := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GOGA")
+        if g == null:
+                return ""
+        var dir := String(g.call("cache_dir")).path_join(UPDATE_DIR)
+        var fname := "gogabox_update.apk" if OS.has_feature("android") \
+                        else "GOGABox_update.zip"
+        var p := dir.path_join(fname)
+        return p if FileAccess.file_exists(p) else ""
+
+## THE AUTO-DOWNLOAD SCHEDULE SEAT: the boot/24h check runs this when the
+## census says an update waits and the player turned AUTO on. Returns the
+## staged path or "" (the note layer tells the player either way).
+static func scheduled_auto(census: Dictionary) -> String:
+        if not bool(census.get("available", false)):
+                return ""
+        if not bool(prefs().get("auto", false)):
+                return ""
+        if staged_path() != "":
+                return ""   # already staged - nothing to fetch again
+        var dl: Dictionary = await download(census)
+        return String(dl.get("path", ""))

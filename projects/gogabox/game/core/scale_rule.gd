@@ -486,6 +486,19 @@ static func boot_window() -> void:
         # itself leaves it.
         if Box.has_method("pc_position"):
                 pc_position = String(Box.call("pc_position"))
+        # v043 pass 3 THE DESIGN-FIRST BOOT (the owner's Windows catch:
+        # "when last position is horizontal, the app opens with horizontal
+        # window but content inside is vertical and got mis-scaled"). F10 is
+        # DESIGN-FIRST (apply_pc lands the canvas mapping before the window
+        # moves - toggle_menu_position); boot was WINDOW-FIRST: the design
+        # only landed later in menu._ready, so the whole splash beat (and
+        # any echo-delayed frame after it) rendered the PORTRAIT project
+        # default inside an already-landscape window - the vertical content
+        # in the horizontal window, mis-scaled. Boot now walks the exact F10
+        # order: the design is applied HERE, before any frame, before the
+        # window reshape.
+        if root_window() != null:
+                apply_pc(root_window(), pc_menu_design())
         var want_fs: bool = Box.has_method("pc_fullscreen") \
                         and Box.call("pc_fullscreen")
         if want_fs:

@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "gogabox_github-HAKORADev_hakora.orbit.005_official",
+  "game_id": "orbit",
+  "title": "GOGA ORBIT",
+  "tag": "the web pilot - three.js in the box",
+  "version": "1.0.0",
+  "age": 3,
+  "content": [],
+  "genres": {
+    "main": [
+      "arcade"
+    ],
+    "sub": [
+      "minimal",
+      "retro"
+    ]
+  },
+  "os": [
+    "android",
+    "pc"
+  ],
+  "runs": {
+    "android": {
+      "kind": "web",
+      "entry": "game/web/index.html"
+    },
+    "pc": {
+      "kind": "web",
+      "entry": "game/web/index.html"
+    }
+  },
+  "thumb": "discover/media/thumb.png",
+  "desc": "A three.js game running INSIDE the box: drag to steer the dart around the orbit lane, catch the gold, dodge the rocks. Served by the box's own localhost seat, bridged through window.GOGA - the web kind, proven end to end.",
+  "fee": 0,
+  "price": 0,
+  "coin_div": 10,
+  "updated": "2026-09-28",
+  "versions_count": 1,
+  "size_bytes": 634211,
+  "files": [
+    {
+      "path": "data/audio/music/README.txt",
+      "sha256": "9aed66a056ac3de8f08f437432979b3a1a60ff49"
+    },
+    {
+      "path": "data/audio/sfx/README.txt",
+      "sha256": "5ec5a499a80b536248efff05be5a34f9d59de4ba"
+    },
+    {
+      "path": "data/logic/tuning.json",
+      "sha256": "16aefc7626c1349b9e818bfb72cc7f58409ee136"
+    },
+    {
+      "path": "data/visuals/assets/board_bg.png",
+      "sha256": "e11956dba830b9f1d243a8236fd21d4497199794"
+    },
+    {
+      "path": "data/visuals/shaders/vignette.gdshader",
+      "sha256": "fa34842fb869e89e3f5b86b95c69f18d104dfb2f"
+    },
+    {
+      "path": "discover/media/thumb.png",
+      "sha256": "840f34a3010f4e1ec116515b647d9d22069c3aed"
+    },
+    {
+      "path": "game/web/goga_bridge.js",
+      "sha256": "ba52141d42299bb678c86dfc74b50bea65885624"
+    },
+    {
+      "path": "game/web/index.html",
+      "sha256": "5f80601d5f2a0fe709559ea8e1ecd0abbb0a05dd"
+    },
+    {
+      "path": "game/web/main.js",
+      "sha256": "b882fd7da68fced144c47e04b896e9381722c27e"
+    },
+    {
+      "path": "game/web/three.min.js",
+      "sha256": "912bc7c150055cd324dfee0ff243cab74e7c6606"
+    },
+    {
+      "path": "save/README.md",
+      "sha256": "54af6f85c8f8e30fb524dbeb529241b3260ec36f"
+    }
+  ]
+}

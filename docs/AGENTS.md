@@ -1723,3 +1723,87 @@ reads without booting the scene.
      headers ("the v043 platform shape"), no law-jargon walls; the
      version-anchored law-speak belongs in AGENTS.md, the plans and the
      engine comments. The owner reads the front door; write it for him.
+
+## THE v043 PASS 3 LAWS (the owner's Windows test round: the dead arrow,
+## the boot mis-scale, the simplified infra, the missing runners, the
+## artifact delivery - "make this as another round and not a version/patch
+## pump", so the config stays 0.4.3)
+
+127. THE TAPPABLE RE-SEAT LAW: a Control living INSIDE a BoxScroll is
+     dead unless it is a REGISTERED tappable - and `_refresh()` clears
+     the tappables on every rebuild, so anything built ONCE beside the
+     feed (the discover switcher arrow) must RE-REGISTER after the
+     clear. The raw mouse click is swallowed by the scroll's own
+     `_mouse()` (handled before the GUI stage) and the touch by `_owns()`
+     - on BOTH platforms through the input stack. The eye pass clicks
+     through the real input wire now (parse_input_event eats WINDOW px -
+     the r4 real-click law).
+128. THE DESIGN-FIRST BOOT LAW: boot walks the exact F10 order - restore
+     the persisted position choice, apply_pc(design) BEFORE any frame and
+     before the window reshape, then re_window. The old window-first
+     order rendered the portrait project default inside an
+     already-landscape window for the whole splash beat (the owner's
+     "opens with horizontal window but content inside is vertical and
+     got mis-scaled"), and the menu's _ready never reflowed after its
+     own design flip (the governor's compare saw no change). Boot parity
+     with F10 is structural now, not timing luck.
+129. THE CHIP LAW (the owner's own clarification): the CONST tables
+     (genres, subs, content) ALWAYS ride the search rows - "if we
+     hardcoded 'porn' then it must keep showing up". An UNKNOWN tag
+     appears ONLY at the census: >= 10 OWNED games sharing it index it
+     as a first-class chip ("if we did not made 'blowjob' but there is
+     10 blowjob-tagged games, then make that tag appear"), persisted in
+     Box meta. The census covers CONTENT tags too, and the age chips
+     wear the WORD ("+12 YOUNG TEENS", "+21 ADULT ONLY" - the archive's
+     own tier texts, Meta.age_label).
+130. THE CATALOG LAW (schema 2, the owner: "there should be really
+     different files for each repos tier"): a source repo serves a real
+     multi-file catalog at GOGAs/discover/index/ - source.json (the
+     identity + the tier file map) + official.json / community.json /
+     hobbyist.json; REPOS.txt stays the plain register the two-step
+     publish PRs against, and CI keeps community.json in lockstep with
+     it. The tier map paths are CATALOG-relative (the files sit beside
+     source.json); the game index paths inside the tier files are
+     GOGAs-folder-relative ("games/<pkg>/..."). THE TIER TRUST LAW: rows
+     from the OFFICIAL source wear the tier FILE's name (the owner
+     curates his own catalog); rows from every other source wear the
+     ENGINE's tier - a community repo can never claim official. Schema-1
+     sources (the inline games array) still parse.
+131. THE VERSION LEDGER LAW: every package carries index/versions.json
+     (one entry per released version, the ledger names the index's
+     version) - index/ is a real folder, not one file; the VERSIONS sort
+     reads real data; the strict validator and the CI both demand it.
+     Future releases APPEND, never rewrite.
+132. THE RUNNER DOORS LAW: the validator always knew godot_embedded |
+     native | web; only the embedded door existed and a web/native
+     launch died silently in mount_for. The doors now exist: WEB - the
+     box serves the package's game/web/ over a LOOPBACK static server
+     (GogaWebserve, 127.0.0.1 only) and opens it in an in-app surface
+     (Android: the gogabrowser plugin - the system WebView inside the
+     activity, no tabs, no redirection; PC: the system's WebView2 runtime
+     in app mode - msedge/chrome --app, a chromeless window, the honest
+     seat until the WebView2 extension lands). NATIVE - the PC launches
+     the package's exe as a CHILD PROCESS and watches it; the session
+     ends when it exits (the Steam model); the Android .so loader is the
+     next platform round and refuses honestly today. The back button in
+     a runner seat IS the exit.
+133. THE ONE-BRIDGE LAW: every transport speaks the SAME ops vocabulary.
+     The TCP bridge (31442) gained a WebSocket twin (31443, loopback) -
+     web games cannot do raw TCP; sdk/web/goga_bridge.js carries the
+     identical hello/coins/save/toast door to window.GOGA. The
+     vocabulary lives in ONE dispatcher (_bridge_dispatch) so the wires
+     cannot drift. Loopback cleartext is the only wire allowed in the
+     clear (the Android network security config names exactly
+     127.0.0.1/localhost).
+134. THE GOGAs DELIVERY LAW: the CI artifacts carry the OFFICIAL tree -
+     the Windows zip ships GOGAs/ NEXT TO the exe (unzip, run, seated),
+     the Android build uploads GOGAs-official-*.zip for the Downloads
+     extraction, the release body carries the placement command, and the
+     box says where the tree goes when it boots empty (one quiet note).
+     The clean-artifact law holds: no paperwork beyond the tree's own
+     README.txt.
+135. THE UPDATES SHEET LAW: the sheet carries the plan's whole schedule -
+     the census, CHECK NOW, the interval picker (12H/24H/2 DAYS/WEEKLY),
+     the AUTO-DOWNLOAD toggle (a scheduled find stages the download and
+     the note names the one APPLY tap), and the staged seat (a downloaded
+     update waits in .cache/update and APPLY runs the platform trick).

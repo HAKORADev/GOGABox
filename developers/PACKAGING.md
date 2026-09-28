@@ -11,6 +11,9 @@ same folder, zipped, for easy sharing.
 <package root>/
   index/
     index.json          # THE MANIFEST - everything the box reads
+    versions.json       # THE VERSION LEDGER - one entry per released
+                        # version (the VERSIONS sort's data; the validator
+                        # demands it; future releases APPEND, never rewrite)
   game/                 # THE RUNNABLE
     android/goga.pck    #   godot packages: one pck per platform (or one shared)
     pc/goga.pck         #   native: .exe / .so · web: entry .html + files
@@ -88,6 +91,8 @@ The box refuses an import/download with a NAMED error for each miss:
 - `index/index.json` missing / not a JSON object / missing any of
   `id, game_id, title, version, age, genres, os, runs, thumb`
 - the `id` does not wear the long-id scheme, or the tier is unknown
+- `index/versions.json` missing, not a ledger (`{"versions": [...]}`),
+  empty, or not naming the index's own version
 - a `runs.<plat>` entry points at a pck/bin/html that does not exist,
   or wears an unknown `kind`
 - `data/logic/`, `data/audio/sfx/`, `data/audio/music/`,

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>GOGA ORBIT</title>
+<style>
+        html, body { margin: 0; padding: 0; background: #0b0d16; overflow: hidden;
+                touch-action: none; -webkit-user-select: none; user-select: none; }
+        #hud { position: fixed; top: 12px; left: 14px; right: 14px; display: flex;
+                justify-content: space-between; color: #f5c56b;
+                font: 600 20px/1.2 monospace; text-shadow: 0 2px 6px #000; pointer-events: none; }
+        #msg { position: fixed; left: 0; right: 0; top: 42%; text-align: center;
+                color: #f5c56b; font: 700 34px/1.4 monospace;
+                text-shadow: 0 3px 10px #000; pointer-events: none; }
+        #sub { font-size: 18px; color: #b99a72; margin-top: 10px; }
+        #coin { color: #ffd76b; }
+</style>
+</head>
+<body>
+<div id="hud"><span id="score">0</span><span id="coin">G</span></div>
+<div id="msg">GOGA ORBIT<div id="sub">drag to steer - catch the gold, dodge the rocks</div></div>
+<script src="three.min.js"></script>
+<script src="goga_bridge.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

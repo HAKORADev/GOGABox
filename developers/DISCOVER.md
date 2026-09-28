@@ -4,31 +4,69 @@ The discover feed is a SEARCH ENGINE over SOURCES. A source is either a
 github repo (served over RAW http — never the API) or a local folder.
 The engine owns the tiers; a source can never claim one.
 
-## The source file (the known-file convention)
+## The catalog (the known-file convention, schema 2)
 
-A github source must serve, at its repo root, this exact path:
+A github source serves, at its repo root, a real MULTI-FILE catalog:
 
 ```
-GOGAs/discover/index/source.json
+GOGAs/discover/
+  index/
+    source.json        # the identity + the tier file map
+    official.json      # the official tier's game rows
+    community.json     # the community source directory (CI-synced)
+    hobbyist.json      # the hobbyist rows (usually empty in a repo)
+  REPOS.txt            # the one-line community register (the PR target)
 ```
 
-fetched as `https://raw.githubusercontent.com/<user>/<repo>/<branch>/GOGAs/discover/index/source.json`.
-That path IS the API (the no-api-limit law) — github's REST is never
-touched, the rate limits are bypassed by construction.
+`source.json`:
 
 ```jsonc
 {
-  "schema": 1,
+  "schema": 2,
   "name": "GOGABox Official",
   "repo": "HAKORADev/GOGABox",
+  "branch": "main",
   "engine_version": "0.4.3",          // the APP self-update channel
   "update_assets": {"android": "<url>", "pc": "<url>"},
+  "tiers": {                           // paths are CATALOG-relative
+    "official": "official.json",
+    "community": "community.json",
+    "hobbyist": "hobbyist.json"
+  }
+}
+```
+
+A tier file's game rows point at packages with GOGAs-folder-relative
+index paths (the raw fetch walks them exactly as written):
+
+```jsonc
+{
+  "schema": 2, "tier": "official", "updated": "2026-09-28",
   "games": [
-    {"index": "games/<pkg id>/index/index.json",   // raw-fetched next
-     "id": "gogabox_github-<user>_...", "version": "1.0.0"}
+    {"index": "games/<pkg id>/index/index.json", "id": "gogabox_github-<user>_...",
+     "game_id": "...", "title": "...", "version": "1.0.0",
+     "size_bytes": 0, "updated": "2026-09-28", "versions_count": 1}
   ]
 }
 ```
+
+`community.json` is the REGISTER's catalog view — the same repos as
+`REPOS.txt`, with room for per-source metadata (branch, note). The two
+files are one register: goga-packages CI fails when a PR touches one but
+not the other. Everything is fetched over
+`raw.githubusercontent.com` — the REST API is never touched, the rate
+limits are bypassed by construction (a well-known path IS the API).
+
+**The tier trust law.** Rows from the OFFICIAL source wear the tier
+FILE's name (the owner curates his own catalog). Rows from every other
+source wear the ENGINE's tier — a community repo listing games in its
+own `official.json` reads community, never official.
+
+**The local simulation.** A LOCAL source walks the SAME catalog when the
+folder is repo-shaped: a repo root (`GOGAs/discover/index/source.json`
+under it) or the GOGAs folder itself (`discover/index/` one level down).
+The local flow IS the contract; schema-1 sources (the old inline
+`games` array in source.json) still parse untouched.
 
 Each game's `index/index.json` carries the full manifest
 (PACKAGING.md) plus the `files` array — the downloader fetches every

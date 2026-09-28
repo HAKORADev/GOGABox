@@ -35,7 +35,11 @@ func _ready() -> void:
         fails += _test("goga: THE STRICT VALIDATOR refusals", _t_goga_validator())
         fails += _test("goga: import shapes + rename + update laws", _t_goga_import())
         fails += _test("goga: the SDK doors (data/save/visual)", _t_goga_sdk())
-        fails += _test("discover: the local source feed + sorts + labels", _t_discover())
+        fails += _test("discover: the local source feed + sorts + labels", await _t_discover())
+        fails += _test("discover: the schema-2 catalog walk (per-tier files)", await _t_catalog())
+        fails += _test("runner: the localhost web seat serves the pilot", await _t_webserve())
+        fails += _test("runner: the WebSocket bridge door (web games)", await _t_ws_bridge())
+        fails += _test("runner: the native child-process door (the stub)", await _t_native_runner())
         fails += _test("sdk: the bridge roundtrip (a standalone client over TCP)", await _t_sdk_bridge())
         fails += _test("update: the schedule + the Windows replace-after-close helper", _t_update())
         # ---- lan (the v042 regression shield, platform-era ids)
@@ -315,6 +319,43 @@ func _t_meta() -> int:
         ok += _check(not Meta.used_genres().is_empty(), "genres used by installed games")
         ok += _check(not Meta.used_subs().is_empty(), "subs used by installed games")
         ok += _check(Meta.used_contents().size() >= 0, "content census reads")
+        # v043 pass 3 THE CHIP LAW, the owner's own clarification: the
+        # const tables ALWAYS show ("if we hardcoded 'porn' then it must
+        # keep showing up"), an unknown tag indexes only at the census
+        # ("if we did not made 'blowjob' but there is 10 blowjob-tagged
+        # games, then make that tag appear") - and the census covers
+        # CONTENT tags now, not only genres/subs.
+        ok += _check(Meta.GENRES.size() >= 12 and Meta.SUBS.size() >= 8,
+                        "the const tables always ride the rows (the hardcoded law)")
+        ok += _check(Meta.CONTENT.size() >= 8,
+                        "the content table always rides the rows (porn stays)")
+        ok += _check(Meta.age_label("21") == "+21 ADULT ONLY",
+                        "the age chip wears the word (+21 ADULT ONLY)")
+        ok += _check(Meta.age_label("12") == "+12 YOUNG TEENS",
+                        "the age chip wears the word (+12 YOUNG TEENS)")
+        var mk_e := func(id: String, genre: String) -> Dictionary:
+                return {"id": id, "genres": {"main": [genre], "sub": []},
+                                "content": [genre]}
+        var nine: Array = []
+        for i in 9:
+                nine.append(mk_e.call("g%d" % i, "blowjob"))
+        var r9: Dictionary = Meta.learn_tags(nine, func(_id): return true)
+        ok += _check((r9["genre"] as Array).is_empty() and (r9["content"] as Array).is_empty(),
+                        "9 games sharing an unknown tag index NOTHING (below the census)")
+        var ten: Array = nine.duplicate(true)
+        ten.append(mk_e.call("g10", "blowjob"))
+        var r10: Dictionary = Meta.learn_tags(ten, func(_id): return true)
+        ok += _check((r10["genre"] as Array) == ["blowjob"],
+                        "10 games sharing an unknown genre index it (the owner's own example)")
+        ok += _check((r10["content"] as Array) == ["blowjob"],
+                        "the content census learns unknown content tags too")
+        # a KNOWN tag never needs learning (porn rides the table forever)
+        var known: Array = []
+        for i in 15:
+                known.append(mk_e.call("k%d" % i, "porn"))
+        var rk: Dictionary = Meta.learn_tags(known, func(_id): return true)
+        ok += _check((rk["content"] as Array).is_empty(),
+                        "a hardcoded tag is never 'learned' - it is always there")
         # the dual thumb: a res:// path stays a resource, junk is null
         ok += _check(Meta.thumb_texture("res://assets/thumbs/soon.png") != null,
                         "res thumbs still load")
@@ -546,7 +587,7 @@ func _t_discover() -> int:
         var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
         var src := repo_root.path_join("GOGAs/games")
         var notes: Array = []
-        var rows: Array = GogaDiscover._feed_for_local(src, [], {}, notes)
+        var rows: Array = await GogaDiscover._feed_for_local(src, [], {}, notes)
         ok += _check(rows.size() >= PILOT_GAME_IDS.size(),
                         "the local source serves %d rows" % rows.size())
         ok += _check(notes.is_empty(), "the local source notes nothing (%s)" % str(notes))
@@ -574,14 +615,14 @@ func _t_discover() -> int:
         _copy_tree(src.path_join("gogabox_github-HAKORADev_hakora.rally.001_official"),
                         vr.path_join("whatever_folder_name"))
         var vnotes: Array = []
-        var vrows: Array = GogaDiscover._feed_for_local(vr, ["someone/their-box"], {}, vnotes)
+        var vrows: Array = await GogaDiscover._feed_for_local(vr, ["someone/their-box"], {}, vnotes)
         ok += _check(vrows.size() == 1, "the virtual repo serves its root")
         if vrows.size() == 1:
                 ok += _check(String(vrows[0]["source"]) == "someone/their-box",
                                 "the virtual row carries the repo name")
                 ok += _check(String(vrows[0]["tier"]) == "community",
                                 "a registered virtual repo reads community")
-        var vrows2: Array = GogaDiscover._feed_for_local(vr, [], {}, [])
+        var vrows2: Array = await GogaDiscover._feed_for_local(vr, [], {}, [])
         if vrows2.size() == 1:
                 ok += _check(String(vrows2[0]["tier"]) == "hobbyist",
                                 "an unregistered virtual repo reads hobbyist")
@@ -638,6 +679,234 @@ func _t_discover() -> int:
                         "installed_version": "2.0.0"}
         ok += _check(bool(GogaDiscover.update_label(newer)["dead"]),
                         "a newer local build reads dead (the source is behind)")
+        return ok
+
+## v043 pass 3 THE SCHEMA 2 CATALOG WALK: the repo's own GOGAs/ is shaped
+## like a source repo now (source.json + the per-tier files) - a local
+## source pointed at it walks the SAME catalog the github flow serves.
+func _t_catalog() -> int:
+        var ok := 0
+        var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
+        var cat := repo_root.path_join("GOGAs")
+        ok += _check(FileAccess.file_exists(cat.path_join("discover/index/source.json")),
+                        "the repo carries the source manifest")
+        for f in ["official.json", "community.json", "hobbyist.json"]:
+                ok += _check(FileAccess.file_exists(cat.path_join("discover/index").path_join(f)),
+                                "the catalog carries the tier file %s" % f)
+        var notes: Array = []
+        var rows: Array = await GogaDiscover._feed_for_local(cat, [], {}, notes)
+        ok += _check(rows.size() >= PILOT_GAME_IDS.size() + 1,
+                        "the catalog walk serves the pilots + the web pilot (%d rows)" % rows.size())
+        if rows.is_empty():
+                return ok
+        var ids: Array = rows.map(func(r): return String(r["game_id"]))
+        ok += _check(ids.has("orbit"), "the web pilot rides the catalog")
+        var orbit: Dictionary = {}
+        for r in rows:
+                if String(r["game_id"]) == "orbit":
+                        orbit = r
+        if not orbit.is_empty():
+                ok += _check(int(orbit["versions_count"]) >= 1,
+                                "the orbit row carries its versions count")
+                ok += _check(String(orbit["thumb_path"]) != "", "the orbit row carries its thumb")
+        # the virtual-repo law keeps its truth through the catalog: a
+        # non-official repo's local tree reads hobbyist, never official
+        ok += _check(String(rows[0]["tier"]) == "hobbyist",
+                        "a local catalog without the repo file reads hobbyist (the tier trust law)")
+        return ok
+
+## v043 pass 3 THE WEB SEAT'S SERVER: the box serves the web pilot's own
+## folder over loopback - the files arrive, traversal dies, 404s name it.
+func _t_webserve() -> int:
+        var ok := 0
+        var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
+        var web_dir := repo_root.path_join("GOGAs/games") \
+                        .path_join("gogabox_github-HAKORADev_hakora.orbit.005_official") \
+                        .path_join("game/web")
+        ok += _check(DirAccess.dir_exists_absolute(web_dir), "the web pilot's folder exists")
+        if not DirAccess.dir_exists_absolute(web_dir):
+                return ok
+        var srv := GogaWebserve.new()
+        add_child(srv)
+        var base: String = srv.serve(web_dir)
+        ok += _check(base != "", "the server opens a loopback port")
+        if base == "":
+                return ok
+        var html: String = await GogaDiscover.http_get(base + "/index.html")
+        ok += _check(html.contains("GOGA ORBIT"), "index.html arrives over the loopback")
+        var js: String = await GogaDiscover.http_get(base + "/main.js")
+        ok += _check(js.contains("GOGA ORBIT") and js.length() > 500, "main.js arrives")
+        var missing: String = await GogaDiscover.http_get(base + "/nope.js")
+        ok += _check(missing == "", "a missing file answers nothing (404)")
+        var trav: String = await GogaDiscover.http_get(base + "/..%2f..%2fetc/passwd")
+        ok += _check(trav == "", "traversal is refused")
+        srv.stop()
+        ok += _check(srv.server == null, "the seat tears down")
+        return ok
+
+## THE WEB BRIDGE DOOR: a browser-shaped client (WebSocket) speaks the
+## SAME vocabulary over 127.0.0.1:31443 - hello, the wallet, the save.
+func _t_ws_bridge() -> int:
+        var ok := 0
+        var ws := WebSocketPeer.new()
+        var err := ws.connect_to_url("ws://127.0.0.1:31443")
+        ok += _check(err == OK, "the ws client dials the bridge")
+        if err != OK:
+                return ok
+        var opened := false
+        for i in 120:
+                ws.poll()
+                if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+                        opened = true
+                        break
+                await get_tree().process_frame
+        ok += _check(opened, "the bridge upgrades the socket")
+        if not opened:
+                return ok
+        # hello
+        ws.send_text(JSON.stringify({"op": "hello", "client": "wsrig", "proto": 1}))
+        var got := ""
+        for i in 120:
+                ws.poll()
+                while ws.get_available_packet_count() > 0:
+                        got = ws.get_packet().get_string_from_utf8()
+                if got != "":
+                        break
+                await get_tree().process_frame
+        ok += _check(got.contains("\"ok\":true") and got.contains("box"), "hello answers over ws")
+        # the wallet + the save roundtrip (the same doors the tcp door serves)
+        ws.send_text(JSON.stringify({"op": "save.write", "key": "save", "data": "ws-bridge-roundtrip"}))
+        var got2 := ""
+        for i in 120:
+                ws.poll()
+                while ws.get_available_packet_count() > 0:
+                        got2 = ws.get_packet().get_string_from_utf8()
+                if got2 != "":
+                        break
+                await get_tree().process_frame
+        ok += _check(got2.contains("\"ok\":true"), "the ws save.write lands")
+        ws.close()
+        var save_file := GOGA.libs_dir().path_join("clients/wsrig/save.json")
+        ok += _check(FileAccess.file_exists(save_file),
+                        "the ws client's save sits in the GOGAs tree (the portable law)")
+        if FileAccess.file_exists(save_file):
+                ok += _check(FileAccess.get_file_as_string(save_file) == "ws-bridge-roundtrip",
+                                "the ws save round-trips")
+        return ok
+
+## THE NATIVE DOOR: compile the stub (a third-party-shaped exe that links
+## the SDK bridge), package it, launch through GameHost, and the runner
+## must spawn it, watch it, and end the session when it exits.
+func _t_native_runner() -> int:
+        var ok := 0
+        if OS.has_feature("android"):
+                return ok   # the stub is a desktop proof; the phone seat refuses by law
+        # ---- build the stub binary (the rig's stand-in for a real exe) ----
+        var stub_dir := ProjectSettings.globalize_path("res://").path_join("../..") \
+                        .path_join("projects/gogabox/tests/native")
+        if not DirAccess.dir_exists_absolute(stub_dir):
+                stub_dir = ProjectSettings.globalize_path("res://").path_join("tests/native")
+        var out_dir := GOGA.cache_dir().path_join("rig/native")
+        DirAccess.make_dir_recursive_absolute(out_dir)
+        var bin_path := out_dir.path_join("nativestub.bin")
+        var cc := OS.execute("cc", ["-O2", "-o", ProjectSettings.globalize_path(bin_path),
+                        stub_dir.path_join("native_stub.c")])
+        if cc != 0 or not FileAccess.file_exists(bin_path):
+                print("    - SKIP: no cc toolchain - the native stub did not build")
+                return ok
+        # ---- the package around it (the native packager's contract) ----
+        var pkg_id := "gogabox_github-rig_native.stub.001_hobbyist"
+        var root := out_dir.path_join(pkg_id)
+        _wipe(root)
+        DirAccess.make_dir_recursive_absolute(root.path_join("game/pc"))
+        for d in ["data/logic", "data/audio/sfx", "data/audio/music",
+                        "data/visuals/shaders", "data/visuals/assets",
+                        "save", "discover/media", "index"]:
+                DirAccess.make_dir_recursive_absolute(root.path_join(d))
+        var stub_bytes := PackedByteArray()
+        var sf := FileAccess.open(bin_path, FileAccess.READ)
+        if sf != null:
+                stub_bytes = sf.get_buffer(int(sf.get_length()))
+                sf.close()
+        var df := FileAccess.open(root.path_join("game/pc/nativestub.bin"), FileAccess.WRITE)
+        var copied := false
+        if df != null and not stub_bytes.is_empty():
+                df.store_buffer(stub_bytes)
+                df.close()
+                copied = true
+        ok += _check(copied, "the stub binary lands in the package")
+        FileAccess.open(root.path_join("save/README.md"), FileAccess.WRITE).store_string("seat")
+        FileAccess.open(root.path_join("data/logic/seed.json"), FileAccess.WRITE).store_string("{}")
+        FileAccess.open(root.path_join("data/audio/sfx/seed.wav"), FileAccess.WRITE).store_8(0)
+        FileAccess.open(root.path_join("data/audio/music/seed.wav"), FileAccess.WRITE).store_8(0)
+        FileAccess.open(root.path_join("data/visuals/shaders/s.gdshader"), FileAccess.WRITE).store_string("shader_type canvas_item;")
+        FileAccess.open(root.path_join("data/visuals/assets/seed.png"), FileAccess.WRITE).store_8(0)
+        FileAccess.open(root.path_join("discover/media/thumb.png"), FileAccess.WRITE).store_8(0)
+        var entry := {
+                "schema": 1, "id": pkg_id, "game_id": "nativestub",
+                "title": "NATIVE STUB", "tag": "the bridge proof", "version": "1.0.0",
+                "age": 3, "content": [], "genres": {"main": ["arcade"], "sub": []},
+                "os": ["pc"],
+                "runs": {"pc": {"kind": "native", "bin": "game/pc/nativestub.bin"}},
+                "thumb": "discover/media/thumb.png", "desc": "the native runner proof",
+                "fee": 0, "price": 0, "coin_div": 10, "orientation": "landscape",
+                "updated": "2026-09-28", "versions_count": 1, "size_bytes": 1,
+                "files": [{"path": "game/pc/nativestub.bin"}],
+        }
+        var ef := FileAccess.open(root.path_join("index/index.json"), FileAccess.WRITE)
+        ef.store_string(JSON.stringify(entry)); ef.close()
+        var vf2 := FileAccess.open(root.path_join("index/versions.json"), FileAccess.WRITE)
+        vf2.store_string(JSON.stringify({"schema": 1, "versions": [{"version": "1.0.0"}]}))
+        vf2.close()
+        var pf := FileAccess.open(root.path_join("discover/page.json"), FileAccess.WRITE)
+        pf.store_string(JSON.stringify({"title": "NATIVE STUB", "desc": "proof"})); pf.close()
+        var v: Dictionary = GOGA.validate_root(root)
+        ok += _check(bool(v["ok"]), "the native package passes the strict validator (%s)" % str(v.get("errors", [])))
+        if not bool(v["ok"]):
+                return ok
+        var imp: Dictionary = GOGA.import_path(root)
+        ok += _check(not (imp["installed"] as Array).is_empty(), "the native package installs")
+        # ---- launch through the box's own door ----
+        Box.reset_all()
+        Box.unlock_game("nativestub", 0)
+        var host_script: GDScript = load("res://game/core/game_host.gd")
+        var router := Node2D.new()
+        add_child(router)
+        var launched: bool = host_script.launch(router, "nativestub")
+        ok += _check(launched, "the native game launches (the runner takes the seat)")
+        if not launched:
+                Box.reset_all()
+                return ok
+        # the host seats through its _ready gate (a couple of frames); catch
+        # the seat the moment it appears
+        var host: Node = null
+        for i in 240:
+                await get_tree().process_frame
+                host = host_script.active_host
+                if host != null and host._runner != null:
+                        break
+        ok += _check(host != null and host._runner != null, "the runner seat is live")
+        # the stub exits on its own after the bridge roundtrip - the runner
+        # must notice and end the session
+        var ended := false
+        for i in 600:
+                await get_tree().process_frame
+                if host_script.active_host == null:
+                        ended = true
+                        break
+        ok += _check(ended, "the runner ends the session when the child exits")
+        if not ended and host != null:
+                host._quit_to_menu()
+        await get_tree().process_frame
+        # the stub's save rode the bridge into the GOGAs tree
+        var stub_save := GOGA.libs_dir().path_join("clients/nativestub/save.json")
+        ok += _check(FileAccess.file_exists(stub_save), "the native game's save landed in libs/clients")
+        if FileAccess.file_exists(stub_save):
+                ok += _check(FileAccess.get_file_as_string(stub_save) == "native-stub-was-here",
+                                "the native save round-trips")
+        ok += _check(Box.stat("nativestub", "plays") >= 1, "the native play counts")
+        GOGA.uninstall("gogabox_github-rig_native.stub.001_hobbyist")
+        Box.reset_all()
         return ok
 
 # ============================================================ LAN (the shield)
@@ -750,8 +1019,28 @@ func _t_all_games() -> int:
                         continue
                 await get_tree().create_timer(3.0).timeout
                 var host: Node = host_script.active_host
-                ok += _check(host != null and host.game != null, id + " host+game alive")
-                if host == null or host.game == null:
+                # v043 pass 3 THE RUNNER SEATS: a web/native entry lives
+                # OUTSIDE the box canvas - no game node, the runner IS the
+                # session. Headless, the web child (the browser) dies the
+                # moment it opens - the honest session end - so the seat is
+                # accepted LIVE or ALREADY-ENDED; both prove the door.
+                var kind := String(g.get("kind", "godot_embedded"))
+                if kind != "godot_embedded":
+                        var seated: bool = host != null \
+                                        and host.game == null \
+                                        and host._runner != null
+                        ok += _check(seated or host == null,
+                                        id + " rides the runner seat")
+                        ok += _check(Box.stat(id, "plays") >= 1,
+                                        id + " play counted")
+                        if seated:
+                                host._quit_to_menu()
+                                await get_tree().process_frame
+                                ok += _check(host_script.active_host == null,
+                                                id + " runner session ended")
+                        continue
+                ok += _check(host != null, id + " host alive")
+                if host == null:
                         continue
                 ok += _check(Box.coins() == before - fee,
                                 id + " fee charged (%d -> %d)" % [before, Box.coins()])
@@ -1150,6 +1439,12 @@ func _build_good_package(root: String, pkg_id := "gogabox_github-TESTER_test.goo
         var f := FileAccess.open(root.path_join("index/index.json"), FileAccess.WRITE)
         f.store_string(JSON.stringify(index, "  "))
         f.close()
+        # v043 pass 3: the version ledger is part of the contract
+        var led := FileAccess.open(root.path_join("index/versions.json"), FileAccess.WRITE)
+        led.store_string(JSON.stringify({
+                "schema": 1,
+                "versions": [{"version": version, "updated": "2026-09-28"}]}, "  "))
+        led.close()
         _touch(root.path_join("game/pc/goga.pck"))
         _touch(root.path_join("game/android/goga.pck"))
         _touch(root.path_join("discover/page.json"),

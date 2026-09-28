@@ -1,0 +1,80 @@
+{
+  "schema": 2,
+  "tier": "official",
+  "updated": "2026-09-28",
+  "games": [
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.domino.003_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.domino.003_official",
+      "game_id": "domino",
+      "title": "DOMINO",
+      "version": "1.0.0",
+      "age": 3,
+      "os": [
+        "pc"
+      ],
+      "size_bytes": 963836,
+      "updated": "2026-09-28",
+      "versions_count": 1
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.jumpcube.004_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.jumpcube.004_official",
+      "game_id": "jumpcube",
+      "title": "CONQUER DICE",
+      "version": "1.0.0",
+      "age": 3,
+      "os": [
+        "android"
+      ],
+      "size_bytes": 650002,
+      "updated": "2026-09-28",
+      "versions_count": 1
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.orbit.005_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.orbit.005_official",
+      "game_id": "orbit",
+      "title": "GOGA ORBIT",
+      "version": "1.0.0",
+      "age": 3,
+      "os": [
+        "android",
+        "pc"
+      ],
+      "size_bytes": 634211,
+      "updated": "2026-09-28",
+      "versions_count": 1
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.rally.001_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.rally.001_official",
+      "game_id": "rally",
+      "title": "PING-PONG",
+      "version": "1.0.0",
+      "age": 7,
+      "os": [
+        "android",
+        "pc"
+      ],
+      "size_bytes": 1170833,
+      "updated": "2026-09-28",
+      "versions_count": 1
+    },
+    {
+      "index": "games/gogabox_github-HAKORADev_hakora.slasher.002_official/index/index.json",
+      "id": "gogabox_github-HAKORADev_hakora.slasher.002_official",
+      "game_id": "slasher",
+      "title": "Fruit Slasher",
+      "version": "1.0.0",
+      "age": 7,
+      "os": [
+        "android",
+        "pc"
+      ],
+      "size_bytes": 1896670,
+      "updated": "2026-09-28",
+      "versions_count": 1
+    }
+  ]
+}

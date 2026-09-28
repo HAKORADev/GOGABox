@@ -27,6 +27,16 @@ Edit `GOGAs/discover/REPOS.txt` in HAKORADev/GOGABox and add ONE line:
 yourname/yourgame
 ```
 
+v043 pass 3: the register has a CATALOG VIEW —
+`GOGAs/discover/index/community.json` (per-source metadata: branch,
+note). A publishing PR touches BOTH files; the CI fails when they drift
+apart (they are one register in two shapes). The packager's catalog
+writer keeps them synced mechanically:
+
+```bash
+python3 tools/v043_package.py --catalog   # regenerate from the tree
+```
+
 The CI (`goga-registry.yml`) validates the PR: the repo exists, the
 source file is there, it parses, the listed game indexes parse, the ids
 wear the scheme, the tiers are legal. The review is the machine's; a

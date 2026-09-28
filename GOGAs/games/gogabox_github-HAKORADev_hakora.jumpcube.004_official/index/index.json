@@ -255,9 +255,9 @@
       "renderer": "mobile"
     }
   },
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "versions_count": 1,
-  "size_bytes": 643744,
+  "size_bytes": 650002,
   "files": [
     {
       "path": "data/audio/music/ambience.wav",
@@ -293,7 +293,11 @@
     },
     {
       "path": "game/android/goga.pck",
-      "sha256": "5ceb6820df36365b95cbae3a60c7390eb5f7aa0d"
+      "sha256": "2afce7fd1516d25f5df3436d50bc3a381d2f025b"
+    },
+    {
+      "path": "index/versions.json",
+      "sha256": "295659e2f527f8b33f64abfef42d8531b985292b"
     },
     {
       "path": "save/README.md",

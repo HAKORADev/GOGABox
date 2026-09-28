@@ -1,32 +1,16 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "GOGABox Official",
   "repo": "HAKORADev/GOGABox",
+  "branch": "main",
   "engine_version": "0.4.3",
   "update_assets": {
     "android": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-v0.4.3-arm64-v8a.apk",
     "pc": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-windows.zip"
   },
-  "games": [
-    {
-      "index": "games/gogabox_github-HAKORADev_hakora.domino.003_official/index/index.json",
-      "id": "gogabox_github-HAKORADev_hakora.domino.003_official",
-      "version": "1.0.0"
-    },
-    {
-      "index": "games/gogabox_github-HAKORADev_hakora.jumpcube.004_official/index/index.json",
-      "id": "gogabox_github-HAKORADev_hakora.jumpcube.004_official",
-      "version": "1.0.0"
-    },
-    {
-      "index": "games/gogabox_github-HAKORADev_hakora.rally.001_official/index/index.json",
-      "id": "gogabox_github-HAKORADev_hakora.rally.001_official",
-      "version": "1.0.0"
-    },
-    {
-      "index": "games/gogabox_github-HAKORADev_hakora.slasher.002_official/index/index.json",
-      "id": "gogabox_github-HAKORADev_hakora.slasher.002_official",
-      "version": "1.0.0"
-    }
-  ]
+  "tiers": {
+    "official": "official.json",
+    "community": "community.json",
+    "hobbyist": "hobbyist.json"
+  }
 }

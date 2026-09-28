@@ -1,0 +1,7 @@
+{
+  "schema": 2,
+  "tier": "community",
+  "_about": "the community source directory - the catalog view of GOGAs/discover/REPOS.txt; goga-packages CI syncs the two, a PR must touch both (the two-step publish)",
+  "updated": "2026-09-28",
+  "sources": []
+}

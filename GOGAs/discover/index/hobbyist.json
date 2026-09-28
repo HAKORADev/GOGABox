@@ -1,0 +1,7 @@
+{
+  "schema": 2,
+  "tier": "hobbyist",
+  "_about": "the hobbyist tier's shape - hobbyist sources are added by players at runtime (ADD SOURCE), so a repo usually serves an empty list here; the engine reads it all the same when a repo curates a hobbyist section",
+  "updated": "2026-09-28",
+  "games": []
+}

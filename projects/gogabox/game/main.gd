@@ -537,6 +537,25 @@ func _boot_update_check() -> void:
         var task := func() -> void:
                 var census: Dictionary = await GogaUpdate.check()
                 if bool(census.get("available", false)):
-                        LanNotes.note("GOGABox v%s is out - SETTINGS > APP UPDATES"
-                                        % String(census.get("served")))
+                        # v043 pass 3 THE AUTO-DOWNLOAD SEAT: AUTO on = the
+                        # update stages itself; the note names the one tap.
+                        var staged: String = await GogaUpdate.scheduled_auto(census)
+                        if staged != "":
+                                LanNotes.note("update v%s staged - SETTINGS > APP UPDATES > APPLY"
+                                                % String(census.get("served")))
+                        else:
+                                LanNotes.note("GOGABox v%s is out - SETTINGS > APP UPDATES"
+                                                % String(census.get("served")))
         task.call()
+        # v043 pass 3 THE EMPTY-HOME COMMAND (the owner: the artifact carries
+        # the GOGAs folder - "windows people take it and put it with the
+        # binary and android ones commanded to put it in downloads folder,
+        # currently the engine makes the files tree but all of them are
+        # empty"). A fresh box with zero packages says WHERE the games come
+        # from - one quiet note, the exact door this build's artifact ships.
+        var goga := get_node_or_null("/root/GOGA")
+        if goga != null and (goga.call("entries") as Array).is_empty():
+                if OS.has_feature("android"):
+                        LanNotes.note("GOGAs is empty - put the official GOGAs folder in Downloads/GOGAs (the release page), or open DISCOVER")
+                else:
+                        LanNotes.note("GOGAs is empty - put the official GOGAs folder next to GOGABox.exe, or open DISCOVER")

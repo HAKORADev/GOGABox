@@ -73,6 +73,7 @@ func _ready() -> void:
         reload_entries()
         _scan_libs()
         _ready_bridge()
+        _ready_ws()   # v043 pass 3: the web bridge door (WebSocket twin)
 
 # ============================================================ THE HOME TREE
 
@@ -222,6 +223,16 @@ func _read_root_entry(root: String) -> Dictionary:
         # and keeps the long one as "pkg_id".
         e["pkg_id"] = String(e["id"])
         e["id"] = String(e.get("game_id", e["pkg_id"]))
+        # v043 pass 3 THE VERSION LEDGER: index/versions.json is the release
+        # history - entries() reads versions_count from it when the index
+        # does not carry a fresher number (the VERSIONS sort's data).
+        var led_v: Variant = JSON.parse_string(
+                        FileAccess.get_file_as_string(root.path_join("index/versions.json"))) \
+                if FileAccess.file_exists(root.path_join("index/versions.json")) else null
+        if led_v is Dictionary:
+                var led: Array = (led_v as Dictionary).get("versions", [])
+                if not e.has("versions_count") and not led.is_empty():
+                        e["versions_count"] = led.size()
         # THE PLATFORM PICK: the run block for THIS device, injected as the
         # registry's own "script" key - the host loads it like any game.
         var run := run_for(e)
@@ -316,6 +327,17 @@ func validate_root(root: String) -> Dictionary:
         # THE PORTABLE SAVE LAW
         if not DirAccess.dir_exists_absolute(root.path_join("save")):
                 errors.append("no save/ - the portable-save law (saves live in the package, never in app-data bloat)")
+        # v043 pass 3 THE VERSION LEDGER (index/ is a real folder, not one
+        # file): index/versions.json carries the release history - the
+        # VERSIONS sort's data and the update story a human can read.
+        var vp := root.path_join("index/versions.json")
+        if not FileAccess.file_exists(vp):
+                errors.append("no index/versions.json - the version ledger (one entry per released version)")
+        else:
+                var vv: Variant = JSON.parse_string(FileAccess.get_file_as_string(vp))
+                if not (vv is Dictionary) or not ((vv as Dictionary).get("versions", []) is Array) \
+                                or ((vv as Dictionary).get("versions", []) as Array).is_empty():
+                        errors.append("index/versions.json is not a ledger ({\"versions\": [...]}) or is empty")
         # THE DISCOVER MATERIAL
         if not FileAccess.file_exists(root.path_join(PAGE_REL)):
                 errors.append("no %s - the discover page material is part of the package" % PAGE_REL)
@@ -518,8 +540,14 @@ func mount_for(e: Dictionary) -> bool:
         if run.is_empty():
                 return false
         var kind := String(run.get("kind", "godot_embedded"))
+        # v043 pass 3: web + native kinds mount NOTHING (the pck law is the
+        # godot_embedded seat) - the runner doors in goga_runner.gd host
+        # them. Returning true here lets GameHost.launch() proceed to the
+        # host, where the runner takes over (the old false silently killed
+        # the launch - the runner doors did not exist yet).
         if kind != "godot_embedded":
-                return false   # native/web run through their own doors
+                _current_id = String(e["id"])
+                return true
         var pck := String(run.get("pck", ""))
         var full := String(e["root"]).path_join(pck)
         if not FileAccess.file_exists(full):
@@ -677,9 +705,12 @@ func _exit_tree() -> void:
                 _sdk_server.stop()
         for p in _sdk_peers:
                 (p["conn"] as StreamPeerTCP).disconnect_from_host()
+        if _ws_tcp != null:
+                _ws_tcp.stop()
 
 func _process(_delta: float) -> void:
         _bridge_tick()
+        _ws_tick()
 
 func _bridge_tick() -> void:
         if _sdk_server == null:
@@ -718,42 +749,101 @@ func _bridge_handle(p: Dictionary, line: String) -> void:
                 return
         var r: Dictionary = req
         var op := String(r.get("op", ""))
+        # the ONE vocabulary: the TCP door and the WebSocket door share it
+        _bridge_send(conn, _bridge_dispatch(p, r, op))
+
+func _bridge_send(conn: StreamPeerTCP, data: Dictionary) -> void:
+        conn.put_data((JSON.stringify(data) + "\n").to_utf8_buffer())
+
+## THE WEB BRIDGE DOOR (v043 pass 3): the WebSocket twin of the TCP bridge
+## (port 31443, loopback only). Web games run in a WebView / app window
+## where raw TCP does not exist - a browser speaks WebSocket. SAME ops
+## vocabulary, SAME answers: hello / coins.balance / coins.spend /
+## coins.earn / save.write / save.read / toast. The sdk/web/goga_bridge.js
+## speaks it for the game. THE ONE API, the transports multiply.
+const SDK_WS_PORT := 31443
+
+var _ws_tcp: TCPServer = null
+var _ws_conns: Array = []          # [{tcp, ws: WebSocketPeer, client: String}]
+
+func _ready_ws() -> void:
+        # a server-style WebSocketPeer pair per connection: Godot 4.7's
+        # WebSocketPeer.accept_stream() upgrades a raw StreamPeerTCP - one
+        # loop, the SAME _bridge_dispatch vocabulary as the raw TCP door.
+        _ws_tcp = TCPServer.new()
+        if _ws_tcp.listen(SDK_WS_PORT, "127.0.0.1") != OK:
+                _ws_tcp = null   # honest: the port is taken (another seat)
+
+func _ws_tick() -> void:
+        if _ws_tcp == null:
+                return
+        while _ws_tcp.is_connection_available():
+                var tcp: StreamPeerTCP = _ws_tcp.take_connection()
+                var ws := WebSocketPeer.new()
+                ws.accept_stream(tcp)
+                _ws_conns.append({"tcp": tcp, "ws": ws, "client": ""})
+        var alive: Array = []
+        for c in _ws_conns:
+                var ws: WebSocketPeer = c["ws"]
+                ws.poll()
+                var state := ws.get_ready_state()
+                if state == WebSocketPeer.STATE_CLOSED:
+                        continue
+                if state == WebSocketPeer.STATE_OPEN:
+                        while ws.get_available_packet_count() > 0:
+                                var line := ws.get_packet().get_string_from_utf8()
+                                _ws_handle(c, line)
+                alive.append(c)
+        _ws_conns = alive
+
+func _ws_handle(c: Dictionary, line: String) -> void:
+        var req: Variant = JSON.parse_string(line)
+        if not (req is Dictionary):
+                _ws_send(c, {"ok": false, "err": "bad json"})
+                return
+        var r: Dictionary = req
+        var op := String(r.get("op", ""))
+        # the SAME vocabulary the TCP bridge serves - one handler, two wires
+        var reply: Dictionary = _bridge_dispatch(c, r, op)
+        _ws_send(c, reply)
+
+func _ws_send(c: Dictionary, data: Dictionary) -> void:
+        var ws: WebSocketPeer = c["ws"]
+        if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+                ws.send_text(JSON.stringify(data))
+
+## The shared bridge vocabulary: the TCP door and the WebSocket door both
+## land here so the two transports can never drift apart.
+func _bridge_dispatch(p: Dictionary, r: Dictionary, op: String) -> Dictionary:
         var client := String(p.get("client", ""))
         match op:
                 "hello":
                         p["client"] = String(r.get("client", "anon"))
-                        _bridge_send(conn, {"ok": true, "box": self_version(),
-                                        "proto": SDK_PROTO})
+                        return {"ok": true, "box": self_version(), "proto": SDK_PROTO}
                 "coins.balance":
-                        _bridge_send(conn, {"ok": true, "coins": Box.coins()})
+                        return {"ok": true, "coins": Box.coins()}
                 "coins.spend":
                         var n := int(r.get("n", 0))
                         var did := Box.spend(n) if not Box.dev_cheat("gogacoins") == 1 else true
-                        _bridge_send(conn, {"ok": did})
+                        return {"ok": did}
                 "coins.earn":
                         Box.earn(int(r.get("n", 0)))
-                        _bridge_send(conn, {"ok": true})
+                        return {"ok": true}
                 "save.write":
                         if client == "":
-                                _bridge_send(conn, {"ok": false, "err": "say hello first"})
-                        else:
-                                _bridge_send(conn, {"ok": _client_save_write(client,
-                                                String(r.get("key", "save")), String(r.get("data", "")))})
+                                return {"ok": false, "err": "say hello first"}
+                        return {"ok": _client_save_write(client,
+                                        String(r.get("key", "save")), String(r.get("data", "")))}
                 "save.read":
                         if client == "":
-                                _bridge_send(conn, {"ok": false, "err": "say hello first"})
-                        else:
-                                _bridge_send(conn, {"ok": true,
-                                                "data": _client_save_read(client, String(r.get("key", "save")))})
+                                return {"ok": false, "err": "say hello first"}
+                        return {"ok": true,
+                                        "data": _client_save_read(client, String(r.get("key", "save")))}
                 "toast":
-                        # the top-level note layer rides anywhere (even in-games)
                         LanNotes.note(String(r.get("msg", "")))
-                        _bridge_send(conn, {"ok": true})
+                        return {"ok": true}
                 _:
-                        _bridge_send(conn, {"ok": false, "err": "unknown op"})
-
-func _bridge_send(conn: StreamPeerTCP, data: Dictionary) -> void:
-        conn.put_data((JSON.stringify(data) + "\n").to_utf8_buffer())
+                        return {"ok": false, "err": "unknown op"}
 
 ## Standalone client saves: GOGAs/libs/clients/<client>/save.json - inside
 ## the GOGAs tree, portable, never app-data (the save law, standalone seat).

@@ -1,0 +1,14 @@
+{
+  "title": "GOGA ORBIT",
+  "desc": "A three.js game running INSIDE the box: drag to steer the dart around the orbit lane, catch the gold, dodge the rocks. Served by the box's own localhost seat, bridged through window.GOGA - the web kind, proven end to end.",
+  "media": [
+    {
+      "kind": "thumb",
+      "file": "media/thumb.png"
+    }
+  ],
+  "entry": {
+    "fee": 0,
+    "price": 0
+  }
+}

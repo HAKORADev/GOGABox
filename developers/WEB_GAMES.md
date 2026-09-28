@@ -8,11 +8,33 @@ redirection. Two families, one door:
 2. **Godot HTML5 exports** — a Godot game exported for web (the
    `index.html` + `.wasm` + `.pck` bundle), running in the same surface.
 
-The tech is the device's own WebView hosted in-app (Android's
-`android.webkit.WebView` — the system browser engine, no browser chrome,
-no tab, no redirection). On PC the box carries the WebView2 slot: the
-web runner is built to light it up when the WebView2 extension lands,
-and until then it refuses with the honest why instead of pretending.
+## The seats (how it actually runs, v043 pass 3)
+
+The box is the SERVER and the HOST:
+
+1. **the localhost seat** — the box serves the package's `game/web/`
+   over `http://127.0.0.1:<port>/` (GogaWebserve — loopback only, one
+   package at a time, torn down when the game closes). Relative paths,
+   ES modules, wasm, textures: the whole modern toolkit works, the
+   `file://` quirks never happen.
+2. **the surface** — Android: the `gogabrowser` plugin hosts the system
+   WebView INSIDE the activity (no browser chrome, no tab, no
+   redirection — the surface is a FrameLayout overlay over the game
+   view). PC: the system's own WebView2 runtime in APP MODE
+   (`msedge --app=<url>` / Chrome fallback) — a chromeless window with
+   no tabs and no address bar, the same engine WebView2 would embed.
+   This is the honest seat until the WebView2 extension lands.
+3. **the bridge** — the page includes `sdk/web/goga_bridge.js` (the
+   packager stages it next to the entry) and speaks `window.GOGA.*`
+   over the box's WebSocket door (`ws://127.0.0.1:31443`). The bridge is
+   the SAME vocabulary every transport speaks (embedded doors, the TCP
+   bridge, the C ABI). Loopback cleartext is the only wire allowed in
+   the clear (Android's network security config names exactly
+   127.0.0.1/localhost).
+
+The working pilot: **GOGA ORBIT** (`GOGAs/games/...orbit.005...`) — a
+three.js game, vendored library, drag to steer, gold pays through the
+bridge, the best run lands in the package's portable save.
 
 ## The package shape
 
@@ -27,35 +49,36 @@ and until then it refuses with the honest why instead of pretending.
 ```
 game/web/
   index.html        # THE ENTRY - the validator refuses if missing
+  goga_bridge.js    # the SDK bridge (stage it from sdk/web/)
   ...               # every other file the game needs, listed in the manifest
 ```
 
 Everything ships as plain files in the package; the strict validator's
-data/ minimums still hold (see PACKAGING.md).
+data/ minimums still hold (see PACKAGING.md). If the surface cannot
+open (no browser on the PC, the plugin missing on a device), the runner
+refuses with the named why — never a silent death.
 
 ## The SDK bridge — window.GOGA.*
 
-The WebView carries a JavascriptInterface named `GOGA` — the SAME SDK
-vocabulary as everyone else, no server, no keys:
-
 ```js
-GOGA.coins()                    // the player's GOGACoins (a JSON answer)
-GOGA.spend(10)                  // true when the box ledger accepted it
-GOGA.earn(5)
-GOGA.saveWrite("save", txt)     // THE PORTABLE SAVE LAW (lands in the
-GOGA.saveRead("save")           //   GOGAs tree, never app-data)
-GOGA.toast("hello")
+await GOGA.hello()               // the handshake (also auto-runs on load)
+GOGA.coins()            -> n     // THE ONE WALLET (a Promise)
+await GOGA.spend(10)             // true when the box ledger accepted it
+await GOGA.earn(5)
+await GOGA.saveWrite("save", txt)  // THE PORTABLE SAVE LAW (lands in the
+GOGA.saveRead("save")              //   GOGAs tree, never app-data)
+await GOGA.toast("hello")
+GOGA.connected()                 // true once the box answered
 ```
 
-The LAN seat for web games rides the same bridge: the box hosts the
-session and the web game speaks the box's own LAN vocabulary through
-`GOGA.*` — the logic is the box's ported LAN (the same seat/room model
-the native games play), not a second implementation drifting apart.
+Every call resolves or REJECTS — a web game run outside the box gets
+the honest refusal, never a hang.
 
 ## The laws at this layer
 
 - NO pop-up tabs, NO external browser redirection, NO full browser
-  install — the in-app surface only.
+  install — the in-app surface only (the app-mode window carries no
+  chrome: no tabs, no address bar).
 - The bridge is the ONLY door between the web game and the box — a web
   game cannot reach the filesystem beyond its own package's seats.
 - The save law is absolute: saves land in the GOGAs tree, carried with

@@ -73,10 +73,15 @@ achievements.
 
 ### Players
 
-Install the app, open the discovery feed (the arrow next to **All
-Games**), download a game, play. The age field in your profile only gates
-the play button on age-rated games — browsing, downloading and owning are
-unrestricted. See `REPORTING.md` if something is broken.
+Install the app and it already carries the official games: the Windows
+zip ships the `GOGAs` folder next to `GOGABox.exe` (unzip, run), and on
+Android you extract the `GOGAs-official` zip so the folder lands at
+`Downloads/GOGAs` — the release page lists both, and the app itself
+reminds you where the folder goes if it boots without it. From there,
+open the discovery feed (the arrow next to **All Games**), download
+more, play. The age field in your profile only gates the play button on
+age-rated games — browsing, downloading and owning are unrestricted.
+See `REPORTING.md` if something is broken.
 
 ### Developers
 
@@ -99,9 +104,11 @@ cd GOGABox
 ./build.sh gogabox            # release APKs (arm32 + arm64) into dist/
 ```
 
-Windows builds run on GitHub Actions for every push (the single
-`GOGABox.exe` artifact), and the same commands work locally with the
-Windows export templates. The pinned toolchain versions live in
+Windows builds run on GitHub Actions for every push (the
+`GOGABox-windows` zip artifact carries the exe and the official GOGAs
+tree together; `GOGAs-official` is the same tree zipped alone for the
+Android Downloads placement), and the same commands work locally with
+the Windows export templates. The pinned toolchain versions live in
 `config/environment.lock`; everything is scripted, so CI and local builds
 are identical.
 

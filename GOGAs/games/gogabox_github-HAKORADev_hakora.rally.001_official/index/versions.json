@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "versions": [
+    {
+      "version": "1.0.0",
+      "updated": "2026-09-28",
+      "notes": "PING-PONG initial package release"
+    }
+  ]
+}

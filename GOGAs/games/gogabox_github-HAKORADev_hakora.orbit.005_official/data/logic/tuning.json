@@ -1,0 +1,13 @@
+{
+  "_about": "this table drives the game through the web SDK bridge - the packed default wins only when the file is absent or broken\norbit's lane tuning - edit and the game obeys",
+  "table": {
+    "lane_radius": 22.0,
+    "start_speed": 0.55,
+    "speed_max_bonus": 1.4,
+    "gold_bonus": 25,
+    "score_per_sec": 6,
+    "steer": 0.012,
+    "rock_count": 14,
+    "gold_count": 6
+  }
+}

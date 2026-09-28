@@ -175,9 +175,9 @@
       "renderer": "forward_plus"
     }
   },
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "versions_count": 1,
-  "size_bytes": 957582,
+  "size_bytes": 963836,
   "files": [
     {
       "path": "data/audio/music/ambience.wav",
@@ -213,7 +213,11 @@
     },
     {
       "path": "game/pc/goga.pck",
-      "sha256": "e319a75d590ac42037b0e3c0d074fc5abf31a6b1"
+      "sha256": "5cf773f7473fdf29ec54ce79f8d2451fbfdb86c3"
+    },
+    {
+      "path": "index/versions.json",
+      "sha256": "fbed6fddbc55b9c5be500e4db1aa76e1cea24b32"
     },
     {
       "path": "save/README.md",

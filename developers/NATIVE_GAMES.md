@@ -74,3 +74,48 @@ wallet, a store and a LAN — it does not cap what launches through it.
    a moddable config beats a dead one), `save/`, `discover/`.
 4. Test through the LOCAL flow (a virtual repo or a plain folder
    import) — the local flow IS the remote flow.
+
+## How the seat runs today (v043 pass 3)
+
+- **PC (Windows)**: the box LAUNCHES the exe as a CHILD PROCESS
+  (`game/pc/<bin>` from the index's `runs.pc`), shows its own holding
+  screen ("close the game window to return"), and ends the session when
+  the process exits. SDK-linked games talk back over the bridge
+  (localhost:31442); games that never heard of the box still run — the
+  bridge is optional, the launch is not.
+- **Android**: the in-process `.so` loader is the NEXT platform round;
+  the door refuses honestly today ("the Android native loader lands
+  with the next platform round") instead of pretending.
+
+## The one-command packager (tools/v043_native_package.py)
+
+Any folder holding a normal game becomes a `.goga`:
+
+```bash
+python3 tools/v043_native_package.py \
+  --id gogabox_github-<you>_zuma.deluxe.001_hobbyist \
+  --title "ZUMA DELUXE" --tag "the PopCap classic" \
+  --bin "game/pc/Zuma.exe" \
+  --source <the extracted game folder> \
+  --out dist/zuma_deluxe.goga
+```
+
+The tool copies the folder WHOLE under `game/pc/`, generates the
+contract around it (index + versions ledger + discover page + the data
+minimums seeded as real files a modder can wire), and zips the `.goga`.
+Import it through the box (IMPORT PACKAGE) or drop the unzipped root
+into `GOGAs/games/`.
+
+### A delisted game from archive.org (the Zuma-shaped walkthrough)
+
+1. Find the item (`archive.org/details/<identifier>`) and download its
+   zip (many abandoned PC games live there).
+2. Extract it — you want the folder with the exe and its data files.
+3. Run the packager (above) with `--bin` pointing at the real exe path
+   inside that folder.
+4. Import the `.goga`, press play: the box launches it as its own
+   process, the game's own window, your wallet untouched.
+5. THE LAW: keep it PRIVATE unless the game's license lets you
+   distribute — a package you upload to a public repo is a
+   redistribution, and MODDING.md's line (distribution-you-do-not-own)
+   applies to packaged games exactly as it applies to assets.

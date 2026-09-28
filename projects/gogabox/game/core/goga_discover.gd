@@ -34,8 +34,23 @@ extends RefCounted
 const OFFICIAL_REPOS := ["HAKORADev/GOGABox"]
 const REPOS_TXT := "GOGAs/discover/REPOS.txt"
 const SOURCE_JSON := "GOGAs/discover/index/source.json"
-const SCHEMA := 1
+# v043 pass 3 THE CATALOG SCHEMA 2 (the owner: "you literally made index/
+# to be one file ... there should be really different files for each repos
+# tier"): the source's index/ folder is a REAL catalog now - one file per
+# repos tier beside the source manifest, and REPOS.txt stays the plain
+# register the two-step publish PRs against. The engine walks the map;
+# a schema-1 source (inline "games") still parses - old repos keep working.
+#   GOGAs/discover/index/source.json     the identity + the tier file map
+#   GOGAs/discover/index/official.json   the official tier's game rows
+#   GOGAs/discover/index/community.json  the community source directory
+#   GOGAs/discover/index/hobbyist.json   the hobbyist rows (usually empty)
+const CATALOG_DIR := "GOGAs/discover/index"
+const SCHEMA := 2
 const RAW_HOST := "https://raw.githubusercontent.com"
+# the community expansion is ONE hop deep, from the official source only -
+# a community repo's own community.json does not fan out again (the feed
+# stays bounded; the register is the official repo's voice, not a web).
+const COMMUNITY_HOP := 1
 
 # ------------------------------------------------------------- the helpers
 
@@ -90,6 +105,15 @@ static func http_get_bytes(url: String, timeout_s := 60.0) -> PackedByteArray:
         http.download_chunk_size = 1 << 20
         var root := _tree().root
         root.add_child(http)
+        if not http.is_inside_tree():
+                # a fetch asked during the tree's own setup window (a boot
+                # probe, a test _ready) - the add_child above is refused;
+                # one frame later it lands
+                await _tree().process_frame
+                root.add_child(http)
+                if not http.is_inside_tree():
+                        http.queue_free()
+                        return PackedByteArray()
         var err := http.request(url)
         if err != OK:
                 http.queue_free()
@@ -204,14 +228,23 @@ static func fetch_feed() -> Dictionary:
                                         String(s.get("branch", "main")), community,
                                         installed_map(), notes))
                 elif String(s.get("kind", "")) == "local":
-                        rows.append_array(_feed_for_local(String(s.get("path", "")),
+                        rows.append_array(await _feed_for_local(String(s.get("path", "")),
                                         community, installed_map(), notes))
         return {"rows": rows, "notes": notes}
 
-## One github source's feed rows: fetch source.json, then each game's
-## index.json - ALL over raw http (the no-api-limit law).
+## One github source's feed rows: fetch source.json, then walk the catalog.
+## SCHEMA 2 (the catalog): source.json's "tiers" map names one file per
+## repos tier under GOGAs/discover/index/ - official/hobbyist files carry
+## game rows, the community file carries a DIRECTORY of sources that each
+## get their own walk (one hop, from the official source only). SCHEMA 1
+## (the old inline "games" array) still parses - existing repos keep
+## working untouched.
+## THE TIER TRUST LAW: rows from the OFFICIAL source wear the tier FILE's
+## name (the owner curates his own catalog); rows from every other source
+## wear the ENGINE's tier (tier_for) - a community repo can never claim
+## official by listing its games in an official.json.
 static func _feed_for_github(repo: String, branch: String, community: Array,
-                installed: Dictionary, notes: Array) -> Array:
+                installed: Dictionary, notes: Array, depth := 0) -> Array:
         var base := "%s/%s/%s" % [RAW_HOST, repo, branch]
         var rows: Array = []
         var txt := await http_get("%s/%s" % [base, SOURCE_JSON])
@@ -222,8 +255,60 @@ static func _feed_for_github(repo: String, branch: String, community: Array,
         if not (src is Dictionary):
                 notes.append({"repo": repo, "why": "the source's index file is not a JSON object"})
                 return rows
+        var s: Dictionary = src
+        var is_official := official_repo(repo)
         var tier := tier_for(repo, community)
-        for g in ((src as Dictionary).get("games", []) as Array):
+        if int(s.get("schema", 1)) >= 2 and s.has("tiers") \
+                        and (s["tiers"] is Dictionary):
+                # ---- SCHEMA 2: the per-tier catalog files ----
+                # the tier map paths are RELATIVE TO THE CATALOG FOLDER
+                # (the files sit beside source.json); the game index paths
+                # INSIDE the tier files are repo-relative (they point into
+                # games/)
+                var catalog_base := base.path_join(SOURCE_JSON.get_base_dir())
+                # the game index paths inside the tier files are GOGAs-
+                # folder-relative ("games/<pkg>/index/index.json" sits under
+                # the repo's GOGAs/) - the SCHEMA 2 convention
+                var goga_base := base.path_join("GOGAs")
+                var tiers: Dictionary = s["tiers"]
+                for tname in ["official", "community", "hobbyist"]:
+                        var rel := String(tiers.get(tname, ""))
+                        if rel == "":
+                                continue
+                        var ttxt := await http_get("%s/%s" % [catalog_base, rel])
+                        if ttxt == "":
+                                notes.append({"repo": repo,
+                                                "why": "the tier file %s answered nothing" % rel})
+                                continue
+                        var tv: Variant = JSON.parse_string(ttxt)
+                        if not (tv is Dictionary):
+                                notes.append({"repo": repo,
+                                                "why": "the tier file %s is not a JSON object" % rel})
+                                continue
+                        var tf: Dictionary = tv
+                        if tname == "community":
+                                # the community DIRECTORY: each listed source
+                                # walks on its own (tier = the engine's law
+                                # for that repo); one hop, from official only
+                                if depth >= COMMUNITY_HOP or not is_official:
+                                        continue
+                                for cs in (tf.get("sources", []) as Array):
+                                        var cd: Dictionary = cs
+                                        var crepo := String(cd.get("repo", ""))
+                                        if crepo == "" or OFFICIAL_REPOS.has(crepo):
+                                                continue
+                                        var cbranch := String(cd.get("branch", "main"))
+                                        rows.append_array(await _feed_for_github(
+                                                        crepo, cbranch, community,
+                                                        installed, notes, depth + 1))
+                        else:
+                                var row_tier: String = tname if is_official else tier
+                                rows.append_array(await _rows_from_tier_games(
+                                                goga_base, tf.get("games", []), row_tier,
+                                                repo, installed, notes, false))
+                return rows
+        # ---- SCHEMA 1: the inline games array (the old convention) ----
+        for g in (s.get("games", []) as Array):
                 var gd: Dictionary = g
                 var index_rel := String(gd.get("index", ""))
                 if index_rel == "":
@@ -239,36 +324,142 @@ static func _feed_for_github(repo: String, branch: String, community: Array,
                 var e: Dictionary = idx
                 var pkg_id := String(e.get("id", ""))
                 var game_base := "%s/%s" % [base, index_rel.trim_suffix("index/index.json")]
-                rows.append({
-                        "pkg_id": pkg_id,
-                        "game_id": String(e.get("game_id", pkg_id)),
-                        "title": String(e.get("title", "")),
-                        "tag": String(e.get("tag", "")),
-                        "version": String(e.get("version", "0")),
-                        "age": int(e.get("age", 3)),
-                        "content": e.get("content", []),
-                        "genres": e.get("genres", {}),
-                        "os": e.get("os", ["android", "pc"]),
-                        "size": int(e.get("size_bytes", gd.get("size_bytes", 0))),
-                        "updated": String(e.get("updated", gd.get("updated", ""))),
-                        "versions_count": int(e.get("versions_count", 1)),
-                        "tier": tier,
-                        "source": repo,
-                        "desc": String(e.get("desc", "")),
-                        "thumb_url": "%s%s" % [game_base, String(e.get("thumb", ""))],
-                        "base_url": game_base,
-                        "installed_version": String(installed.get(pkg_id, "")),
-                })
+                rows.append(_make_row(e, gd, pkg_id, tier, repo, game_base,
+                                installed, false))
         return rows
+
+## The shared SCHEMA 2 walk: one tier file's "games" rows (raw URLs or
+## local paths both land here; `local` flips the fetch doors).
+static func _rows_from_tier_games(base: String, games: Array, row_tier: String,
+                source_name: String, installed: Dictionary, notes: Array,
+                local: bool) -> Array:
+        var rows: Array = []
+        for g in games:
+                var gd: Dictionary = g
+                var index_rel := String(gd.get("index", ""))
+                if index_rel == "":
+                        continue
+                var itxt: String
+                if local:
+                        itxt = FileAccess.get_file_as_string(
+                                        base.path_join(index_rel)) \
+                                if FileAccess.file_exists(base.path_join(index_rel)) \
+                                else ""
+                else:
+                        itxt = await http_get("%s/%s" % [base, index_rel])
+                if itxt == "":
+                        notes.append({"repo": source_name,
+                                        "why": "game index %s answered nothing" % index_rel})
+                        continue
+                var idx: Variant = JSON.parse_string(itxt)
+                if not (idx is Dictionary):
+                        notes.append({"repo": source_name,
+                                        "why": "game index %s is not a JSON object" % index_rel})
+                        continue
+                var e: Dictionary = idx
+                var pkg_id := String(e.get("id", ""))
+                var game_base: String
+                if local:
+                        game_base = base.path_join(index_rel.trim_suffix("index/index.json"))
+                else:
+                        game_base = "%s/%s" % [base, index_rel.trim_suffix("index/index.json")]
+                rows.append(_make_row(e, gd, pkg_id, row_tier, source_name,
+                                game_base, installed, local))
+        return rows
+
+## One feed row from a game's index.json (+ the tier row's fast metadata).
+static func _make_row(e: Dictionary, gd: Dictionary, pkg_id: String, tier: String,
+                source_name: String, game_base: String, installed: Dictionary,
+                local: bool) -> Dictionary:
+        var row := {
+                "pkg_id": pkg_id,
+                "game_id": String(e.get("game_id", pkg_id)),
+                "title": String(e.get("title", "")),
+                "tag": String(e.get("tag", "")),
+                "version": String(e.get("version", "0")),
+                "age": int(e.get("age", 3)),
+                "content": e.get("content", []),
+                "genres": e.get("genres", {}),
+                "os": e.get("os", ["android", "pc"]),
+                "size": int(e.get("size_bytes", gd.get("size_bytes", 0))),
+                "updated": String(e.get("updated", gd.get("updated", ""))),
+                "versions_count": int(e.get("versions_count", gd.get("versions_count", 1))),
+                "tier": tier,
+                "source": source_name,
+                "desc": String(e.get("desc", "")),
+                "base_url": game_base,
+                "installed_version": String(installed.get(pkg_id, "")),
+        }
+        if local:
+                row["thumb_path"] = game_base.path_join(String(e.get("thumb", "")))
+                row["local"] = true
+        else:
+                row["thumb_url"] = "%s%s" % [game_base, String(e.get("thumb", ""))]
+        return row
 
 ## One LOCAL source's feed rows: a folder root, a parent of roots, or a
 ## virtual repo (gogabox.repo.json marks the root of the simulation).
+## v043 pass 3 THE FULL SIMULATION: a folder shaped like a repo (carrying
+## GOGAs/discover/index/source.json) walks the SCHEMA 2 catalog exactly
+## like the github flow - the local developer has tested the real thing.
 static func _feed_for_local(path: String, community: Array,
                 installed: Dictionary, notes: Array) -> Array:
         var rows: Array = []
         if not DirAccess.dir_exists_absolute(path):
                 notes.append({"repo": path, "why": "the local source folder does not exist"})
                 return rows
+        var tier := "hobbyist"
+        var repo_name := ""
+        var repo_file := path.path_join("gogabox.repo.json")
+        if FileAccess.file_exists(repo_file):
+                # THE VIRTUAL REPO: the developer's local simulation of the
+                # github flow - same files, same validation, zero network
+                var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(repo_file))
+                if v is Dictionary:
+                        repo_name = String((v as Dictionary).get("repo", ""))
+                        tier = tier_for(repo_name, community)
+        elif official_repo(path.get_file()):
+                tier = "official"
+        # ---- the repo-shaped walk (the SCHEMA 2 catalog, local doors) ----
+        # the catalog sits at <root>/GOGAs/discover/index when the source
+        # points at a REPO root, or at <root>/discover/index when it points
+        # at the GOGAs folder itself (the tree next to the exe) - both are
+        # the same catalog, one folder apart
+        var catalog := path.path_join(CATALOG_DIR)
+        if not FileAccess.file_exists(catalog.path_join("source.json")):
+                catalog = path.path_join("discover/index")
+        if FileAccess.file_exists(catalog.path_join("source.json")):
+                var stxt := FileAccess.get_file_as_string(
+                                catalog.path_join("source.json"))
+                var sv: Variant = JSON.parse_string(stxt)
+                if sv is Dictionary and int((sv as Dictionary).get("schema", 1)) >= 2 \
+                                and ((sv as Dictionary).get("tiers", {}) is Dictionary):
+                        var s: Dictionary = sv
+                        var tiers: Dictionary = s["tiers"]
+                        for tname in ["official", "hobbyist"]:
+                                var rel := String(tiers.get(tname, ""))
+                                if rel == "":
+                                        continue
+                                var tf_path := catalog.path_join(rel)
+                                if not FileAccess.file_exists(tf_path):
+                                        continue
+                                var tv: Variant = JSON.parse_string(
+                                                FileAccess.get_file_as_string(tf_path))
+                                if not (tv is Dictionary):
+                                        continue
+                                var row_tier: String = tname if tier == "official" else tier
+                                # the tier files' game paths are relative to
+                                # the GOGAs FOLDER: two levels up from the
+                                # catalog (repo-root sources and GOGAs-folder
+                                # sources both land right)
+                                var goga_base := catalog.get_base_dir().get_base_dir()
+                                rows.append_array(await _rows_from_tier_games(goga_base,
+                                                (tv as Dictionary).get("games", []),
+                                                row_tier,
+                                                repo_name if repo_name != "" else "local:" + path,
+                                                installed, notes, true))
+                        return rows
+        # ---- the plain package walk (folder root / parent of roots) ----
         var roots: Array = []
         if FileAccess.file_exists(path.path_join("index/index.json")):
                 roots.append(path)
@@ -284,18 +475,6 @@ static func _feed_for_local(path: String, community: Array,
                                                 roots.append(sub)
                                 n = da.get_next()
                         da.list_dir_end()
-        var tier := "hobbyist"
-        var repo_name := ""
-        var repo_file := path.path_join("gogabox.repo.json")
-        if FileAccess.file_exists(repo_file):
-                # THE VIRTUAL REPO: the developer's local simulation of the
-                # github flow - same files, same validation, zero network
-                var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(repo_file))
-                if v is Dictionary:
-                        repo_name = String((v as Dictionary).get("repo", ""))
-                        tier = tier_for(repo_name, community)
-        elif official_repo(path.get_file()):
-                tier = "official"
         for root in roots:
                 var itxt := FileAccess.get_file_as_string(root.path_join("index/index.json"))
                 var idx: Variant = JSON.parse_string(itxt)
@@ -304,27 +483,12 @@ static func _feed_for_local(path: String, community: Array,
                         continue
                 var e: Dictionary = idx
                 var pkg_id := String(e.get("id", ""))
-                rows.append({
-                        "pkg_id": pkg_id,
-                        "game_id": String(e.get("game_id", pkg_id)),
-                        "title": String(e.get("title", "")),
-                        "tag": String(e.get("tag", "")),
-                        "version": String(e.get("version", "0")),
-                        "age": int(e.get("age", 3)),
-                        "content": e.get("content", []),
-                        "genres": e.get("genres", {}),
-                        "os": e.get("os", ["android", "pc"]),
-                        "size": int(e.get("size_bytes", _dir_size(root))),
-                        "updated": String(e.get("updated", "")),
-                        "versions_count": int(e.get("versions_count", 1)),
-                        "tier": tier,
-                        "source": repo_name if repo_name != "" else "local:" + path,
-                        "desc": String(e.get("desc", "")),
-                        "thumb_path": root.path_join(String(e.get("thumb", ""))),
-                        "base_url": root,
-                        "local": true,
-                        "installed_version": String(installed.get(pkg_id, "")),
-                })
+                # a plain folder's size is measured on the spot (the index
+                # may not carry size_bytes)
+                rows.append(_make_row(e, {"size_bytes": _dir_size(root)},
+                                pkg_id, tier,
+                                repo_name if repo_name != "" else "local:" + path,
+                                root, installed, true))
         return rows
 
 static func _dir_size(path: String) -> int:

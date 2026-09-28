@@ -22,6 +22,7 @@ var _session_open := true
 var _accum := 0.0        # play seconds accumulated since last flush
 var _over_sheet_pair: Array = []   # [center, dim] of the live game-over sheet
 var _orient_now := ""    # v0.2.0: the orientation the game is CURRENTLY in
+var _runner: Node = null # v043 pass 3: the web/native runner seat, when one is live
 # v041-2 r2 THE REAL-WINDOW GATE state: the gate is open while a boot/reload
 # waits for the physical window (the design governor's window-half heal stays
 # quiet so the gate owns the wait), and the drift counter rides the governor.
@@ -169,6 +170,16 @@ func _ready() -> void:
         W = get_viewport_rect().size.x
         H = get_viewport_rect().size.y
 
+        # v043 pass 3 THE RUNNER DOORS: web + native entries never reach the
+        # embedded script path (their old road was a silent mount failure -
+        # "does not worth testing this way"). The runner seats them: the
+        # web surface (Android WebView / PC app-mode window) or the native
+        # child process (the Steam model), with the same session accounting
+        # every embedded run gets.
+        var rkind := String(game_def.get("kind", "godot_embedded"))
+        if rkind == "web" or rkind == "native":
+                _seat_runner()
+                return
         # full-screen OWN-WORLD background - MUST live on a CanvasLayer. A
         # Control under a Node2D anchors to a ZERO rect in Godot 4.7 (verified
         # headless): the v0.0.3/0.0.4 bg collapsed to 0x0, so the live box menu
@@ -217,6 +228,22 @@ func _ready() -> void:
                 if not LAN.report_open(id):
                         if game.has_method("lan_hold_end_solo"):
                                 game.lan_hold_end_solo()
+
+## The runner seat (web / native): session accounting + the honest refusal
+## sheet when the door cannot open. The runner's finished signal IS the
+## quit (the child window closed, the surface was dismissed, or END).
+func _seat_runner() -> void:
+        var id := String(game_def["id"])
+        Box.record_started(id)
+        Box.set_active_game(id)
+        var runner := GogaRunner.new()
+        add_child(runner)
+        _runner = runner
+        if not runner.setup(self, game_def):
+                runner.show_refusal()
+        runner.finished.connect(func():
+                if _session_open:
+                        _quit_to_menu())
 
 ## v0.2.0 - a game picked a DIFFERENT play position: unload it and reload
 ## it in that position. The session (fee, play count, host chrome) is kept
@@ -476,7 +503,13 @@ func _quit_to_menu() -> void:
 ## Android back button while playing -> THE BACK LAW (v0.3.3-p2): a game
 ## sheet open -> close it; the pause sheet open -> resume; nothing open ->
 ## pause. The same behavior as the HUD "<" button (game_base._back_pressed).
+## v043 pass 3 THE RUNNER BACK LAW: in a web/native seat the back button
+## IS the exit - the game lives outside the box's canvas (the WebView or
+## the child window), there is no pause sheet to open.
 func request_pause() -> void:
+        if _runner != null and is_instance_valid(_runner):
+                _runner.finish_from_back()
+                return
         if game != null and is_instance_valid(game) and not game.over:
                 game._back_pressed()
 

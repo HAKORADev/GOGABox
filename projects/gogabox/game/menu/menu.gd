@@ -115,7 +115,7 @@ var _filter_content := ""
 # v043 THE SELF-LEARNING INDEX (the owner: "when there is +10 games in the
 # user library have same genre/sub-genre, then index it too") - the
 # learned chips ride the search sheet; the index persists in Box meta.
-var _learned := {"genre": [], "sub": []}
+var _learned := {"genre": [], "sub": [], "content": []}
 
 func _ready() -> void:
         # v0.4.1 THE POSITION SEAT: the PC menu restores its persisted
@@ -209,6 +209,14 @@ func _ready() -> void:
         Roadmap.tick()
         _refresh()
         _apply_base()   # v0.1.3: design + safe margins decided at build too
+        # v043 pass 3 THE BOOT LAYOUT PARITY (the owner's Windows mis-scale):
+        # _apply_base may have MOVED the design here (the persisted landscape
+        # choice vs the portrait project default) - F10 and _on_resized both
+        # reflow after a design move; _ready never did. The governor skipped
+        # it too (the design was already flipped, its compare saw no change).
+        # One explicit reflow closes that seam for good.
+        _layout()
+        _bg_canvas_update()
         # NOTE: the banner joins only after the splash (main.gd -> on_splash_done)
 
         # slow tick so timed mysteries resolve live + battery chip stays honest
@@ -1068,6 +1076,17 @@ func _build_grid() -> void:
         _discover_arrow = Arc.button(">", Vector2(56, 56), 30, Arc.HOT,
                         func(): _toggle_feed_kind())
         head_row.add_child(_discover_arrow)
+        # v043 pass 3 THE TAPPABLE LAW (the owner's Windows catch: "clicking
+        # the arrow to switch to discover made nothing at all"): the arrow
+        # lives INSIDE the feed BoxScroll, and the scroll owns every press -
+        # a raw Button inside it is a DEAD button (the mouse click is marked
+        # handled in _mouse(), the touch is consumed by _owns()). Every
+        # other discover control was registered; the arrow never was - the
+        # flow test called _toggle_feed_kind() directly and masked it. Now
+        # it rides the same tappable wire as the rest of the feed.
+        _discover_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _feed_scroll.register_tappable(_discover_arrow,
+                        Arc._tap_emitter(_discover_arrow))
         var hint := Arc.label("discover", 16, Color("8a6a40"), false)
         hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
         head_row.add_child(hint)
@@ -1114,6 +1133,14 @@ func _refresh() -> void:
                 c.queue_free()
         _feed_scroll.stop_motion()
         _feed_scroll._tappables.clear()
+        # v043 pass 3 THE ARROW RE-SEAT (the owner's dead-arrow catch): the
+        # clear above wipes EVERY tappable - the tiles re-register as they
+        # rebuild, and the switcher arrow (built once beside the headline)
+        # must re-seat with them or the second refresh kills it forever.
+        if _discover_arrow != null and is_instance_valid(_discover_arrow):
+                _discover_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                _feed_scroll.register_tappable(_discover_arrow,
+                                Arc._tap_emitter(_discover_arrow))
 
         # ---- carousel lists (v0.0.9: ONE strip, arrows switch the list) ----
         # TODAY'S PICKS: daily random over OWNED games only (owner rule).
@@ -1965,28 +1992,41 @@ func _open_search() -> void:
         v.add_child(_chip_row(scroll, "LAN", ["lan", "lan_2p", "lan_3p", "lan_4p",
                         "lan_cross", "lan_phone", "lan_pc"],
                         func(id: String): _filter_lan = "" if _filter_lan == id else id, "lan"))
-        # v043: the learned chips join the const tables (the self-learning
-        # index - >= 10 owned games sharing an unknown tag index it) and
+        # v043 pass 3 THE CHIP LAW, the owner's own clarification ("if we
+        # hardcoded 'porn' then it must keep showing up, but if we did not
+        # made 'blowjob' but there is 10 blowjob-tagged games, then make
+        # that tag appear for the user in the search"):
+        #   - the CONST TABLES always ride the rows (porn stays, empty
+        #     library or not - used_genres() alone starved the rows)
+        #   - an UNKNOWN tag appears only at >= 10 owned games (the
+        #     self-learning index; the old used_* leak indexed any count)
+        #   - the learned census now covers content tags too
         # every row label reads the owner's rename: MORE -> SUB GENRES.
         _learn_tags()
-        var genres: Array = Meta.used_genres()
+        var genres: Array = Meta.GENRES.keys()
         for lid in (_learned["genre"] as Array):
                 if not genres.has(String(lid)):
                         genres.append(String(lid))
         v.add_child(_chip_row(scroll, "GENRES", genres,
                         func(id: String): _filter_genre = "" if _filter_genre == id else id, "genre"))
-        var subs: Array = Meta.used_subs()
+        var subs: Array = Meta.SUBS.keys()
         for lid in (_learned["sub"] as Array):
                 if not subs.has(String(lid)):
                         subs.append(String(lid))
         v.add_child(_chip_row(scroll, "SUB GENRES", subs,
                         func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
-        # v043 THE AGE ROW (the ladder, 3..+21 - the archive's own bands)
+        # v043 THE AGE ROW (the ladder, 3..+21 - the archive's own bands,
+        # the WORD rides the number: "+12 YOUNG TEENS", "+21 ADULT ONLY")
         v.add_child(_chip_row(scroll, "AGE", Meta.AGES.keys(),
                         func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
-        # v043 THE CONTENT ROW (horror / gambling / politics / porn / psycho
-        # / gore / nudity / illegal trading - the archive's taxonomy)
-        v.add_child(_chip_row(scroll, "CONTENT", Meta.used_contents(),
+        # v043 pass 3 THE CONTENT ROW: the hardcoded taxonomy always shows
+        # (horror / gambling / politics / porn / psycho / gore / nudity /
+        # illegal trading) + the learned unknowns at the 10-game census.
+        var cons: Array = Meta.CONTENT.keys()
+        for lid in (_learned["content"] as Array):
+                if not cons.has(String(lid)):
+                        cons.append(String(lid))
+        v.add_child(_chip_row(scroll, "CONTENT", cons,
                         func(id: String): _filter_content = "" if _filter_content == id else id, "content"))
         # STATES (single-select): none -> all games; favorites -> owned hearts;
         # mystery -> the unlisted black boxes. The grid headline follows.
@@ -2036,7 +2076,7 @@ func _learn_tags() -> void:
         var res := Meta.learn_tags(GameReg.games(), func(id: String) -> bool:
                 return Box.owns_game(id))
         var stored: Dictionary = Box.get_meta_dict("learned_tags")
-        for kind in ["genre", "sub"]:
+        for kind in ["genre", "sub", "content"]:
                 var merged: Array = (stored.get(kind, []) as Array).duplicate()
                 for sid in (res[kind] as Array):
                         if not merged.has(String(sid)):
@@ -2075,7 +2115,10 @@ func _chip_row(scroll: BoxScroll, title_: String, ids: Array, on_toggle: Callabl
                         "os": lbl = "PHONE" if sid == "android" else "PC"
                         "ctrl": lbl = Meta.ctrl_label(sid)
                         "lan": lbl = Meta.lan_label(sid)
-                        "age": lbl = "+" + sid
+                        # v043 pass 3: the word rides the number (the owner:
+                        # "put next to age tag, the word of it, like +21 -
+                        # adult only, +12 young teens") - Meta.age_label
+                        "age": lbl = Meta.age_label(sid)
                         "content": lbl = Meta.content_label(sid)
                 var b := Button.new()
                 b.text = " " + lbl
@@ -3006,8 +3049,12 @@ func _open_settings() -> void:
                         func(): _close_sheet()))
         Arc.fit_sheet(vb, 4)
 
-## THE APP UPDATES sheet: the honest census (current vs served), the
-## download into GOGAs/.cache/update/, then the platform's apply trick.
+## THE APP UPDATES sheet - v043 pass 3, rebuilt to the plan's shape
+## ("develop the update/download stuff in the GOGABox ofc and the
+## schedule"): the census (current vs served), CHECK NOW, the schedule
+## (the interval + AUTO-DOWNLOAD), the staged seat (a downloaded update
+## waits in GOGAs/.cache/update - APPLY NOW runs the platform trick),
+## and the honest platform note. Every door names what it does.
 func _open_update_sheet() -> void:
         var vb := _sheet_base()
         var t := Arc.label("APP UPDATES", 40, Arc.INK)
@@ -3018,6 +3065,7 @@ func _open_update_sheet() -> void:
         status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         vb.add_child(status)
+        # ---- the action button (DOWNLOAD & APPLY / APPLY STAGED) ----
         var action := Arc.button("DOWNLOAD & APPLY", Vector2(480, 76), 24, Arc.ACCENT)
         action.visible = false
         var apply_state := {"census": {}}
@@ -3027,6 +3075,93 @@ func _open_update_sheet() -> void:
                 action.disabled = true
                 action.text = "FETCHING..."
                 _update_download_and_apply(apply_state["census"], action))
+        # ---- THE SCHEDULE: the interval + the auto-download toggle ----
+        var prefs := GogaUpdate.prefs()
+        var sched_row := HFlowContainer.new()
+        sched_row.add_theme_constant_override("h_separation", 8)
+        sched_row.add_theme_constant_override("v_separation", 8)
+        vb.add_child(Arc.label("CHECK SCHEDULE", 22, Arc.HOT))
+        vb.add_child(sched_row)
+        var interval_btns: Array = []
+        for iv in GogaUpdate.INTERVALS:
+                var hours := int(iv[0])
+                var b := Button.new()
+                b.text = " " + String(iv[1]) + " "
+                b.toggle_mode = true
+                b.button_pressed = int(prefs.get("interval_h", 24)) == hours
+                b.add_theme_font_override("font", Arc.font_ui())
+                b.add_theme_font_size_override("font_size", 18)
+                b.add_theme_color_override("font_color",
+                                Arc.CARD if b.button_pressed else Color("7a5a34"))
+                b.add_theme_stylebox_override("normal", Arc.panel_style(
+                                Color(0.98, 0.62, 0.1) if b.button_pressed
+                                else Color(0, 0, 0, 0.14), 20))
+                b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+                b.toggled.connect(func(_on: bool):
+                        Jukebox.sfx("click", -4.0)
+                        GogaUpdate.set_pref("interval_h", hours)
+                        for ob in interval_btns:
+                                (ob as Button).button_pressed = ob == b
+                        for ob in interval_btns:
+                                if (ob as Button).button_pressed:
+                                        (ob as Button).add_theme_color_override(
+                                                        "font_color", Arc.CARD)
+                                else:
+                                        (ob as Button).add_theme_color_override(
+                                                        "font_color", Color("7a5a34")))
+                interval_btns.append(b)
+                sched_row.add_child(b)
+        var auto_row := HBoxContainer.new()
+        auto_row.add_theme_constant_override("separation", 12)
+        var auto_btn := Arc.button("AUTO-DOWNLOAD: OFF" if not bool(prefs.get("auto", false))
+                        else "AUTO-DOWNLOAD: ON", Vector2(480, 64), 22,
+                        Color(0.16, 0.10, 0.05, 0.85))
+        auto_row.add_child(auto_btn)
+        vb.add_child(auto_row)
+        auto_btn.pressed.connect(func():
+                var on := not bool(GogaUpdate.prefs().get("auto", false))
+                GogaUpdate.set_pref("auto", on)
+                auto_btn.text = "AUTO-DOWNLOAD: ON" if on else "AUTO-DOWNLOAD: OFF"
+                Arc.toast(_toast, "auto-download " + ("on - updates stage themselves" if on else "off")))
+        var sched_note := Arc.label("the box checks the official source on this schedule; AUTO stages the download so APPLY is one tap",
+                        17, Color("8a6a40"), false)
+        sched_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        sched_note.custom_minimum_size = Vector2(520, 0)
+        vb.add_child(sched_note)
+        # ---- the staged seat: a downloaded update waits here ----
+        var staged := GogaUpdate.staged_path()
+        var apply_staged := Arc.button("APPLY STAGED UPDATE", Vector2(480, 70), 22,
+                        Color(0.42, 0.30, 0.16))
+        if staged == "":
+                apply_staged.visible = false
+        vb.add_child(apply_staged)
+        apply_staged.pressed.connect(func():
+                Jukebox.sfx("click", -4.0)
+                apply_staged.disabled = true
+                var sp := GogaUpdate.staged_path()
+                if sp == "":
+                        apply_staged.disabled = false
+                        return
+                var res: Dictionary = GogaUpdate.apply_android(sp) \
+                                if OS.has_feature("android") \
+                                else GogaUpdate.apply_windows(sp)
+                if bool(res.get("ok", false)):
+                        if OS.has_feature("android"):
+                                Arc.toast(_toast, "the installer opened - confirm to update")
+                        else:
+                                Arc.toast(_toast, "staged - close GOGABox when ready and it applies itself")
+                else:
+                        apply_staged.disabled = false
+                        Arc.toast(_toast, String(res.get("why", ""))))
+        vb.add_child(Arc.button("CHECK NOW", Vector2(480, 70), 24,
+                        Color(0.42, 0.30, 0.16), func():
+                                Jukebox.sfx("click", -4.0)
+                                status.text = "checking the official source..."
+                                action.visible = false
+                                var c: Dictionary = await GogaUpdate.check()
+                                GogaUpdate.mark_checked()
+                                apply_state["census"] = c
+                                _update_status(status, action, c)))
         vb.add_child(Arc.button("CLOSE", Vector2(480, 64), 24, Color(0.42, 0.30, 0.16),
                         func(): _close_sheet()))
         Arc.fit_sheet(vb, 1)
@@ -3035,6 +3170,11 @@ func _open_update_sheet() -> void:
         apply_state["census"] = census
         if not is_instance_valid(status):
                 return
+        _update_status(status, action, census)
+
+## The census line + the action button's state (shared by the sheet open
+## and CHECK NOW - one truth for both).
+func _update_status(status: Label, action: Button, census: Dictionary) -> void:
         var why := String(census.get("why", ""))
         if why != "":
                 status.text = why
@@ -3043,6 +3183,8 @@ func _open_update_sheet() -> void:
                 status.text = "an update is waiting: v%s (you run v%s)" \
                                 % [String(census.get("served")), String(census.get("current"))]
                 action.visible = true
+                action.disabled = false
+                action.text = "DOWNLOAD & APPLY"
         else:
                 status.text = "you are on the newest build (v%s)" \
                                 % String(census.get("current"))

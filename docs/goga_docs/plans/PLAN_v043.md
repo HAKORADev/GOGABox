@@ -178,3 +178,88 @@ the platform is, how packages work, repo map, quickstart, publishing) —
 no version-anchored headers, no law-jargon walls; AGREEMENT.md intro
 de-changelogged. The law-speak stays where it belongs (AGENTS.md, the
 developers catalog, the engine comments).
+
+## PASS 3 — THE PLATFORM CORRECTNESS ROUND (the owner's Windows test round)
+
+The owner tested the pass-2 build on Windows and came back with a list:
+the discover arrow did nothing, the boot mis-scaled (horizontal window,
+vertical content), the GOGAs tree shipped empty beside nothing, the
+search chips behaved the opposite of his words, the GOGAs infra was
+"simplified... will never survive one real-life work", the updates menu
+was not the plan's, and the runner kinds (web/native) had never actually
+existed. His own framing: "make this as another round and not a
+version/patch pump" - the config stays 0.4.3.
+
+**The dead arrow (the tappable re-seat law, 127).** The switcher arrow
+was a real Button inside the feed BoxScroll, and the scroll owns every
+press (the mouse is swallowed in `_mouse()`, the touch in `_owns()`) -
+every other discover control was a registered tappable, the arrow never
+was, and the flow test called `_toggle_feed_kind()` directly, masking
+it. Worse: `_refresh()` CLEARS the tappables, so even a correct
+registration at build time died on the first rebuild. The arrow now
+re-seats on every refresh, and the eye pass clicks it through the REAL
+input stack (parse_input_event + the emulated-touch twin - the r4
+window-px law).
+
+**The boot mis-scale (the design-first boot law, 128).** F10 is
+design-first (apply_pc, then the window); boot was window-first - the
+design only landed in menu._ready, after the splash beat, and the
+menu's own flip never triggered a reflow (the governor's compare saw no
+change). Boot now walks the F10 order and the eye pass proves it: the
+persisted landscape choice renders the landscape design from the first
+frame, the grid reflows, nothing letterboxes.
+
+**The chips (the chip law, 129).** The owner's clarification verbatim:
+hardcoded tags always show; unknown tags appear only at >= 10 owned
+games. The old rows used used_* (any count, no hardcoded table). The
+rows now open with the const tables, the census covers content tags
+too, and the age chips wear the words ("+12 YOUNG TEENS", "+21 ADULT
+ONLY" - the archive's own tier texts).
+
+**The catalog (the catalog law, 130).** GOGAs/discover/index/ was ONE
+file. Schema 2: source.json (the identity + the tier file map) +
+official.json / community.json / hobbyist.json, REPOS.txt unchanged as
+the PR register, CI keeping community.json in lockstep. The tier trust
+law: official-source rows wear the file's name, everyone else wears the
+engine's tier. Local sources walk the same catalog when repo-shaped
+(repo root or the GOGAs folder itself). Per package: index/versions.json
+(the ledger law, 131) - the VERSIONS sort reads real data, the
+validator and CI demand it.
+
+**The runner doors (the runner doors + one-bridge laws, 132-133).**
+mount_for returned false for web/native - the launch died silently.
+Now: WEB = the box's own loopback static server (GogaWebserve) + the
+gogabrowser Android plugin (the system WebView in-activity) / the PC
+app-mode window (msedge/chrome --app, the WebView2 runtime, chromeless)
++ sdk/web/goga_bridge.js over the NEW WebSocket door (31443 - same
+vocabulary, one dispatcher). NATIVE = the PC child process + exit
+watching (the rig compiles a real C stub that rides the TCP bridge and
+proves the whole loop); the Android .so loader refuses honestly this
+round. THE WEB PILOT SHIPS: GOGA ORBIT (three.js, vendored, bridge-live)
+as the fifth official pilot.
+
+**The delivery (the GOGAs delivery law, 134).** The Windows zip now
+carries GOGAs/ beside the exe; the Android build uploads
+GOGAs-official-*.zip for the Downloads extraction; the release body
+carries the placement command; the box notes where the tree goes when
+it boots empty.
+
+**The updates sheet (the updates sheet law, 135).** CHECK NOW, the
+interval picker (12H/24H/2D/WEEKLY), AUTO-DOWNLOAD (a scheduled find
+stages the download; the note names the APPLY tap), and the staged
+seat - the plan's whole schedule, not just the census.
+
+**The native packaging tool** (tools/v043_native_package.py): any
+folder with a normal game becomes a .goga in one command - the
+Zuma-shaped walkthrough lives in developers/NATIVE_GAMES.md. The
+archive.org pull could not run from this sandbox (the front door was
+unreachable all session); the tool is proven end to end with a
+compiled stand-in, the walkthrough is written for the owner's machine.
+
+Gates: flow_test ALL TESTS PASSED (the catalog walk, the webserve, the
+WebSocket bridge, the native stub ride it) + qa_v042_lan 177/0 +
+parse_gate 90 scripts ALL CLEAN + the CI tree validator ALL VALID + the
+eye pass (six shots) reviewed by eye: the landscape boot, the arrow
+flip through a real click, the five-pilot catalog feed, the live web
+seat (the three.js game rendering in the app-mode window), the rebuilt
+updates sheet, the full chip rows.

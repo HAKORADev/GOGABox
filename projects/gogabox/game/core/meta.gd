@@ -305,15 +305,19 @@ static func used_contents() -> Array:
 ## v043 THE SELF-LEARNING INDEX (the owner: "add a feature in the search
 ## engine of GOGABox to index games genres/sub-genres to detect unsupported
 ## keywords, when there is +10 games in the user library have same
-## genre/sub-genre, then index it too"). `entries` = the unified entries,
-## `owns` = Callable(id) -> bool (the user-library check). A tag NOT in the
-## const tables that >= LEARN_THRESHOLD owned games share becomes a
-## first-class filter chip. Returns the learned ids per kind; the caller
-## persists them (Box meta) so the index survives restarts.
+## genre/sub-genre, then index it too"). v043 pass 3, the owner's own
+## clarification: the census covers CONTENT tags too ("if we did not made
+## 'blowjob' but there is 10 blowjob-tagged games, then make that tag
+## appear") - the hardcoded tables always show on their own; ONLY unknown
+## tags ride the 10-game census. `entries` = the unified entries, `owns` =
+## Callable(id) -> bool (the user-library check). A tag NOT in the const
+## tables that >= LEARN_THRESHOLD owned games share becomes a first-class
+## filter chip. Returns the learned ids per kind; the caller persists them
+## (Box meta) so the index survives restarts.
 const LEARN_THRESHOLD := 10
 
 static func learn_tags(entries: Array, owns: Callable) -> Dictionary:
-        var tally := {"genre": {}, "sub": {}}
+        var tally := {"genre": {}, "sub": {}, "content": {}}
         for g in entries:
                 var gid := String(g["id"])
                 if not bool(owns.call(gid)):
@@ -330,8 +334,16 @@ static func learn_tags(entries: Array, owns: Callable) -> Dictionary:
                                 if not tally[kind].has(sid):
                                         tally[kind][sid] = 0
                                 tally[kind][sid] = int(tally[kind][sid]) + 1
-        var out := {"genre": [], "sub": []}
-        for kind in ["genre", "sub"]:
+                # v043 pass 3: the content census joins (the owner's porn/blowjob line)
+                for craw in (g.get("content", []) as Array):
+                        var cid := normalize_tag(String(craw))
+                        if cid == "" or CONTENT.has(cid):
+                                continue
+                        if not tally["content"].has(cid):
+                                tally["content"][cid] = 0
+                        tally["content"][cid] = int(tally["content"][cid]) + 1
+        var out := {"genre": [], "sub": [], "content": []}
+        for kind in ["genre", "sub", "content"]:
                 for sid in tally[kind]:
                         if int(tally[kind][sid]) >= LEARN_THRESHOLD:
                                 out[kind].append(sid)

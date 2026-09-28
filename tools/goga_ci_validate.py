@@ -72,13 +72,105 @@ def validate_game_index(idx: dict, source_repo: str):
         errs.append("no files manifest (the downloader fetches through it)")
     return errs
 
+def validate_ledger(ledger_path: Path, pkg_name: str, version: str):
+    """v043 pass 3 THE VERSION LEDGER: index/versions.json - one entry per
+    released version, newest last; the VERSIONS sort's data."""
+    if not ledger_path.exists():
+        return [f"{pkg_name}: no index/versions.json - the version ledger"]
+    try:
+        led = json.loads(ledger_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return [f"{pkg_name}: index/versions.json is not JSON ({e})"]
+    vs = led.get("versions")
+    if not isinstance(vs, list) or not vs:
+        return [f"{pkg_name}: index/versions.json carries no versions[]"]
+    errs = []
+    for v in vs:
+        if not isinstance(v, dict) or not v.get("version"):
+            errs.append(f"{pkg_name}: a ledger entry without its version")
+    versions = [str(v.get("version")) for v in vs if isinstance(v, dict)]
+    if str(version) not in versions:
+        errs.append(f"{pkg_name}: the ledger does not name the index version {version}")
+    return errs
+
+def validate_catalog_tree():
+    """v043 pass 3 THE CATALOG (schema 2): the per-tier files parse, the
+    official rows match the tree, community.json and REPOS.txt agree."""
+    errs = []
+    cat = ROOT / "GOGAs" / "discover" / "index"
+    src_path = cat / "source.json"
+    if not src_path.exists():
+        return ["no GOGAs/discover/index/source.json"]
+    src = json.loads(src_path.read_text(encoding="utf-8"))
+    if int(src.get("schema", 1)) < 2:
+        errs.append("source.json is still schema 1 - run tools/v043_package.py (the catalog rebuild)")
+        return errs
+    tiers = src.get("tiers") or {}
+    for t in ("official", "community", "hobbyist"):
+        rel = tiers.get(t)
+        if not rel:
+            errs.append(f"source.json's tier map misses \"{t}\"")
+            continue
+        # the tier map paths are RELATIVE TO THE CATALOG FOLDER (the files
+        # sit beside source.json); the game index paths INSIDE the tier
+        # files are repo-relative (they point into games/)
+        p = cat / rel
+        if not p.exists():
+            errs.append(f"the tier file {rel} does not exist")
+            continue
+        tf = json.loads(p.read_text(encoding="utf-8"))
+        if t == "community":
+            # the community directory must agree with REPOS.txt (the two
+            # files are one register - a PR touches both, CI keeps lockstep)
+            registered = set(repos_txt_lines())
+            listed = {str(s.get("repo", "")) for s in tf.get("sources", [])
+                      if s.get("repo")}
+            if registered != listed:
+                errs.append("community.json does not match REPOS.txt - "
+                            f"register={sorted(registered)} catalog={sorted(listed)}")
+    # the official rows name every package in the tree
+    off_rel = tiers.get("official", "")
+    off_path = ROOT / "GOGAs" / off_rel if off_rel else None
+    if off_path and off_path.exists():
+        off = json.loads(off_path.read_text(encoding="utf-8"))
+        listed_ids = set()
+        for g in off.get("games", []):
+            listed_ids.add(str(g.get("id", "")))
+            ip = ROOT / "GOGAs" / str(g.get("index", ""))
+            if not ip.exists():
+                errs.append(f"official.json names a game the tree does not carry: {g.get('index')}")
+        for pkg in sorted((ROOT / "GOGAs" / "games").glob("gogabox_github-*")):
+            idx = json.loads((pkg / "index" / "index.json").read_text(encoding="utf-8"))
+            if idx.get("id") not in listed_ids:
+                errs.append(f"official.json does not list {pkg.name}")
+    return errs
+
+def _games_of_source(src: dict, repo: str, branch: str):
+    """the source's game rows - schema 2 (the tier map) or schema 1
+    (the inline games array). Returns (games, errs)."""
+    if int(src.get("schema", 1)) >= 2 and isinstance(src.get("tiers"), dict):
+        errs = []
+        games = []
+        for t in ("official", "hobbyist"):
+            rel = src["tiers"].get(t, "")
+            if not rel:
+                continue
+            tf = fetch(f"{RAW}/{repo}/{branch}/{rel}")
+            if "__err__" in tf:
+                errs.append(f"tier file {rel}: {tf['__err__']}")
+                continue
+            games += tf.get("games", [])
+        return games, errs
+    return src.get("games", []), []
+
 def validate_repo(repo: str, branch="main"):
     """fetch + validate one source repo; returns (errors, game_count)"""
     src = fetch(f"{RAW}/{repo}/{branch}/GOGAs/discover/index/source.json")
     if "__err__" in src:
         return [f"source.json: {src['__err__']}"], 0
     errs = []
-    games = src.get("games", [])
+    games, gerrs = _games_of_source(src, repo, branch)
+    errs += gerrs
     for g in games:
         rel = g.get("index", "")
         if not rel:
@@ -121,16 +213,14 @@ def validate_local_tree():
             errs.append(f"{pkg.name}: save/ missing")
         if not (pkg / "discover" / "page.json").is_file():
             errs.append(f"{pkg.name}: discover/page.json missing")
+        # v043 pass 3: the version ledger (index/ is a real folder)
+        idx = json.loads(idx_path.read_text(encoding="utf-8"))
+        errs += validate_ledger(pkg / "index" / "versions.json", pkg.name,
+                                idx.get("version", ""))
     if n == 0:
         errs.append("no packages under GOGAs/games/")
-    # the official source manifest parses + lists them
-    src_path = ROOT / "GOGAs" / "discover" / "index" / "source.json"
-    if not src_path.exists():
-        errs.append("no GOGAs/discover/index/source.json")
-    else:
-        src = json.loads(src_path.read_text(encoding="utf-8"))
-        if len(src.get("games", [])) != n:
-            errs.append("source.json's games list does not match the tree")
+    # the catalog (schema 2): per-tier files + the tree agreement
+    errs += validate_catalog_tree()
     return errs
 
 def repos_txt_lines() -> list:

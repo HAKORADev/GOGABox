@@ -281,7 +281,8 @@ def assemble(p: dict, pcks: dict) -> Path:
     """the package root in GOGAs/games/<pkg id>/"""
     gid = p["id"]
     slug = f"hakora.{gid}.{{N}}"
-    n = {"rally": "001", "slasher": "002", "domino": "003", "jumpcube": "004"}[gid]
+    n = {"rally": "001", "slasher": "002", "domino": "003", "jumpcube": "004",
+         "orbit": "005"}[gid]
     pkg_id = f"gogabox_github-HAKORADev_hakora.{gid}.{n}_official"
     root = GOGAS / "games" / pkg_id
     if root.exists():
@@ -351,6 +352,19 @@ def assemble(p: dict, pcks: dict) -> Path:
     # never arrives, and the strict validator would then refuse the install)
     extract_logic(p, root)
     fill_data_minimums(p, root)
+    # v043 pass 3 THE VERSION LEDGER - index/ is a real folder, not one
+    # file: versions.json carries the release history (the VERSIONS sort's
+    # data, the update story a human can read, and the strict validator
+    # demands it). Future releases APPEND an entry; never rewrite history.
+    # Written BEFORE the manifest walk so the downloader ships it too.
+    (root / "index" / "versions.json").write_text(json.dumps({
+        "schema": 1,
+        "versions": [{
+            "version": p["version"],
+            "updated": date.today().isoformat(),
+            "notes": f"{p['title']} initial package release",
+        }],
+    }, indent=2) + "\n", encoding="utf-8")
     files = []
     seen = set()
     for f in sorted(root.rglob("*")):
@@ -435,6 +449,10 @@ def _gen_board_png(dest: Path, from_thumb: Path) -> None:
 
 def main() -> int:
     which = sys.argv[1:] or [p["id"] for p in PILOTS]
+    if which == ["--catalog"]:
+        # the catalog-only regen (the publishing flow's sync door)
+        write_catalog()
+        return 0
     BUILD.mkdir(parents=True, exist_ok=True)
     for p in PILOTS:
         if p["id"] not in which:
@@ -444,27 +462,90 @@ def main() -> int:
         pcks = export_pack(staged, p)
         root = assemble(p, pcks)
         print(f"   package: {root}")
-    # the official source manifest (the raw-URL feed entry)
+    # v043 pass 3 THE CATALOG (schema 2) - discover/index/ is a real
+    # multi-file catalog now, one file per repos tier (the owner: "there
+    # should be really different files for each repos tier ... it's all
+    # feel un-expandable"). source.json carries the identity + the tier
+    # file map; official.json carries THIS repo's game rows; community.json
+    # is the community source directory (CI-synced with REPOS.txt);
+    # hobbyist.json is the shape. REPOS.txt stays the plain register the
+    # two-step publish PRs against - the engine reads BOTH.
+    write_catalog()
+    print("official catalog rebuilt (schema 2, per-tier files)")
+    return 0
+
+
+def write_catalog() -> None:
+    """the SCHEMA 2 discover catalog from the committed packages tree."""
+    src_dir = GOGAS / "discover" / "index"
+    src_dir.mkdir(parents=True, exist_ok=True)
     games = []
     for pkg in sorted((GOGAS / "games").glob("gogabox_github-*")):
         idx = json.loads((pkg / "index" / "index.json").read_text(encoding="utf-8"))
+        led_p = pkg / "index" / "versions.json"
+        vcount = 1
+        if led_p.exists():
+            led = json.loads(led_p.read_text(encoding="utf-8"))
+            vcount = max(1, len(led.get("versions", [])))
         games.append({"index": f"games/{pkg.name}/index/index.json",
-                      "id": idx["id"], "version": idx["version"]})
-    src_dir = GOGAS / "discover" / "index"
-    src_dir.mkdir(parents=True, exist_ok=True)
+                      "id": idx["id"], "game_id": idx.get("game_id", ""),
+                      "title": idx.get("title", ""), "version": idx["version"],
+                      "age": idx.get("age", 3), "os": idx.get("os", []),
+                      "size_bytes": idx.get("size_bytes", 0),
+                      "updated": idx.get("updated", ""),
+                      "versions_count": vcount})
     (src_dir / "source.json").write_text(json.dumps({
-        "schema": 1,
+        "schema": 2,
         "name": "GOGABox Official",
         "repo": "HAKORADev/GOGABox",
+        "branch": "main",
         "engine_version": "0.4.3",
         "update_assets": {
             "android": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-v0.4.3-arm64-v8a.apk",
             "pc": "https://github.com/HAKORADev/GOGABox/releases/latest/download/GOGABox-windows.zip",
         },
+        "tiers": {
+            "official": "official.json",
+            "community": "community.json",
+            "hobbyist": "hobbyist.json",
+        },
+    }, indent=2) + "\n", encoding="utf-8")
+    (src_dir / "official.json").write_text(json.dumps({
+        "schema": 2,
+        "tier": "official",
+        "updated": date.today().isoformat(),
         "games": games,
     }, indent=2) + "\n", encoding="utf-8")
-    print(f"official source manifest: {games}")
-    return 0
+    # the community directory: SYNCED with REPOS.txt (the register is the
+    # PR target; this file is its catalog view - goga-packages CI keeps
+    # them in lockstep and fails when a PR touched one but not the other)
+    repos_txt = (GOGAS / "discover" / "REPOS.txt").read_text(encoding="utf-8") \
+            if (GOGAS / "discover" / "REPOS.txt").exists() else ""
+    sources = []
+    for line in repos_txt.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#") and "/" in s:
+            sources.append({"repo": s, "branch": "main", "note": ""})
+    (src_dir / "community.json").write_text(json.dumps({
+        "schema": 2,
+        "tier": "community",
+        "_about": ("the community source directory - the catalog view of "
+                   "GOGAs/discover/REPOS.txt; goga-packages CI syncs the "
+                   "two, a PR must touch both (the two-step publish)"),
+        "updated": date.today().isoformat(),
+        "sources": sources,
+    }, indent=2) + "\n", encoding="utf-8")
+    (src_dir / "hobbyist.json").write_text(json.dumps({
+        "schema": 2,
+        "tier": "hobbyist",
+        "_about": ("the hobbyist tier's shape - hobbyist sources are added "
+                   "by players at runtime (ADD SOURCE), so a repo usually "
+                   "serves an empty list here; the engine reads it all the "
+                   "same when a repo curates a hobbyist section"),
+        "updated": date.today().isoformat(),
+        "games": [],
+    }, indent=2) + "\n", encoding="utf-8")
+    print(f"official catalog: {len(games)} games (schema 2, per-tier files)")
 
 if __name__ == "__main__":
     sys.exit(main())
