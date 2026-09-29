@@ -7,6 +7,7 @@ extends Node
 var menu: Node2D
 
 func _ready() -> void:
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("code", 1)
         menu = Node2D.new()
         menu.set_script(load("res://game/menu/menu.gd"))

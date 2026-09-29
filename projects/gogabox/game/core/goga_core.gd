@@ -25,14 +25,34 @@ const ENTRY_PCK := "game.pck"       # THE UNIFIED ENTRY LAW - one name everywher
 const MANIFEST := "game.json"       # the name file
 const DEFAULT_SCRIPT := "res://entry.gd"   # the default entry script in a pack
 
+# v044-1 THE BOX SETTINGS FILE - the one visible settings seat.
+# `GOGAs/box.json` rides beside the games; a plain text editor is the UI:
+#
+#   {
+#     "hide_mature": true,     hide +12 games, their age chips and their
+#                              content tags (the family view; the default)
+#     "dev_cheats": false,     the dev-cheat sheet + every cheat switch
+#                              (default; true re-arms the owner's five-tap)
+#     "starter_game": ""       optional: the id of the free starter game
+#                              (default: the alphabetically-first folder)
+#   }
+#
+# Missing file = the defaults above. The file (re)reads at boot and on
+# every menu refresh - edit it, go back to the box, done.
+const SETTINGS_FILE := "box.json"
+const SETTINGS_DEFAULTS := {"hide_mature": true, "dev_cheats": false,
+                "starter_game": ""}
+
 var _home := ""
 var _entries: Array = []
 var _entries_by_id := {}
 var _current_id := ""               # the running game (SDK context)
 var _thumb_cache := {}              # path -> ImageTexture (disk thumbs)
+var _settings: Dictionary = {}      # the box.json overlay (SETTINGS_DEFAULTS under it)
 
 func _ready() -> void:
         ensure_tree()
+        reload_settings()
         reload_entries()
 
 # ============================================================ THE HOME TREE
@@ -79,7 +99,51 @@ func ensure_tree() -> bool:
                         var err := DirAccess.make_dir_recursive_absolute(d)
                         if err != OK:
                                 ok = false
+        _ensure_settings_file()
         return ok
+
+# ============================================================ THE SETTINGS
+
+## Read GOGAs/box.json over the defaults. Never fails: a missing, broken
+## or half-edited file just means the defaults (the scan law's spirit -
+## a bad file is not a refusal, the box stays playable).
+func reload_settings() -> void:
+        _settings = {}
+        var p := home().path_join(SETTINGS_FILE)
+        if FileAccess.file_exists(p):
+                var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(p))
+                if v is Dictionary:
+                        _settings = v
+
+## Ship the file when it is not there, so the toggle is DISCOVERABLE -
+## a player opens GOGAs/, sees box.json, flips one word. Silent on a
+## read-only tree (the defaults still rule in memory).
+func _ensure_settings_file() -> void:
+        var p := home().path_join(SETTINGS_FILE)
+        if FileAccess.file_exists(p):
+                return
+        var f := FileAccess.open(p, FileAccess.WRITE)
+        if f == null:
+                return
+        f.store_string(JSON.stringify(SETTINGS_DEFAULTS, "  ") + "\n")
+        f.close()
+
+## One settings read, defaults under everything.
+func box_setting(key: String, def: Variant = null) -> Variant:
+        if _settings.has(key):
+                return _settings[key]
+        return SETTINGS_DEFAULTS.get(key, def)
+
+## THE MATURE LAW: true (the default) hides +12 games, their age chips
+## and their content tags everywhere the box renders them.
+func hide_mature() -> bool:
+        return bool(box_setting("hide_mature", true))
+
+## THE DEV-CHEATS MASTER: false (the default) and every cheat reads 0 -
+## the five-tap knock stays dead, the sheet never opens, no saved cheat
+## value can ever act. true re-arms the whole owner sheet.
+func dev_cheats_enabled() -> bool:
+        return bool(box_setting("dev_cheats", false))
 
 # ============================================================ THE ENTRIES
 
@@ -276,6 +340,11 @@ func thumb_texture(e: Dictionary) -> Texture2D:
         var img := Image.load_from_file(full)
         if img == null:
                 return null
+        # v044-1 THE MIPMAP LAW (see Meta.thumb_texture): thin art survives
+        # every downscale seat only with a mipmap chain.
+        if img.is_compressed():
+                img.decompress()
+        img.generate_mipmaps()
         var tex := ImageTexture.create_from_image(img)
         _thumb_cache[full] = tex
         return tex

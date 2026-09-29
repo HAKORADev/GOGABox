@@ -86,8 +86,13 @@ func _run(g: Dictionary) -> void:
         v.add_child(frame)
 
         var thumb := TextureRect.new()
-        var tpath := String(g.get("thumb", ""))
-        thumb.texture = load(tpath) if ResourceLoader.exists(tpath) else null
+        # v044-1: the folder thumb is a RELATIVE file - resolve it against
+        # the game's folder (a bare load() only reads res://, so the load
+        # screen rendered an empty frame for every folder game), and sample
+        # it with the mipmap filter (the aliasing law).
+        thumb.texture = Meta.thumb_texture(String(g.get("thumb", "")),
+                        String(g.get("root", "")))
+        thumb.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         thumb.set_anchors_preset(Control.PRESET_FULL_RECT)
         var inset := 4.0            # flush against the golden line
         thumb.offset_left = inset

@@ -8,6 +8,7 @@ var game: GogaGame
 var last := ""
 
 func _ready() -> void:
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         var ok := GameHost.launch(self, "merge")
         print("LAUNCH ok=", ok)

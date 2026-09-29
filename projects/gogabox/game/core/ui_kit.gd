@@ -544,10 +544,17 @@ static func fit_sheet(vb: VBoxContainer, keep_tail := 1, preserve_key := "") -> 
         var need := vb.get_combined_minimum_size().y + margins
         if need <= avail_h:
                 return                         # fits - nothing to do
-        # sheets holding raw sliders stay untouched: BoxScroll would swallow
-        # the slider drags (native overflow is the lesser evil there)
+        # v044-1 THE SCROLLABLE-FORM LAW: only real DRAG controls (sliders)
+        # refuse the wrap - BoxScroll would swallow their drags. Writable
+        # fields (LineEdit/TextEdit) are welcome now: BoxScroll's FIELD LAW
+        # (r4 law 92, _field_at) never captures a press that lands on one,
+        # so a form sheet scrolls exactly like every other sheet while the
+        # fields keep their presses. The old guard counted LineEdit/TextEdit
+        # as sliders, which is what kept the profile sheet from ever
+        # scrolling (the owner's v044-1 report) - the wrap fit_sheet
+        # promised in law 93 silently never happened for any form sheet.
         for c in vb.get_children():
-                if _has_slider(c):
+                if _has_dragger(c):
                         return
         var kids := vb.get_children()
         var tail: Array = kids.slice(maxi(0, kids.size() - keep_tail))
@@ -848,11 +855,15 @@ static func _buttons_in(n: Node) -> Array:
                         stack.append(c)
         return out
 
-static func _has_slider(n: Node) -> bool:
+static func _has_dragger(n: Node) -> bool:
+        # the REAL drag class only - a Slider/SpinBox owns its drag motion.
+        # Writable fields are NOT here: BoxScroll._field_at already yields
+        # every press that lands on a LineEdit/TextEdit (law 92), so they
+        # live inside scrolling sheets safely (THE SCROLLABLE-FORM LAW).
         var stack := [n]
         while not stack.is_empty():
                 var cur: Node = stack.pop_back()
-                if cur is Slider or cur is SpinBox or cur is LineEdit or cur is TextEdit:
+                if cur is Slider or cur is SpinBox:
                         return true
                 for c in cur.get_children():
                         stack.append(c)

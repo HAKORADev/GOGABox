@@ -37,6 +37,9 @@ static func games() -> Array:
                         "id": String(g["id"]),
                         "title": String(g["title"]),
                         "thumb": String(g.get("thumb", "")),
+                        # v044-1: the folder-game thumb is a RELATIVE file name -
+                        # the row renderers need the root to resolve it
+                        "root": String(g.get("root", "")),
                         "name": String(cur.get("name", "COINS")),
                         "rate": float(cur.get("rate", 1.0)),
                         "tint": cur.get("tint", Arc.COIN),

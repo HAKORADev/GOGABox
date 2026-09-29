@@ -207,6 +207,10 @@ func _ready() -> void:
         # mystery page) - a boot-time popup gets reflex-denied and burns the
         # one ask the OS gives us.
         Roadmap.tick()
+        # v044-1 THE STARTER LAW: the free game is seeded from DATA (the
+        # GOGAs tree + box.json), never a baked name - runs before the
+        # first feed build so the tile is already owned when it renders.
+        Box.seed_starter()
         _refresh()
         _apply_base()   # v0.1.3: design + safe margins decided at build too
         # v043 pass 3 THE BOOT LAYOUT PARITY (the owner's Windows mis-scale):
@@ -1076,6 +1080,10 @@ func _build_grid() -> void:
 # ---------------------------------------------------------------- feed
 
 func _refresh() -> void:
+        # v044-1 THE SETTINGS REREAD: box.json is the settings UI - the file
+        # rereads on every feed rebuild, so an edit + any refresh (back from
+        # a game, a purchase, the day tick) applies it without a reboot.
+        GOGA.reload_settings()
         # v040-11 THE CONTINUITY LAW (the owner: "i bought something, it
         # refreshed the list and returned me to the top - eliminate it"): the
         # feed + the carousel strip keep their offsets across every refresh
@@ -1106,6 +1114,8 @@ func _refresh() -> void:
         #   never belonged here).
         var picks: Array = []
         for g in Roadmap.daily_picks():
+                if _mature_hidden(g):
+                        continue   # v044-1: the mature fold rides the strips too
                 picks.append({"g": g, "stat": String(g["tag"])})
         var played: Array = []
         var never: Array = []
@@ -1113,6 +1123,8 @@ func _refresh() -> void:
                 var gid := String(g["id"])
                 if not Box.owns_game(gid):
                         continue
+                if _mature_hidden(g):
+                        continue   # v044-1: the mature fold
                 var plays := Box.stat(gid, "plays")
                 var ts := Box.last_played_at(gid)
                 if plays > 0:
@@ -1220,7 +1232,21 @@ func _refresh() -> void:
         # frame, no top-jump, no flicker (verified: tests/scroll_law_probe.gd)
         _feed_scroll.scroll_vertical = keep_feed
 
+## v044-1 THE MATURE LAW - the one helper every list reads. GOGAs/box.json
+## "hide_mature" (default TRUE, the family view) hides the +12 band and
+## up: the games themselves, their age chips, their content tags, their
+## guide/pre-play/trophies rows, everywhere the box renders them. Flipping
+## the json to false is the uncensored experience - everything returns on
+## the next refresh. The economy never changes: owned stays owned, coins
+## stay coins - only the VIEWS fold their mature seats away.
+func _mature_hidden(g: Dictionary) -> bool:
+        return GOGA.hide_mature() and int(g.get("age", 3)) >= 12
+
 func _passes_filters(g: Dictionary) -> bool:
+        # v044-1: the mature fold is FIRST - before the mystery bypass, so a
+        # hidden +12 game's black box leaks nothing and renders nowhere.
+        if _mature_hidden(g):
+                return false
         # MYSTERY tiles bypass metadata filters: a black box carries no public
         # info, and filtering by genre would LEAK what the hidden game is.
         if Roadmap.state(String(g["id"])) == "MYSTERY":
@@ -1342,6 +1368,10 @@ func _add_thumb(b: Control, g: Dictionary, label_strip: float,
         # for a coming_soon game; final art is for SHIPPED games only
         var path := String(_soon_art(g).get("thumb", ""))
         t.texture = Meta.thumb_texture(path, String(g.get("root", "")))
+        # v044-1 THE MIPMAP LAW: thumbs shrink hard (334x242 tiles, 96x64
+        # rows, 56x40 trophy rows) - the mipmap filter keeps thin art alive
+        # at every seat (the owner's bovo line-wipe report).
+        t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         t.set_anchors_preset(Control.PRESET_FULL_RECT)
         t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if fit_whole \
@@ -1956,17 +1986,20 @@ func _open_search() -> void:
                         func(id: String): _filter_sub = "" if _filter_sub == id else id, "sub"))
         # v043 THE AGE ROW (the ladder, 3..+21 - the archive's own bands,
         # the WORD rides the number: "+12 YOUNG TEENS", "+21 ADULT ONLY")
-        v.add_child(_chip_row(scroll, "AGE", Meta.AGES.keys(),
-                        func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
-        # v043 pass 3 THE CONTENT ROW: the hardcoded taxonomy always shows
-        # (horror / gambling / politics / porn / psycho / gore / nudity /
-        # illegal trading) + the learned unknowns at the 10-game census.
-        var cons: Array = Meta.CONTENT.keys()
-        for lid in (_learned["content"] as Array):
-                if not cons.has(String(lid)):
-                        cons.append(String(lid))
-        v.add_child(_chip_row(scroll, "CONTENT", cons,
-                        func(id: String): _filter_content = "" if _filter_content == id else id, "content"))
+        # v044-1: the age + content filter rows fold away with the mature
+        # machinery while hide_mature rules.
+        if not GOGA.hide_mature():
+                v.add_child(_chip_row(scroll, "AGE", Meta.AGES.keys(),
+                                func(id: String): _filter_age = "" if _filter_age == id else id, "age"))
+                # v043 pass 3 THE CONTENT ROW: the hardcoded taxonomy always shows
+                # (horror / gambling / politics / porn / psycho / gore / nudity /
+                # illegal trading) + the learned unknowns at the 10-game census.
+                var cons: Array = Meta.CONTENT.keys()
+                for lid in (_learned["content"] as Array):
+                        if not cons.has(String(lid)):
+                                cons.append(String(lid))
+                v.add_child(_chip_row(scroll, "CONTENT", cons,
+                                func(id: String): _filter_content = "" if _filter_content == id else id, "content"))
         # STATES (single-select): none -> all games; favorites -> owned hearts;
         # mystery -> the unlisted black boxes. The grid headline follows.
         v.add_child(_state_row(scroll))
@@ -2168,6 +2201,8 @@ func _open_help() -> void:
                 var id := String(g["id"])
                 if not Box.owns_game(id):
                         continue
+                if _mature_hidden(g):
+                        continue   # v044-1: the mature fold
                 shown += 1
                 list.add_child(_help_row(g, scroll))
         if shown == 0:
@@ -2194,7 +2229,13 @@ func _help_row(g: Dictionary, scroll: BoxScroll) -> Control:
         v.add_child(head)
         var ic := TextureRect.new()
         var tp := String(g.get("thumb", ""))
-        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        # v044-1 THE FOLDER THUMB LAW: a game folder's "thumb" is a RELATIVE
+        # file name ("thumb.png") - load() only reads res://, so every
+        # folder-game row here rendered EMPTY (the owner's guide/trophies
+        # report). Meta.thumb_texture resolves the relative name against the
+        # game's own folder root and reads the file from disk.
+        ic.texture = Meta.thumb_texture(tp, String(g.get("root", "")))
+        ic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         ic.custom_minimum_size = Vector2(96, 64)
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -2331,19 +2372,23 @@ func _open_guide(g: Dictionary) -> void:
         # never mixed together in one pile). v043: AGE + CONTENT join above
         # them (the app-store question returns) and every tag id normalizes
         # (THE LOWERCASE LAW).
-        v.add_child(Arc.label("AGE", 24, Arc.HOT))
-        v.add_child(Arc.chip(Meta.age_label(str(maxi(3, int(g.get("age", 3))))), "",
-                        Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
-        var gcons: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
-        if not gcons.is_empty():
-                v.add_child(Arc.label("CONTENT", 24, Arc.HOT))
-                var conrow := HFlowContainer.new()
-                conrow.add_theme_constant_override("h_separation", 8)
-                conrow.add_theme_constant_override("v_separation", 8)
-                for cid in gcons:
-                        conrow.add_child(Arc.chip(Meta.content_label(String(cid)), "",
-                                        Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
-                v.add_child(conrow)
+        # v044-1 THE MATURE LAW: the age chip + the content tags are part of
+        # the mature machinery - they fold away with everything else while
+        # hide_mature rules (the family view has no age ratings to read).
+        if not GOGA.hide_mature():
+                v.add_child(Arc.label("AGE", 24, Arc.HOT))
+                v.add_child(Arc.chip(Meta.age_label(str(maxi(3, int(g.get("age", 3))))), "",
+                                Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
+                var gcons: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+                if not gcons.is_empty():
+                        v.add_child(Arc.label("CONTENT", 24, Arc.HOT))
+                        var conrow := HFlowContainer.new()
+                        conrow.add_theme_constant_override("h_separation", 8)
+                        conrow.add_theme_constant_override("v_separation", 8)
+                        for cid in gcons:
+                                conrow.add_child(Arc.chip(Meta.content_label(String(cid)), "",
+                                                Color(0, 0, 0, 0.14), 20, Color("7a5a34")))
+                        v.add_child(conrow)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 v.add_child(Arc.label("GENRES", 24, Arc.HOT))
@@ -2445,7 +2490,8 @@ func _open_topup_picker() -> void:
         list.add_theme_constant_override("separation", 10)
         list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         scroll.add_child(list)
-        var carriers := GameCoin.games()
+        var carriers: Array = GameCoin.games().filter(
+                        func(r): return not _mature_hidden(GameReg.get_game(String(r["id"]))))
         for r in carriers:
                 var rec: Dictionary = r
                 list.add_child(_topup_row(rec, scroll))
@@ -2475,7 +2521,10 @@ func _topup_row(rec: Dictionary, scroll: BoxScroll) -> Control:
         v.add_child(head)
         var ic := TextureRect.new()
         var tp := String(rec.get("thumb", ""))
-        ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+        # v044-1: same folder-thumb law as the guide row - resolve against
+        # the game's own folder root, never a bare load()
+        ic.texture = Meta.thumb_texture(tp, String(rec.get("root", "")))
+        ic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         ic.custom_minimum_size = Vector2(96, 64)
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -3921,6 +3970,7 @@ func _header_block(vb: VBoxContainer, g: Dictionary, faded := false, allow_fav :
         # package's own thumb (Meta handles both seats; the package's
         # relative thumb joins its root)
         thumb.texture = Meta.thumb_texture(tp, String(g.get("root", "")))
+        thumb.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         thumb.custom_minimum_size = Vector2(220, 150)
         thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -4240,20 +4290,22 @@ func _open_game_page(g: Dictionary) -> void:
                 content.add_child(crow)
         # v043 THE AGE + CONTENT SECTIONS (the app-store question returns):
         # the age chip + the content tags seat right above GENRES, their own
-        # labeled rows, the same design language.
-        content.add_child(Arc.label("AGE", 20, Arc.HOT))
-        content.add_child(Arc.chip(Meta.age_label(str(maxi(3, game_age))), "",
-                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
-        var cons_list: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
-        if not cons_list.is_empty():
-                content.add_child(Arc.label("CONTENT", 20, Arc.HOT))
-                var crow2 := HFlowContainer.new()
-                crow2.add_theme_constant_override("h_separation", 8)
-                crow2.add_theme_constant_override("v_separation", 8)
-                for cid in cons_list:
-                        crow2.add_child(Arc.chip(Meta.content_label(String(cid)), "",
-                                        Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
-                content.add_child(crow2)
+        # labeled rows, the same design language. v044-1: they fold away
+        # while the mature rule hides them (the family view).
+        if not GOGA.hide_mature():
+                content.add_child(Arc.label("AGE", 20, Arc.HOT))
+                content.add_child(Arc.chip(Meta.age_label(str(maxi(3, game_age))), "",
+                                Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+                var cons_list: Array = (g.get("content", []) as Array).map(func(t): return Meta.normalize_tag(String(t)))
+                if not cons_list.is_empty():
+                        content.add_child(Arc.label("CONTENT", 20, Arc.HOT))
+                        var crow2 := HFlowContainer.new()
+                        crow2.add_theme_constant_override("h_separation", 8)
+                        crow2.add_theme_constant_override("v_separation", 8)
+                        for cid in cons_list:
+                                crow2.add_child(Arc.chip(Meta.content_label(String(cid)), "",
+                                                Color(0, 0, 0, 0.14), 19, Color("7a5a34")))
+                        content.add_child(crow2)
         var geo: Dictionary = g.get("genres", {})
         if not (geo.get("main", []) as Array).is_empty():
                 content.add_child(Arc.label("GENRES", 20, Arc.HOT))
@@ -4639,6 +4691,8 @@ func _open_trophies() -> void:
         # locked games (even as rows) would leak how many games the box will grow.
         var rows := []
         for g in GameReg.playable():
+                if _mature_hidden(g):
+                        continue   # v044-1: the mature fold
                 if Box.owns_game(String(g["id"])):
                         rows.append(g)
 
@@ -4671,7 +4725,11 @@ func _stat_row(g: Dictionary) -> Control:
                         and ResourceLoader.exists(SOON_THUMB) else null
         if ic.texture == null:
                 var tp := String(g.get("thumb", ""))
-                ic.texture = load(tp) if ResourceLoader.exists(tp) else null
+                # v044-1: the folder-thumb law - relative name, game-root
+                # resolved (the trophies rows rendered empty thumbs for
+                # every folder game)
+                ic.texture = Meta.thumb_texture(tp, String(g.get("root", "")))
+        ic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
         ic.custom_minimum_size = Vector2(56, 40)
         ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED

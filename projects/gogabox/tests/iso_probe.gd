@@ -22,6 +22,7 @@ func _ready() -> void:
                 await get_tree().process_frame
                 print("PROBE menu cycle ", mi, " done")
         for round_i in 3:
+                GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
                 Box.dev_set_cheat("all_owned", 1 if round_i == 2 else 0)
                 if round_i != 2:
                         Box.earn(100000)

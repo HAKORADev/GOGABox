@@ -24,6 +24,7 @@ func _ready() -> void:
         await _shot(dir + "/03_menu_dragged.png")
         # SQUARES, the 3-board game, at the daily shape (the film save owns
         # nothing - the all_owned dev cheat opens the door, then it's off)
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         DisplayServer.window_set_size(Vector2i(455, 810))
         GameHost.launch(_main, "squares")

@@ -25,6 +25,7 @@ func _ready() -> void:
         Box.earn(100000)
         # THE ALWAYS-PLAYABLE CHEAT: the eye pass launches the same games
         # repeatedly - the battery/daily gates would refuse the 3rd boot
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         Box.unlock_game("domino", 0)
         Box.unlock_game("slasher", 0)

@@ -106,6 +106,15 @@ static func thumb_texture(path: String, root := "") -> Texture2D:
         var img := Image.load_from_file(full)
         if img == null:
                 return null
+        # v044-1 THE MIPMAP LAW: a 960x640 folder thumb renders at every size
+        # from the 334x242 feed tile down to a 56x40 trophies row - plain linear
+        # sampling at those ratios ALIASES (the owner's bovo report: board lines
+        # wiped "perfectly" - the thin grid lines landed between samples and
+        # vanished, per axis, by phase). A mipmap chain turns every downscale
+        # into a clean, stable shrink.
+        if img.is_compressed():
+                img.decompress()
+        img.generate_mipmaps()
         var tex := ImageTexture.create_from_image(img)
         _thumb_cache[full] = tex
         return tex

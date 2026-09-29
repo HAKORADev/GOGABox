@@ -114,17 +114,15 @@ func _t_registry() -> int:
                 var g := GameReg.get_game(gid)
                 ok += _check(not g.is_empty(), gid + " reads through GameReg.get_game")
                 ok += _check(String(g.get("root", "")) != "", gid + " carries its package root")
-                # the script path only exists when THIS platform has a run
-                # block (jumpcube is android-only: on the pc rig it honestly
-                # wears no_run_for_platform instead)
+                # the script path exists on EVERY platform now (v044-1: the
+                # whole shipping set runs everywhere - the phone-only/pc-only
+                # tags were the v044 rig's test seats and are gone)
                 var os_list: Array = g.get("os", ["android", "pc"])
                 var platform_now := "android" if OS.has_feature("android") else "pc"
-                if os_list.has(platform_now):
-                        ok += _check(String(g.get("script", "")).begins_with("res://"),
-                                        gid + " carries its pck script path")
-                else:
-                        ok += _check(bool(g.get("no_run_for_platform", false)),
-                                        gid + " honestly reports no run for this platform")
+                ok += _check(os_list.has(platform_now),
+                                gid + " runs on this platform (all-platform law)")
+                ok += _check(String(g.get("script", "")).begins_with("res://"),
+                                gid + " carries its pck script path")
                 ok += _check(int(g.get("age", 0)) >= 3, gid + " wears an age tag")
         # a game id that exists nowhere reads empty (never crashes)
         ok += _check(GameReg.get_game("does_not_exist").is_empty(), "unknown id -> empty")
@@ -401,14 +399,41 @@ func _t_folder_scan() -> int:
         ok += _check(GOGA.uninstall("_rig_noname"), "uninstall removes a game folder")
         GOGA.reload_entries()
         # 3) the platform truth: an os list without this device flags
-        # no_run_for_platform (domino is pc-only, jumpcube android-only)
-        var domino: Dictionary = GOGA.entry("domino")
-        var jumpcube: Dictionary = GOGA.entry("jumpcube")
+        #    no_run_for_platform. v044-1: the whole shipping set runs on
+        #    BOTH platforms (the test tags were a v044 rig artifact) - the
+        #    door itself is still proven with a lab folder wearing one os.
+        var lab3 := GOGA.games_dir().path_join("_rig_oneos")
+        _wipe(lab3)
+        DirAccess.make_dir_recursive_absolute(lab3)
+        _touch(lab3.path_join("game.pck"))
+        var f3 := FileAccess.open(lab3.path_join("game.json"), FileAccess.WRITE)
+        f3.store_string(JSON.stringify({"title": "ONE OS", "os": ["pc"]}))
+        f3.close()
+        GOGA.reload_entries()
+        var oneos: Dictionary = GOGA.entry("_rig_oneos")
         var platform_now := "android" if OS.has_feature("android") else "pc"
-        ok += _check(bool(domino.get("no_run_for_platform", false)) == (platform_now != "pc"),
-                        "domino (pc only) flags the wrong platform")
-        ok += _check(bool(jumpcube.get("no_run_for_platform", false)) == (platform_now != "android"),
-                        "jumpcube (phone only) flags the wrong platform")
+        ok += _check(bool(oneos.get("no_run_for_platform", false)) == (platform_now != "pc"),
+                        "a pc-only lab game flags the wrong platform")
+        for g in GOGA.entries():
+                ok += _check(not bool(g.get("no_run_for_platform", false)),
+                                "the shipping set runs everywhere: " + String(g["id"]))
+        ok += _check(GOGA.uninstall("_rig_oneos"), "the lab folder cleans up")
+        GOGA.reload_entries()
+        # 4) v044-1 THE SETTINGS FILE: box.json carries the mature fold + the
+        #    dev-cheats master; a missing/broken file means the defaults.
+        var sp := GOGA.home().path_join("box.json")
+        DirAccess.remove_absolute(sp)
+        GOGA.reload_settings()
+        ok += _check(GOGA.hide_mature(), "the mature fold defaults ON")
+        ok += _check(not GOGA.dev_cheats_enabled(), "the dev-cheats master defaults OFF")
+        var fs := FileAccess.open(sp, FileAccess.WRITE)
+        fs.store_string(JSON.stringify({"hide_mature": false, "dev_cheats": true}))
+        fs.close()
+        GOGA.reload_settings()
+        ok += _check(not GOGA.hide_mature(), "the file flips the mature fold off")
+        ok += _check(GOGA.dev_cheats_enabled(), "the file arms the dev-cheats master")
+        DirAccess.remove_absolute(sp)
+        GOGA.reload_settings()
         return ok
 
 func _t_goga_sdk() -> int:
@@ -561,14 +586,13 @@ func _t_jumpcube_ai() -> int:
         ok += _check(not e.is_empty(), "jumpcube is installed")
         if e.is_empty():
                 return ok
-        # v044 THE PLATFORM TRUTH: one pack runs anywhere - the MENU's
-        # PHONE ONLY button is the gate, not the mount. On the pc rig the
-        # android-only flag reads true; the pack itself still mounts and
-        # the CPU brain answers (the game is a full citizen of any box).
+        # v044 THE PLATFORM TRUTH + v044-1: one pack runs anywhere - the
+        # shipping set is all-platform now, so the pack mounts and the CPU
+        # brain answers on every rig (the game is a full citizen of any box).
         var platform_now := "android" if OS.has_feature("android") else "pc"
         var os_list: Array = e.get("os", ["android", "pc"])
-        ok += _check(bool(e.get("no_run_for_platform", false)) == (not os_list.has(platform_now)),
-                        "jumpcube's platform flag matches its os list")
+        ok += _check(os_list.has(platform_now),
+                        "jumpcube runs on this platform (all-platform law)")
         ok += _check(GOGA.mount_for(e), "jumpcube's pck mounts (platform-blind)")
         var jc: GDScript = load(String(e["script"]))
         ok += _check(jc != null, "the pack's script loads from the mounted pck")
@@ -652,9 +676,13 @@ func _t_charging() -> int:
 func _t_dev_cheats() -> int:
         var ok := 0
         Box.reset_all()
-        ok += _check(Box.dev_cheat("all_owned") == 0, "cheats start off")
+        # v044-1 THE MASTER SWITCH: box.json "dev_cheats" (default FALSE)
+        # gates the whole sheet - master off, even a SAVED cheat reads 0.
+        GOGA._settings["dev_cheats"] = false
         Box.dev_set_cheat("all_owned", 1)
-        ok += _check(Box.dev_cheat("all_owned") == 1, "the cheat arms")
+        ok += _check(Box.dev_cheat("all_owned") == 0, "the master kills a saved cheat")
+        GOGA._settings["dev_cheats"] = true
+        ok += _check(Box.dev_cheat("all_owned") == 1, "the master arms the sheet")
         ok += _check(Box.owns_game("domino"), "all_owned owns everything")
         ok += _check(Box.coins() == 150, "all_owned never touches the wallet")
         Box.dev_set_cheat("gogacoins", 1)
@@ -663,17 +691,26 @@ func _t_dev_cheats() -> int:
         Box.dev_set_cheat("all_owned", 0)
         Box.dev_set_cheat("gogacoins", 0)
         ok += _check(not Box.owns_game("domino"), "the cheat disarms")
+        # the master gates EVERY cheat read - flip it back off and the
+        # armed gogacoins above goes inert instantly
+        Box.dev_set_cheat("gogacoins", 1)
+        GOGA._settings["dev_cheats"] = false
+        ok += _check(Box.coins() == 150, "master off: the armed cheat is inert")
+        GOGA._settings["dev_cheats"] = true
         # THE GIVE-EVERYTHING LAW works on the installed world
         Box.dev_grant_everything()
         for e in GOGA.entries():
                 ok += _check(Box.owns_game(String(e["id"])),
                                 "grant-everything owns " + String(e["id"]))
+        GOGA._settings.erase("dev_cheats")   # back to the file truth
         Box.reset_all()
         return ok
 
 func _t_isolation() -> int:
         var ok := 0
         Box.reset_all()
+        # v044-1: this section arms cheats itself - the master rides on
+        GOGA._settings["dev_cheats"] = true
         Box.dev_set_cheat("all_owned", 1)
         var host_script: GDScript = load("res://game/core/game_host.gd")
         var router := Node2D.new()

@@ -203,6 +203,7 @@ func _mk_key(keycode: Key, pressed: bool, echo := false) -> InputEventKey:
 
 func _scroll_laws() -> void:
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         var menu := Node2D.new()
         menu.set_script(load("res://game/menu/menu.gd"))
@@ -323,6 +324,7 @@ func _scroll_laws() -> void:
 # ============================================================ CURSOR
 func _cursor_law() -> void:
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         var router := Node2D.new()
         add_child(router)

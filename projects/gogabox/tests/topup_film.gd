@@ -18,6 +18,7 @@ func _shot(name: String) -> void:
 func _run() -> void:
         DirAccess.make_dir_recursive_absolute(shot_dir)
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         Box.earn(1234)
         GameCoin.add("heavywar", 777)

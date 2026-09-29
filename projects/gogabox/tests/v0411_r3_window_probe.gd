@@ -32,6 +32,7 @@ func _ready() -> void:
                 return
         var win := get_window()
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         # the persisted position: PORTRAIT (the menu's own seat)
         if Box.has_method("set_pc_position"):

@@ -94,6 +94,7 @@ func _ready() -> void:
         await get_tree().create_timer(0.3).timeout
 
         # ---- 4. the quiet frame: a game runs with zero window writes ----
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         GameHost.launch(self, "matcher")
         await get_tree().create_timer(2.0).timeout

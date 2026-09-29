@@ -15,6 +15,7 @@ const GAMES := [
 var _main: Node
 
 func _ready() -> void:
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         _main = load("res://main.tscn").instantiate()
         add_child(_main)

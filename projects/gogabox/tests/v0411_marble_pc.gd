@@ -37,6 +37,7 @@ func _ready() -> void:
                 get_tree().quit(0)
                 return
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)
         var main := Node2D.new()
         main.set_script(load("res://game/main.gd"))

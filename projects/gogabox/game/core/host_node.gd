@@ -269,12 +269,21 @@ func _on_orientation_reload(o: String) -> void:
         # NOTHING; the game reboots only after the real rotation lands).
         _gate_open = true
         var rotated := false
+        # v044-1: the fullscreen window half is EXEMPT here too (the same
+        # exemption _gate_real_window earned) - a PC fullscreen window is the
+        # monitor, it never follows a content kind, so the old loop waited
+        # the full 1.5s for a resize that can never come (the half-shaped
+        # canvas sat on screen the whole wait). In fullscreen the CANVAS
+        # truth is the whole truth: the design write is synchronous, the
+        # letterbox wears the ink, and the ask resolves in two frames.
+        var fs_pc := ScaleRule.is_pc() and ScaleRule.is_fullscreen()
         for i in 90:
                 await get_tree().process_frame
                 # v041-2 r3: BOTH truths - the real window AND the canvas
                 # design (the menu's stomp used to pass the window check
                 # while the canvas wore the wrong design)
-                if _window_kind_matches(o) and _design_kind_matches(o):
+                if (fs_pc or _window_kind_matches(o)) \
+                                and _design_kind_matches(o):
                         rotated = true
                         break
         _gate_open = false
@@ -283,22 +292,52 @@ func _on_orientation_reload(o: String) -> void:
         if rotated:
                 _assert_own_design(o)
         if not rotated:
-                # the window REFUSED the position: resync from the real
-                # window and let the live game settle its ask in THIS shape
-                var vps3 := get_viewport_rect().size
-                _orient_now = "horizontal" if vps3.x > vps3.y else "vertical"
+                # v044-1 THE SETTLE LAW - the refused ask lands on the
+                # PHYSICAL truth, whole. The disease: _apply_orientation(o)
+                # had ALREADY flipped the canvas to the ASKED design, so the
+                # old resync read the canvas (vps3) and "settled" into the
+                # ask the window just refused - a self-fulfilling lie. The
+                # design stayed flipped, the world kept its OLD shape under
+                # the NEW canvas (the half background, the brown fallback
+                # under it), the game was never rebuilt (the early return
+                # skips the reseat), and the kind watcher only re-asked into
+                # the same refuse - forever. PC fullscreen always refuses
+                # (the monitor is a fixed shape) and a phone with the
+                # rotation lock refuses too: windowed never saw this, which
+                # is exactly the owner's v044-1 report. THE LAW: the settle
+                # reads the PHYSICAL window kind, the design re-asserts
+                # there, and the world RE-SEATS whenever its built kind
+                # disagrees - the same honest reload the rotated path runs.
+                var ws := DisplayServer.window_get_size()
+                var settled := o
+                if ws.x > 0 and ws.y > 0:
+                        settled = "horizontal" if ws.x > ws.y else "vertical"
+                _orient_now = settled
+                _assert_own_design(settled)
                 # v041-1 r7: a refused ask leaves the WINDOW honest too -
-                # re_window back to the settled kind so the exact stranded
-                # state from the owner's report (a rotated window around
-                # un-rotated content) can never outlive the refuse. Phone:
-                # no-op by the phone branch's own absence (re_window is a
-                # PC seat); fullscreen/headless: re_window no-ops itself.
+                # re_window back to the settled kind. Fullscreen/headless:
+                # re_window no-ops itself.
                 if ScaleRule.is_pc():
                         ScaleRule.re_window("landscape" \
-                                        if _orient_now == "horizontal"
+                                        if settled == "horizontal"
                                         else "portrait")
                 if game != null and is_instance_valid(game):
+                        var built := String(game.get("view_kind"))
                         game.orientation_settled()
+                        if built != "" and built != settled:
+                                # the world sits in a kind the window refused:
+                                # the honest reseat (the reload path's own dance)
+                                _close_over_sheet()
+                                _clear_game()
+                                game = (load(String(game_def["script"])) \
+                                                as GDScript).new()
+                                game.game_id = String(game_def["id"])
+                                game.start_orientation = settled
+                                game.request_finish.connect(_on_finish)
+                                game.request_quit.connect(_quit_to_menu)
+                                game.request_orientation_reload \
+                                                .connect(_on_orientation_reload)
+                                add_child(game)
                 return
         _orient_now = o
         _close_over_sheet()

@@ -74,7 +74,12 @@ func _ready() -> void:
 func _defaults() -> Dictionary:
         return {
                 "coins": START_COINS,
-                "owned": ["snake"],           # snake is the free starter game
+                # v044-1 THE STARTER LAW: no name lives in the box any more -
+                # the free starter game is seeded by seed_starter() (the
+                # box.json "starter_game" when that folder exists, else the
+                # alphabetically-first game folder) the first time the box
+                # boots with a non-empty GOGAs tree.
+                "owned": [],
                 # v0.4.0-17: pc_fullscreen rides along (the PC FULLSCREEN
                 # LAW - Windows settings toggle + F11/Alt+Enter persist here;
                 # phones ignore it, the key just never applies there).
@@ -103,12 +108,37 @@ func _load() -> void:
         if parsed is Dictionary:
                 _merge(data, parsed)
         if not (data["owned"] is Array):
-                data["owned"] = ["snake"]
-        if not (data["owned"] as Array).has("snake"):
-                (data["owned"] as Array).append("snake")
+                data["owned"] = []
         if not (data["favorites"] is Array):
                 data["favorites"] = []
         _migrate_box_pool()
+
+## v044-1 THE STARTER LAW - the box's one free game, decided by DATA, never
+## by a baked name. Runs when the menu boots (the GOGA runtime exists by
+## then): an owned list that still names no EXISTING game (a fresh install,
+## or a save whose only owned id lost its folder) seeds ONE starter game:
+## box.json "starter_game" when that folder exists, else the
+## alphabetically-first game folder - deterministic on every device, and a
+## player who owns real games never gets a surprise append.
+func seed_starter() -> void:
+        var owned: Array = data["owned"]
+        for id in owned:
+                if not GameReg.get_game(String(id)).is_empty():
+                        return   # still owns something real - nothing to seed
+        var want := String(GOGA.box_setting("starter_game", ""))
+        if want != "" and GameReg.get_game(want).is_empty():
+                want = ""    # the named starter is not installed - fall through
+        if want == "":
+                var ids: Array = []
+                for g in GameReg.games():
+                        if not g.get("coming_soon", false):
+                                ids.append(String(g["id"]))
+                if ids.is_empty():
+                        return   # an empty box seeds nothing (the honest empty home)
+                ids.sort()
+                want = String(ids[0])
+        owned.append(want)
+        save()
 
 ## v0.1.1: the box bank charges ONLY while the app is CLOSED (owner rule -
 ## "the GOGABox battery bank still charges even inside the app... i have
@@ -497,6 +527,13 @@ func extra_on(game_id: String, extra_id: String) -> bool:
                 and dev_cheat("x_%s_%s" % [game_id, extra_id]) == 1
 
 func dev_cheat(name: String) -> int:
+        # v044-1 THE DEV-CHEATS MASTER: GOGAs/box.json "dev_cheats" (default
+        # FALSE) arms the whole sheet. Master off = every cheat reads 0:
+        # the five-tap knock stays dead (the CODE read is 0), the sheet can
+        # never open, and no saved cheat value can ever act. Flipping the
+        # json to true re-arms everything exactly as it was.
+        if not GOGA.dev_cheats_enabled():
+                return 0
         return int(get_progress("__dev__", "cheat_" + name,
                         int(DEV_CHEAT_DEFAULTS.get(name, 0))))
 
@@ -666,10 +703,9 @@ func entry_cost(id: String, fee: int) -> int:
                 return mini(fee, maxi(0, coins()))
         return fee
 
-## v0.1.4 original helper, kept working (tests + callers): the snake flavor
-## of the shared entry_cost policy. Same numbers it always gave.
-func snake_entry_cost(fee: int) -> int:
-        return entry_cost("snake", fee)
+## v0.1.4 original helper, retired with the snake hardcode (v044-1): no
+## caller ever surfaced outside the box, and the shared entry_cost policy
+## needs no game-named flavor.
 
 ## Anti-softlock: the cheapest fee across owned, playable games.
 func cheapest_owned_fee() -> int:

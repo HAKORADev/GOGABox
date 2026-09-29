@@ -24,6 +24,7 @@ var fail_count := 0
 func _ready() -> void:
         DirAccess.make_dir_recursive_absolute(out_dir)
         Box.reset_all()
+        GOGA._settings["dev_cheats"] = true   # v044-1: the rig arms the master
         Box.dev_set_cheat("all_owned", 1)   # the full feed - the owner's box
         menu = Node2D.new()
         menu.set_script(load("res://game/menu/menu.gd"))
