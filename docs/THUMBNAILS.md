@@ -119,6 +119,6 @@ What exists if it ever comes back:
 | 6x SOON tiles | 960x640 generated | `SOON_NAMES` in the composer (shrinks as games ship) |
 | mystery | unchanged (tile art) | rule R4 — never touched |
 
-Adding a NEW game: registry entry + a scene function in the composer +
-its SPEC dict (or a SOON placeholder until the game is playable). See
-`docs/ADDING_A_GAME.md`.
+The folder-era rule (v044): a game's tile is the `thumb.png` file inside
+its `GOGAs/games/<id>/` folder - any 3:2 image (960x640 is the norm). The
+composer + the rules above remain the house style for DRAWN tiles.
