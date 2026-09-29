@@ -4139,7 +4139,8 @@ func _open_game_page(g: Dictionary) -> void:
                         else "PC ONLY" if wrong_plat \
                         else ("PLAY  -%d" % pay if (pay > 0) else "PLAY  FREE"))
         var play_btn := Arc.coin_button(play_txt, Vector2(540, 92), 34, Arc.ACCENT) \
-                        if (pay > 0 and can_age) else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
+                        if (pay > 0 and can_age and not wrong_plat) \
+                        else Arc.button(play_txt, Vector2(540, 92), 34, Arc.ACCENT)
         content.add_child(play_btn)
         if not can_play:
                 play_btn.disabled = true
