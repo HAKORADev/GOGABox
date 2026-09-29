@@ -1,0 +1,260 @@
+{
+  "title": "BOARD LUDO",
+  "tag": "roll and run home",
+  "script": "res://game/games/ludo/ludo.gd",
+  "thumb": "thumb.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "lan": {
+    "players": 4,
+    "platforms": [
+      "android",
+      "pc"
+    ],
+    "cross": true
+  },
+  "coin_div": 1,
+  "price": 450,
+  "fee": 8,
+  "shop": true,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 15,
+    "needs_games": 16
+  },
+  "desc": "the classic one-die ludo, redressed for the box: ",
+  "": "+ \"the only mind at the table.\"",
+  "run": "the \"",
+  "climb": "your color's arm and bring \"",
+  "two": "of your pawns \"",
+  "and": "a landed-on pawn slides \"",
+  "the": "1-and-3 double",
+  "or": "four-army \"",
+  "controls": [
+    "TAP ANYWHERE TO START, then pick the way to play: ",
+    "+ \"x1 one army each",
+    "x2 you field armies 1 AND 3 \"",
+    "+ \"against 2 AND 4",
+    "x4 every side is a rival\"",
+    "on your turn your tray shows the die grayed out ",
+    "+ \"and waiting - tap it and the die fades in",
+    "\n                        + ",
+    "shuffles",
+    "and settles\"",
+    "roll a 6 to drop a pawn onto your start cell, and ",
+    "+ \"a 6 always rolls again\"",
+    "tap a pawn with an arrow to choose it - it lifts ",
+    "+ \"and its legal landings light up; tap a landing \"",
+    "+ \"to walk it",
+    "tap elsewhere to choose another \"",
+    "+ \"pawn\"",
+    "land on a rival pawn to eat it - it slides all the ",
+    "+ \"way back to its base; no bonus moves",
+    "ever\"",
+    "your start cell and the four stars are GUARDED - ",
+    "+ \"nobody gets eaten there\"",
+    "two of your pawns on one cell are a BLOCKADE - ",
+    "+ \"rivals cannot pass or land",
+    "you pass freely",
+    "and \"",
+    "+ \"a third pawn can never join\"",
+    "walk the full loop, climb your color's arm, land ",
+    "+ \"every pawn home - first full team wins the round\"",
+    "a GOGACoin appears every 6 minutes on a cell you ",
+    "+ \"can still reach - walk through it to take it \"",
+    "+ \"(the CPU steals it too)\"",
+    "the loser opens the next round; win +1 score, ",
+    "+ \"loss -1",
+    "run bonus /1\"",
+    "piece skins and themes live in the SHOP - the skins ",
+    "+ \"re-ink YOUR pawns on any theme\""
+  ],
+  "genres": {
+    "main": [
+      "board",
+      "family"
+    ],
+    "sub": [
+      "turnbased",
+      "competitive",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "First Lap",
+      "desc": "Reach a score of 10",
+      "tier": 1,
+      "rule": {
+        "k": "score",
+        "key": "",
+        "v": 10
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "The Marathon",
+      "desc": "Reach a score of 25",
+      "tier": 2,
+      "rule": {
+        "k": "score",
+        "key": "",
+        "v": 25
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "Bottom of the Ninth",
+      "desc": "Reach a score of 50",
+      "tier": 3,
+      "rule": {
+        "k": "score",
+        "key": "",
+        "v": 50
+      }
+    },
+    {
+      "id": "wins_t1",
+      "title": "First Home",
+      "desc": "Win 1 round",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 1
+      }
+    },
+    {
+      "id": "wins_t2",
+      "title": "The Board Walker",
+      "desc": "Win 25 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 25
+      }
+    },
+    {
+      "id": "wins_t3",
+      "title": "The Ludo Throne",
+      "desc": "Win 100 rounds",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 100
+      }
+    },
+    {
+      "id": "streak_t1",
+      "title": "Back to Back",
+      "desc": "Win 3 rounds in a row",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "streak",
+        "v": 3
+      }
+    },
+    {
+      "id": "streak_t2",
+      "title": "The Triple Crown",
+      "desc": "Win 5 rounds in a row",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "streak",
+        "v": 5
+      }
+    },
+    {
+      "id": "captures_t1",
+      "title": "The Eater",
+      "desc": "Eat 25 rival pawns",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "captures",
+        "v": 25
+      }
+    },
+    {
+      "id": "captures_t2",
+      "title": "The Table's Terror",
+      "desc": "Eat 250 rival pawns",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "captures",
+        "v": 250
+      }
+    },
+    {
+      "id": "homes_t1",
+      "title": "The Conductor",
+      "desc": "Bring 50 pawns home",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "homes",
+        "v": 50
+      }
+    },
+    {
+      "id": "homes_t2",
+      "title": "The Full Fleet",
+      "desc": "Bring 500 pawns home",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "homes",
+        "v": 500
+      }
+    },
+    {
+      "id": "coins_t1",
+      "title": "The Path's Toll",
+      "desc": "Take 10 GOGACoins off the board",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "coins",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "The Regular",
+      "desc": "Play 8 runs",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Table's Resident",
+      "desc": "Play 40 runs",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "click a pawn, then click the highlighted move"
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}

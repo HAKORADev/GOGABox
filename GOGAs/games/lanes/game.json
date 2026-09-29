@@ -1,0 +1,193 @@
+{
+  "title": "Space Dash",
+  "tag": "kill the sky",
+  "script": "res://game/games/lanes/lanes.gd",
+  "thumb": "thumb.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 500,
+  "price": 200,
+  "fee": 20,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 0,
+    "orders": [
+      {
+        "type": "plays",
+        "game": "rally",
+        "count": 3
+      },
+      {
+        "type": "beat_best",
+        "game": "rally"
+      }
+    ],
+    "needs_games": 2
+  },
+  "charges": {
+    "per_round": 2,
+    "capacity": 10,
+    "regen_minutes": 5
+  },
+  "blocked_hours": {
+    "from": 1,
+    "to": 8
+  },
+  "daily_rounds": 6,
+  "daily_minutes": 15,
+  "desc": "Five lanes, a sky FULL of enemy ships, four weapons. Kills are score, wrecks drop loot, and the war only gets harder the more you kill. Buy ships, weapons and spaces in the shop.",
+  "controls": [
+    "tap the LEFT / RIGHT EDGE to move one lane that way - the walls block you",
+    "press the MIDDLE of the screen to shoot - rapid taps and holding both fire",
+    "kills are score: every wreck pops +nn, and the deep sky only gets meaner the more you kill",
+    "wrecks drop loot: a GOGACoin every 5-10 kills, power points for the held weapon, weapon + shield items once bought in the shop",
+    "3 hearts; +1 heart per 1000 score; a crash costs -500 score and one heart - the last death ends the run",
+    "yellow beams upgrade into more beams; the red laser pierces whole columns (2s live / 0.5s cd); thunder chains ship to ship (5s live / 2s cd); the bomb launcher blasts a radius (2s cd)",
+    "weapon power ladders 0/1/3/6/10/15/20 PER weapon - dying drops the held weapon 3 rungs",
+    "some ships wear shield bubbles; shatter carriers spin invulnerable shards - shoot the gap that faces you; rare UFO elites fire shotguns",
+    "the shop sells ship skins, the laser/thunder/bomb weapons (they join the loot), the shield power, and 3 spaces - no options menu, just fly"
+  ],
+  "genres": {
+    "main": [
+      "action",
+      "arcade",
+      "shooter"
+    ],
+    "sub": [
+      "retro",
+      "singleplayer",
+      "survival"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "Blooded Wings",
+      "desc": "Score 500 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "score",
+        "v": 500
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "Sky Reaper",
+      "desc": "Score 1500 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "score",
+        "v": 1500
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "Storm Born",
+      "desc": "Score 4000 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "score",
+        "v": 4000
+      }
+    },
+    {
+      "id": "score_t4",
+      "title": "The Sky Is Mine",
+      "desc": "Score 10000 in one run",
+      "tier": 4,
+      "rule": {
+        "k": "score",
+        "v": 10000
+      }
+    },
+    {
+      "id": "kills_t1",
+      "title": "Century Hawk",
+      "desc": "Kill 60 ships in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "best_kills",
+        "v": 60
+      }
+    },
+    {
+      "id": "kills_t2",
+      "title": "Ace of Aces",
+      "desc": "Kill 150 ships in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "best_kills",
+        "v": 150
+      }
+    },
+    {
+      "id": "kills_t3",
+      "title": "Death of the Sky",
+      "desc": "Kill 300 ships in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "best_kills",
+        "v": 300
+      }
+    },
+    {
+      "id": "kills_tot",
+      "title": "War Economy",
+      "desc": "Kill 3000 ships total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "kills",
+        "v": 3000
+      }
+    },
+    {
+      "id": "power_t1",
+      "title": "Fully Armed",
+      "desc": "Max a weapon's power (20)",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_power",
+        "v": 20
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "Sky Veteran",
+      "desc": "Play 50 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 50
+      }
+    }
+  ],
+  "controls_pc": [
+    "LEFT / RIGHT arrow keys change lanes",
+    "SPACE holds the fire"
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}

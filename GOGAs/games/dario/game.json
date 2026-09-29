@@ -1,0 +1,164 @@
+{
+  "title": "Cursed Dario",
+  "tag": "escape the curse",
+  "script": "res://game/games/dario/dario.gd",
+  "thumb": "thumb.png",
+  "orientation": "landscape",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "coin_div": 10,
+  "price": 350,
+  "fee": 100,
+  "shop": true,
+  "reveal": {
+    "kind": "orders",
+    "appear_after": 3,
+    "orders": [
+      {
+        "type": "plays",
+        "game": "merge",
+        "count": 4
+      },
+      {
+        "type": "ach_in",
+        "game": "merge",
+        "count": 2
+      }
+    ],
+    "needs_games": 6
+  },
+  "desc": "Dario fell into this world through a Witcher's curse. Ten TALL levels of stomp, dodge and deja vu to the end line - where SHE waits. Crush the Witcher (20 stomps, dodge her curses) and escape... probably. A mario-like with ? crates (the GOGACoins live inside them), timed ghost platforms, hunting bats, a charging rhino, a shop (the night sky, three powerups), 3 lives and a story that remembers you.",
+  "controls": [
+    "hold the LEFT half of the screen and slide to walk left/right",
+    "tap the RIGHT side to jump - land on enemies to stomp them",
+    "every enemy kind pays its own points (5 to 25); snails and turtles patrol small lanes, the rhino chases and SPRINT-CHARGES when it faces you - jump it, dodge it, stomp it; the bat HUNTS you",
+    "the spiky turtle kills ONLY while its spikes are OUT (it flashes before they come out)",
+    "bump ? crates from below: a GOGACoin pops out (5 a level), a powerup - or nothing at all; POWER JUMP is exactly twice the jump",
+    "fire burns the lingerer, spikes hurt the toucher, moving platforms carry, and GHOST platforms appear and vanish - time your climb",
+    "3 lives - a death restarts the level: -100 score and everything you grabbed in that attempt is gone",
+    "the shop sells the night sky (wear it or take it off) and the powerups: STRONG FOOT, THE SHIELD, POWER JUMP",
+    "grab every trophy. Beat the Witcher. Escape. (You won't.)"
+  ],
+  "genres": {
+    "main": [
+      "adventure",
+      "arcade"
+    ],
+    "sub": [
+      "platformer",
+      "story",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "stomp_t1",
+      "title": "Heel of the Hero",
+      "desc": "Stomp 25 enemies total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "stomped",
+        "v": 25
+      }
+    },
+    {
+      "id": "stomp_t2",
+      "title": "Boot Camp",
+      "desc": "Stomp 100 enemies total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "stomped",
+        "v": 100
+      }
+    },
+    {
+      "id": "stomp_t3",
+      "title": "The Stomp Dynasty",
+      "desc": "Stomp 400 enemies total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "stomped",
+        "v": 400
+      }
+    },
+    {
+      "id": "witcher_t1",
+      "title": "Witcher Slayer",
+      "desc": "Crush the Witcher",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "witcher",
+        "v": 1
+      }
+    },
+    {
+      "id": "clear_t1",
+      "title": "The Escape That Wasn't",
+      "desc": "Clear all ten levels in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "levels_done",
+        "v": 10
+      }
+    },
+    {
+      "id": "score_t1",
+      "title": "Curse Runner",
+      "desc": "Score 2000 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 2000
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "The Curse Breaker",
+      "desc": "Score 6000 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 6000
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 10 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "Cursed Regular",
+      "desc": "Play 30 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 30
+      }
+    }
+  ],
+  "controls_pc": [
+    "LEFT / RIGHT arrow keys run",
+    "SPACE jumps"
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}

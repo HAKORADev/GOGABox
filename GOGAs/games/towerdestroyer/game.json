@@ -1,0 +1,161 @@
+{
+  "title": "TOWER DESTROYER",
+  "tag": "hold to fire, never let black land",
+  "script": "res://game/games/towerdestroyer/towerdestroyer.gd",
+  "thumb": "thumb.png",
+  "orientation": "portrait",
+  "dim": "3d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "lan": {
+    "players": 4,
+    "platforms": [
+      "android",
+      "pc"
+    ],
+    "cross": true
+  },
+  "coin_div": 100,
+  "price": 450,
+  "fee": 8,
+  "shop": true,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 8,
+    "needs_games": 11
+  },
+  "desc": "The box's first crew shooter. You sit at the ",
+  "": "+ \"iron",
+  "the": "\n                        + ",
+  "so": "the tower never repeats itself. \"",
+  "\n                        + ": "its own reaction",
+  "its": "own trigger rhythm - and \"",
+  "score": "bonus rides /100. Skins are designs: \"",
+  "crystal": "carbon and gold cannons",
+  "and": "\n                        + ",
+  "ice": "lava",
+  "steel": "and gold shots.\"",
+  "controls": [
+    "Pick the CREW (1-4), then tap anywhere to start.",
+    "HOLD anywhere to fire; release to save your ",
+    "+ \"shots. Gaps let balls fly through to \"",
+    "+ \"the platform above.\"",
+    "Black eats balls and never breaks - never let ",
+    "+ \"it land over your seat.\"",
+    "The last hit on a platform banks its point; ",
+    "+ \"CPU gunners keep their own scores.\"",
+    "A GOGACoin rides the tower after every 200 ",
+    "+ \"destroyed platforms - break its \"",
+    "+ \"segment or lose it.\""
+  ],
+  "genres": {
+    "main": [
+      "arcade",
+      "action",
+      "casual"
+    ],
+    "sub": [
+      "singleplayer",
+      "procedural"
+    ]
+  },
+  "ach": [
+    {
+      "id": "td_first",
+      "title": "First Rubble",
+      "desc": "Destroy your first platform",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "destroyed",
+        "v": 1
+      }
+    },
+    {
+      "id": "td_p50",
+      "title": "Demolition Hand",
+      "desc": "Score 50 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "score",
+        "v": 50
+      }
+    },
+    {
+      "id": "td_plays",
+      "title": "Site Regular",
+      "desc": "Play 10 runs",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 10
+      }
+    },
+    {
+      "id": "td_squad",
+      "title": "Full Crew",
+      "desc": "Run a 4-shooter crew",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "mode4",
+        "v": 1
+      }
+    },
+    {
+      "id": "td_coin",
+      "title": "Coin Crane",
+      "desc": "Bank 3 tower GOGACoins (lifetime)",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "coins_taken",
+        "v": 3
+      }
+    },
+    {
+      "id": "td_p150",
+      "title": "High Excavation",
+      "desc": "Score 150 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "score",
+        "v": 150
+      }
+    },
+    {
+      "id": "td_200",
+      "title": "The 200 Club",
+      "desc": "Destroy 200 platforms in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "run_destroyed",
+        "v": 200
+      }
+    },
+    {
+      "id": "td_500",
+      "title": "Eternal Wreckage",
+      "desc": "Destroy 500 platforms (lifetime)",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "destroyed",
+        "v": 500
+      }
+    }
+  ],
+  "controls_pc": [
+    "HOLD LEFT MOUSE / SPACE / DOWN to fire; release ",
+    "+ \"to hold your fire.\"",
+    "1-4 on the crew screen picks the shooters.",
+    "GAMEPAD: X (or A) fires."
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}

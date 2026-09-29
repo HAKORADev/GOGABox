@@ -4,17 +4,19 @@ GOGAs - the GOGABox games home
 Where this folder lives:
 - Windows: next to GOGABox.exe (the box's zip already ships it there -
   unzip anywhere and both arrive together).
-- Android: at Downloads/GOGAs (extract the GOGAs-official zip into the
-  Downloads folder; the box asks for the all-files permission the first
-  time it needs it).
+- Android: at Downloads/GOGAs (extract the GOGAs zip into the Downloads
+  folder; the box asks for the all-files permission the first time it
+  needs it).
 
 What is inside:
-- games/     the installed packages - the official pilots ship here
-- discover/  the source catalog: the official source (index/ with the
-             per-tier files) + REPOS.txt (the community register)
-- libs/      the SDK bridges' extension point
-- .cache/    download temp, created by the box (safe to empty)
+- games/<id>/   one folder per game. The folder name is the game's id.
 
-No games here yet, or you deleted everything? Open DISCOVER inside
-GOGABox - the official source serves the same tree over the network,
-and ADD SOURCE takes any folder or repo you point it at.
+A game folder carries:
+- game.json     the game's name and details (the box reads this)
+- game.pck      the game itself - the one file the box launches
+- thumb.png     the tile picture shown in the feed
+- anything else the game's own business (its saves, its data) - GOGABox
+  never touches or checks the rest of the folder.
+
+Adding a game: drop its folder into games/ and start GOGABox. Removing
+a game: delete its folder. Sharing a game: share the folder.

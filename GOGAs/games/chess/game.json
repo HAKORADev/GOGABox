@@ -1,0 +1,180 @@
+{
+  "title": "CHECKMATE",
+  "tag": "the old war",
+  "script": "res://game/games/chess/chess.gd",
+  "thumb": "thumb.png",
+  "orientation": "auto",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "lan": {
+    "players": 2,
+    "platforms": [
+      "android",
+      "pc"
+    ],
+    "cross": true
+  },
+  "coin_div": 1,
+  "price": 700,
+  "fee": 10,
+  "shop": true,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 8,
+    "price": 700,
+    "needs_games": 9
+  },
+  "desc": "the old war, played by the book: every piece moves by the law, castling, en passant, promotion, check, checkmate, stalemate, the 50-move rule, repetition and bare kings are all real. The CPU wears SIX hidden personalities - each with its own opening book (the Jobava London lives here) and its own honest mistakes - and it adapts to your openings for two rounds. Highlights show every legal move, the last move and every check. Win +1, lose -1, a draw pays nothing.",
+  "controls": [
+    "TAP ANYWHERE TO START - the OPTIONALS shelf opens: pick WHITE or BLACK for the first war (white by default); after that the loser takes WHITE next, a draw swaps colors; a mid-play pick from the OPTIONALS button rides the next opener",
+    "choose your position first - the war stands TALL (vertical) or lies WIDE (horizontal)",
+    "tap a piece to see its legal moves - dots walk there, rings take; tap again to play, or DRAG the piece",
+    "castling moves the king two squares (all the real conditions hold), pawns promote through the picker - underpromotion included",
+    "a checked king glows red; checkmate, stalemate, the 50-move rule, threefold repetition and bare kings all end the round by the book",
+    "a GOGACoin appears every 3 minutes on a reachable square - the next piece to land there takes it, the CPU races you",
+    "the shop wears 4 piece sets and 4 boards - everything past CLASSIC and WALNUT is bought"
+  ],
+  "genres": {
+    "main": [
+      "strategy",
+      "puzzle"
+    ],
+    "sub": [
+      "turnbased",
+      "competitive",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "First Blood",
+      "desc": "Score 3 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 3
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "War Chest",
+      "desc": "Score 10 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 10
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "Grand Table",
+      "desc": "Score 25 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 25
+      }
+    },
+    {
+      "id": "score_t4",
+      "title": "The Old War's Master",
+      "desc": "Score 50 in one run",
+      "tier": 4,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 50
+      }
+    },
+    {
+      "id": "wins_t1",
+      "title": "Mated",
+      "desc": "Win 10 rounds total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 10
+      }
+    },
+    {
+      "id": "wins_t2",
+      "title": "The Quiet Executioner",
+      "desc": "Win 50 rounds total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 50
+      }
+    },
+    {
+      "id": "cap_t1",
+      "title": "Collector",
+      "desc": "Capture 100 pieces total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "captures",
+        "v": 100
+      }
+    },
+    {
+      "id": "cap_t2",
+      "title": "The Battlefield Sweep",
+      "desc": "Capture 500 pieces total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "captures",
+        "v": 500
+      }
+    },
+    {
+      "id": "coins_t1",
+      "title": "Coin Snatcher",
+      "desc": "Take 25 GOGACoins total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "coins_taken",
+        "v": 25
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 8 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The War's Resident",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "click a piece, then click its square"
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}

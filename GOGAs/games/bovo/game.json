@@ -1,0 +1,179 @@
+{
+  "title": "FIVE IN ROW",
+  "tag": "five in a row",
+  "script": "res://game/games/bovo/bovo.gd",
+  "thumb": "thumb.png",
+  "orientation": "portrait",
+  "dim": "2d",
+  "os": [
+    "android",
+    "pc"
+  ],
+  "lan": {
+    "players": 2,
+    "platforms": [
+      "android",
+      "pc"
+    ],
+    "cross": true
+  },
+  "coin_div": 2,
+  "price": 450,
+  "fee": 8,
+  "shop": true,
+  "reveal": {
+    "kind": "direct",
+    "appear_after": 10,
+    "needs_games": 11
+  },
+  "desc": "stones on a warm wooden board - place one per turn, five in a row (any direction) wins. The CPU wears four invisible moods, remembers your openings for two rounds and stops falling for the same trick. Grow the battlefield: the 10x10 and 12x12 boards are bought in the shop and applied in options, exactly like 2048. Every win pays +1, every loss costs -1, and a GOGACoin lands on the board after every 3 rounds - place a stone on it first.",
+  "controls": [
+    "TAP ANYWHERE TO START - tap an intersection to place your stone (the ghost previews the point, lift to confirm)",
+    "five in a row, column, or diagonal wins - win +1, loss -1 (your score never goes under zero), a full board draws",
+    "the loser of a round opens the next; a draw swaps the opener",
+    "after every 3 rounds a GOGACoin rests on an intersection - place a stone on it first, the CPU races you",
+    "OPTIONS switches the board: 8x8 free, 10x10 and 12x12 bought in the shop first (the 2048 way - switch starts a fresh board)",
+    "the bank is in the pause sheet: END ends the run and pays (run bonus /2)",
+    "the shop wears 5 stone pairs and 5 boards (slab + room) - everything past CHARCOAL and HONEY is bought"
+  ],
+  "genres": {
+    "main": [
+      "strategy",
+      "puzzle"
+    ],
+    "sub": [
+      "turnbased",
+      "competitive",
+      "singleplayer"
+    ]
+  },
+  "ach": [
+    {
+      "id": "score_t1",
+      "title": "First Five",
+      "desc": "Score 5 in one run",
+      "tier": 1,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 5
+      }
+    },
+    {
+      "id": "score_t2",
+      "title": "Line Sense",
+      "desc": "Score 15 in one run",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 15
+      }
+    },
+    {
+      "id": "score_t3",
+      "title": "The Long Line",
+      "desc": "Score 40 in one run",
+      "tier": 3,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 40
+      }
+    },
+    {
+      "id": "score_t4",
+      "title": "The Five Master",
+      "desc": "Score 100 in one run",
+      "tier": 4,
+      "rule": {
+        "k": "max",
+        "key": "max_score",
+        "v": 100
+      }
+    },
+    {
+      "id": "wins_t1",
+      "title": "Five!",
+      "desc": "Win 10 rounds total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 10
+      }
+    },
+    {
+      "id": "wins_t2",
+      "title": "The Quiet Board",
+      "desc": "Win 50 rounds total",
+      "tier": 2,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 50
+      }
+    },
+    {
+      "id": "wins_t3",
+      "title": "The Stone Reader",
+      "desc": "Win 200 rounds total",
+      "tier": 3,
+      "rule": {
+        "k": "cnt",
+        "key": "wins",
+        "v": 200
+      }
+    },
+    {
+      "id": "streak_t1",
+      "title": "Relentless",
+      "desc": "Win 5 rounds in a row",
+      "tier": 2,
+      "rule": {
+        "k": "max",
+        "key": "streak",
+        "v": 5
+      }
+    },
+    {
+      "id": "coins_t1",
+      "title": "Coin Snatcher",
+      "desc": "Take 25 GOGACoins total",
+      "tier": 1,
+      "rule": {
+        "k": "cnt",
+        "key": "coins_taken",
+        "v": 25
+      }
+    },
+    {
+      "id": "plays_t1",
+      "title": "Regular",
+      "desc": "Play 8 rounds",
+      "tier": 1,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 8
+      }
+    },
+    {
+      "id": "plays_t2",
+      "title": "The Board's Resident",
+      "desc": "Play 40 rounds",
+      "tier": 2,
+      "rule": {
+        "k": "stat",
+        "key": "plays",
+        "v": 40
+      }
+    }
+  ],
+  "controls_pc": [
+    "click a crossing to place your mark"
+  ],
+  "version": "1.0.0",
+  "age": 3,
+  "content": []
+}
