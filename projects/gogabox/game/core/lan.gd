@@ -1,8 +1,10 @@
 extends Node
 ## LAN — the box's local-network multiplayer core (v042; v042-1 r3 THE ROOM
-## LAW). Plain TCP (TCPServer / StreamPeerTCP), newline-delimited JSON
-## messages. The session dies with the app (THE HOST/JOIN LAW). The host
-## owns the truth; clients mirror (one clock, no drift).
+## LAW; v044 THE LOCAL LAW - the online leg is gone: no router mapping, no
+## room codes, one wifi only). Plain TCP (TCPServer / StreamPeerTCP),
+## newline-delimited JSON messages. The session dies with the app (THE
+## HOST/JOIN LAW). The host owns the truth; clients mirror (one clock, no
+## drift).
 ##
 ## THE ROOM LAW (v042-1 r3, the owner's third report):
 ##   "in games there is whether server-side world or the host-side world,
@@ -83,9 +85,6 @@ var conn_addr := ""                # r4: the address the session wire REALLY use
                                    # (the LAN ip when I host; the dialed ip when I
                                    # join) - the voice/beacons must ride the REAL
                                    # wire, never a public hairpin that cannot cross
-var room_code := ""
-var upnp_ok := false
-var online_ready := false          # r3 THE ONLINE HONESTY LAW: the router opened the port
 
 var _srv: TCPServer = null
 var _port := 0
@@ -202,199 +201,22 @@ func host_session() -> String:
         _my_state = "lobby"
         _open_game = ""
         _add_local_seat(0)
-        # r4: the LAN truth rides FIRST (the address on this wifi), the
-        # internet mapping refines the code in a background thread - a
-        # router that thinks for 5 seconds never freezes the host's UI.
+        # v044 THE LOCAL LAW: the session lives on this network's address.
+        # No router mapping, no room codes, nothing online.
         var lan_ip := _lan_ip()
         host_addr = "%s:%d" % [lan_ip, _port]
         conn_addr = host_addr
-        room_code = encode_code(lan_ip, _port)
-        _map_thread = Thread.new()
-        _map_thread.start(_start_upnp.bind(_port))
         _broadcast_seats()
         session_changed.emit()
         return ""
 
-var _map_thread: Thread = null
 
-## r3 THE ONLINE HONESTY LAW (the owner: "i have tried the online thing,
-## it failed ... i bet you are just trolling me and have not truly
-## integrated the tech for real here"), r4 THE REAL MAPPING STACK (the
-## owner: "for vLAN (online) it does not work saying wifi refused the
-## port, try to fix it, if you will keep trolling, then just remove it if
-## it is not really possible, i do not want players to run another tool
-## to play vLAN"): ONE host-side mapping attempt now rides THREE
-## protocols in order - UPnP, then NAT-PMP, then PCP - each the router's
-## own door, no third-party tool anywhere. When ANY of them opens the
-## port, the code carries the PUBLIC address and the session sheet says
-## ONLINE ON: the join truly reaches the internet. When all three refuse,
-## the sheet says ONLINE OFF - LAN + VPN only - never a silent lie.
-## r4: the whole attempt runs IN A THREAD (the session is LAN-live while
-## the router thinks; the result lands through _apply_online deferred).
-func _start_upnp(port_at_start: int) -> void:
-        var ext := ""
-        _gw_ip = ""
-        # ---- 1. UPnP (the engine's own stack) ----
-        var upnp := UPNP.new()
-        if upnp.discover(2000, 3) == UPNP.UPNP_RESULT_SUCCESS \
-                        and upnp.get_gateway() != null:
-                for i in 3:
-                        if upnp.add_port_mapping(port_at_start, port_at_start,
-                                        "GOGABox LAN", "TCP", 0) \
-                                        == UPNP.UPNP_RESULT_SUCCESS:
-                                upnp_ok = true
-                                ext = upnp.query_external_address()
-                                break
-                if ext == "":
-                        # the gateway device itself - the NAT-PMP/PCP legs
-                        # aim at its real address (never a guessed .1)
-                        _gw_ip = _upnp_gateway_ip(upnp)
-        # ---- 2 + 3. NAT-PMP / PCP (raw UDP to the gateway) ----
-        if ext == "":
-                if _gw_ip == "":
-                        _gw_ip = _guess_gateway_ip()
-                if _gw_ip != "":
-                        ext = _map_nat_pmp(_gw_ip, port_at_start)
-                        if ext == "":
-                                ext = _map_pcp(_gw_ip, port_at_start)
-        _apply_online.call_deferred(ext, port_at_start)
-
-## The thread's answer lands on the main thread: the code upgrades to the
-## PUBLIC address when a door opened, and the sheet says so.
-func _apply_online(ext: String, port_at_start: int) -> void:
-        if not session_active() or not is_host or _port != port_at_start:
-                return
-        online_ready = ext != ""
-        if ext == "":
-                ext = _lan_ip()
-        host_addr = "%s:%d" % [ext, port_at_start]
-        room_code = encode_code(ext, port_at_start)
-        session_changed.emit()
-
-var _gw_ip := ""
-
-func _upnp_gateway_ip(upnp: UPNP) -> String:
-        var g := upnp.get_gateway()
-        if g == null:
-                return ""
-        var url := String(g.url)
-        var s := url
-        if s.begins_with("http://"):
-                s = s.substr(7)
-        elif s.begins_with("https://"):
-                s = s.substr(8)
-        var slash := s.find(":")
-        if slash >= 0:
-                s = s.substr(0, slash)
-        var slash2 := s.find("/")
-        if slash2 >= 0:
-                s = s.substr(0, slash2)
-        return s if s.contains(".") else ""
-
-## No UPnP device answered: the gateway is almost always the .1 or the
-## .254 of this device's own /24 - try the honest candidates.
-func _guess_gateway_ip() -> String:
-        var ip := _lan_ip()
-        var quads := ip.split(".")
-        if quads.size() != 4:
-                return ""
-        return "%s.%s.%s.1" % [quads[0], quads[1], quads[2]]
-
-## NAT-PMP (RFC 6886): 12-byte TCP-map request to gateway:5351 over UDP.
-## Returns the public ip the gateway reports, "" when refused.
-func _map_nat_pmp(gw: String, port: int) -> String:
-        var udp := PacketPeerUDP.new()
-        var req := PackedByteArray()
-        req.resize(12)
-        req[0] = 0          # version
-        req[1] = 1          # op = MAP (TCP)
-        req[2] = 0; req[3] = 0
-        req.encode_u16(4, port)      # public port
-        req.encode_u16(6, port)      # private port
-        req.encode_u32(8, 7200)      # lifetime 2h
-        var res := _pmp_roundtrip(udp, gw, req)
-        udp.close()
-        if res.size() < 16 or res[1] != 129:
-                return ""
-        if res.decode_u16(2) != 0:
-                return ""            # the gateway refused the map
-        return _gw_public_from_res(udp, gw, res)
-
-## PCP (RFC 6887): the MAP opcode with the NAT-PMP-compatible body.
-func _map_pcp(gw: String, port: int) -> String:
-        var udp := PacketPeerUDP.new()
-        var req := PackedByteArray()
-        req.resize(24)
-        req[0] = 2           # version
-        req[1] = 1           # op = MAP
-        req.encode_u16(2, 0)          # reserved
-        req.encode_u32(4, 7200)       # lifetime
-        for i in 12:                  # the nonce
-                req[8 + i] = (7 + i) & 0xFF
-        req[20] = 6          # protocol = TCP
-        req.resize(36)
-        req.encode_u16(28, 0)         # reserved
-        req.encode_u16(30, port)      # internal port
-        req.encode_u16(32, port)      # external port
-        req.encode_u32(34, 0)         # prefix (IPv6 only)
-        var res := _pmp_roundtrip(udp, gw, req)
-        udp.close()
-        if res.size() < 36 or res[1] != 2:
-                return ""
-        if res.decode_u32(4) == 0:
-                return ""            # lifetime 0 = refused
-        return _gw_public_from_res(udp, gw, res)
-
-## One UDP question, one answer (0.4s patience, 2 tries - the join law
-## bounds the whole mapping attempt so a leave never waits long).
-func _pmp_roundtrip(udp: PacketPeerUDP, gw: String, req: PackedByteArray) -> PackedByteArray:
-        for i in 2:
-                udp.set_dest_address(gw, 5351)
-                udp.put_packet(req)
-                var waited := 0.0
-                while waited < 0.4:
-                        if udp.get_available_packet_count() > 0:
-                                return udp.get_packet()
-                        OS.delay_usec(20000)
-                        waited += 0.02
-        return PackedByteArray()
-
-## The gateway's own public address: NAT-PMP's PUBLIC address op (or the
-## PCP response's origin fields fall back to the map's source host).
-func _gw_public_from_res(udp: PacketPeerUDP, gw: String, res: PackedByteArray) -> String:
-        # ask the gateway its public address (NAT-PMP op 0 / PCP the same
-        # body with op 0) - the map itself never carries the ip
-        var req := PackedByteArray()
-        req.resize(2)
-        req[0] = 0
-        req[1] = 0
-        for i in 2:
-                udp.set_dest_address(gw, 5351)
-                udp.put_packet(req)
-                var waited := 0.0
-                while waited < 0.4:
-                        if udp.get_available_packet_count() > 0:
-                                var pk := udp.get_packet()
-                                if pk.size() >= 12:
-                                        var a := "%d.%d.%d.%d" % [pk[8], pk[9], pk[10], pk[11]]
-                                        if a != "0.0.0.0":
-                                                return a
-                        OS.delay_usec(20000)
-                        waited += 0.02
-        # THE HONESTY LAW: a map without a public address cannot carry an
-        # honest code - "" means the next leg tries, and ONLINE stays OFF.
-        return ""
-
-## JOIN — connect to a host by "ip:port" or room code. Returns "" or error.
+## JOIN — connect to a host by "ip:port" (the address the host's session
+## sheet shows). Returns "" or an error line.
 func join_session(addr_raw: String) -> String:
         if session_active():
                 return "already in a session"
         var addr := addr_raw.strip_edges()
-        if addr.begins_with("GOGA-"):
-                var decoded := decode_code(addr)
-                if decoded == "":
-                        return "bad room code"
-                addr = decoded
         var parts := addr.split(":")
         if parts.size() < 1 or parts[0].strip_edges() == "":
                 return "enter the host address"
@@ -430,16 +252,7 @@ func leave_session() -> void:
         _close_all()
         _reset_session()
 
-## r4: the mapping thread must outlive NOTHING - a core that leaves (or
-## dies) while the router is still thinking joins its thread before any
-## field is torn down (the "previously freed" class the rig caught).
-func _join_map_thread() -> void:
-        if _map_thread != null and _map_thread.is_started():
-                _map_thread.wait_to_finish()
-        _map_thread = null
-
 func _reset_session() -> void:
-        _join_map_thread()
         _teardown_match_local("THE SESSION ENDED")
         mode = "idle"
         is_host = false
@@ -1300,21 +1113,9 @@ func _handle_line(line: String, who: String) -> void:
 func _touch() -> void:
         _last_host_msg = Time.get_unix_time_from_system()
 
-## r4 THE HONEST JOIN DEATH: the line names the REAL wall. A private
-## address that never answers = the same wifi / firewall / the host not
-## hosting. A PUBLIC address that refuses = the host's router closed the
-## port - the host's own sheet must say ONLINE ON before this can work.
+## THE HONEST JOIN DEATH: the line names the REAL wall. A private address
+## that never answers = the same wifi / firewall / the host not hosting.
 func _join_death_line() -> String:
-        var ip := conn_addr.split(":")[0] if conn_addr != "" else ""
-        var quads := ip.split(".")
-        var public := false
-        if quads.size() == 4:
-                var a0 := int(quads[0]) if quads[0].is_valid_int() else 0
-                var a1 := int(quads[1]) if quads[1].is_valid_int() else 0
-                public = not (a0 == 10 or (a0 == 172 and a1 >= 16 and a1 <= 31) \
-                                or (a0 == 192 and a1 == 168) or a0 == 127 or a0 == 0)
-        if public:
-                return "cannot reach the host - the host's router closed the port (the host's session sheet must say ONLINE ON)"
         return "cannot reach the host - check the address, the wifi and the firewall"
 
 func _admit(conn: StreamPeerTCP, hello: Dictionary) -> void:
@@ -1390,7 +1191,6 @@ func _drop_peer(dev: String) -> void:
         rooms_changed.emit()
 
 func _host_died(why: String) -> void:
-        _join_map_thread()
         _close_all()
         _teardown_match_local("THE HOST IS GONE" if why == "" else why, [])
         mode = "idle"
@@ -1422,46 +1222,6 @@ func _clean_seats(arr: Array) -> Array:
                         out.append(d)
         return out
 
-## ================= the room code (the VLAN leg) =================
-
-## "GOGA-XXXXXX-XXXXXXC" — hex(ip:4 + port:2) + a checksum letter.
-## Reversible without any server; works over UPnP internet plays and over
-## VLAN NICs (Tailscale/ZeroTier) unchanged.
-const CODE_ALPHA := "ABCDEFGHJKMNPQRSTUVWXYZ"
-
-func encode_code(ip: String, port: int) -> String:
-        var quads := ip.split(".")
-        if quads.size() != 4:
-                return ""
-        var bytes := PackedByteArray()
-        for q in quads:
-                var v := q.to_int()
-                if v < 0 or v > 255:
-                        return ""
-                bytes.append(v)
-        bytes.append((port >> 8) & 0xFF)
-        bytes.append(port & 0xFF)
-        var hex := bytes.hex_encode().to_upper()
-        var chk := CODE_ALPHA[absi(hash(hex)) % CODE_ALPHA.length()]
-        return "GOGA-%s-%s%s" % [hex.substr(0, 6), hex.substr(6, 6), chk]
-
-func decode_code(code: String) -> String:
-        var c := code.strip_edges().to_upper().replace(" ", "")
-        if not c.begins_with("GOGA-"):
-                return ""
-        var body := c.substr(5).replace("-", "")
-        if body.length() != 13:
-                return ""
-        var hex := body.substr(0, 12)
-        var chk := body.substr(12, 1)
-        if CODE_ALPHA[absi(hash(hex)) % CODE_ALPHA.length()] != chk:
-                return ""
-        var bytes := PackedByteArray()
-        for i in range(0, 12, 2):
-                bytes.append(("0x" + hex.substr(i, 2)).hex_to_int())
-        var ip := "%d.%d.%d.%d" % [bytes[0], bytes[1], bytes[2], bytes[3]]
-        var port := (bytes[4] << 8) | bytes[5]
-        return "%s:%d" % [ip, port]
 
 func _lan_ip() -> String:
         for ip in IP.get_local_addresses():
@@ -1477,8 +1237,7 @@ func probe_state() -> Dictionary:
         for rid in rooms:
                 arr.append(rooms[rid])
         return {"mode": mode, "seats": seats.duplicate(true), "rooms": arr,
-                "my_room": _my_room, "port": _port, "addr": host_addr,
-                "code": room_code, "online": online_ready}
+                "my_room": _my_room, "port": _port, "addr": host_addr}
 
 # ============================================== v042-1 r3 THE SESSION EXTRAS
 ## THE CHAT LAW (ids, the honest dedupe, the live unread), THE FACE WIRE,

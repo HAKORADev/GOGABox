@@ -25,11 +25,6 @@ func _ready() -> void:
         # BEFORE the menu reads the pixels - the first frame is already the
         # right shape. Phones: is_pc() is false, this is a no-op.
         ScaleRule.boot_window()
-        # v043 THE UPDATE SCHEDULE (the boot check seat): the official
-        # source's engine_version vs this build - a quiet top-level note
-        # when an update waits; the schedule re-checks every 24h. Never a
-        # gate, never a nag - the note rides the LanNotes layer once.
-        _boot_update_check()
         # v0.1.3 THE RESOLUTION & SCALE RULE (ScaleRule.gd = source of truth):
         # internal resolution FIXED at 1080x1920 portrait / 1920x1080
         # landscape; stretch canvas_items + aspect EXPAND fills ANY window
@@ -45,6 +40,8 @@ func _ready() -> void:
         # on_game_entered/on_game_closed actually fire (v0.0.4 passed the menu
         # itself, so the hide never happened -> the big L survived on device).
         _menu.set("router", self)
+        # v044 THE EMPTY-HOME NOTE: a box with no games gets one quiet line.
+        _boot_home_note()
 
         var achiever: Node = load("res://game/core/achiever.gd").new()
         add_child(achiever)
@@ -526,36 +523,12 @@ func _pad_axis(pname: String, on: bool, key: Key) -> void:
         _pad_held[pname] = on
         _push_key(key, on)
 
-## v043 THE BOOT UPDATE CHECK: once a day (the schedule), the official
-## source's engine_version is read over raw http; a newer one leaves ONE
-## quiet note pointing at SETTINGS > APP UPDATES. Fire-and-forget: the
-## box never waits on the wire.
-func _boot_update_check() -> void:
-        if not GogaUpdate.should_check():
-                return
-        GogaUpdate.mark_checked()
-        var task := func() -> void:
-                var census: Dictionary = await GogaUpdate.check()
-                if bool(census.get("available", false)):
-                        # v043 pass 3 THE AUTO-DOWNLOAD SEAT: AUTO on = the
-                        # update stages itself; the note names the one tap.
-                        var staged: String = await GogaUpdate.scheduled_auto(census)
-                        if staged != "":
-                                LanNotes.note("update v%s staged - SETTINGS > APP UPDATES > APPLY"
-                                                % String(census.get("served")))
-                        else:
-                                LanNotes.note("GOGABox v%s is out - SETTINGS > APP UPDATES"
-                                                % String(census.get("served")))
-        task.call()
-        # v043 pass 3 THE EMPTY-HOME COMMAND (the owner: the artifact carries
-        # the GOGAs folder - "windows people take it and put it with the
-        # binary and android ones commanded to put it in downloads folder,
-        # currently the engine makes the files tree but all of them are
-        # empty"). A fresh box with zero packages says WHERE the games come
-        # from - one quiet note, the exact door this build's artifact ships.
+## v044 THE EMPTY-HOME NOTE (the quiet version of the old lecture): a box
+## with zero games says where game folders go - one line, no store talk.
+func _boot_home_note() -> void:
         var goga := get_node_or_null("/root/GOGA")
         if goga != null and (goga.call("entries") as Array).is_empty():
                 if OS.has_feature("android"):
-                        LanNotes.note("GOGAs is empty - put the official GOGAs folder in Downloads/GOGAs (the release page), or open DISCOVER")
+                        LanNotes.note("No games found - put game folders in Downloads/GOGAs/games")
                 else:
-                        LanNotes.note("GOGAs is empty - put the official GOGAs folder next to GOGABox.exe, or open DISCOVER")
+                        LanNotes.note("No games found - put game folders in GOGAs/games next to GOGABox.exe")

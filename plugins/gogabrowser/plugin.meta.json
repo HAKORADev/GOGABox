@@ -1,6 +1,0 @@
-{
-	"addon_dir": "gogabrowser",
-	"gradle_deps": [],
-	"godot_plugin_version": 1,
-	"description": "In-app WebView surface for GOGABox web games (v1 GodotPlugin) - the system WebView hosted inside the activity (no browser chrome, no tab, no redirection). load_url/show_surface/hide_surface/is_visible; the page's SDK bridge rides the box's WebSocket door (127.0.0.1:31443), no JavascriptInterface plumbing needed. Java source staged into <project>/android/build/src/main/java; no external deps."
-}

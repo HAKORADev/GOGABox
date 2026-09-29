@@ -18,7 +18,6 @@
       },
       "use_plugins": [
         "notify",
-        "gogabrowser"
       ],
       "keystore": {
         "path": "config/keystore/arsenal-release.jks",
