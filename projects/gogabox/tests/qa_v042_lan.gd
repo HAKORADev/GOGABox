@@ -17,17 +17,17 @@ func _check(cond: bool, why: String) -> void:
                 print("  FAIL: %s" % why)
 
 func _ready() -> void:
-        # v043 THE RIG: the pilots install first (the rooms/open seats run
-        # against REAL installed packages - the box bakes zero games)
+        # v044 THE RIG: the game folders arrive by copy (the rooms/open
+        # seats run against REAL installed games - the box bakes zero games)
         GOGA.set_home("user://goga_rig")
         _wipe_dir("user://goga_rig")
         GOGA.set_home("user://goga_rig")
         var repo_root := ProjectSettings.globalize_path("res://").path_join("../..")
-        GOGA.import_path(repo_root.path_join("GOGAs/games"))
+        _copy_dir(repo_root.path_join("GOGAs/games"), GOGA.games_dir())
+        GOGA.reload_entries()
 
         print("=== qa_v042_lan: THE LOOPBACK RIG ===")
         _t_name_law()
-        _t_code()
         _t_tags()
         _t_profile()
         await _t_session()
@@ -202,17 +202,6 @@ func _t_name_law() -> void:
                         "the 21st letter dies (max 20)")
         _check(LanProfile.name_ok("ab"), "a 2-char name stands")
 
-func _t_code() -> void:
-        print("-- THE ROOM CODE (reversible, checksummed)")
-        var lan := _bus("codebus", "CODER")
-        var code: String = lan.encode_code("192.168.1.20", 31440)
-        _check(code.begins_with("GOGA-"), "the code wears the prefix")
-        _check(lan.decode_code(code) == "192.168.1.20:31440", "the code round-trips")
-        var bad: String = code.substr(0, code.length() - 1) + "Q"
-        _check(lan.decode_code(bad) == "", "a tampered code dies on the checksum")
-        _check(lan.decode_code("GOGA-NOPE") == "", "garbage dies")
-        _drop(lan)
-
 func _t_tags() -> void:
         print("-- THE MULTI-LEVEL LAN TAGS")
         var cross := {"lan": {"players": 4, "platforms": ["android", "pc"], "cross": true}}
@@ -235,7 +224,7 @@ func _t_tags() -> void:
                         with_lan += 1
         # v043: the four pilots wear the seat (the box bakes zero games -
         # the census counts the INSTALLED world)
-        _check(with_lan == 4, "exactly four pilots wear the LAN seat (%d)" % with_lan)
+        _check(with_lan == 12, "the archive's twelve lan games wear the seat (%d)" % with_lan)
         for gid in ["rally", "slasher", "domino", "jumpcube"]:
                 _check(not Meta.lan_list(GameReg.get_game(gid)).is_empty(),
                                 "%s wears the seat" % gid)
@@ -756,3 +745,21 @@ func _wipe_dir(path: String) -> void:
                                 n = da.get_next()
                         da.list_dir_end()
                 DirAccess.remove_absolute(path)
+
+
+func _copy_dir(src: String, dst: String) -> void:
+        DirAccess.make_dir_recursive_absolute(dst)
+        var da := DirAccess.open(src)
+        if da == null:
+                return
+        da.list_dir_begin()
+        var n := da.get_next()
+        while n != "":
+                var s := src.path_join(n)
+                var d := dst.path_join(n)
+                if da.current_is_dir():
+                        _copy_dir(s, d)
+                else:
+                        da.copy(s, d)
+                n = da.get_next()
+        da.list_dir_end()

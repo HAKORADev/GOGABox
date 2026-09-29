@@ -69,6 +69,80 @@ def scripts_of(gid: str):
     return sorted(p for p in d.glob("*.gd"))
 
 
+CLASS_RE = re.compile(r'^class_name\s+(\w+)', re.M)
+WORD_RE = re.compile(r'\b([A-Z]\w+)\b')
+
+
+def bridge_game_classes(game_dir: Path) -> None:
+    """THE CLASS BRIDGE (v044): a pack's class_names never reach the box's
+    global class cache, so `var meta: DWMeta` in a mounted script degrades
+    to Variant and every `:=` inference on it dies at parse time (the
+    deathworm class of failures - invisible in v043 because the pilots were
+    single-script games). The bridge is mechanical: every script that names
+    a sibling class gets a local `const C := preload("<path>")` - the const
+    is a real type in annotations, expressions and .new() calls, with zero
+    hand edits to the game's code."""
+    files = sorted(game_dir.glob("*.gd"))
+    classes: dict = {}
+    for f in files:
+        m = CLASS_RE.search(f.read_text(encoding="utf-8", errors="replace"))
+        if m:
+            classes[m.group(1)] = f
+    if not classes:
+        return
+    for f in files:
+        txt = f.read_text(encoding="utf-8", errors="replace")
+        orig = txt
+        mine = CLASS_RE.search(txt)
+        need = []
+        for cname, cfile in classes.items():
+            if mine and mine.group(1) == cname:
+                # THE DECLARER: the box runtime cannot resolve the script's
+                # own class_name either - the static self-factory goes
+                # untyped and constructs through new(); the declarer's own
+                # factory call sites drop the := inference (an untyped
+                # return can never feed :=)
+                txt = re.sub(r'static func (\w+)\(\) -> %s:' % cname,
+                             r'static func \1():', txt)
+                txt = re.sub(r'var (\w+) := %s\.new\(\)' % cname,
+                             r'var \1 := new()', txt)
+                txt = re.sub(r'var (\w+) := load_meta\(\)',
+                             r'var \1 = load_meta()', txt)
+                txt = re.sub(r'var (\w+) := _load_meta\(\)',
+                             r'var \1 = _load_meta()', txt)
+                continue
+            body = CLASS_RE.sub("", txt, count=1)
+            if not re.search(r'\b%s\b' % re.escape(cname), body):
+                continue
+            # rel from the STAGING ROOT (res://game/games/<gid>/<file>.gd)
+            rel = "res://" + cfile.relative_to(
+                    game_dir.parents[2]).as_posix()
+            need.append((cname, rel))
+        if not need and txt == orig:
+            continue
+        if need:
+            lines = txt.split("\n")
+            insert_at = 0
+            for i, ln in enumerate(lines):
+                if ln.startswith("class_name "):
+                    insert_at = i + 1
+                    continue   # keep scanning: extends usually follows
+                if ln.startswith("extends "):
+                    insert_at = i + 1
+                    break
+                if ln.strip() == "" and i < 4:
+                    continue
+                break
+            # a header comment marks the bridge (never silent magic)
+            block = ["# v044 THE CLASS BRIDGE: the pack's classes are not in the",
+                     "# box's global cache - these consts carry them locally."]
+            for cname, rel in need:
+                block.append('const %s := preload("%s")' % (cname, rel))
+            lines[insert_at:insert_at] = block
+            txt = "\n".join(lines)
+        f.write_text(txt, encoding="utf-8")
+
+
 def archive_audio_stems() -> dict:
     """stem -> relative path under archive/games_v042/audio/."""
     out = {}
@@ -93,10 +167,21 @@ def stage(gid: str, audio_stems: dict) -> Path:
     # the game's scripts, original paths
     for src in scripts_of(gid):
         shutil.copy2(src, dest / "game" / "games" / gid / src.name)
+    bridge_game_classes(dest / "game" / "games" / gid)
     # the game's assets, 1:1 res paths (code-drawn games have none)
     game_assets = ARCH / "assets" / gid
     if game_assets.exists():
         shutil.copytree(game_assets, dest / "assets" / "games" / gid)
+    # CROSS-GAME ASSET BORROWS (invaders wears lanes' ships and stars):
+    # any literal naming another game's asset folder drags that folder in
+    blobs0 = "\n".join(p.read_text(encoding="utf-8", errors="replace")
+                       for p in scripts_of(gid))
+    for other in set(re.findall(r'res://assets/games/([a-z0-9_]+)/', blobs0)):
+        if other == gid:
+            continue
+        src_other = ARCH / "assets" / other
+        if src_other.exists():
+            shutil.copytree(src_other, dest / "assets" / "games" / other)
     # the shared UI + fonts the core draws with
     for shared in ("ui", "fonts"):
         d = PROJ / "assets" / shared
@@ -213,6 +298,20 @@ def export_pack(staged: Path) -> Path:
     return dest
 
 
+def thumb_of(gid: str) -> Path:
+    """the archive's thumb for a game - the registry entry names it (the
+    historical names wander: cosmic_spud's tile lives at spud.png)."""
+    reg = json.loads((ARCH / "registry_entries" / f"{gid}.json")
+                     .read_text(encoding="utf-8"))
+    t = reg.get("thumb", "")
+    if t:
+        name = Path(t).name
+        p = ARCH / "thumbs" / name
+        if p.exists():
+            return p
+    return ARCH / "thumbs" / f"{gid}.png"
+
+
 def assemble(gid: str, pck: Path) -> Path:
     root = GOGAS / "games" / gid
     if root.exists():
@@ -233,7 +332,7 @@ def assemble(gid: str, pck: Path) -> Path:
     (root / "game.json").write_text(
         json.dumps(entry, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")
-    thumb = ARCH / "thumbs" / f"{gid}.png"
+    thumb = thumb_of(gid)
     if thumb.exists():
         shutil.copy2(thumb, root / "thumb.png")
     return root
