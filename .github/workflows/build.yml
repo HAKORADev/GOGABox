@@ -326,13 +326,9 @@ jobs:
         run: |
           VERSION="$(jq -r '.projects["${{ inputs.project }}"].version_name' config/projects.json)"
           TAG="${{ inputs.project }}-v${VERSION}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.apk dist/*.zip --clobber
-          else
-            gh release create "$TAG" dist/*.apk dist/*.zip --title "GOGABox v${VERSION}" --notes-file release_body.md
-          fi
           # v044-1: the release body is the manual - what to download and
           # where each piece lands (the same doors the box itself names).
+          # It is written FIRST: the create call consumes it.
           cat > release_body.md <<BODY_EOF
           # GOGABox v${VERSION}
 
@@ -350,4 +346,9 @@ jobs:
 
           **Settings** - open \`GOGAs/box.json\` in any text editor: \`hide_mature\` (default true) keeps +12 games and their tags out of the box; \`dev_cheats\` (default false) keeps the dev menu locked.
           BODY_EOF
-          gh release edit "$TAG" --notes-file release_body.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk dist/*.zip --clobber
+            gh release edit "$TAG" --notes-file release_body.md
+          else
+            gh release create "$TAG" dist/*.apk dist/*.zip --title "GOGABox v${VERSION}" --notes-file release_body.md
+          fi
