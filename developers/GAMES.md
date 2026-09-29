@@ -29,11 +29,13 @@ The box's whole vocabulary, flat and human-editable:
   "tag": "slice the fruit, skip the bombs",
   "desc": "one line shown on the game page",
   "os": ["android", "pc"],
+  "orientation": "portrait",
   "age": 7,
   "content": [],
   "genres": { "main": ["arcade"], "sub": ["reflex"] },
   "fee": 0,
   "price": 0,
+  "shop": false,
   "controls": ["swipe to slice"],
   "controls_pc": ["hold the mouse button and swipe"],
   "thumb": "thumb.png",
@@ -41,19 +43,69 @@ The box's whole vocabulary, flat and human-editable:
 }
 ```
 
-- `os` — `["android"]`, `["pc"]` or both. A game missing this device
-  shows an honest dead **PHONE ONLY** / **PC ONLY** button instead of a
-  play button that does nothing.
-- `age` — the age-door tag (3..21). The profile's age number is the only
-  reader: an underage profile sees the play button grayed with "you must
-  be +nn". Browsing and owning are never age-gated.
-- `content` — optional content tags (`horror`, `gore`, `porn`, `gambling`
-  ...) that ride the search filters.
+- `os` — `["android"]`, `["pc"]` or both (the default). A game missing
+  this device shows an honest dead **PHONE ONLY** / **PC ONLY** button
+  instead of a play button that does nothing. One pure-GDScript pack
+  runs on both platforms unchanged — write the tag only when a game
+  truly cannot run somewhere.
+- `orientation` — `"portrait"`, `"landscape"`, or `"auto"` (the window's
+  shape at launch decides; the sensor then locks it for the session).
+- `age` — the age-door tag (3, 5, 7, 9, 12, 16, 18, 21). The profile's
+  age number is the only reader: an underage profile sees the play
+  button grayed with "you must be +nn". Browsing and owning are never
+  age-gated. NOTE: while the box's `hide_mature` setting rules (the
+  default), games rated +12 and up are hidden from the feed entirely —
+  see the box.json section in this folder's README.
+- `content` — optional content tags (`horror`, `gore`, `porn`,
+  `gambling`, `politics`, `psycho`, `nudity`, `illegal`) that ride the
+  search filters and fold away with the mature view.
 - `fee` — GOGACoins per round (0 = free). `price` — the shop price
   (0 = free to own). `shop: true` lets the player buy it from the page.
-- `script` — the res:// path of your main script INSIDE the pack. Every
-  game the box ships uses its natural path; a game that prefers the
-  default can skip the key (the box then looks for `res://entry.gd`).
+- `script` — the res:// path of your main script INSIDE the pack. The
+  default is `res://game/games/<id>/entry.gd`.
+
+### The reveal vocabulary — mystery, orders, unlock conditions
+
+A game does not have to appear the moment its folder lands. The
+`reveal` block turns it into a mystery tile that resolves when the
+player does something:
+
+```json
+"reveal": {
+  "kind": "orders",
+  "appear_after": 3,
+  "needs_games": 5,
+  "orders": [
+    { "type": "plays",    "game": "xo",     "count": 3 },
+    { "type": "earn_in",  "game": "snake",  "amount": 30 },
+    { "type": "spend_in", "game": "rally",  "amount": 20 },
+    { "type": "beat_best","game": "merge" },
+    { "type": "ach_exact","game": "bovo",   "ach": "wins_t1" },
+    { "type": "ach_in",   "game": "ludo",   "count": 2 }
+  ]
+}
+```
+
+- `kind` — how the tile appears:
+  - `"direct"` — no conditions; it shows as a locked tile right away.
+  - `"orders"` — a MYSTERY (black tile) until every order line is done.
+  - `"inbox"` — a MYSTERY until the box has `minutes` of total play time.
+  - `"real"` — a MYSTERY on a countdown: `hours` after the box first
+    saw it, it reveals (the mystery page shows the clock).
+  - `"chain"` — reveals only when the previous game in the feed is owned
+    and played (the old ladder; rare now).
+- `appear_after` — owned games needed before the teaser even shows.
+- `needs_games` — owned games required to BUY once revealed.
+- `orders` — the requirement lines (shown on the mystery page with live
+  progress): `plays`, `earn_in`, `spend_in`, `beat_best`, `ach_in`,
+  `ach_exact` — each names a `game` (another installed game's id) and
+  its `count`/`amount`/`ach`.
+
+The box computes everything live from its own stats — your game ships
+the declarative block and the box does the watching. Games can also
+declare `charge_unlock` (GOGACharges poured before the buy),
+`hours`/`blocked_hours` (time-of-day windows), `daily_rounds`/
+`daily_minutes` (per-day caps) and `charges` (the GOGABattery pool).
 
 ## 3. The script
 
@@ -64,8 +116,6 @@ the packer stages the box core beside your code). The shape:
 extends GameBase
 # my_game.gd - the whole game
 
-const A := "res://assets/games/my_game/"   # your assets, any layout you like
-
 func _goga_setup() -> void:
         # build your world here - runs once at boot
         pass
@@ -75,30 +125,36 @@ func _goga_tick(delta: float) -> void:
         pass
 ```
 
-`GameBase` hands you: the touch kit (taps, drags, holds), the HUD
-helpers, the score/coins doors (`set_score`, `add_run_coins`,
-`finish_run(score)`), the pause/back sheet, the orientation ask, and the
-scale rule (portrait, landscape or both). The shipped games under
-`GOGAs/games/` are the living reference — `rally/` (pong.gd) is the
-smallest complete one.
+`GameBase` hands you: the touch kit (`tk.tapped`, `tk.swiped`,
+`tk.dragged` — mouse included), the HUD (score + coins), the score and
+coin doors (`set_score`, `add_score`, `add_run_coins`, `finish_run`),
+the pause/back sheet, the orientation ask, the LAN relay doors (see
+LAN.md), and the SDK doors (see GOGACOINS.md).
+
+`developers/template/` is a COMPLETE tiny game built exactly this way —
+copy it, rename it, make it yours. It builds and runs out of the box:
+
+```bash
+python3 tools/make_game.py developers/template my_first_game
+```
 
 ## 4. The pack
 
-Run the packer:
+From any folder shaped like the template (a `game.json`, an `entry.gd`,
+your assets):
 
 ```bash
-python3 tools/v044_package.py my_game
+python3 tools/make_game.py path/to/your_game [--id your_game_id]
 ```
 
-It stages a Godot project around your files (the box's base classes at
-their real paths — that is what lets a pack extend them), imports it,
-exports ONE `game.pck`, and writes `game.json` + `thumb.png` beside it.
-One pack runs on BOTH platforms — a pure-GDScript 2D pack is
-platform-neutral.
+The tool stages a Godot project around your files (the box's base
+classes at their real paths — that is what lets a pack extend them),
+imports it, exports ONE `game.pck`, and writes the folder straight into
+`GOGAs/games/<id>/`. One pack runs on BOTH platforms.
 
-The packer audits every referenced path (your script's `res://` literals
-must exist — missing art or audio aborts the build by name) and carries
-your music + sfx in automatically.
+The audit walks every `res://` literal in your scripts: a missing art or
+audio file aborts the build BY NAME (a pack never ships half-referenced);
+box-project files (fonts, shared UI) are carried in automatically.
 
 ## 5. Ship it
 

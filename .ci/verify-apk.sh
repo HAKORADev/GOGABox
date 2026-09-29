@@ -28,7 +28,14 @@ TSKV="$(echo "$BADGING" | grep -oE "^targetSdkVersion:'[^']+'" || true)"
 gda_log "verify[$KEY]: $PKG | $SDKV $TSKV"
 gda_log "verify[$KEY]: $NATIVE"
 
-echo "$NATIVE" | grep -q "$WANT_ABI" || gda_die "ABI mismatch: wanted $WANT_ABI, badging says: $NATIVE"
+# v044-1 THE ONE APK LAW: the universal build carries BOTH arm ABIs -
+# the badging must name arm64-v8a AND armeabi-v7a in the one apk.
+if [ "$WANT_ABI" = "universal" ]; then
+  echo "$NATIVE" | grep -q "arm64-v8a" || gda_die "universal ABI mismatch: no arm64-v8a in: $NATIVE"
+  echo "$NATIVE" | grep -q "armeabi-v7a" || gda_die "universal ABI mismatch: no armeabi-v7a in: $NATIVE"
+else
+  echo "$NATIVE" | grep -q "$WANT_ABI" || gda_die "ABI mismatch: wanted $WANT_ABI, badging says: $NATIVE"
+fi
 
 # machine-readable line for build summaries
 echo "OK|$KEY|$WANT_ABI|$(basename "$APK")|$(stat -c%s "$APK")|$PKG|$NATIVE"

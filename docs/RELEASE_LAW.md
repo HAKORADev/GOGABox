@@ -8,8 +8,9 @@ anymore and NOT per-build by default.
 **Owner law, set 2026-09-19 (the open-source round):** GOGABox builds for
 ANDROID and WINDOWS again — the old "no way to make money from windows
 builds" reason is gone (the box is MIT + 0 ads now, money was never the
-point). ONE build action (`build.yml`) ships both: the APKs (arm32 + arm64)
-and THE one Windows exe — `GOGABox.exe`, x86_32, official templates (SSE2
+point). ONE build action (`build.yml`) ships both: THE one universal APK
+(both arm ABIs in one installable - THE ONE APK LAW, v044-1) and THE one
+Windows exe — `GOGABox.exe`, x86_32, official templates (SSE2
 baseline: it runs on pre-2014 CPUs with no SSE4.2), single file with the
 embedded pck, verified by THE REAL-EXE LAW in CI. No 64-bit exe, no
 template forging.

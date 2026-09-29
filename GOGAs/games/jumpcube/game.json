@@ -6,7 +6,8 @@
   "orientation": "portrait",
   "dim": "2d",
   "os": [
-    "android"
+    "android",
+    "pc"
   ],
   "lan": {
     "players": 2,

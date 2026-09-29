@@ -3,7 +3,7 @@
 # arsenal main build CLI - source -> APK, identical locally and on CI.
 #
 # Usage:
-#   ./build.sh <project-key> [--abi all|arm64-v8a|armeabi-v7a] [--type release|debug]
+#   ./build.sh <project-key> [--abi all|universal] [--type release|debug]
 #              [--aab] [--skip-import]
 #
 # What it does:
@@ -13,6 +13,10 @@
 #   4. godot --headless --export-release per ABI (each export runs the full
 #      gradle build -> real APK)
 #   5. verify every APK (signature, badging, ABI, size) and write a summary
+#
+# v044-1 THE ONE APK LAW: "universal" is the ONE Android seat - a single
+# apk carrying BOTH arm ABIs (arm32 + arm64). One artifact, no "which apk
+# do I install" question, ever.
 #
 # Outputs land in  dist/<project>/<apk_name>-<abi>.apk
 # ============================================================================
@@ -53,6 +57,7 @@ bash "$GDA_ROOT/.ci/materialize-project.sh" "$KEY"
 # ---------------------------------------------------------------- 2. patch presets
 abi_code() {
   case "$1" in
+    universal)   echo $((VBASE + 1)) ;;
     armeabi-v7a) echo $((VBASE + 1)) ;;
     arm64-v8a)   echo $((VBASE + 2)) ;;
     x86)         echo $((VBASE + 3)) ;;

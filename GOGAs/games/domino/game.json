@@ -6,6 +6,7 @@
   "orientation": "auto",
   "dim": "2d",
   "os": [
+    "android",
     "pc"
   ],
   "lan": {

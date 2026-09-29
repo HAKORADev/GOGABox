@@ -33,6 +33,13 @@ run). On Android it sits at `Downloads/GOGAs`. Adding a game is the same
 on both: drop the folder in, start the box. Removing a game is deleting
 its folder. Sharing a game is sharing the folder.
 
+**The settings are a file.** `GOGAs/box.json` sits beside the games and
+holds the whole box's settings: `hide_mature` (default `true`) keeps
+games rated +12 and up — along with their age and content tags — out of
+the feed, for a family-friendly box; set it to `false` and everything
+shows. `dev_cheats` (default `false`) keeps the hidden dev menu locked.
+Open the file in any text editor, change a word, restart the box.
+
 **Everything the box does, it does offline.** No downloads, no updates to
 check, no accounts to reach. The only network traffic GOGABox ever makes
 is the LAN multiplayer session you start yourself.
@@ -43,9 +50,8 @@ is the LAN multiplayer session you start yourself.
 |---|---|
 | `projects/gogabox/` | the application (Godot 4.7) |
 | `GOGAs/games/` | the shipping set of games — 31 folders, one per game |
-| `developers/` | how to make games for GOGABox, and how to use the coins and the LAN |
-| `archive/games_v042/` | the original source archive the games were ported from |
-| `tools/` | bootstrap, test runner, the game packer |
+| `developers/` | how to make games for GOGABox, how to mod them, and how to use the coins and the LAN |
+| `tools/` | bootstrap, test runner, the game packer (`make_game.py`) |
 | `docs/` | project documentation and planning notes |
 | `AGREEMENT.md` | the plain end-user agreement |
 
@@ -53,19 +59,22 @@ is the LAN multiplayer session you start yourself.
 
 ### Players
 
-Grab the release for your platform. Windows: unzip, run — the games are
-already next to the exe. Android: install the APK, extract the `GOGAs`
-zip into `Downloads`, done. The age field in your profile only gates the
+Grab a release. Windows: unzip, run — the games are already next to the
+exe. Android: install the one universal APK (it carries both arm
+architectures — there is nothing to choose), extract the `GOGAs` zip
+into `Downloads`, done. The age field in your profile only gates the
 play button on age-rated games; everything else in the box is
 unrestricted.
 
 ### Making a game
 
-Start at `developers/README.md`. The short version: build your game in
-Godot 4 as a script that extends the box's `GameBase`, pack it with
-`tools/v044_package.py`, and you get a folder you can play, keep or
-share. GOGACoins, achievements and LAN seats are optional doors your game
-can walk through — or ignore completely.
+Start at `developers/README.md`. There is a complete tiny game in
+`developers/template/` — build it with `python3 tools/make_game.py
+developers/template my_first_game` and it shows up in your feed. The
+short version: your game is a script that extends the box's `GameBase`;
+the packer turns it into a folder you can play, keep or share.
+GOGACoins, achievements and LAN seats are optional doors your game can
+walk through — or ignore completely.
 
 ### Building from source
 
@@ -76,7 +85,7 @@ git clone https://github.com/HAKORADev/GOGABox.git
 cd GOGABox
 ./tools/bootstrap.sh          # installs JDK 17, Android SDK, Godot 4.7.2 (cached in .cache/)
 ./tools/test.sh gogabox       # headless integration tests (boots every game)
-./build.sh gogabox            # release APKs (arm32 + arm64) into dist/
+./build.sh gogabox            # the universal APK into dist/
 ```
 
 Windows builds run on GitHub Actions for every push: the

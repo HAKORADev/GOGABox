@@ -26,10 +26,25 @@ In `game.json`:
 With the tag, the box derives the search chips (`lan`, `lan_2p`..`4p`,
 `lan_cross`...), shows the PLAYERS badge on your tile, seats the session
 lines on your pre-play page, and opens the system waiting room when your
-game starts inside a live session. Your game code checks the seat like
-the shipped games do (see `snake`, `rally`, `domino` — each wears a
-slightly different relay shape, from shared-board turns to mirrored
-real-time).
+game starts inside a live session.
+
+## The relay doors your game implements
+
+The box routes everything; your script answers the calls it cares about
+(duck-typed — implement what you need, ignore the rest):
+
+- `lan_match_start(params)` — the room owner pressed START; `params`
+  carries the room's config (board size, mode...). Build the match.
+- `lan_act(act)` — a player's move/action arrived; apply it.
+- `lan_snap(...)` / `lan_prog(...)` — periodic state/progress syncs.
+- `lan_end(results, why)` — the match folded (someone ended or left).
+- `lan_solo()` — the no-session fallback: play the ordinary solo game.
+
+To send, call the LAN autoload's send doors from your tick/handlers;
+the base's `finish_run` remains the ONE way a run ends (in a live match
+it folds the whole room — nobody plays a folded match). The template
+game in this folder shows the solo shape; the shipped games demonstrate
+the full range, from shared-board turns to mirrored real-time.
 
 ## What the box owns (you never build this)
 

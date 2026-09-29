@@ -6,8 +6,8 @@
 
 | trigger | behavior |
 |---|---|
-| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × every ABI in its `abi_presets` (release) + THE Windows exe |
-| **manual dispatch** | pick `project` + `abi` (`all`/`arm64-v8a`/`armeabi-v7a`) + `build_type` (`release`/`debug`), optional `create_release` (APKs + the Windows zip) |
+| **push → main** (paths: `projects/**`, `plugins/**`, `config/**`, `.ci/**`, `tools/**`, `build.sh`) | builds every project with `ci_auto: true` × the `universal` preset (release) + THE Windows exe |
+| **manual dispatch** | pick `project` + `abi` (`all`/`universal`) + `build_type` (`release`/`debug`), optional `create_release` (the universal APK + the Windows zip + the GOGAs zip) |
 
 Job flow: `plan` (generates the matrix with `.ci/ci-matrix.sh` — the same
 script runs locally) → one `build` job per (project, abi) → the `windows`
@@ -70,11 +70,15 @@ First uncached run ≈ 20–25 min per ABI; cached runs ≈ 8–12 min.
 
 ## Releases
 
-Manual dispatch with `create_release: true` attaches both ABIs + the Windows zip to a GitHub
-release tagged `<project>-v<version_name>` — project-scoped, so two games
-can both be at v1.0.0 without colliding (older global `v<version>` tags like
-`v1.0.0` remain from before this scheme). Re-running with
-the same version re-uploads (clobbers).
+Manual dispatch with `create_release: true` attaches ONE universal APK
+(both arm ABIs — THE ONE APK LAW, v044-1), the Windows zip and the one
+GOGAs zip (the same for both platforms) to a GitHub release tagged
+`<project>-v<version_name>` — project-scoped, so two games can both be at
+v1.0.0 without colliding (older global `v<version>` tags like `v1.0.0`
+remain from before this scheme). The release body is the manual: what to
+download, where the GOGAs folder lands per platform, and the box.json
+settings one-liner. Re-running with the same version re-uploads
+(clobbers).
 
 ## Production signing on CI (optional, when ready)
 

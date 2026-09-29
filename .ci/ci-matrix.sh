@@ -6,7 +6,7 @@
 # - push:              builds every project with ci_auto=true, all ABIs
 # Output: a single-line JSON for GitHub Actions `matrix: ${{ fromJson(...) }}`
 # Usage: .ci/ci-matrix.sh [--event push|workflow_dispatch] [--project KEY]
-#                         [--abi all|arm64-v8a|armeabi-v7a]
+#                         [--abi all|universal]
 #                         [--build-type release|debug]
 # ============================================================================
 set -euo pipefail

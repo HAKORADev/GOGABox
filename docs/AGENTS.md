@@ -37,8 +37,9 @@ the economy + the folder runtime + the LAN). The box bakes ZERO games
 and the repo's own `GOGAs/games/` IS the shipping set — all 31 games of
 the v042 generation, ported. The machinery around it (`build.sh`,
 `.ci/`, `tools/`, `config/`, `plugins/`, CI) exists to build and ship
-that one product. The DEVELOPERS' side (make a game, the coins, the
-LAN) lives in `developers/` — three short docs, no platform machinery.
+that one product. The DEVELOPERS' side (make a game, mod a game, the coins, the
+LAN) lives in `developers/` — four short docs + a complete template
+game, no platform machinery.
 
 v044 THE BOX, SIMPLIFIED (the owner's rollback round): Godot-only (the
 web + native runners, the bridges, the gogabrowser plugin are GONE), no
@@ -208,12 +209,13 @@ completion). Cached runs ≈ 8–12 min per ABI, cold ≈ 20–25.
 **Version bump (GOGABox design rule, owner-locked v0.1.8; THE PATCH NAMING
 LAW, owner-locked v0.3.3-6)** — every new build gets `version_name`
 **+0.0.1** (0.1.7 → 0.1.8 → 0.1.9 → 0.2.0 …) and `version_code_base`
-**+10**; effective codes: arm32 = base+1, arm64 = base+2 (Play Store needs
-distinct codes, higher on the modern ABI). Patches are REAL version
+**+10**; effective codes: universal (v044-1 THE ONE APK LAW) = base+1 —
+the per-ABI arm32/arm64 codes (+1/+2) retired with the two-apk release.
+Patches are REAL version
 numbers now: a patch of `0.3.3` is **`0.3.3-1`, `0.3.3-2`, …** (`0.3.3-6`
 = the sixth patch of 0.3.3), and a build with no patch is plain `0.3.3`.
 NEVER write "PATCH N" words anywhere - `version_name` is printed verbatim
-in the APK filename (`GOGABox-v<version_name>-<abi>.apk`) and the release
+in the APK filename (`GOGABox-v<version_name>-universal.apk`) and the release
 tag (`v<version_name>`), so the suffix number IS the patch identity. A
 patch still bumps `version_code_base` +10 (every installable build needs
 a fresh, higher code). Any other jump (+0.1.2, skipping, vibes) is
@@ -277,7 +279,7 @@ subjects (`git log` is the real history).
 | need | read |
 |---|---|
 | env setup, toolchain freeze, pitfalls | docs/SETUP.md |
-| add a new game | inside the box: one registry entry + one GogaGame script + one thumbnail — read `docs/goga_docs/plans/BOX_CORE_DESIGN.md` and docs/ADDING_A_GAME.md |
+| add a game to the box | `developers/GAMES.md` + `developers/template/` — the folder + make_game.py (the game-folder world; the baked-era ADDING_A_GAME doc is retired) |
 | the platforms + the 0-ads law | docs/RELEASE_LAW.md + this file §4 |
 | assets policy, manifest, source catalogs, store trials | docs/ASSETS.md |
 | studying other games: portals, APKs, engines, the usage law | docs/DECOMPILATION.md |
@@ -1874,3 +1876,74 @@ reads without booting the scene.
      build); the Windows zip carries `GOGAs/` beside the exe; the
      Android artifact ships the `GOGAs` zip for the Downloads
      placement. The repo's `GOGAs/games/` tree IS the shipping set.
+
+## THE v044-1 LAWS (the checkpoint round - the owner: "ok, tested the
+## build, feels very complete to me ... this is likely last release for
+## now ... polish this thing")
+
+145. THE BOX SETTINGS FILE: `GOGAs/box.json` rides beside the games —
+     the ONE visible settings seat, a plain text editor is the UI.
+     `hide_mature` (default TRUE), `dev_cheats` (default FALSE),
+     `starter_game` (optional id). Missing/broken file = the defaults
+     (the scan law's spirit — a bad file is not a refusal). The box
+     ships the file; the engine recreates it when a player deletes it;
+     the menu re-reads it on every feed refresh (edit + go back = done).
+146. THE MATURE LAW: `hide_mature` true (the default, the family view)
+     folds the +12 band and up out of the box — the games, their age
+     chips, their content tags, their guide/pre-play/trophies/top-up
+     rows, the AGE + CONTENT filter rows; the fold is the FIRST check
+     in _passes_filters so a hidden +12 game's MYSTERY box leaks
+     nothing. Economy never changes: owned stays owned. The uncensored
+     experience is the owner's own flip of one word.
+147. THE DEV-CHEATS MASTER: box.json "dev_cheats" gates the whole sheet.
+     Master off (the default) = `Box.dev_cheat()` reads 0 for EVERY key:
+     the five-tap knock stays dead, the sheet never opens, and a stale
+     saved cheat value can never act ("make sure the toggle will work
+     accurately to hide/disable it without issues"). The rigs arm the
+     master themselves (`GOGA._settings["dev_cheats"] = true`).
+148. THE STARTER LAW: no game name is baked in the box — the free
+     starter game is DATA: box.json "starter_game" when that folder
+     exists, else the alphabetically-first game folder, seeded once by
+     `Box.seed_starter()` when the owned list names no existing game.
+     (The "snake" hardcode is dead — a box with no snake folder used to
+     own a ghost.)
+149. THE SCROLLABLE-FORM LAW: fit_sheet refuses the wrap only for real
+     DRAG controls (Slider/SpinBox). Writable fields ride the wrap —
+     BoxScroll's field law (92) yields their presses. The old guard
+     counted LineEdit/TextEdit as sliders: the profile sheet's wrap
+     (law 93) silently never happened — the owner's "it refused to
+     scroll like them".
+150. THE FOLDER THUMB LAW: a game folder's "thumb" is a RELATIVE file
+     name; `load()` only reads res:// — the guide rows, the trophies
+     rows and the top-up rows rendered EMPTY tiles for every folder
+     game. Every row renderer goes through `Meta.thumb_texture(path,
+     root)`. (GameCoin.games() now carries the game's root too.)
+151. THE SETTLE LAW (the fullscreen half-background): a rotation ask
+     flips the canvas BEFORE the wait, so a refused ask must settle on
+     the PHYSICAL window kind — never the canvas (the old resync read
+     back the design it had just written: the lie was self-fulfilling,
+     the world kept its old shape under the flipped canvas, the game
+     never rebuilt, the watcher re-asked into the same refuse forever).
+     In fullscreen the canvas truth is the whole truth (the window is
+     the monitor; the boot gate's exemption now covers the mid-flight
+     gate too) — the ask resolves in frames and the game RE-SEATS. A
+     real refusal (a phone's rotation lock) re-asserts the physical
+     design and rebuilds the world when its kind disagrees.
+152. THE ONE APK LAW: the Android seat is "universal" — ONE apk with
+     BOTH arm ABIs (version_code = base+1); the per-ABI presets and
+     their two-artifact releases are gone ("people usually do not know
+     what apk they have to install"). verify-apk demands BOTH ABIs in
+     the badging.
+153. THE MAKE-GAME LAW: `tools/make_game.py <folder> [--id]` is the one
+     packer — any folder with an `entry.gd` (+ optional game.json)
+     becomes a game folder, the class bridge + the res-audit riding
+     from v044. The archive/ tree and the v043/v044 packaging tools are
+     DELETED (the owner: "it will exist in git history anyway but now
+     it serves nothing") — a rebuild of an old game reads its sources
+     from git history, never from a live folder.
+154. THE TEMPLATE LAW: `developers/template/` is a complete tiny game
+     (entry.gd + game.json) that builds with the make-game law and
+     boots in the box — the docs' living reference instead of the
+     deleted archive sources. The developers' docs carry the reveal
+     vocabulary (mystery/orders/inbox/real, appear_after, needs_games)
+     so games can unlock after XX without any engine change.

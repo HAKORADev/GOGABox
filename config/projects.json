@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. version_code: arm64 gets base+2, armeabi-v7a gets base+1 (Play Store requires distinct, higher on the modern ABI).",
+  "_doc": "Project registry. Adding a game = copy a project folder, add an entry here, done. ci_auto=true means 'build this on every push to main'. v044-1 THE ONE APK LAW: the Android preset is 'universal' - ONE apk carrying arm32+arm64 (version_code = base+1); the per-ABI presets are gone.",
   "projects": {
     "gogabox": {
       "display_name": "GOGABox",
@@ -9,12 +9,11 @@
       "ci_auto": true,
       "apk_name": "GOGABox",
       "package": "hakora.dev.gogabox",
-      "version_name": "0.4.4",
-      "version_code_base": 31500,
+      "version_name": "0.4.4-1",
+      "version_code_base": 31510,
       "aab": false,
       "abi_presets": {
-        "arm64-v8a": "Android arm64",
-        "armeabi-v7a": "Android arm32"
+        "universal": "Android universal"
       },
       "use_plugins": [
         "notify"
@@ -25,7 +24,5 @@
         "pass": "gogabox-arsenal-2026"
       }
     }
-  },
-  "version_name": "0.4.2-4",
-  "version_code_base": 31480
+  }
 }

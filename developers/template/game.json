@@ -1,0 +1,14 @@
+{
+  "title": "POP THE DOTS",
+  "tag": "the template game - copy me",
+  "desc": "one dot waits on the board, pop it before it dies. a miss costs 3 seconds; every 5th dot pays a GOGACoin. the template everything else is built from.",
+  "os": ["android", "pc"],
+  "age": 3,
+  "content": [],
+  "genres": { "main": ["casual"], "sub": ["reflex"] },
+  "fee": 0,
+  "price": 0,
+  "controls": ["tap the dot"],
+  "controls_pc": ["click the dot"],
+  "lan": { "players": 1 }
+}

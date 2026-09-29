@@ -5,9 +5,21 @@ offline-only; a game is a folder you can hand to a friend.
 
 | you want to... | read |
 |---|---|
-| make a game | [GAMES.md](GAMES.md) — the folder, the entry, the pack |
+| make a game | [GAMES.md](GAMES.md) — the folder, the entry, the pack, the mystery/reveal vocabulary |
 | use GOGACoins / achievements / saves in it | [GOGACOINS.md](GOGACOINS.md) |
 | make it playable on a LAN | [LAN.md](LAN.md) |
+| mod an existing game (or make yours moddable) | [MODDING.md](MODDING.md) |
+
+## Start from the template
+
+`template/` is a complete, tiny, working game — script, name file and
+all. Build it and it lands in your box:
+
+```bash
+python3 tools/make_game.py developers/template my_first_game
+```
+
+Start GOGABox: the game is in the feed. Then make it yours.
 
 ## The whole contract in one screen
 
@@ -27,8 +39,19 @@ GOGAs/games/<game-id>/
 
 ## The tools
 
-- `tools/v044_package.py` — stages a Godot project around your game
-  (the box's base classes at their real paths), imports, exports the one
-  `game.pck`, and writes `game.json` from your registry entry.
-- `tools/test.sh gogabox` — the box's battery; it boots every game folder
-  in the tree, so a game that survives it boots on a player's device.
+- `tools/make_game.py <folder> [--id <game-id>]` — stages a Godot
+  project around your game (the box's base classes at their real
+  paths), audits every referenced asset, imports, exports the one
+  `game.pck`, and writes the folder into `GOGAs/games/`.
+- `tools/test.sh gogabox` — the box's battery; it boots every game
+  folder in the tree, so a game that survives it boots on a player's
+  device.
+
+## The settings seat
+
+`GOGAs/box.json` (beside the games) is the player-facing settings file:
+`hide_mature` keeps +12 games out of the feed (default true),
+`dev_cheats` keeps the dev menu locked (default false),
+`starter_game` names the free starter game (empty = the box picks the
+alphabetically-first folder). A game developer reads it the same way a
+player does — it is one honest file, documented in `GOGAs/README.txt`.
