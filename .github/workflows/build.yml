@@ -269,7 +269,10 @@ jobs:
           Z="$(ls stage/GOGABox-windows-*.zip | head -1)"
           ZS="$(stat -c%s "$Z")"
           ES="$(stat -c%s "$F")"
-          [ "$ES" -lt 120000000 ] || { echo "::error::the exe re-fattened ($ES bytes) - game bytes are back inside the binary"; exit 1; }
+          # the honest exe: the 116 MB template + the box's own store
+          # assets (~8 MB) - measured 123.8 MB at v044; a single baked
+          # game would blow well past 130
+          [ "$ES" -lt 130000000 ] || { echo "::error::the exe re-fattened ($ES bytes) - game bytes are back inside the binary"; exit 1; }
           [ "$ZS" -lt 250000000 ] || { echo "::error::the delivery re-fattened ($ZS bytes) - the slim-pack laws are being violated"; exit 1; }
           GZ="$(ls stage/GOGAs-official-*.zip | head -1)"
           GZS="$(stat -c%s "$GZ")"
