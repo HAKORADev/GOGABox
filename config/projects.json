@@ -17,7 +17,7 @@
         "armeabi-v7a": "Android arm32"
       },
       "use_plugins": [
-        "notify",
+        "notify"
       ],
       "keystore": {
         "path": "config/keystore/arsenal-release.jks",
