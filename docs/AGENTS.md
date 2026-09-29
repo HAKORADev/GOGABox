@@ -30,19 +30,24 @@ Then, in order:
 
 ## 1. What this repo is (and is not)
 
-**This repo is GOGABox** — the games platform (the engine + the store +
-the launcher). One product: the `projects/gogabox/` Godot project (the
-menu box + the economy + the GOGA runtime + the discover engine + the
-package runner). The box bakes ZERO games since v043 (THE EMPTY BINARY
-LAW): every game arrives as an installed GOGA package through the GOGAs
-tree, and the four official pilots live in `GOGAs/` + `packaging/`. The
-machinery around it (`build.sh`, `.ci/`, `tools/`, `config/`, `plugins/`,
-CI) exists to build and ship that one product — it stays generic in
-mechanics (registry-driven, no hardcoded IDs). The DEVELOPERS' side of
-the house (the SDK, the package contract, publishing, modding, the
-agents playbooks) lives in `developers/` — its own manual
-(`developers/AGENTS.md`) governs agents working ON the platform's
-outward face; THIS file governs working ON the repo.
+**This repo is GOGABox** — the game box (the engine + the games beside
+it). One product: the `projects/gogabox/` Godot project (the menu box +
+the economy + the folder runtime + the LAN). The box bakes ZERO games
+(THE EMPTY BINARY LAW stands): every game is a FOLDER under `GOGAs/`,
+and the repo's own `GOGAs/games/` IS the shipping set — all 31 games of
+the v042 generation, ported. The machinery around it (`build.sh`,
+`.ci/`, `tools/`, `config/`, `plugins/`, CI) exists to build and ship
+that one product. The DEVELOPERS' side (make a game, the coins, the
+LAN) lives in `developers/` — three short docs, no platform machinery.
+
+v044 THE BOX, SIMPLIFIED (the owner's rollback round): Godot-only (the
+web + native runners, the bridges, the gogabrowser plugin are GONE), no
+discover (no sources, no tiers, no catalog, no downloads, no imports,
+no .goga/.gogas), no self-update (goga_update.gd is GONE), LAN keeps the
+local half only (no UPnP mapping, no room codes, nothing online). The
+game folder contract: folder = id, `game.json` = the name file,
+`game.pck` = THE one entry. The play button tells the platform truth
+(PHONE ONLY / PC ONLY).
 
 | layer | rule |
 |---|---|
@@ -1807,3 +1812,65 @@ reads without booting the scene.
      the AUTO-DOWNLOAD toggle (a scheduled find stages the download and
      the note names the one APPLY tap), and the staged seat (a downloaded
      update waits in .cache/update and APPLY runs the platform trick).
+
+## THE v044 LAWS (the box, simplified - the owner's rollback round: "we
+## should not support web or native games ... we should not make a
+## discover or github-backed infra ... no importin, no downloading, no
+## internet updates ... make this as v044")
+
+> The v043 platform laws above (the tiers, the catalog, the version
+> ledger, the runner doors, the self-update, the delivery of pilots) are
+> RETIRED HISTORY — the machinery they describe is deleted from the
+> engine. Do not resurrect any of it. What survived: THE EMPTY BINARY
+> LAW, THE GOGAs HOME LAW, the mount law (replace_files=false), the age
+> door + the content tags + the chip law, the boot design laws, the
+> GOGAs delivery beside the artifacts, the whole LAN stack minus its
+> online leg.
+
+136. THE GAME FOLDER LAW: a game is `GOGAs/games/<id>/` — the folder
+     name IS the id; `game.json` is the name file (title, os, age,
+     content, genres, fee, price, shop, reveal, lan, ach, controls,
+     thumb, script); `game.pck` is THE ONE ENTRY (one name everywhere);
+     `thumb.png` is the feed tile. Everything else in the folder belongs
+     to the game — the box never reads, never validates, never polices.
+137. THE SCAN LAW: the engine's whole "validation" is two file reads —
+     a folder without `game.pck` is not a game (not a refusal, not an
+     error), a pack without a manifest still plays wearing its folder
+     name. No id scheme, no tiers, no version ledger, no data/save
+     minimums, no .goga/.gogas, no import dialog, no ADD SOURCE.
+138. THE ONE-PACK LAW: one platform-neutral `game.pck` per game (pure
+     GDScript 2D packs run everywhere); the mount law holds
+     (replace_files=false — the box's own paths can never be shadowed).
+     THE CLASS BRIDGE rides the packer: a pack's class_names never reach
+     the box's global class cache, so each sibling class gets a local
+     `const C := preload(...)` and the static self-factories go untyped
+     — without it, typed annotations degrade to Variant and every
+     `:=` inference on them dies at parse time (the deathworm class).
+139. THE PLATFORM TRUTH: `game.json` "os" is the whole story — a game
+     missing this device wears the dead button PHONE ONLY / PC ONLY with
+     the one-line why ("this one is built for the phone only"). The
+     launcher never refuses a mount for platform reasons; the MENU is
+     the gate. A dead button carries no coin icon (it costs nothing).
+140. THE LOCAL LAN LAW: the session lives on the wifi's address; the
+     join sheet takes the host's address; there is no UPnP/NAT-PMP/PCP
+     mapping, no room codes, no ONLINE states, no internet play. The
+     session core (rooms, holds, relays, chat, voice, faces, locks,
+     declines) is untouched.
+141. THE OFFLINE LAW: the box makes zero web calls — no discover, no
+     downloads, no update checks, no version pings. The INTERNET
+     permission rides the LAN peer sockets only. REQUEST_INSTALL_PACKAGES
+     is gone (no self-update to install).
+142. THE SDK IS OPTIONAL: `GOGA.coins_*` / `save_*` / `data_*` /
+     `visual_override` are in-process doors that point INSIDE the game's
+     own folder (the save door creates `save/` on first write). The TCP
+     bridge, the WebSocket bridge and the native ABI are deleted — a
+     Godot game talks to the box in-process or not at all.
+143. THE TEXT LAW (the owner: "remove the AISlop extra text ... make it
+     sound more natural"): menus carry labels and one-line helps. No
+     honesty walls, no store lectures, no feature tours. The empty-home
+     note is one line ("No games found - put game folders in ...").
+144. THE DELIVERY LAW (v044 shape): the exe is the ENGINE ONLY (CI
+     guards the floor — game bytes back inside the binary fail the
+     build); the Windows zip carries `GOGAs/` beside the exe; the
+     Android artifact ships the `GOGAs` zip for the Downloads
+     placement. The repo's `GOGAs/games/` tree IS the shipping set.

@@ -257,21 +257,20 @@ jobs:
           cd .. && mv "GOGAs-official-${V}.zip" stage/
           ls -la stage/
 
-      # THE SMALL DELIVERY LAW (v0.4.0-17, the owner: "213 MBs ... x2.2 the
-      # size of one apk ... there is something like compressing"): the
-      # slim-pack rounds did their part - every wav source is ogg, every 2D
-      # texture is lossless (tools/v0417_slim_*.py) - so the zip must stay
-      # lean. The artifact ships THE ZIP ONLY: the raw exe inside it is the
-      # engine (the official 32-bit template is ~116 MB of fixed
-      # D3D12/ANGLE/Vulkan floor) + the game, and shipping both twice made
-      # the old artifact ~360 MB. Guard: a re-fattened pack fails CI.
-      - name: THE SMALL DELIVERY LAW - the zip is what ships and it stays lean
+      # THE SMALL DELIVERY LAW (v0.4.0-17, v044 shape): the EXE itself is
+      # the engine only (the official 32-bit template is ~116 MB of fixed
+      # D3D12/ANGLE/Vulkan floor) - zero game bytes inside (THE EMPTY
+      # BINARY LAW). The games ride BESIDE it as GOGAs/ (~82 MB of packs).
+      # The exe floor guard fails on any game byte sneaking back in; the
+      # zip ceiling covers the engine + the shipping game set.
+      - name: THE SMALL DELIVERY LAW - the exe stays empty, the games ride beside
         run: |
           F="projects/build/GOGABox.exe"
           Z="$(ls stage/GOGABox-windows-*.zip | head -1)"
           ZS="$(stat -c%s "$Z")"
           ES="$(stat -c%s "$F")"
-          [ "$ZS" -lt 175000000 ] || { echo "::error::the delivery re-fattened ($ZS bytes) - the slim-pack laws are being violated"; exit 1; }
+          [ "$ES" -lt 120000000 ] || { echo "::error::the exe re-fattened ($ES bytes) - game bytes are back inside the binary"; exit 1; }
+          [ "$ZS" -lt 250000000 ] || { echo "::error::the delivery re-fattened ($ZS bytes) - the slim-pack laws are being violated"; exit 1; }
           GZ="$(ls stage/GOGAs-official-*.zip | head -1)"
           GZS="$(stat -c%s "$GZ")"
           echo "THE DELIVERY: exe $ES bytes | windows zip $ZS bytes | GOGAs zip $GZS bytes"

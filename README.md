@@ -1,96 +1,71 @@
 # GOGABox
 
-GOGABox is an open-source game platform for Android and Windows: a
-lightweight launcher, a discovery store and a runtime engine in one
-application. The app itself ships without games. Games are delivered as
-open, folder-based packages that anyone can inspect, modify and publish —
-from a terminal, an editor or an AI agent.
+GOGABox is an open-source game box for Android and Windows: one small
+application that holds your games, your coins, your saves and your
+progress. The app itself contains zero games — every game is a plain
+folder that lives beside it, so the box stays light and the games stay
+yours.
 
-Licensed under MIT. No ads, no accounts, no tracking, no DRM, no servers
-of ours.
+Licensed under MIT. No ads, no accounts, no tracking, no servers, no
+internet features of any kind — LAN multiplayer runs on your own wifi.
 
 ## How it works
 
-**The application is an engine.** The binary contains the feed, the
-search, the wallet (GOGACoins), the achievements, the LAN multiplayer and
-the package runtime — but zero games. Every game arrives as a package:
+**The application is the box.** The binary contains the game feed, the
+search, the GOGACoin wallet, the achievements, the profile and the LAN
+multiplayer — but zero games. Every game is a folder:
 
 ```
-my-game/                      a GOGA package (a plain folder)
-├── index/index.json          the manifest: id, title, version, age,
-│                             genres, platform builds, thumbnail
-├── game/                     the runnable build (Godot .pck, a native
-│                             binary, or a web entry .html)
-├── discover/                 the store-page material (text, media)
-├── data/                     plain, moddable game data (JSON logic,
-│                             audio, visuals, shaders)
-└── save/                     portable saves — live inside the package
+GOGAs/games/<game-id>/     one folder per game
+├── game.json              the game's name and details
+├── game.pck               the game itself (the one file the box launches)
+└── thumb.png              the tile picture shown in the feed
 ```
 
-Packages are installed from the built-in discovery feed, from a `.goga`
-(single game) or `.gogas` (collection) archive, or from any local folder.
-Everything installs into the player's **GOGAs** folder — next to the
-executable on Windows, in `Downloads/GOGAs/` on Android — and that folder
-belongs to the player: games, saves and mods included.
+The folder name is the game's id. The name lives in `game.json`. The rest
+of the folder belongs to the game — its saves, its data files, whatever it
+wants. The box reads two files, launches one, and never checks or polices
+anything else.
 
-**Discovery is decentralized.** The engine reads package indexes over
-plain HTTP (GitHub raw URLs; the GitHub API is never used, so there are no
-rate-limit problems). This repository is the first official source.
-Community repos publish by opening a pull request that adds one line to
-`GOGAs/discover/REPOS.txt`; a CI workflow validates the linked repo's
-index before it merges. Anyone can also add a local folder as a source —
-including a "virtual repo" layout that simulates the full GitHub flow
-offline, which is how developers test before publishing.
+**Where the folder goes.** On Windows the `GOGAs` folder sits next to
+`GOGABox.exe` (the release zip already ships them together — unzip and
+run). On Android it sits at `Downloads/GOGAs`. Adding a game is the same
+on both: drop the folder in, start the box. Removing a game is deleting
+its folder. Sharing a game is sharing the folder.
 
-**Three tiers, hardcoded in the engine:** `official` (this repository's
-packages), `community` (listed in `REPOS.txt`, CI-verified) and
-`hobbyist` (everything else). There is no developer account system.
-
-**Games run through the box, never around it.** Godot games load in-process
-from their `.pck`; native games launch as child processes and talk to the
-box over localhost (the same model as the Steam API); web games (Godot
-HTML5 or plain HTML/three.js) run in an in-app browser view with a
-JavaScript bridge — no pop-up tabs, no redirects. A small C ABI
-(`sdk/native/`) lets any native game integrate coins, saves and
-achievements.
+**Everything the box does, it does offline.** No downloads, no updates to
+check, no accounts to reach. The only network traffic GOGABox ever makes
+is the LAN multiplayer session you start yourself.
 
 ## Repository layout
 
 | path | what |
 |---|---|
-| `projects/gogabox/` | the application (Godot 4.7): engine, store, package runtime |
-| `GOGAs/` | the official package source: committed packages + discovery manifest |
-| `developers/` | the developers catalog — SDK reference, packaging, publishing, modding |
-| `sdk/` | the Godot SDK plugin and the native C ABI header + reference client |
-| `packaging/` | per-game packaging sources for the official packages |
-| `archive/games_v042/` | the last generation of built-in games, preserved whole |
-| `tools/` | bootstrap, test runner, packaging rig, CI validators |
+| `projects/gogabox/` | the application (Godot 4.7) |
+| `GOGAs/games/` | the shipping set of games — 31 folders, one per game |
+| `developers/` | how to make games for GOGABox, and how to use the coins and the LAN |
+| `archive/games_v042/` | the original source archive the games were ported from |
+| `tools/` | bootstrap, test runner, the game packer |
 | `docs/` | project documentation and planning notes |
-| `AGREEMENT.md` | end-user and developer agreements |
-| `REPORTING.md` | how bug reports work |
+| `AGREEMENT.md` | the plain end-user agreement |
 
 ## Getting started
 
 ### Players
 
-Install the app and it already carries the official games: the Windows
-zip ships the `GOGAs` folder next to `GOGABox.exe` (unzip, run), and on
-Android you extract the `GOGAs-official` zip so the folder lands at
-`Downloads/GOGAs` — the release page lists both, and the app itself
-reminds you where the folder goes if it boots without it. From there,
-open the discovery feed (the arrow next to **All Games**), download
-more, play. The age field in your profile only gates the play button on
-age-rated games — browsing, downloading and owning are unrestricted.
-See `REPORTING.md` if something is broken.
+Grab the release for your platform. Windows: unzip, run — the games are
+already next to the exe. Android: install the APK, extract the `GOGAs`
+zip into `Downloads`, done. The age field in your profile only gates the
+play button on age-rated games; everything else in the box is
+unrestricted.
 
-### Developers
+### Making a game
 
-Start at `developers/README.md`. The short path: read
-`developers/PACKAGING.md`, copy one of the official packages under
-`GOGAs/games/` as a template, validate it with
-`python3 tools/goga_ci_validate.py tree`, then publish via pull request
-(`developers/PUBLISHING.md`). Modding existing games is a first-class
-workflow — see `developers/MODDING.md`.
+Start at `developers/README.md`. The short version: build your game in
+Godot 4 as a script that extends the box's `GameBase`, pack it with
+`tools/v044_package.py`, and you get a folder you can play, keep or
+share. GOGACoins, achievements and LAN seats are optional doors your game
+can walk through — or ignore completely.
 
 ### Building from source
 
@@ -100,23 +75,19 @@ Ubuntu (24.04 tested) with `curl unzip zip jq python3`:
 git clone https://github.com/HAKORADev/GOGABox.git
 cd GOGABox
 ./tools/bootstrap.sh          # installs JDK 17, Android SDK, Godot 4.7.2 (cached in .cache/)
-./tools/test.sh gogabox       # headless integration tests
+./tools/test.sh gogabox       # headless integration tests (boots every game)
 ./build.sh gogabox            # release APKs (arm32 + arm64) into dist/
 ```
 
-Windows builds run on GitHub Actions for every push (the
-`GOGABox-windows` zip artifact carries the exe and the official GOGAs
-tree together; `GOGAs-official` is the same tree zipped alone for the
-Android Downloads placement), and the same commands work locally with
-the Windows export templates. The pinned toolchain versions live in
+Windows builds run on GitHub Actions for every push: the
+`GOGABox-windows` zip artifact carries the exe and the `GOGAs` folder
+together, and `GOGAs-official` is the same folder zipped alone for the
+Android Downloads placement. The pinned toolchain versions live in
 `config/environment.lock`; everything is scripted, so CI and local builds
 are identical.
 
 ## Contributing
 
-Bug reports go through GitHub issues — see `REPORTING.md` for what a good
-report contains (a game id, when the report is about a game). Game changes
-and new packages are pull requests. The agreements in `AGREEMENT.md`
-describe what players and developers can expect from each other; the
-short version is that everything here is open by construction and stays
-that way.
+Issues for bugs, pull requests for fixes. Games live as folders — if you
+make one that runs in the box, it is a game for the box; how you share it
+is up to you.
