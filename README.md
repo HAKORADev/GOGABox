@@ -1,5 +1,9 @@
 # GOGABox 📦
 
+<p align="center">
+  <img src="projects/gogabox/g-logo.png" alt="GOGABox Logo" width="128" height="128"/>
+</p>
+
 Hey! GOGABox is an open-source game box for Android and Windows — one
 small app that holds your games, your coins, your saves and your
 progress. The app itself ships with zero games: every game is a plain
