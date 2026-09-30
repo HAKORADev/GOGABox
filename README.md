@@ -1,7 +1,7 @@
 # GOGABox 📦
 
 <p align="center">
-  <img src="projects/gogabox/g-logo.png" alt="GOGABox Logo" width="128" height="128"/>
+  <img src="projects/gogabox/icons/main_512x512.png" alt="GOGABox Logo" width="128" height="128"/>
 </p>
 
 Hey! GOGABox is an open-source game box for Android and Windows — one

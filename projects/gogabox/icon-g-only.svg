@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-<circle cx="64" cy="46" r="52" fill="#5a3719" opacity="0.45"/>
-<text x="64" y="100" font-family="monospace" font-size="104" font-weight="bold"
- text-anchor="middle" fill="#ffb020" stroke="#7a4a14" stroke-width="4">G</text>
-<circle cx="100" cy="98" r="9" fill="#a06e14"/><circle cx="100" cy="98" r="6.6" fill="#ffc93c"/>
-</svg>
