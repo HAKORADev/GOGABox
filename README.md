@@ -1,17 +1,17 @@
-# GOGABox
+# GOGABox 📦
 
-GOGABox is an open-source game box for Android and Windows: one small
-application that holds your games, your coins, your saves and your
-progress. The app itself contains zero games — every game is a plain
+Hey! GOGABox is an open-source game box for Android and Windows — one
+small app that holds your games, your coins, your saves and your
+progress. The app itself ships with zero games: every game is a plain
 folder that lives beside it, so the box stays light and the games stay
-yours.
+yours. Add them, share them, mod them — they're just folders.
 
 Licensed under MIT. No ads, no accounts, no tracking, no servers, no
 internet features of any kind — LAN multiplayer runs on your own wifi.
 
-## How it works
+## 🎮 How it works
 
-**The application is the box.** The binary contains the game feed, the
+**The app is the box.** Inside the binary lives the game feed, the
 search, the GOGACoin wallet, the achievements, the profile and the LAN
 multiplayer — but zero games. Every game is a folder:
 
@@ -44,7 +44,7 @@ Open the file in any text editor, change a word, restart the box.
 check, no accounts to reach. The only network traffic GOGABox ever makes
 is the LAN multiplayer session you start yourself.
 
-## Repository layout
+## 🗂️ Repository layout
 
 | path | what |
 |---|---|
@@ -55,7 +55,7 @@ is the LAN multiplayer session you start yourself.
 | `docs/` | project documentation and planning notes |
 | `AGREEMENT.md` | the plain end-user agreement |
 
-## Getting started
+## 🚀 Getting started
 
 ### Players
 
@@ -95,7 +95,7 @@ Android Downloads placement. The pinned toolchain versions live in
 `config/environment.lock`; everything is scripted, so CI and local builds
 are identical.
 
-## Contributing
+## 🤝 Contributing
 
 Issues for bugs, pull requests for fixes. Games live as folders — if you
 make one that runs in the box, it is a game for the box; how you share it
